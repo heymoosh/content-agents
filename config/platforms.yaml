@@ -1,0 +1,48 @@
+# Per-platform format rules. validate.ts enforces hard limits; Claude follows style notes when drafting.
+platforms:
+  x:
+    max_chars: 280
+    derivative_count: [3, 5]
+    style: >
+      Short claims or provocations. Pick the sharpest sentence from the source and
+      trim for 280-char energy. No hashtag spam; 0-1 hashtags max.
+  linkedin:
+    max_chars: 3000
+    derivative_count: [1, 2]
+    style: >
+      Lesson post, left-aligned narrative, practitioner voice. Insight-driven,
+      not link-dump. Short paragraphs, line breaks between thoughts.
+  bluesky:
+    max_chars: 300
+    derivative_count: [1, 2]
+    style: >
+      Like X but slightly more casual and observational. Civic/tech audience,
+      less algorithmic pressure.
+  community:
+    max_chars: 1500
+    derivative_count: [1, 1]
+    style: >
+      Conversational, specific to the community (see communities below). Shorter than
+      LinkedIn. Reads like a member sharing, never like marketing.
+  video-script:
+    max_words: 220        # ~60-90s at normal speaking pace
+    style: >
+      Hook in first line, 1-2 main points, call to action. Direct, thoughtful,
+      not hype-y. Written to be spoken aloud.
+  quote-card:
+    max_chars: 180
+    style: One or two quotable lines pulled verbatim from the source.
+
+communities:
+  moral-ambition:
+    notes: Broad community on moral ambition as a life philosophy. Civic and social good angle.
+  democratic-resilience:
+    notes: >
+      Subgroup inside Moral Ambition focused on U.S. democracy, elections, civic action.
+      Strongest traction for the voting tool. Be specific and action-oriented here.
+  women-in-product:
+    notes: Technical builder POV, AI-native product work. Professional credibility angle.
+  abc-builders:
+    notes: AI builder community. Presence not yet established — observe before posting heavily.
+  lennys:
+    notes: Product strategy, growth. Selective and occasional engagement only.

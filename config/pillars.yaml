@@ -1,0 +1,34 @@
+# The 3 content pillars. Single rubric for tagging posts (Build 0) and content (Build 1).
+# Claude reads this file when tagging — keep descriptions and signals current.
+pillars:
+  - id: human-ai
+    name: Human-centered AI
+    description: >
+      What "more human" actually means — kind, egalitarian, inclusive AI.
+      Practical tools for social good. AI ethics in practice, not in the abstract.
+    signals:
+      - inclusive/egalitarian AI futures
+      - AI for social good
+      - critiques of hype-driven AI culture
+      - designing AI products around people
+  - id: claude-code
+    name: Claude Code / solo builder workflows
+    description: >
+      Real lessons from building with AI as a solo developer. Claude Code workflows,
+      solo product discipline, agent orchestration, build logs.
+    signals:
+      - Claude Code tips, skills, agents, automation
+      - solo dev discipline and process
+      - build-in-public logs
+      - AI-assisted engineering lessons
+  - id: civic-tech
+    name: Civic tech & the voting tool
+    description: >
+      Nonpartisan ballot research, the voter choice tool, democratic participation,
+      AI in civic life. Action-oriented democracy content.
+    signals:
+      - voting tool updates and demos
+      - ballot research, election information access
+      - civic action, democratic resilience
+      - nonpartisan civic AI
+# Anything that fits none of the above gets pillar "other".

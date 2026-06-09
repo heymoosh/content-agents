@@ -1,0 +1,17 @@
+node_modules/
+.env
+data/analytics.db
+data/inbox/**
+!data/inbox/**/.gitkeep
+data/processed/**
+!data/processed/.gitkeep
+data/cost-log.csv
+content/**/video/*.mp4
+content/**/video/*.wav
+content/**/video/*.mp3
+content/**/images/*.png
+content/**/images/*.jpg
+.remotion/
+out/
+*.log
+.DS_Store
