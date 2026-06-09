@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
 
 // Validate every derivative in a content folder against config/platforms.yaml.
 //   tsx src/atomize/validate.ts content/2026-06-09-some-post
@@ -10,12 +11,6 @@ import { repoRoot } from "../db/db.js";
 interface PlatformRule {
   max_chars?: number;
   max_words?: number;
-}
-
-function splitFrontmatter(text: string): { fm: Record<string, unknown>; body: string } {
-  const m = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  if (!m) return { fm: {}, body: text };
-  return { fm: (parse(m[1]) as Record<string, unknown>) ?? {}, body: m[2].trim() };
 }
 
 function main() {
