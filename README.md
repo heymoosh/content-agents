@@ -23,10 +23,12 @@ folder too. One window, one folder, that's the whole system.
    |---|---|---|
    | *(none)* | Analytics import + strategy briefs + text derivatives | works today |
    | `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | auto-fetch Bluesky stats | 2 min, do early |
-   | `GEMINI_API_KEY` | quote-card backgrounds, video images, voice-memo transcription | when you want images |
+   | `GEMINI_API_KEY` | quote-card backgrounds, video scene images, voice-memo transcription | when you want images |
+   | `OPENROUTER_API_KEY` | Grok writes the hook-driven video script | when you want video |
+   | *local video tools* | voiceover (Kokoro) + captions (whisper.cpp) — no API key, but installs | when you want video — see `docs/setup-kokoro.md` |
    | `TYPEFULLY_API_KEY` | scheduled posting to X + LinkedIn + Bluesky | when ready to publish — see `docs/setup-typefully.md` |
-   | `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` | video voiceover | when/if you settle on the video stack |
    | `YOUTUBE_*` | auto-upload Shorts | with video — see `docs/setup-youtube-oauth.md` |
+   | `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` | *fallback* voiceover if you don't like Kokoro | only if you swap `tts: elevenlabs` in `config/providers.yaml` |
 
 3. Connect your accounts inside Typefully once (X, LinkedIn, Bluesky) — that's what makes
    one API cover three platforms.
@@ -60,21 +62,45 @@ folder too. One window, one folder, that's the whole system.
 Plain scripts (Claude runs these for you, but they work standalone): `npm run ingest`,
 `npm run bluesky`, `npm run snapshot`, `npm run resonance`, `npm run render`, `npm run publish:*`.
 
-## Video status
+## Video: essay → auto-short
 
-Text + image posts work end-to-end today. The video pipeline is **built and tested**
-(Remotion render: 9:16, AI voiceover, word-by-word captions, generated B-roll, ~$0.15–0.30
-per video) but voiceover needs a TTS provider — currently wired for ElevenLabs, swappable in
-`config/providers.yaml` + one adapter file if you choose a different stack. Remotion itself
-is HTML/CSS/React-based rendering, so it composes with whatever direction you land on.
-Until then, `/atomize` simply skips video and notes it in the review queue.
+Text + image posts work today with no extra setup. Video is the part that needs a one-time
+install, because voiceover runs **locally and free** (Kokoro) instead of a paid API.
+
+**How the video flow works** (the point: you steer with words, not by dictating every shot):
+
+1. `/atomize <your essay>` — Grok drafts a 60–90s hook-driven script, then Claude storyboards
+   it into 5–7 scenes (one visual per scene, styled from `config/style.yaml`) and writes
+   `content/<slug>/video/storyboard.md`. **It stops here. Nothing is generated yet.**
+2. **You read the storyboard as text** (~30 sec) — the cheap checkpoint. Edit any scene, then
+   set the `storyboard` row in `review-queue.md` to `approve` (or `revise` + a note).
+3. `npm run render -- --render-video content/<slug>` — only now does it spend: generates the
+   scene images, voiceover, captions, and the final 9:16 MP4 + thumbnail. (Claude runs this for
+   you once you approve; it refuses to run while the storyboard is still `pending`.)
+
+Bad scene direction costs nothing to fix (it's just text); a bad image costs ~$0.02; voice is
+free. Video scripts are the one place the system writes *for* you — it drafts from your essay's
+ideas, and you approve every storyboard before anything renders.
+
+**One-time video setup** — follow `docs/setup-kokoro.md`. In short:
+- Set `OPENROUTER_API_KEY` (Grok, the script writer) and `GEMINI_API_KEY` (scene images).
+- Run **Kokoro** for voiceover — easiest is one Docker command (kokoro-fastapi).
+- Install **whisper.cpp** (+ a model) and **ffmpeg** — these turn the voiceover into
+  word-by-word captions. (Kokoro doesn't emit timing; whisper.cpp recovers it.)
+- Don't like Kokoro's voice? Set `tts: elevenlabs` in `config/providers.yaml`, add
+  `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID`, and the whisper/ffmpeg steps are skipped.
+
+Until the video tools are installed, `/atomize` still does text + images and notes video as
+skipped in the review queue.
 
 ## Costs (steady state)
 
 - Typefully paid plan (API access) — you've opted in
-- ElevenLabs ~$6/mo — only when video starts
-- Gemini pay-per-use — pennies (images $0.02 each)
-- Everything else (Remotion, Bluesky, YouTube, this repo) — free
+- Gemini pay-per-use — pennies (scene/quote-card images $0.02 each)
+- OpenRouter (Grok script) — ~$0.01 per video
+- Voiceover — **free** (Kokoro runs locally); ElevenLabs ~$6/mo only if you swap to it
+- Everything else (Remotion, whisper.cpp, Bluesky, YouTube, this repo) — free
+- Every generated dollar is logged in `data/cost-log.csv`
 
 ## When something breaks
 

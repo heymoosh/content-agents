@@ -14,13 +14,16 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { logCost } from "../util/cost-log.js";
 import { getImage, getTTS, isEnabled } from "../providers/registry.js";
 import { charsToWordCaptions } from "./captions.js";
+import { charsOrWhisper } from "./align.js";
 
 // Render assets for a content folder.
 //   tsx src/video/render.ts --still <content-folder> --quote <derivative-name>
-//   tsx src/video/render.ts --video <content-folder>
-// Video mode expects:
-//   derivatives/video-script.md      (the spoken script — written during /atomize)
-//   video/image-prompts.txt          (one image prompt per line — written during /atomize)
+//   tsx src/video/render.ts --render-video <content-folder>   (storyboard-driven; gated on approval)
+//   tsx src/video/render.ts --video <content-folder>          (low-level; expects the two files below)
+// --video mode expects:
+//   derivatives/video-script.md      (the spoken script)
+//   video/image-prompts.txt          (one image prompt per line)
+// --render-video derives both of those from an APPROVED video/storyboard.md, then runs --video.
 
 const PUBLIC_DIR = join(repoRoot, "remotion", "public");
 const ENTRY = join(repoRoot, "remotion", "index.ts");
@@ -111,16 +114,13 @@ async function renderVideo(folder: string): Promise<void> {
       outPath: audioPath,
     });
     logCost({ step: `tts:${tts.name}`, detail: slug, costUsd: ttsCost });
-    if (!charTimestamps) {
-      throw new Error(
-        `${tts.name} returned no character timestamps — captions need alignment. ` +
-          `Add a forced-alignment step (whisper.cpp) or use a provider with timestamps.`
-      );
-    }
-    writeFileSync(join(videoDir, "alignment.json"), JSON.stringify(charTimestamps));
+
+    // Providers without char timestamps (e.g. Kokoro) get a Whisper forced-alignment pass.
+    const aligned = await charsOrWhisper(charTimestamps, audioPath);
+    writeFileSync(join(videoDir, "alignment.json"), JSON.stringify(aligned));
 
     // 2. Captions
-    const captions = charsToWordCaptions(charTimestamps);
+    const captions = charsToWordCaptions(aligned);
     writeFileSync(join(videoDir, "captions.json"), JSON.stringify(captions, null, 2));
     const durationMs = captions[captions.length - 1].endMs + 800;
 
@@ -175,6 +175,73 @@ async function renderVideo(folder: string): Promise<void> {
   });
 }
 
+// Read the status of the storyboard row in review-queue.md (the canonical approval gate).
+// Columns: id | platform | format | asset | native | brand | cta | status | notes.
+function storyboardStatus(folder: string): string | null {
+  const queuePath = join(folder, "review-queue.md");
+  if (!existsSync(queuePath)) return null;
+  for (const line of readFileSync(queuePath, "utf8").split("\n")) {
+    if (!line.trim().startsWith("|")) continue;
+    const cells = line.split("|").map((c) => c.trim());
+    // cells[0] is empty (leading |); shift so format=cells[3], status=cells[8].
+    if (cells[3] === "storyboard") return cells[8] ?? "";
+  }
+  return null;
+}
+
+// Derive the low-level render inputs from an APPROVED storyboard, then run --video.
+async function renderVideoFromStoryboard(folder: string): Promise<void> {
+  const sbPath = join(folder, "video", "storyboard.md");
+  if (!existsSync(sbPath)) {
+    throw new Error(`missing ${sbPath} — run /atomize step 7a to write the storyboard first.`);
+  }
+
+  const status = storyboardStatus(folder);
+  if (status === null) {
+    throw new Error(
+      `no storyboard row in ${join(folder, "review-queue.md")} — run /atomize step 7a first.`
+    );
+  }
+  if (status !== "approve") {
+    throw new Error(
+      `storyboard not approved (status="${status}") — review video/storyboard.md and set the ` +
+        `storyboard row to "approve" in review-queue.md before rendering. No paid generation runs until then.`
+    );
+  }
+
+  const { fm, body } = splitFrontmatter(readFileSync(sbPath, "utf8"));
+
+  // Script = everything under "## Script" up to the next "## " heading.
+  const scriptMatch = body.match(/##\s+Script\s*\n([\s\S]*?)(?:\n##\s|$)/);
+  const script = scriptMatch?.[1].trim();
+  if (!script) throw new Error(`${sbPath}: could not find a "## Script" section`);
+
+  // Visual prompts = every "- visual:" line, in order.
+  const visuals = body
+    .split("\n")
+    .map((l) => l.match(/^\s*-\s*visual:\s*(.+)$/i)?.[1]?.trim())
+    .filter((v): v is string => Boolean(v));
+  if (visuals.length === 0) {
+    throw new Error(`${sbPath}: no "- visual:" lines found — each scene needs one.`);
+  }
+
+  // derivatives/video-script.md (validate.ts exempts video-script from source_lines).
+  const scriptPath = join(folder, "derivatives", "video-script.md");
+  mkdirSync(join(folder, "derivatives"), { recursive: true });
+  const sourceRef = fm.source_ref ? String(fm.source_ref) : "video/storyboard.md";
+  writeFileSync(
+    scriptPath,
+    `---\nplatform: video-script\nsource_ref: ${sourceRef}\n---\n\n${script}\n`
+  );
+
+  // video/image-prompts.txt (one per line — what --video reads).
+  mkdirSync(join(folder, "video"), { recursive: true });
+  writeFileSync(join(folder, "video", "image-prompts.txt"), visuals.join("\n") + "\n");
+
+  console.log(`derived from storyboard: ${visuals.length} scene(s) → image-prompts.txt + video-script.md`);
+  await renderVideo(folder);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const mode = args[0];
@@ -183,11 +250,13 @@ async function main() {
     const quoteIdx = args.indexOf("--quote");
     const quoteName = quoteIdx !== -1 ? args[quoteIdx + 1] : "quote-card-1";
     await renderStill(folder, quoteName);
+  } else if (mode === "--render-video") {
+    await renderVideoFromStoryboard(resolveFolder(args[1]));
   } else if (mode === "--video") {
     await renderVideo(resolveFolder(args[1]));
   } else {
     console.error(
-      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>]\n  tsx src/video/render.ts --video <content-folder>"
+      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>]\n  tsx src/video/render.ts --render-video <content-folder>\n  tsx src/video/render.ts --video <content-folder>"
     );
     process.exit(1);
   }

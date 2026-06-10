@@ -43,7 +43,9 @@ function main() {
       violations.push(`${file}: unknown or missing platform "${platform}" in frontmatter`);
       continue;
     }
-    if (!fm.source_lines) {
+    // Video scripts are the scoped exception to extraction-first (Grok-drafted from the
+    // essay's ideas, reviewed before render — see CLAUDE.md rule 1), so no source_lines.
+    if (platform !== "video-script" && !fm.source_lines) {
       violations.push(`${file}: missing source_lines frontmatter (extraction-first traceability)`);
     }
     if (rule.max_chars && body.length > rule.max_chars) {

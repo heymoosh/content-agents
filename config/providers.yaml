@@ -1,8 +1,8 @@
 # Provider selection — one line per capability.
 # Swapping providers = add an adapter file in src/providers/<capability>/ and change the name here.
 # "none" disables the capability (pipeline steps that need it are skipped).
-tts: elevenlabs
+tts: kokoro            # local + free; needs kokoro-fastapi + whisper.cpp (see docs/setup-kokoro.md). Swap to "elevenlabs" if quality disappoints.
 image: gemini-imagen
 transcription: gemini
-text-polish: none      # set to "grok-openrouter" to enable X-native polish via OpenRouter
+text-polish: grok-openrouter   # VIDEO SCRIPTS ONLY (atomize step 7a). Text posts stay extraction-first — see CLAUDE.md rule 1.
 video-broll: none      # future: "veo" (expensive, ~$2-6/video — deliberately off)

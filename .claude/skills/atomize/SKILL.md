@@ -49,8 +49,8 @@ for review. Muxin wrote the thinking; you package it.
      ---
      <the post text — nothing else>
      ```
-   - If `text-polish` is enabled in `config/providers.yaml`, X variants may be passed through
-     it for punch — but the polished text must still trace to source_lines; re-check after.
+   - Text derivatives are ALWAYS Claude-authored and extraction-first. Do NOT pass them
+     through `text-polish` — that provider (Grok) is reserved for video scripts only (step 7a).
 
 5. **Score honestly** (the frontmatter `scores`):
    - `native`: does this read like a real human post on that platform? (1–5)
@@ -61,19 +61,68 @@ for review. Muxin wrote the thinking; you package it.
 6. **Validate.** `npm run validate -- <folder>` — must pass before queueing. Fix violations,
    don't relax limits.
 
-7. **Generate assets** (each step skips gracefully if its API key is missing — note it in the
-   review queue):
-   - Quote cards: `npm run render -- --still <folder> --quote quote-card-1`
-   - Video: `npm run render -- --video <folder>` (TTS → captions → Remotion → MP4 + thumbnail
-     + title.txt + description.txt + transcript.txt). Write title/description yourself first
-     into `video/title.txt` + `video/description.txt` — extraction-first applies to these too.
+7. **Generate assets.** Quote cards first (cheap, extraction-first):
+   - `npm run render -- --still <folder> --quote quote-card-1`
 
-8. **Queue for review.** Fill `<folder>/review-queue.md` with one row per asset
+   Video is **two-phase** — the storyboard is reviewed as TEXT before any paid generation.
+
+   **7a — Script + storyboard (cheap; the only spend here is the Grok text call).**
+   Video scripts are the scoped exception to extraction-first (CLAUDE.md rule 1): Grok drafts
+   from the essay's *ideas*, not verbatim lines.
+   - Call the script writer (Grok via the `text-polish` provider) on the source/extracts with a
+     brief: a 60–90s, hook-first spoken script (hook in line 1, 1–2 points, CTA), ≤220 words,
+     conversational, not hype-y. (Use `getTextPolish().polish({ draft, platform: "video-script",
+     instructions })`, or invoke `text-polish` however the run plumbs it.) Sanity-check it stays
+     true to the essay's ideas — reject and re-prompt if it invents claims Muxin wouldn't make.
+   - Read `config/style.yaml`. Storyboard the script into **5–7 scenes**. For each scene write a
+     `beat` (one line), a `visual` (an Imagen prompt — concrete scene, ending with
+     `global.mood` + the matching pillar's `suffix` so all scenes share one look), and a
+     `motion` hint (`zoom-in` / `zoom-out` / `pan-left` / `pan-right`).
+   - Write `<folder>/video/storyboard.md`:
+     ```markdown
+     ---
+     kind: storyboard
+     pillar: human-ai
+     script_words: 78
+     source_ref: source.md
+     status: pending
+     ---
+     ## Script
+     <the spoken script>
+
+     ## Scenes
+     ### Scene 1
+     - beat: <what this scene covers>
+     - visual: <Imagen prompt … + style suffix>
+     - motion: zoom-in
+     ### Scene 2
+     ...
+     ```
+   - Add a **storyboard** row to `review-queue.md` (`format: storyboard`,
+     asset `video/storyboard.md`, status `pending`). **STOP for video here — generate NO images
+     or audio.** Tell Muxin to review the storyboard before it renders.
+
+   **7b — Render (only after the storyboard row is approved).**
+   - Write `video/title.txt` + `video/description.txt` (extraction-first applies to these).
+   - `npm run render -- --render-video <folder>` — refuses unless the storyboard row is
+     `approve`; then derives `derivatives/video-script.md` + `video/image-prompts.txt` from the
+     storyboard and runs TTS → (Whisper alignment if the voice has no timestamps) → captions →
+     images → Remotion → `video/short.mp4` + thumbnail + transcript.
+   - Add a **short** row to `review-queue.md` for `video/short.mp4` (status `pending`).
+   - (Each step notes in the queue if an API key/local dep is missing rather than failing the run.)
+
+8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset
    (id, platform, format, asset path, scores, status=pending). Then STOP. Do not publish.
    Tell Muxin: the folder path, asset counts, and anything skipped.
 
 ## --revise mode
 
-`/atomize --revise <folder>`: read `review-queue.md`, find rows with status `revise`, re-draft
-ONLY those derivatives using the `notes` column as instruction (extraction-first still applies),
-reset their status to `pending`, re-validate, and report.
+`/atomize --revise <folder>`: read `review-queue.md`, find rows with status `revise`, and act
+by `format`:
+- **Text derivatives / quote cards**: re-draft ONLY those using the `notes` column as
+  instruction (extraction-first still applies), re-validate.
+- **storyboard**: regenerate `video/storyboard.md` per the note (re-script via Grok and/or
+  re-storyboard) — this is the cheap checkpoint, so no image/audio spend.
+- **short** (MP4): re-run `npm run render -- --render-video <folder>` (delete
+  `images/video-*.png` first to force image regeneration past the cache).
+Reset revised rows to `pending`, re-validate, and report.

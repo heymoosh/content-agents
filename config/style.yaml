@@ -1,0 +1,29 @@
+# Visual style bible for video shorts. Consumed by Claude in /atomize step 7a:
+# when writing each scene's image prompt, append `global.mood` + the pillar's `suffix`
+# so all 5-7 scenes share one look (the main lever for cross-scene consistency).
+# Caption look mirrors the hardcoded values in remotion/Short.tsx (v1 documents intent;
+# wiring style.yaml INTO Short.tsx is deferred to v2).
+global:
+  aspect: "9:16"
+  palette: "deep indigo (#0c0c14) base, warm amber (#ffd34d) accents, soft and desaturated"
+  mood: "atmospheric, cinematic, minimal, shallow depth of field, no text, no logos, no watermarks, no captions baked in"
+  caption:
+    highlight: "#ffd34d"   # active-word karaoke highlight in Short.tsx
+    base_color: "white"
+    font_px: 64
+
+pillars:
+  human-ai:
+    motifs: "diverse human hands, warm faces, organic textures, people and machines in quiet harmony"
+    suffix: "soft warm cinematic lighting, indigo-to-amber palette, intimate human scale, hopeful"
+  claude-code:
+    motifs: "clean workshop desk, terminal glow, a single focused builder, tools and craft"
+    suffix: "moody desk lighting, calm focused mood, indigo screens with amber key light, uncluttered"
+  civic-tech:
+    motifs: "civic spaces, ballots and hands voting, hopeful public architecture, community"
+    suffix: "bright civic daylight, hopeful and nonpartisan, neutral, indigo-amber accents"
+
+  # Fallback for content tagged "other" (see pillars.yaml).
+  other:
+    motifs: "abstract conceptual imagery, evocative rather than literal"
+    suffix: "indigo-to-amber palette, cinematic, minimal, evocative"
