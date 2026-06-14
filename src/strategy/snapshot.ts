@@ -30,6 +30,17 @@ function engagement(p: PostStat): number {
   // replies weighted highest: real conversation > passive likes (per Build 0 goals)
 }
 
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+const HALF_LIFE_WEEKS = 4; // anti-fossilization: a win 4 weeks old counts half as much today
+
+// Recency-decayed engagement: same score, weighted by how recent the post is, so stale wins
+// visibly fade and the brief can't keep leaning on what worked months ago.
+function recencyWeightedEngagement(p: PostStat, now: number): number {
+  if (!p.posted_at) return engagement(p);
+  const ageWeeks = Math.max(0, (now - new Date(p.posted_at).getTime()) / WEEK_MS);
+  return engagement(p) * 0.5 ** (ageWeeks / HALF_LIFE_WEEKS);
+}
+
 function main() {
   const db = openDb();
   const posts = db
@@ -85,13 +96,13 @@ function main() {
       )}, reposts ${tot("reposts")}, clicks ${tot("clicks")}, new follows/subs ${tot("new_follows")}\n`
     );
     const top = [...withMetrics].sort((a, b) => engagement(b) - engagement(a)).slice(0, 5);
-    console.log(`Top posts by engagement (replies ×3, reposts ×2, likes ×1):\n`);
-    console.log(`| Eng | Imp | Likes | Re | RT | Pillar | Post |`);
-    console.log(`|---|---|---|---|---|---|---|`);
+    console.log(`Top posts by engagement (replies ×3, reposts ×2, likes ×1; RcEng = recency-weighted, ${HALF_LIFE_WEEKS}-wk half-life):\n`);
+    console.log(`| Eng | RcEng | Imp | Likes | Re | RT | Pillar | Post |`);
+    console.log(`|---|---|---|---|---|---|---|---|`);
     for (const p of top) {
       const text = (p.content_text ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ").slice(0, 80);
       console.log(
-        `| ${engagement(p)} | ${p.impressions ?? "-"} | ${p.likes ?? "-"} | ${p.replies ?? "-"} | ${
+        `| ${engagement(p)} | ${recencyWeightedEngagement(p, now).toFixed(1)} | ${p.impressions ?? "-"} | ${p.likes ?? "-"} | ${p.replies ?? "-"} | ${
           p.reposts ?? "-"
         } | ${p.pillar ?? "untagged"} | ${text}${p.url ? ` ([link](${p.url}))` : ""} |`
       );

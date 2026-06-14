@@ -30,11 +30,11 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
 |---|---|---|---|---|
 | Ingest analytics | files in `data/inbox/` | `npm run ingest`, `npm run bluesky` | — | rows in `data/analytics.db` |
 | Tag pillars | untagged posts exist | `npm run snapshot -- --untagged`, `tsx src/db/tag-posts.ts` | assign pillar per post (rubric: `config/pillars.yaml`) | `posts.pillar` |
-| Strategy | `/strategy` (weekly) | `npm run snapshot`, `npm run resonance` | synthesize brief, cite real posts | `briefs/YYYY-MM-DD-strategy-brief.md` |
-| Atomize | `/atomize <url\|file>` | `npm run new-content`, `npm run validate` | extraction-first drafting + scoring | `content/<slug>/derivatives/`, `review-queue.md` |
+| Strategy | `/strategy` (weekly) | `npm run grade-bets`, `npm run snapshot`, `npm run resonance`, `npm run link-bet` | grade last cycle's bets, then synthesize brief citing real posts; record new bets | `briefs/YYYY-MM-DD-strategy-brief.md`, `briefs/bets.md` |
+| Atomize | `/atomize <url\|file>` | `npm run new-content`, `npm run validate` | extraction-first drafting + scoring; record `from_brief`/`directives_applied` | `content/<slug>/derivatives/`, `review-queue.md` |
 | Assets | inside `/atomize` | `npm run render` | storyboard scenes + visual prompts (video script drafted by Grok); approved before render | `images/`, `video/storyboard.md`, `video/` |
 | Review | **Muxin, by hand** | — | — | statuses in `review-queue.md` |
-| Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, `ready-to-paste/`, `publish-log.md` |
+| Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
 | Whole cycle | `/cycle` | all of the above | orchestration | — |
 
 ## Conventions
@@ -46,6 +46,11 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
   `video/`, `ready-to-paste/`, `review-queue.md`, `publish-log.md`.
 - `data/community-log.md` is Muxin's append-only manual observation log — read it during
   `/strategy`, never edit it.
+- `briefs/bets.md` is the feedback loop's memory: `/strategy` writes a bet per recommendation and
+  grades the prior cycle's bets against fresh data (`npm run grade-bets`); `/publish` appends
+  append-only `Placed log` rows when assets ship; `npm run link-bet` stamps `posts.bet_id` once a
+  published post is matched to its analytics outcome. Committed every cycle (unlike `analytics.db`).
 - Channels with <4 weeks of data must be flagged INSUFFICIENT in briefs (computed by
-  `snapshot.ts`, not by judgment).
+  `snapshot.ts`, not by judgment). Recency-weighted engagement (`snapshot`/`resonance`, 4-wk
+  half-life) and `grade-bets` flags guard against fossilized strategy.
 - Secrets in `.env` only (see `.env.example`). Never commit `.env` or `data/analytics.db`.

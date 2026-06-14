@@ -9,7 +9,26 @@ Produce `briefs/<today>-strategy-brief.md` from the analytics DB + community log
 do the judgment; scripts do the numbers. Never invent metrics — every claim must cite a real
 post or number from the script output.
 
+**This brief is one turn of a loop, not a fresh start.** Before recommending anything new, you
+grade whether last cycle's bets paid off (Step 0). The `briefs/bets.md` ledger is the memory that
+makes `/cycle` compound instead of restarting every week.
+
 ## Steps
+
+0. **Grade the last cycle** (skip only if `briefs/` is empty — the very first run).
+   - Read the most recent prior brief in `briefs/` AND `briefs/bets.md`.
+   - Run `npm run grade-bets`. It scores every `open`/`carried` bet from analytics linked via
+     `posts.bet_id`: sample size, avg engagement vs. the platform reference, weeks open, a verdict,
+     and `SUGGEST_FLIP` / `SUGGEST_RETIRE` flags.
+   - **Match published posts to bets first if needed.** For bets whose `Placed log` rows aren't yet
+     reflected in the analytics (a post shipped last cycle now has metrics), find the analytics row
+     for each placed derivative — match by the placed row's text prefix + platform + approximate
+     date against `npm run snapshot` output. Write the matches back with
+     `npm run link-bet -- '<json [{id, bet_id}]>'`, then re-run `npm run grade-bets`.
+   - In `briefs/bets.md`, append a `grade:` line (with today's date + the cited numbers) under each
+     graded bet, update its `status` (`confirmed` / `failed` / `carried`), apply the
+     `underperform_streak` updates the script prints, and **act on every flag** (flip/retire it, or
+     write one sentence defending why you're keeping it — silence is not allowed).
 
 1. **Freshness check.** Run `npm run ingest` if `data/inbox/` has files. If `.env` has Bluesky
    creds, run `npm run bluesky`. If the DB is empty, stop and tell Muxin which exports to drop
@@ -32,6 +51,10 @@ post or number from the script output.
    # Strategy Brief — YYYY-MM-DD
    data_window: <earliest posted_at> → <today>
 
+   ## Last cycle scorecard
+   <from Step 0 — skip on the first run. Table: bet | type | claim | grade | numbers cited | new status>
+   <1-2 sentences: what we learned, what we're retiring/flipping, what we're still testing>
+
    ## Data confidence
    <verbatim table from snapshot — INSUFFICIENT channels get directional-only treatment>
 
@@ -39,14 +62,14 @@ post or number from the script output.
    <snapshot output + 2-3 sentences of your reading per channel>
 
    ## Topic resonance map
-   <resonance table + your interpretation; ignore cells with n<3>
+   <resonance table + your interpretation; ignore cells with n<3; where rc << raw avg, the win is aging out>
 
    ## Community signals
    <synthesis of community-log.md: what sparked conversation vs silence, per community>
 
    ## Recommendations
    1. [DO MORE] <pillar/format/channel> — evidence: <specific posts + metrics>
-   2. [TEST] <hypothesis worth one week of testing> — evidence: <why>
+   2. [TEST] <hypothesis worth testing> — evidence: <why>  (carry forward unresolved TESTs from the scorecard)
    3. [DO LESS] <what the data says isn't working> — evidence: <...>
 
    ## Directives for atomization
@@ -56,10 +79,33 @@ post or number from the script output.
    - hooks_that_worked: ["<verbatim opening lines from top posts>"]
    ```
 
-5. **Honesty rules.**
+   The `Directives for atomization` block must be **derived from the scorecard**: never carry a
+   directive that maps to a bet you just graded `failed`. Carry-forward TESTs that are still
+   unresolved so a hypothesis gets settled rather than forgotten.
+
+5. **Record this cycle's bets.** For each new recommendation, append a bet block to the `## Bets`
+   section of `briefs/bets.md` so next cycle can grade it:
+
+   ```markdown
+   ## bet:YYYY-MM-DD-NNN
+   brief: briefs/YYYY-MM-DD-strategy-brief.md
+   type: DO_MORE | TEST | DO_LESS
+   claim: "<the recommendation in one line>"
+   hypothesis_metric: <the measurable bar, e.g. "avg replies per claude-code X post > 4">
+   status: open
+   underperform_streak: 0
+   ```
+
+   (`/publish` appends `Placed log` rows here automatically when assets ship — leave those alone.)
+
+6. **Honesty rules.**
    - A channel flagged INSUFFICIENT gets at most a [TEST] recommendation, never [DO MORE].
-   - 2-3 recommendations max. If the data is too thin to support any, say exactly that and
+   - A bet graded on n<3 (insufficient-sample) may be carried as a TEST but NEVER promoted to a
+     [DO MORE] directive — thin data caps confidence.
+   - Every `SUGGEST_FLIP` / `SUGGEST_RETIRE` flag from `grade-bets` must be acted on or overridden
+     with one sentence of justification. No bet survives by inertia.
+   - 2-3 *new* recommendations max. If the data is too thin to support any, say exactly that and
      recommend consistent posting for N more weeks instead.
    - This brief informs Muxin's judgment; it does not replace it. Flag uncertainty plainly.
 
-6. Show Muxin a 3-bullet summary of the brief and where it was written.
+7. Show Muxin a 3-bullet summary of the brief, the scorecard verdicts, and where it was written.

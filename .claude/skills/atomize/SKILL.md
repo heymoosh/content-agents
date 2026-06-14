@@ -24,7 +24,10 @@ for review. Muxin wrote the thinking; you package it.
 
 2. **Read the latest strategy brief** in `briefs/` (highest date). Apply its
    `Directives for atomization` — pillar priority, channel emphasis, format notes, hooks that
-   worked. If no brief exists, proceed with defaults and note that in the review queue header.
+   worked. **Record which brief and which directives you acted on** in each derivative's
+   frontmatter (`from_brief`, `directives_applied`, see step 4) — that attribution is what lets
+   `/publish` log the bet and `/strategy` later grade whether it paid off. If no brief exists,
+   proceed with defaults and note that in the review queue header.
 
 3. **Tag + extract.** Identify the pillar(s) (rubric: `config/pillars.yaml`). List the 5–10
    most quotable/claimable sentences with their line numbers. Write these to
@@ -46,6 +49,8 @@ for review. Muxin wrote the thinking; you package it.
      source_lines: [12, 31-33]
      scores: { native: 4, brand: 5, cta: true }
      cta: https://...       # or none
+     from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
+     directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
      ---
      <the post text — nothing else>
      ```

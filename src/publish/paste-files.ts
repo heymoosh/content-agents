@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { readQueue, setStatus, appendPublishLog } from "./queue.js";
+import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 
 // Emit ready-to-paste files for platforms with no API (community posts, Substack teasers).
 //   tsx src/publish/paste-files.ts <content-folder>
@@ -33,6 +33,7 @@ function main() {
     writeFileSync(outPath, `# paste into: ${target}\n# delete these two header lines before posting\n\n${body}\n`);
     setStatus(folder, row, "published");
     appendPublishLog(folder, `${row.id} → ready-to-paste/${row.id}.txt (${target})`);
+    appendBetPlacement(folder, row.id, row.platform, `ready-to-paste/${row.id}.txt (${target})`, fm, body);
     console.log(`ready to paste: ${outPath} (${target})`);
   }
 }

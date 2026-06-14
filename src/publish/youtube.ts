@@ -2,7 +2,8 @@ import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { readQueue, setStatus, appendPublishLog } from "./queue.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
+import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 
 // Upload approved video rows to YouTube as Shorts (private by default — flip to public
 // in YouTube Studio after a spot-check, or set YOUTUBE_PRIVACY=public).
@@ -88,11 +89,18 @@ async function main() {
   if (!/#shorts/i.test(title)) title = `${title} #Shorts`;
   const description = readFileSync(descPath, "utf8").trim();
 
+  // The short's attribution lives in the video-script derivative's frontmatter (if present).
+  const scriptPath = join(folder, "derivatives", "video-script.md");
+  const { fm } = existsSync(scriptPath)
+    ? splitFrontmatter(readFileSync(scriptPath, "utf8"))
+    : { fm: {} as Record<string, unknown> };
+
   for (const row of approved) {
     const videoId = await uploadShort(videoPath, title, description);
     const url = `https://youtube.com/shorts/${videoId}`;
     setStatus(folder, row, "published");
     appendPublishLog(folder, `${row.id} → youtube ${url} (privacy: ${process.env.YOUTUBE_PRIVACY ?? "private"})`);
+    appendBetPlacement(folder, row.id, "youtube", url, fm, title);
     console.log(`uploaded: ${url}`);
   }
 }
