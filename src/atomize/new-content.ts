@@ -100,7 +100,7 @@ async function main() {
   );
   writeFileSync(
     join(dir, "review-queue.md"),
-    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n`
+    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n> Routing: see routing.md — only platforms the router marked \`include\` are queued below.\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n`
   );
   console.log(dir);
 }
