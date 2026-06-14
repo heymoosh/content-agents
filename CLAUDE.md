@@ -30,8 +30,9 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
 |---|---|---|---|---|
 | Ingest analytics | files in `data/inbox/` | `npm run ingest`, `npm run bluesky` | — | rows in `data/analytics.db` |
 | Tag pillars | untagged posts exist | `npm run snapshot -- --untagged`, `tsx src/db/tag-posts.ts` | assign pillar per post (rubric: `config/pillars.yaml`) | `posts.pillar` |
-| Strategy | `/strategy` (weekly) | `npm run grade-bets`, `npm run snapshot`, `npm run resonance`, `npm run link-bet` | grade last cycle's bets, then synthesize brief citing real posts; record new bets | `briefs/YYYY-MM-DD-strategy-brief.md`, `briefs/bets.md` |
-| Atomize | `/atomize <url\|file>` | `npm run new-content`, `npm run validate` | extraction-first drafting + scoring; record `from_brief`/`directives_applied` | `content/<slug>/derivatives/`, `review-queue.md` |
+| Strategy | `/strategy` (weekly) | `npm run grade-bets`, `npm run snapshot`, `npm run resonance`, `npm run link-bet`, `npm run route -- --all` | grade last cycle's bets, synthesize brief citing real posts, record new bets | `briefs/YYYY-MM-DD-strategy-brief.md`, `briefs/bets.md` |
+| Route | inside `/atomize` (+ `/strategy`) | `npm run route` | pillar tag drives it; Muxin still approves what's queued | `content/<slug>/routing.md` |
+| Atomize | `/atomize <url\|file>` | `npm run new-content`, `npm run validate` | extraction-first drafting + scoring; record `from_brief`/`directives_applied`; **only for routing `include` platforms** | `content/<slug>/derivatives/`, `review-queue.md` |
 | Assets | inside `/atomize` | `npm run render` | storyboard scenes + visual prompts (video script drafted by Grok); approved before render | `images/`, `video/storyboard.md`, `video/` |
 | Review | **Muxin, by hand** | — | — | statuses in `review-queue.md` |
 | Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
@@ -53,4 +54,8 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
 - Channels with <4 weeks of data must be flagged INSUFFICIENT in briefs (computed by
   `snapshot.ts`, not by judgment). Recency-weighted engagement (`snapshot`/`resonance`, 4-wk
   half-life) and `grade-bets` flags guard against fossilized strategy.
+- Routing decides which platforms a piece is atomized to (`route.ts` + `config/routing.yaml`),
+  gating generation in `/atomize` — not "post everywhere." Data narrows it; cold-start posts
+  broadly to config defaults. Routing only gates what's *generated/queued*; Muxin's
+  `review-queue.md` approval is still the only thing that publishes.
 - Secrets in `.env` only (see `.env.example`). Never commit `.env` or `data/analytics.db`.

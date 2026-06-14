@@ -43,6 +43,8 @@ makes `/cycle` compound instead of restarting every week.
 3. **Run the numbers.**
    - `npm run snapshot` → channel performance + data-confidence table
    - `npm run resonance` → pillar × platform map
+   - `npm run route -- --all` → routing map (where each pillar should post; the include/skip
+     gate `/atomize` applies, from this data + `config/routing.yaml`)
    - Read `data/community-log.md` (manual observations — treat as qualitative signal)
 
 4. **Write the brief** to `briefs/YYYY-MM-DD-strategy-brief.md`:
@@ -63,6 +65,10 @@ makes `/cycle` compound instead of restarting every week.
 
    ## Topic resonance map
    <resonance table + your interpretation; ignore cells with n<3; where rc << raw avg, the win is aging out>
+
+   ## Routing map (what to post where)
+   <route --all table — which pillars route to which platforms, and why. Note where the
+    gate is data-driven vs cold-start. This is the include/skip rule /atomize enforces.>
 
    ## Community signals
    <synthesis of community-log.md: what sparked conversation vs silence, per community>

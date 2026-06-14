@@ -1,0 +1,25 @@
+# Editorial layer for the content router (src/strategy/route.ts).
+# Data (resonance) decides which platforms get a piece when there is enough of it;
+# this file fills cold-start gaps and encodes rules the data can't see yet.
+#
+# Routing targets are derivative platforms only: x, linkedin, bluesky, and
+# community:<id> (see config/platforms.yaml communities). Substack is the SOURCE
+# channel, not a target. video-script / quote-card are format assets — see
+# thresholds.always_consider; they are never platform-gated.
+
+defaults:                 # platforms to include per pillar while data is INSUFFICIENT (cold start)
+  human-ai:    [x, linkedin, bluesky]
+  claude-code: [x, linkedin, bluesky]
+  civic-tech:  [bluesky, x, community:democratic-resilience]
+  other:       [x]
+
+rules:                    # hard overrides applied AFTER the data decision
+  civic-tech:
+    always: [community:democratic-resilience]   # voting tool's strongest room — always route here
+  # claude-code:
+  #   never: [community:lennys]                  # example: never auto-route claude-code there
+
+thresholds:
+  min_posts_for_data: 3   # n below this (for a pillar on a platform) → treat as cold start
+  skip_below_score: 0.4   # normalized fit (0..1) under which a platform is skipped
+  always_consider: [video-script, quote-card]  # format assets, always generated, never gated

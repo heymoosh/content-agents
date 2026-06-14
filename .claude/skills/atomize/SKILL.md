@@ -43,11 +43,24 @@ for review. Muxin wrote the thinking; you package it.
    most quotable/claimable sentences with their line numbers. Write these to
    `<folder>/extracts.md` — this is the working material for every derivative.
 
+3.5. **Route — decide which platforms this piece is for.** Run
+   `npm run route -- --pillar <pillar> --folder <folder>` (once per tagged pillar). It writes
+   `<folder>/routing.md` and prints the include/skip decision per platform, informed by the
+   analytics (which platforms are receptive to this pillar) plus `config/routing.yaml`. Only
+   generate text derivatives in step 4 for platforms the router marked **`include`**; do not
+   produce assets for `skip` platforms — the point is to post where it makes sense, not
+   everywhere. If the piece spans two pillars, run the router per pillar and include a platform
+   if **either** pillar includes it. Layer the strategy brief (step 2) on top: the brief may
+   tighten further, but don't re-add a data-skipped platform without a stated reason.
+   Cold-start platforms come back `include` with low confidence — that's expected; routing
+   tightens as data accrues.
+
 4. **Generate text derivatives** into `<folder>/derivatives/` per `config/platforms.yaml`
-   (counts and style there):
-   - `x-1.md … x-5.md`, `linkedin-1.md`, `bluesky-1.md`
-   - Community variants ONLY for communities where the brief shows a reason to post, e.g.
-     `community-democratic-resilience.md`. Respect `config/platforms.yaml` community notes
+   (counts and style there), **only for the platforms `routing.md` marked `include`**:
+   - `x-1.md … x-5.md`, `linkedin-1.md`, `bluesky-1.md` — skip any of these whose platform the
+     router excluded (e.g. no `linkedin-1.md` if LinkedIn was skipped for this pillar).
+   - Community variants ONLY where routing **and** the brief agree there's a reason to post,
+     e.g. `community-democratic-resilience.md`. Respect `config/platforms.yaml` community notes
      (ABC Builders: observe-only unless brief says otherwise).
    - `video-script.md` (hook / 1–2 points / CTA, ≤220 words, written to be spoken) and
      `quote-card-1.md` (verbatim quotable line) — these drive the asset steps.
@@ -126,9 +139,12 @@ for review. Muxin wrote the thinking; you package it.
    - Add a **short** row to `review-queue.md` for `video/short.mp4` (status `pending`).
    - (Each step notes in the queue if an API key/local dep is missing rather than failing the run.)
 
-8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset
+8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset that was
+   generated — i.e. only routing `include` platforms plus the format assets
    (id, platform, format, asset path, scores, status=pending). Then STOP. Do not publish.
-   Tell Muxin: the folder path, asset counts, and anything skipped.
+   Tell Muxin: the folder path, asset counts, which platforms routing skipped (and why, per
+   `routing.md`), and anything else skipped. If Muxin wants a skipped platform anyway, they can
+   say so (or adjust `config/routing.yaml`) and you'll generate it.
 
 ## --revise mode
 
