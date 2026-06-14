@@ -1,6 +1,6 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into platform assets (text, quote cards, video) and a review queue. Usage - /atomize <substack-url | file | audio-file>, or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of Muxin's original content into platform assets (text, quote cards, video) and a review queue. Usage - /atomize <substack-url | file | audio-file | pasted text>, or /atomize --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
@@ -21,6 +21,16 @@ for review. Muxin wrote the thinking; you package it.
 
 1. **Ingest.** `npm run new-content -- <arg>` → prints the content folder path. (Audio files
    are transcribed automatically via the configured provider.) Read `source.md`.
+   - When Muxin **pastes a raw body of text** instead of a URL/file/audio path, pipe it to
+     the script via stdin using a quoted heredoc so the text (backticks, `$`, quotes) is
+     passed literally:
+     ```
+     npm run new-content -- --text <<'ATOMIZE_EOF'
+     <the pasted body, verbatim>
+     ATOMIZE_EOF
+     ```
+     The title is derived from the first `# heading` or the first non-empty line, so a
+     `# Title` line at the top of the paste helps.
 
 2. **Read the latest strategy brief** in `briefs/` (highest date). Apply its
    `Directives for atomization` — pillar priority, channel emphasis, format notes, hooks that
