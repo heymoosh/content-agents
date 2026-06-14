@@ -28,7 +28,10 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
    - Emits `ready-to-paste/<id>.txt` files; Muxin copy-pastes when convenient.
 
 5. Each script flips published rows to `published` and appends to `publish-log.md` —
-   re-running /publish is a no-op for already-published rows.
+   re-running /publish is a no-op for already-published rows. Each script also appends a `Placed
+   log` row to `briefs/bets.md` (carrying the derivative's `from_brief` + `directives_applied`), so
+   next cycle `/strategy` can match the post back to its analytics outcome and grade the bet. This
+   is deterministic and deduped on `(folder, row id)` — do not edit those rows by hand.
 
 6. Report: what was scheduled/uploaded/emitted, with links from `publish-log.md`, and
    anything skipped because keys are missing.

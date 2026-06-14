@@ -15,7 +15,9 @@ checkpoint; never barrel through.
    brief is >2 weeks old, remind Muxin to export analytics (`docs/analytics-export-howto.md`).
 
 2. **Strategy.** If the newest file in `briefs/` is older than 7 days (or new data was just
-   imported), run the `/strategy` skill flow. Otherwise note the brief is current.
+   imported), run the `/strategy` skill flow. Note that `/strategy` now **grades last cycle's bets
+   first** (`briefs/bets.md` + `npm run grade-bets`) before writing new recommendations — this is
+   the feedback loop that makes the cycle compound. Otherwise note the brief is current.
 
 3. **New content.** Ask Muxin if there's new content to atomize (Substack URL, file, or voice
    memo), or check any URLs/files they provided with the command. For each, run the
@@ -28,4 +30,5 @@ checkpoint; never barrel through.
    if Muxin says yes (or already asked for publish in this conversation).
 
 6. **Wrap up.** Summarize the cycle (imported / brief / atomized / published). Offer to commit
-   and push the cycle's artifacts (briefs, derivatives, logs, queue updates).
+   and push the cycle's artifacts (briefs **including `briefs/bets.md`**, derivatives, logs, queue
+   updates) — the bets ledger is the loop's memory, so it must be committed every cycle.

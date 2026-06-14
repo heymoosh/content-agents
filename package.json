@@ -10,6 +10,8 @@
     "bluesky": "tsx src/ingest/fetch-bluesky.ts",
     "snapshot": "tsx src/strategy/snapshot.ts",
     "resonance": "tsx src/strategy/resonance.ts",
+    "grade-bets": "tsx src/strategy/grade-bets.ts",
+    "link-bet": "tsx src/db/link-bet.ts",
     "new-content": "tsx src/atomize/new-content.ts",
     "validate": "tsx src/atomize/validate.ts",
     "render": "tsx src/video/render.ts",

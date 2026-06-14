@@ -12,6 +12,12 @@ export function openDb(): Database.Database {
   db.pragma("journal_mode = WAL");
   const schema = readFileSync(join(ROOT, "src", "db", "schema.sql"), "utf8");
   db.exec(schema);
+  // Migrate DBs created before posts.bet_id existed (CREATE TABLE IF NOT EXISTS won't add it).
+  const cols = db.prepare("PRAGMA table_info(posts)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "bet_id")) {
+    db.exec("ALTER TABLE posts ADD COLUMN bet_id TEXT");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_posts_bet ON posts(bet_id)");
+  }
   return db;
 }
 

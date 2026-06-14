@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS posts (
   content_text TEXT,
   format TEXT,                         -- 'text' | 'thread' | 'image' | 'video' | 'newsletter'
   pillar TEXT,                         -- 'human-ai' | 'claude-code' | 'civic-tech' | 'other' | NULL = untagged
+  bet_id TEXT,                         -- set by link-bet.ts when /strategy matches a post to a brief's bet (NULL = unattributed)
   UNIQUE(platform, platform_post_id)
 );
 
@@ -35,4 +36,5 @@ CREATE TABLE IF NOT EXISTS imports (
 
 CREATE INDEX IF NOT EXISTS idx_posts_platform ON posts(platform);
 CREATE INDEX IF NOT EXISTS idx_posts_pillar ON posts(pillar);
+CREATE INDEX IF NOT EXISTS idx_posts_bet ON posts(bet_id);
 CREATE INDEX IF NOT EXISTS idx_metrics_post ON metrics(post_id);

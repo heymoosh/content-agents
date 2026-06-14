@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { readQueue, setStatus, appendPublishLog } from "./queue.js";
+import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue
 // to Typefully as SCHEDULED DRAFTS (next free slot) — never instant publish.
@@ -63,7 +63,7 @@ async function main() {
   const setId = await socialSetId();
   for (const row of approved) {
     const assetPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
-    const { body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
+    const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
     const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
     const draft = await api(`/social-sets/${setId}/drafts`, {
       method: "POST",
@@ -80,6 +80,7 @@ async function main() {
     }) as { id?: string | number; share_url?: string };
     setStatus(folder, row, "published");
     appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, next-free-slot)`);
+    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"}`, fm, body);
     console.log(`scheduled: ${row.id} (${row.platform}) → typefully draft ${draft.id ?? "?"}`);
   }
 }
