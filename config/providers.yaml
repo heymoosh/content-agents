@@ -2,7 +2,15 @@
 # Swapping providers = add an adapter file in src/providers/<capability>/ and change the name here.
 # "none" disables the capability (pipeline steps that need it are skipped).
 tts: kokoro            # local + free; needs kokoro-fastapi + whisper.cpp (see docs/setup-kokoro.md). Swap to "elevenlabs" if quality disappoints.
-image: gemini-imagen
+image: openrouter-image   # default image ADAPTER. COST-FIRST: Riverflow by default; step UP only on request, never automatically.
+# Image model + settings passed to generate(). render.ts picks a profile per job:
+#   default → Riverflow, cheap — for MOST images                →  no flag
+#   pro     → Nano Banana Pro (direct Google), step-up #1        →  render ... --pro
+#   hero    → gpt-5.4-image-2, best look, step-up #2             →  render ... --hero
+# Escalation is ALWAYS offered to Muxin first, never auto — see the /atomize skill's image policy.
+image_params: { model: sourceful/riverflow-v2-fast, modalities: ["image"] }               # Riverflow v2 fast ~$0.02/img
+image_pro:   { provider: gemini-nano-banana, model: gemini-3-pro-image-preview }          # Nano Banana Pro ~$0.13/img (direct Google)
+image_hero:  { provider: openrouter-image, model: openai/gpt-5.4-image-2 }                # best look ~$0.23/img, slow
 transcription: gemini
 text-polish: grok-openrouter   # VIDEO SCRIPTS ONLY (atomize step 7a). Text posts stay extraction-first — see CLAUDE.md rule 1.
 video-broll: none      # future: "veo" (expensive, ~$2-6/video — deliberately off)

@@ -17,6 +17,7 @@
     "new-content": "tsx src/atomize/new-content.ts",
     "validate": "tsx src/atomize/validate.ts",
     "render": "tsx src/video/render.ts",
+    "bakeoff": "tsx src/bakeoff/run.ts",
     "publish:typefully": "tsx src/publish/typefully.ts",
     "publish:youtube": "tsx src/publish/youtube.ts",
     "publish:paste": "tsx src/publish/paste-files.ts",

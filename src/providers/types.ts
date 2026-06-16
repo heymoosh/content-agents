@@ -18,6 +18,10 @@ export interface ImageProvider {
     prompt: string;
     aspect: "9:16" | "1:1" | "16:9";
     outPath: string;
+    // Optional per-call settings (model variant, quality, OpenRouter slug, cost override).
+    // The main pipeline omits it; the bakeoff passes a contender's `params` from
+    // config/bakeoff.yaml so one adapter can stand in for many model/setting combos.
+    params?: Record<string, unknown>;
   }): Promise<{ imagePath: string; costUsd: number }>;
 }
 

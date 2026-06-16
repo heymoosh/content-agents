@@ -103,6 +103,12 @@ for review. Muxin wrote the thinking; you package it.
 
 7. **Generate assets.** Quote cards first (cheap, extraction-first):
    - `npm run render -- --still <folder> --quote quote-card-1`
+   - **Image model policy — cost-first, escalate only on request, NEVER automatically.** Default
+     is **Riverflow** (~$0.02) for most images. If Muxin dislikes a result, do NOT silently switch
+     to a pricier model — **offer first**: *"we can try a different prompt on Riverflow, or step up
+     to a more expensive model."* Only on his yes, re-render with `--pro` (Nano Banana Pro ~$0.13)
+     or `--hero` (gpt-5.4-image-2 ~$0.23). Flags work on `--still` and `--render-video`. (Free
+     option for flat conceptual spots: hand-author an SVG → `remotion-svg` path / `/bakeoff`.)
 
    Video is **two-phase** — the storyboard is reviewed as TEXT before any paid generation.
 
