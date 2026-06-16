@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Wrapper the content-agents TTS adapter calls as KOKORO_CMD (KOKORO_MODE=cli).
+# Runs the local Kokoro-ONNX voiceover in its dedicated venv. See docs/setup-kokoro.md.
+set -euo pipefail
+VENV_PY="${KOKORO_VENV_PY:-$HOME/.content-agents/venv/bin/python}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$VENV_PY" "$HERE/kokoro_tts.py" "$@"
