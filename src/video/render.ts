@@ -46,12 +46,14 @@ function remotion(args: string[]): void {
   execFileSync("npx", ["remotion", ...args], { cwd: repoRoot, stdio: "inherit" });
 }
 
-function withJob<T>(fn: (jobDir: string, jobName: string) => T): T {
+async function withJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): Promise<T> {
   const jobName = `job-${Date.now().toString(36)}`;
   const jobDir = join(PUBLIC_DIR, jobName);
   mkdirSync(jobDir, { recursive: true });
   try {
-    return fn(jobDir, jobName);
+    // await so the finally (jobDir cleanup) runs AFTER the async body finishes,
+    // not the instant fn() returns its pending promise.
+    return await fn(jobDir, jobName);
   } finally {
     rmSync(jobDir, { recursive: true, force: true });
   }

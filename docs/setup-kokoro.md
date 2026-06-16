@@ -41,6 +41,39 @@ KOKORO_CMD=/path/to/your/kokoro-wrapper
 The wrapper is invoked as `KOKORO_CMD "<script text>" "<output.mp3>"` and must write the mp3 to
 that second-argument path.
 
+### Option C — Kokoro-ONNX, no Docker (lightweight, ~1 GB total) ✅ this repo's setup
+
+The Docker image (Option A) is 5–8 GB. To get the same free/local voice for ~1 GB, run
+Kokoro's ONNX model in a small Python venv. `scripts/kokoro-tts` (committed) is the wrapper.
+
+```bash
+# 1. venv + packages (onnxruntime, kokoro-onnx, soundfile, pip-bundled espeak-ng)
+python3 -m venv ~/.content-agents/venv
+~/.content-agents/venv/bin/pip install "kokoro-onnx>=0.4.0" soundfile
+
+# 2. model files (~340 MB) into ~/.content-agents/kokoro/
+curl -L -o ~/.content-agents/kokoro/kokoro-v1.0.onnx \
+  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
+curl -L -o ~/.content-agents/kokoro/voices-v1.0.bin \
+  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+
+# 3. make the wrapper executable
+chmod +x scripts/kokoro-tts scripts/kokoro_tts.py
+```
+
+Then in `.env`:
+
+```
+KOKORO_MODE=cli
+KOKORO_CMD=/absolute/path/to/repo/scripts/kokoro-tts
+KOKORO_VOICE=af_heart
+```
+
+`scripts/kokoro_tts.py` loads the ONNX model, synthesizes with `soundfile`, and encodes to mp3
+via ffmpeg (§3). Voice/model paths are overridable with `KOKORO_VOICE`, `KOKORO_ONNX_MODEL`,
+`KOKORO_ONNX_VOICES`. You still need whisper.cpp (§2) for caption timing, since Kokoro emits no
+timestamps.
+
 ## 2. whisper.cpp (captions)
 
 Build the binary and download a model:
