@@ -69,7 +69,7 @@ const KenBurnsImage: React.FC<{ src: string; index: number; durationInFrames: nu
   );
 };
 
-const CaptionOverlay: React.FC<{ captions: Caption[] }> = ({ captions }) => {
+export const CaptionOverlay: React.FC<{ captions: Caption[] }> = ({ captions }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const currentMs = (frame / fps) * 1000;

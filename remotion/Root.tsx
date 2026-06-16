@@ -7,6 +7,11 @@ import {
   illustrationSchema,
   calculateIllustrationMetadata,
 } from "./Illustration";
+import {
+  AnimatedShort,
+  animatedShortSchema,
+  calculateAnimatedShortMetadata,
+} from "./AnimatedShort";
 
 export const Root: React.FC = () => {
   return (
@@ -26,6 +31,23 @@ export const Root: React.FC = () => {
           durationMs: 10000,
         }}
         calculateMetadata={calculateShortMetadata}
+      />
+      <Composition
+        id="AnimatedShort"
+        component={AnimatedShort}
+        schema={animatedShortSchema}
+        width={1080}
+        height={1920}
+        fps={30}
+        durationInFrames={300}
+        defaultProps={{
+          audio: "",
+          clips: [] as string[],
+          clipFrames: [] as number[],
+          captions: [],
+          durationMs: 10000,
+        }}
+        calculateMetadata={calculateAnimatedShortMetadata}
       />
       <Still
         id="QuoteCard"

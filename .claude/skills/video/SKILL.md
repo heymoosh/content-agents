@@ -30,10 +30,14 @@ Video is the most expensive thing the pipeline does. It is **two-phase, money on
 | Engine | What it is | ~Cost | Status |
 |---|---|---|---|
 | **image-motion** (default) | still scene images + Ken Burns zoom/pan in Remotion | ~$0.12/short (Riverflow ×6) | **live** |
-| **animated** | true generative video per scene, Veo direct on the Gemini key (no extra fee), no-audio tier (we overlay Kokoro voice) | ~$1–4.50/short | planned (Phase 2 — not yet wired) |
+| **animated** | Kling interpolates between approved keyframe stills (start→end per scene) via OpenRouter; clips stitched under Kokoro voice + captions | ~$0.08/s ≈ $1–3/short | **live** |
 
-Default to **image-motion**. When the animated engine lands, pick it explicitly per short and
-offer the cost first. Both coexist — animation is an added option, not a replacement for B-roll.
+Default to **image-motion** (cheap). Pick **animated** explicitly per short and **offer the cost
+first**. Both coexist — animation is an added option, not a replacement for B-roll. In animated
+mode the scene visuals become **keyframes**: generate the keyframe stills, **you approve them**,
+then Kling animates the transitions between consecutive keyframes
+(`render --keyframes-only` → review the stills → `render --animated`). Veo was evaluated and
+rejected — it can't do start→end interpolation on the Gemini key; see [[video-pipeline-architecture]].
 
 ## Steps
 
@@ -79,15 +83,26 @@ offer the cost first. Both coexist — animation is an added option, not a repla
    `video/storyboard.md`, status `pending`). **STOP — generate NO images or audio.** Tell Muxin
    to review the storyboard before it renders.
 
-5. **Render (only after the storyboard row is `approve`).**
-   - Write `video/title.txt` + `video/description.txt` (extraction-first applies to these).
-   - `npm run render -- --render-video <folder>` — refuses unless the storyboard row is
-     `approve`; then derives `derivatives/video-script.md` + `video/image-prompts.txt` from the
-     storyboard and runs TTS → (Whisper alignment) → captions → scene images → Remotion →
-     `video/short.mp4` + thumbnail + transcript.
-   - **Image model is cost-first** — Riverflow (~$0.02) by default. Only add `--pro`
-     (Nano Banana Pro ~$0.13) or `--hero` (gpt-5.4-image-2 ~$0.23) if Muxin asks; **offer first,
-     never auto-escalate.**
+5. **Render (only after the storyboard row is `approve`).** Write `video/title.txt` +
+   `video/description.txt` (extraction-first applies). Then pick the engine (storyboard `engine:`):
+
+   **image-motion (default, cheap):**
+   - `npm run render -- --render-video <folder>` — derives `derivatives/video-script.md` +
+     `video/image-prompts.txt` from the storyboard, then TTS → (Whisper alignment) → captions →
+     scene images → Remotion → `video/short.mp4` + thumbnail + transcript.
+
+   **animated (Kling interpolation):**
+   - **Keyframe-approval gate first:**
+     `npm run render -- --render-video <folder> --animated --keyframes-only` generates one
+     keyframe still per scene visual into `images/keyframe-*.png` and **stops**. Show Muxin the
+     stills and **get approval before any paid animation.**
+   - Then: `npm run render -- --render-video <folder> --animated` — TTS + captions, then Kling
+     animates between consecutive keyframes (~$0.08/s) and stitches the clips under the voice +
+     captions → `video/short.mp4`. **Offer the cost first** (≈ $1–3 for a few scenes).
+
+   - **Image model is cost-first** — Riverflow (~$0.02) by default for stills/keyframes. Only add
+     `--pro` (Nano Banana Pro ~$0.13) or `--hero` (gpt-5.4-image-2 ~$0.23) if Muxin asks; **offer
+     first, never auto-escalate.** (Flags work on the animated path too.)
    - Add a **short** row to `review-queue.md` for `video/short.mp4` (status `pending`).
    - Add a **tiktok** row too (platform `tiktok`, format `short`, asset `video/short.mp4`,
      status `pending`) — the same render fans out to TikTok at publish (`npm run publish:tiktok`,
