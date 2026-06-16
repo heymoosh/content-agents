@@ -61,6 +61,13 @@ export const AnimatedShort: React.FC<AnimatedShortProps> = ({
           </Sequence>
         );
       })}
+      {/* Scrim so white captions stay legible over bright/light animated backgrounds.
+          (The image-motion path darkens its stills; the video clips here are not dimmed.) */}
+      <AbsoluteFill
+        style={{
+          background: "linear-gradient(to bottom, rgba(0,0,0,0) 55%, rgba(0,0,0,0.7) 100%)",
+        }}
+      />
       {audio ? <Audio src={staticFile(audio)} /> : null}
       <CaptionOverlay captions={captions as Caption[]} />
     </AbsoluteFill>
