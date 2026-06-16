@@ -21,7 +21,9 @@ checkpoint; never barrel through.
 
 3. **New content.** Ask Muxin if there's new content to atomize (Substack URL, file, or voice
    memo), or check any URLs/files they provided with the command. For each, run the
-   `/atomize` skill flow. (Atomization ends at the review queue — do not publish.)
+   `/atomize` skill flow (text + quote cards). (Atomization ends at the review queue — do not
+   publish.) **Video is separate:** for any piece worth a short, offer to run `/video <folder>`
+   — it's the heavier, costlier path, so it's opt-in per piece, not automatic.
 
 4. **Pending reviews.** Scan `content/*/review-queue.md` for rows still `pending` or `revise`.
    List them with folder paths. For `revise` rows, offer to run `/atomize --revise`.
