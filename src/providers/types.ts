@@ -38,3 +38,19 @@ export interface TextPolishProvider {
     instructions: string;
   }): Promise<{ text: string; costUsd: number }>;
 }
+
+export interface VideoBrollProvider {
+  name: string;
+  // Animate between a first and last keyframe (e.g. Kling first/last-frame interpolation).
+  // Async under the hood (submit → poll → download); resolves once the clip is written.
+  interpolate(req: {
+    prompt: string;
+    firstFramePath: string;
+    lastFramePath: string;
+    aspect: "9:16" | "1:1" | "16:9";
+    durationSeconds: number;
+    outPath: string;
+    // Per-call settings from config/providers.yaml `video_broll_params` (model, resolution, cost).
+    params?: Record<string, unknown>;
+  }): Promise<{ videoPath: string; costUsd: number }>;
+}
