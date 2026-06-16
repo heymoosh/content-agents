@@ -43,6 +43,8 @@ makes `/cycle` compound instead of restarting every week.
 3. **Run the numbers.**
    - `npm run snapshot` → channel performance + data-confidence table
    - `npm run resonance` → pillar × platform map
+   - `npm run audience` → who follows you: LinkedIn demographics + follower/subscriber totals &
+     growth (demographics are LinkedIn-only; X/Bluesky give counts, Substack free/paid)
    - `npm run route -- --all` → routing map (where each pillar should post; the include/skip
      gate `/atomize` applies, from this data + `config/routing.yaml`)
    - Read `data/community-log.md` (manual observations — treat as qualitative signal)
@@ -65,6 +67,12 @@ makes `/cycle` compound instead of restarting every week.
 
    ## Topic resonance map
    <resonance table + your interpretation; ignore cells with n<3; where rc << raw avg, the win is aging out>
+
+   ## Audience (who you're reaching)
+   <audience output: reach table + LinkedIn demographics + Substack tier. 1-2 sentences —
+    does the audience Muxin actually reaches match the target reader for each pillar? A mismatch
+    (e.g. reaching big-company seniors when a pillar targets indie builders) is a positioning/
+    routing signal, not trivia. Demographics are LinkedIn-only; treat sub-100 audiences as anecdote.>
 
    ## Routing map (what to post where)
    <route --all table — which pillars route to which platforms, and why. Note where the
