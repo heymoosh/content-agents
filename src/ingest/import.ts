@@ -4,28 +4,27 @@ import { openDb, repoRoot } from "../db/db.js";
 import { sha256File } from "../util/hash.js";
 import { ImportRow } from "./types.js";
 import { parseX } from "./parse-x.js";
-import { parseSubstack } from "./parse-substack.js";
+import { parseSubstack, parseSubstackExport } from "./parse-substack.js";
 import { parseLinkedIn } from "./parse-linkedin.js";
 
 const INBOX = join(repoRoot, "data", "inbox");
 const PROCESSED = join(repoRoot, "data", "processed");
 const PLATFORMS = ["x", "linkedin", "substack"] as const;
 
-async function parseFile(platform: string, path: string): Promise<ImportRow[]> {
+async function parseEntry(platform: string, path: string, isDir: boolean): Promise<ImportRow[]> {
   const name = basename(path);
-  if (platform === "linkedin" && [".xlsx", ".xls"].includes(extname(name).toLowerCase())) {
-    return parseLinkedIn(name, readFileSync(path));
-  }
-  const text = readFileSync(path, "utf8");
   switch (platform) {
     case "x":
-      return parseX(name, text);
+      return parseX(name, readFileSync(path, "utf8"));
     case "linkedin":
-      // LinkedIn occasionally offers CSV too — reuse the X-style CSV path is wrong;
-      // fail loudly so the parser gets extended deliberately.
-      throw new Error(`LinkedIn drop must be .xlsx (got ${name}).`);
+      if (![".xlsx", ".xls"].includes(extname(name).toLowerCase())) {
+        throw new Error(`LinkedIn drop must be the .xlsx analytics export (got ${name}).`);
+      }
+      return parseLinkedIn(name, readFileSync(path));
     case "substack":
-      return parseSubstack(name, text);
+      // A full export is an unpacked folder (posts.csv + per-post event logs); a loose stats
+      // download is a single CSV. Handle both.
+      return isDir ? parseSubstackExport(path) : parseSubstack(name, readFileSync(path, "utf8"));
     default:
       throw new Error(`unknown platform folder: ${platform}`);
   }
@@ -59,44 +58,53 @@ export async function runImport(): Promise<void> {
 
   for (const platform of PLATFORMS) {
     const dir = join(INBOX, platform);
-    let files: string[] = [];
+    let entries: { name: string; isDir: boolean }[] = [];
     try {
-      files = readdirSync(dir).filter((f) => !f.startsWith("."));
+      entries = readdirSync(dir, { withFileTypes: true })
+        .filter((e) => !e.name.startsWith("."))
+        .map((e) => ({ name: e.name, isDir: e.isDirectory() }));
     } catch {
       continue;
     }
-    for (const file of files) {
+    for (const { name: file, isDir } of entries) {
       const path = join(dir, file);
-      const hash = sha256File(path);
-      if (seenImport.get(hash)) {
-        console.log(`skip (already imported): ${platform}/${file}`);
-        continue;
-      }
-      const rows = await parseFile(platform, path);
-      const tx = db.transaction((rows: ImportRow[]) => {
-        for (const row of rows) {
-          const { id } = upsertPost.get(row) as { id: number };
-          insertMetrics.run(
-            id,
-            now,
-            row.metrics.impressions,
-            row.metrics.likes,
-            row.metrics.replies,
-            row.metrics.reposts,
-            row.metrics.clicks,
-            row.metrics.newFollows,
-            row.metrics.engagementRate,
-            JSON.stringify(row.raw)
-          );
+      // A Substack export folder has no single file to hash — use its posts.csv manifest.
+      const hashSource = isDir && platform === "substack" ? join(path, "posts.csv") : path;
+      try {
+        const hash = sha256File(hashSource);
+        if (seenImport.get(hash)) {
+          console.log(`skip (already imported): ${platform}/${file}`);
+          continue;
         }
-        insertImport.run(hash, file, platform, now, rows.length);
-      });
-      tx(rows);
-      mkdirSync(PROCESSED, { recursive: true });
-      renameSync(path, join(PROCESSED, `${hash.slice(0, 8)}-${file}`));
-      console.log(`imported: ${platform}/${file} → ${rows.length} rows`);
-      totalFiles++;
-      totalRows += rows.length;
+        const rows = await parseEntry(platform, path, isDir);
+        const tx = db.transaction((rows: ImportRow[]) => {
+          for (const row of rows) {
+            const { id } = upsertPost.get(row) as { id: number };
+            insertMetrics.run(
+              id,
+              now,
+              row.metrics.impressions,
+              row.metrics.likes,
+              row.metrics.replies,
+              row.metrics.reposts,
+              row.metrics.clicks,
+              row.metrics.newFollows,
+              row.metrics.engagementRate,
+              JSON.stringify(row.raw)
+            );
+          }
+          insertImport.run(hash, file, platform, now, rows.length);
+        });
+        tx(rows);
+        mkdirSync(PROCESSED, { recursive: true });
+        renameSync(path, join(PROCESSED, `${hash.slice(0, 8)}-${file}`));
+        console.log(`imported: ${platform}/${file} → ${rows.length} rows`);
+        totalFiles++;
+        totalRows += rows.length;
+      } catch (e) {
+        // Isolate failures: a bad file in one platform must not abort the others.
+        console.error(`skip (failed): ${platform}/${file} — ${e instanceof Error ? e.message : e}`);
+      }
     }
   }
 
