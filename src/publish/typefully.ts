@@ -47,16 +47,38 @@ async function socialSetId(): Promise<string> {
   return id;
 }
 
-// CTA placement per platform (config/cta.yaml). Keeps the link out of the body where the
-// platform algorithm penalizes in-post links (X, LinkedIn) — see Platform Reference.
-function loadCtaPlacement(): Record<string, string> {
+// CTA config (config/cta.yaml): placement keeps the link out of the body where the platform
+// algorithm penalizes in-post links (X, LinkedIn); source_fallback is used when a `cta: source`
+// derivative has no published essay URL to point at. See Platform Reference.
+function loadCtaConfig(): {
+  placement: Record<string, string>;
+  fallbackUrl: string | null;
+  fallbackLabel: string;
+} {
   try {
     const cfg = parseYaml(readFileSync(join(repoRoot, "config", "cta.yaml"), "utf8")) as {
       placement?: Record<string, string>;
+      source_fallback?: { url?: string; label?: string };
     };
-    return cfg.placement ?? {};
+    return {
+      placement: cfg.placement ?? {},
+      fallbackUrl: cfg.source_fallback?.url ?? null,
+      fallbackLabel: cfg.source_fallback?.label ?? "",
+    };
   } catch {
-    return {};
+    return { placement: {}, fallbackUrl: null, fallbackLabel: "" };
+  }
+}
+
+// The source essay's own URL — what `cta: source` derivatives point at. Pasted into source.md
+// `canonical_url` (auto-filled when atomized from a live URL). Null until it's a real http(s) url.
+function loadCanonicalUrl(folder: string): string | null {
+  try {
+    const { fm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
+    const u = typeof fm.canonical_url === "string" ? fm.canonical_url.trim() : "";
+    return /^https?:\/\//.test(u) ? u : null;
+  } catch {
+    return null;
   }
 }
 
@@ -113,16 +135,34 @@ async function main() {
   }
 
   const setId = await socialSetId();
-  const placementMap = loadCtaPlacement();
+  const { placement: placementMap, fallbackUrl, fallbackLabel } = loadCtaConfig();
+  const canonicalUrl = loadCanonicalUrl(folder);
   const maxMap = loadPlatformMax();
   for (const row of approved) {
     const assetPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
     const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
     const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
 
+    // Resolve the CTA link: `none`/empty → none; `source` → the essay's own url (canonical_url),
+    // falling back to the Substack home when no essay url exists; any other value → a literal url.
     const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
-    const ctaUrl = rawCta && rawCta.toLowerCase() !== "none" ? rawCta : null;
-    const ctaLabel = typeof fm.cta_label === "string" ? fm.cta_label : "";
+    let ctaUrl: string | null;
+    let ctaLabel = typeof fm.cta_label === "string" ? fm.cta_label : "";
+    if (!rawCta || rawCta.toLowerCase() === "none") {
+      ctaUrl = null;
+    } else if (rawCta.toLowerCase() === "source") {
+      if (canonicalUrl) {
+        ctaUrl = canonicalUrl;
+      } else {
+        ctaUrl = fallbackUrl;
+        if (fallbackLabel) ctaLabel = fallbackLabel;
+        if (ctaUrl) {
+          console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
+        }
+      }
+    } else {
+      ctaUrl = rawCta;
+    }
     const placement = placementMap[row.platform] ?? "inline";
     const { posts, manualComment } = buildPosts(body, ctaUrl, ctaLabel, placement, maxMap[row.platform] ?? Infinity);
 
