@@ -12,7 +12,7 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
    arguments, or worldview statements in Muxin's voice. Every such derivative must carry
    `source_lines` frontmatter tracing the lines it was built from.
    - **Scoped exception — video scripts.** Video shorts are a deliberate exception: Grok (via the
-     `text-polish` provider, in `/atomize` step 7a) drafts a hook-driven script from the essay's
+     `text-polish` provider, in the `/video` skill) drafts a hook-driven script from the essay's
      *ideas* — not verbatim-traced. This is allowed ONLY because every storyboard is reviewed and
      approved by Muxin in `review-queue.md` *before* any render, and nothing auto-publishes. The
      exception is video scripts only; it must never bleed into text/image derivatives.
@@ -32,8 +32,9 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
 | Tag pillars | untagged posts exist | `npm run snapshot -- --untagged`, `tsx src/db/tag-posts.ts` | assign pillar per post (rubric: `config/pillars.yaml`) | `posts.pillar` |
 | Strategy | `/strategy` (weekly) | `npm run grade-bets`, `npm run snapshot`, `npm run resonance`, `npm run link-bet`, `npm run route -- --all` | grade last cycle's bets, synthesize brief citing real posts, record new bets | `briefs/YYYY-MM-DD-strategy-brief.md`, `briefs/bets.md` |
 | Route | inside `/atomize` (+ `/strategy`) | `npm run route` | pillar tag drives it; Muxin still approves what's queued | `content/<slug>/routing.md` |
-| Atomize | `/atomize <url\|file>` | `npm run new-content`, `npm run validate` | extraction-first drafting + scoring; record `from_brief`/`directives_applied`; **only for routing `include` platforms** | `content/<slug>/derivatives/`, `review-queue.md` |
-| Assets | inside `/atomize` | `npm run render` | storyboard scenes + visual prompts (video script drafted by Grok); approved before render | `images/`, `video/storyboard.md`, `video/` |
+| Atomize | `/atomize <url\|file>` | `npm run new-content`, `npm run validate` | extraction-first drafting + scoring (text posts + quote cards); record `from_brief`/`directives_applied`; **only for routing `include` platforms** | `content/<slug>/derivatives/`, `review-queue.md` |
+| Quote cards | inside `/atomize` | `npm run render -- --still` | extraction-first quote line + cost-first image model | `images/` |
+| Video | `/video <file\|folder>` | `npm run render -- --render-video` | Grok script + 5–7 storyboard scenes/visual prompts; storyboard approved as TEXT before any render | `video/storyboard.md`, `video/short.mp4` |
 | Review | **Muxin, by hand** | — | — | statuses in `review-queue.md` |
 | Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
 | Whole cycle | `/cycle` | all of the above | orchestration | — |

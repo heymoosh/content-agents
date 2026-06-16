@@ -4,8 +4,9 @@
 #
 # Routing targets are derivative platforms only: x, linkedin, bluesky, and
 # community:<id> (see config/platforms.yaml communities). Substack is the SOURCE
-# channel, not a target. video-script / quote-card are format assets — see
-# thresholds.always_consider; they are never platform-gated.
+# channel, not a target. quote-card is a format asset — see thresholds.always_consider;
+# it is never platform-gated. (Video scripts moved to the /video skill — atomize no
+# longer generates them, so video-script is not routed here.)
 
 defaults:                 # platforms to include per pillar while data is INSUFFICIENT (cold start)
   human-ai:    [x, linkedin, bluesky]
@@ -22,4 +23,4 @@ rules:                    # hard overrides applied AFTER the data decision
 thresholds:
   min_posts_for_data: 3   # n below this (for a pillar on a platform) → treat as cold start
   skip_below_score: 0.4   # normalized fit (0..1) under which a platform is skipped
-  always_consider: [video-script, quote-card]  # format assets, always generated, never gated
+  always_consider: [quote-card]  # format asset, always generated, never gated (video → /video skill)

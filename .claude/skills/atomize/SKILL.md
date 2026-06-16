@@ -1,12 +1,17 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into platform assets (text, quote cards, video) and a review queue. Usage - /atomize <substack-url | file | audio-file | pasted text>, or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, or /atomize --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
 
 Turn ONE piece of Muxin's original content into platform-specific assets, scored and queued
 for review. Muxin wrote the thinking; you package it.
+
+**Scope:** `/atomize` handles the **cheap, high-volume** derivatives — text posts and quote
+cards — so you can run it on everything. Turning a piece into a **video short is the separate,
+deliberate `/video` skill** (script → storyboard → review → render); it's heavier and costs
+real money, so it's opt-in per piece, not bundled here.
 
 ## The extraction-first rule (non-negotiable)
 
@@ -41,7 +46,8 @@ for review. Muxin wrote the thinking; you package it.
 
 3. **Tag + extract.** Identify the pillar(s) (rubric: `config/pillars.yaml`). List the 5–10
    most quotable/claimable sentences with their line numbers. Write these to
-   `<folder>/extracts.md` — this is the working material for every derivative.
+   `<folder>/extracts.md` — this is the working material for every derivative (and for `/video`
+   later, if this piece becomes a short).
 
 3.5. **Route — decide which platforms this piece is for.** Run
    `npm run route -- --pillar <pillar> --folder <folder>` (once per tagged pillar). It writes
@@ -62,12 +68,11 @@ for review. Muxin wrote the thinking; you package it.
    - Community variants ONLY where routing **and** the brief agree there's a reason to post,
      e.g. `community-democratic-resilience.md`. Respect `config/platforms.yaml` community notes
      (ABC Builders: observe-only unless brief says otherwise).
-   - `video-script.md` (hook / 1–2 points / CTA, ≤220 words, written to be spoken) and
-     `quote-card-1.md` (verbatim quotable line) — these drive the asset steps.
+   - `quote-card-1.md` (a verbatim quotable line) — drives the quote-card asset (step 7).
    - File format:
      ```markdown
      ---
-     platform: x            # x | linkedin | bluesky | community | video-script | quote-card
+     platform: x            # x | linkedin | bluesky | community | quote-card
      option: 1
      source_lines: [12, 31-33]
      scores: { native: 4, brand: 5, cta: true }
@@ -79,7 +84,8 @@ for review. Muxin wrote the thinking; you package it.
      <the post text — nothing else>
      ```
    - Text derivatives are ALWAYS Claude-authored and extraction-first. Do NOT pass them
-     through `text-polish` — that provider (Grok) is reserved for video scripts only (step 7a).
+     through `text-polish` — that provider (Grok) is reserved for video scripts, which now live
+     in the `/video` skill.
 
 4.5. **Stamp the CTA** (`config/cta.yaml`). The funnel: convert rented attention into owned
    audience. For each text derivative set `cta` + `cta_label` from the target for THAT
@@ -91,8 +97,8 @@ for review. Muxin wrote the thinking; you package it.
    isn't a "go read the essay" invite, you may set its `cta` to a literal url or `none` instead.
    **Never write the link into the post body** — `/publish` places it per platform from
    `cta.yaml` `placement` (X → first reply, LinkedIn → first comment, Bluesky/community →
-   inline), so the body stays clean and dodges the in-post link penalty. `quote-card` and
-   `video-script` carry their CTA inside the asset itself — leave their `cta` as `none` here.
+   inline), so the body stays clean and dodges the in-post link penalty. The `quote-card`
+   carries its CTA inside the asset itself — leave its `cta` as `none` here.
    Donations are never the headline ask; the default CTA is "come read / subscribe."
    - **Check `canonical_url`.** If source.md has no `canonical_url` (a local draft, not yet
      published), tell Muxin to paste the published essay URL into source.md before `/publish` —
@@ -107,68 +113,26 @@ for review. Muxin wrote the thinking; you package it.
 6. **Validate.** `npm run validate -- <folder>` — must pass before queueing. Fix violations,
    don't relax limits.
 
-7. **Generate assets.** Quote cards first (cheap, extraction-first):
+7. **Generate the quote-card asset** (cheap, extraction-first):
    - `npm run render -- --still <folder> --quote quote-card-1`
    - **Image model policy — cost-first, escalate only on request, NEVER automatically.** Default
-     is **Riverflow** (~$0.02) for most images. If Muxin dislikes a result, do NOT silently switch
-     to a pricier model — **offer first**: *"we can try a different prompt on Riverflow, or step up
-     to a more expensive model."* Only on his yes, re-render with `--pro` (Nano Banana Pro ~$0.13)
-     or `--hero` (gpt-5.4-image-2 ~$0.23). Flags work on `--still` and `--render-video`. (Free
-     option for flat conceptual spots: hand-author an SVG → `remotion-svg` path / `/bakeoff`.)
+     is **Riverflow** (~$0.02). If Muxin dislikes a result, do NOT silently switch to a pricier
+     model — **offer first**: *"we can try a different prompt on Riverflow, or step up to a more
+     expensive model."* Only on his yes, re-render with `--pro` (Nano Banana Pro ~$0.13) or
+     `--hero` (gpt-5.4-image-2 ~$0.23). (Free option for flat conceptual spots: hand-author an
+     SVG → `remotion-svg` path / `/bakeoff`.)
 
-   Video is **two-phase** — the storyboard is reviewed as TEXT before any paid generation.
-
-   **7a — Script + storyboard (cheap; the only spend here is the Grok text call).**
-   Video scripts are the scoped exception to extraction-first (CLAUDE.md rule 1): Grok drafts
-   from the essay's *ideas*, not verbatim lines.
-   - Call the script writer (Grok via the `text-polish` provider) on the source/extracts with a
-     brief: a 60–90s, hook-first spoken script (hook in line 1, 1–2 points, CTA), ≤220 words,
-     conversational, not hype-y. (Use `getTextPolish().polish({ draft, platform: "video-script",
-     instructions })`, or invoke `text-polish` however the run plumbs it.) Sanity-check it stays
-     true to the essay's ideas — reject and re-prompt if it invents claims Muxin wouldn't make.
-   - Read `config/style.yaml`. Storyboard the script into **5–7 scenes**. For each scene write a
-     `beat` (one line), a `visual` (an Imagen prompt — concrete scene, ending with
-     `global.mood` + the matching pillar's `suffix` so all scenes share one look), and a
-     `motion` hint (`zoom-in` / `zoom-out` / `pan-left` / `pan-right`).
-   - Write `<folder>/video/storyboard.md`:
-     ```markdown
-     ---
-     kind: storyboard
-     pillar: human-ai
-     script_words: 78
-     source_ref: source.md
-     status: pending
-     ---
-     ## Script
-     <the spoken script>
-
-     ## Scenes
-     ### Scene 1
-     - beat: <what this scene covers>
-     - visual: <Imagen prompt … + style suffix>
-     - motion: zoom-in
-     ### Scene 2
-     ...
-     ```
-   - Add a **storyboard** row to `review-queue.md` (`format: storyboard`,
-     asset `video/storyboard.md`, status `pending`). **STOP for video here — generate NO images
-     or audio.** Tell Muxin to review the storyboard before it renders.
-
-   **7b — Render (only after the storyboard row is approved).**
-   - Write `video/title.txt` + `video/description.txt` (extraction-first applies to these).
-   - `npm run render -- --render-video <folder>` — refuses unless the storyboard row is
-     `approve`; then derives `derivatives/video-script.md` + `video/image-prompts.txt` from the
-     storyboard and runs TTS → (Whisper alignment if the voice has no timestamps) → captions →
-     images → Remotion → `video/short.mp4` + thumbnail + transcript.
-   - Add a **short** row to `review-queue.md` for `video/short.mp4` (status `pending`).
-   - (Each step notes in the queue if an API key/local dep is missing rather than failing the run.)
+   **Video shorts are a separate skill.** `/atomize` no longer scripts or renders video — that
+   keeps it cheap (text + quote cards). To turn this piece into a short, run **`/video <folder>`**
+   (script → storyboard → review → render).
 
 8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset that was
-   generated — i.e. only routing `include` platforms plus the format assets
+   generated — the routing `include` text platforms plus the quote card
    (id, platform, format, asset path, scores, status=pending). Then STOP. Do not publish.
    Tell Muxin: the folder path, asset counts, which platforms routing skipped (and why, per
    `routing.md`), and anything else skipped. If Muxin wants a skipped platform anyway, they can
-   say so (or adjust `config/routing.yaml`) and you'll generate it.
+   say so (or adjust `config/routing.yaml`) and you'll generate it. If the piece is a good
+   candidate for a short, mention they can run `/video <folder>`.
 
 ## --revise mode
 
@@ -176,8 +140,5 @@ for review. Muxin wrote the thinking; you package it.
 by `format`:
 - **Text derivatives / quote cards**: re-draft ONLY those using the `notes` column as
   instruction (extraction-first still applies), re-validate.
-- **storyboard**: regenerate `video/storyboard.md` per the note (re-script via Grok and/or
-  re-storyboard) — this is the cheap checkpoint, so no image/audio spend.
-- **short** (MP4): re-run `npm run render -- --render-video <folder>` (delete
-  `images/video-*.png` first to force image regeneration past the cache).
-Reset revised rows to `pending`, re-validate, and report.
+Reset revised rows to `pending`, re-validate, and report. (storyboard / short rows are revised
+with `/video --revise <folder>`.)
