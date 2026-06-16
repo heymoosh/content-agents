@@ -28,6 +28,10 @@ async function main() {
     INSERT INTO metrics (post_id, captured_at, impressions, likes, replies, reposts, clicks, new_follows, engagement_rate, raw_json)
     VALUES (?, ?, NULL, ?, ?, ?, NULL, NULL, NULL, ?)
   `);
+  const insertAudience = db.prepare(`
+    INSERT OR IGNORE INTO audience (platform, captured_at, as_of_date, metric_type, dimension, value_label, value_count, value_pct, source_file, raw_json)
+    VALUES ('bluesky', ?, NULL, 'follower_total', NULL, NULL, ?, NULL, 'atproto:getProfile', ?)
+  `);
 
   let cursor: string | undefined;
   let count = 0;
@@ -64,6 +68,24 @@ async function main() {
     }
     cursor = res.data.cursor;
   } while (cursor);
+
+  // Audience snapshot: follower count is a point-in-time value, so repeated runs build a growth
+  // series via captured_at. Bluesky/AT Protocol exposes no follower demographics.
+  try {
+    const prof = await agent.getProfile({ actor: handle });
+    insertAudience.run(
+      now,
+      prof.data.followersCount ?? null,
+      JSON.stringify({
+        followersCount: prof.data.followersCount,
+        followsCount: prof.data.followsCount,
+        postsCount: prof.data.postsCount,
+      })
+    );
+    console.log(`bluesky: follower_total snapshot = ${prof.data.followersCount ?? "?"}`);
+  } catch (e) {
+    console.error(`bluesky: profile snapshot failed — ${e instanceof Error ? e.message : e}`);
+  }
 
   console.log(`bluesky: captured metrics for ${count} posts`);
   db.close();

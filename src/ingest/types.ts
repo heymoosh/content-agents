@@ -17,6 +17,20 @@ export interface ImportRow {
   raw: Record<string, unknown>; // every source column, preserved verbatim
 }
 
+// Audience-level row (who follows you), as opposed to per-post ImportRow. See schema.sql `audience`.
+export interface AudienceRow {
+  platform: "x" | "linkedin" | "substack" | "bluesky";
+  capturedAt: string; // ISO8601 — when ingested
+  asOfDate: string | null; // ISO8601 — date the source attributes the value to
+  metricType: "follower_total" | "follower_delta" | "demographic";
+  dimension: string | null; // null for totals
+  valueLabel: string | null; // null for totals
+  valueCount: number | null; // absolute count when known
+  valuePct: number | null; // demographic share 0–100; null when source says "< 1%"
+  sourceFile: string | null;
+  raw: Record<string, unknown>;
+}
+
 export class ParseError extends Error {
   constructor(file: string, detail: string) {
     super(
