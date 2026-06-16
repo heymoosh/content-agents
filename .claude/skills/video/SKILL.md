@@ -89,9 +89,12 @@ offer the cost first. Both coexist — animation is an added option, not a repla
      (Nano Banana Pro ~$0.13) or `--hero` (gpt-5.4-image-2 ~$0.23) if Muxin asks; **offer first,
      never auto-escalate.**
    - Add a **short** row to `review-queue.md` for `video/short.mp4` (status `pending`).
+   - Add a **tiktok** row too (platform `tiktok`, format `short`, asset `video/short.mp4`,
+     status `pending`) — the same render fans out to TikTok at publish (`npm run publish:tiktok`,
+     caption = `video/title.txt`). Muxin approves or discards it like any other row.
 
-6. **Stop.** Report the folder, the `short` row, and what it cost. Do not publish — that's
-   `/publish`.
+6. **Stop.** Report the folder, the `short` and `tiktok` rows, and what it cost. Do not publish —
+   that's `/publish`.
 
 ## --revise <folder>
 

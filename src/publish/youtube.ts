@@ -71,8 +71,10 @@ async function main() {
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
   const { rows } = readQueue(folder);
+  // The same render also feeds TikTok via a separate `tiktok` row (src/publish/tiktok.ts);
+  // exclude it so a short isn't double-posted here.
   const approved = rows.filter(
-    (r) => r.status === "approve" && (r.platform === "youtube" || r.format === "short")
+    (r) => r.status === "approve" && r.platform !== "tiktok" && (r.platform === "youtube" || r.format === "short")
   );
   if (approved.length === 0) {
     console.log("no approved video rows in the review queue");
