@@ -20,6 +20,7 @@
     "bakeoff": "tsx src/bakeoff/run.ts",
     "publish:typefully": "tsx src/publish/typefully.ts",
     "publish:youtube": "tsx src/publish/youtube.ts",
+    "publish:tiktok": "tsx src/publish/tiktok.ts",
     "publish:paste": "tsx src/publish/paste-files.ts",
     "typecheck": "tsc --noEmit"
   },
