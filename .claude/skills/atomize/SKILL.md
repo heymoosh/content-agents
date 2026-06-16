@@ -71,7 +71,7 @@ for review. Muxin wrote the thinking; you package it.
      option: 1
      source_lines: [12, 31-33]
      scores: { native: 4, brand: 5, cta: true }
-     cta: https://...       # the CTA link, or none — stamped from config/cta.yaml (step 4.5)
+     cta: source            # source | <literal-url> | none — stamped from config/cta.yaml (step 4.5)
      cta_label: "Full essay (free to subscribe):"   # short lead-in for the link; omit when cta is none
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
      directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
@@ -82,15 +82,21 @@ for review. Muxin wrote the thinking; you package it.
      through `text-polish` — that provider (Grok) is reserved for video scripts only (step 7a).
 
 4.5. **Stamp the CTA** (`config/cta.yaml`). The funnel: convert rented attention into owned
-   audience. For each text derivative set `cta` (url) + `cta_label` from the target for THAT
-   derivative's pillar — human-ai / claude-code / other → the Substack subscribe link;
-   civic-tech (and community rooms posting civic content) → the voting tool. A piece that spans
-   pillars: choose per derivative (e.g. a civic-leaning Bluesky take on a human-ai essay may
-   point at the voting tool). **Never write the link into the post body** — `/publish` places it
-   per platform from `cta.yaml` `placement` (X → first reply, LinkedIn → first comment,
-   Bluesky/community → inline), so the body stays clean and dodges the in-post link penalty.
-   `quote-card` and `video-script` carry their CTA inside the asset itself — leave their `cta`
-   as `none` here. Donations are never the headline ask; the default CTA is "come subscribe."
+   audience. For each text derivative set `cta` + `cta_label` from the target for THAT
+   derivative's pillar — human-ai / claude-code / other → `cta: source` (a "read more" link to
+   the essay itself; `/publish` resolves it from source.md `canonical_url`, falling back to the
+   Substack home when there's no essay URL); civic-tech (and community rooms posting civic
+   content) → the voting tool URL. A piece that spans pillars: choose per derivative (e.g. a
+   civic-leaning Bluesky take on a human-ai essay may point at the voting tool). If a derivative
+   isn't a "go read the essay" invite, you may set its `cta` to a literal url or `none` instead.
+   **Never write the link into the post body** — `/publish` places it per platform from
+   `cta.yaml` `placement` (X → first reply, LinkedIn → first comment, Bluesky/community →
+   inline), so the body stays clean and dodges the in-post link penalty. `quote-card` and
+   `video-script` carry their CTA inside the asset itself — leave their `cta` as `none` here.
+   Donations are never the headline ask; the default CTA is "come read / subscribe."
+   - **Check `canonical_url`.** If source.md has no `canonical_url` (a local draft, not yet
+     published), tell Muxin to paste the published essay URL into source.md before `/publish` —
+     otherwise every `cta: source` link falls back to the Substack home instead of the essay.
 
 5. **Score honestly** (the frontmatter `scores`):
    - `native`: does this read like a real human post on that platform? (1–5)

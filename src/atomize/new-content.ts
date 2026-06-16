@@ -92,15 +92,25 @@ async function main() {
     mkdirSync(join(dir, sub), { recursive: true });
   }
 
+  // canonical_url is the published essay's own URL — what "read more" CTAs (cta: source) point
+  // at. Auto-filled when atomizing a live URL; left blank as a paste-in slot for local drafts.
+  const canonicalUrl = /^https?:\/\//.test(src.origin) ? src.origin : "";
+  const canonicalLine = canonicalUrl
+    ? `canonical_url: ${canonicalUrl}`
+    : `canonical_url:   # paste the published essay URL so "read more" CTAs point at it (else they fall back to the Substack home)`;
+
   // Number the source lines so derivatives can cite source_lines precisely.
   const body = src.text.trim();
   writeFileSync(
     join(dir, "source.md"),
-    `---\ntitle: "${src.title.replace(/"/g, '\\"')}"\norigin: ${src.origin}\npublished_at: ${src.publishedAt ?? "null"}\ningested_at: ${new Date().toISOString()}\n---\n\n${body}\n`
+    `---\ntitle: "${src.title.replace(/"/g, '\\"')}"\norigin: ${src.origin}\n${canonicalLine}\npublished_at: ${src.publishedAt ?? "null"}\ningested_at: ${new Date().toISOString()}\n---\n\n${body}\n`
   );
+  const ctaReminder = canonicalUrl
+    ? ""
+    : `> CTA: this draft has no \`canonical_url\` yet. To send "read more" posts to the essay itself, paste the published URL into source.md \`canonical_url:\` before /publish — otherwise those CTAs fall back to the Substack home.\n\n`;
   writeFileSync(
     join(dir, "review-queue.md"),
-    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n> Routing: see routing.md — only platforms the router marked \`include\` are queued below.\n\n| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n`
+    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n> Routing: see routing.md — only platforms the router marked \`include\` are queued below.\n\n${ctaReminder}| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n`
   );
   console.log(dir);
 }

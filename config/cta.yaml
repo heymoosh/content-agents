@@ -3,23 +3,32 @@
 # /publish (typefully) then PLACES that link per `placement` for the platform — so the post body
 # stays clean (Muxin's words only) and the link never triggers an algorithm penalty.
 #
-# Brand-building funnel (no product to sell yet): the default CTA converts rented platform
-# attention into OWNED audience → Substack subscribe. Civic-tech posts point at the voting tool.
-# Donations stay secondary — never the headline ask.
+# Brand-building funnel (no product to sell yet): a "read more" CTA sends people to the
+# SOURCE essay itself (where the Substack subscribe prompt also lives) — converting rented
+# platform attention into OWNED audience. When there's no specific essay to point at, it falls
+# back to the Substack home. Civic-tech posts point at the voting tool. Donations stay
+# secondary — never the headline ask.
 
 targets:                 # default CTA per pillar — /atomize fills `cta` + `cta_label` from here
   human-ai:
-    url: "https://humaninference.substack.com"
+    url: source          # → the source essay's own url (source.md `canonical_url`); else source_fallback
     label: "Full essay (free to subscribe):"
   claude-code:
-    url: "https://humaninference.substack.com"
+    url: source
     label: "Full essay (free to subscribe):"
   civic-tech:
     url: "https://voter-choice.vercel.app/"
     label: "See where your reps actually stand:"
   other:
-    url: "https://humaninference.substack.com"
-    label: "More:"
+    url: source
+    label: "Read the full piece (free to subscribe):"
+
+# Fallback when `url: source` can't resolve — the piece has no published essay URL yet
+# (voice memo, raw thought, or `canonical_url` not pasted into source.md). /publish swaps in
+# this url + label so the funnel still converts to an owned subscriber instead of breaking.
+source_fallback:
+  url: "https://humaninference.substack.com"
+  label: "More from me (free to subscribe):"
 
 placement:               # WHERE the link goes per platform (from Branding/.../Platform Reference.md)
   x: reply               # links in-post = 30-50% reach penalty → link goes in the first reply
@@ -28,6 +37,10 @@ placement:               # WHERE the link goes per platform (from Branding/.../P
   community: inline      # action-oriented rooms — link inline
 
 # Notes:
+# - `cta: source` is resolved at /publish from the content folder's source.md `canonical_url`.
+#   Atomizing a live Substack URL auto-fills it; for a local draft, paste the published URL into
+#   source.md before /publish so "read more" CTAs land on the essay (else they fall back to home).
 # - quote-card / video-script carry their own CTA inside the asset; they are not placed here.
-# - A derivative can override the pillar default by setting its own `cta:` in frontmatter
-#   (e.g. a civic-leaning Bluesky post on a human-ai essay can point at the voting tool).
+# - A derivative can override the pillar default by setting its own `cta:` in frontmatter — a
+#   literal url (e.g. a civic-leaning Bluesky post on a human-ai essay → the voting tool), or
+#   `none` for no link.

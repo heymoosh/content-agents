@@ -3,7 +3,7 @@ platform: linkedin
 option: 1
 source_lines: [114, 116, 118, 120, 122]
 scores: { native: 5, brand: 5, cta: true }
-cta: https://humaninference.substack.com
+cta: source
 cta_label: "Full essay (free to subscribe):"
 ---
 For as long as I can remember, the obvious response — invest in people, give everyone a real floor, treat a human being as worth something before they've proven their market value — has been waved away as naive and idealistic.
