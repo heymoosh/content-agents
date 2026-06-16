@@ -1,6 +1,7 @@
 import "../util/env.js";
 import { readFileSync } from "node:fs";
 import { join, isAbsolute } from "node:path";
+import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
@@ -46,6 +47,57 @@ async function socialSetId(): Promise<string> {
   return id;
 }
 
+// CTA placement per platform (config/cta.yaml). Keeps the link out of the body where the
+// platform algorithm penalizes in-post links (X, LinkedIn) — see Platform Reference.
+function loadCtaPlacement(): Record<string, string> {
+  try {
+    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "cta.yaml"), "utf8")) as {
+      placement?: Record<string, string>;
+    };
+    return cfg.placement ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function loadPlatformMax(): Record<string, number> {
+  try {
+    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
+      platforms?: Record<string, { max_chars?: number }>;
+    };
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(cfg.platforms ?? {})) out[k] = v.max_chars ?? Infinity;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+// Build the Typefully `posts` array, placing the CTA link per config so the body stays clean.
+// Returns a manual-comment string when the platform needs the link added by hand (LinkedIn).
+function buildPosts(
+  body: string,
+  ctaUrl: string | null,
+  ctaLabel: string,
+  placement: string,
+  max: number
+): { posts: { text: string }[]; manualComment: string | null } {
+  if (!ctaUrl) return { posts: [{ text: body }], manualComment: null };
+  const ctaLine = `${ctaLabel} ${ctaUrl}`.trim();
+
+  if (placement === "comment") {
+    // LinkedIn: links are suppressed in-body and the API can't post a first comment for us.
+    return { posts: [{ text: body }], manualComment: ctaLine };
+  }
+  if (placement === "inline") {
+    const combined = `${body}\n\n${ctaLine}`;
+    if (combined.length <= max) return { posts: [{ text: combined }], manualComment: null };
+    return { posts: [{ text: body }, { text: ctaLine }], manualComment: null }; // would overflow → reply
+  }
+  // "reply" (X) or any unknown placement → link in the first reply
+  return { posts: [{ text: body }, { text: ctaLine }], manualComment: null };
+}
+
 async function main() {
   const arg = process.argv[2];
   if (!arg) {
@@ -61,10 +113,19 @@ async function main() {
   }
 
   const setId = await socialSetId();
+  const placementMap = loadCtaPlacement();
+  const maxMap = loadPlatformMax();
   for (const row of approved) {
     const assetPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
     const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
     const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
+
+    const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
+    const ctaUrl = rawCta && rawCta.toLowerCase() !== "none" ? rawCta : null;
+    const ctaLabel = typeof fm.cta_label === "string" ? fm.cta_label : "";
+    const placement = placementMap[row.platform] ?? "inline";
+    const { posts, manualComment } = buildPosts(body, ctaUrl, ctaLabel, placement, maxMap[row.platform] ?? Infinity);
+
     const draft = await api(`/social-sets/${setId}/drafts`, {
       method: "POST",
       body: JSON.stringify({
@@ -73,15 +134,22 @@ async function main() {
         platforms: {
           [platformKey]: {
             enabled: true,
-            posts: [{ text: body }],
+            posts,
           },
         },
       }),
     }) as { id?: string | number; share_url?: string };
     setStatus(folder, row, "published");
-    appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, next-free-slot)`);
+    const placeNote = ctaUrl ? `, cta→${placement}` : "";
+    appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, next-free-slot${placeNote})`);
+    if (manualComment) {
+      appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
+    }
     appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"}`, fm, body);
-    console.log(`scheduled: ${row.id} (${row.platform}) → typefully draft ${draft.id ?? "?"}`);
+    console.log(
+      `scheduled: ${row.id} (${row.platform}) → typefully draft ${draft.id ?? "?"}${placeNote}` +
+        (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
+    );
   }
 }
 

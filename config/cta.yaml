@@ -1,0 +1,33 @@
+# Calls to action — the funnel layer.
+# /atomize stamps each text derivative's `cta` (url) + `cta_label` from the pillar target below;
+# /publish (typefully) then PLACES that link per `placement` for the platform — so the post body
+# stays clean (Muxin's words only) and the link never triggers an algorithm penalty.
+#
+# Brand-building funnel (no product to sell yet): the default CTA converts rented platform
+# attention into OWNED audience → Substack subscribe. Civic-tech posts point at the voting tool.
+# Donations stay secondary — never the headline ask.
+
+targets:                 # default CTA per pillar — /atomize fills `cta` + `cta_label` from here
+  human-ai:
+    url: "https://humaninference.substack.com"
+    label: "Full essay (free to subscribe):"
+  claude-code:
+    url: "https://humaninference.substack.com"
+    label: "Full essay (free to subscribe):"
+  civic-tech:
+    url: "https://voter-choice.vercel.app/"
+    label: "See where your reps actually stand:"
+  other:
+    url: "https://humaninference.substack.com"
+    label: "More:"
+
+placement:               # WHERE the link goes per platform (from Branding/.../Platform Reference.md)
+  x: reply               # links in-post = 30-50% reach penalty → link goes in the first reply
+  linkedin: comment      # external links suppressed in body → first comment (publish logs a manual nudge)
+  bluesky: inline        # links are fine inline here
+  community: inline      # action-oriented rooms — link inline
+
+# Notes:
+# - quote-card / video-script carry their own CTA inside the asset; they are not placed here.
+# - A derivative can override the pillar default by setting its own `cta:` in frontmatter
+#   (e.g. a civic-leaning Bluesky post on a human-ai essay can point at the voting tool).
