@@ -22,42 +22,72 @@ const DIR_FOR: Record<Capability, string> = {
   "video-broll": "broll",
 };
 
+function readProviders(): Record<string, unknown> {
+  return parse(readFileSync(join(repoRoot, "config", "providers.yaml"), "utf8")) as Record<
+    string,
+    unknown
+  >;
+}
+
 function configuredName(capability: Capability): string {
-  const config = parse(readFileSync(join(repoRoot, "config", "providers.yaml"), "utf8")) as
-    Record<string, string>;
-  const name = config[capability];
-  if (!name) throw new Error(`config/providers.yaml has no entry for "${capability}"`);
+  const name = readProviders()[capability];
+  if (typeof name !== "string" || !name) {
+    throw new Error(`config/providers.yaml has no entry for "${capability}"`);
+  }
   return name;
 }
 
-async function load<T>(capability: Capability): Promise<T> {
-  const name = configuredName(capability);
+async function importProvider<T>(dir: string, name: string): Promise<T> {
   if (name === "none") {
-    throw new Error(
-      `capability "${capability}" is disabled (set to "none" in config/providers.yaml)`
-    );
+    throw new Error(`adapter is disabled ("none") in config/providers.yaml`);
   }
-  const modPath = `./${DIR_FOR[capability]}/${name}.js`;
+  const modPath = `./${dir}/${name}.js`;
   let mod: { provider?: T };
   try {
     mod = await import(modPath);
   } catch (e) {
     throw new Error(
-      `no adapter "${name}" for capability "${capability}" — expected src/providers/${DIR_FOR[capability]}/${name}.ts ` +
-        `exporting \`provider\`. Configured in config/providers.yaml. (${(e as Error).message})`
+      `no adapter "${name}" — expected src/providers/${dir}/${name}.ts exporting \`provider\` ` +
+        `(configured in config/providers.yaml). (${(e as Error).message})`
     );
   }
   if (!mod.provider) {
-    throw new Error(`src/providers/${DIR_FOR[capability]}/${name}.ts does not export \`provider\``);
+    throw new Error(`src/providers/${dir}/${name}.ts does not export \`provider\``);
   }
   return mod.provider;
 }
 
+async function load<T>(capability: Capability): Promise<T> {
+  return importProvider<T>(DIR_FOR[capability], configuredName(capability));
+}
+
 export function isEnabled(capability: Capability): boolean {
-  return configuredName(capability) !== "none";
+  const name = readProviders()[capability];
+  return typeof name === "string" && name !== "none";
+}
+
+// Image generation runs under named profiles in config/providers.yaml so one adapter can serve
+// many models. The returned `params` are passed straight to provider.generate():
+//   image: <adapter>   + image_params: { model, ... }   → default workhorse
+//   image_hero:  { provider, ...params }                 → premium override (render --hero)
+//   image_cheap: { provider, ...params }                 → cheap/bulk override (render --cheap)
+export type ImageProfile = "pro" | "hero";
+export async function getImage(
+  profile?: ImageProfile
+): Promise<{ provider: ImageProvider; params: Record<string, unknown> }> {
+  const cfg = readProviders();
+  if (profile) {
+    const o = cfg[`image_${profile}`] as Record<string, unknown> | undefined;
+    if (!o || typeof o.provider !== "string") {
+      throw new Error(`config/providers.yaml has no "image_${profile}: { provider, ... }" profile`);
+    }
+    const { provider: name, ...params } = o;
+    return { provider: await importProvider<ImageProvider>("image", name as string), params };
+  }
+  const provider = await load<ImageProvider>("image");
+  return { provider, params: (cfg.image_params as Record<string, unknown>) ?? {} };
 }
 
 export const getTTS = () => load<TTSProvider>("tts");
-export const getImage = () => load<ImageProvider>("image");
 export const getTranscription = () => load<TranscriptionProvider>("transcription");
 export const getTextPolish = () => load<TextPolishProvider>("text-polish");

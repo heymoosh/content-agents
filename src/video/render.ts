@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { logCost } from "../util/cost-log.js";
-import { getImage, getTTS, isEnabled } from "../providers/registry.js";
+import { getImage, getTTS, isEnabled, type ImageProfile } from "../providers/registry.js";
 import { charsToWordCaptions } from "./captions.js";
 import { charsOrWhisper } from "./align.js";
 
@@ -59,24 +59,36 @@ async function withJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): 
   }
 }
 
-async function renderStill(folder: string, quoteName: string): Promise<void> {
+async function renderStill(
+  folder: string,
+  quoteName: string,
+  profile?: ImageProfile
+): Promise<void> {
   const quote = readDerivative(folder, quoteName);
   const slug = basename(folder);
 
   await withJob(async (jobDir, jobName) => {
     let bgImage: string | null = null;
-    if (isEnabled("image") && process.env.GEMINI_API_KEY) {
-      const provider = await getImage();
-      const promptFile = join(folder, "images", `${quoteName}-prompt.txt`);
-      const prompt = existsSync(promptFile)
-        ? readFileSync(promptFile, "utf8").trim()
-        : "abstract soft gradient texture, deep indigo and warm amber, minimal, atmospheric, no text, no people";
-      const bgPath = join(jobDir, "bg.png");
-      const { costUsd } = await provider.generate({ prompt, aspect: "1:1", outPath: bgPath });
-      logCost({ step: `image:${provider.name}`, detail: `${slug}/${quoteName}-bg`, costUsd });
-      bgImage = `${jobName}/bg.png`;
+    if (isEnabled("image")) {
+      try {
+        const { provider, params } = await getImage(profile);
+        const promptFile = join(folder, "images", `${quoteName}-prompt.txt`);
+        // Quote-card background sits UNDER Muxin's overlaid quote, so the model must not bake in
+        // its own text/title/caption (these image models love to add them).
+        const prompt = existsSync(promptFile)
+          ? readFileSync(promptFile, "utf8").trim()
+          : "flat editorial screen-print background texture, New Yorker style, limited palette of cream, persimmon, teal and ochre, minimal, atmospheric, no text, no title, no caption, no people";
+        const bgPath = join(jobDir, "bg.png");
+        const { costUsd } = await provider.generate({ prompt, aspect: "1:1", outPath: bgPath, params });
+        logCost({ step: `image:${provider.name}`, detail: `${slug}/${quoteName}-bg`, costUsd });
+        bgImage = `${jobName}/bg.png`;
+      } catch (e) {
+        console.log(
+          `image generation failed (${(e as Error).message.slice(0, 140)}) — rendering gradient-only card`
+        );
+      }
     } else {
-      console.log("image provider disabled or GEMINI_API_KEY missing — rendering gradient-only card");
+      console.log("image provider disabled — rendering gradient-only card");
     }
 
     const props = { quote, attribution: "Muxin Li", bgImage };
@@ -89,7 +101,7 @@ async function renderStill(folder: string, quoteName: string): Promise<void> {
   });
 }
 
-async function renderVideo(folder: string): Promise<void> {
+async function renderVideo(folder: string, profile?: ImageProfile): Promise<void> {
   const script = readDerivative(folder, "video-script");
   const slug = basename(folder);
   const videoDir = join(folder, "video");
@@ -127,7 +139,7 @@ async function renderVideo(folder: string): Promise<void> {
     const durationMs = captions[captions.length - 1].endMs + 800;
 
     // 3. Images
-    const image = await getImage();
+    const { provider: image, params: imageParams } = await getImage(profile);
     const imageNames: string[] = [];
     for (let i = 0; i < prompts.length; i++) {
       const outPath = join(folder, "images", `video-${i + 1}.png`);
@@ -136,6 +148,7 @@ async function renderVideo(folder: string): Promise<void> {
           prompt: prompts[i],
           aspect: "9:16",
           outPath,
+          params: imageParams,
         });
         logCost({ step: `image:${image.name}`, detail: `${slug}/video-${i + 1}`, costUsd });
       }
@@ -192,7 +205,7 @@ function storyboardStatus(folder: string): string | null {
 }
 
 // Derive the low-level render inputs from an APPROVED storyboard, then run --video.
-async function renderVideoFromStoryboard(folder: string): Promise<void> {
+async function renderVideoFromStoryboard(folder: string, profile?: ImageProfile): Promise<void> {
   const sbPath = join(folder, "video", "storyboard.md");
   if (!existsSync(sbPath)) {
     throw new Error(`missing ${sbPath} — run /atomize step 7a to write the storyboard first.`);
@@ -241,24 +254,30 @@ async function renderVideoFromStoryboard(folder: string): Promise<void> {
   writeFileSync(join(folder, "video", "image-prompts.txt"), visuals.join("\n") + "\n");
 
   console.log(`derived from storyboard: ${visuals.length} scene(s) → image-prompts.txt + video-script.md`);
-  await renderVideo(folder);
+  await renderVideo(folder, profile);
 }
 
 async function main() {
   const args = process.argv.slice(2);
   const mode = args[0];
+  // Image model profile: cheap default (Riverflow), or --pro / --hero step-ups (config/providers.yaml).
+  const profile: ImageProfile | undefined = args.includes("--hero")
+    ? "hero"
+    : args.includes("--pro")
+      ? "pro"
+      : undefined;
   if (mode === "--still") {
     const folder = resolveFolder(args[1]);
     const quoteIdx = args.indexOf("--quote");
     const quoteName = quoteIdx !== -1 ? args[quoteIdx + 1] : "quote-card-1";
-    await renderStill(folder, quoteName);
+    await renderStill(folder, quoteName, profile);
   } else if (mode === "--render-video") {
-    await renderVideoFromStoryboard(resolveFolder(args[1]));
+    await renderVideoFromStoryboard(resolveFolder(args[1]), profile);
   } else if (mode === "--video") {
-    await renderVideo(resolveFolder(args[1]));
+    await renderVideo(resolveFolder(args[1]), profile);
   } else {
     console.error(
-      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>]\n  tsx src/video/render.ts --render-video <content-folder>\n  tsx src/video/render.ts --video <content-folder>"
+      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
     );
     process.exit(1);
   }

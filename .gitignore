@@ -11,6 +11,7 @@ content/**/video/*.wav
 content/**/video/*.mp3
 content/**/images/*.png
 content/**/images/*.jpg
+/bakeoff/
 .remotion/
 out/
 *.log
