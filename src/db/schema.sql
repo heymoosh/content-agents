@@ -34,6 +34,28 @@ CREATE TABLE IF NOT EXISTS imports (
   row_count INTEGER
 );
 
+-- Audience-level data (who follows you), separate from per-post metrics. One long/EAV-style
+-- table holds both scalar totals (a follower count = metric_type 'follower_total', dimension NULL)
+-- and demographic breakdowns (metric_type 'demographic', dimension+value_label+value_pct). Only
+-- LinkedIn populates demographics; Substack adds subscriber tier; Bluesky a follower count; X none.
+-- Repeated captured_at snapshots reconstruct growth-over-time for snapshot-only platforms.
+CREATE TABLE IF NOT EXISTS audience (
+  id INTEGER PRIMARY KEY,
+  platform TEXT NOT NULL,              -- 'x' | 'linkedin' | 'substack' | 'bluesky'
+  captured_at TEXT NOT NULL,           -- ISO8601: when WE ingested (enables growth-over-time)
+  as_of_date TEXT,                     -- ISO8601 date the source attributes the value to
+  metric_type TEXT NOT NULL,           -- 'follower_total' | 'follower_delta' | 'demographic'
+  dimension TEXT,                      -- NULL for totals; 'location'|'seniority'|'industry'|'company'|'job_title'|'company_size'|'tier'
+  value_label TEXT,                    -- NULL for totals; e.g. 'Greater Houston', 'Senior', 'paid'
+  value_count INTEGER,                 -- absolute count when known (totals, deltas, tier counts)
+  value_pct REAL,                      -- demographic share (0–100); NULL when source says "< 1%"
+  source_file TEXT,                    -- export filename / 'atproto:getProfile' for provenance
+  raw_json TEXT,
+  UNIQUE(platform, captured_at, metric_type, dimension, value_label)
+);
+
+CREATE INDEX IF NOT EXISTS idx_audience_platform ON audience(platform, metric_type);
+
 CREATE INDEX IF NOT EXISTS idx_posts_platform ON posts(platform);
 CREATE INDEX IF NOT EXISTS idx_posts_pillar ON posts(pillar);
 CREATE INDEX IF NOT EXISTS idx_posts_bet ON posts(bet_id);

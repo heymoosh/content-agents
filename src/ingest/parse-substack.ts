@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { parseCsv, findColumn, toInt, toFloat } from "../util/csv.js";
 import { sha256Text } from "../util/hash.js";
-import { ImportRow, ParseError } from "./types.js";
+import { ImportRow, AudienceRow, ParseError } from "./types.js";
 
 // Substack post-stats CSV (from the dashboard's posts export). Aliases cover the
 // full-export `posts.csv` and the stats table download.
@@ -107,6 +107,44 @@ export function parseSubstackExport(dir: string): ImportRow[] {
   }
   if (out.length === 0) throw new ParseError("posts.csv", "no published posts with stats found");
   return out;
+}
+
+// Substack audience from the export's email_list.*.csv: subscriber TOTAL + free/paid tier split.
+// Substack exposes no real demographics — tier is the only "breakdown" available.
+export function parseSubstackAudience(dir: string): AudienceRow[] {
+  let files: string[] = [];
+  try {
+    files = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const listFile = files.find((f) => /^email_list.*\.csv$/i.test(f));
+  if (!listFile) return [];
+  const rows = parseCsv(readFileSync(join(dir, listFile), "utf8"));
+  if (rows.length < 2) return [];
+  const header = rows[0];
+  const ai = findColumn(header, ["active_subscription", "active subscription"]);
+  const fp = findColumn(header, ["first_payment_at", "first payment at"]);
+
+  let total = 0;
+  let paid = 0;
+  for (const r of rows.slice(1)) {
+    if (r.length === 1 && !r[0]) continue;
+    total++;
+    const active = ai >= 0 && /^(true|1|yes)$/i.test((r[ai] ?? "").trim());
+    const paidAt = fp >= 0 && (r[fp] ?? "").trim() !== "";
+    if (active || paidAt) paid++;
+  }
+  if (total === 0) return [];
+
+  const capturedAt = new Date().toISOString();
+  const base = { platform: "substack" as const, capturedAt, sourceFile: listFile, asOfDate: null };
+  const pct = (n: number) => Math.round((n / total) * 1000) / 10;
+  return [
+    { ...base, metricType: "follower_total", dimension: null, valueLabel: null, valueCount: total, valuePct: null, raw: {} },
+    { ...base, metricType: "demographic", dimension: "tier", valueLabel: "paid", valueCount: paid, valuePct: pct(paid), raw: {} },
+    { ...base, metricType: "demographic", dimension: "tier", valueLabel: "free", valueCount: total - paid, valuePct: pct(total - paid), raw: {} },
+  ];
 }
 
 export function parseSubstack(fileName: string, content: string): ImportRow[] {

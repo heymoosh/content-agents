@@ -2,10 +2,10 @@ import { readdirSync, readFileSync, renameSync, mkdirSync } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { openDb, repoRoot } from "../db/db.js";
 import { sha256File } from "../util/hash.js";
-import { ImportRow } from "./types.js";
+import { ImportRow, AudienceRow } from "./types.js";
 import { parseX } from "./parse-x.js";
-import { parseSubstack, parseSubstackExport } from "./parse-substack.js";
-import { parseLinkedIn } from "./parse-linkedin.js";
+import { parseSubstack, parseSubstackExport, parseSubstackAudience } from "./parse-substack.js";
+import { parseLinkedIn, parseLinkedInAudience } from "./parse-linkedin.js";
 
 const INBOX = join(repoRoot, "data", "inbox");
 const PROCESSED = join(repoRoot, "data", "processed");
@@ -30,6 +30,19 @@ async function parseEntry(platform: string, path: string, isDir: boolean): Promi
   }
 }
 
+// Audience-level rows (follower totals / demographics) alongside the per-post data. Only LinkedIn
+// (xlsx) and Substack (export folder) carry any; X and Bluesky-CSV produce none here.
+async function parseAudienceFor(platform: string, path: string, isDir: boolean): Promise<AudienceRow[]> {
+  const name = basename(path);
+  if (platform === "linkedin" && [".xlsx", ".xls"].includes(extname(name).toLowerCase())) {
+    return parseLinkedInAudience(name, readFileSync(path));
+  }
+  if (platform === "substack" && isDir) {
+    return parseSubstackAudience(path);
+  }
+  return [];
+}
+
 export async function runImport(): Promise<void> {
   const db = openDb();
   const now = new Date().toISOString();
@@ -46,6 +59,10 @@ export async function runImport(): Promise<void> {
   `);
   const insertMetrics = db.prepare(`
     INSERT INTO metrics (post_id, captured_at, impressions, likes, replies, reposts, clicks, new_follows, engagement_rate, raw_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertAudience = db.prepare(`
+    INSERT OR IGNORE INTO audience (platform, captured_at, as_of_date, metric_type, dimension, value_label, value_count, value_pct, source_file, raw_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const seenImport = db.prepare("SELECT 1 FROM imports WHERE sha256 = ?");
@@ -77,7 +94,8 @@ export async function runImport(): Promise<void> {
           continue;
         }
         const rows = await parseEntry(platform, path, isDir);
-        const tx = db.transaction((rows: ImportRow[]) => {
+        const audienceRows = await parseAudienceFor(platform, path, isDir);
+        const tx = db.transaction(() => {
           for (const row of rows) {
             const { id } = upsertPost.get(row) as { id: number };
             insertMetrics.run(
@@ -93,12 +111,27 @@ export async function runImport(): Promise<void> {
               JSON.stringify(row.raw)
             );
           }
+          for (const a of audienceRows) {
+            insertAudience.run(
+              a.platform,
+              a.capturedAt,
+              a.asOfDate,
+              a.metricType,
+              a.dimension,
+              a.valueLabel,
+              a.valueCount,
+              a.valuePct,
+              a.sourceFile,
+              JSON.stringify(a.raw)
+            );
+          }
           insertImport.run(hash, file, platform, now, rows.length);
         });
-        tx(rows);
+        tx();
         mkdirSync(PROCESSED, { recursive: true });
         renameSync(path, join(PROCESSED, `${hash.slice(0, 8)}-${file}`));
-        console.log(`imported: ${platform}/${file} → ${rows.length} rows`);
+        const audNote = audienceRows.length ? ` + ${audienceRows.length} audience rows` : "";
+        console.log(`imported: ${platform}/${file} → ${rows.length} rows${audNote}`);
         totalFiles++;
         totalRows += rows.length;
       } catch (e) {
