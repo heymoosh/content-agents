@@ -15,16 +15,19 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
    If nothing is approved, stop.
 
 2. **Text posts** (x / linkedin / bluesky): `npm run publish:typefully -- <folder>`
-   - Creates SCHEDULED drafts (next free slot) — Typefully's queue is the second safety net.
+   - Creates SCHEDULED drafts — Typefully's queue is the second safety net.
    - LinkedIn's CTA link goes INLINE in the body (`config/cta.yaml` placement). The cleaner
      first-comment needs gated LinkedIn API access; inline keeps LinkedIn fully automated on
      Typefully like the rest. X's link goes in the first reply; Bluesky/community inline.
-   - **Timing: anchor to PST, not Muxin's local CST** (the tech/AI audience skews West Coast).
-     Target each platform's `best_times_pst` window in `config/platforms.yaml`, and spread a
-     piece's derivatives ~1/day across the week, never same-day. Because the script schedules to
-     "next-free-slot", these windows are realized via the Typefully schedule (set the slots to
-     match) or by dragging drafts to the right times in Typefully after. Tell Muxin the suggested
-     per-post schedule when you report.
+   - **Timing is automatic and PT-anchored** (the tech/AI audience skews West Coast). The script
+     computes an explicit publish time per post from each platform's cadence in
+     `config/platforms.yaml` (`posts_per_week` + `slot_days` + `slot_time_pst`, DST-aware) and
+     sends it to Typefully — ~1/day, never same-day, capped at `posts_per_week`. No manual
+     dragging. It prints the full per-post schedule; relay that when you report. A platform with
+     no cadence config falls back to "next-free-slot".
+   - Known limit (Phase 2): spacing is computed per `/publish` run; publishing two folders close
+     together can double-book a slot. Cross-run/cross-piece spacing from the rolling approved pool
+     is not built yet — note it if Muxin ships multiple pieces at once.
    - On a 402 error: Typefully needs a paid plan — surface this to Muxin with the
      Postiz fallback noted in `docs/setup-typefully.md`. Do not work around it.
 

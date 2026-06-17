@@ -59,12 +59,31 @@ async function withJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): 
   }
 }
 
+// Named quote-card color schemes (house palette: cream/ink/persimmon/teal/ochre — memory:
+// image-style-newyorker). Consistent branding: every card uses DEFAULT_SCHEME unless its
+// frontmatter pins one with `scheme:`. The New Yorker DNA (serif type, keyline, ornament,
+// rule, small-caps attribution) is constant; only the three colors change per scheme.
+const CARD_SCHEMES: Record<string, { paper: string; ink: string; accent: string }> = {
+  classic: { paper: "#f2ead9", ink: "#1a1a1a", accent: "#e2552f" }, // beige paper, ink, persimmon
+  "teal-accent": { paper: "#f2ead9", ink: "#1a1a1a", accent: "#2f7e7e" }, // beige paper, ink, teal
+  "teal-block": { paper: "#2f7e7e", ink: "#f2ead9", accent: "#d8a23a" }, // teal paper, cream type, ochre
+  ink: { paper: "#1a1a1a", ink: "#f2ead9", accent: "#2f7e7e" }, // dark paper, cream type, teal
+};
+const DEFAULT_SCHEME = "classic";
+
+function resolveScheme(fm: Record<string, unknown>): { paper: string; ink: string; accent: string } {
+  const name = typeof fm.scheme === "string" ? fm.scheme.toLowerCase() : "";
+  return CARD_SCHEMES[name] ?? CARD_SCHEMES[DEFAULT_SCHEME];
+}
+
 async function renderStill(
   folder: string,
   quoteName: string,
   profile?: ImageProfile
 ): Promise<void> {
-  const quote = readDerivative(folder, quoteName);
+  const { fm, body: quote } = splitFrontmatter(
+    readFileSync(join(folder, "derivatives", `${quoteName}.md`), "utf8")
+  );
   const slug = basename(folder);
 
   await withJob(async (jobDir, jobName) => {
@@ -72,7 +91,7 @@ async function renderStill(
     // (Muxin's call, June 2026: "just quotes, not illustrations.") The quote IS the design, so
     // we skip the quote-card background image-gen entirely (the --pro/--hero profile and the
     // image-model policy still apply to video b-roll, just not to quote cards).
-    const props = { quote, attribution: "Muxin Li" };
+    const props = { quote, attribution: "Muxin Li", ...resolveScheme(fm) };
     const propsFile = join(jobDir, "props.json");
     writeFileSync(propsFile, JSON.stringify(props));
     const outPath = join(folder, "images", `${quoteName}.png`);
