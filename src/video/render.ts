@@ -69,7 +69,7 @@ const CARD_SCHEMES: Record<string, { paper: string; ink: string; accent: string 
   "teal-block": { paper: "#2f7e7e", ink: "#f2ead9", accent: "#d8a23a" }, // teal paper, cream type, ochre
   ink: { paper: "#1a1a1a", ink: "#f2ead9", accent: "#2f7e7e" }, // dark paper, cream type, teal
 };
-const DEFAULT_SCHEME = "classic";
+const DEFAULT_SCHEME = "teal-accent";
 
 function resolveScheme(fm: Record<string, unknown>): { paper: string; ink: string; accent: string } {
   const name = typeof fm.scheme === "string" ? fm.scheme.toLowerCase() : "";
