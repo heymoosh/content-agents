@@ -1,0 +1,11 @@
+---
+platform: bluesky
+option: 6
+source_lines: [118]
+scores: { native: 5, brand: 5, cta: true }
+cta: source
+cta_label: "Full essay (free to subscribe):"
+from_brief: briefs/2026-06-16-strategy-brief.md
+directives_applied: [prioritize_pillar:human-ai, voice:no-ai-tells]
+---
+If the scarce resource is no longer information or even technical skill, but human judgment, then investing broadly in people stops being charity or idealism. It becomes a strategy.
