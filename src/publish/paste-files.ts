@@ -8,6 +8,9 @@ import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./qu
 //   tsx src/publish/paste-files.ts <content-folder>
 
 const PASTE_PLATFORMS = new Set(["community", "substack"]);
+// Community rows carry a `community:<id>` suffix (e.g. community:democratic-resilience); match on
+// the base platform before the colon so those rows are picked up.
+const basePlatform = (p: string): string => p.split(":")[0];
 
 function main() {
   const arg = process.argv[2];
@@ -17,7 +20,7 @@ function main() {
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
   const { rows } = readQueue(folder);
-  const approved = rows.filter((r) => r.status === "approve" && PASTE_PLATFORMS.has(r.platform));
+  const approved = rows.filter((r) => r.status === "approve" && PASTE_PLATFORMS.has(basePlatform(r.platform)));
   if (approved.length === 0) {
     console.log("no approved community/substack rows in the review queue");
     return;

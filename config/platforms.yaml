@@ -1,20 +1,29 @@
 # Per-platform format rules. validate.ts enforces hard limits; Claude follows style notes when drafting.
+#
+# Scheduling (Muxin, 2026-06-16): anchor posting times to PST, NOT his local CST, because the
+# tech/AI audience skews West Coast (SF Bay is a top location). Each platform's `best_times_pst` is
+# the target window. Spread a piece's derivatives ~1/day across the week; never dump them same-day.
+# NOTE: publish:typefully uses Typefully's "next-free-slot", so these windows are realized by setting
+# the Typefully schedule to match them (or dragging drafts to these times in the Typefully UI).
 platforms:
   x:
     max_chars: 280
     derivative_count: [3, 5]
+    best_times_pst: "Tue-Thu, 9-11am (primary), 1-2pm (secondary). Weak on weekends."
     style: >
       Short claims or provocations. Pick the sharpest sentence from the source and
       trim for 280-char energy. No hashtag spam; 0-1 hashtags max.
   linkedin:
     max_chars: 3000
     derivative_count: [1, 2]
+    best_times_pst: "Tue-Thu, 8-10am. Business hours only; no evenings or weekends."
     style: >
       Lesson post, left-aligned narrative, practitioner voice. Insight-driven,
       not link-dump. Short paragraphs, line breaks between thoughts.
   bluesky:
     max_chars: 300
     derivative_count: [1, 2]
+    best_times_pst: "Weekday 9-11am and 6-9pm. Evenings are lively for the AI/tech crowd."
     style: >
       Like X but slightly more casual and observational. Civic/tech audience,
       less algorithmic pressure.
