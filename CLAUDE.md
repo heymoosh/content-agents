@@ -51,9 +51,11 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 
 ## Build 2 — Fiction (composed prose, walled off)
 
-Build 2 is the **opposite** of extraction-first: `/story` *composes* original fiction with
-Grok (the `prose` provider). Muxin is the showrunner (world, characters, direction); Claude
-drafts the prose and holds consistency. This composition is allowed **only because every
+Build 2 is the **opposite** of extraction-first: `/story` *composes* original fiction. Muxin is
+the showrunner (world, characters, direction); Claude drafts the prose and holds consistency.
+Two drafting modes, set per series in `series.yaml` `prose:`: **claude-native** (default, no API
+key, Opus plans the beats and a Sonnet/Haiku writer subagent drafts) or an external **`prose`
+provider** (e.g. `grok-openrouter`) via `npm run story:draft` when a key is configured. This composition is allowed **only because every
 chapter is reviewed and approved by Muxin on a GitHub PR before it publishes, and nothing
 auto-publishes** — the same principle as the video-script exception (rule 1), extended to a
 whole build. It must never bleed back into Build 0/1: text/image derivatives stay

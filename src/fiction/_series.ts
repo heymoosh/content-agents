@@ -11,7 +11,10 @@ export const STORIES_DIR = join(repoRoot, "stories");
 export interface SeriesConfig {
   slug?: string;
   title?: string;
-  prose?: string; // override config/providers.yaml `prose` for this series; "default" = global
+  prose?: string; // "default" = global config; "claude-native" = composed by the /story skill;
+  // or an adapter name in src/providers/prose/ for the external story:draft path
+  planner_model?: string; // claude-native: model that plans beats + QCs (e.g. opus)
+  writer_model?: string; // claude-native: model that drafts prose (e.g. sonnet, haiku)
   narrative?: { pov?: string; tense?: string; style_ref?: string };
   chapter?: { target_words?: number; min_words?: number };
   illustration?: { style_lock?: string; aspect?: string };

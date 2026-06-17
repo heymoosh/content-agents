@@ -68,6 +68,14 @@ async function main() {
     (beatsFile ? readFileSync(beatsFile, "utf8") : flag("--beats")) ??
     `Write chapter ${chapterN}, advancing the story per the outline and canon. End on a hook that makes the reader need the next chapter.`;
 
+  if (cfg.prose === "claude-native") {
+    console.error(
+      `series "${cfg.slug ?? series}" is prose: claude-native — chapters are composed by the ` +
+        `/story skill (Opus plans, ${cfg.writer_model ?? "sonnet"} writes), not by this script. ` +
+        `Set prose: to an adapter in src/providers/prose/ to use story:draft.`
+    );
+    process.exit(1);
+  }
   const useNamed = cfg.prose && cfg.prose !== "default";
   const provider = useNamed ? await getProseNamed(cfg.prose as string) : await getProse();
   const { text, costUsd } = await provider.generate({ system, context, instructions });

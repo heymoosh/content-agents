@@ -60,18 +60,35 @@ holds, or flag the seam.
    outline/canon support; if Muxin gave direction for this chapter, use it. Write the beat
    sheet to a temp file or pass it inline.
 2. **Inspect the context pack** (optional but cheap): `npm run story:context -- <series>` prints
-   exactly what the model will see. Sanity-check it's coherent and not missing a character.
-3. **Draft via Grok:**
+   exactly what the writer will see (bible, canon, character sheets, recent chapters). Sanity-
+   check it's coherent and not missing a character.
+3. **Draft. Two modes, set by `series.yaml` `prose:`.**
+
+   **Claude-native (default; `prose: claude-native`, no API key).** Opus plans, a writer model
+   drafts:
+   - Read `config/fiction/craft.md` + `config/fiction/style.yaml` and the context pack from step
+     2. As the planner (Opus), finalize the beat sheet from step 1.
+   - Spawn a writer subagent with the model named in `series.yaml` `writer_model` (default
+     `sonnet`; A/B with `haiku` anytime) using the Agent tool. Hand it: the craft + style rules,
+     the context pack, the beat sheet, the target length, and the hard format rule (one sentence
+     or one short beat of dialogue per line, blank line between paragraphs, prose only, no em
+     dashes). Have it return ONLY the chapter prose.
+   - Write the returned prose to `chapters/chapter-NN.md` with the frontmatter (series, chapter,
+     title, pov, status: drafting, word_count, prose_model: claude-<writer_model>). Keep one
+     sentence per line. No external API, nothing to log to cost-log.
+
+   **External provider (`prose: <adapter>`, needs a key).** When a prose adapter + key are
+   configured (e.g. `grok-openrouter`):
    ```
    npm run story:draft -- <series> --beats <<'BEATS_EOF'
    <your beat sheet for this chapter>
    BEATS_EOF
    ```
-   (or `--beats-file <path>`). This writes `chapters/chapter-NN.md` one-sentence-per-line,
-   logs the cost, and prints the path. The craft + style guards (`config/fiction/*`) are
-   injected automatically.
+   (or `--beats-file <path>`). Writes `chapters/chapter-NN.md` one-sentence-per-line, logs cost,
+   prints the path. Craft + style guards are injected automatically.
 4. **QC it (your judgment).** Read the draft against `config/fiction/style.yaml`'s
-   `check_before_pr`: does it open on a question, does every scene have a goal + obstacle, does
+   `check_before_pr`: does it open in motion (not on a literal question), does every scene have a
+   goal + obstacle, zero em dashes, does
    it **end on a turn/open loop**, does anything contradict canon? Set the `title` in
    frontmatter. If it's flat or off-canon, re-draft (adjust the beats and re-run `story:draft`
    to a fresh chapter number, or edit surgically). This is where storytelling instinct lives —
