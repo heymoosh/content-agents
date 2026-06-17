@@ -72,4 +72,18 @@ matters.
   medical band), standing for the systemic rot, not just the person.
 - Who could have been his reason to stay, and how he turned from it.
 - Names: the Betrayer, the Unwilling Prince, key children.
-- Chapter 1 opens mid-strike with Eli present (locked).
+- Chapter 1 opening is being reworked (see Muxin's preferred Grok draft); the data-center strike
+  below is parked for a later chapter, not the opener.
+
+## Parked scene outlines (for later chapters)
+
+### The witness strike (a later data-center op, not Chapter 1)
+A strike is underway on a tight clock and the building was supposed to be empty. It is not: a
+night maintenance worker, as dispossessed as the crew, is still inside. The clean sabotage
+becomes a moral choice. Dez argues to proceed; Eli goes in himself to get the worker out,
+because he will not let the operation treat a person as acceptable collateral (his interior
+fracture in action, and the live mirror of his own wound, a system that once filed someone he
+loved as low priority). It costs them: a close call, the worker sees his face, the strike lands
+messy. Grief surfaces in motion (his hand finds the band) rather than in monologue. The turn:
+Dez is quietly furious that Eli risked everyone for one stranger, the appetite-versus-restraint
+fracture goes personal, and the witness is a loose thread that will return.
