@@ -59,10 +59,11 @@ auto-publishes** — the same principle as the video-script exception (rule 1), 
 whole build. It must never bleed back into Build 0/1: text/image derivatives stay
 extraction-first.
 
-- **Rule 5 does not apply to fiction.** `config/voice.yaml` (Muxin's nonfiction PM voice, the
-  em-dash ban) governs Builds 0/1 only. Fiction is governed by `config/fiction/craft.md` +
-  `config/fiction/style.yaml` (and per-series `narrative:` overrides). Em dashes are fine in
-  prose.
+- **Rule 5 does not apply to fiction, except the em-dash ban.** `config/voice.yaml` (Muxin's
+  nonfiction PM voice) governs Builds 0/1 only. Fiction is governed by `config/fiction/craft.md`
+  + `config/fiction/style.yaml` (and per-series `narrative:` overrides). The one rule that
+  carries over: **no em dashes** (Muxin's house rule, fiction included). The fiction guards
+  strip them like `voice.yaml` does for nonfiction.
 - **Consistency model:** `bible.md` (living world/character reference) + `canon.md` (append-only
   ledger of established facts, updated on lock) + `characters/<name>.md` sheets + loose
   `outline.md`. The plot may evolve; established canon must not silently break.

@@ -1,7 +1,10 @@
 # Narrative style for fiction (Build 2). This is the fiction equivalent of config/voice.yaml,
-# and it REPLACES voice.yaml for fiction — the nonfiction PM voice and its em-dash ban do not
-# apply to composed prose (em dashes are legitimate in fiction). A series can override any of
-# these in stories/<slug>/series.yaml under `narrative:`.
+# and it REPLACES voice.yaml for fiction: the nonfiction PM voice does not apply to composed
+# prose. The em-dash ban DOES carry over though (Muxin's house rule, fiction included). A
+# series can override any of these in stories/<slug>/series.yaml under `narrative:`.
+
+banned_punctuation:
+  - "Em dashes. Use periods, commas, colons, or parentheses instead. Target is zero."
 
 narrative:
   pov: "third person limited"      # third-limited | first | third-omniscient
@@ -26,8 +29,9 @@ is_not:
   - "Generic-AI. No reflexive triads, no 'not X but Y' as a rhythm tic, no cliché."
 
 check_before_pr:
-  - "Read it aloud. Does the opening plant a question in the first two sentences?"
+  - "Read it aloud. Does the opening drop us into motion or tension (no literal question, no rhetorical hook)?"
+  - "Count the em dashes. Target is zero. Replace any with a period, comma, colon, or parentheses."
   - "Does every scene have a goal and an obstacle?"
   - "Does the chapter END on a turn or an open loop the reader will subscribe to resolve?"
-  - "Is anything contradicting the bible / canon / character sheets? Fix it."
+  - "Is anything contradicting the bible, canon, or character sheets? Fix it."
   - "One sentence per line, blank line between paragraphs (for line-level PR review)?"
