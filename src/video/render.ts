@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { logCost } from "../util/cost-log.js";
-import { getImage, getTTS, isEnabled, type ImageProfile } from "../providers/registry.js";
+import { getImage, getTTS, getBroll, isEnabled, type ImageProfile } from "../providers/registry.js";
 import { charsToWordCaptions } from "./captions.js";
 import { charsOrWhisper } from "./align.js";
 
@@ -257,6 +257,162 @@ async function renderVideoFromStoryboard(folder: string, profile?: ImageProfile)
   await renderVideo(folder, profile);
 }
 
+// TTS the script, align, and write captions — shared by the animated render path.
+async function synthVoiceAndCaptions(
+  videoDir: string,
+  script: string,
+  slug: string
+): Promise<{ audioPath: string; captions: ReturnType<typeof charsToWordCaptions>; durationMs: number }> {
+  const tts = await getTTS();
+  const audioPath = join(videoDir, "voiceover.mp3");
+  const { charTimestamps, costUsd } = await tts.synthesize({ text: script, outPath: audioPath });
+  logCost({ step: `tts:${tts.name}`, detail: slug, costUsd });
+  const aligned = await charsOrWhisper(charTimestamps, audioPath);
+  writeFileSync(join(videoDir, "alignment.json"), JSON.stringify(aligned));
+  const captions = charsToWordCaptions(aligned);
+  writeFileSync(join(videoDir, "captions.json"), JSON.stringify(captions, null, 2));
+  const durationMs = captions[captions.length - 1].endMs + 800;
+  return { audioPath, captions, durationMs };
+}
+
+// ANIMATED engine: the storyboard's scene visuals become keyframe stills; the video provider
+// (Kling) animates BETWEEN consecutive keyframes; the clips are stitched under the voiceover +
+// captions. `keyframesOnly` generates just the stills and stops, so they can be approved before
+// any paid animation. Gated on the same approved storyboard row as the image-motion path.
+async function renderAnimatedFromStoryboard(
+  folder: string,
+  profile?: ImageProfile,
+  keyframesOnly = false
+): Promise<void> {
+  const sbPath = join(folder, "video", "storyboard.md");
+  if (!existsSync(sbPath)) throw new Error(`missing ${sbPath} — write the storyboard first (/video).`);
+  if (storyboardStatus(folder) !== "approve") {
+    throw new Error(
+      `storyboard not approved (status="${storyboardStatus(folder) ?? "missing"}") — approve it in ` +
+        `review-queue.md before rendering. No paid generation runs until then.`
+    );
+  }
+
+  const { fm, body } = splitFrontmatter(readFileSync(sbPath, "utf8"));
+  const script = body.match(/##\s+Script\s*\n([\s\S]*?)(?:\n##\s|$)/)?.[1].trim();
+  if (!script) throw new Error(`${sbPath}: could not find a "## Script" section`);
+  const visuals = body
+    .split("\n")
+    .map((l) => l.match(/^\s*-\s*visual:\s*(.+)$/i)?.[1]?.trim())
+    .filter((v): v is string => Boolean(v));
+  if (visuals.length < 2) {
+    throw new Error(`${sbPath}: animated mode needs ≥2 scene "- visual:" keyframes (got ${visuals.length}).`);
+  }
+
+  const slug = basename(folder);
+  const videoDir = join(folder, "video");
+  mkdirSync(videoDir, { recursive: true });
+  mkdirSync(join(folder, "images"), { recursive: true });
+  mkdirSync(join(folder, "derivatives"), { recursive: true });
+  const sourceRef = fm.source_ref ? String(fm.source_ref) : "video/storyboard.md";
+  writeFileSync(
+    join(folder, "derivatives", "video-script.md"),
+    `---\nplatform: video-script\nsource_ref: ${sourceRef}\n---\n\n${script}\n`
+  );
+
+  // 1. Keyframe stills — one per scene visual; the frames you approve before any Kling spend.
+  // Consistency: default to Nano Banana Pro (reference-image conditioning) so the character +
+  // style hold across scenes. Each keyframe references an anchor (a user-supplied
+  // images/reference.* if present, else scene 1) plus the previous frame for local continuity.
+  const kfProfile: ImageProfile = profile ?? "pro";
+  const { provider: image, params: imageParams } = await getImage(kfProfile);
+  const userRef = ["reference.png", "reference.jpg", "reference.jpeg"]
+    .map((n) => join(folder, "images", n))
+    .find((p) => existsSync(p));
+  if (userRef) console.log(`character reference: ${userRef}`);
+  const keyframes: string[] = [];
+  for (let i = 0; i < visuals.length; i++) {
+    const kfPath = join(folder, "images", `keyframe-${i + 1}.png`);
+    if (!existsSync(kfPath)) {
+      const refs = [
+        ...new Set(
+          [userRef ?? keyframes[0], keyframes[i - 1]].filter((p): p is string => Boolean(p))
+        ),
+      ];
+      const { costUsd } = await image.generate({
+        prompt: visuals[i],
+        aspect: "9:16",
+        outPath: kfPath,
+        params: imageParams,
+        referenceImages: refs,
+      });
+      logCost({ step: `image:${image.name}`, detail: `${slug}/keyframe-${i + 1}`, costUsd });
+    }
+    keyframes.push(kfPath);
+  }
+  console.log(`keyframes: ${keyframes.length} stills → ${join(folder, "images")}`);
+  if (keyframesOnly) {
+    console.log("--keyframes-only: review the keyframe-*.png stills, then re-run without the flag to animate.");
+    return;
+  }
+
+  // 2. Voice + captions.
+  const { audioPath, captions, durationMs } = await synthVoiceAndCaptions(videoDir, script, slug);
+
+  // 3. Animate between consecutive keyframes; clip length sized to fill the voiceover.
+  const fps = 30;
+  const numClips = keyframes.length - 1;
+  const perClipSec = Math.min(8, Math.max(3, Math.round(durationMs / 1000 / numClips)));
+  const { provider: broll, params: brollParams } = await getBroll();
+  const clipsDir = join(videoDir, "clips");
+  mkdirSync(clipsDir, { recursive: true });
+
+  await withJob(async (jobDir, jobName) => {
+    const clipNames: string[] = [];
+    const clipFrames: number[] = [];
+    for (let i = 0; i < numClips; i++) {
+      const clipPath = join(clipsDir, `clip-${i + 1}.mp4`);
+      if (!existsSync(clipPath)) {
+        const { costUsd } = await broll.interpolate({
+          prompt: `Smooth, gentle motion transitioning into: ${visuals[i + 1]}`,
+          firstFramePath: keyframes[i],
+          lastFramePath: keyframes[i + 1],
+          aspect: "9:16",
+          durationSeconds: perClipSec,
+          outPath: clipPath,
+          params: brollParams,
+        });
+        logCost({ step: `video-broll:${broll.name}`, detail: `${slug}/clip-${i + 1}`, costUsd });
+      }
+      const jobClip = `clip-${i + 1}.mp4`;
+      copyFileSync(clipPath, join(jobDir, jobClip));
+      clipNames.push(`${jobName}/${jobClip}`);
+      clipFrames.push(perClipSec * fps);
+    }
+
+    copyFileSync(audioPath, join(jobDir, "voiceover.mp3"));
+    const props = {
+      audio: `${jobName}/voiceover.mp3`,
+      clips: clipNames,
+      clipFrames,
+      captions,
+      durationMs,
+    };
+    const propsFile = join(jobDir, "props.json");
+    writeFileSync(propsFile, JSON.stringify(props));
+
+    const mp4 = join(videoDir, "short.mp4");
+    remotion(["render", ENTRY, "AnimatedShort", mp4, `--props=${propsFile}`]);
+    remotion([
+      "still",
+      ENTRY,
+      "AnimatedShort",
+      join(videoDir, "thumbnail.png"),
+      `--props=${propsFile}`,
+      "--frame=15",
+    ]);
+    writeFileSync(join(videoDir, "transcript.txt"), script + "\n");
+    console.log(
+      `animated video: ${mp4} (${numClips} Kling clip(s) @ ${perClipSec}s, ${(durationMs / 1000).toFixed(1)}s total)`
+    );
+  });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const mode = args[0];
@@ -272,12 +428,17 @@ async function main() {
     const quoteName = quoteIdx !== -1 ? args[quoteIdx + 1] : "quote-card-1";
     await renderStill(folder, quoteName, profile);
   } else if (mode === "--render-video") {
-    await renderVideoFromStoryboard(resolveFolder(args[1]), profile);
+    const folder = resolveFolder(args[1]);
+    if (args.includes("--animated")) {
+      await renderAnimatedFromStoryboard(folder, profile, args.includes("--keyframes-only"));
+    } else {
+      await renderVideoFromStoryboard(folder, profile);
+    }
   } else if (mode === "--video") {
     await renderVideo(resolveFolder(args[1]), profile);
   } else {
     console.error(
-      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
+      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]            (image-motion B-roll)\n  tsx src/video/render.ts --render-video <content-folder> --animated [--keyframes-only] [--pro|--hero]\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
     );
     process.exit(1);
   }

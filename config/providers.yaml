@@ -13,4 +13,7 @@ image_pro:   { provider: gemini-nano-banana, model: gemini-3-pro-image-preview }
 image_hero:  { provider: openrouter-image, model: openai/gpt-5.4-image-2 }                # best look ~$0.23/img, slow
 transcription: gemini
 text-polish: grok-openrouter   # VIDEO SCRIPTS ONLY (atomize step 7a). Text posts stay extraction-first — see CLAUDE.md rule 1.
-video-broll: none      # future: "veo" (expensive, ~$2-6/video — deliberately off)
+video-broll: openrouter-video   # animated scenes: Kling first+last-frame interpolation (OpenRouter). Used by /video.
+# Animated scene-engine settings, passed to interpolate(). Kling v3.0 Std ~$0.08/s — cheaper than Veo,
+# and the one model verified to do start→end interpolation on the existing OPENROUTER_API_KEY.
+video_broll_params: { model: kwaivgi/kling-v3.0-std, resolution: 720p, cost_per_sec: 0.08 }

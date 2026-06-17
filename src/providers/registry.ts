@@ -8,6 +8,7 @@ import type {
   ImageProvider,
   TranscriptionProvider,
   TextPolishProvider,
+  VideoBrollProvider,
 } from "./types.js";
 
 // Adapter lookup: config/providers.yaml maps capability → provider name → module in
@@ -91,3 +92,13 @@ export async function getImage(
 export const getTTS = () => load<TTSProvider>("tts");
 export const getTranscription = () => load<TranscriptionProvider>("transcription");
 export const getTextPolish = () => load<TextPolishProvider>("text-polish");
+
+// Animated scene engine. Like getImage(), returns the adapter plus its `video_broll_params`
+// (model/resolution/cost), passed straight to provider.interpolate().
+export async function getBroll(): Promise<{
+  provider: VideoBrollProvider;
+  params: Record<string, unknown>;
+}> {
+  const provider = await load<VideoBrollProvider>("video-broll");
+  return { provider, params: (readProviders().video_broll_params as Record<string, unknown>) ?? {} };
+}

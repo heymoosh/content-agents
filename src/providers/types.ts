@@ -22,6 +22,9 @@ export interface ImageProvider {
     // The main pipeline omits it; the bakeoff passes a contender's `params` from
     // config/bakeoff.yaml so one adapter can stand in for many model/setting combos.
     params?: Record<string, unknown>;
+    // Optional reference image paths for character/style consistency (e.g. an anchor frame +
+    // the previous scene keyframe). Adapters that can't condition on images ignore them.
+    referenceImages?: string[];
   }): Promise<{ imagePath: string; costUsd: number }>;
 }
 
@@ -37,4 +40,20 @@ export interface TextPolishProvider {
     platform: string;
     instructions: string;
   }): Promise<{ text: string; costUsd: number }>;
+}
+
+export interface VideoBrollProvider {
+  name: string;
+  // Animate between a first and last keyframe (e.g. Kling first/last-frame interpolation).
+  // Async under the hood (submit → poll → download); resolves once the clip is written.
+  interpolate(req: {
+    prompt: string;
+    firstFramePath: string;
+    lastFramePath: string;
+    aspect: "9:16" | "1:1" | "16:9";
+    durationSeconds: number;
+    outPath: string;
+    // Per-call settings from config/providers.yaml `video_broll_params` (model, resolution, cost).
+    params?: Record<string, unknown>;
+  }): Promise<{ videoPath: string; costUsd: number }>;
 }

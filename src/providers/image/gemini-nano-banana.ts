@@ -1,6 +1,15 @@
 import "../../util/env.js";
+import { readFileSync, existsSync } from "node:fs";
+import { extname } from "node:path";
 import type { ImageProvider } from "../types.js";
 import { writeImageFile } from "./_write.js";
+
+function mimeFor(path: string): string {
+  const ext = extname(path).toLowerCase();
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  return "image/png";
+}
 
 // Direct Google adapter for the "Nano Banana" image models (Gemini *-image), via the
 // generateContent endpoint (NOT Imagen's :predict). Default = Nano Banana Pro
@@ -14,11 +23,19 @@ const DEFAULT_COST = 0.134;
 
 export const provider: ImageProvider = {
   name: "gemini-nano-banana",
-  async generate({ prompt, aspect, outPath, params }) {
+  async generate({ prompt, aspect, outPath, params, referenceImages }) {
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error("GEMINI_API_KEY missing in .env (see .env.example)");
     const model = (params?.model as string) ?? DEFAULT_MODEL;
     const cost = (params?.cost_usd as number) ?? DEFAULT_COST;
+
+    // Reference images (character/style anchors) ride alongside the prompt — Nano Banana keeps
+    // the same character + look across scenes. Missing paths are skipped.
+    const refParts = (referenceImages ?? [])
+      .filter((p) => existsSync(p))
+      .map((p) => ({
+        inlineData: { mimeType: mimeFor(p), data: readFileSync(p).toString("base64") },
+      }));
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -26,7 +43,7 @@ export const provider: ImageProvider = {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts: [{ text: prompt }, ...refParts] }],
           generationConfig: {
             responseModalities: ["IMAGE"],
             imageConfig: { aspectRatio: aspect },
