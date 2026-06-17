@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS posts (
   url TEXT,
   content_text TEXT,
   format TEXT,                         -- 'text' | 'thread' | 'image' | 'video' | 'newsletter'
-  pillar TEXT,                         -- 'human-ai' | 'claude-code' | 'civic-tech' | 'other' | NULL = untagged
+  pillar TEXT,                         -- 'human-ai' | 'claude-code' | 'civic-tech' | 'career-work' | 'builder' | 'other' | NULL = untagged
   bet_id TEXT,                         -- set by link-bet.ts when /strategy matches a post to a brief's bet (NULL = unattributed)
   UNIQUE(platform, platform_post_id)
 );

@@ -23,6 +23,14 @@ pillars:
     motifs: "civic spaces, ballots and hands voting, hopeful public architecture, community"
     suffix: "bright civic daylight, hopeful and nonpartisan, neutral, indigo-amber accents"
 
+  career-work:
+    motifs: "people at work and craft, hands building a career, interviews and teams, desks and tools, the dignity of work"
+    suffix: "warm professional lighting, indigo-to-amber palette, human and aspirational, modern workplace"
+
+  builder:
+    motifs: "a solo builder shipping, sketches and prototypes, launch moments, a small team forming, tools on a workbench"
+    suffix: "focused workshop lighting, indigo-to-amber palette, scrappy and determined, building energy"
+
   # Fallback for content tagged "other" (see pillars.yaml).
   other:
     motifs: "abstract conceptual imagery, evocative rather than literal"

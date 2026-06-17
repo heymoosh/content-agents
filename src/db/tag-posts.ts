@@ -4,7 +4,7 @@ import { openDb } from "./db.js";
 // Write back pillar tags assigned by Claude.
 //   tsx src/db/tag-posts.ts '[{"id":1,"pillar":"civic-tech"}, ...]'
 //   tsx src/db/tag-posts.ts tags.json
-const VALID = new Set(["human-ai", "claude-code", "civic-tech", "other"]);
+const VALID = new Set(["human-ai", "claude-code", "civic-tech", "career-work", "builder", "other"]);
 
 function main() {
   const arg = process.argv[2];

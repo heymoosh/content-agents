@@ -9,9 +9,13 @@ import { toInt, toFloat } from "../util/csv.js";
 // The left block is the top posts by engagement, the right block the top posts by impressions —
 // overlapping but not identical sets. We merge both blocks by Post URL so each post carries
 // whatever it has (engagements and/or impressions). The export has NO post text and no per-metric
-// breakdown (likes/comments/reposts), so contentText is null and only impressions + an engagement
-// rate are populated. Audience demographics (DEMOGRAPHICS/FOLLOWERS sheets) are not per-post and
-// are intentionally not ingested here.
+// breakdown: LinkedIn reports ONE aggregate "Engagements" count per post (reactions + comments +
+// reposts + clicks lumped together), never split. We surface that aggregate into the `likes`
+// metric field so it feeds the engagement score (replies×3 + reposts×2 + likes×1) at weight 1,
+// which is the only way LinkedIn shows up in resonance/routing at all. `likes` here therefore
+// means "total engagements", documented in memory platform-mechanics-and-exports. contentText is
+// null (recovered from the URL slug). Audience demographics (DEMOGRAPHICS/FOLLOWERS sheets) are
+// not per-post and are handled separately in parseLinkedInAudience.
 const norm = (s: string) => s.trim().toLowerCase();
 
 // LinkedIn post URLs embed the post's opening words as a slug:
@@ -105,7 +109,8 @@ export async function parseLinkedIn(fileName: string, buffer: Buffer): Promise<I
       format: "text",
       metrics: {
         impressions: rec.impressions,
-        likes: null,
+        likes: rec.engagements, // LinkedIn's aggregate "Engagements" count (see header note) — the
+        // engagement-score proxy, since the export gives no like/comment/repost split.
         replies: null,
         reposts: null,
         clicks: null,

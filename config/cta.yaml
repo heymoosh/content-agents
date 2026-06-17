@@ -19,6 +19,12 @@ targets:                 # default CTA per pillar — /atomize fills `cta` + `ct
   civic-tech:
     url: "https://voter-choice.vercel.app/"
     label: "See where your reps actually stand:"
+  career-work:
+    url: "https://humaninference.substack.com"
+    label: "Full essay (free to subscribe):"
+  builder:
+    url: "https://humaninference.substack.com"
+    label: "Full essay (free to subscribe):"
   other:
     url: source
     label: "Read the full piece (free to subscribe):"
@@ -32,7 +38,9 @@ source_fallback:
 
 placement:               # WHERE the link goes per platform (from Branding/.../Platform Reference.md)
   x: reply               # links in-post = 30-50% reach penalty → link goes in the first reply
-  linkedin: comment      # external links suppressed in body → first comment (publish logs a manual nudge)
+  linkedin: inline       # link in the post body. The cleaner first-comment needs gated LinkedIn API
+                         # access (Community Management); inline keeps LinkedIn on Typefully like the
+                         # rest, fully automated. Accepts the in-feed link penalty (modest at this scale).
   bluesky: inline        # links are fine inline here
   community: inline      # action-oriented rooms — link inline
 
