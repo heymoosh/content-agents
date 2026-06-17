@@ -96,6 +96,11 @@ rejected — it can't do start→end interpolation on the Gemini key; see [[vide
      `npm run render -- --render-video <folder> --animated --keyframes-only` generates one
      keyframe still per scene visual into `images/keyframe-*.png` and **stops**. Show Muxin the
      stills and **get approval before any paid animation.**
+   - **Consistency:** animated keyframes default to **Nano Banana Pro** (~$0.13/still) with
+     reference-image conditioning so the character + style stay the same across scenes — scene 1
+     anchors the look, and each frame also references the previous one. To pin a recurring
+     character/brand, drop an `images/reference.png` in the folder; it becomes the anchor for
+     every keyframe.
    - Then: `npm run render -- --render-video <folder> --animated` — TTS + captions, then Kling
      animates between consecutive keyframes (~$0.08/s) and stitches the clips under the voice +
      captions → `video/short.mp4`. **Offer the cost first** (≈ $1–3 for a few scenes).

@@ -315,17 +315,31 @@ async function renderAnimatedFromStoryboard(
     `---\nplatform: video-script\nsource_ref: ${sourceRef}\n---\n\n${script}\n`
   );
 
-  // 1. Keyframe stills — one per scene visual. These are what you approve before any Kling spend.
-  const { provider: image, params: imageParams } = await getImage(profile);
+  // 1. Keyframe stills — one per scene visual; the frames you approve before any Kling spend.
+  // Consistency: default to Nano Banana Pro (reference-image conditioning) so the character +
+  // style hold across scenes. Each keyframe references an anchor (a user-supplied
+  // images/reference.* if present, else scene 1) plus the previous frame for local continuity.
+  const kfProfile: ImageProfile = profile ?? "pro";
+  const { provider: image, params: imageParams } = await getImage(kfProfile);
+  const userRef = ["reference.png", "reference.jpg", "reference.jpeg"]
+    .map((n) => join(folder, "images", n))
+    .find((p) => existsSync(p));
+  if (userRef) console.log(`character reference: ${userRef}`);
   const keyframes: string[] = [];
   for (let i = 0; i < visuals.length; i++) {
     const kfPath = join(folder, "images", `keyframe-${i + 1}.png`);
     if (!existsSync(kfPath)) {
+      const refs = [
+        ...new Set(
+          [userRef ?? keyframes[0], keyframes[i - 1]].filter((p): p is string => Boolean(p))
+        ),
+      ];
       const { costUsd } = await image.generate({
         prompt: visuals[i],
         aspect: "9:16",
         outPath: kfPath,
         params: imageParams,
+        referenceImages: refs,
       });
       logCost({ step: `image:${image.name}`, detail: `${slug}/keyframe-${i + 1}`, costUsd });
     }

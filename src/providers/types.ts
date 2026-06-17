@@ -22,6 +22,9 @@ export interface ImageProvider {
     // The main pipeline omits it; the bakeoff passes a contender's `params` from
     // config/bakeoff.yaml so one adapter can stand in for many model/setting combos.
     params?: Record<string, unknown>;
+    // Optional reference image paths for character/style consistency (e.g. an anchor frame +
+    // the previous scene keyframe). Adapters that can't condition on images ignore them.
+    referenceImages?: string[];
   }): Promise<{ imagePath: string; costUsd: number }>;
 }
 
