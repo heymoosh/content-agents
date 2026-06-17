@@ -67,10 +67,18 @@ Last Titan, interwoven and told together, alternating chapters only when the sto
 - **The road and the mentor.** How Eli comes to the yard sale proof and the closed loop, and the
   old, quiet mentor who tried every legitimate path and can show him where each one closed. The
   mentor shows him the map, not permission, and may be horrified by what he does with it.
-- **The cell, the first strike, the turn.** The cell forms, including the Betrayer as its first
-  believer. A first data center strike succeeds and the movement grows. The decision to turn on
-  the enclaves. The assault: real damage, but not a toppling. The betrayal. Most rebels die or
-  scatter.
+- **The cell and the campaign.** The cell forms, including the Betrayer as its first believer.
+  The first data center strike succeeds (Chapter 1) and the movement grows. Escalation is slow
+  and earned, NOT a jump to the enclaves: a one-hour data center disruption to assaulting a
+  fortified enclave is too big a leap and operationally implausible. The middle is a campaign of
+  strikes against an opponent that adapts. Each early win was easy only because no one believed
+  people like them could act; after the first success the defenses harden (cameras, contracts, a
+  budget line for the specific problem of the guerrillas, and eventually a placed human worker as
+  a deterrent, see the witness scene in `outline.md`). They cannot repeat a tactic; every
+  operation must be faster, stranger, never the same twice, and the cost climbs each round.
+- **The turn toward the enclaves (late) and the assault.** Only after the cheaper path is proven
+  and exhausted does the real target become where the wealth and power concentrate. The assault:
+  real damage, but not a toppling. The betrayal. Most rebels die or scatter.
 - **Eli steps down.** Something happens and Eli no longer leads. Not mainly a physical injury
   (though it could be): exhaustion from the violence and the chaos, the pain of the betrayal, and
   the recognition that the original path was never going to arrive anywhere. He hands leadership

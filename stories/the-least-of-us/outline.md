@@ -25,9 +25,24 @@ The road to the war, and the cost.
 - **The cell forms.** The first followers, including the Betrayer as believer. The argument,
   present from the start, between those who want only to lay waste and those who insist on
   building toward something.
-- **The first strike.** A data center, rendered through nerves and consequence, not method. It
-  succeeds. The movement grows. The taste of capability.
-- **The turn toward the enclaves.** The decision that the real target is where the wealth and
+- **The first strike (Chapter 1).** Chapter 1 IS the first data center strike that actually
+  works. Rendered through nerves and consequence, never method. It succeeds because nobody who
+  mattered believed people like them could do anything; that disbelief is the only reason it was
+  easy. Eli feels the removal of a pressure, not triumph.
+- **Escalation is slow and earned, NOT a jump to the enclaves.** Do not lurch from a one-hour
+  data center disruption to assaulting an enclave; that is operationally implausible and feels
+  wrong. The middle of the Uprising is a campaign of strikes against an opponent that adapts.
+  After the first public success the defenses harden (cameras, contracts, a budget line for "the
+  specific problem of people like him"). They cannot repeat a tactic; each operation has to be
+  faster, stranger, never the same way twice. The cost and risk climb with every round. The turn
+  toward the enclaves comes only much later, after the strikes have proven and exhausted the
+  cheaper path, when the kamikaze "nothing to lose" logic takes over.
+- **The hardening, made concrete (see Parked scene below).** A later data center is defended by a
+  placed human worker (replacing the robot dogs), a deliberate deterrent: they bet the guerrillas
+  will not risk harming a person. They are right. Eli takes the bait. (Alternative: the human is
+  only a temporary stand-in while the robot security is being upgraded. Either way it forces the
+  moral choice and signals the rules have changed.)
+- **The turn toward the enclaves (late).** Eventually the real target becomes where the wealth and
   power concentrate. The kamikaze logic of people with nothing to lose against impossible odds.
 - **The assault.** Real damage. Not a toppling. The limits of destruction as a theory of change.
 - **The betrayal and the scattering.** The Betrayer, emptied out, gives the enclaves the means to
@@ -83,18 +98,24 @@ matters.
   medical band), standing for the systemic rot, not just the person.
 - Who could have been his reason to stay, and how he turned from it.
 - Names: the Betrayer, the Unwilling Prince, key children.
-- Chapter 1 opening is being reworked (see Muxin's preferred Grok draft); the data-center strike
-  below is parked for a later chapter, not the opener.
+- Chapter 1 is DRAFTED (`chapters/chapter-01.md`, "Unexplained Infrastructure Stress"): the first
+  successful data center strike, ending on "it gets harder from here," not on the enclaves.
+- The slow-escalation campaign: what the second and third strikes look like as the defenses adapt,
+  and how the cell is forced to change tactics each time.
 
 ## Parked scene outlines (for later chapters)
 
-### The witness strike (a later data-center op, not Chapter 1)
-A strike is underway on a tight clock and the building was supposed to be empty. It is not: a
-night maintenance worker, as dispossessed as the crew, is still inside. The clean sabotage
-becomes a moral choice. Dez argues to proceed; Eli goes in himself to get the worker out,
-because he will not let the operation treat a person as acceptable collateral (his interior
+### The witness strike (a LATER data-center op, the defenses-have-hardened chapter)
+By now the easy targets are gone and the opponent has adapted. A facility is defended by a placed
+human worker (replacing the robot dogs), a deliberate deterrent: the operators bet the guerrillas
+will not risk harming a person. They are right. (Alternative: the human is only a temporary
+stand-in while the robot security is upgraded.) Either way the rules have changed. A strike is
+underway on a tight clock and the building was supposed to be empty; it is not. The clean
+sabotage becomes a moral choice. Dez argues to proceed; Eli goes in himself to get the worker
+out, because he will not let the operation treat a person as acceptable collateral (his interior
 fracture in action, and the live mirror of his own wound, a system that once filed someone he
-loved as low priority). It costs them: a close call, the worker sees his face, the strike lands
-messy. Grief surfaces in motion (his hand finds the band) rather than in monologue. The turn:
-Dez is quietly furious that Eli risked everyone for one stranger, the appetite-versus-restraint
-fracture goes personal, and the witness is a loose thread that will return.
+loved as low priority). Eli takes the bait, which is exactly what the defense counted on. It
+costs them: a close call, the worker sees his face, the strike lands messy. Grief surfaces in
+motion (his hand finds the object) rather than in monologue. The turn: Dez is quietly furious
+that Eli risked everyone for one stranger, the appetite-versus-restraint fracture goes personal,
+and the witness is a loose thread that will return.
