@@ -3,19 +3,25 @@
 > Loose and evolving. Beat ideas and the shape of the saga, not a contract. The plot is allowed
 > to change. The writer uses this for direction, not as law.
 
-## Book 1: The Uprising
+> Structure note: this is ONE serialized series, not two books. The Uprising thread and the Last
+> Titan thread are interwoven and told together, with chapters alternating between them only when
+> the story calls for it (no rigid switch). The two lists below are threads, not volumes.
 
-The road to conclusion, the war, and the cost.
+## The Uprising thread
 
-- **The wound, in its place.** Eli's tipping loss. Not clean. The system processes someone he
-  loved with no malice and no face, and steals the specific small thing he was holding onto (the
-  crib, still OPEN). He already understood the mechanism before it reached him.
+The road to the war, and the cost.
+
+- **The wound, in its place.** Eli's tipping loss. Not clean, and not one event: a stack of
+  concrete personal system failures (a claim unprocessed in time, years underpaid and overworked,
+  and more), with no malice and no face anywhere in the machinery. It leaves behind a specific
+  object (see Running list). He already understood the mechanism before it reached him.
 - **The proof.** How Eli came to the yard sale model and the closed loop: displacement that is
   permanent, correctives that are captured, a bottom that cannot recover by trying. The mentor,
-  the old quiet one who tried every legitimate path and can show where each door closed, and who
-  offers the map but not permission.
-- **The pause before conclusion.** The cliff edge beat. The path that still existed and the
-  person who could have been his reason to stay, and how that closed.
+  the old quiet one who tried every legitimate path and can show where each one closed for him,
+  and who offers the map but not permission. (The map looks doorless; the story never confirms it.)
+- **The pause before conclusion.** The cliff edge beat. A path that still existed and the person
+  who could have been his reason to stay, and how, in his grief, he turned away from it rather
+  than it being sealed off.
 - **The cell forms.** The first followers, including the Betrayer as believer. The argument,
   present from the start, between those who want only to lay waste and those who insist on
   building toward something.
@@ -26,8 +32,12 @@ The road to conclusion, the war, and the cost.
 - **The assault.** Real damage. Not a toppling. The limits of destruction as a theory of change.
 - **The betrayal and the scattering.** The Betrayer, emptied out, gives the enclaves the means to
   counter. Most rebels die. The survivors scatter. Eli lives.
+- **Eli steps down.** Worn out by the violence and chaos, hollowed by the betrayal, and forced to
+  admit the path was never going to arrive anywhere, Eli stops leading. He hands it on. What
+  survives becomes a community led collectively by community leaders, more democratic, no longer
+  one man's movement.
 
-## Book 2: The Last Titan
+## The Last Titan thread
 
 What actually ends the enclaves, and what gets built instead.
 
@@ -43,8 +53,9 @@ What actually ends the enclaves, and what gets built instead.
   only as a warning for future generations.
 - **Mosst escapes.** Not a comic death. They never find him.
 - **The pen pals.** Eli's later years. The anonymous correspondent. Two men who come to enjoy each
-  other's company across a growing exchange of letters, neither knowing where it is headed, though
-  we do.
+  other's company across a growing exchange of letters, recognizing a spiritual familiar in each
+  other. For the first time in a long time, both have the space to be curious about the
+  alternatives that might have existed.
 - **The new name.** Eli invites him into the rebuilt community, more humane and more present than
   the world that was. No one recognizes the Last Titan anymore. He is given a new name and a home.
   The most seen man alive, finally seen by one person. That is where it ends.
@@ -57,7 +68,8 @@ matters.
 
 ## Running list of things to find
 
-- The crib: Eli's specific small object or act.
-- Who could have been his reason to stay, and how it closed.
+- The object of the wound: the specific thing the loss leaves behind (a claim-denied notice, a
+  medical band), standing for the systemic rot, not just the person.
+- Who could have been his reason to stay, and how he turned from it.
 - Names: the Betrayer, the Unwilling Prince, key children.
-- Where Chapter 1 opens (see the draft PR discussion).
+- Chapter 1 opens mid-strike with Eli present (locked).
