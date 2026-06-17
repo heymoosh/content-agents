@@ -12,7 +12,7 @@ import { openDb, repoRoot } from "../db/db.js";
 //   tsx src/strategy/route.ts --all
 //        → full pillar × platform routing-map markdown (for the strategy brief)
 
-const PILLARS = ["human-ai", "claude-code", "civic-tech", "other"];
+const PILLARS = ["human-ai", "claude-code", "civic-tech", "career-work", "builder", "other"];
 // Derivative target platforms routing chooses among. Substack is the source channel,
 // not a target. Community targets come from config (defaults / rules), not the DB.
 const CORE_TEXT = ["x", "linkedin", "bluesky"];
@@ -48,10 +48,14 @@ function loadConfig(): RoutingConfig {
 }
 
 // Pillar × platform engagement (same weighting + latest-metrics CTE as resonance.ts),
-// plus weeks-of-data per platform (same as snapshot.ts) for confidence.
+// plus weeks-of-data per platform (same as snapshot.ts) for confidence, plus a per-platform
+// engagement baseline. The baseline matters because engagement scales are NOT comparable across
+// platforms: X is a weighted replies/reposts/likes score (single digits) while LinkedIn carries
+// one lumped "Engagements" count per post (often 100+). We judge each platform on its own scale.
 function loadData(): {
   cells: Map<string, Cell>; // key: `${platform}|${pillar}`
   weeks: Map<string, number>; // key: platform
+  baselines: Map<string, number>; // key: platform → avg engagement per post on that platform
 } {
   const db = openDb();
   const rows = db
@@ -78,6 +82,18 @@ function loadData(): {
   const cells = new Map<string, Cell>();
   for (const r of rows) cells.set(`${r.platform}|${r.pillar}`, { n: r.n, avg_eng: r.avg_eng });
 
+  // Per-platform baseline = average engagement per post on that platform (post-weighted across
+  // its pillars). Used to score each pillar relative to the platform's own norm.
+  const baseTotals = new Map<string, { sum: number; n: number }>();
+  for (const r of rows) {
+    const b = baseTotals.get(r.platform) ?? { sum: 0, n: 0 };
+    b.sum += r.avg_eng * r.n;
+    b.n += r.n;
+    baseTotals.set(r.platform, b);
+  }
+  const baselines = new Map<string, number>();
+  for (const [pl, b] of baseTotals) baselines.set(pl, b.n > 0 ? b.sum / b.n : 0);
+
   const byPlatform = new Map<string, number[]>();
   for (const d of dates) {
     const t = new Date(d.posted_at).getTime();
@@ -91,13 +107,13 @@ function loadData(): {
   for (const [pl, ts] of byPlatform) {
     weeks.set(pl, Math.max(1, Math.round((Math.min(now, Math.max(...ts)) - Math.min(...ts)) / WEEK)));
   }
-  return { cells, weeks };
+  return { cells, weeks, baselines };
 }
 
 function decideForPillar(
   pillar: string,
   cfg: RoutingConfig,
-  data: { cells: Map<string, Cell>; weeks: Map<string, number> }
+  data: { cells: Map<string, Cell>; weeks: Map<string, number>; baselines: Map<string, number> }
 ): Decision[] {
   const defaults = cfg.defaults[pillar] ?? [];
   const rule = cfg.rules[pillar] ?? {};
@@ -107,12 +123,6 @@ function decideForPillar(
 
   // Candidate targets: the core text platforms + anything config names for this pillar.
   const candidates = [...new Set([...CORE_TEXT, ...defaults, ...always, ...never])];
-
-  // Normalize fit against the strongest confident platform for this pillar.
-  const confident = CORE_TEXT.map((pl) => data.cells.get(`${pl}|${pillar}`))
-    .filter((c): c is Cell => !!c && c.n >= min_posts_for_data)
-    .map((c) => c.avg_eng);
-  const maxEng = confident.length ? Math.max(...confident) : 0;
 
   const out: Decision[] = [];
   for (const platform of candidates) {
@@ -128,7 +138,12 @@ function decideForPillar(
     const weeks = data.weeks.get(platform) ?? 0;
     const hasData = !!cell && cell.n >= min_posts_for_data && weeks >= 4;
     if (hasData && cell) {
-      const score = maxEng > 0 ? cell.avg_eng / maxEng : 0;
+      // Fit = this pillar's avg engagement relative to the platform's average post. Each platform
+      // is scored on its OWN scale, so X (small weighted scores) and LinkedIn (large lumped
+      // engagement counts) are never compared in absolute terms. A pillar at the platform's norm
+      // scores ~1.0; skip_below_score is the fraction-of-norm floor under which we drop it.
+      const baseline = data.baselines.get(platform) ?? 0;
+      const score = baseline > 0 ? cell.avg_eng / baseline : 0;
       const decision = score >= skip_below_score ? "include" : "skip";
       out.push({
         platform,
@@ -137,8 +152,8 @@ function decideForPillar(
         confidence: "data",
         rationale:
           decision === "include"
-            ? `data: ${score.toFixed(2)} fit (n=${cell.n}) — receptive to this topic`
-            : `data: ${score.toFixed(2)} fit (n=${cell.n}) — underperforms for this topic`,
+            ? `data: ${score.toFixed(2)}× platform norm (n=${cell.n}) — receptive to this topic`
+            : `data: ${score.toFixed(2)}× platform norm (n=${cell.n}) — underperforms here`,
       });
     } else {
       // Cold start: post broadly to the configured defaults to gather signal; otherwise hold.

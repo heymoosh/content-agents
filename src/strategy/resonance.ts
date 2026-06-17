@@ -3,7 +3,7 @@ import { openDb } from "../db/db.js";
 // Topic resonance map: pillar × platform. Requires posts to be tagged first.
 //   tsx src/strategy/resonance.ts
 
-const PILLARS = ["human-ai", "claude-code", "civic-tech", "other"];
+const PILLARS = ["human-ai", "claude-code", "civic-tech", "career-work", "builder", "other"];
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 const HALF_LIFE_WEEKS = 4; // matches snapshot.ts: a win 4 weeks old counts half as much today
 

@@ -1,0 +1,56 @@
+# Voice & anti-AI-tells guide for ALL generated writing in this repo.
+# Muxin's standing rule (2026-06-16): "write in my voice, avoid AI tells."
+# Read this file whenever you DRAFT or EDIT any text a human will read:
+#   - /atomize text derivatives (the light platform-format edits you ARE allowed to make)
+#   - the video script (the Grok / text-polish prompt) and video title/description
+#   - the /strategy brief prose
+#   - ready-to-paste copy, anything else with words in it
+#
+# Extraction-first still wins (CLAUDE.md rule 1): derivatives quote Muxin verbatim. This guide
+# governs the edits you ARE allowed to make for platform format, plus any non-verbatim copy
+# (video scripts, the brief, titles). When in doubt: cut, do not add.
+
+voice:
+  # Muxin writes like a working product manager thinking out loud, not a thought-leader
+  # performing for an audience. Direct, specific, a little contrarian. Confident without hype.
+  # He earns a claim instead of announcing it. Plain words beat impressive ones.
+  is:
+    - "Plain, direct, declarative. Short sentences carry the weight."
+    - "Concrete over abstract. Name the actual thing."
+    - "First person, grounded in real experience ('I've spent hundreds of hours...')."
+    - "Contrarian when earned. States the counterintuitive claim flat, no drumroll before it."
+    - "Lets one good sentence land. Never restates the same point three ways."
+  is_not:
+    - "Thought-leader cadence. No performing insight."
+    - "Hype, hedging, or throat-clearing."
+    - "Triads and antithesis as a reflex."
+
+# Hard bans. If a draft contains any of these, rewrite before queueing. Do not soften, remove.
+banned:
+  punctuation:
+    - "Em dashes (the long dash). Normalize to a period, comma, colon, or parentheses."
+    - "Muxin's own writing never uses em dashes. When one appears it came from an AI (an AI-generated derivative, or an AI-processed copy of a source). Strip it: recast as two sentences, or use commas, colons, or parentheses. This restores his voice, it does not change it. NOTE: the source.md you extract from may itself be an AI-processed copy with em dashes that were never in Muxin's original, so do not treat a source em dash as his."
+  phrases:
+    - "here's the thing / here's the kicker / the thing is"
+    - "it's not just X, it's Y  /  it's not about X, it's about Y  /  not just ... but"
+    - "isn't just / more than just"
+    - "let's dive in / let's unpack / let's break it down"
+    - "in a world where / in an age of / in today's ..."
+    - "at the end of the day / the reality is / the truth is / make no mistake"
+    - "it's worth noting / that said / needless to say"
+    - "This isn't X. It's Y.  (the one-word-sentence drumroll for fake emphasis)"
+  words:
+    - "delve, leverage (as a verb), unlock, supercharge, game-changer, tapestry, testament,"
+    - "navigate the complexities, ever-evolving, robust, seamless, realm, landscape, foster,"
+    - "harness, elevate, empower, paradigm, journey (figurative), at scale"
+  formatting:
+    - "Emoji used as bullets or decoration."
+    - "Rhetorical-question hook crutch ('Ever wondered...?', 'What if I told you...')."
+    - "Triadic lists when one or two items would do."
+    - "Bolding random phrases for emphasis."
+
+check_before_queue:
+  - "Read it aloud. If it sounds like a confident person talking, keep it. If it sounds like a brand, cut it."
+  - "Count the em dashes. Target is zero."
+  - "Scan for the banned phrases and words above. Replace, do not just trim."
+  - "Did you add a claim Muxin did not make? Extraction-first: delete it."

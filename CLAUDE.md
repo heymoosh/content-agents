@@ -23,6 +23,13 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
 4. **Discrete verifiable outputs.** Every pipeline step writes a file or DB rows that can be
    inspected. Scripts do deterministic work; Claude does judgment (tagging, synthesis,
    extraction, scoring) inline while running skills.
+5. **Muxin's voice, no AI tells.** Every word a human will read (text derivatives, video
+   scripts, titles, the strategy brief, ready-to-paste copy) follows `config/voice.yaml`. No
+   em dashes, no "here's the thing", none of the obvious AI writing patterns listed there.
+   Em dashes are never Muxin's; they ride in on AI-generated copy (derivatives, or an
+   AI-processed `source.md` copy whose dashes were never in his original). Strip them to
+   periods, commas, colons, or parentheses. Read it aloud; if it sounds like a brand instead of
+   Muxin talking, rewrite it.
 
 ## Pipeline map
 

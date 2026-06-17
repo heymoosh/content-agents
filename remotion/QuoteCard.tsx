@@ -1,59 +1,105 @@
 import React from "react";
-import { AbsoluteFill, Img, staticFile } from "remotion";
+import { AbsoluteFill } from "remotion";
 import { z } from "zod";
 
+// New Yorker–style typographic quote card: cream paper, ink serif, hairline keyline,
+// one restrained persimmon accent. No illustration — the type IS the design.
+// Palette mirrors the house screen-print look (memory: image-style-newyorker).
 export const quoteCardSchema = z.object({
   quote: z.string(),
   attribution: z.string(),
-  bgImage: z.string().nullable(),
 });
+
+const PAPER = "#f2ead9"; // cream
+const INK = "#1a1a1a"; // black ink
+const ACCENT = "#e2552f"; // persimmon — the single house accent
+
+// High-contrast Didone / editorial serif stack (macOS-first; Chromium renders local fonts).
+const SERIF = "'Didot', 'Bodoni 72', 'Hoefler Text', Georgia, 'Times New Roman', serif";
 
 export const QuoteCard: React.FC<z.infer<typeof quoteCardSchema>> = ({
   quote,
   attribution,
-  bgImage,
 }) => {
-  const fontSize = quote.length > 120 ? 52 : quote.length > 60 ? 64 : 78;
+  const len = quote.length;
+  const fontSize = len > 160 ? 50 : len > 110 ? 60 : len > 70 ? 72 : 88;
+
   return (
-    <AbsoluteFill
-      style={{
-        background: "linear-gradient(150deg, #131320 0%, #1d2440 55%, #2a1f3d 100%)",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      {bgImage ? (
-        <>
-          <Img
-            src={staticFile(bgImage)}
-            style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover" }}
-          />
-          <AbsoluteFill style={{ background: "rgba(12,12,24,0.72)" }} />
-        </>
-      ) : null}
+    <AbsoluteFill style={{ background: PAPER, justifyContent: "center", alignItems: "center" }}>
+      {/* Inset hairline keyline — the editorial frame */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 44,
+          border: `1.5px solid ${INK}`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 52,
+          border: `0.75px solid ${INK}`,
+          opacity: 0.55,
+        }}
+      />
+
       <div
         style={{
           position: "relative",
-          maxWidth: 860,
-          padding: "0 60px",
-          fontFamily: "Georgia, 'Times New Roman', serif",
-          color: "white",
-          textAlign: "left",
+          maxWidth: 820,
+          padding: "0 80px",
+          textAlign: "center",
+          color: INK,
         }}
       >
-        <div style={{ fontSize: 130, lineHeight: 0.4, color: "#ffd34d", marginBottom: 36 }}>“</div>
-        <div style={{ fontSize, lineHeight: 1.35, fontWeight: 500 }}>{quote}</div>
+        {/* Opening ornament — the one persimmon touch */}
         <div
           style={{
-            marginTop: 48,
-            fontSize: 34,
-            fontFamily:
-              "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
-            color: "#b9bdd1",
-            letterSpacing: 1,
+            fontFamily: SERIF,
+            fontSize: 150,
+            lineHeight: 0.2,
+            color: ACCENT,
+            height: 70,
+            marginBottom: 28,
           }}
         >
-          — {attribution}
+          &ldquo;
+        </div>
+
+        <div
+          style={{
+            fontFamily: SERIF,
+            fontSize,
+            lineHeight: 1.32,
+            fontWeight: 400,
+            letterSpacing: "0.005em",
+          }}
+        >
+          {quote}
+        </div>
+
+        {/* Short rule + attribution in tracked small caps */}
+        <div
+          style={{
+            width: 56,
+            height: 2,
+            background: ACCENT,
+            margin: "48px auto 22px",
+          }}
+        />
+        <div
+          style={{
+            fontFamily: SERIF,
+            fontSize: 26,
+            textTransform: "uppercase",
+            letterSpacing: "0.32em",
+            color: INK,
+            opacity: 0.8,
+            // letter-spacing pushes text right; nudge back to keep it optically centered
+            paddingLeft: "0.32em",
+          }}
+        >
+          {attribution}
         </div>
       </div>
     </AbsoluteFill>

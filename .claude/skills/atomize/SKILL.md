@@ -22,6 +22,20 @@ real money, so it's opt-in per piece, not bundled here.
   text came from. If you can't point at lines, you wrote it — delete it.
 - If the source is too thin to atomize honestly, say so and stop. Do not pad.
 
+## Voice & AI tells (non-negotiable — CLAUDE.md rule 5)
+
+Read `config/voice.yaml` before you draft or edit ANY text below. It applies to every
+derivative, the video script, and the video title/description. The short version:
+
+- **No em dashes.** Normalize them to periods, commas, colons, or parentheses. This holds even
+  for verbatim extractions: keep Muxin's words, change the dash. (Muxin's source essays use em
+  dashes; the published derivatives must not.)
+- **No AI tells:** "here's the thing", "it's not just X, it's Y", "let's unpack", "delve",
+  "leverage", "unlock", rhetorical-question hooks, emoji bullets, reflexive triads. See the full
+  banned list in `config/voice.yaml`.
+- Muxin sounds like a working PM thinking out loud: plain, direct, specific, contrarian when
+  earned, never performing. Read each draft aloud before queueing it.
+
 ## Steps
 
 1. **Ingest.** `npm run new-content -- <arg>` → prints the content folder path. (Audio files

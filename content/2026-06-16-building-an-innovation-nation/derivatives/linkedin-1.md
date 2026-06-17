@@ -1,19 +1,21 @@
 ---
 platform: linkedin
 option: 1
-source_lines: [114, 116, 118, 120, 122]
+source_lines: [10, 20, 46, 104, 106, 108, 118, 120]
 scores: { native: 5, brand: 5, cta: true }
 cta: source
-cta_label: "Full essay (free to subscribe):"
+cta_label: "Read the full article:"
+from_brief: briefs/2026-06-16-strategy-brief.md
+directives_applied: [prioritize_pillar:human-ai, linkedin:lead-with-PM-builder-angle, voice:no-ai-tells]
 ---
-For as long as I can remember, the obvious response — invest in people, give everyone a real floor, treat a human being as worth something before they've proven their market value — has been waved away as naive and idealistic.
+I mostly focus on product innovation. That is my expertise as a product manager, and I've spent hundreds of hours listening to founders describe what it actually takes to build a successful tech company.
 
-A nice sentiment we can't afford, because the hard logic of competition says the efficient thing and the humane thing pull in opposite directions, and efficiency wins.
+And while the machine is incredibly adept at executing on things that are already well scoped, it still does not quite have the sense of taste and judgment that you need to understand what good looks like, what insight is, or what product to build.
 
-I don't think that's true anymore. I think AI changes the equation.
+Yet talking to customers gets treated like a checkbox instead of the art and practice that it really is. Products are shaped in theory and strategic frameworks rather than treated as hypotheses to be experimented on.
 
-If the scarce resource is no longer information or even technical skill, but human judgment — and judgment grows only when people have the time, safety, and freedom to develop it — then investing broadly in people stops being charity or idealism. It becomes a strategy.
+Y Combinator, after funding thousands of startups, found that past a baseline of intelligence, what matters most is determination: the ability to just keep going and keep trying. And determination, resilience, taste, and judgment, the things that matter most, do not belong to a privileged few. They can come from anywhere.
+
+If the scarce resource is no longer information or even technical skill, but human judgment, and judgment grows only when people have the time, safety, and freedom to develop it, then investing broadly in people stops being charity or idealism. It becomes a strategy.
 
 The most economically valuable thing a society can do may be the thing we've spent decades dismissing as soft: give as many people as possible the chance to become someone worth betting on.
-
-For maybe the first time, our reasons to chase wealth and our reasons to build a more humane society point the same direction — not out of virtue, but out of necessity.

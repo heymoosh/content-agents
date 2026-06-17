@@ -12,15 +12,17 @@ pillars:
       - critiques of hype-driven AI culture
       - designing AI products around people
   - id: claude-code
-    name: Claude Code / solo builder workflows
+    name: Claude Code & AI coding workflows
     description: >
-      Real lessons from building with AI as a solo developer. Claude Code workflows,
-      solo product discipline, agent orchestration, build logs.
+      Real lessons building WITH AI coding tools specifically: Claude Code tips, skills,
+      agents, agent orchestration, automation, and AI-assisted engineering. The narrow
+      "how to build with AI tooling" pillar. General building-in-public and PM craft live
+      in the `builder` pillar.
     signals:
       - Claude Code tips, skills, agents, automation
-      - solo dev discipline and process
-      - build-in-public logs
+      - agent orchestration and AI workflows
       - AI-assisted engineering lessons
+      - debugging and working with AI coding tools
   - id: civic-tech
     name: Civic tech & the voting tool
     description: >
@@ -31,4 +33,31 @@ pillars:
       - ballot research, election information access
       - civic action, democratic resilience
       - nonpartisan civic AI
+  - id: career-work
+    name: Careers & the future of work
+    description: >
+      Practical, personal content on navigating careers and work in the AI age:
+      job hunting, recruiting, hiring, resumes, AI-era career strategy, and the
+      changing nature of work and labor. Drawn from Muxin's PM and job-search
+      experience. The practical, personal arm of the human-ai thesis about work.
+      (Split out of "other" 2026-06-16 after it emerged as the top-engaging theme
+      on LinkedIn; treat as a track-and-test pillar, n still small.)
+    signals:
+      - job hunting, recruiting, hiring, resumes
+      - AI-era career strategy and advice
+      - the future of work and labor
+      - personal career navigation and lessons
+  - id: builder
+    name: Solo builder & product
+    description: >
+      The craft and journey of building products solo: building and launching in public,
+      product management craft and discipline, shipping and iterating, finding collaborators.
+      The general builder's practice, NOT tied to AI coding tools (that is `claude-code`).
+      (Split out of "other" 2026-06-16; build-in-public did well on LinkedIn, PM craft does
+      well on X. Track-and-test, n still small.)
+    signals:
+      - building and launching products in public
+      - product management craft and discipline
+      - shipping and iterating as a solo builder
+      - finding collaborators, the founder/builder journey
 # Anything that fits none of the above gets pillar "other".

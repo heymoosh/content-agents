@@ -68,30 +68,11 @@ async function renderStill(
   const slug = basename(folder);
 
   await withJob(async (jobDir, jobName) => {
-    let bgImage: string | null = null;
-    if (isEnabled("image")) {
-      try {
-        const { provider, params } = await getImage(profile);
-        const promptFile = join(folder, "images", `${quoteName}-prompt.txt`);
-        // Quote-card background sits UNDER Muxin's overlaid quote, so the model must not bake in
-        // its own text/title/caption (these image models love to add them).
-        const prompt = existsSync(promptFile)
-          ? readFileSync(promptFile, "utf8").trim()
-          : "flat editorial screen-print background texture, New Yorker style, limited palette of cream, persimmon, teal and ochre, minimal, atmospheric, no text, no title, no caption, no people";
-        const bgPath = join(jobDir, "bg.png");
-        const { costUsd } = await provider.generate({ prompt, aspect: "1:1", outPath: bgPath, params });
-        logCost({ step: `image:${provider.name}`, detail: `${slug}/${quoteName}-bg`, costUsd });
-        bgImage = `${jobName}/bg.png`;
-      } catch (e) {
-        console.log(
-          `image generation failed (${(e as Error).message.slice(0, 140)}) — rendering gradient-only card`
-        );
-      }
-    } else {
-      console.log("image provider disabled — rendering gradient-only card");
-    }
-
-    const props = { quote, attribution: "Muxin Li", bgImage };
+    // Quote cards are purely typographic (New Yorker style), no illustration background.
+    // (Muxin's call, June 2026: "just quotes, not illustrations.") The quote IS the design, so
+    // we skip the quote-card background image-gen entirely (the --pro/--hero profile and the
+    // image-model policy still apply to video b-roll, just not to quote cards).
+    const props = { quote, attribution: "Muxin Li" };
     const propsFile = join(jobDir, "props.json");
     writeFileSync(propsFile, JSON.stringify(props));
     const outPath = join(folder, "images", `${quoteName}.png`);

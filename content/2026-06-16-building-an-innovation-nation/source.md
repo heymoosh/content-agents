@@ -2,7 +2,7 @@
 title: "Building an Innovation Nation"
 origin: file:Building an Innovation Nation.md
 canonical_url: https://humaninference.substack.com/p/building-an-innovation-nation
-published_at: null
+published_at: 2026-06-15
 ingested_at: 2026-06-16T17:14:24.482Z
 ---
 

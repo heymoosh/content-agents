@@ -52,8 +52,11 @@ rejected — it can't do start→end interpolation on the Gemini key; see [[vide
 
 3. **Script (Grok — the cheap spend).** Call the script writer (Grok via the `text-polish`
    provider) on the source/extracts: a 60–90s, hook-first spoken script (hook in line 1, 1–2
-   points, CTA), ≤220 words, conversational, not hype-y. Sanity-check it stays true to the
-   essay's ideas — reject and re-prompt if it invents claims Muxin wouldn't make.
+   points, CTA), ≤220 words, conversational, not hype-y. **Pass the `config/voice.yaml` rules into
+   the Grok instructions** (no em dashes, no AI tells, Muxin's plain PM voice) — this is the one
+   place copy is generated non-verbatim, so it needs the voice guard most (CLAUDE.md rule 5).
+   Sanity-check it stays true to the essay's ideas AND clean of AI tells — reject and re-prompt if
+   it invents claims Muxin wouldn't make or slips in banned phrasing.
 
 4. **Storyboard.** Read `config/style.yaml`. Storyboard the script into **5–7 scenes**. For each
    scene write a `beat` (one line), a `visual` (a scene prompt ending with `global.mood` + the

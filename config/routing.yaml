@@ -12,6 +12,8 @@ defaults:                 # platforms to include per pillar while data is INSUFF
   human-ai:    [x, linkedin, bluesky]
   claude-code: [x, linkedin, bluesky]
   civic-tech:  [bluesky, x, community:democratic-resilience]
+  career-work: [linkedin, x]   # LinkedIn-led: it's the top-engaging theme there. X to gather signal.
+  builder:     [x, linkedin]   # build-in-public lands on LinkedIn; PM craft does well on X.
   other:       [x]
 
 rules:                    # hard overrides applied AFTER the data decision
