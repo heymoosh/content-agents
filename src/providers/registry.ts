@@ -9,6 +9,7 @@ import type {
   TranscriptionProvider,
   TextPolishProvider,
   VideoBrollProvider,
+  ProseProvider,
 } from "./types.js";
 
 // Adapter lookup: config/providers.yaml maps capability → provider name → module in
@@ -21,6 +22,7 @@ const DIR_FOR: Record<Capability, string> = {
   transcription: "transcription",
   "text-polish": "polish",
   "video-broll": "broll",
+  prose: "prose",
 };
 
 function readProviders(): Record<string, unknown> {
@@ -92,6 +94,11 @@ export async function getImage(
 export const getTTS = () => load<TTSProvider>("tts");
 export const getTranscription = () => load<TranscriptionProvider>("transcription");
 export const getTextPolish = () => load<TextPolishProvider>("text-polish");
+
+// Fiction prose (Build 2). getProse() uses the global config/providers.yaml `prose` entry;
+// getProseNamed() lets a series.yaml override the model for one series without a config edit.
+export const getProse = () => load<ProseProvider>("prose");
+export const getProseNamed = (name: string) => importProvider<ProseProvider>("prose", name);
 
 // Animated scene engine. Like getImage(), returns the adapter plus its `video_broll_params`
 // (model/resolution/cost), passed straight to provider.interpolate().

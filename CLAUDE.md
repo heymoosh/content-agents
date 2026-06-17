@@ -1,9 +1,12 @@
 # content-agents
 
-Two connected systems for Muxin Li's content operation, orchestrated by Claude Code:
+Systems for Muxin Li's content operation, orchestrated by Claude Code:
 
 - **Build 0 — Strategy Intelligence**: analytics in → SQLite → weekly strategy brief (`briefs/`)
 - **Build 1 — Atomization**: original content + brief → platform assets (text, images, video) → human review → publish
+- **Build 2 — Fiction**: a serialized, monetized fiction series written chapter-by-chapter
+  (`stories/`). The one place AI *composes* original prose. Deliberately walled off from
+  Builds 0/1 — see the Build 2 section below.
 
 ## Non-negotiable rules
 
@@ -46,6 +49,41 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
 | Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, TikTok scheduled post (PostPeer), `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
 | Whole cycle | `/cycle` | all of the above | orchestration | — |
 
+## Build 2 — Fiction (composed prose, walled off)
+
+Build 2 is the **opposite** of extraction-first: `/story` *composes* original fiction with
+Grok (the `prose` provider). Muxin is the showrunner (world, characters, direction); Claude
+drafts the prose and holds consistency. This composition is allowed **only because every
+chapter is reviewed and approved by Muxin on a GitHub PR before it publishes, and nothing
+auto-publishes** — the same principle as the video-script exception (rule 1), extended to a
+whole build. It must never bleed back into Build 0/1: text/image derivatives stay
+extraction-first.
+
+- **Rule 5 does not apply to fiction.** `config/voice.yaml` (Muxin's nonfiction PM voice, the
+  em-dash ban) governs Builds 0/1 only. Fiction is governed by `config/fiction/craft.md` +
+  `config/fiction/style.yaml` (and per-series `narrative:` overrides). Em dashes are fine in
+  prose.
+- **Consistency model:** `bible.md` (living world/character reference) + `canon.md` (append-only
+  ledger of established facts, updated on lock) + `characters/<name>.md` sheets + loose
+  `outline.md`. The plot may evolve; established canon must not silently break.
+- **Review loop = GitHub PR, one per chapter.** Muxin comments on lines/ranges (mobile-friendly
+  comment bubbles); `/story --revise` makes **surgical edits to only the commented passages**,
+  replies on threads, pushes. Never rewrite unannotated prose. Approve → `/story lock`.
+- **Skills/scripts:** `/story` (new series, draft chapter, revise from PR comments, lock) and
+  `/illustrate` (character fan-art variants + optional consistent-style scene art). Scripts:
+  `npm run story:new | story:context | story:draft | story:validate | story:lock | story:illustrate`.
+- **Promotion reuses Builds 0/1:** a locked chapter can feed `/atomize` (teaser quoting a real
+  excerpt + cliffhanger) and `/video` to drive subscriptions — those quote published prose, so
+  they stay extraction-first.
+
+| Step | Trigger | Script(s) | Claude judgment | Output |
+|---|---|---|---|---|
+| New series | `/story new <notes>` | `npm run story:new` | structure notes → bible + character sheets + outline | `stories/<slug>/` |
+| Draft chapter | `/story <series>` | `npm run story:context`, `npm run story:draft`, `npm run story:validate` | beat sheet, QC for page-turner craft + canon consistency, set title | `chapters/chapter-NN.md`, draft PR |
+| Revise | PR comments / `/story --revise` | `npm run story:validate` | surgical edits to commented passages only; reply on threads | updated chapter, PR pushes |
+| Lock | `/story lock` (after approve) | `npm run story:lock` | continuity entry, character-state updates | `canon.md`, `ready-to-paste/chapter-NN.txt` |
+| Illustrate | `/illustrate <series>` | `npm run story:illustrate` | fan-art styles / scene prompts; cost-first model | `illustrations/` |
+
 ## Conventions
 
 - TypeScript ESM, run with `tsx`. No build step.
@@ -53,6 +91,10 @@ Two connected systems for Muxin Li's content operation, orchestrated by Claude C
   `config/providers.yaml`. Every adapter returns `costUsd`; costs append to `data/cost-log.csv`.
 - Content folders: `content/<YYYY-MM-DD>-<slug>/` with `source.md`, `derivatives/`, `images/`,
   `video/`, `ready-to-paste/`, `review-queue.md`, `publish-log.md`.
+- Fiction series (Build 2): `stories/<slug>/` with `series.yaml`, `bible.md`, `outline.md`,
+  `canon.md`, `characters/`, `chapters/`, `illustrations/`, `ready-to-paste/`. Chapters are
+  written one sentence per line so GitHub PR comments anchor to a passage. `config/fiction/`
+  holds the craft + style guards (the fiction equivalent of `config/voice.yaml`).
 - `data/community-log.md` is Muxin's append-only manual observation log — read it during
   `/strategy`, never edit it.
 - `briefs/bets.md` is the feedback loop's memory: `/strategy` writes a bet per recommendation and
