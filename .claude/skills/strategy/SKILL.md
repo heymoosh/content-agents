@@ -9,6 +9,10 @@ Produce `briefs/<today>-strategy-brief.md` from the analytics DB + community log
 do the judgment; scripts do the numbers. Never invent metrics — every claim must cite a real
 post or number from the script output.
 
+**Write the brief in Muxin's voice, no AI tells** (CLAUDE.md rule 5 / `config/voice.yaml`): no
+em dashes, no "here's the thing", no thought-leader filler. Plain and direct. The brief is for
+Muxin to read, so it should sound like a sharp analyst talking, not a content machine.
+
 **This brief is one turn of a loop, not a fresh start.** Before recommending anything new, you
 grade whether last cycle's bets paid off (Step 0). The `briefs/bets.md` ledger is the memory that
 makes `/cycle` compound instead of restarting every week.
