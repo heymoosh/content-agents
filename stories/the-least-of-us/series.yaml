@@ -1,0 +1,30 @@
+slug: the-least-of-us
+title: "The Least of Us"
+
+# Drafting mode for this series.
+#   prose: claude-native  -> the /story skill composes the chapter with Claude itself (no API
+#                            key, no external provider). Opus plans the beats, the writer model
+#                            below drafts the prose. This is the current default for this series.
+#   prose: <adapter>      -> use an external src/providers/prose/ adapter (e.g. grok-openrouter)
+#                            with a configured API key, via `npm run story:draft`.
+prose: claude-native
+planner_model: opus           # plans beats, holds canon + consistency, QCs the draft
+writer_model: sonnet          # drafts the prose (tighter, less verbose; A/B with haiku anytime)
+
+narrative:
+  pov: third person limited, rotating by chapter (Eli primary)
+  tense: past
+  style_ref: config/fiction/style.yaml
+
+chapter:
+  target_words: 2400
+  min_words: 1400
+
+illustration:
+  style_lock: ""              # locked visual style for in-chapter art (set once you choose one)
+  aspect: "1:1"
+
+substack:
+  publication: ""             # your substack publication URL
+
+created: 2026-06-17T17:52:22.899Z

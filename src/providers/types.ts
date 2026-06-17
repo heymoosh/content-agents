@@ -1,4 +1,10 @@
-export type Capability = "tts" | "image" | "transcription" | "text-polish" | "video-broll";
+export type Capability =
+  | "tts"
+  | "image"
+  | "transcription"
+  | "text-polish"
+  | "video-broll"
+  | "prose";
 
 export interface TTSResult {
   audioPath: string;
@@ -39,6 +45,18 @@ export interface TextPolishProvider {
     draft: string;
     platform: string;
     instructions: string;
+  }): Promise<{ text: string; costUsd: number }>;
+}
+
+// Long-form fiction generation (Build 2 — Fiction). Unlike TextPolishProvider, prose needs
+// the whole story context (bible + canon + prior chapters) alongside the per-chapter ask, so
+// it takes a system prompt (craft + style), a context pack, and chapter instructions.
+export interface ProseProvider {
+  name: string;
+  generate(req: {
+    system: string; // craft + narrative style + voice rules (config/fiction/*)
+    context: string; // assembled context pack: bible, canon, character sheets, prior chapters
+    instructions: string; // what THIS chapter should do (beat sheet / Muxin's direction)
   }): Promise<{ text: string; costUsd: number }>;
 }
 

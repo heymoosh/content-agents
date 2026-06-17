@@ -1,0 +1,37 @@
+# Narrative style for fiction (Build 2). This is the fiction equivalent of config/voice.yaml,
+# and it REPLACES voice.yaml for fiction: the nonfiction PM voice does not apply to composed
+# prose. The em-dash ban DOES carry over though (Muxin's house rule, fiction included). A
+# series can override any of these in stories/<slug>/series.yaml under `narrative:`.
+
+banned_punctuation:
+  - "Em dashes. Use periods, commas, colons, or parentheses instead. Target is zero."
+
+narrative:
+  pov: "third person limited"      # third-limited | first | third-omniscient
+  tense: "past"                    # past | present
+  register: >
+    Literary but propulsive. Clean, modern prose. Closer to Le Guin or Ishiguro than to
+    high-fantasy purple. Trust the reader; do not over-explain.
+  dialogue: >
+    Naturalistic and compressed. People talk around what they want. Distinct cadence per
+    character (see the character sheets). Use contractions.
+
+is:
+  - "Concrete and sensory. One precise detail over three vague ones."
+  - "Propulsive. Every paragraph earns the next."
+  - "Confident with white space. A short line can carry a scene."
+  - "Emotionally exact. Name the real feeling, do not perform it."
+
+is_not:
+  - "Purple. No piled adjectives, no ornamental metaphor for its own sake."
+  - "Throat-clearing. No 'little did they know', no waking-up openings."
+  - "Over-explained. Do not summarize a feeling the scene already showed."
+  - "Generic-AI. No reflexive triads, no 'not X but Y' as a rhythm tic, no cliché."
+
+check_before_pr:
+  - "Read it aloud. Does the opening drop us into motion or tension (no literal question, no rhetorical hook)?"
+  - "Count the em dashes. Target is zero. Replace any with a period, comma, colon, or parentheses."
+  - "Does every scene have a goal and an obstacle?"
+  - "Does the chapter END on a turn or an open loop the reader will subscribe to resolve?"
+  - "Is anything contradicting the bible, canon, or character sheets? Fix it."
+  - "One sentence per line, blank line between paragraphs (for line-level PR review)?"
