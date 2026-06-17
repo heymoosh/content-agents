@@ -58,7 +58,18 @@ What actually ends the enclaves, and what gets built instead.
   alternatives that might have existed.
 - **The new name.** Eli invites him into the rebuilt community, more humane and more present than
   the world that was. No one recognizes the Last Titan anymore. He is given a new name and a home.
-  The most seen man alive, finally seen by one person. That is where it ends.
+  The most seen man alive, finally seen by one person. That is where his story ends.
+
+## The closing chapter: Lena
+
+The saga's final chapter belongs to Lena, Eli's lost love. In her voice (a late conversation
+while she was sick, or an earlier one Eli carries, OPEN), she shares her theory of why we are all
+here: consciousness shaping probability, love as its highest vibration, time not linear so a
+future can reach back and shape the past, and the kinder world as not an impossible ideal but an
+inevitable destination, because everything is already here. "We made it. Somehow we made it." It
+is the inverse of the closed map Eli surrendered to, and the note the whole story resolves on.
+The bookend: open on the wound of losing her, close on her vision. Source: `characters/lena.md`,
+`notes/lena-the-last-chapter.md`.
 
 ## The spiritual throughline (keep it alive in every chapter)
 

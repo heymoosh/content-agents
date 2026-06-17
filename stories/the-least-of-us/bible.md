@@ -90,6 +90,15 @@ Last Titan, interwoven and told together, alternating chapters only when the sto
   long time both men have the space to be curious about the alternatives that might have existed.
   The invitation. Mosst's quiet end under a new name in the humane community rebuilt from the ashes.
 
+**The closing chapter belongs to Lena.** The saga ends in the voice of the woman Eli lost. She
+shares a theory of why we are all here (synchronicity as consciousness shaping probability, love
+as its highest vibration, time not strictly linear so a future can reach back and shape the past,
+and the kinder world as not an impossible ideal but an inevitable destination, because everything
+is already here: "we made it"). It is the exact inverse of the closed map Eli surrendered to, and
+the note the whole saga resolves on. Full sheet: `characters/lena.md`; source note:
+`notes/lena-the-last-chapter.md`. Likely a late conversation while she was sick, or an earlier one
+Eli carries (OPEN). This is the bookend: open on the wound of losing her, close on her vision.
+
 ## Spiritual core
 
 There is anger, but there is also hope. The story's real subject is not the war; it is what a
@@ -101,7 +110,9 @@ redeem; what finally outlasts the enclaves is presence, patience, and the refusa
 thing you fought. Eli's particular tragedy is not that no other path existed. It is that, after
 his loss, he gave up looking for one and let grief and anger carry him toward an end that was
 never a real destination. Only late, in the correspondence with Mosst, does the curiosity come
-back, the chance to wonder what the alternatives might have been.
+back, the chance to wonder what the alternatives might have been. The hope the book is finally
+betting on is Lena's, delivered in the closing chapter: that a kinder world is not a doomed ideal
+but an inevitable destination. Eli's arc is the long way back to what she already saw.
 
 ## Themes and touchstones
 
@@ -168,9 +179,9 @@ Full sheets live in `characters/`. In brief:
   legitimate path and can show exactly where each one closed for him. Shows the map, not
   permission. May be horrified by what Eli does. The "I showed you the truth, not permission"
   tension.
-- **Proposed names (from the Chapter 1 seed, not yet locked):** **Lena**, the loved one Eli lost
-  (the wound). **Mira**, a child in the camp, around eight (replaces the "Sasha" placeholder).
-  Confirm or change before they harden into canon.
+- **Lena** is locked: the loved one Eli lost (the wound) and the voice of the closing chapter.
+  Sheet at `characters/lena.md`.
+- **Mira** (a camp child, ~8, replacing the "Sasha" placeholder) is proposed, not yet locked.
 - Names still open for the Betrayer, the Unwilling Prince, and the rest of the children.
 
 ## Craft boundary (non negotiable for this series)
