@@ -28,10 +28,14 @@ the story just runs the logic forward.
 - **Structural displacement, not a recession.** AI has permanently removed whole categories of
   labor, faster than any retraining or institution can absorb. This is not cyclical. There is no
   rate cut that fixes it. Huge populations of dispossessed youth have nothing to return to.
-- **The yard sale proof.** A real kinetic wealth model (Boghosian, Tufts) shows that even under
-  perfectly fair, random exchange, wealth concentrates at the top and the bottom cannot recover
-  without external forced redistribution. In this world it is not a metaphor. It is a proof the
-  Leader encounters and cannot refute. Oligarchy as a mathematical attractor.
+- **The yard sale strand.** A real kinetic wealth model (Boghosian, Tufts) suggests that even
+  under fair, random exchange, wealth tends to concentrate at the top and the bottom struggles to
+  recover without external redistribution. **Handle with care.** It is one strand among several
+  (structural displacement, the amplification gap, captured correctives), not the whole argument
+  and not a single "aha." Eli has lived with it over years, not discovered it in a dramatic
+  moment. In the prose it stays oblique and felt, never a lecture or a graph-in-the-pocket gotcha;
+  let his lived sense of it carry the weight. We do not oversimplify the real result or assert
+  contested economics as settled fact. This is fiction, not an economics paper.
 - **The amplification gap.** AI does not distribute. It amplifies. The enclaves run clean, tuned,
   uncompromised models. The dispossessed get hobbled, ad driven, engagement optimized systems by
   design. The information asymmetry is structural.
@@ -164,7 +168,10 @@ Full sheets live in `characters/`. In brief:
   legitimate path and can show exactly where each one closed for him. Shows the map, not
   permission. May be horrified by what Eli does. The "I showed you the truth, not permission"
   tension.
-- Names for the Betrayer, the Unwilling Prince, and the children.
+- **Proposed names (from the Chapter 1 seed, not yet locked):** **Lena**, the loved one Eli lost
+  (the wound). **Mira**, a child in the camp, around eight (replaces the "Sasha" placeholder).
+  Confirm or change before they harden into canon.
+- Names still open for the Betrayer, the Unwilling Prince, and the rest of the children.
 
 ## Craft boundary (non negotiable for this series)
 
