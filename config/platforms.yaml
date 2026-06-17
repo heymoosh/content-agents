@@ -17,9 +17,9 @@ platforms:
   x:
     max_chars: 280
     derivative_count: [3, 5]
-    best_times_pst: "Tue-Thu, 9-11am (primary), 1-2pm (secondary). Weak on weekends."
+    best_times_pst: "Tue-Thu, 9-11am (primary), 1-2pm (secondary). Weaker on weekends, but posting keeps presence."
     posts_per_week: 5
-    slot_days: [Mon, Tue, Wed, Thu, Fri]
+    slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]   # weekends allowed; weekly cap still limits volume
     slot_time_pst: "09:30"
     style: >
       Short claims or provocations. Pick the sharpest sentence from the source and
@@ -37,9 +37,9 @@ platforms:
   bluesky:
     max_chars: 300
     derivative_count: [2, 4]
-    best_times_pst: "Weekday 9-11am and 6-9pm. Evenings are lively for the AI/tech crowd."
-    posts_per_week: 5
-    slot_days: [Mon, Tue, Wed, Thu, Fri]
+    best_times_pst: "Daily 9-11am and 6-9pm. Evenings are lively for the AI/tech crowd, weekends included."
+    posts_per_week: 7
+    slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]   # tech/AI crowd is active on weekends → true daily
     slot_time_pst: "18:30"
     style: >
       Like X but slightly more casual and observational. Civic/tech audience,
