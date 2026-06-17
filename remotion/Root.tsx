@@ -58,7 +58,6 @@ export const Root: React.FC = () => {
         defaultProps={{
           quote: "Quote goes here",
           attribution: "Muxin Li",
-          bgImage: null as string | null,
         }}
       />
       <Composition
