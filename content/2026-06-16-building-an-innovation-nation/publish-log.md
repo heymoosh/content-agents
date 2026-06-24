@@ -27,3 +27,6 @@
 - 2026-06-24T20:11:01.705Z — quote-card-4 → upload-post upload-post job 6521933aa8ae48abb6339cc7f11232be → x [x] (scheduled 2026-07-13T19:00:00.000Z)
 - 2026-06-24T20:11:02.298Z — quote-card-5 → upload-post upload-post job b8d956c542a249b99d6efe04bd02af07 → linkedin+bluesky [linkedin+bluesky +link] (scheduled 2026-07-14T19:00:00.000Z)
 - 2026-06-24T20:11:02.845Z — quote-card-5 → upload-post upload-post job d83fa9cd4cea40d683df625afb39db98 → x [x] (scheduled 2026-07-14T19:00:00.000Z)
+- 2026-06-24T22:37:38.501Z — qvid-x → typefully draft 9638763 (x, Fri, Jun 26, 9:30 AM PT, cta→reply)
+- 2026-06-24T22:37:45.739Z — qvid-linkedin → typefully draft 9638768 (linkedin, Tue, Jun 30, 8:30 AM PT, cta→inline)
+- 2026-06-24T22:37:52.591Z — qvid-bluesky → typefully draft 9638769 (bluesky, Fri, Jun 26, 6:30 PM PT, cta→inline)
