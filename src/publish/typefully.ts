@@ -1,6 +1,7 @@
 import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
@@ -108,35 +109,47 @@ function buildPosts(
   return { posts: [{ text: body }, { text: ctaLine }], manualComment: null };
 }
 
-// Read-only: list what's currently scheduled in Typefully (sanity-check the queue). No writes.
-//   tsx src/publish/typefully.ts --list
-async function runList(): Promise<void> {
+// Read-only: the live Typefully scheduled-draft queue, normalized for the unified view + --list.
+// No writes. Exported so queue-view.ts can merge it with the other channels.
+export type TypefullyScheduled = { whenIso: string; platforms: string[]; title: string };
+
+export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
   const setId = await socialSetId();
   const res = (await api(`/social-sets/${setId}/drafts?limit=50`)) as
     | { results?: TypefullyDraft[] }
     | TypefullyDraft[];
   const list = Array.isArray(res) ? res : res.results ?? [];
-  const scheduled = list
+  return list
     .filter((d) => d.scheduled_date && (d.status === "scheduled" || new Date(d.scheduled_date) > new Date()))
-    .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime());
+    .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime())
+    .map((d) => ({
+      whenIso: d.scheduled_date!,
+      platforms: (
+        [
+          ["x", d.x_post_enabled],
+          ["linkedin", d.linkedin_post_enabled],
+          ["bluesky", d.bluesky_post_enabled],
+          ["threads", d.threads_post_enabled],
+          ["mastodon", d.mastodon_post_enabled],
+        ] as const
+      )
+        .filter(([, v]) => v)
+        .map(([k]) => k),
+      title: String(d.draft_title ?? d.id),
+    }));
+}
+
+// Read-only: list what's currently scheduled in Typefully (sanity-check the queue). No writes.
+//   tsx src/publish/typefully.ts --list
+async function runList(): Promise<void> {
+  const scheduled = await fetchScheduledDrafts();
   if (!scheduled.length) {
     console.log("No scheduled drafts found in Typefully.");
     return;
   }
   console.log(`Scheduled in Typefully (${scheduled.length}), times in PT:`);
   for (const d of scheduled) {
-    const plats =
-      [
-        ["x", d.x_post_enabled],
-        ["linkedin", d.linkedin_post_enabled],
-        ["bluesky", d.bluesky_post_enabled],
-        ["threads", d.threads_post_enabled],
-        ["mastodon", d.mastodon_post_enabled],
-      ]
-        .filter(([, v]) => v)
-        .map(([k]) => k)
-        .join(",") || "?";
-    console.log(`  ${fmtLa(new Date(d.scheduled_date!))}  [${plats}]  ${d.draft_title ?? d.id}`);
+    console.log(`  ${fmtLa(new Date(d.whenIso))}  [${d.platforms.join(",") || "?"}]  ${d.title}`);
   }
 }
 
@@ -254,7 +267,11 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+// Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)
+// without triggering main()/process.exit. Matches tiktok.ts / cards.ts / youtube.ts.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

@@ -74,6 +74,15 @@ platforms:
     posts_per_week: 3
     slot_days: [Tue, Wed, Thu, Fri]
     slot_time_pst: "17:00"
+  youtube:
+    # YouTube Shorts cadence for the unified scheduler (publish:youtube). The short is uploaded as a
+    # SCHEDULED publish (status.publishAt = the claimed slot, private until then) so it auto-goes
+    # public on the same clock as text/cards/TikTok. The same render also feeds TikTok under a
+    # separate platform key, so the two can share a calendar day. Remove these three fields to revert
+    # to a plain private upload (manual flip in Studio).
+    posts_per_week: 3
+    slot_days: [Tue, Wed, Thu, Fri]
+    slot_time_pst: "16:00"
 
 communities:
   moral-ambition:

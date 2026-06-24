@@ -32,6 +32,8 @@
     "publish:tiktok": "tsx src/publish/tiktok.ts",
     "publish:cards": "tsx src/publish/cards.ts",
     "publish:paste": "tsx src/publish/paste-files.ts",
+    "publish:all": "tsx src/publish/all.ts",
+    "queue": "tsx src/publish/queue-view.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck"
   },

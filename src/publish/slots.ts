@@ -1,4 +1,4 @@
-import { readFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
@@ -88,7 +88,7 @@ export function fmtLa(d: Date): string {
 // --- ledger (append-only JSONL of every claimed (platform, LA day)) ---
 
 const LEDGER = join(repoRoot, "data", "publish-schedule.jsonl");
-interface Claim {
+export interface Claim {
   platform: string;
   day: string; // LA YYYY-MM-DD
   time: string; // ISO
@@ -96,9 +96,26 @@ interface Claim {
   by: string;
 }
 
-function readLedger(): Claim[] {
+// Read back every claim in the shared ledger. Exported so the unified queue view (queue-view.ts)
+// can reconcile live service state against what we claimed, without re-implementing the claim logic.
+export function readLedger(): Claim[] {
   if (!existsSync(LEDGER)) return [];
   return readFileSync(LEDGER, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Claim);
+}
+
+// Compact the ledger by dropping claims whose scheduled time has already passed (the unified queue
+// view's `--sync`). Past claims have either published or lapsed downstream, so they no longer
+// constrain new claims; keeping the file to FUTURE slots only keeps it honest and small. Append-only
+// during normal runs; this is the one intentional rewrite.
+export function pruneLedger(nowMs: number = Date.now()): { removed: number; kept: number } {
+  const claims = readLedger();
+  const future = claims.filter((c) => new Date(c.time).getTime() > nowMs);
+  const removed = claims.length - future.length;
+  if (removed > 0) {
+    mkdirSync(dirname(LEDGER), { recursive: true });
+    writeFileSync(LEDGER, future.length ? future.map((c) => JSON.stringify(c)).join("\n") + "\n" : "");
+  }
+  return { removed, kept: future.length };
 }
 
 function appendLedger(claims: Claim[]): void {
