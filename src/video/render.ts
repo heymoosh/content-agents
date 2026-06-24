@@ -283,7 +283,8 @@ async function synthVoiceAndCaptions(
 async function prepareScenes(
   folder: string,
   profile: ImageProfile | undefined,
-  keyframesOnly: boolean
+  keyframesOnly: boolean,
+  singleStill = false
 ): Promise<{ script: string; visuals: string[]; keyframes: string[]; slug: string; videoDir: string } | null> {
   const sbPath = join(folder, "video", "storyboard.md");
   if (!existsSync(sbPath)) throw new Error(`missing ${sbPath} — write the storyboard first (/video).`);
@@ -324,8 +325,11 @@ async function prepareScenes(
     .map((n) => join(folder, "images", n))
     .find((p) => existsSync(p));
   if (userRef) console.log(`character reference: ${userRef}`);
+  // --motion needs only ONE base illustration — HyperFrames choreographs the motion on it, so it
+  // never pays for multiple stills. --animated needs one keyframe per scene to interpolate between.
+  const stillVisuals = singleStill ? visuals.slice(0, 1) : visuals;
   const keyframes: string[] = [];
-  for (let i = 0; i < visuals.length; i++) {
+  for (let i = 0; i < stillVisuals.length; i++) {
     const kfPath = join(folder, "images", `keyframe-${i + 1}.png`);
     if (!existsSync(kfPath)) {
       const refs = [
@@ -334,7 +338,7 @@ async function prepareScenes(
         ),
       ];
       const { costUsd } = await image.generate({
-        prompt: visuals[i],
+        prompt: stillVisuals[i],
         aspect: "9:16",
         outPath: kfPath,
         params: imageParams,
@@ -437,7 +441,7 @@ async function renderMotionFromStoryboard(
   profile?: ImageProfile,
   keyframesOnly = false
 ): Promise<void> {
-  const scenes = await prepareScenes(folder, profile, keyframesOnly);
+  const scenes = await prepareScenes(folder, profile, keyframesOnly, true); // one base still — HyperFrames adds the motion
   if (!scenes) return;
   const { script, keyframes, slug, videoDir } = scenes;
 

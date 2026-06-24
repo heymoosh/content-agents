@@ -31,13 +31,13 @@ Video is the most expensive thing the pipeline does. It is **two-phase, money on
 |---|---|---|---|
 | **image-motion** (default) | still scene images + Ken Burns zoom/pan in Remotion | ~$0.12/short (Riverflow ×6) | **live** |
 | **animated** | Kling interpolates between approved keyframe stills (start→end per scene) via OpenRouter; clips stitched under Kokoro voice + captions | ~$0.08/s ≈ $1–3/short | **live** |
-| **motion** | HyperFrames (free, local) choreographs the approved stills into a silent motion-graphics visual (Ken Burns + crossfades); Kokoro voice + captions laid on via AnimatedShort | ~$0.13/scene still + $0 motion ≈ $0.65/short | **live** |
+| **motion** | HyperFrames (free, local) choreographs ONE generated still into a motion-graphics visual (camera + overlays); Kokoro voice + captions laid on via AnimatedShort | ~$0.13 (one still; motion is free) | **live** |
 
 **Three engines, cost-first.** Default to **image-motion** (cheapest slideshow). For real motion,
 pick per short and **offer the cost first**:
-- **`--motion`** (HyperFrames, ~$0.65, perfectly consistent) — the **default choice for
-  flat-editorial illustration**. Generated stills + choreographed motion (camera, crossfades,
-  overlays), free deterministic render. Never drifts.
+- **`--motion`** (HyperFrames, ~$0.13, perfectly consistent) — the **default choice for
+  flat-editorial illustration**. ONE generated still + choreographed motion (camera, overlays,
+  reveals); HyperFrames adds the motion for free, so it never pays per scene. Never drifts.
 - **`--animated`** (Kling, ~$1–3) — only when a character needs to *physically* move. Kling
   imagines the motion between keyframes; pricier and can drift.
 
@@ -116,11 +116,12 @@ evaluated and rejected (no start→end interpolation on the Gemini key); see
      captions → `video/short.mp4`. **Offer the cost first** (≈ $1–3 for a few scenes).
 
    **motion (HyperFrames — cheapest, perfectly consistent; the default for illustration):**
-   - Same keyframe-approval gate: `npm run render -- --render-video <folder> --motion --keyframes-only`
-     generates the scene stills (Nano Banana Pro + consistency, same as animated) and **stops** for approval.
-   - Then: `npm run render -- --render-video <folder> --motion` — HyperFrames choreographs the stills
-     into a silent motion visual (free, local — fetched via `npx hyperframes`, no install), and Kokoro
-     voice + captions are laid on top → `video/short.mp4`. Cost is just the stills (~$0.13 each); motion + render are $0.
+   - `npm run render -- --render-video <folder> --motion --keyframes-only` generates **one base still**
+     (Nano Banana Pro + consistency) and **stops** for approval.
+   - Then: `npm run render -- --render-video <folder> --motion` — HyperFrames choreographs that one
+     still into a silent motion visual (free, local — fetched via `npx hyperframes`, no install), and
+     Kokoro voice + captions are laid on top → `video/short.mp4`. **Cost is one still (~$0.13)**; the
+     motion + render are $0. (HyperFrames adds the motion, so --motion never pays per scene.)
 
    - **Image model is cost-first** — Riverflow (~$0.02) by default for stills/keyframes. Only add
      `--pro` (Nano Banana Pro ~$0.13) or `--hero` (gpt-5.4-image-2 ~$0.23) if Muxin asks; **offer
