@@ -14,7 +14,22 @@ const DISTRIBUTED = new Set(["x", "linkedin", "bluesky"]); // where atomized pos
 const NATIVE_ONLY = new Set(["substack", "substack-note"]); // always Muxin's own writing → organic
 const BETS_PATH = join(repoRoot, "briefs", "bets.md");
 
-const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+// Reduce text to lowercase alphanumerics + single spaces before matching. Exports differ:
+// LinkedIn stores text punctuation-stripped/lowercased AND truncated to a ~40-char snippet, while
+// the Placed-log prefix is the first 80 chars of the derivative. So normalize, then match on a
+// leading overlap (below) rather than a strict substring.
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+// Does a published post's (normalized) text correspond to a Placed-log prefix? X/Bluesky carry the
+// full post text (substring match); LinkedIn truncates, so also accept a leading-prefix overlap in
+// EITHER direction (the shorter string being the start of the longer), with a 20-char floor so a
+// short snippet can't false-positive.
+function leadMatch(content: string, prefix: string): boolean {
+  if (prefix.length < 12 || content.length === 0) return false;
+  if (content.includes(prefix)) return true;
+  const [shorter, longer] = content.length <= prefix.length ? [content, prefix] : [prefix, content];
+  return shorter.length >= 20 && longer.startsWith(shorter);
+}
 
 interface Placed {
   platform: string;
@@ -65,7 +80,7 @@ function main() {
         const content = norm(p.content_text ?? "");
         const matched =
           !!p.bet_id ||
-          (content.length > 0 && placed.some((pl) => pl.platform === p.platform && content.includes(pl.prefix)));
+          placed.some((pl) => pl.platform === p.platform && leadMatch(content, pl.prefix));
         value = matched ? "atomized" : "organic";
         if (matched) matches.push(`  #${p.id} ${p.platform}: ${(p.content_text ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
       } else if (NATIVE_ONLY.has(p.platform)) {

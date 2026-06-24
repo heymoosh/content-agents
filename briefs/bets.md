@@ -14,30 +14,58 @@ brief: briefs/2026-06-16-strategy-brief.md
 type: DO_MORE
 claim: "Substantive on-pillar posts (human-ai, claude-code) on X out-pull personal/off-pillar 'other'."
 hypothesis_metric: avg engagement of human-ai + claude-code X posts stays > 1.3 AND beats 'other' by ≥ 0.4 next cycle
-status: open
+status: confirmed
 underperform_streak: 0
+grade: 2026-06-24 — on-pillar X 1.47 (human-ai 1.45/n=71, claude-code 1.5/n=46) vs 'other' 0.60; beats by 0.87, both clear 1.3. Passed.
 
 ## bet:2026-06-16-002
 brief: briefs/2026-06-16-strategy-brief.md
 type: TEST
 claim: "civic-tech is a real X performer, not noise (currently 1.7 avg but only n=6)."
 hypothesis_metric: civic-tech X posts reach n ≥ 10 with avg engagement ≥ 1.3
-status: open
+status: carried
 underperform_streak: 0
+grade: 2026-06-24 — civic-tech X avg 1.63 (clears 1.3) but n=8, still short of 10. Trending right; carry one more cycle.
 
 ## bet:2026-06-16-003
 brief: briefs/2026-06-16-strategy-brief.md
 type: DO_LESS
 claim: "Cutting default personal/off-pillar 'other' posting on X raises overall X engagement."
 hypothesis_metric: share of X posts tagged 'other' drops below 25% (now ~31%) AND overall X avg engagement rises above 1.3
-status: open
-underperform_streak: 0
+status: carried
+underperform_streak: 1
+grade: 2026-06-24 — 'other' share fell 31%→23% (condition met) but overall X avg stuck at 1.28 (<1.3). The cut tidied the mix without lifting engagement; X is structurally low. Carry, but the real lesson is the X ceiling, not the mix.
 
 ## bet:2026-06-16-004
 brief: briefs/2026-06-16-strategy-brief.md
 type: DO_MORE
 claim: "On LinkedIn, builder/PM-framed posts out-engage values/human-ai framing."
 hypothesis_metric: avg engagement of claude-code + builder-framed LinkedIn posts stays above human-ai LinkedIn posts (baseline this cycle: 12.9 vs 7.3)
+status: confirmed
+underperform_streak: 0
+grade: 2026-06-24 — claude-code+builder LinkedIn 8.65 vs human-ai 5.5. Holds, but claude-code (10.93) carries it; builder fell to 4.38 (below human-ai). Confirmed via claude-code.
+
+## bet:2026-06-24-001
+brief: briefs/2026-06-24-strategy-brief.md
+type: DO_MORE
+claim: "Substack Notes are the highest-ROI surface; notes out-engage essays by multiples."
+hypothesis_metric: substack-note avg engagement stays ≥ 5 and ≥ 3× essay reactions, n ≥ 15
+status: open
+underperform_streak: 0
+
+## bet:2026-06-24-002
+brief: briefs/2026-06-24-strategy-brief.md
+type: TEST
+claim: "Atomized/pipeline posts out-engage organic hand-posts on X."
+hypothesis_metric: atomized X avg engagement > organic X avg with atomized n ≥ 10
+status: open
+underperform_streak: 0
+
+## bet:2026-06-24-003
+brief: briefs/2026-06-24-strategy-brief.md
+type: DO_LESS
+claim: "Routing society/human-ai essays to LinkedIn underperforms; keep LinkedIn for claude-code/career/personal."
+hypothesis_metric: atomized human-ai LinkedIn avg < organic LinkedIn avg, confirmed at atomized n ≥ 5
 status: open
 underperform_streak: 0
 - placed 2026-06-17T00:00:33.397Z [2026-06-16-building-an-innovation-nation/x-1] x → typefully draft 9540317 | from_brief: briefs/2026-06-16-strategy-brief.md | directives: prioritize_pillar:human-ai, x:contrarian-lead, voice:no-ai-tells | "Extreme inequality is the natural outcome of a perfectly fair economy. Wealth be"
@@ -55,7 +83,3 @@ underperform_streak: 0
 - placed 2026-06-17T03:51:15.192Z [2026-06-16-building-an-innovation-nation/bluesky-4] bluesky → typefully draft 9541995 | from_brief: briefs/2026-06-16-strategy-brief.md | directives: prioritize_pillar:human-ai, voice:no-ai-tells | "We've been taught to absorb rules and apply them. The net effect is that we've m"
 - placed 2026-06-17T03:51:15.374Z [2026-06-16-building-an-innovation-nation/bluesky-5] bluesky → typefully draft 9541996 | from_brief: briefs/2026-06-16-strategy-brief.md | directives: prioritize_pillar:human-ai, voice:no-ai-tells | "Wealth begets more wealth, because the wealthy have more buffer to survive many "
 - placed 2026-06-17T03:51:15.566Z [2026-06-16-building-an-innovation-nation/bluesky-6] bluesky → typefully draft 9541997 | from_brief: briefs/2026-06-16-strategy-brief.md | directives: prioritize_pillar:human-ai, voice:no-ai-tells | "If the scarce resource is no longer information or even technical skill, but hum"
-- placed 2026-06-24T20:09:11.705Z [2026-06-16-building-an-innovation-nation/quote-card-2] quote-card → postpeer post 6a3c3967060dd1b4214d5558 → bluesky+linkedin+linkedin | postpeer post 6a3c3967060dd1b4214d555e → twitter @ 2026-06-25T19:00:00.000Z | "Extreme inequality is the natural outcome of a perfectly fair economy."
-- placed 2026-06-24T20:11:00.586Z [2026-06-16-building-an-innovation-nation/quote-card-3] quote-card → upload-post job 9cce6f7492ec45a8ae810bc0beb5e97f → linkedin+bluesky | upload-post job c283be7ff94347618a561aede34a2e81 → x @ 2026-07-07T19:00:00.000Z | "Talent is not something that only certain types of people have. It is a capabili"
-- placed 2026-06-24T20:11:01.708Z [2026-06-16-building-an-innovation-nation/quote-card-4] quote-card → upload-post job 88cd1313ed684a8ebb668b81f59db48b → linkedin+bluesky | upload-post job 6521933aa8ae48abb6339cc7f11232be → x @ 2026-07-13T19:00:00.000Z | "Give as many people as possible the chance to become someone worth betting on."
-- placed 2026-06-24T20:11:02.846Z [2026-06-16-building-an-innovation-nation/quote-card-5] quote-card → upload-post job b8d956c542a249b99d6efe04bd02af07 → linkedin+bluesky | upload-post job d83fa9cd4cea40d683df625afb39db98 → x @ 2026-07-14T19:00:00.000Z | "We've made ourselves mechanical, exactly the kind of work now at risk of being a"
