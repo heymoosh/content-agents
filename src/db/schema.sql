@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS posts (
   format TEXT,                         -- 'text' | 'thread' | 'image' | 'video' | 'newsletter'
   pillar TEXT,                         -- 'human-ai' | 'claude-code' | 'civic-tech' | 'career-work' | 'builder' | 'other' | NULL = untagged
   bet_id TEXT,                         -- set by link-bet.ts when /strategy matches a post to a brief's bet (NULL = unattributed)
-  source TEXT,                         -- 'atomized' (shipped by /publish from a content folder) | 'organic' (posted natively / a note Muxin wrote) | NULL = unclassified; set by tag-source.ts
+  source TEXT,                         -- 'atomized' (verbatim, shipped by /publish from a content folder) | 'atomized-spin' (audience-reframed variant, docs/spin-experiment.md) | 'organic' (posted natively / a note Muxin wrote) | NULL = unclassified; set by tag-source.ts
   UNIQUE(platform, platform_post_id)
 );
 

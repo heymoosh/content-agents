@@ -64,17 +64,18 @@ function main() {
 
   console.log(`# Atomized vs organic — ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
-    `Per platform: machine-distributed (atomized) vs natively posted (organic). Cell = avg engagement ` +
-      `(replies ×3, reposts ×2, likes ×1) · rc = recency-weighted (${HALF_LIFE_WEEKS}-wk half-life) · n posts. ` +
-      `⚠INSUFFICIENT = n<3 or <4 weeks of data.\n`
+    `Per platform: verbatim-atomized vs spin (audience-reframed) vs natively posted (organic). ` +
+      `Cell = avg engagement (replies ×3, reposts ×2, likes ×1) · rc = recency-weighted ` +
+      `(${HALF_LIFE_WEEKS}-wk half-life) · n posts. ⚠INSUFFICIENT = n<3 or <4 weeks of data.\n`
   );
-  console.log(`| platform | atomized | organic |`);
-  console.log(`|---|---|---|`);
+  console.log(`| platform | atomized | atomized-spin | organic |`);
+  console.log(`|---|---|---|---|`);
   for (const pl of platforms) {
-    console.log(`| ${pl} | ${cell(pl, "atomized")} | ${cell(pl, "organic")} |`);
+    console.log(`| ${pl} | ${cell(pl, "atomized")} | ${cell(pl, "atomized-spin")} | ${cell(pl, "organic")} |`);
   }
   console.log(
-    `\n> Observational, not a controlled test: atomized = derivatives shipped from a content folder; ` +
+    `\n> Observational, not a controlled test: atomized = verbatim derivatives shipped from a content ` +
+      `folder; atomized-spin = derivatives reframed for audience fit (docs/spin-experiment.md); ` +
       `organic = posts Muxin wrote natively (incl. Substack notes). The content differs between groups, ` +
       `so a gap is a reason to investigate, not proof. Flagged groups are too small to read yet.`
   );

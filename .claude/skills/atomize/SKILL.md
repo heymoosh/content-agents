@@ -22,6 +22,11 @@ real money, so it's opt-in per piece, not bundled here.
   text came from. If you can't point at lines, you wrote it — delete it.
 - If the source is too thin to atomize honestly, say so and stop. Do not pad.
 
+**This is the default and stays the default.** There is one opt-in, tracked exception:
+`/atomize --spin` lets you reframe and flavor a post for its audience (see **Spin mode** below).
+It is OFF unless Muxin asks for it, and even then it may re-angle but never invent a claim Muxin
+didn't make. Do not spin unless the invocation says `--spin`.
+
 ## Voice & AI tells (non-negotiable — CLAUDE.md rule 5)
 
 Read `config/voice.yaml` before you draft or edit ANY text below. It applies to every
@@ -88,7 +93,8 @@ derivative, the video script, and the video title/description. The short version
      ---
      platform: x            # x | linkedin | bluesky | community | quote-card
      option: 1
-     source_lines: [12, 31-33]
+     source_lines: [12, 31-33]   # required normally; best-effort (the ideas drawn from) when spin: true
+     # spin: true           # ONLY on a --spin run — marks an audience-reframed variant (Spin mode below)
      scores: { native: 4, brand: 5, cta: true }
      cta: source            # source | <literal-url> | none — stamped from config/cta.yaml (step 4.5)
      cta_label: "Full essay (free to subscribe):"   # short lead-in for the link; omit when cta is none
@@ -127,7 +133,8 @@ derivative, the video script, and the video title/description. The short version
    - Score 1–2 → discard it yourself rather than queueing junk.
 
 6. **Validate.** `npm run validate -- <folder>` — must pass before queueing. Fix violations,
-   don't relax limits.
+   don't relax limits. (Validation enforces char/word limits for every derivative and requires
+   `source_lines` except on `spin: true` derivatives, where it's best-effort — Spin mode below.)
 
 7. **Generate the quote-card asset** (cheap, extraction-first):
    - `npm run render -- --still <folder> --quote quote-card-1`
@@ -170,6 +177,51 @@ directly and spreads the ones worth spreading.
    for a platform like LinkedIn, the "don't pad, stop" rule applies). Substack is already excluded
    as a routing target, so a note is never reposted back to where it came from. Muxin still approves
    every draft in `review-queue.md` before `/publish`.
+
+## Spin mode — /atomize --spin (opt-in audience-fit experiment)
+
+Default atomization is verbatim extraction. **Spin is the one exception**, and it runs ONLY when
+the invocation is `/atomize --spin <arg>` (or Muxin asks for a spin on a re-run). It tests a single
+hypothesis: does reframing a post for its audience lift engagement enough to be worth dropping
+strict verbatim? It is measured against verbatim, so it must be tracked, not silently mixed in.
+Full rationale + protocol: `docs/spin-experiment.md`.
+
+**What changes vs. the normal flow:** run steps 1–8 exactly as above, with three differences.
+
+1. **You may reframe and flavor — within hard guardrails.** For a spun derivative you MAY re-angle
+   the framing, change the hook, reorder, and adapt the register to the platform's audience. You MAY
+   NOT introduce a claim, argument, statistic, metaphor, or worldview Muxin did not express in the
+   source. Every spun post must still be traceable to something Muxin actually said or believes —
+   reframed, not invented. When unsure whether a line crosses from flavor into invention, it has
+   crossed; cut it.
+2. **Mark it.** Add `spin: true` to the derivative's frontmatter. `source_lines` becomes
+   best-effort: point at the lines/ideas you drew from (validation no longer hard-requires it for
+   `spin: true`, but include it when you can — it keeps the trace honest).
+3. **Everything else holds.** `config/voice.yaml` applies in full (no em dashes, no AI tells).
+   Scoring, CTA stamping (`config/cta.yaml` — spin does not change CTA), routing, and the
+   `review-queue.md` approval gate are unchanged. Nothing publishes without Muxin's `approve`.
+
+**Which derivatives to spin (default for a `--spin` run):** spin **LinkedIn and X** — the platforms
+where audience-format fit varies most. Keep **Bluesky, community, and the quote card near-verbatim**
+(those surfaces already work; don't disturb the baseline). So a typical `--spin` run produces
+`spin: true` LinkedIn + X derivatives and ordinary verbatim Bluesky/quote-card derivatives. The A/B
+accumulates across runs over the weeks (verbatim from normal runs vs. spin from `--spin` runs), not
+within one piece. If Muxin wants a clean same-piece A/B, produce both the verbatim and the spun
+version of a platform and let review pick — say so in the review-queue header so it's not read as a
+dupe.
+
+**The invent-vs-flavor line, made concrete.** Say `source.md` line 14 reads:
+
+> Most AI rollouts automate the wrong layer: they hand the judgment to the model and keep the typing manual.
+
+- **Verbatim (default, X):** "Most AI rollouts automate the wrong layer: they hand the judgment to the model and keep the typing manual." → `source_lines: [14]`
+- **✅ Allowed spin (LinkedIn, reframed as a lesson, new hook, same claim):** "The most common AI mistake I keep seeing: teams automate the judgment and keep doing the typing by hand. That's the wrong layer. Flip it." → `spin: true`, `source_lines: [14]`. The hook and register changed; the claim is still Muxin's.
+- **❌ Not a spin, it's invention:** "Most AI rollouts automate the wrong layer. Studies show 70% fail in year one because of it." → bans: invents a statistic ("70%") and a citation ("studies show") Muxin never stated. Cut it, even on a spin run.
+
+When you queue spun derivatives, tell Muxin which are `spin: true` and on which platforms, so the
+experiment stays legible. Once published, `/publish` stamps the Placed-log row with a `spin` marker,
+`tag-source` classifies the post `atomized-spin`, and `/strategy`'s `origin-compare` shows
+verbatim-atomized vs spin vs organic per platform.
 
 ## --revise mode
 

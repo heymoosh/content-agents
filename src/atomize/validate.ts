@@ -45,7 +45,9 @@ function main() {
     }
     // Video scripts are the scoped exception to extraction-first (Grok-drafted from the
     // essay's ideas, reviewed before render — see CLAUDE.md rule 1), so no source_lines.
-    if (platform !== "video-script" && !fm.source_lines) {
+    // Spin variants (the opt-in audience-fit experiment, docs/spin-experiment.md) reframe
+    // within guardrails, so source_lines is best-effort there too — not required to validate.
+    if (platform !== "video-script" && !fm.spin && !fm.source_lines) {
       violations.push(`${file}: missing source_lines frontmatter (extraction-first traceability)`);
     }
     if (rule.max_chars && body.length > rule.max_chars) {
