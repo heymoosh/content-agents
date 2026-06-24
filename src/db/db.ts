@@ -20,8 +20,11 @@ export function openDb(): Database.Database {
   }
   if (!cols.some((c) => c.name === "source")) {
     db.exec("ALTER TABLE posts ADD COLUMN source TEXT");
-    db.exec("CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)");
   }
+  // Index OUTSIDE the column guard (and not in schema.sql, which runs before this migration):
+  // the column is guaranteed to exist by here (CREATE TABLE on a fresh DB, ALTER above on a legacy
+  // one), and CREATE INDEX IF NOT EXISTS is idempotent.
+  db.exec("CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)");
   return db;
 }
 
