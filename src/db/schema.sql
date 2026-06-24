@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS posts (
   format TEXT,                         -- 'text' | 'thread' | 'image' | 'video' | 'newsletter'
   pillar TEXT,                         -- 'human-ai' | 'claude-code' | 'civic-tech' | 'career-work' | 'builder' | 'other' | NULL = untagged
   bet_id TEXT,                         -- set by link-bet.ts when /strategy matches a post to a brief's bet (NULL = unattributed)
+  source TEXT,                         -- 'atomized' (shipped by /publish from a content folder) | 'organic' (posted natively / a note Muxin wrote) | NULL = unclassified; set by tag-source.ts
   UNIQUE(platform, platform_post_id)
 );
 
@@ -59,4 +60,5 @@ CREATE INDEX IF NOT EXISTS idx_audience_platform ON audience(platform, metric_ty
 CREATE INDEX IF NOT EXISTS idx_posts_platform ON posts(platform);
 CREATE INDEX IF NOT EXISTS idx_posts_pillar ON posts(pillar);
 CREATE INDEX IF NOT EXISTS idx_posts_bet ON posts(bet_id);
+CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source);
 CREATE INDEX IF NOT EXISTS idx_metrics_post ON metrics(post_id);
