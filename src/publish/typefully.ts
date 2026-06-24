@@ -1,5 +1,5 @@
 import "../util/env.js";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
@@ -50,6 +50,24 @@ async function socialSetId(): Promise<string> {
     console.log(`multiple social sets found; using first (${id}). Pin with TYPEFULLY_SOCIAL_SET_ID in .env.`);
   }
   return id;
+}
+
+// Upload a media file (mp4/mov/png/jpg/gif) to Typefully via its presigned-S3 flow, returning the
+// media_id to attach to a post. Used for native video posts (e.g. animated quote cards).
+async function uploadMedia(setId: string, filePath: string): Promise<string> {
+  const { media_id, upload_url } = (await api(`/social-sets/${setId}/media/upload`, {
+    method: "POST",
+    body: JSON.stringify({ file_name: basename(filePath) }),
+  })) as { media_id?: string; upload_url?: string };
+  if (!media_id || !upload_url) {
+    throw new Error(`typefully media/upload returned no media_id/upload_url for ${filePath}`);
+  }
+  // PUT the raw bytes to the presigned URL — NO auth or content-type headers (the signature validates it).
+  const put = await fetch(upload_url, { method: "PUT", body: readFileSync(filePath) });
+  if (!put.ok) {
+    throw new Error(`media upload PUT failed (${basename(filePath)}): ${put.status} ${await put.text()}`);
+  }
+  return media_id;
 }
 
 function loadPlatformMax(): Record<string, number> {
@@ -195,6 +213,17 @@ async function main() {
     }
     const placement = cfg.placement[row.platform] ?? "inline";
     const { posts, manualComment } = buildPosts(body, ctaUrl, ctaLabel, placement, maxMap[row.platform] ?? Infinity);
+
+    // Attach a video/image if the derivative declares one (frontmatter `media:`), e.g. an animated
+    // quote card → native video post. Uploaded once and attached to the first post.
+    const mediaRef = typeof fm.media === "string" ? fm.media.trim() : "";
+    if (mediaRef) {
+      const mediaPath = isAbsolute(mediaRef) ? mediaRef : join(folder, mediaRef);
+      if (!existsSync(mediaPath)) throw new Error(`media for ${row.id} not found: ${mediaPath}`);
+      const mediaId = await uploadMedia(setId, mediaPath);
+      (posts[0] as { text: string; media_ids?: string[] }).media_ids = [mediaId];
+      console.log(`  ↳ uploaded ${basename(mediaPath)} → media attached to ${row.id}`);
+    }
 
     const publishAt = slotByRow.get(row.id) ?? "next-free-slot";
     const when = whenByRow.get(row.id) ?? "next-free-slot";
