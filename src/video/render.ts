@@ -65,7 +65,7 @@ async function withJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): 
 // rule, small-caps attribution) is constant; only the three colors change per scheme.
 const CARD_SCHEMES: Record<string, { paper: string; ink: string; accent: string }> = {
   classic: { paper: "#f2ead9", ink: "#1a1a1a", accent: "#e2552f" }, // beige paper, ink, persimmon
-  "teal-accent": { paper: "#f2ead9", ink: "#1a1a1a", accent: "#2f7e7e" }, // beige paper, ink, teal
+  "teal-accent": { paper: "#e7e9e7", ink: "#1a1a1a", accent: "#2f7e7e" }, // cool grey paper, ink, teal
   "teal-block": { paper: "#2f7e7e", ink: "#f2ead9", accent: "#d8a23a" }, // teal paper, cream type, ochre
   ink: { paper: "#1a1a1a", ink: "#f2ead9", accent: "#2f7e7e" }, // dark paper, cream type, teal
 };
@@ -91,7 +91,16 @@ async function renderStill(
     // (Muxin's call, June 2026: "just quotes, not illustrations.") The quote IS the design, so
     // we skip the quote-card background image-gen entirely (the --pro/--hero profile and the
     // image-model policy still apply to video b-roll, just not to quote cards).
-    const props = { quote, attribution: "Muxin Li", ...resolveScheme(fm) };
+    // The article title rides under the attribution as the in-asset source line. Pulled from
+    // source.md frontmatter (the published essay's title); empty → the line is omitted.
+    let source = "";
+    try {
+      const { fm: srcFm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
+      if (typeof srcFm.title === "string") source = srcFm.title;
+    } catch {
+      // no source.md (e.g. a bare quote) — render without the source line
+    }
+    const props = { quote, attribution: "Muxin Li", source, ...resolveScheme(fm) };
     const propsFile = join(jobDir, "props.json");
     writeFileSync(propsFile, JSON.stringify(props));
     const outPath = join(folder, "images", `${quoteName}.png`);

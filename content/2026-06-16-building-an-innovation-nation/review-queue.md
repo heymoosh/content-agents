@@ -36,10 +36,10 @@ human-ai. The data confirms LinkedIn rewards the builder/PM register (claude-cod
 | bluesky-5 | bluesky | text | derivatives/bluesky-5.md | 5 | 5 | yes | published | NEW: wealth begets wealth (L94), econ angle |
 | bluesky-6 | bluesky | text | derivatives/bluesky-6.md | 5 | 5 | yes | published | NEW: investing in people becomes a strategy (L118); extends to Tue 6/23 |
 | community-democratic-resilience | community:democratic-resilience | text | derivatives/community-democratic-resilience.md | 5 | 5 | yes | published | civic CTA → voting tool |
-| quote-card-1 | quote-card | image | images/quote-card-1.png | 5 | 5 | no | approve | New Yorker typographic style (no illustration); render needed (no PNG present in worktree) |
-| quote-card-2 | quote-card | image | images/quote-card-2.png | 5 | 5 | no | pending | NEW: "Extreme inequality is the natural outcome of a perfectly fair economy" (L78) |
-| quote-card-3 | quote-card | image | images/quote-card-3.png | 5 | 5 | no | pending | NEW: talent can emerge from anyone (L98) |
-| quote-card-4 | quote-card | image | images/quote-card-4.png | 5 | 5 | no | pending | NEW: someone worth betting on (L120) |
-| quote-card-5 | quote-card | image | images/quote-card-5.png | 5 | 5 | no | pending | NEW: we've made ourselves mechanical (L60) |
-| quote-card-6 | quote-card | image | images/quote-card-6.png | 5 | 5 | no | pending | NEW: determination over intelligence (L106) |
+| quote-card-1 | quote-card | image | images/quote-card-1.png | 5 | 5 | yes | published | supervised test card posted via PostPeer (bluesky+linkedin x2+twitter) link-free before the CTA path existed; left as-is. cta now source for the record |
+| quote-card-2 | quote-card | image | images/quote-card-2.png | 5 | 5 | yes | published | NEW: "Extreme inequality is the natural outcome of a perfectly fair economy" (L78) |
+| quote-card-3 | quote-card | image | images/quote-card-3.png | 5 | 5 | yes | published | NEW: talent can emerge from anyone (L98) |
+| quote-card-4 | quote-card | image | images/quote-card-4.png | 5 | 5 | yes | published | NEW: someone worth betting on (L120) |
+| quote-card-5 | quote-card | image | images/quote-card-5.png | 5 | 5 | yes | published | NEW: we've made ourselves mechanical (L60) |
+| quote-card-6 | quote-card | image | images/quote-card-6.png | 5 | 5 | yes | approve | NEW: determination over intelligence (L106) |
 | video-script | video-script | storyboard | — | — | — | — | blocked | needs OPENROUTER_API_KEY (Grok); set it + re-run to draft script + storyboard |
