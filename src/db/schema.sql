@@ -60,5 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_audience_platform ON audience(platform, metric_ty
 CREATE INDEX IF NOT EXISTS idx_posts_platform ON posts(platform);
 CREATE INDEX IF NOT EXISTS idx_posts_pillar ON posts(pillar);
 CREATE INDEX IF NOT EXISTS idx_posts_bet ON posts(bet_id);
-CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source);
 CREATE INDEX IF NOT EXISTS idx_metrics_post ON metrics(post_id);
+-- NOTE: no idx_posts_source here on purpose. `source` is added by a migration in db.ts that runs
+-- AFTER this file executes, so indexing it here would throw "no such column: source" on a legacy
+-- DB. The index is created in that migration instead.
