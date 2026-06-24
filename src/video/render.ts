@@ -15,6 +15,7 @@ import { logCost } from "../util/cost-log.js";
 import { getImage, getTTS, getBroll, isEnabled, type ImageProfile } from "../providers/registry.js";
 import { charsToWordCaptions } from "./captions.js";
 import { charsOrWhisper } from "./align.js";
+import { renderMotionBg } from "./hyperframes.js";
 
 // Render assets for a content folder.
 //   tsx src/video/render.ts --still <content-folder> --quote <derivative-name>
@@ -275,15 +276,15 @@ async function synthVoiceAndCaptions(
   return { audioPath, captions, durationMs };
 }
 
-// ANIMATED engine: the storyboard's scene visuals become keyframe stills; the video provider
-// (Kling) animates BETWEEN consecutive keyframes; the clips are stitched under the voiceover +
-// captions. `keyframesOnly` generates just the stills and stops, so they can be approved before
-// any paid animation. Gated on the same approved storyboard row as the image-motion path.
-async function renderAnimatedFromStoryboard(
+// Shared front half of the animated + motion engines: validate the approved storyboard, write
+// video-script.md, and generate the scene keyframe stills WITH character/style consistency
+// (Nano Banana Pro + reference images). Returns null when keyframesOnly (stills written; stop for
+// approval before any paid render). Gated on the same approved storyboard row as image-motion.
+async function prepareScenes(
   folder: string,
-  profile?: ImageProfile,
-  keyframesOnly = false
-): Promise<void> {
+  profile: ImageProfile | undefined,
+  keyframesOnly: boolean
+): Promise<{ script: string; visuals: string[]; keyframes: string[]; slug: string; videoDir: string } | null> {
   const sbPath = join(folder, "video", "storyboard.md");
   if (!existsSync(sbPath)) throw new Error(`missing ${sbPath} — write the storyboard first (/video).`);
   if (storyboardStatus(folder) !== "approve") {
@@ -300,9 +301,7 @@ async function renderAnimatedFromStoryboard(
     .split("\n")
     .map((l) => l.match(/^\s*-\s*visual:\s*(.+)$/i)?.[1]?.trim())
     .filter((v): v is string => Boolean(v));
-  if (visuals.length < 2) {
-    throw new Error(`${sbPath}: animated mode needs ≥2 scene "- visual:" keyframes (got ${visuals.length}).`);
-  }
+  if (visuals.length < 1) throw new Error(`${sbPath}: no scene "- visual:" lines found.`);
 
   const slug = basename(folder);
   const videoDir = join(folder, "video");
@@ -315,10 +314,10 @@ async function renderAnimatedFromStoryboard(
     `---\nplatform: video-script\nsource_ref: ${sourceRef}\n---\n\n${script}\n`
   );
 
-  // 1. Keyframe stills — one per scene visual; the frames you approve before any Kling spend.
+  // Keyframe stills — one per scene visual; the frames you approve before any paid render.
   // Consistency: default to Nano Banana Pro (reference-image conditioning) so the character +
-  // style hold across scenes. Each keyframe references an anchor (a user-supplied
-  // images/reference.* if present, else scene 1) plus the previous frame for local continuity.
+  // style hold across scenes. Each references an anchor (a user-supplied images/reference.* if
+  // present, else scene 1) plus the previous frame for local continuity.
   const kfProfile: ImageProfile = profile ?? "pro";
   const { provider: image, params: imageParams } = await getImage(kfProfile);
   const userRef = ["reference.png", "reference.jpg", "reference.jpeg"]
@@ -347,8 +346,24 @@ async function renderAnimatedFromStoryboard(
   }
   console.log(`keyframes: ${keyframes.length} stills → ${join(folder, "images")}`);
   if (keyframesOnly) {
-    console.log("--keyframes-only: review the keyframe-*.png stills, then re-run without the flag to animate.");
-    return;
+    console.log("--keyframes-only: review the keyframe-*.png stills, then re-run without the flag to render.");
+    return null;
+  }
+  return { script, visuals, keyframes, slug, videoDir };
+}
+
+// ANIMATED engine: the video provider (Kling) animates BETWEEN consecutive approved keyframes; the
+// clips are stitched under the voiceover + captions. Needs ≥2 keyframes (use --motion for one).
+async function renderAnimatedFromStoryboard(
+  folder: string,
+  profile?: ImageProfile,
+  keyframesOnly = false
+): Promise<void> {
+  const scenes = await prepareScenes(folder, profile, keyframesOnly);
+  if (!scenes) return;
+  const { script, visuals, keyframes, slug, videoDir } = scenes;
+  if (keyframes.length < 2) {
+    throw new Error(`animated mode needs ≥2 scene keyframes (got ${keyframes.length}); use --motion for one.`);
   }
 
   // 2. Voice + captions.
@@ -413,6 +428,58 @@ async function renderAnimatedFromStoryboard(
   });
 }
 
+// MOTION engine: the approved scene stills are choreographed into a SILENT motion-graphics visual
+// by HyperFrames (Ken Burns + crossfades — free, local, deterministic, perfectly consistent), then
+// the Kokoro voice + captions are laid on top via the same AnimatedShort composition. Cheapest
+// animated path; best for flat-editorial illustration. Same gate + --keyframes-only as --animated.
+async function renderMotionFromStoryboard(
+  folder: string,
+  profile?: ImageProfile,
+  keyframesOnly = false
+): Promise<void> {
+  const scenes = await prepareScenes(folder, profile, keyframesOnly);
+  if (!scenes) return;
+  const { script, keyframes, slug, videoDir } = scenes;
+
+  // 1. Voice + captions.
+  const { audioPath, captions, durationMs } = await synthVoiceAndCaptions(videoDir, script, slug);
+
+  // 2. HyperFrames renders the silent motion visual from the consistent stills.
+  const fps = 30;
+  const bgPath = join(videoDir, "motion-bg.mp4");
+  renderMotionBg(keyframes, durationMs, bgPath);
+
+  // 3. Lay the voiceover + captions over it via AnimatedShort (one full-length clip).
+  await withJob(async (jobDir, jobName) => {
+    copyFileSync(bgPath, join(jobDir, "motion-bg.mp4"));
+    copyFileSync(audioPath, join(jobDir, "voiceover.mp3"));
+    const props = {
+      audio: `${jobName}/voiceover.mp3`,
+      clips: [`${jobName}/motion-bg.mp4`],
+      clipFrames: [Math.ceil((durationMs / 1000) * fps)],
+      captions,
+      durationMs,
+    };
+    const propsFile = join(jobDir, "props.json");
+    writeFileSync(propsFile, JSON.stringify(props));
+
+    const mp4 = join(videoDir, "short.mp4");
+    remotion(["render", ENTRY, "AnimatedShort", mp4, `--props=${propsFile}`]);
+    remotion([
+      "still",
+      ENTRY,
+      "AnimatedShort",
+      join(videoDir, "thumbnail.png"),
+      `--props=${propsFile}`,
+      "--frame=15",
+    ]);
+    writeFileSync(join(videoDir, "transcript.txt"), script + "\n");
+    console.log(
+      `motion video: ${mp4} (${keyframes.length} scene(s), ${(durationMs / 1000).toFixed(1)}s, HyperFrames + Kokoro)`
+    );
+  });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const mode = args[0];
@@ -429,7 +496,9 @@ async function main() {
     await renderStill(folder, quoteName, profile);
   } else if (mode === "--render-video") {
     const folder = resolveFolder(args[1]);
-    if (args.includes("--animated")) {
+    if (args.includes("--motion")) {
+      await renderMotionFromStoryboard(folder, profile, args.includes("--keyframes-only"));
+    } else if (args.includes("--animated")) {
       await renderAnimatedFromStoryboard(folder, profile, args.includes("--keyframes-only"));
     } else {
       await renderVideoFromStoryboard(folder, profile);
@@ -438,7 +507,7 @@ async function main() {
     await renderVideo(resolveFolder(args[1]), profile);
   } else {
     console.error(
-      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]            (image-motion B-roll)\n  tsx src/video/render.ts --render-video <content-folder> --animated [--keyframes-only] [--pro|--hero]\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
+      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]            (image-motion B-roll)\n  tsx src/video/render.ts --render-video <content-folder> --motion [--keyframes-only] [--pro|--hero]   (HyperFrames)\n  tsx src/video/render.ts --render-video <content-folder> --animated [--keyframes-only] [--pro|--hero]  (Kling)\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
     );
     process.exit(1);
   }
