@@ -16,6 +16,10 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
 
 2. **Text posts** (x / linkedin / bluesky): `npm run publish:typefully -- <folder>`
    - Creates SCHEDULED drafts — Typefully's queue is the second safety net.
+   - **Native video/image**: if a text-platform derivative declares `media: <path>` in its
+     frontmatter (e.g. an animated quote card → `media: video/quote-animated.mp4`), the file is
+     uploaded to Typefully and attached to the post — a native video post on X/LinkedIn/Bluesky.
+     The body stays the caption. `.mp4`/`.mov` for video.
    - LinkedIn's CTA link goes INLINE in the body (`config/cta.yaml` placement). The cleaner
      first-comment needs gated LinkedIn API access; inline keeps LinkedIn fully automated on
      Typefully like the rest. X's link goes in the first reply; Bluesky/community inline.
