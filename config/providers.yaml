@@ -18,6 +18,7 @@ prose: grok-openrouter         # BUILD 2 — FICTION ONLY. Composes original cha
 # the model is locked, moving to the direct xAI API (to skip OpenRouter's ~5% fee) is one new
 # file, src/providers/prose/grok-xai.ts, plus changing this line to `prose: grok-xai`.
 video-broll: openrouter-video   # animated scenes: Kling first+last-frame interpolation (OpenRouter). Used by /video.
+image_post: upload-post   # quote-card auto-publisher (publish:cards). On upload-post since PostPeer's 20/mo free quota ran out 2026-06 (cards 2 shipped via postpeer); switch back to "postpeer" once its cycle resets — see .env.example.
 # Animated scene-engine settings, passed to interpolate(). Kling v3.0 Std ~$0.08/s — cheaper than Veo,
 # and the one model verified to do start→end interpolation on the existing OPENROUTER_API_KEY.
 video_broll_params: { model: kwaivgi/kling-v3.0-std, resolution: 720p, cost_per_sec: 0.08 }

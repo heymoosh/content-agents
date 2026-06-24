@@ -1,16 +1,19 @@
 import "../util/env.js";
 import { readFileSync } from "node:fs";
-import { join, isAbsolute } from "node:path";
+import { join, isAbsolute, basename } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
+import { loadCtaConfig, loadCanonicalUrl, resolveCta } from "./cta.js";
+import { claimSlots, fmtLa } from "./slots.js";
 
-// Push approved text posts (x / linkedin / bluesky) from a content folder's review queue
-// to Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish
-// time computed from the platform cadence in config/platforms.yaml (posts_per_week + slot_days +
-// slot_time_pst, anchored to PT/DST-aware); platforms without a cadence fall back to next-free-slot.
-//   tsx src/publish/typefully.ts <content-folder>
+// Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
+// Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
+// from the UNIFIED scheduler (src/publish/slots.ts + config/platforms.yaml cadence + the shared
+// slot ledger), so text and cards never double-book a platform on the same day — across runs and
+// streams. Platforms without a cadence fall back to Typefully "next-free-slot".
+//   tsx src/publish/typefully.ts <content-folder> | --list
 // Needs TYPEFULLY_API_KEY (and optionally TYPEFULLY_SOCIAL_SET_ID) in .env.
 
 const BASE = "https://api.typefully.com/v2";
@@ -49,41 +52,6 @@ async function socialSetId(): Promise<string> {
   return id;
 }
 
-// CTA config (config/cta.yaml): placement keeps the link out of the body where the platform
-// algorithm penalizes in-post links (X, LinkedIn); source_fallback is used when a `cta: source`
-// derivative has no published essay URL to point at. See Platform Reference.
-function loadCtaConfig(): {
-  placement: Record<string, string>;
-  fallbackUrl: string | null;
-  fallbackLabel: string;
-} {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "cta.yaml"), "utf8")) as {
-      placement?: Record<string, string>;
-      source_fallback?: { url?: string; label?: string };
-    };
-    return {
-      placement: cfg.placement ?? {},
-      fallbackUrl: cfg.source_fallback?.url ?? null,
-      fallbackLabel: cfg.source_fallback?.label ?? "",
-    };
-  } catch {
-    return { placement: {}, fallbackUrl: null, fallbackLabel: "" };
-  }
-}
-
-// The source essay's own URL — what `cta: source` derivatives point at. Pasted into source.md
-// `canonical_url` (auto-filled when atomized from a live URL). Null until it's a real http(s) url.
-function loadCanonicalUrl(folder: string): string | null {
-  try {
-    const { fm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
-    const u = typeof fm.canonical_url === "string" ? fm.canonical_url.trim() : "";
-    return /^https?:\/\//.test(u) ? u : null;
-  } catch {
-    return null;
-  }
-}
-
 function loadPlatformMax(): Record<string, number> {
   try {
     const cfg = parseYaml(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
@@ -95,94 +63,6 @@ function loadPlatformMax(): Record<string, number> {
   } catch {
     return {};
   }
-}
-
-// ── Cadence scheduler ──────────────────────────────────────────────────────
-// Compute an EXPLICIT publish time per post from config/platforms.yaml (posts_per_week +
-// slot_days + slot_time_pst), anchored to America/Los_Angeles (DST-aware), so Typefully
-// auto-publishes on schedule instead of dumping everything into "next-free-slot".
-const TZ = "America/Los_Angeles";
-const WEEKDAYS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-
-type PlatformSchedule = { postsPerWeek: number; days: number[]; timePst: string };
-
-function loadSchedule(): Record<string, PlatformSchedule> {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
-      platforms?: Record<string, { posts_per_week?: number; slot_days?: string[]; slot_time_pst?: string }>;
-    };
-    const out: Record<string, PlatformSchedule> = {};
-    for (const [k, v] of Object.entries(cfg.platforms ?? {})) {
-      if (!v.posts_per_week || !v.slot_days || !v.slot_time_pst) continue;
-      const days = v.slot_days
-        .map((s) => WEEKDAYS[s.toLowerCase().slice(0, 3)])
-        .filter((n): n is number => n !== undefined);
-      if (days.length) out[k] = { postsPerWeek: v.posts_per_week, days, timePst: v.slot_time_pst };
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-// The LA wall-clock parts (calendar day + weekday) of a given instant.
-function laParts(d: Date): { year: number; month: number; day: number; weekday: number } {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, weekday: "short", year: "numeric", month: "2-digit", day: "2-digit",
-  });
-  const p = Object.fromEntries(dtf.formatToParts(d).map((x) => [x.type, x.value]));
-  return { year: +p.year, month: +p.month, day: +p.day, weekday: WEEKDAYS[String(p.weekday).toLowerCase()] };
-}
-
-// LA's UTC offset (ms) at a given instant — accounts for PST vs PDT.
-function laOffsetMs(d: Date): number {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
-  const p = Object.fromEntries(dtf.formatToParts(d).map((x) => [x.type, x.value]));
-  const hour = +p.hour === 24 ? 0 : +p.hour;
-  return Date.UTC(+p.year, +p.month - 1, +p.day, hour, +p.minute, +p.second) - d.getTime();
-}
-
-// The UTC instant for a given LA wall-clock date+time (DST-aware).
-function laWallToInstant(y: number, mo: number, d: number, h: number, mi: number): Date {
-  const guess = Date.UTC(y, mo - 1, d, h, mi, 0);
-  return new Date(guess - laOffsetMs(new Date(guess)));
-}
-
-// Monday-of-week key (LA) for the posts_per_week cap.
-function weekKey(y: number, mo: number, d: number, weekday: number): string {
-  const back = (weekday + 6) % 7; // days since Monday
-  return new Date(Date.UTC(y, mo - 1, d - back)).toISOString().slice(0, 10);
-}
-
-// `count` future slot instants for one platform, ~1/day on slot_days, ≤ posts_per_week per week.
-function computeSlots(cfg: PlatformSchedule, count: number, now: Date): Date[] {
-  const [hh, mm] = cfg.timePst.split(":").map(Number);
-  const slots: Date[] = [];
-  const perWeek: Record<string, number> = {};
-  for (let offset = 1; offset <= 180 && slots.length < count; offset++) {
-    const probe = new Date(now.getTime() + offset * 86_400_000);
-    const { year, month, day, weekday } = laParts(probe);
-    if (!cfg.days.includes(weekday)) continue;
-    const wk = weekKey(year, month, day, weekday);
-    if ((perWeek[wk] ?? 0) >= cfg.postsPerWeek) continue;
-    const instant = laWallToInstant(year, month, day, hh, mm);
-    if (instant.getTime() <= now.getTime()) continue;
-    slots.push(instant);
-    perWeek[wk] = (perWeek[wk] ?? 0) + 1;
-  }
-  return slots;
-}
-
-function fmtLa(d: Date): string {
-  return (
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ, weekday: "short", month: "short", day: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true,
-    }).format(d) + " PT"
-  );
 }
 
 // Build the Typefully `posts` array, placing the CTA link per config so the body stays clean.
@@ -273,35 +153,33 @@ async function main() {
   }
 
   const setId = await socialSetId();
-  const { placement: placementMap, fallbackUrl, fallbackLabel } = loadCtaConfig();
+  const cfg = loadCtaConfig();
   const canonicalUrl = loadCanonicalUrl(folder);
   const maxMap = loadPlatformMax();
 
-  // Assign an explicit publish time per row from the platform cadence (config/platforms.yaml).
-  // Rows fill future slots in queue order; platforms without a cadence fall back to next-free-slot.
-  const schedule = loadSchedule();
-  const now = new Date();
+  // Claim an explicit publish time per row from the unified scheduler (config/platforms.yaml
+  // cadence + shared ledger). Rows of a platform fill consecutive free slots; the ledger keeps
+  // them from colliding with cards or a separate run. Platforms with no cadence → "next-free-slot".
   const byPlatform: Record<string, typeof approved> = {};
   for (const r of approved) (byPlatform[r.platform] ??= []).push(r);
   const slotByRow = new Map<string, string>(); // rowId → ISO publish_at | "next-free-slot"
   const whenByRow = new Map<string, string>(); // rowId → human label for logs
   for (const [platform, rowsP] of Object.entries(byPlatform)) {
-    const sched = schedule[platform];
-    const slots = sched ? computeSlots(sched, rowsP.length, now) : [];
+    const { times, labels } = claimSlots({
+      windowKey: platform,
+      conflictPlatforms: [platform],
+      count: rowsP.length,
+      asset: `${basename(folder)}/${platform}`,
+      by: "typefully",
+    });
     rowsP.forEach((r, i) => {
-      if (i < slots.length) {
-        slotByRow.set(r.id, slots[i].toISOString());
-        whenByRow.set(r.id, fmtLa(slots[i]));
-      } else {
-        slotByRow.set(r.id, "next-free-slot");
-        whenByRow.set(r.id, "next-free-slot");
-      }
+      slotByRow.set(r.id, times[i] ?? "next-free-slot");
+      whenByRow.set(r.id, labels[i] ?? "next-free-slot");
     });
   }
   console.log("Cadence schedule (PT):");
   for (const [platform, rowsP] of Object.entries(byPlatform)) {
-    const sched = schedule[platform];
-    console.log(`  ${platform}${sched ? ` (${sched.postsPerWeek}/wk)` : " (next-free-slot)"}:`);
+    console.log(`  ${platform}:`);
     for (const r of rowsP) console.log(`    ${r.id} → ${whenByRow.get(r.id)}`);
   }
 
@@ -310,27 +188,12 @@ async function main() {
     const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
     const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
 
-    // Resolve the CTA link: `none`/empty → none; `source` → the essay's own url (canonical_url),
-    // falling back to the Substack home when no essay url exists; any other value → a literal url.
-    const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
-    let ctaUrl: string | null;
-    let ctaLabel = typeof fm.cta_label === "string" ? fm.cta_label : "";
-    if (!rawCta || rawCta.toLowerCase() === "none") {
-      ctaUrl = null;
-    } else if (rawCta.toLowerCase() === "source") {
-      if (canonicalUrl) {
-        ctaUrl = canonicalUrl;
-      } else {
-        ctaUrl = fallbackUrl;
-        if (fallbackLabel) ctaLabel = fallbackLabel;
-        if (ctaUrl) {
-          console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
-        }
-      }
-    } else {
-      ctaUrl = rawCta;
+    // Resolve the CTA link (shared funnel layer — src/publish/cta.ts), then place it per cta.yaml.
+    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg);
+    if (usedFallback) {
+      console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
     }
-    const placement = placementMap[row.platform] ?? "inline";
+    const placement = cfg.placement[row.platform] ?? "inline";
     const { posts, manualComment } = buildPosts(body, ctaUrl, ctaLabel, placement, maxMap[row.platform] ?? Infinity);
 
     const publishAt = slotByRow.get(row.id) ?? "next-free-slot";
@@ -354,7 +217,7 @@ async function main() {
     if (manualComment) {
       appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
     }
-    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"}`, fm, body);
+    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, body);
     console.log(
       `scheduled: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
         (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")

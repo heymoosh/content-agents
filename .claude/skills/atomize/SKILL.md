@@ -111,8 +111,10 @@ derivative, the video script, and the video title/description. The short version
    isn't a "go read the essay" invite, you may set its `cta` to a literal url or `none` instead.
    **Never write the link into the post body** — `/publish` places it per platform from
    `cta.yaml` `placement` (X → first reply, LinkedIn → first comment, Bluesky/community →
-   inline), so the body stays clean and dodges the in-post link penalty. The `quote-card`
-   carries its CTA inside the asset itself — leave its `cta` as `none` here.
+   inline), so the body stays clean and dodges the in-post link penalty. The `quote-card` takes
+   the pillar CTA too (default `cta: source`); `publish:cards` places it INLINE on inline platforms
+   (Bluesky/LinkedIn) and OMITS it where placement is `reply` (X), since the image relays can't post
+   a reply. Set a card's `cta` to `none` only to deliberately ship it link-free.
    Donations are never the headline ask; the default CTA is "come read / subscribe."
    - **Check `canonical_url`.** If source.md has no `canonical_url` (a local draft, not yet
      published), tell Muxin to paste the published essay URL into source.md before `/publish` —

@@ -6,6 +6,7 @@ data/inbox/**
 data/processed/**
 !data/processed/.gitkeep
 data/cost-log.csv
+data/publish-schedule.jsonl
 content/**/video/*.mp4
 content/**/video/*.wav
 content/**/video/*.mp3

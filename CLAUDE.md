@@ -22,7 +22,8 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
 3. **No browser automation for posting.** Official APIs and sanctioned API relays (Typefully,
-   YouTube, AT Protocol, PostPeer for TikTok) or ready-to-paste files only.
+   YouTube, AT Protocol, PostPeer for TikTok + quote cards, Upload-Post as the card failover) or
+   ready-to-paste files only.
 4. **Discrete verifiable outputs.** Every pipeline step writes a file or DB rows that can be
    inspected. Scripts do deterministic work; Claude does judgment (tagging, synthesis,
    extraction, scoring) inline while running skills.
@@ -46,7 +47,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 | Quote cards | inside `/atomize` | `npm run render -- --still` | extraction-first quote line + cost-first image model | `images/` |
 | Video | `/video <file\|folder>` | `npm run render -- --render-video` | Grok script + 5–7 storyboard scenes/visual prompts; storyboard approved as TEXT before any render | `video/storyboard.md`, `video/short.mp4` |
 | Review | **Muxin, by hand** | — | — | statuses in `review-queue.md` |
-| Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, TikTok scheduled post (PostPeer), `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
+| Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, TikTok scheduled post (PostPeer), quote-card scheduled post (PostPeer/Upload-Post, `publish:cards`), `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
 | Whole cycle | `/cycle` | all of the above | orchestration | — |
 
 ## Build 2 — Fiction (composed prose, walled off)
@@ -111,4 +112,12 @@ extraction-first.
   gating generation in `/atomize` — not "post everywhere." Data narrows it; cold-start posts
   broadly to config defaults. Routing only gates what's *generated/queued*; Muxin's
   `review-queue.md` approval is still the only thing that publishes.
+- Publish timing is owned by ONE unified scheduler (`src/publish/slots.ts` + the `posts_per_week` /
+  `slot_days` / `slot_time_pst` cadence in `config/platforms.yaml` + the shared slot ledger
+  `data/publish-schedule.jsonl`), used by ALL scheduled channels — text (Typefully), cards (image
+  relays), and TikTok (PostPeer). It claims the next free, PT-anchored slot per platform, ≤1
+  post/platform/PT-day and ≤ `posts_per_week` across runs and streams. Cards (`quote-card` cadence)
+  also de-conflict against each platform they fan out to. Edit `config/platforms.yaml` to change
+  cadence — Typefully gets explicit times, not its "next-free-slot"; TikTok still honors
+  `TIKTOK_SCHEDULE_AT` as a manual one-off override.
 - Secrets in `.env` only (see `.env.example`). Never commit `.env` or `data/analytics.db`.

@@ -11,8 +11,10 @@
 #   slot_days       — weekdays eligible for a slot (Sun..Sat); scheduler places ~1/day, never same-day
 #   slot_time_pst   — time of day (PST/PDT wall clock) for that day's slot, inside best_times_pst
 # Approved posts fill the next free future slots in queue order, spreading across weeks if there are
-# more than posts_per_week. (Cross-piece spacing across separate /publish runs is Phase 2.) A platform
-# without these three fields falls back to Typefully "next-free-slot".
+# more than posts_per_week. Cross-run + cross-stream spacing IS built: src/publish/slots.ts records
+# every claim in a shared ledger (data/publish-schedule.jsonl), so text and cards never double-book a
+# platform's day across separate runs. A platform without these three fields falls back to
+# Typefully "next-free-slot".
 platforms:
   x:
     max_chars: 280
@@ -57,7 +59,21 @@ platforms:
       not hype-y. Written to be spoken aloud.
   quote-card:
     max_chars: 180
+    # Card cadence for the unified scheduler (publish:cards). A card fans out to several platforms
+    # at once, so it gets its own midday weekday window; it also de-conflicts against (and counts
+    # toward) each target platform's cap, so a card series never pushes e.g. LinkedIn past its 2/wk.
+    posts_per_week: 7
+    slot_days: [Mon, Tue, Wed, Thu, Fri]
+    slot_time_pst: "12:00"
     style: One or two quotable lines pulled verbatim from the source.
+  tiktok:
+    # TikTok video cadence for the unified scheduler (publish:tiktok), so the short shares the one
+    # ledger as text + cards and never lands a PT day another TikTok post already took. Usually 1
+    # short/piece, so the weekly cap is mostly headroom. TIKTOK_SCHEDULE_AT overrides for a one-off;
+    # with no entry here it falls back to TIKTOK_SCHEDULE_LEAD_MIN.
+    posts_per_week: 3
+    slot_days: [Tue, Wed, Thu, Fri]
+    slot_time_pst: "17:00"
 
 communities:
   moral-ambition:

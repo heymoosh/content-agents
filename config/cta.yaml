@@ -48,7 +48,10 @@ placement:               # WHERE the link goes per platform (from Branding/.../P
 # - `cta: source` is resolved at /publish from the content folder's source.md `canonical_url`.
 #   Atomizing a live Substack URL auto-fills it; for a local draft, paste the published URL into
 #   source.md before /publish so "read more" CTAs land on the essay (else they fall back to home).
-# - quote-card / video-script carry their own CTA inside the asset; they are not placed here.
+# - quote-card derivatives now take the pillar CTA too (default `source`); publish:cards places it
+#   like text — INLINE on inline platforms (Bluesky/LinkedIn), OMITTED where placement is `reply`
+#   (X), because the image relays can't post a reply/first-comment so omitting dodges X's penalty.
+#   video-script still carries its CTA inside the asset.
 # - A derivative can override the pillar default by setting its own `cta:` in frontmatter — a
 #   literal url (e.g. a civic-leaning Bluesky post on a human-ai essay → the voting tool), or
 #   `none` for no link.
