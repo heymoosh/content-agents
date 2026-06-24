@@ -1,6 +1,7 @@
 node_modules/
 .env
 data/analytics.db
+data/notes-cache.json
 data/inbox/**
 !data/inbox/**/.gitkeep
 data/processed/**

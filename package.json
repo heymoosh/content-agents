@@ -11,10 +11,13 @@
     "snapshot": "tsx src/strategy/snapshot.ts",
     "resonance": "tsx src/strategy/resonance.ts",
     "audience": "tsx src/strategy/audience.ts",
+    "origin-compare": "tsx src/strategy/origin-compare.ts",
     "grade-bets": "tsx src/strategy/grade-bets.ts",
     "link-bet": "tsx src/db/link-bet.ts",
+    "tag-source": "tsx src/db/tag-source.ts",
     "route": "tsx src/strategy/route.ts",
     "new-content": "tsx src/atomize/new-content.ts",
+    "new-notes": "tsx src/atomize/new-notes.ts",
     "validate": "tsx src/atomize/validate.ts",
     "render": "tsx src/video/render.ts",
     "story:new": "tsx src/fiction/new-series.ts",
@@ -29,7 +32,8 @@
     "publish:tiktok": "tsx src/publish/tiktok.ts",
     "publish:cards": "tsx src/publish/cards.ts",
     "publish:paste": "tsx src/publish/paste-files.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck"
   },
   "dependencies": {
     "@atproto/api": "^0.13.35",

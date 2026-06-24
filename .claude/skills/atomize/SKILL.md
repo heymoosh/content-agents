@@ -1,6 +1,6 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), or /atomize --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
@@ -149,6 +149,27 @@ derivative, the video script, and the video title/description. The short version
    `routing.md`), and anything else skipped. If Muxin wants a skipped platform anyway, they can
    say so (or adjust `config/routing.yaml`) and you'll generate it. If the piece is a good
    candidate for a short, mention they can run `/video <folder>`.
+
+## Notes mode — /atomize notes
+
+Muxin's Substack **Notes** (short posts, not essays) are his highest-engagement surface, but they
+never appear in the RSS feed, so the URL path above can't reach them. `/atomize notes` pulls them
+directly and spreads the ones worth spreading.
+
+1. **Pull + list.** `npm run new-notes` (needs `SUBSTACK_HANDLE` in `.env`). It prints a numbered
+   list of recent original notes with engagement, ingests their engagement into analytics (so
+   `/strategy` resonance covers Notes — they're otherwise invisible to it), and caches the list.
+   Show Muxin the list.
+2. **Pick.** Muxin says which to spread. `npm run new-notes -- --pick 1,3` scaffolds one content
+   folder per picked note (`source_kind: substack-note`, the note's own URL as `origin` +
+   `canonical_url`). Don't spread every note — only the ones worth cross-posting.
+3. **Spread each.** For each scaffolded folder, run the standard flow above (steps 2–8): read the
+   brief, tag the pillar, `npm run route`, generate derivatives, validate, queue. A note is short
+   and already platform-ready, so the **whole note is the extract** — derivatives are near-verbatim
+   cross-posts trimmed to each platform's limit (extraction-first still holds; if a note is too thin
+   for a platform like LinkedIn, the "don't pad, stop" rule applies). Substack is already excluded
+   as a routing target, so a note is never reposted back to where it came from. Muxin still approves
+   every draft in `review-queue.md` before `/publish`.
 
 ## --revise mode
 
