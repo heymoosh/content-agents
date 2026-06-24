@@ -31,13 +31,20 @@ Video is the most expensive thing the pipeline does. It is **two-phase, money on
 |---|---|---|---|
 | **image-motion** (default) | still scene images + Ken Burns zoom/pan in Remotion | ~$0.12/short (Riverflow ×6) | **live** |
 | **animated** | Kling interpolates between approved keyframe stills (start→end per scene) via OpenRouter; clips stitched under Kokoro voice + captions | ~$0.08/s ≈ $1–3/short | **live** |
+| **motion** | HyperFrames (free, local) choreographs the approved stills into a silent motion-graphics visual (Ken Burns + crossfades); Kokoro voice + captions laid on via AnimatedShort | ~$0.13/scene still + $0 motion ≈ $0.65/short | **live** |
 
-Default to **image-motion** (cheap). Pick **animated** explicitly per short and **offer the cost
-first**. Both coexist — animation is an added option, not a replacement for B-roll. In animated
-mode the scene visuals become **keyframes**: generate the keyframe stills, **you approve them**,
-then Kling animates the transitions between consecutive keyframes
-(`render --keyframes-only` → review the stills → `render --animated`). Veo was evaluated and
-rejected — it can't do start→end interpolation on the Gemini key; see [[video-pipeline-architecture]].
+**Three engines, cost-first.** Default to **image-motion** (cheapest slideshow). For real motion,
+pick per short and **offer the cost first**:
+- **`--motion`** (HyperFrames, ~$0.65, perfectly consistent) — the **default choice for
+  flat-editorial illustration**. Generated stills + choreographed motion (camera, crossfades,
+  overlays), free deterministic render. Never drifts.
+- **`--animated`** (Kling, ~$1–3) — only when a character needs to *physically* move. Kling
+  imagines the motion between keyframes; pricier and can drift.
+
+Both paths share the **keyframe-approval gate**: scene visuals become keyframe stills → generate
+them with `--keyframes-only` → **you approve** → then render (`--motion` or `--animated`). Veo was
+evaluated and rejected (no start→end interpolation on the Gemini key); see
+[[video-pipeline-architecture]].
 
 ## Steps
 
@@ -107,6 +114,13 @@ rejected — it can't do start→end interpolation on the Gemini key; see [[vide
    - Then: `npm run render -- --render-video <folder> --animated` — TTS + captions, then Kling
      animates between consecutive keyframes (~$0.08/s) and stitches the clips under the voice +
      captions → `video/short.mp4`. **Offer the cost first** (≈ $1–3 for a few scenes).
+
+   **motion (HyperFrames — cheapest, perfectly consistent; the default for illustration):**
+   - Same keyframe-approval gate: `npm run render -- --render-video <folder> --motion --keyframes-only`
+     generates the scene stills (Nano Banana Pro + consistency, same as animated) and **stops** for approval.
+   - Then: `npm run render -- --render-video <folder> --motion` — HyperFrames choreographs the stills
+     into a silent motion visual (free, local — fetched via `npx hyperframes`, no install), and Kokoro
+     voice + captions are laid on top → `video/short.mp4`. Cost is just the stills (~$0.13 each); motion + render are $0.
 
    - **Image model is cost-first** — Riverflow (~$0.02) by default for stills/keyframes. Only add
      `--pro` (Nano Banana Pro ~$0.13) or `--hero` (gpt-5.4-image-2 ~$0.23) if Muxin asks; **offer
