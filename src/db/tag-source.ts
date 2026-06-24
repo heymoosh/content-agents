@@ -3,8 +3,10 @@ import { join } from "node:path";
 import { openDb, repoRoot } from "./db.js";
 
 // Classify each post's origin so origin-compare.ts can measure whether atomizing earns traction:
-//   'atomized' — shipped by /publish from a content folder
-//   'organic'  — posted natively / a note Muxin wrote
+//   'atomized'      — shipped by /publish from a content folder (verbatim extraction-first)
+//   'atomized-spin' — shipped from a content folder, but reframed for audience fit (the opt-in
+//                     spin experiment, docs/spin-experiment.md — Placed-log row carries `| spin`)
+//   'organic'       — posted natively / a note Muxin wrote
 // Deterministic; runs during /strategy next to link-bet. The atomized signal is that the post text
 // matches a Placed-log row in briefs/bets.md (what /publish shipped), OR the post already carries a
 // bet_id (in case the text was edited before posting). Everything else on a native channel is organic.
@@ -34,9 +36,12 @@ function leadMatch(content: string, prefix: string): boolean {
 interface Placed {
   platform: string;
   prefix: string;
+  spin: boolean;
 }
 
-// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | \"<text-prefix>\"" rows.
+// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | \"<text-prefix>\"" rows.
+// The optional ` | spin ` segment (written by appendBetPlacement for spin-experiment derivatives)
+// marks an audience-reframed variant; it sits before the end-anchored quote so both still parse.
 function readPlaced(): Placed[] {
   let text = "";
   try {
@@ -51,7 +56,8 @@ function readPlaced(): Placed[] {
     const quote = line.match(/\|\s+"([^"]*)"\s*$/);
     if (!plat) continue;
     const prefix = quote ? norm(quote[1]) : "";
-    if (prefix.length >= 12) out.push({ platform: plat[1], prefix });
+    const spin = /\|\s+spin\s*(\||$)/.test(line);
+    if (prefix.length >= 12) out.push({ platform: plat[1], prefix, spin });
   }
   return out;
 }
@@ -69,6 +75,7 @@ function main() {
 
   const update = db.prepare("UPDATE posts SET source = ? WHERE id = ?");
   let atomized = 0;
+  let spun = 0;
   let organic = 0;
   let untouched = 0;
   const matches: string[] = [];
@@ -78,11 +85,12 @@ function main() {
       let value: string;
       if (DISTRIBUTED.has(p.platform)) {
         const content = norm(p.content_text ?? "");
-        const matched =
-          !!p.bet_id ||
-          placed.some((pl) => pl.platform === p.platform && leadMatch(content, pl.prefix));
-        value = matched ? "atomized" : "organic";
-        if (matched) matches.push(`  #${p.id} ${p.platform}: ${(p.content_text ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
+        // Keep the matched row so its spin marker can promote 'atomized' → 'atomized-spin'.
+        const hit = placed.find((pl) => pl.platform === p.platform && leadMatch(content, pl.prefix));
+        const matched = !!p.bet_id || !!hit;
+        // bet_id-only matches (text edited before posting) lose the spin signal → default atomized.
+        value = matched ? (hit?.spin ? "atomized-spin" : "atomized") : "organic";
+        if (matched) matches.push(`  #${p.id} ${p.platform}${hit?.spin ? " (spin)" : ""}: ${(p.content_text ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
       } else if (NATIVE_ONLY.has(p.platform)) {
         value = "organic";
       } else {
@@ -90,15 +98,16 @@ function main() {
         continue; // unknown platform — leave source as-is
       }
       if (value !== p.source) update.run(value, p.id);
-      if (value === "atomized") atomized++;
-      else organic++;
+      if (value === "organic") organic++;
+      else if (value === "atomized-spin") spun++;
+      else atomized++;
     }
   });
   tx();
   db.close();
 
   console.log(
-    `tag-source: ${atomized} atomized, ${organic} organic, ${untouched} left untouched (parsed ${placed.length} placed rows)`
+    `tag-source: ${atomized} atomized, ${spun} atomized-spin, ${organic} organic, ${untouched} left untouched (parsed ${placed.length} placed rows)`
   );
   if (matches.length) {
     console.log(`\natomized (sanity-check these are real):`);

@@ -52,9 +52,11 @@ makes `/cycle` compound instead of restarting every week.
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`.
-   - `npm run origin-compare` → atomized vs organic engagement per platform. Answers "is atomizing
-     earning traction, or is Muxin better off posting natively?" Observational; flags INSUFFICIENT
-     groups — don't over-read a gap.
+   - `npm run origin-compare` → atomized vs spin vs organic engagement per platform. Answers "is
+     atomizing earning traction, or is Muxin better off posting natively?" Observational; flags
+     INSUFFICIENT groups — don't over-read a gap. It also prints a **Spin experiment readiness**
+     line: if it says `SPIN BASELINE READY`, the verbatim baseline has hit n≥10 on a platform and
+     it's time to start the spin experiment (surface this in the brief — see Step 4).
    - `npm run audience` → who follows you: LinkedIn demographics + follower/subscriber totals &
      growth (demographics are LinkedIn-only; X/Bluesky give counts, Substack free/paid)
    - `npm run route -- --all` → routing map (where each pillar should post; the include/skip
@@ -84,7 +86,11 @@ makes `/cycle` compound instead of restarting every week.
    <origin-compare table + 1-2 sentences: are pipeline-distributed posts earning traction vs ones
     Muxin posted natively (incl. Substack notes)? Observational — flag INSUFFICIENT groups and don't
     over-read a gap. Where Muxin barely posts natively on a platform, read it as "do the cross-posts
-    land at all" rather than a head-to-head.>
+    land at all" rather than a head-to-head.
+    If origin-compare printed `SPIN BASELINE READY`, add a one-line **[TEST] start spin** call to
+    action here (and a matching TEST bet in Step 5): the verbatim baseline is now big enough to
+    measure spin against, so it's time to run `/atomize --spin`. If it's not ready, say nothing —
+    don't manufacture a spin recommendation early.>
 
    ## Audience (who you're reaching)
    <audience output: reach table + LinkedIn demographics + Substack tier. 1-2 sentences —

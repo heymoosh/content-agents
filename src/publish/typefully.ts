@@ -227,19 +227,29 @@ async function main() {
 
     const publishAt = slotByRow.get(row.id) ?? "next-free-slot";
     const when = whenByRow.get(row.id) ?? "next-free-slot";
-    const draft = await api(`/social-sets/${setId}/drafts`, {
-      method: "POST",
-      body: JSON.stringify({
-        draft_title: `${row.id} (content-agents)`,
-        publish_at: publishAt,
-        platforms: {
-          [platformKey]: {
-            enabled: true,
-            posts,
-          },
-        },
-      }),
-    }) as { id?: string | number; share_url?: string };
+    const draftBody = JSON.stringify({
+      draft_title: `${row.id} (content-agents)`,
+      publish_at: publishAt,
+      platforms: { [platformKey]: { enabled: true, posts } },
+    });
+    // Uploaded video can still be transcoding for a few seconds — retry the draft on "processing".
+    let draft: { id?: string | number; share_url?: string };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        draft = (await api(`/social-sets/${setId}/drafts`, { method: "POST", body: draftBody })) as {
+          id?: string | number;
+          share_url?: string;
+        };
+        break;
+      } catch (e) {
+        if (attempt < 12 && /processing/i.test((e as Error).message)) {
+          if (attempt === 0) console.log(`  ↳ media still transcoding, waiting…`);
+          await new Promise((r) => setTimeout(r, 5000));
+          continue;
+        }
+        throw e;
+      }
+    }
     setStatus(folder, row, "published");
     const placeNote = ctaUrl ? `, cta→${placement}` : "";
     appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, ${when}${placeNote})`);

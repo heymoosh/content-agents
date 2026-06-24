@@ -8,6 +8,10 @@ import { openDb } from "../db/db.js";
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 const HALF_LIFE_WEEKS = 4; // matches snapshot.ts / resonance.ts
+// Don't start the spin experiment (docs/spin-experiment.md) until verbatim atomized has a real
+// baseline to be measured against. The count lives only in this local DB, so the weekly /strategy
+// run is the reminder: we print the baseline status here every cycle and surface it in the brief.
+const SPIN_BASELINE_N = 10;
 
 interface Row {
   platform: string;
@@ -64,20 +68,46 @@ function main() {
 
   console.log(`# Atomized vs organic — ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
-    `Per platform: machine-distributed (atomized) vs natively posted (organic). Cell = avg engagement ` +
-      `(replies ×3, reposts ×2, likes ×1) · rc = recency-weighted (${HALF_LIFE_WEEKS}-wk half-life) · n posts. ` +
-      `⚠INSUFFICIENT = n<3 or <4 weeks of data.\n`
+    `Per platform: verbatim-atomized vs spin (audience-reframed) vs natively posted (organic). ` +
+      `Cell = avg engagement (replies ×3, reposts ×2, likes ×1) · rc = recency-weighted ` +
+      `(${HALF_LIFE_WEEKS}-wk half-life) · n posts. ⚠INSUFFICIENT = n<3 or <4 weeks of data.\n`
   );
-  console.log(`| platform | atomized | organic |`);
-  console.log(`|---|---|---|`);
+  console.log(`| platform | atomized | atomized-spin | organic |`);
+  console.log(`|---|---|---|---|`);
   for (const pl of platforms) {
-    console.log(`| ${pl} | ${cell(pl, "atomized")} | ${cell(pl, "organic")} |`);
+    console.log(`| ${pl} | ${cell(pl, "atomized")} | ${cell(pl, "atomized-spin")} | ${cell(pl, "organic")} |`);
   }
   console.log(
-    `\n> Observational, not a controlled test: atomized = derivatives shipped from a content folder; ` +
+    `\n> Observational, not a controlled test: atomized = verbatim derivatives shipped from a content ` +
+      `folder; atomized-spin = derivatives reframed for audience fit (docs/spin-experiment.md); ` +
       `organic = posts Muxin wrote natively (incl. Substack notes). The content differs between groups, ` +
       `so a gap is a reason to investigate, not proof. Flagged groups are too small to read yet.`
   );
+
+  // Spin-experiment readiness: flag the moment verbatim atomized crosses the baseline on any
+  // platform, so /strategy can tell Muxin it's time to start spinning (and stay quiet until then).
+  const verbatimN = platforms
+    .map((pl) => ({ pl, n: rows.filter((r) => r.platform === pl && r.source === "atomized").length }))
+    .filter((x) => x.n > 0);
+  const ready = verbatimN.filter((x) => x.n >= SPIN_BASELINE_N);
+  console.log(`\n## Spin experiment readiness\n`);
+  if (ready.length) {
+    console.log(
+      `**SPIN BASELINE READY.** Verbatim atomized has reached n≥${SPIN_BASELINE_N} on ` +
+        `${ready.map((x) => `${x.pl} (n=${x.n})`).join(", ")}. Start the experiment there: run ` +
+        `\`/atomize --spin\` on new pieces (LinkedIn/X first), and record a spin bet in briefs/bets.md ` +
+        `so it gets graded. See docs/spin-experiment.md.`
+    );
+  } else {
+    const best = [...verbatimN].sort((a, b) => b.n - a.n)[0];
+    console.log(
+      `Not yet — keep shipping verbatim. ` +
+        (best
+          ? `Best baseline so far: ${best.pl} n=${best.n} of ${SPIN_BASELINE_N} needed.`
+          : `No verbatim-atomized posts classified yet.`) +
+        ` Spin stays off until a platform hits n≥${SPIN_BASELINE_N} (docs/spin-experiment.md).`
+    );
+  }
 }
 
 main();

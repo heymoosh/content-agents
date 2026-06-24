@@ -108,7 +108,11 @@ export function appendBetPlacement(
   const directives = dir
     ? ` | directives: ${Array.isArray(dir) ? dir.join(", ") : String(dir)}`
     : "";
+  // Spin marker (audience-fit experiment, docs/spin-experiment.md): tag-source reads this back
+  // to classify the post 'atomized-spin' instead of 'atomized'. Placed BEFORE the quoted prefix
+  // so tag-source's end-anchored quote regex still finds the text at the line's tail.
+  const spin = fm.spin ? ` | spin` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${prefix}`;
   writeFileSync(BETS_PATH, existing.replace(/\n*$/, "\n") + line + "\n");
 }
