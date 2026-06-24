@@ -57,17 +57,26 @@ holds, or flag the seam.
 1. **Build the beat sheet (your judgment).** Read `bible.md`, `canon.md`, the character sheets,
    `outline.md`, and the previous chapter. Decide what THIS chapter should do: whose POV, the
    scene goal + obstacle, what question it opens, and the ending hook. Keep it inside what the
-   outline/canon support; if Muxin gave direction for this chapter, use it. Write the beat
-   sheet to a temp file or pass it inline.
-2. **Inspect the context pack** (optional but cheap): `npm run story:context -- <series>` prints
+   outline/canon support; if Muxin gave direction for this chapter, use it.
+   - **Open in the action.** A chapter that opens on a character alone, observing or reflecting,
+     with nothing at stake in the scene, will be boring no matter how good the prose. Give the
+     opening scene a concrete goal, an obstacle, a clock or a risk, and a cost. Reveal character
+     through choice under pressure, not through interior monologue. Dramatize the wound and the
+     theme inside action; do not narrate them. A great model cannot rescue inert beats.
+2. **Beat-sheet approval gate (REQUIRED, no prose before this).** Post the beat sheet to Muxin
+   and STOP. Show: the scene goal + obstacle + stakes, who is in it, the turn it ends on, and any
+   new names/elements you are inventing. Get his sign-off (or revisions) BEFORE writing any prose.
+   This is the cheapest place to fix a chapter, and skipping it is how you ship a boring draft.
+   Only proceed once he approves the outline.
+3. **Inspect the context pack** (optional but cheap): `npm run story:context -- <series>` prints
    exactly what the writer will see (bible, canon, character sheets, recent chapters). Sanity-
    check it's coherent and not missing a character.
-3. **Draft. Two modes, set by `series.yaml` `prose:`.**
+4. **Draft (only after the outline is approved). Two modes, set by `series.yaml` `prose:`.**
 
    **Claude-native (default; `prose: claude-native`, no API key).** Opus plans, a writer model
    drafts:
-   - Read `config/fiction/craft.md` + `config/fiction/style.yaml` and the context pack from step
-     2. As the planner (Opus), finalize the beat sheet from step 1.
+   - Read `config/fiction/craft.md` + `config/fiction/style.yaml` and the context pack. As the
+     planner (Opus), finalize the approved beat sheet.
    - Spawn a writer subagent with the model named in `series.yaml` `writer_model` (default
      `sonnet`; A/B with `haiku` anytime) using the Agent tool. Hand it: the craft + style rules,
      the context pack, the beat sheet, the target length, and the hard format rule (one sentence
@@ -81,21 +90,21 @@ holds, or flag the seam.
    configured (e.g. `grok-openrouter`):
    ```
    npm run story:draft -- <series> --beats <<'BEATS_EOF'
-   <your beat sheet for this chapter>
+   <your approved beat sheet for this chapter>
    BEATS_EOF
    ```
    (or `--beats-file <path>`). Writes `chapters/chapter-NN.md` one-sentence-per-line, logs cost,
    prints the path. Craft + style guards are injected automatically.
-4. **QC it (your judgment).** Read the draft against `config/fiction/style.yaml`'s
+5. **QC it (your judgment).** Read the draft against `config/fiction/style.yaml`'s
    `check_before_pr`: does it open in motion (not on a literal question), does every scene have a
    goal + obstacle, zero em dashes, does
    it **end on a turn/open loop**, does anything contradict canon? Set the `title` in
    frontmatter. If it's flat or off-canon, re-draft (adjust the beats and re-run `story:draft`
    to a fresh chapter number, or edit surgically). This is where storytelling instinct lives —
    don't ship a chapter that doesn't pull.
-5. **Validate:** `npm run story:validate -- <series> --chapter N` (frontmatter, one-sentence-
+6. **Validate:** `npm run story:validate -- <series> --chapter N` (frontmatter, one-sentence-
    per-line for clean PR anchoring, min word count). Fix violations.
-6. **Open the review PR.** Commit just this chapter on a per-chapter branch and open a **draft
+7. **Open the review PR.** Commit just this chapter on a per-chapter branch and open a **draft
    PR** so Muxin can comment from his phone:
    - Branch: `story/<slug>/chapter-NN`. Commit `chapters/chapter-NN.md` (+ any sheet/outline/
      bible updates this chapter required).
@@ -103,7 +112,7 @@ holds, or flag the seam.
      explains: this is for line-level review, comment on any line to request a change, approve
      when happy.
    - Offer to `subscribe_pr_activity` on the PR so Muxin's comments wake this session.
-7. **Stop.** Report the PR link and the chapter's hook in one line. Do not publish.
+8. **Stop.** Report the PR link and the chapter's hook in one line. Do not publish.
 
 ## Revising from PR comments — `/story --revise <series> <chapter>` (or driven by PR events)
 
