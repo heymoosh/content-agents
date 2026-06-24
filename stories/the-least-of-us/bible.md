@@ -28,10 +28,14 @@ the story just runs the logic forward.
 - **Structural displacement, not a recession.** AI has permanently removed whole categories of
   labor, faster than any retraining or institution can absorb. This is not cyclical. There is no
   rate cut that fixes it. Huge populations of dispossessed youth have nothing to return to.
-- **The yard sale proof.** A real kinetic wealth model (Boghosian, Tufts) shows that even under
-  perfectly fair, random exchange, wealth concentrates at the top and the bottom cannot recover
-  without external forced redistribution. In this world it is not a metaphor. It is a proof the
-  Leader encounters and cannot refute. Oligarchy as a mathematical attractor.
+- **The yard sale strand.** A real kinetic wealth model (Boghosian, Tufts) suggests that even
+  under fair, random exchange, wealth tends to concentrate at the top and the bottom struggles to
+  recover without external redistribution. **Handle with care.** It is one strand among several
+  (structural displacement, the amplification gap, captured correctives), not the whole argument
+  and not a single "aha." Eli has lived with it over years, not discovered it in a dramatic
+  moment. In the prose it stays oblique and felt, never a lecture or a graph-in-the-pocket gotcha;
+  let his lived sense of it carry the weight. We do not oversimplify the real result or assert
+  contested economics as settled fact. This is fiction, not an economics paper.
 - **The amplification gap.** AI does not distribute. It amplifies. The enclaves run clean, tuned,
   uncompromised models. The dispossessed get hobbled, ad driven, engagement optimized systems by
   design. The information asymmetry is structural.
@@ -63,10 +67,18 @@ Last Titan, interwoven and told together, alternating chapters only when the sto
 - **The road and the mentor.** How Eli comes to the yard sale proof and the closed loop, and the
   old, quiet mentor who tried every legitimate path and can show him where each one closed. The
   mentor shows him the map, not permission, and may be horrified by what he does with it.
-- **The cell, the first strike, the turn.** The cell forms, including the Betrayer as its first
-  believer. A first data center strike succeeds and the movement grows. The decision to turn on
-  the enclaves. The assault: real damage, but not a toppling. The betrayal. Most rebels die or
-  scatter.
+- **The cell and the campaign.** The cell forms, including the Betrayer as its first believer.
+  The first data center strike succeeds (Chapter 1) and the movement grows. Escalation is slow
+  and earned, NOT a jump to the enclaves: a one-hour data center disruption to assaulting a
+  fortified enclave is too big a leap and operationally implausible. The middle is a campaign of
+  strikes against an opponent that adapts. Each early win was easy only because no one believed
+  people like them could act; after the first success the defenses harden (cameras, contracts, a
+  budget line for the specific problem of the guerrillas, and eventually a placed human worker as
+  a deterrent, see the witness scene in `outline.md`). They cannot repeat a tactic; every
+  operation must be faster, stranger, never the same twice, and the cost climbs each round.
+- **The turn toward the enclaves (late) and the assault.** Only after the cheaper path is proven
+  and exhausted does the real target become where the wealth and power concentrate. The assault:
+  real damage, but not a toppling. The betrayal. Most rebels die or scatter.
 - **Eli steps down.** Something happens and Eli no longer leads. Not mainly a physical injury
   (though it could be): exhaustion from the violence and the chaos, the pain of the betrayal, and
   the recognition that the original path was never going to arrive anywhere. He hands leadership
@@ -86,6 +98,15 @@ Last Titan, interwoven and told together, alternating chapters only when the sto
   long time both men have the space to be curious about the alternatives that might have existed.
   The invitation. Mosst's quiet end under a new name in the humane community rebuilt from the ashes.
 
+**The closing chapter belongs to Lena.** The saga ends in the voice of the woman Eli lost. She
+shares a theory of why we are all here (synchronicity as consciousness shaping probability, love
+as its highest vibration, time not strictly linear so a future can reach back and shape the past,
+and the kinder world as not an impossible ideal but an inevitable destination, because everything
+is already here: "we made it"). It is the exact inverse of the closed map Eli surrendered to, and
+the note the whole saga resolves on. Full sheet: `characters/lena.md`; source note:
+`notes/lena-the-last-chapter.md`. Likely a late conversation while she was sick, or an earlier one
+Eli carries (OPEN). This is the bookend: open on the wound of losing her, close on her vision.
+
 ## Spiritual core
 
 There is anger, but there is also hope. The story's real subject is not the war; it is what a
@@ -97,7 +118,9 @@ redeem; what finally outlasts the enclaves is presence, patience, and the refusa
 thing you fought. Eli's particular tragedy is not that no other path existed. It is that, after
 his loss, he gave up looking for one and let grief and anger carry him toward an end that was
 never a real destination. Only late, in the correspondence with Mosst, does the curiosity come
-back, the chance to wonder what the alternatives might have been.
+back, the chance to wonder what the alternatives might have been. The hope the book is finally
+betting on is Lena's, delivered in the closing chapter: that a kinder world is not a doomed ideal
+but an inevitable destination. Eli's arc is the long way back to what she already saw.
 
 ## Themes and touchstones
 
@@ -164,7 +187,10 @@ Full sheets live in `characters/`. In brief:
   legitimate path and can show exactly where each one closed for him. Shows the map, not
   permission. May be horrified by what Eli does. The "I showed you the truth, not permission"
   tension.
-- Names for the Betrayer, the Unwilling Prince, and the children.
+- **Lena** is locked: the loved one Eli lost (the wound) and the voice of the closing chapter.
+  Sheet at `characters/lena.md`.
+- **Mira** (a camp child, ~8, replacing the "Sasha" placeholder) is proposed, not yet locked.
+- Names still open for the Betrayer, the Unwilling Prince, and the rest of the children.
 
 ## Craft boundary (non negotiable for this series)
 
