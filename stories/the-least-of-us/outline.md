@@ -98,11 +98,12 @@ matters.
   medical band), standing for the systemic rot, not just the person.
 - Who could have been his reason to stay, and how he turned from it.
 - Names: the Betrayer, the Unwilling Prince, key children.
-- Chapter 1 is DRAFTED (`chapters/chapter-01.md`, "Unexplained Infrastructure Stress"): the first
-  successful data center strike, ending on "it gets harder from here," not on the enclaves.
-  **STATUS: Muxin wants to rework this draft (something feels off, reason not yet pinned down).**
-  When reworking, start fresh from `notes/chapter-01-seed.md` + `notes/chapter-01-keepers.md` and
-  this bible/outline; treat the current draft as a reference, not a baseline to defend.
+- Chapter 1 is NOT yet written. A first attempt ("Unexplained Infrastructure Stress," the first
+  successful data center strike) was set aside at `notes/chapter-01-draft-v1.md` because Muxin
+  wants to rethink it (something feels off, reason not yet pinned down). `chapters/` is empty on
+  purpose. **Start Chapter 1 fresh** from `notes/chapter-01-seed.md` + `notes/chapter-01-keepers.md`
+  and this bible/outline; treat draft-v1 as a reference only, not a baseline to defend. Use the
+  `/story` beat-sheet approval gate (agree the outline with Muxin before any prose).
 - The slow-escalation campaign: what the second and third strikes look like as the defenses adapt,
   and how the cell is forced to change tactics each time.
 
