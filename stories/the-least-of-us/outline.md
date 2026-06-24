@@ -100,6 +100,9 @@ matters.
 - Names: the Betrayer, the Unwilling Prince, key children.
 - Chapter 1 is DRAFTED (`chapters/chapter-01.md`, "Unexplained Infrastructure Stress"): the first
   successful data center strike, ending on "it gets harder from here," not on the enclaves.
+  **STATUS: Muxin wants to rework this draft (something feels off, reason not yet pinned down).**
+  When reworking, start fresh from `notes/chapter-01-seed.md` + `notes/chapter-01-keepers.md` and
+  this bible/outline; treat the current draft as a reference, not a baseline to defend.
 - The slow-escalation campaign: what the second and third strikes look like as the defenses adapt,
   and how the cell is forced to change tactics each time.
 
