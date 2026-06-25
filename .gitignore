@@ -13,6 +13,7 @@ content/**/video/*.wav
 content/**/video/*.mp3
 content/**/images/*.png
 content/**/images/*.jpg
+content/**/images/*.mp4
 /bakeoff/
 .remotion/
 out/

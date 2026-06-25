@@ -15,7 +15,7 @@ import { logCost } from "../util/cost-log.js";
 import { getImage, getTTS, getBroll, isEnabled, type ImageProfile } from "../providers/registry.js";
 import { charsToWordCaptions } from "./captions.js";
 import { charsOrWhisper } from "./align.js";
-import { renderMotionBg } from "./hyperframes.js";
+import { renderMotionBg, renderCardAnimation } from "./hyperframes.js";
 
 // Render assets for a content folder.
 //   tsx src/video/render.ts --still <content-folder> --quote <derivative-name>
@@ -86,6 +86,8 @@ async function renderStill(
     readFileSync(join(folder, "derivatives", `${quoteName}.md`), "utf8")
   );
   const slug = basename(folder);
+  const outPath = join(folder, "images", `${quoteName}.png`);
+  mkdirSync(join(folder, "images"), { recursive: true });
 
   await withJob(async (jobDir, jobName) => {
     // Quote cards are purely typographic (New Yorker style), no illustration background.
@@ -94,21 +96,28 @@ async function renderStill(
     // image-model policy still apply to video b-roll, just not to quote cards).
     // The article title rides under the attribution as the in-asset source line. Pulled from
     // source.md frontmatter (the published essay's title); empty → the line is omitted.
+    // Notes (source_kind: substack-note) have no article title — the first line of the note
+    // is not a title, so the source line is suppressed to keep the card clean.
     let source = "";
     try {
       const { fm: srcFm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
-      if (typeof srcFm.title === "string") source = srcFm.title;
+      if (typeof srcFm.title === "string" && srcFm.source_kind !== "substack-note") {
+        source = srcFm.title;
+      }
     } catch {
       // no source.md (e.g. a bare quote) — render without the source line
     }
     const props = { quote, attribution: "Muxin Li", source, ...resolveScheme(fm) };
     const propsFile = join(jobDir, "props.json");
     writeFileSync(propsFile, JSON.stringify(props));
-    const outPath = join(folder, "images", `${quoteName}.png`);
-    mkdirSync(join(folder, "images"), { recursive: true });
     remotion(["still", ENTRY, "QuoteCard", outPath, `--props=${propsFile}`]);
     console.log(`quote card: ${outPath}`);
   });
+
+  // Animated companion — free (HyperFrames, local headless Chrome). Always produced alongside
+  // the static PNG so a notes card emits both without extra steps.
+  const animPath = join(folder, "images", `${quoteName}.mp4`);
+  renderCardAnimation(outPath, animPath);
 }
 
 async function renderVideo(folder: string, profile?: ImageProfile): Promise<void> {

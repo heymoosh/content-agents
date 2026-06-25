@@ -81,6 +81,71 @@ const HF_CONFIG = JSON.stringify(
   2
 );
 
+// Build a HyperFrames composition for a square (1:1) quote card — one still, gentle Ken Burns
+// zoom. Produces the free animated MP4 companion to the static PNG.
+function buildCardMotionComposition(stillName: string, durationMs: number): string {
+  const totalSec = durationMs / 1000;
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1080px; overflow: hidden; background: #f2ead9; }
+      #card { width: 1080px; height: 1080px; position: relative; overflow: hidden; }
+      .scene { position: absolute; inset: 0; width: 1080px; height: 1080px; }
+      .scene img { width: 1080px; height: 1080px; object-fit: cover; display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="card" data-composition-id="main" data-start="0" data-duration="${totalSec.toFixed(2)}" data-width="1080" data-height="1080">
+      <div class="scene" id="scene-0"><img src="assets/${stillName}" alt="" /></div>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      gsap.set("#scene-0", { opacity: 1 });
+      tl.fromTo("#scene-0 img", { scale: 1.0, xPercent: 1.5 }, { scale: 1.06, xPercent: -1.5, duration: ${totalSec.toFixed(2)}, ease: "none" }, 0);
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
+`;
+}
+
+// Render an animated MP4 companion from a square (1:1) quote-card PNG using HyperFrames.
+// Free, local, deterministic — same toolchain as renderMotionBg but for 1080×1080 cards.
+// Default 10 s: enough to read the quote, loops naturally for social media autoplay.
+export function renderCardAnimation(stillPath: string, outPath: string, durationMs = 10_000): void {
+  const proj = join(tmpdir(), `hf-card-${Date.now().toString(36)}`);
+  const assets = join(proj, "assets");
+  mkdirSync(assets, { recursive: true });
+  try {
+    const name = "card.png";
+    copyFileSync(stillPath, join(assets, name));
+    writeFileSync(join(proj, "hyperframes.json"), HF_CONFIG);
+    writeFileSync(join(proj, "index.html"), buildCardMotionComposition(name, durationMs));
+    execFileSync("npx", ["--yes", `hyperframes@${HF_VERSION}`, "render"], {
+      cwd: proj,
+      stdio: ["ignore", "inherit", "inherit"],
+    });
+    const rendersDir = join(proj, "renders");
+    const mp4 = existsSync(rendersDir)
+      ? readdirSync(rendersDir)
+          .filter((f) => f.endsWith(".mp4"))
+          .map((f) => join(rendersDir, f))
+          .sort()
+          .pop()
+      : undefined;
+    if (!mp4) throw new Error(`HyperFrames produced no mp4 in ${rendersDir}`);
+    copyFileSync(mp4, outPath);
+    console.log(`hyperframes: animated card → ${basename(outPath)}`);
+  } finally {
+    rmSync(proj, { recursive: true, force: true });
+  }
+}
+
 // Render the silent motion-graphics visual from the scene stills to `outPath` (an mp4).
 export function renderMotionBg(stillPaths: string[], durationMs: number, outPath: string): void {
   const proj = join(tmpdir(), `hf-motion-${Date.now().toString(36)}`);
