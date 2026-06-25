@@ -18,6 +18,28 @@ closing chapter is the inversion. Chapter 1's only job is to make the reader fee
 door by door, so that when the faction appears it reads as the first door that did not slam, while
 quietly planting that this door may not arrive anywhere either.
 
+## Form: the contained portrait (the Bill & Frank model)
+
+Chapter 1 is a self-contained chapter, modeled on "Long, Long Time" (The Last of Us, HBO, ep. 3,
+Bill and Frank). Resonant on purpose: the series title leans on that DNA. It is a complete life
+felt in one chapter, rich with domestic detail, emotionally whole. It earns its place by deepening
+the world's stakes, not by launching a protagonist we must track. The everyman is NOT a promised
+recurring POV; the saga has no single protagonist (it is a collection of characters), so he is free
+to resurface in the ensemble later, but the chapter stands alone.
+
+What the model demands:
+- **Compress time, do not cram a bad week.** The cascade erodes over months or years (the slow
+  boil), not a single firing. The richness lives in the slow erosion.
+- **A relationship at the center.** Like Bill and Frank, the human bond is the foreground and the
+  economics are backdrop. The loss must be relational, not just financial. This is where a partner
+  or a child earns a place, and where the vanishing-ladder thread becomes personal ("what do I tell
+  MY kid") instead of overheard. (Open: who is at his center.)
+- **Domestic specificity.** Their strawberries, wine, guitar; ours is his apartment, routines, the
+  objects of the old life. The collapse is felt through which small things stop being possible.
+- **A complete arc with a real ending.** Recruitment is that ending: not a cliffhanger into an
+  ongoing story, but the last image of the man he used to be. The old self ends; the resistance
+  member begins.
+
 ## The cascade: three falling doors
 
 The engine is the same as Eli's wound (outline): no malice, no face anywhere in the machinery. The
@@ -59,9 +81,10 @@ charity. They want him BECAUSE of what the system discarded: he knows how these 
 from the inside. The bible/keepers already give the faction "prompt engineers" who find sloppy
 agentic deployments and pry them open; he becomes one of them. The cruelty (made to train the
 machine, recorded, thrown away) becomes the hook (the resistance wants the very knowledge that was
-declared worthless). This also hands him his throughline role: our technical eyes on every later
-strike, never the leader. Altitude guard: the chapter lives in his fear and humiliation, not his
-expertise. We meet the human first; the skill is what the faction sees, not what we lead with.
+declared worthless). This stays the chapter's closing image, NOT a promise to follow him (see Form
+below): he may resurface later in the ensemble, but the chapter does not depend on it. Altitude
+guard: the chapter lives in his fear and humiliation, not his expertise. We meet the human first;
+the skill is what the faction sees, not what we lead with.
 
 ### Door 2, Recourse: the corrective was skewed before he reached it
 
@@ -117,9 +140,11 @@ felt and oblique (an overheard question, a half-answer he cannot give), never a 
 He bottoms out having tried every legitimate door. The faction finds him, not Eli, perhaps someone
 a few months ahead of him on the same road. It lands as relief: the first door that did not close.
 Recruitment is earned and ironic, not charity: they want him for the discarded skill (see
-skill-as-ticket under Door 1). End on the naming, not on triumph: there is now a class of people the
-system stopped needing, and they are done asking. Keep a faint warning underneath, so Chapter 1 is
-honest with the eventual ending (the violent path does not actually arrive anywhere either).
+skill-as-ticket under Door 1). Per the contained-portrait form, this is the chapter's TERMINAL
+image, the last look at the man he used to be, not a cliffhanger into his ongoing story. End on the
+naming, not on triumph: there is now a class of people the system stopped needing, and they are done
+asking. Keep a faint warning underneath, so Chapter 1 is honest with the eventual ending (the
+violent path does not actually arrive anywhere either).
 
 ## On the democracy door: the Gilens-Page debate (handle with honesty)
 
