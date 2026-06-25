@@ -1,7 +1,7 @@
 ---
 series: the-least-of-us
 chapter: 1
-title: "No Longer Required"
+title: "Freedom from Drudgery"
 pov: Marcus
 status: drafting
 word_count: 3016
