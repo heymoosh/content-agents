@@ -120,10 +120,11 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
     )
     .join(" ");
 
-  // Timing: stagger 0.022 s per char, each char animates 0.28 s
-  const charStagger = 0.022;
+  // Timing: ~0.06 s stagger per char gives one word (~5 chars) every 0.3 s —
+  // matches comfortable reading pace so the quote builds as you read along.
+  const charStagger = 0.060;
   const charDur = 0.28;
-  const charsStart = 0.32; // after quote mark lands
+  const charsStart = 0.35; // after quote mark lands
   const lastCharStart = charsStart + (totalChars - 1) * charStagger;
   const charsEnd = lastCharStart + charDur;
   const ruleAt = charsEnd + 0.18;
