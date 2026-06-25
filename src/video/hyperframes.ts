@@ -94,42 +94,36 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Build a HyperFrames composition for a square (1:1) quote card — per-character slot reveal.
-// Each letter lives inside an overflow:hidden slot. Letters rise up through their slot so the
-// quote literally assembles itself character-by-character. No fade, no zoom — pure typographic
-// motion. Quote mark drops with elastic bounce → chars build left-to-right through slots →
+// Build a HyperFrames composition for a square (1:1) quote card — word-by-word slot reveal.
+// Each WORD lives inside an overflow:hidden slot and rises up through it as a unit.
+// No fading, no character splitting — one whole word appears at a time, at reading pace.
+// Quote mark drops with elastic bounce → words build one per slot at ~0.30 s each →
 // teal rule wipes in → byline settles. Matches the static Remotion card design exactly.
 function buildCardMotionComposition(data: CardData, durationMs: number): string {
   const len = data.quote.length;
   const words = data.quote.trim().split(/\s+/);
-  const totalChars = words.reduce((n, w) => n + w.length, 0);
+  const wordCount = words.length;
   const fontSize = len > 160 ? 50 : len > 110 ? 60 : len > 70 ? 72 : 88;
-  // Slot height = line-height in px, with a touch of padding for descenders
-  const slotH = Math.round(fontSize * 1.42);
+  // Slot height clips each word as it rises — line-height px + descender room
+  const slotH = Math.round(fontSize * 1.45);
   const serif = "'Didot', 'Bodoni 72', 'Hoefler Text', Georgia, 'Times New Roman', serif";
   const hasSource = !!(data.source && data.source.length > 0);
 
-  // Each word is an overflow:hidden slot; inside it each character is an individual span.
-  // Words flow naturally via inline-block; spaces between word-slots are real text nodes.
-  const charHtml = words
-    .map(
-      (w) =>
-        `<span class="ws"><span class="wc">${Array.from(w)
-          .map((ch) => `<span class="l">${esc(ch)}</span>`)
-          .join("")}</span></span>`
-    )
+  // Each word is an overflow:hidden slot (.ws); the word itself (.wc) rises up through it.
+  // Spaces between .ws spans are real text nodes so lines wrap naturally.
+  const wordHtml = words
+    .map((w) => `<span class="ws"><span class="wc">${esc(w)}</span></span>`)
     .join(" ");
 
-  // Timing: ~0.06 s stagger per char gives one word (~5 chars) every 0.3 s —
-  // matches comfortable reading pace so the quote builds as you read along.
-  const charStagger = 0.060;
-  const charDur = 0.28;
-  const charsStart = 0.35; // after quote mark lands
-  const lastCharStart = charsStart + (totalChars - 1) * charStagger;
-  const charsEnd = lastCharStart + charDur;
-  const ruleAt = charsEnd + 0.18;
-  const bylineAt = ruleAt + 0.40;
-  const minSec = bylineAt + 0.38 + (hasSource ? 0.38 : 0) + 3.2;
+  // Timing: one word every 0.30 s at reading pace
+  const wordStagger = 0.30;
+  const wordDur = 0.32;
+  const wordsStart = 0.35;
+  const lastWordStart = wordsStart + (wordCount - 1) * wordStagger;
+  const wordsEnd = lastWordStart + wordDur;
+  const ruleAt = wordsEnd + 0.20;
+  const bylineAt = ruleAt + 0.42;
+  const minSec = bylineAt + 0.38 + (hasSource ? 0.40 : 0) + 3.2;
   const totalSec = Math.max(durationMs / 1000, minSec);
 
   return `<!doctype html>
@@ -146,10 +140,8 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       #cb { position: relative; max-width: 820px; padding: 0 80px; text-align: center; color: ${data.ink}; }
       #qm { font-family: ${serif}; font-size: 116px; line-height: 0.66; color: ${data.accent}; height: 64px; margin-bottom: 6px; }
       #qt { font-family: ${serif}; font-size: ${fontSize}px; line-height: 1.32; font-weight: 400; letter-spacing: 0.005em; }
-      /* ws = word-slot (clips the rising chars), wc = inner block that carries the chars */
       .ws { display: inline-block; overflow: hidden; vertical-align: bottom; height: ${slotH}px; }
       .wc { display: inline-block; white-space: nowrap; }
-      .l  { display: inline-block; }
       #rl { width: 56px; height: 2px; background: ${data.accent}; margin: 48px auto 22px; }
       #at { font-family: ${serif}; font-size: 26px; text-transform: uppercase; letter-spacing: 0.32em; color: ${data.ink}; padding-left: 0.32em; }
       ${hasSource ? `#sl { position: absolute; bottom: 80px; left: 0; right: 0; text-align: center; font-family: ${serif}; font-size: 32px; text-transform: uppercase; letter-spacing: 0.08em; color: ${data.ink}; white-space: nowrap; }` : ""}
@@ -161,7 +153,7 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       <div id="b2"></div>
       <div id="cb">
         <div id="qm">&ldquo;</div>
-        <div id="qt">${charHtml}</div>
+        <div id="qt">${wordHtml}</div>
         <div id="rl"></div>
         <div id="at">${esc(data.attribution)}</div>
       </div>
@@ -171,23 +163,22 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
 
-      // All chars start below their slot (hidden by overflow:hidden on .ws)
-      gsap.set(".l", { y: "115%" });
-      // Quote mark and decoration start hidden
+      // Each word starts below its slot (hidden by overflow:hidden on .ws)
+      gsap.set(".wc", { y: "110%" });
       gsap.set("#qm", { opacity: 0, y: -55, transformOrigin: "50% 100%" });
       gsap.set("#rl", { scaleX: 0, opacity: 0, transformOrigin: "0% 50%" });
-      gsap.set("#at", { opacity: 0, y: 20 });
+      gsap.set("#at", { opacity: 0, y: 18 });
       ${hasSource ? 'gsap.set("#sl", { opacity: 0 });' : ""}
 
-      // Quote mark drops from above with a sharp elastic bounce
+      // Quote mark drops from above with elastic bounce
       tl.to("#qm", { opacity: 1, y: 0, duration: 0.30, ease: "elastic.out(1.1, 0.55)" }, 0.0);
-      // Characters rise through their overflow-hidden slots — the main event
-      tl.to(".l", { y: "0%", duration: ${charDur.toFixed(2)}, stagger: ${charStagger.toFixed(3)}, ease: "power2.out" }, ${charsStart.toFixed(2)});
+      // Each word rises through its slot — one per 0.30 s, matching reading pace
+      tl.to(".wc", { y: "0%", duration: ${wordDur.toFixed(2)}, stagger: ${wordStagger.toFixed(2)}, ease: "power3.out" }, ${wordsStart.toFixed(2)});
       // Teal rule wipes in from the left
       tl.to("#rl", { opacity: 1, scaleX: 1, duration: 0.30, ease: "power3.out" }, ${ruleAt.toFixed(2)});
       // Byline rises in
       tl.to("#at", { opacity: 0.8, y: 0, duration: 0.36, ease: "power2.out" }, ${bylineAt.toFixed(2)});
-      ${hasSource ? `tl.to("#sl", { opacity: 0.55, duration: 0.32, ease: "power1.in" }, ${(bylineAt + 0.40).toFixed(2)});` : ""}
+      ${hasSource ? `tl.to("#sl", { opacity: 0.55, duration: 0.32, ease: "power1.in" }, ${(bylineAt + 0.42).toFixed(2)});` : ""}
       // Anchor end
       tl.to("#card", { opacity: 1, duration: 0.001 }, ${(totalSec - 0.001).toFixed(3)});
 
@@ -197,6 +188,7 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
 </html>
 `;
 }
+
 
 // Render an animated MP4 companion for a quote card from its text content — kinetic typographic
 // reveal, no image. Free, local, deterministic — same HyperFrames toolchain as renderMotionBg.
