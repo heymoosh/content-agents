@@ -94,17 +94,32 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Build a HyperFrames composition for a square (1:1) quote card — kinetic typographic reveal.
-// Recreates the flat-editorial card design in HTML/CSS (same as the Remotion QuoteCard still):
-// off-white paper, double hairline keyline, teal quote mark + teal divider rule, Didone serif
-// quote type, small-caps "MUXIN LI" byline. Animates the text into place (no image, no pan/zoom):
-// quote mark scales in → quote body rises+fades → rule draws from center → byline settles in.
+// Build a HyperFrames composition for a square (1:1) quote card — word-by-word kinetic text.
+// Each word is an independent inline-block span animated with GSAP stagger: they rise up and
+// fade in sequentially, giving genuine per-word motion rather than a block dissolve.
+// Quote mark pops in first → words stagger in left-to-right → teal rule draws → byline rises.
 function buildCardMotionComposition(data: CardData, durationMs: number): string {
-  const totalSec = durationMs / 1000;
   const len = data.quote.length;
+  const words = data.quote.trim().split(/\s+/);
+  const wordCount = words.length;
   const fontSize = len > 160 ? 50 : len > 110 ? 60 : len > 70 ? 72 : 88;
   const serif = "'Didot', 'Bodoni 72', 'Hoefler Text', Georgia, 'Times New Roman', serif";
   const hasSource = !!(data.source && data.source.length > 0);
+
+  // Timing: each word staggers 0.065 s apart, animates over 0.38 s
+  const stagger = 0.065;
+  const wordDur = 0.38;
+  const wordsStart = 0.30;
+  const lastWordStart = wordsStart + (wordCount - 1) * stagger;
+  const wordsEnd = lastWordStart + wordDur;
+  const ruleAt = wordsEnd + 0.18;
+  const bylineAt = ruleAt + 0.42;
+  // Minimum clip length = animation end + 3 s reading hold
+  const minSec = bylineAt + 0.4 + (hasSource ? 0.4 : 0) + 3.0;
+  const totalSec = Math.max(durationMs / 1000, minSec);
+
+  // Pre-split words into spans server-side (avoids DOM timing races in headless Chrome)
+  const wordSpans = words.map((w) => `<span class="w">${esc(w)}</span>`).join(" ");
 
   return `<!doctype html>
 <html lang="en">
@@ -120,6 +135,7 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       #cb { position: relative; max-width: 820px; padding: 0 80px; text-align: center; color: ${data.ink}; }
       #qm { font-family: ${serif}; font-size: 116px; line-height: 0.66; color: ${data.accent}; height: 64px; margin-bottom: 6px; }
       #qt { font-family: ${serif}; font-size: ${fontSize}px; line-height: 1.32; font-weight: 400; letter-spacing: 0.005em; }
+      #qt .w { display: inline-block; }
       #rl { width: 56px; height: 2px; background: ${data.accent}; margin: 48px auto 22px; }
       #at { font-family: ${serif}; font-size: 26px; text-transform: uppercase; letter-spacing: 0.32em; color: ${data.ink}; padding-left: 0.32em; }
       ${hasSource ? `#sl { position: absolute; bottom: 80px; left: 0; right: 0; text-align: center; font-family: ${serif}; font-size: 32px; text-transform: uppercase; letter-spacing: 0.08em; color: ${data.ink}; white-space: nowrap; }` : ""}
@@ -131,7 +147,7 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       <div id="b2"></div>
       <div id="cb">
         <div id="qm">&ldquo;</div>
-        <div id="qt">${esc(data.quote)}</div>
+        <div id="qt">${wordSpans}</div>
         <div id="rl"></div>
         <div id="at">${esc(data.attribution)}</div>
       </div>
@@ -141,23 +157,23 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
 
-      // All text/decoration starts hidden
-      gsap.set(["#qm", "#qt", "#rl", "#at"${hasSource ? ', "#sl"' : ""}], { opacity: 0 });
-      gsap.set("#qm", { scale: 0.82, transformOrigin: "50% 80%" });
-      gsap.set(["#qt", "#at"], { y: 28 });
-      gsap.set("#rl", { scaleX: 0, transformOrigin: "50% 50%" });
+      // Initial hidden state — each word starts low and transparent
+      gsap.set("#qm", { opacity: 0, scale: 0.70, transformOrigin: "50% 80%" });
+      gsap.set(".w", { opacity: 0, y: 26 });
+      gsap.set("#rl", { opacity: 0, scaleX: 0, transformOrigin: "50% 50%" });
+      gsap.set("#at", { opacity: 0, y: 14 });
+      ${hasSource ? 'gsap.set("#sl", { opacity: 0 });' : ""}
 
-      // 0.10s — opening quote mark scales in and fades
-      tl.to("#qm", { opacity: 1, scale: 1, duration: 0.45, ease: "power2.out" }, 0.10);
-      // 0.65s — quote body rises and fades in
-      tl.to("#qt", { opacity: 1, y: 0, duration: 0.65, ease: "power3.out" }, 0.65);
-      // 1.50s — accent rule draws in from center
-      tl.to("#rl", { opacity: 1, scaleX: 1, duration: 0.35, ease: "power2.inOut" }, 1.50);
-      // 1.90s — byline rises in
-      tl.to("#at", { opacity: 0.8, y: 0, duration: 0.40, ease: "power2.out" }, 1.90);
-      ${hasSource ? `// 2.30s — source title fades in last
-      tl.to("#sl", { opacity: 0.55, duration: 0.35, ease: "power1.in" }, 2.30);` : ""}
-      // Anchor to full duration so HyperFrames scrubs the hold correctly
+      // Quote mark snaps in with a slight overshoot
+      tl.to("#qm", { opacity: 1, scale: 1, duration: 0.28, ease: "back.out(1.6)" }, 0.0);
+      // Each word rises and fades in with a stagger — this is the main event
+      tl.to(".w", { opacity: 1, y: 0, duration: ${wordDur.toFixed(2)}, stagger: ${stagger.toFixed(3)}, ease: "power3.out" }, ${wordsStart.toFixed(2)});
+      // Teal rule draws out from its center
+      tl.to("#rl", { opacity: 1, scaleX: 1, duration: 0.32, ease: "power2.inOut" }, ${ruleAt.toFixed(2)});
+      // Byline rises in last
+      tl.to("#at", { opacity: 0.8, y: 0, duration: 0.38, ease: "power2.out" }, ${bylineAt.toFixed(2)});
+      ${hasSource ? `tl.to("#sl", { opacity: 0.55, duration: 0.32, ease: "power1.in" }, ${(bylineAt + 0.42).toFixed(2)});` : ""}
+      // Anchor end so HyperFrames scrubs the hold correctly
       tl.to("#card", { opacity: 1, duration: 0.001 }, ${(totalSec - 0.001).toFixed(3)});
 
       window.__timelines["main"] = tl;
