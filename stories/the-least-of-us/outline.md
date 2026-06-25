@@ -29,8 +29,10 @@ The road to the war, and the cost.
   world and the core thematic conflict in real time: the displacement AI drives through jobs,
   democratic process, and labor, lived moment to moment by a single person we follow. It closes
   with that person being **recruited into the guerrilla faction**. They are the throughline POV,
-  NOT the leader. Concept agreed in conversation; beats not yet pinned. (Open question: who this
-  person is and how they connect to Eli / Lena / the existing cast.)
+  NOT the leader. Concept agreed in conversation; beats not yet pinned. Worldbuilding bank,
+  central-conflict statement, real-world anchors, and the cascade (work / recourse / labor) are in
+  `notes/worldbuilding-displacement.md`. (Open question: who this person is and how/whether they
+  connect to the existing cast.)
 - **The first strike (introduces Eli; a LATER chapter — formerly slotted as Chapter 1).** The
   first data center strike that actually works. Rendered through nerves and consequence, never
   method. It succeeds because nobody who mattered believed people like them could do anything;
