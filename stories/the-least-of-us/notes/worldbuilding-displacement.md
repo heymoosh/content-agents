@@ -6,6 +6,24 @@
 > the craft guardrails. Agreed with Muxin in conversation (2026-06). Eli does NOT appear in this
 > chapter. The everyman is a new throughline witness, not the leader and not the Betrayer.
 
+## Status / resume pointer (as of 2026-06-25)
+
+- Chapter 1 is DRAFTED: `chapters/chapter-01.md`, title "Freedom from Drudgery", POV Marcus, third
+  limited past, ~3,074 words, validated (zero em dashes, one sentence per line). Spans ~4 years as
+  written (Sam ages 6 to 9).
+- Open as DRAFT PR #30 (heymoosh/content-agents), awaiting Muxin's line-level review. Not locked.
+- Names are placeholders: Marcus (everyman), Dana (partner), Sam (child ~6 to 9), Reza
+  (colleague Marcus automates out in Scene 1, who recruits him at the end).
+- The two leader-introduction drafts stay parked in `notes/leader-intro/` (a LATER chapter, not Ch1).
+- Open questions flagged on the PR: timeline (~4 yrs as written vs the ~5 yrs / Sam to 11 in the
+  Form section below); the climax line "not rescue, not salvation, nothing that simple" (negation
+  rhythm, retune if it reads as a tic). Title is decided ("Freedom from Drudgery").
+- To resume in a fresh session: read this whole note for the decisions and rationale. To act on PR
+  review comments, `/story --revise the-least-of-us 1` (surgical edits to ONLY commented passages,
+  reply on threads, push, re-run `npm run story:validate`). To lock after Muxin approves,
+  `/story lock the-least-of-us 1`. Re-subscribe to PR #30 (subscribe_pr_activity) if you want
+  comments to wake the session, and re-arm an hourly babysit check.
+
 ## The central conflict of the whole series
 
 > When the people who own the machines no longer need your labor, your vote, or your consent, what
