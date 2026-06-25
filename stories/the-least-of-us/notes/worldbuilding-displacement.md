@@ -39,10 +39,29 @@ The cruelty is built in. It is framed as innovation and productivity, it is reco
 worker's own diligence becomes the training data that deprecates him. No villain in the room. A
 calendar invite, a metric, a deactivated badge.
 
-Timeless version: a competent mid-tier knowledge worker (technical writer, analyst, ops lead). The
-new directive is "AI-first": justify your headcount, train the assistant on your workflow, hit an
-AI-usage number in review. He is good at it, and that is the trap. The better he documents himself,
-the more completely he is captured.
+Timeless version: a technical knowledge worker, competent and mid-tier (technical writer, analyst,
+internal-tooling / ops, a PM who shipped the AI feature). Two layers of irony, both deliberate:
+
+- **He is mildly complicit, not innocent.** He was adjacent to the machine before it turned on him.
+  He shipped the efficiency, trained the assistant, optimized a workflow that quietly deleted
+  somebody else's job a year before it deleted his. He believed the framing (innovation,
+  productivity, "learn to adapt") right up until he was on the receiving end. He remains an everyman
+  the reader rides along with, but he is denied innocence, which is more interesting than a pure
+  victim and dodges the agitprop trap. His arc carries a moral reckoning: he helped build the thing.
+- **The ladder gets pulled up behind him.** The new directive is "AI-first": justify your headcount,
+  train the assistant on your workflow, hit an AI-usage number in review. He is good at it, and that
+  is the trap. The better he documents himself, the more completely he is captured. The technical
+  skill that was supposed to be the safe hedge is exactly what gets automated. See "The vanishing
+  ladder" below.
+
+**Skill-as-ticket (closes Door 1 into the ending).** The faction's recruitment at the end is NOT
+charity. They want him BECAUSE of what the system discarded: he knows how these deployments think
+from the inside. The bible/keepers already give the faction "prompt engineers" who find sloppy
+agentic deployments and pry them open; he becomes one of them. The cruelty (made to train the
+machine, recorded, thrown away) becomes the hook (the resistance wants the very knowledge that was
+declared worthless). This also hands him his throughline role: our technical eyes on every later
+strike, never the leader. Altitude guard: the chapter lives in his fear and humiliation, not his
+expertise. We meet the human first; the skill is what the faction sees, not what we lead with.
 
 ### Door 2, Recourse: the corrective was skewed before he reached it
 
@@ -81,13 +100,26 @@ delivery and private security arriving as normal; everyone around him also told 
 adapt. His cascade is one instance of a world sorting into those who own the machines and those the
 machines made redundant. That sorting IS the underclass the resistance comes from.
 
+## The vanishing ladder (theme: no advice left for the children)
+
+The knowledge worker was supposed to be safe. He was told that education, being good with his head,
+was the hedge against exactly this. So when the floor goes it is not just income that drops out, it
+is the whole story he was told about who gets to be secure. Nobody promised the factory would never
+close; they DID promise this. The collapse is not only of jobs but of the LADDER itself: there is no
+next rung to point a child at. The current, widely felt version is the parent's dilemma (what do I
+tell my kid to study now that the technical career path is going). Thread this into the world layer
+and let it rhyme with the series' children theme: the war is nominally FOR the children, yet the
+first thing the collapse takes is any honest answer to "what should I be when I grow up." Keep it
+felt and oblique (an overheard question, a half-answer he cannot give), never a speech.
+
 ## The ending (no Eli)
 
 He bottoms out having tried every legitimate door. The faction finds him, not Eli, perhaps someone
 a few months ahead of him on the same road. It lands as relief: the first door that did not close.
-End on the naming, not on triumph: there is now a class of people the system stopped needing, and
-they are done asking. Keep a faint warning underneath, so Chapter 1 is honest with the eventual
-ending (the violent path does not actually arrive anywhere either).
+Recruitment is earned and ironic, not charity: they want him for the discarded skill (see
+skill-as-ticket under Door 1). End on the naming, not on triumph: there is now a class of people the
+system stopped needing, and they are done asking. Keep a faint warning underneath, so Chapter 1 is
+honest with the eventual ending (the violent path does not actually arrive anywhere either).
 
 ## On the democracy door: the Gilens-Page debate (handle with honesty)
 
