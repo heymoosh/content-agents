@@ -28,8 +28,10 @@ recurring POV; the saga has no single protagonist (it is a collection of charact
 to resurface in the ensemble later, but the chapter stands alone.
 
 What the model demands:
-- **Compress time, do not cram a bad week.** The cascade erodes over months or years (the slow
-  boil), not a single firing. The richness lives in the slow erosion.
+- **Compress time across ~five years, do not cram a bad week.** The cascade erodes slowly over
+  about five years (the slow boil), not a single firing. The child aging from ~6 to ~11 is the
+  clock: the future-question ("what should I be") evolves and darkens as honest answers vanish. The
+  richness lives in the slow erosion.
 - **A relationship at the center: a partner and a young child (locked).** Like Bill and Frank, the
   human bond is the foreground and the economics are backdrop. The loss must be relational, not just
   financial. The small family does double duty: the slow economic erosion strains the partnership
@@ -117,6 +119,53 @@ He drops to the physical and gig underclass to survive and finds it automating t
 delivery, self-checkout, algorithmic scheduling, ratings as discipline) and precarious by design.
 This is the world Eli came from, so it quietly seeds the larger story. The fall has no bottom.
 
+## Realism check (firing, the papered door, the floor)
+
+Grounding so the chapter reports reality, not melodrama. Muxin's question: are automated
+role-elimination emails real? Yes, but they are CLASS-STRATIFIED, and that gradient is the chapter's
+backbone, use it.
+
+- **Automated firing is real, mostly at the gig/managed-labor layer.** Amazon Flex driver Stephen
+  Normandin, ~4 years in, was terminated by an automated email after the algorithm decided he
+  underperformed (locked gates, a bad-lighting selfie, things beyond his control); appeals go to a
+  bot. Amazon's system "automatically generates warnings or terminations without input from
+  supervisors." The LITERAL fired-by-algorithm beat belongs in Door 3 (the floor), not Door 1.
+- **White-collar layoffs are impersonal but human-rubber-stamped.** His own cut is the templated
+  mass-RIF: a calendar invite, a deactivated badge, a locked-out laptop, a form email. Machine-driven
+  logic, a human signature. Keep it that cold and that ordinary; do not invent a sci-fi "the AI
+  fired me" for his salaried layer, it would read false.
+- **The gradient = his descent.** Firing gets MORE automated as he falls: he builds the automated
+  denials -> he is impersonally RIF'd -> he is literally fired by a bot in the gig layer. The cruelty
+  escalates with the class drop. True to life and thematically exact.
+- **Claims-denial echo (canon tie).** His domain is claims/benefits adjudication. The system he ships
+  issues automated "final determination: claim denied, no further appeals" notices, the exact texture
+  of Eli's wound in the keepers/bible (Lena's denied claim). Later his OWN unemployment/benefits
+  claim is processed by a machine like the one he built, and denied or stalled. He is filed as
+  low-priority by his own creation. No forced plot link to Eli; a thematic rhyme that makes the saga
+  rhyme.
+
+### The papered door, made concrete (Door 2 / Scene 4): how hard he tried
+
+The recourse step must show the WORK of trying, not a montage. Real channels, each one papered, over
+five years:
+- **The job hunt.** ~83% of employers use AI resume screening; AI ranking is now the majority
+  experience; grading systems (e.g. HiredScore) mean low-ranked resumes are never seen by a human
+  (functional auto-reject). 18 to 30% of postings are "ghost jobs" that do not exist. Applicants send
+  32 to 200 applications. The machines he helped normalize now screen him out, unseen.
+- **Retraining.** He enrolls in a reskilling / "adjustment" program. The documented lived pattern:
+  underfunded, outdated, and at best lands people at far lower pay (older Trade Adjustment Assistance
+  evaluations found it ineffective, even wage-negative; recent research contests this, so dramatize
+  HIS hollow experience, do not assert "retraining never works" as settled fact).
+- **His own benefits.** Unemployment / benefits claims routed through automated adjudication, delayed
+  and denied by the faceless machinery (rhymes with his job and with Lena).
+- **Democracy.** Petitions a rep, a town hall, an agency complaint, maybe a class action about
+  displacement. The relief bill was written by the industry it regulates; the regulator revolves in
+  and out of that industry; the suit settles for pennies years later. Papered, not slammed (keep the
+  Gilens-Page honesty: his bitter conclusion, never the narrator's verdict).
+
+The point is not one rejection but the slow, total accumulation: every legitimate lever pulled, every
+one connected to nothing.
+
 ## The world-changing layer (macro rhymes with micro)
 
 Thread the society-wide sorting through his personal fall, so his life and the world change in the
@@ -197,3 +246,8 @@ conclusion to earn or reject, not the narrator's.
 - Elkjaer & Klitgaard systematic review (2024), Perspectives on Politics: https://www.cambridge.org/core/journals/perspectives-on-politics/article/economic-inequality-and-political-responsiveness-a-systematic-review/3364318C95A3D608048BA1800013C7E1
 - Money in politics / RepresentUs: https://represent.us/explains/how-money-influences-policies-regulations/
 - Revolving door / OpenSecrets: https://www.opensecrets.org/revolving-door
+- Fired by bot / Amazon Flex (Normandin) / Bloomberg: https://www.bloomberg.com/news/features/2021-06-28/fired-by-bot-amazon-turns-to-machine-managers-and-workers-are-losing-out
+- Amazon Flex automated firing / AI Incident Database: https://incidentdatabase.ai/cite/111/
+- AI resume screening & ghost jobs / 2025 job-market review (Interview Guys): https://blog.theinterviewguys.com/2025-job-market-year-end-review/
+- Trade Adjustment Assistance outcomes / Searchlight Institute "Lost in Transition": https://www.searchlightinstitute.org/research/lost-in-transition-how-trade-adjustment-assistance-came-up-short-and-where-it-succeeded/
+- Can displaced labor be retrained? (Wharton/Mackin working paper): https://mackinstitute.wharton.upenn.edu/wp-content/uploads/2018/11/FP0385_WP_2018Nov.pdf
