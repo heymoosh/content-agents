@@ -1,9 +1,11 @@
 ---
 series: the-least-of-us
-chapter: 1
+chapter: null
 title: "Unexplained Infrastructure Stress"
 pov: Eli
-status: drafting
+status: parked
+parked_as: leader-introduction-candidate
+parked_reason: "First-strike opener (earlier draft of the same beat as draft-hallway.md). Introduces Eli the leader; held for a LATER chapter. Chapter 1 repositioned to the displacement opening. See notes/leader-intro/README.md."
 word_count: 1676
 prose_model: claude-sonnet
 generated_at: 2026-06-17

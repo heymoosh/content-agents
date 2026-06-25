@@ -25,10 +25,19 @@ The road to the war, and the cost.
 - **The cell forms.** The first followers, including the Betrayer as believer. The argument,
   present from the start, between those who want only to lay waste and those who insist on
   building toward something.
-- **The first strike (Chapter 1).** Chapter 1 IS the first data center strike that actually
-  works. Rendered through nerves and consequence, never method. It succeeds because nobody who
-  mattered believed people like them could do anything; that disbelief is the only reason it was
-  easy. Eli feels the removal of a pressure, not triumph.
+- **The displacement opening (Chapter 1 — being designed).** The series opener sets the whole
+  world and the core thematic conflict in real time: the displacement AI drives through jobs,
+  democratic process, and labor, lived moment to moment by a single person we follow. It closes
+  with that person being **recruited into the guerrilla faction**. They are the throughline POV,
+  NOT the leader. Concept agreed in conversation; beats not yet pinned. (Open question: who this
+  person is and how they connect to Eli / Lena / the existing cast.)
+- **The first strike (introduces Eli; a LATER chapter — formerly slotted as Chapter 1).** The
+  first data center strike that actually works. Rendered through nerves and consequence, never
+  method. It succeeds because nobody who mattered believed people like them could do anything;
+  that disbelief is the only reason it was easy. Eli feels the removal of a pressure, not triumph.
+  Two parked drafts of this beat live in `notes/leader-intro/` ("The Hallway" and "Unexplained
+  Infrastructure Stress"); seed + keepers in `notes/chapter-01-seed.md` /
+  `notes/chapter-01-keepers.md`. This is where the audience first meets the leader, NOT the opener.
 - **Escalation is slow and earned, NOT a jump to the enclaves.** Do not lurch from a one-hour
   data center disruption to assaulting an enclave; that is operationally implausible and feels
   wrong. The middle of the Uprising is a campaign of strikes against an opponent that adapts.
@@ -98,12 +107,11 @@ matters.
   medical band), standing for the systemic rot, not just the person.
 - Who could have been his reason to stay, and how he turned from it.
 - Names: the Betrayer, the Unwilling Prince, key children.
-- Chapter 1 is NOT yet written. A first attempt ("Unexplained Infrastructure Stress," the first
-  successful data center strike) was set aside at `notes/chapter-01-draft-v1.md` because Muxin
-  wants to rethink it (something feels off, reason not yet pinned down). `chapters/` is empty on
-  purpose. **Start Chapter 1 fresh** from `notes/chapter-01-seed.md` + `notes/chapter-01-keepers.md`
-  and this bible/outline; treat draft-v1 as a reference only, not a baseline to defend. Use the
-  `/story` beat-sheet approval gate (agree the outline with Muxin before any prose).
+- Chapter 1 is NOT yet written and has been **repositioned** to the displacement opening (see the
+  Uprising thread). The two first-strike drafts ("The Hallway", "Unexplained Infrastructure
+  Stress") are parked in `notes/leader-intro/` as candidates for the LATER leader-introduction
+  chapter, not as Chapter 1. `chapters/` is empty on purpose. When we build the displacement
+  opener, use the `/story` beat-sheet approval gate (agree the beats with Muxin before any prose).
 - The slow-escalation campaign: what the second and third strikes look like as the defenses adapt,
   and how the cell is forced to change tactics each time.
 

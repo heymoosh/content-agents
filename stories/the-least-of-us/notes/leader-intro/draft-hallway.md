@@ -1,9 +1,11 @@
 ---
 series: the-least-of-us
-chapter: 1
+chapter: null
 title: "The Hallway"
 pov: Eli
-status: drafting
+status: parked
+parked_as: leader-introduction-candidate
+parked_reason: "Strong draft, but introduces Eli (the leader) rather than setting the world. Held for a LATER chapter; Chapter 1 repositioned to the displacement opening. See notes/leader-intro/README.md."
 word_count: 1471
 prose_model: claude-sonnet
 generated_at: 2026-06-24
