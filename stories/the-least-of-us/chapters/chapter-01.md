@@ -4,7 +4,7 @@ chapter: 1
 title: "Freedom from Drudgery"
 pov: Marcus
 status: drafting
-word_count: 3016
+word_count: 3074
 prose_model: claude-sonnet
 generated_at: 2026-06-25
 ---
@@ -48,6 +48,16 @@ Determination: approved.
 Processing time: 0.8 seconds.
 
 The VP on the left said something quietly approving and Hendricks said "there it is" and someone started a small applause that the room didn't fully commit to.
+
+"This is what we've been building toward," Hendricks said, loud enough now for the whole table.
+
+"Freedom from drudgery."
+
+It was the line from the deck, printed under the product name on every slide.
+
+A few people made the small sounds of agreement that such lines are built to produce.
+
+The review team at the long table made none.
 
 Marcus watched the queue.
 
