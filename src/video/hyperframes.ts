@@ -81,10 +81,31 @@ const HF_CONFIG = JSON.stringify(
   2
 );
 
-// Build a HyperFrames composition for a square (1:1) quote card — one still, gentle Ken Burns
-// zoom. Produces the free animated MP4 companion to the static PNG.
-function buildCardMotionComposition(stillName: string, durationMs: number): string {
+export interface CardData {
+  quote: string;
+  attribution: string;
+  source?: string;
+  paper: string;
+  ink: string;
+  accent: string;
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Build a HyperFrames composition for a square (1:1) quote card — kinetic typographic reveal.
+// Recreates the flat-editorial card design in HTML/CSS (same as the Remotion QuoteCard still):
+// off-white paper, double hairline keyline, teal quote mark + teal divider rule, Didone serif
+// quote type, small-caps "MUXIN LI" byline. Animates the text into place (no image, no pan/zoom):
+// quote mark scales in → quote body rises+fades → rule draws from center → byline settles in.
+function buildCardMotionComposition(data: CardData, durationMs: number): string {
   const totalSec = durationMs / 1000;
+  const len = data.quote.length;
+  const fontSize = len > 160 ? 50 : len > 110 ? 60 : len > 70 ? 72 : 88;
+  const serif = "'Didot', 'Bodoni 72', 'Hoefler Text', Georgia, 'Times New Roman', serif";
+  const hasSource = !!(data.source && data.source.length > 0);
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -92,21 +113,53 @@ function buildCardMotionComposition(stillName: string, durationMs: number): stri
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 1080px; height: 1080px; overflow: hidden; background: #f2ead9; }
-      #card { width: 1080px; height: 1080px; position: relative; overflow: hidden; }
-      .scene { position: absolute; inset: 0; width: 1080px; height: 1080px; }
-      .scene img { width: 1080px; height: 1080px; object-fit: cover; display: block; }
+      html, body { width: 1080px; height: 1080px; overflow: hidden; background: ${data.paper}; }
+      #card { width: 1080px; height: 1080px; position: relative; display: flex; justify-content: center; align-items: center; }
+      #b1 { position: absolute; inset: 44px; border: 1.5px solid ${data.ink}; }
+      #b2 { position: absolute; inset: 52px; border: 0.75px solid ${data.ink}; opacity: 0.55; }
+      #cb { position: relative; max-width: 820px; padding: 0 80px; text-align: center; color: ${data.ink}; }
+      #qm { font-family: ${serif}; font-size: 116px; line-height: 0.66; color: ${data.accent}; height: 64px; margin-bottom: 6px; }
+      #qt { font-family: ${serif}; font-size: ${fontSize}px; line-height: 1.32; font-weight: 400; letter-spacing: 0.005em; }
+      #rl { width: 56px; height: 2px; background: ${data.accent}; margin: 48px auto 22px; }
+      #at { font-family: ${serif}; font-size: 26px; text-transform: uppercase; letter-spacing: 0.32em; color: ${data.ink}; padding-left: 0.32em; }
+      ${hasSource ? `#sl { position: absolute; bottom: 80px; left: 0; right: 0; text-align: center; font-family: ${serif}; font-size: 32px; text-transform: uppercase; letter-spacing: 0.08em; color: ${data.ink}; white-space: nowrap; }` : ""}
     </style>
   </head>
   <body>
     <div id="card" data-composition-id="main" data-start="0" data-duration="${totalSec.toFixed(2)}" data-width="1080" data-height="1080">
-      <div class="scene" id="scene-0"><img src="assets/${stillName}" alt="" /></div>
+      <div id="b1"></div>
+      <div id="b2"></div>
+      <div id="cb">
+        <div id="qm">&ldquo;</div>
+        <div id="qt">${esc(data.quote)}</div>
+        <div id="rl"></div>
+        <div id="at">${esc(data.attribution)}</div>
+      </div>
+      ${hasSource ? `<div id="sl">${esc(data.source!)}</div>` : ""}
     </div>
     <script>
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
-      gsap.set("#scene-0", { opacity: 1 });
-      tl.fromTo("#scene-0 img", { scale: 1.0, xPercent: 1.5 }, { scale: 1.06, xPercent: -1.5, duration: ${totalSec.toFixed(2)}, ease: "none" }, 0);
+
+      // All text/decoration starts hidden
+      gsap.set(["#qm", "#qt", "#rl", "#at"${hasSource ? ', "#sl"' : ""}], { opacity: 0 });
+      gsap.set("#qm", { scale: 0.82, transformOrigin: "50% 80%" });
+      gsap.set(["#qt", "#at"], { y: 28 });
+      gsap.set("#rl", { scaleX: 0, transformOrigin: "50% 50%" });
+
+      // 0.10s — opening quote mark scales in and fades
+      tl.to("#qm", { opacity: 1, scale: 1, duration: 0.45, ease: "power2.out" }, 0.10);
+      // 0.65s — quote body rises and fades in
+      tl.to("#qt", { opacity: 1, y: 0, duration: 0.65, ease: "power3.out" }, 0.65);
+      // 1.50s — accent rule draws in from center
+      tl.to("#rl", { opacity: 1, scaleX: 1, duration: 0.35, ease: "power2.inOut" }, 1.50);
+      // 1.90s — byline rises in
+      tl.to("#at", { opacity: 0.8, y: 0, duration: 0.40, ease: "power2.out" }, 1.90);
+      ${hasSource ? `// 2.30s — source title fades in last
+      tl.to("#sl", { opacity: 0.55, duration: 0.35, ease: "power1.in" }, 2.30);` : ""}
+      // Anchor to full duration so HyperFrames scrubs the hold correctly
+      tl.to("#card", { opacity: 1, duration: 0.001 }, ${(totalSec - 0.001).toFixed(3)});
+
       window.__timelines["main"] = tl;
     </script>
   </body>
@@ -114,18 +167,16 @@ function buildCardMotionComposition(stillName: string, durationMs: number): stri
 `;
 }
 
-// Render an animated MP4 companion from a square (1:1) quote-card PNG using HyperFrames.
-// Free, local, deterministic — same toolchain as renderMotionBg but for 1080×1080 cards.
-// Default 10 s: enough to read the quote, loops naturally for social media autoplay.
-export function renderCardAnimation(stillPath: string, outPath: string, durationMs = 10_000): void {
+// Render an animated MP4 companion for a quote card from its text content — kinetic typographic
+// reveal, no image. Free, local, deterministic — same HyperFrames toolchain as renderMotionBg.
+// Default 5 s: snappy editorial reveal (text animates in over ~2.5s) + 2.5s reading hold.
+export function renderCardAnimation(data: CardData, outPath: string, durationMs = 5_000): void {
   const proj = join(tmpdir(), `hf-card-${Date.now().toString(36)}`);
   const assets = join(proj, "assets");
   mkdirSync(assets, { recursive: true });
   try {
-    const name = "card.png";
-    copyFileSync(stillPath, join(assets, name));
     writeFileSync(join(proj, "hyperframes.json"), HF_CONFIG);
-    writeFileSync(join(proj, "index.html"), buildCardMotionComposition(name, durationMs));
+    writeFileSync(join(proj, "index.html"), buildCardMotionComposition(data, durationMs));
     execFileSync("npx", ["--yes", `hyperframes@${HF_VERSION}`, "render"], {
       cwd: proj,
       stdio: ["ignore", "inherit", "inherit"],
