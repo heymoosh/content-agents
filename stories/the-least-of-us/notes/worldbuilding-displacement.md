@@ -158,13 +158,40 @@ five years:
   HIS hollow experience, do not assert "retraining never works" as settled fact).
 - **His own benefits.** Unemployment / benefits claims routed through automated adjudication, delayed
   and denied by the faceless machinery (rhymes with his job and with Lena).
-- **Democracy.** Petitions a rep, a town hall, an agency complaint, maybe a class action about
-  displacement. The relief bill was written by the industry it regulates; the regulator revolves in
-  and out of that industry; the suit settles for pennies years later. Papered, not slammed (keep the
-  Gilens-Page honesty: his bitter conclusion, never the narrator's verdict).
+- **Democracy / legal recourse (the specific gaps he falls through).** Each real channel, and what
+  realistically happens:
+  - **The courthouse is locked before he arrives.** ~60M US workers (more than a third of the
+    workforce) are bound by forced-arbitration clauses, and Epic Systems v. Lewis (2018, 5-4) made
+    class-action waivers enforceable. When one automated system harms thousands identically, they
+    are forbidden to band together. He is funneled into private arbitration: confidential, one-on-one,
+    arbitrator paid by the repeat-player employer, low win rates, small awards. (Fitting detail: Epic
+    Systems is a healthcare-software firm and the original plaintiff was a technical writer, his
+    exact profession.)
+  - **His representative sends a form letter.** Offices triage by effort; mass/templated contact is
+    noise. Casework can sometimes unstick one individual snag (a frozen benefits claim) but cannot
+    touch the structural cause; on policy, constituent contact rarely moves a vote already aligned
+    with donors. The responsive lever (casework) fixes one form; the lever that could fix the system
+    (policy) is unresponsive to anyone without money.
+  - **The agency takes a year and yields a hollow remedy, if it has jurisdiction at all.** Labor/EEO
+    complaints take months to over a year, agencies are backlogged and whipsawed by political
+    priorities, and a "win" is make-whole backpay plus a posted notice, no deterrent. For
+    displacement specifically there is likely NO agency with jurisdiction, because being automated
+    out is not illegal.
+  - **His vote is structurally inert.** Safe/gerrymandered seats, money-decided primaries, an
+    incumbent aligned with the industry. Petitions get a templated non-answer.
+  - **There is no union.** Salaried tech workers were never organized; as a gig "independent
+    contractor" he has no collective-bargaining right, and the arbitration clause waits there too.
 
-The point is not one rejection but the slow, total accumulation: every legitimate lever pulled, every
-one connected to nothing.
+The gap underneath all the gaps (the thematic key): **nothing that happened to him was illegal.**
+Every corrective assumes a VIOLATION, a law broken, a right infringed. His ruin was legal at every
+step; the system did exactly what it was built to do. There is no door not because the doors are
+locked but because the doors are for a different kind of harm. He was not wronged in any way the
+machinery recognizes as a wrong. More chilling than corruption, and it matches the bible: "morally
+wrong, yet legitimized at every step by ordinary real-world structures." This realization is what
+makes the faction's hand, at the end, feel like the only door left.
+
+The point is not one rejection but the slow, total accumulation over five years: every legitimate
+lever pulled, every one connected to nothing.
 
 ## The world-changing layer (macro rhymes with micro)
 
@@ -251,3 +278,6 @@ conclusion to earn or reject, not the narrator's.
 - AI resume screening & ghost jobs / 2025 job-market review (Interview Guys): https://blog.theinterviewguys.com/2025-job-market-year-end-review/
 - Trade Adjustment Assistance outcomes / Searchlight Institute "Lost in Transition": https://www.searchlightinstitute.org/research/lost-in-transition-how-trade-adjustment-assistance-came-up-short-and-where-it-succeeded/
 - Can displaced labor be retrained? (Wharton/Mackin working paper): https://mackinstitute.wharton.upenn.edu/wp-content/uploads/2018/11/FP0385_WP_2018Nov.pdf
+- Forced arbitration / Epic Systems v. Lewis (~60M workers) / EPI via ABA: https://www.americanbar.org/groups/labor_law/publications/labor_employment_law_news/fall-issue-2023/the-practical-effects-of-epic-systems-v-lewis/
+- Epic Systems Corp. v. Lewis / Wikipedia: https://en.wikipedia.org/wiki/Epic_Systems_Corp._v._Lewis
+- Contacting Congress / form letters & constituent influence (EA Forum review): https://forum.effectivealtruism.org/posts/5oStggnYLGzomhvvn/talking-to-congress-can-constituents-contacting-their
