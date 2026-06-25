@@ -30,10 +30,13 @@ to resurface in the ensemble later, but the chapter stands alone.
 What the model demands:
 - **Compress time, do not cram a bad week.** The cascade erodes over months or years (the slow
   boil), not a single firing. The richness lives in the slow erosion.
-- **A relationship at the center.** Like Bill and Frank, the human bond is the foreground and the
-  economics are backdrop. The loss must be relational, not just financial. This is where a partner
-  or a child earns a place, and where the vanishing-ladder thread becomes personal ("what do I tell
-  MY kid") instead of overheard. (Open: who is at his center.)
+- **A relationship at the center: a partner and a young child (locked).** Like Bill and Frank, the
+  human bond is the foreground and the economics are backdrop. The loss must be relational, not just
+  financial. The small family does double duty: the slow economic erosion strains the partnership
+  (the truest felt version of this collapse), and the child turns the vanishing-ladder thread
+  personal ("what do I tell MY kid") and ties straight into the series' children theme. It also
+  raises the cost of the ending: recruitment risks more than himself. Hold both relationships
+  without letting either go thin; a contained portrait can carry it if the detail stays specific.
 - **Domestic specificity.** Their strawberries, wine, guitar; ours is his apartment, routines, the
   objects of the old life. The collapse is felt through which small things stop being possible.
 - **A complete arc with a real ending.** Recruitment is that ending: not a cliffhanger into an
