@@ -6,7 +6,7 @@ import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { loadCtaConfig, loadCanonicalUrl, resolveCta, appendCtaLine, type CtaConfig } from "./cta.js";
+import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta, appendCtaLine, type CtaConfig } from "./cta.js";
 import { claimSlots } from "./slots.js";
 
 // Schedule approved `quote-card` (image) rows from a content folder's review queue to the social
@@ -143,12 +143,13 @@ async function runCheck(folder: string | null): Promise<void> {
     console.log(`\n${cards.length} approved quote-card row(s) in ${folder}:`);
     if (cards.length > 0) {
       const canonicalUrl = loadCanonicalUrl(folder);
+      const sourceKind = loadSourceKind(folder);
       const { labels } = claimSlots({ windowKey: "quote-card", conflictPlatforms: [], count: 1, asset: "(preview)", by: "cards", dryRun: true });
       console.log(`  next free card slot (config/platforms.yaml quote-card cadence): ${labels[0] ?? "next-free-slot"}`);
       for (const c of cards) {
         const imagePath = isAbsolute(c.asset) ? c.asset : join(folder, c.asset);
         const rendered = existsSync(imagePath) ? "rendered" : "NOT RENDERED — run `npm run render -- --still`";
-        const { url } = resolveCta(cardCopy(folder, c.id).fm, canonicalUrl, cfg);
+        const { url } = resolveCta(cardCopy(folder, c.id).fm, canonicalUrl, cfg, sourceKind);
         console.log(`  • ${c.id}  ${c.asset} (${rendered})  ${url ? `link → ${url}` : "no link"}`);
       }
     }
@@ -193,6 +194,7 @@ async function main() {
   const allTargets = await provider.listTargets();
   const cfg = loadCtaConfig();
   const canonicalUrl = loadCanonicalUrl(folder);
+  const sourceKind = loadSourceKind(folder);
 
   // Claim a slot per card from the unified scheduler (windowKey `quote-card`), de-conflicting
   // against each target platform so a card never shares a day with a text post there. `--at`
@@ -224,7 +226,7 @@ async function main() {
       throw new Error("no card slot available — give config/platforms.yaml a `quote-card` cadence (posts_per_week + slot_days + slot_time_pst)");
     }
     const { quote, fm } = cardCopy(folder, row.id);
-    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg);
+    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
     if (usedFallback) {
       console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
     }

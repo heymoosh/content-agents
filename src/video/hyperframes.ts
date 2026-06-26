@@ -81,6 +81,241 @@ const HF_CONFIG = JSON.stringify(
   2
 );
 
+export interface CardData {
+  quote: string;
+  attribution: string;
+  source?: string;
+  paper: string;
+  ink: string;
+  accent: string;
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// A self-contained SVG film-grain tile as a data URI, used as a tiling background-image on the
+// paper. feTurbulence is rendered INTO the bitmap (it is not a live CSS `filter:` on the captured
+// node, which trips HyperFrames' size limit) — so it stays free, local, and capture-safe. The
+// grain is faint (low opacity, fine fractal noise) so it reads as paper tooth, not static.
+function grainDataUri(): string {
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>` +
+    `<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/>` +
+    `<feColorMatrix type='saturate' values='0'/></filter>` +
+    `<rect width='160' height='160' filter='url(%23n)' opacity='0.05'/></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${svg}`;
+}
+
+// Split the quote into SENTENCES — the only structural unit of the choreography. A sentence ends at
+// . ! ? (kept with the word). Returns each word's sentence index (parallel to `words`); a quote with
+// no terminal punctuation is one sentence. This is what drives the reveal: one smooth stagger per
+// sentence, a single pause between sentences. No mid-sentence chunking.
+function splitSentences(words: string[]): number[] {
+  const sentOf = new Array<number>(words.length).fill(0);
+  let s = 0;
+  for (let i = 0; i < words.length; i++) {
+    sentOf[i] = s;
+    if (i < words.length - 1 && /[.!?]["')\]]?$/.test(words[i].trim())) s++;
+  }
+  return sentOf;
+}
+
+// Build a HyperFrames composition for a square (1:1) quote card — editorial print look + calm,
+// SENTENCE-paced reveal. Same look as before (screen-print paper grain + warm vignette, teal
+// keyline, OVERSIZED accent quote mark, Didone serif, hairline rule + MUXIN LI byline). The MOTION
+// is deliberately simple: within a sentence, words reveal in ONE smooth gentle rise+fade at a single
+// consistent reading-pace stagger (no mid-sentence pauses, no varied per-word directions). BETWEEN
+// sentences there is a single clear pause — the only structural break. The FINAL sentence is the
+// climax: it lands in the accent color with a slight scale pop and an underline swipe. A
+// low-amplitude vignette breathe keeps the frame alive. Reading pace preserved (~9.5s total).
+function buildCardMotionComposition(data: CardData, durationMs: number): string {
+  const len = data.quote.length;
+  const words = data.quote.trim().split(/\s+/);
+  const fontSize = len > 160 ? 50 : len > 110 ? 60 : len > 70 ? 72 : 88;
+  const serif = "'Didot', 'Bodoni 72', 'Hoefler Text', Georgia, 'Times New Roman', serif";
+  const hasSource = !!(data.source && data.source.length > 0);
+
+  // Sentences drive the reveal; the LAST sentence is the emphasis/climax (verbatim, so extraction-
+  // first holds trivially). Its words carry .em (accent color); the run wraps in #emph for one
+  // underline swipe. The whole closing sentence is the accent beat.
+  const sentOf = splitSentences(words);
+  const sentCount = sentOf[sentOf.length - 1] + 1;
+  const emphSent = sentCount - 1;
+  const emphStart = sentOf.indexOf(emphSent);
+  const emphEnd = sentOf.lastIndexOf(emphSent);
+
+  // Each word carries its sentence index (data-s). Final-sentence words add .em (accent color); the
+  // run is wrapped in #emph so one underline swipe sits under the whole closing sentence. Real-text-
+  // node spaces between words keep natural line wrapping.
+  let wordHtml = "";
+  for (let i = 0; i < words.length; i++) {
+    if (i === emphStart) wordHtml += `<span id="emph"><span id="emul"></span>`;
+    const cls = sentOf[i] === emphSent ? "w em" : "w";
+    wordHtml += `<span class="${cls}" data-s="${sentOf[i]}">${esc(words[i])}</span>`;
+    if (i === emphEnd) wordHtml += `</span>`;
+    if (i < words.length - 1) wordHtml += " ";
+  }
+
+  // Timing — one smooth consistent stagger WITHIN each sentence, a single pause BETWEEN sentences.
+  const wordsStart = 0.5;
+  const wordStagger = 0.16; // reading-pace word stagger inside a sentence (consistent)
+  const wordDur = 0.5; // each word's rise+fade length
+  const sentencePause = 0.7; // the one structural break, between sentences
+  const sentStart: number[] = [];
+  let t = wordsStart;
+  for (let s = 0; s < sentCount; s++) {
+    sentStart.push(t);
+    const sentSize = sentOf.filter((x) => x === s).length;
+    // advance past this sentence's staggered words, then add the single between-sentence pause.
+    t += (sentSize - 1) * wordStagger + wordDur + sentencePause;
+  }
+  // Climax (final sentence): settle time → scale pop → underline swipe.
+  const emphSize = sentOf.filter((x) => x === emphSent).length;
+  const emphSettled = sentStart[emphSent] + (emphSize - 1) * wordStagger + wordDur;
+  const popAt = emphSettled - 0.06;
+  const emulAt = popAt + 0.16;
+  const wordsEnd = emphSettled;
+  const ruleAt = wordsEnd + 0.3;
+  const bylineAt = ruleAt + 0.42;
+  const minSec = bylineAt + 0.38 + (hasSource ? 0.4 : 0) + 3.6; // trailing reading hold ~9.5s total
+  const totalSec = Math.max(durationMs / 1000, minSec);
+
+  // Emit one entrance tween per NON-final sentence (a single smooth rise+fade, consistent stagger).
+  // The final sentence gets its own climax entrance below.
+  const sentTweens = [];
+  for (let s = 0; s < sentCount; s++) {
+    if (s === emphSent) continue;
+    sentTweens.push(
+      `tl.from('[data-s="${s}"]', { y: 28, opacity: 0, duration: ${wordDur.toFixed(2)}, ease: "power2.out", stagger: ${wordStagger} }, ${sentStart[s].toFixed(2)});`
+    );
+  }
+  const sentTweenJs = sentTweens.join("\n      ");
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1080px; overflow: hidden; background: ${data.paper}; }
+      #card { width: 1080px; height: 1080px; position: relative; display: flex; justify-content: center; align-items: center; background: ${data.paper}; }
+      /* Paper tooth: faint film grain tile + a warm vignette so the off-white reads as printed stock. */
+      #grain { position: absolute; inset: 0; background-image: url("${grainDataUri()}"); background-repeat: repeat; opacity: 0.9; pointer-events: none; }
+      #vig { position: absolute; inset: 0; background: radial-gradient(120% 120% at 50% 42%, transparent 55%, rgba(0,0,0,0.10) 100%); pointer-events: none; }
+      #b1 { position: absolute; inset: 44px; border: 1.5px solid ${data.ink}; }
+      #b2 { position: absolute; inset: 52px; border: 0.75px solid ${data.ink}; opacity: 0.55; }
+      #cb { position: relative; max-width: 840px; padding: 0 80px; text-align: center; color: ${data.ink}; }
+      /* Oversized opening quotation mark — the lead-in ornament, pulled tight above the quote. */
+      #qm { font-family: ${serif}; font-size: 200px; line-height: 0.62; font-weight: 700; color: ${data.accent}; height: 96px; margin-bottom: 2px; }
+      #qt { font-family: ${serif}; font-size: ${fontSize}px; line-height: 1.34; font-weight: 500; letter-spacing: 0.004em; }
+      .w { display: inline-block; white-space: nowrap; will-change: transform, opacity; }
+      .em { color: ${data.accent}; font-weight: 700; }
+      /* Emphasis run wrapper: hosts the underline swipe directly under the accent phrase. */
+      #emph { position: relative; display: inline; }
+      #emul { position: absolute; left: 0; right: 0; bottom: -2px; height: 4px; background: ${data.accent}; border-radius: 2px; transform-origin: 0% 50%; }
+      #rl { width: 64px; height: 2px; background: ${data.accent}; margin: 50px auto 22px; }
+      #at { font-family: ${serif}; font-size: 27px; text-transform: uppercase; letter-spacing: 0.34em; font-weight: 600; color: ${data.ink}; padding-left: 0.34em; }
+      ${hasSource ? `#sl { position: absolute; bottom: 80px; left: 0; right: 0; text-align: center; font-family: ${serif}; font-size: 32px; text-transform: uppercase; letter-spacing: 0.08em; color: ${data.ink}; white-space: nowrap; }` : ""}
+    </style>
+  </head>
+  <body>
+    <div id="card" data-composition-id="main" data-start="0" data-duration="${totalSec.toFixed(2)}" data-width="1080" data-height="1080">
+      <div id="grain"></div>
+      <div id="vig"></div>
+      <div id="b1"></div>
+      <div id="b2"></div>
+      <div id="cb">
+        <div id="qm">&ldquo;</div>
+        <div id="qt">${wordHtml}</div>
+        <div id="rl"></div>
+        <div id="at">${esc(data.attribution)}</div>
+      </div>
+      ${hasSource ? `<div id="sl">${esc(data.source!)}</div>` : ""}
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // Words are revealed by the per-sentence from() tweens below — each applies its own hidden
+      // start state (opacity 0 + a gentle rise) via immediateRender, so DON'T gsap.set(".w") to 0
+      // here (that would poison every from() target to 0 and the words would never appear).
+      gsap.set("#qm", { opacity: 0, y: -60, scale: 0.7, transformOrigin: "50% 100%" });
+      gsap.set("#emul", { scaleX: 0, opacity: 0 });
+      gsap.set("#rl", { scaleX: 0, opacity: 0, transformOrigin: "0% 50%" });
+      gsap.set("#at", { opacity: 0, y: 18 });
+      ${hasSource ? 'gsap.set("#sl", { opacity: 0 });' : ""}
+
+      // CONTINUOUS background life (low amplitude, whole duration) so the frame is never dead:
+      // a slow vignette breathe. The grain tile stays STATIC (re-painting the turbulence-filled
+      // tile every frame trips HyperFrames' capture-size limit) — the breathe alone keeps the
+      // frame alive. A FINITE repeat count (not -1) keeps the captured clip length bounded.
+      gsap.set("#vig", { opacity: 0.85 });
+      tl.to("#vig", { opacity: 1.0, duration: 3.4, ease: "sine.inOut", yoyo: true, repeat: ${Math.max(1, Math.ceil(totalSec / 3.4))} }, 0.0);
+
+      // Oversized quote mark settles in with an elastic drop + scale.
+      tl.to("#qm", { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "elastic.out(1.05, 0.6)" }, 0.0);
+
+      // Each NON-final sentence reveals as ONE smooth gentle rise+fade at a single consistent
+      // reading-pace stagger. The only break is the pause BETWEEN sentences (baked into the start
+      // times). No mid-sentence pauses, no varied per-word directions.
+      ${sentTweenJs}
+
+      // After the between-sentence pause, the FINAL sentence lands as the climax: the same calm
+      // rise+fade (accent color is already on .em), then a slight scale pop + an underline swipe.
+      tl.from('[data-s="${emphSent}"]', { y: 28, opacity: 0, duration: ${wordDur.toFixed(2)}, ease: "power2.out", stagger: ${wordStagger} }, ${sentStart[emphSent].toFixed(2)});
+      // Slight scale pop as the closing sentence settles.
+      tl.to("#emph", { scale: 1.06, duration: 0.24, ease: "back.out(1.8)", transformOrigin: "50% 100%" }, ${popAt.toFixed(2)});
+      tl.to("#emph", { scale: 1, duration: 0.32, ease: "power2.out" }, ">-0.02");
+      // Accent underline swipes left→right beneath the closing sentence.
+      tl.to("#emul", { opacity: 1, scaleX: 1, duration: 0.34, ease: "power3.out" }, ${emulAt.toFixed(2)});
+
+      // House rule wipes in from the left, then the byline rises in.
+      tl.to("#rl", { opacity: 1, scaleX: 1, duration: 0.32, ease: "power3.out" }, ${ruleAt.toFixed(2)});
+      tl.to("#at", { opacity: 0.85, y: 0, duration: 0.36, ease: "power2.out" }, ${bylineAt.toFixed(2)});
+      ${hasSource ? `tl.to("#sl", { opacity: 0.55, duration: 0.32, ease: "power1.in" }, ${(bylineAt + 0.42).toFixed(2)});` : ""}
+      // Anchor end
+      tl.to("#card", { opacity: 1, duration: 0.001 }, ${(totalSec - 0.001).toFixed(3)});
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
+`;
+}
+
+
+// Render an animated MP4 companion for a quote card from its text content — kinetic typographic
+// reveal, no image. Free, local, deterministic — same HyperFrames toolchain as renderMotionBg.
+// Default 5 s: snappy editorial reveal (text animates in over ~2.5s) + 2.5s reading hold.
+export function renderCardAnimation(data: CardData, outPath: string, durationMs = 5_000): void {
+  const proj = join(tmpdir(), `hf-card-${Date.now().toString(36)}`);
+  const assets = join(proj, "assets");
+  mkdirSync(assets, { recursive: true });
+  try {
+    writeFileSync(join(proj, "hyperframes.json"), HF_CONFIG);
+    writeFileSync(join(proj, "index.html"), buildCardMotionComposition(data, durationMs));
+    execFileSync("npx", ["--yes", `hyperframes@${HF_VERSION}`, "render"], {
+      cwd: proj,
+      stdio: ["ignore", "inherit", "inherit"],
+    });
+    const rendersDir = join(proj, "renders");
+    const mp4 = existsSync(rendersDir)
+      ? readdirSync(rendersDir)
+          .filter((f) => f.endsWith(".mp4"))
+          .map((f) => join(rendersDir, f))
+          .sort()
+          .pop()
+      : undefined;
+    if (!mp4) throw new Error(`HyperFrames produced no mp4 in ${rendersDir}`);
+    copyFileSync(mp4, outPath);
+    console.log(`hyperframes: animated card → ${basename(outPath)}`);
+  } finally {
+    rmSync(proj, { recursive: true, force: true });
+  }
+}
+
 // Render the silent motion-graphics visual from the scene stills to `outPath` (an mp4).
 export function renderMotionBg(stillPaths: string[], durationMs: number, outPath: string): void {
   const proj = join(tmpdir(), `hf-motion-${Date.now().toString(36)}`);

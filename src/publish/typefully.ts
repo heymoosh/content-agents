@@ -6,7 +6,7 @@ import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { loadCtaConfig, loadCanonicalUrl, resolveCta } from "./cta.js";
+import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
@@ -186,6 +186,7 @@ async function main() {
   const setId = await socialSetId();
   const cfg = loadCtaConfig();
   const canonicalUrl = loadCanonicalUrl(folder);
+  const sourceKind = loadSourceKind(folder);
   const maxMap = loadPlatformMax();
 
   // Claim an explicit publish time per row from the unified scheduler (config/platforms.yaml
@@ -220,7 +221,7 @@ async function main() {
     const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
 
     // Resolve the CTA link (shared funnel layer — src/publish/cta.ts), then place it per cta.yaml.
-    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg);
+    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
     if (usedFallback) {
       console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
     }

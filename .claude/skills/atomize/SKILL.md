@@ -178,6 +178,16 @@ directly and spreads the ones worth spreading.
    as a routing target, so a note is never reposted back to where it came from. Muxin still approves
    every draft in `review-queue.md` before `/publish`.
 
+   **Quote card for a note.** The note body IS the quotable unit, so the quote card uses the whole
+   note, not a sub-sentence. Put the entire note body in `quote-card-1.md` with `source_lines`
+   pointing at the body line(s). If the full body runs past ~280 characters (it turns unreadable at
+   card font sizes), take the strongest self-contained sentence(s) that stand as a complete thought
+   without the rest of the note. Never use the `title` frontmatter field as the quote source: for a
+   note that field is an 80-char synthetic truncation (`noteTitle()` cuts the first 80 chars, often
+   mid-sentence), not a verbatim excerpt, and quoting it is what produced the broken, nonsensical
+   cards. Strip em dashes per voice rules, and set `cta_label: "Full note (free to subscribe):"`
+   rather than the essay CTA, since this is a note.
+
 ## Spin mode — /atomize --spin (opt-in audience-fit experiment)
 
 Default atomization is verbatim extraction. **Spin is the one exception**, and it runs ONLY when

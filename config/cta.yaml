@@ -55,3 +55,7 @@ placement:               # WHERE the link goes per platform (from Branding/.../P
 # - A derivative can override the pillar default by setting its own `cta:` in frontmatter — a
 #   literal url (e.g. a civic-leaning Bluesky post on a human-ai essay → the voting tool), or
 #   `none` for no link.
+# - Note-derived content (source_kind: substack-note) links to the ORIGINAL note by default: an
+#   empty `cta` on a note resolves to the note's own canonical_url (a Note is itself the
+#   destination). Enforced in src/publish/cta.ts, scoped to notes — essays are unaffected. An
+#   explicit `cta: none` or a literal url on a note derivative still wins.
