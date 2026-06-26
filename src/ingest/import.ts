@@ -11,6 +11,17 @@ const INBOX = join(repoRoot, "data", "inbox");
 const PROCESSED = join(repoRoot, "data", "processed");
 const PLATFORMS = ["x", "linkedin", "substack"] as const;
 
+function toMediaType(format: ImportRow["format"]): "text" | "quote-card" | "video" | "note" | "unknown" {
+  switch (format) {
+    case "video": return "video";
+    case "image": return "quote-card";
+    case "text":
+    case "thread":
+    case "newsletter": return "text";
+    default: return "unknown";
+  }
+}
+
 async function parseEntry(platform: string, path: string, isDir: boolean): Promise<ImportRow[]> {
   const name = basename(path);
   switch (platform) {
@@ -48,13 +59,14 @@ export async function runImport(): Promise<void> {
   const now = new Date().toISOString();
 
   const upsertPost = db.prepare(`
-    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format)
-    VALUES (@platform, @platformPostId, @postedAt, @url, @contentText, @format)
+    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type)
+    VALUES (@platform, @platformPostId, @postedAt, @url, @contentText, @format, @mediaType)
     ON CONFLICT(platform, platform_post_id) DO UPDATE SET
       posted_at = COALESCE(excluded.posted_at, posts.posted_at),
       url = COALESCE(excluded.url, posts.url),
       content_text = COALESCE(excluded.content_text, posts.content_text),
-      format = COALESCE(excluded.format, posts.format)
+      format = COALESCE(excluded.format, posts.format),
+      media_type = COALESCE(excluded.media_type, posts.media_type)
     RETURNING id
   `);
   const insertMetrics = db.prepare(`
@@ -97,7 +109,7 @@ export async function runImport(): Promise<void> {
         const audienceRows = await parseAudienceFor(platform, path, isDir);
         const tx = db.transaction(() => {
           for (const row of rows) {
-            const { id } = upsertPost.get(row) as { id: number };
+            const { id } = upsertPost.get({ ...row, mediaType: toMediaType(row.format) }) as { id: number };
             insertMetrics.run(
               id,
               now,

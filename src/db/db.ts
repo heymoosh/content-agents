@@ -21,10 +21,20 @@ export function openDb(): Database.Database {
   if (!cols.some((c) => c.name === "source")) {
     db.exec("ALTER TABLE posts ADD COLUMN source TEXT");
   }
-  // Index OUTSIDE the column guard (and not in schema.sql, which runs before this migration):
-  // the column is guaranteed to exist by here (CREATE TABLE on a fresh DB, ALTER above on a legacy
-  // one), and CREATE INDEX IF NOT EXISTS is idempotent.
+  if (!cols.some((c) => c.name === "media_type")) {
+    db.exec("ALTER TABLE posts ADD COLUMN media_type TEXT");
+    // Backfill from format column so existing rows are immediately queryable.
+    db.exec(`UPDATE posts SET media_type = CASE
+      WHEN format = 'video'                          THEN 'video'
+      WHEN format = 'image'                          THEN 'quote-card'
+      WHEN format IN ('text', 'thread', 'newsletter') THEN 'text'
+      ELSE 'unknown'
+    END WHERE media_type IS NULL`);
+  }
+  // Indexes OUTSIDE the column guards (and not in schema.sql, which runs before these migrations):
+  // columns are guaranteed to exist by here, and CREATE INDEX IF NOT EXISTS is idempotent.
   db.exec("CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_posts_media_type ON posts(media_type)");
   return db;
 }
 

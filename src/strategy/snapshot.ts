@@ -17,6 +17,7 @@ interface PostStat {
   url: string | null;
   content_text: string | null;
   pillar: string | null;
+  media_type: string | null;
   impressions: number | null;
   likes: number | null;
   replies: number | null;
@@ -45,7 +46,7 @@ function main() {
   const db = openDb();
   const posts = db
     .prepare(
-      `SELECT p.id, p.platform, p.posted_at, p.url, p.content_text, p.pillar,
+      `SELECT p.id, p.platform, p.posted_at, p.url, p.content_text, p.pillar, p.media_type,
               m.impressions, m.likes, m.replies, m.reposts, m.clicks, m.new_follows
        FROM posts p LEFT JOIN (${LATEST_METRICS}) m ON m.post_id = p.id`
     )
@@ -115,6 +116,37 @@ function main() {
       `\n> ⚠ ${untaggedCount} posts untagged — run \`npm run snapshot -- --untagged\`, assign pillars, write back with \`tsx src/db/tag-posts.ts\`.`
     );
   }
+
+  // Media-type x platform engagement breakdown — shows which content formats drive engagement per channel.
+  const withType = posts.filter((p) => p.media_type && p.media_type !== "unknown");
+  if (withType.length > 0) {
+    console.log(`\n## Format breakdown (platform × media type)\n`);
+    console.log(
+      `Cell = posts | avg engagement (replies ×3, reposts ×2, likes ×1) | avg impressions\n`
+    );
+    const mediaTypes = [...new Set(withType.map((p) => p.media_type!))].sort();
+    console.log(`| Platform | ${mediaTypes.join(" | ")} |`);
+    console.log(`|---|${mediaTypes.map(() => "---").join("|")}|`);
+    for (const pl of platforms) {
+      const cell = (mt: string): string => {
+        const group = withType.filter((p) => p.platform === pl && p.media_type === mt);
+        if (group.length === 0) return "—";
+        const withMetrics = group.filter((p) => p.impressions != null || p.likes != null);
+        const avgEng =
+          withMetrics.length > 0
+            ? (withMetrics.reduce((s, p) => s + engagement(p), 0) / withMetrics.length).toFixed(1)
+            : "—";
+        const avgImp =
+          withMetrics.length > 0
+            ? Math.round(withMetrics.reduce((s, p) => s + (p.impressions ?? 0), 0) / withMetrics.length)
+            : "—";
+        return `n=${group.length} | eng ${avgEng} | imp ${avgImp}`;
+      };
+      console.log(`| ${pl} | ${mediaTypes.map((mt) => cell(mt)).join(" | ")} |`);
+    }
+    console.log(`\n> text = plain post; quote-card = image card from /atomize; video = short-form video; note = Substack Note`);
+  }
+
   db.close();
 }
 
