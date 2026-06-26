@@ -102,15 +102,9 @@ async function renderStill(
   } catch {
     // no source.md (e.g. a bare quote) — render without the source line
   }
-  // Optional emphasis phrase for the ANIMATED card — a verbatim span of the quote that lands in the
-  // accent color with a kinetic pop. Extraction-first: it must be a contiguous substring of the
-  // quote; the animator falls back to the quote's closing clause if absent or unmatched. The static
-  // PNG ignores it (the QuoteCard schema doesn't read it). Frontmatter: `emphasis: "..."`.
-  const emphasis = typeof fm.emphasis === "string" ? fm.emphasis : undefined;
   // Quote cards are purely typographic (New Yorker style), no illustration background.
   // (Muxin's call, June 2026: "just quotes, not illustrations.") The quote IS the design.
   const props = { quote, attribution: "Muxin Li", source, ...resolveScheme(fm) };
-  const animProps = { ...props, emphasis };
 
   await withJob(async (jobDir, _jobName) => {
     const propsFile = join(jobDir, "props.json");
@@ -120,9 +114,10 @@ async function renderStill(
   });
 
   // Animated companion — free (HyperFrames, local headless Chrome). Always produced alongside
-  // the static PNG so a notes card emits both without extra steps.
+  // the static PNG so a notes card emits both without extra steps. The animation's accent climax
+  // is the verbatim closing sentence (chosen in hyperframes.ts), so no extra props are needed.
   const animPath = join(folder, "images", `${quoteName}.mp4`);
-  renderCardAnimation(animProps, animPath);
+  renderCardAnimation(props, animPath);
 }
 
 async function renderVideo(folder: string, profile?: ImageProfile): Promise<void> {

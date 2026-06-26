@@ -88,65 +88,10 @@ export interface CardData {
   paper: string;
   ink: string;
   accent: string;
-  // Optional verbatim span of `quote` to land in the accent color with a scale/weight pop.
-  // MUST be a contiguous substring of `quote` (extraction-first: no composed copy). If absent
-  // or not found, the card auto-picks the closing clause so every card still gets one accent beat.
-  emphasis?: string;
 }
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-// Normalize a token for emphasis matching (strip surrounding punctuation, lowercase).
-function normWord(w: string): string {
-  return w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").toLowerCase();
-}
-
-const STOP = new Set([
-  "the", "a", "an", "and", "or", "but", "if", "of", "to", "in", "on", "at", "by", "for",
-  "is", "are", "was", "were", "be", "been", "it", "its", "that", "this", "as", "from",
-  "not", "no", "do", "does", "can", "we", "you", "they", "i", "he", "she", "with", "so",
-  "what", "who", "which", "than", "then", "only", "have", "has", "had", "about",
-]);
-
-// Choose which words (by index) land in the accent color. Extraction-first: the phrase is always a
-// contiguous run of words already in the quote. Prefer the caller's verbatim `emphasis`; else fall
-// back to the quote's CLOSING clause (after the last sentence break, capped to a tidy 2–4 words),
-// which is where Muxin's lines tend to land their point. Returns a Set of word indices to accent.
-function pickEmphasisIndices(words: string[], emphasis?: string): Set<number> {
-  const norm = words.map(normWord);
-  // 1. Honor an explicit verbatim emphasis span if it matches a contiguous run.
-  if (emphasis && emphasis.trim()) {
-    const want = emphasis.trim().split(/\s+/).map(normWord).filter(Boolean);
-    if (want.length) {
-      for (let i = 0; i + want.length <= words.length; i++) {
-        let ok = true;
-        for (let j = 0; j < want.length; j++) {
-          if (norm[i + j] !== want[j]) { ok = false; break; }
-        }
-        if (ok) {
-          const out = new Set<number>();
-          for (let j = 0; j < want.length; j++) out.add(i + j);
-          return out;
-        }
-      }
-    }
-  }
-  // 2. Fallback: the closing clause. Find the start of the final sentence/clause (after the last
-  // word that ends in . ; : before the tail), then take its meaningful words (drop trailing stop
-  // words), capped to the last 4 so the accent beat stays tight.
-  let clauseStart = 0;
-  for (let i = 0; i < words.length - 1; i++) {
-    if (/[.;:]$/.test(words[i].trim())) clauseStart = i + 1;
-  }
-  let end = words.length - 1;
-  while (end > clauseStart && STOP.has(norm[end])) end--; // drop trailing stop words
-  let start = Math.max(clauseStart, end - 3);
-  while (start < end && STOP.has(norm[start])) start++; // trim leading stop words
-  const out = new Set<number>();
-  for (let i = start; i <= end; i++) out.add(i);
-  return out;
 }
 
 // A self-contained SVG film-grain tile as a data URI, used as a tiling background-image on the
@@ -193,8 +138,7 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
 
   // Sentences drive the reveal; the LAST sentence is the emphasis/climax (verbatim, so extraction-
   // first holds trivially). Its words carry .em (accent color); the run wraps in #emph for one
-  // underline swipe. (data.emphasis / pickEmphasisIndices stay available but the sentence-level
-  // climax is the design now — the whole closing sentence is the accent beat.)
+  // underline swipe. The whole closing sentence is the accent beat.
   const sentOf = splitSentences(words);
   const sentCount = sentOf[sentOf.length - 1] + 1;
   const emphSent = sentCount - 1;
