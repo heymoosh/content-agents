@@ -162,56 +162,144 @@ function grainDataUri(): string {
   return `data:image/svg+xml;charset=utf-8,${svg}`;
 }
 
-// Build a HyperFrames composition for a square (1:1) quote card — editorial print look + kinetic
-// reveal. Screen-print paper (subtle grain + a warm vignette), a high-contrast display serif, an
-// OVERSIZED accent quotation mark, a hairline rule + tracked "MUXIN LI" byline footer. Each word
-// rises through an overflow:hidden slot AND fades in on eased timing (reading-pace stagger kept),
-// then the chosen verbatim emphasis phrase lands in the accent color with a scale/weight pop and a
-// hairline accent underline swipes beneath it. Matches the static Remotion card's DNA, dialed up.
+// Split the quote into phrase GROUPS — the unit of entrance choreography. Groups break on clause
+// punctuation (, ; : .) and cap at ~3 words so long clauses read as lines; a lone leading stop word
+// merges forward so "It can" rides with its clause. The emphasis run is forced into its OWN group so
+// it can land as a distinct held climax. Returns each word's group index (parallel to `words`).
+function groupWords(words: string[], emph: Set<number>): number[] {
+  const emphIdx = [...emph].sort((a, b) => a - b);
+  const emphStart = emphIdx[0];
+  const emphEnd = emphIdx[emphIdx.length - 1];
+  const norm = words.map(normWord);
+  const groupOf = new Array<number>(words.length).fill(0);
+  let g = -1;
+  let lenInGroup = 0;
+  let inEmph = false;
+  for (let i = 0; i < words.length; i++) {
+    const atEmphStart = i === emphStart;
+    const atEmphEnd = i === emphEnd;
+    // The emphasis run is its own group: open it at emphStart, never break inside it.
+    if (atEmphStart) {
+      g++;
+      lenInGroup = 0;
+      inEmph = true;
+    } else if (inEmph) {
+      // stay in the emphasis group until past its end
+    } else {
+      const prevEndsClause = i > 0 && /[,;:.]$/.test(words[i - 1].trim());
+      const startNew = g < 0 || prevEndsClause || lenInGroup >= 3;
+      if (startNew) {
+        g++;
+        lenInGroup = 0;
+      }
+    }
+    groupOf[i] = g;
+    lenInGroup++;
+    if (atEmphEnd) inEmph = false;
+  }
+  return groupOf;
+}
+
+// Build a HyperFrames composition for a square (1:1) quote card — editorial print look + VARIED
+// kinetic choreography. Same look as before (screen-print paper grain + warm vignette, teal
+// keyline, OVERSIZED accent quote mark, Didone serif, hairline rule + MUXIN LI byline). The MOTION
+// is grouped by phrase: each phrase enters as a unit with its OWN vector + easing — rise, settle
+// from above, a slight horizontal drift, or a scale-from-94% — alternating so no two consecutive
+// lines move alike. A held beat lets the line before the emphasis settle, then the emphasis phrase
+// lands as the climax (overshoot entrance + accent scale pop + underline swipe). A low-amplitude
+// vignette breathe + slow grain drift keep the frame alive between reveals. Reading pace preserved.
 function buildCardMotionComposition(data: CardData, durationMs: number): string {
   const len = data.quote.length;
   const words = data.quote.trim().split(/\s+/);
-  const wordCount = words.length;
   const fontSize = len > 160 ? 50 : len > 110 ? 60 : len > 70 ? 72 : 88;
-  // Slot height clips each word as it rises — line-height px + descender room
-  const slotH = Math.round(fontSize * 1.45);
   const serif = "'Didot', 'Bodoni 72', 'Hoefler Text', Georgia, 'Times New Roman', serif";
   const hasSource = !!(data.source && data.source.length > 0);
 
   // Which words land in the accent color (extraction-first: always a contiguous verbatim run).
   const emph = pickEmphasisIndices(words, data.emphasis);
-  // The accent-underline swipe spans only the emphasis run; place it as a flowing inline group so
-  // the rule sits exactly under those words wherever they wrap.
   const emphIdx = [...emph].sort((a, b) => a - b);
   const emphStart = emphIdx[0];
   const emphEnd = emphIdx[emphIdx.length - 1];
 
-  // Each word is an overflow:hidden slot (.ws); the word itself (.wc) rises + fades through it.
-  // Emphasis words carry .em (accent color + heavier weight); the run is wrapped in #emph so one
-  // underline swipe can sit under the whole phrase. Spaces between slots are real text nodes so
-  // lines wrap naturally.
+  // Phrase groups + which group is the emphasis run.
+  const groupOf = groupWords(words, emph);
+  const groupCount = groupOf[groupOf.length - 1] + 1;
+  const emphGroup = groupOf[emphStart];
+
+  // Each word carries its group index (data-g). Emphasis words add .em (accent color + weight); the
+  // run is wrapped in #emph so one underline swipe sits under the whole phrase. Real-text-node
+  // spaces between words keep natural line wrapping. No overflow clip now — entrances vary by
+  // vector, so the word animates its own transform + fade rather than rising through a slot.
   let wordHtml = "";
   for (let i = 0; i < words.length; i++) {
     if (i === emphStart) wordHtml += `<span id="emph"><span id="emul"></span>`;
-    const cls = emph.has(i) ? "ws em" : "ws";
-    wordHtml += `<span class="${cls}"><span class="wc">${esc(words[i])}</span></span>`;
+    const cls = emph.has(i) ? "w em" : "w";
+    wordHtml += `<span class="${cls}" data-g="${groupOf[i]}">${esc(words[i])}</span>`;
     if (i === emphEnd) wordHtml += `</span>`;
     if (i < words.length - 1) wordHtml += " ";
   }
 
-  // Timing: one word every 0.30 s at reading pace
-  const wordStagger = 0.30;
-  const wordDur = 0.36;
-  const wordsStart = 0.45;
-  const lastWordStart = wordsStart + (wordCount - 1) * wordStagger;
-  const wordsEnd = lastWordStart + wordDur;
-  // The emphasis pop fires as its last word settles; underline swipes right after.
-  const popAt = wordsStart + emphEnd * wordStagger + wordDur * 0.5;
-  const emulAt = popAt + 0.18;
-  const ruleAt = wordsEnd + 0.30;
+  // Entrance palette — one per group, chosen so consecutive groups never share a vector. Each is a
+  // {from, ease} GSAP recipe applied to the group's words (with a small intra-group stagger so a
+  // phrase reads as a unit, not a metronome). Index picked by walking the palette and skipping the
+  // previous group's choice; the emphasis group gets a dedicated overshoot recipe (handled below).
+  const palette = [
+    { name: "rise", from: "{ y: 46, opacity: 0 }", ease: "power3.out" },
+    { name: "settle", from: "{ y: -34, opacity: 0 }", ease: "power2.out" }, // drop from above
+    { name: "drift", from: "{ x: -30, opacity: 0 }", ease: "power2.out" }, // horizontal slide
+    { name: "scale", from: "{ scale: 0.94, opacity: 0, transformOrigin: '50% 60%' }", ease: "back.out(1.5)" },
+  ];
+  const groupStyle: number[] = [];
+  for (let g = 0; g < groupCount; g++) {
+    let pick = g % palette.length;
+    if (g > 0 && pick === groupStyle[g - 1]) pick = (pick + 1) % palette.length;
+    groupStyle.push(pick);
+  }
+
+  // Rhythm — varied gaps between group entrances (not a constant per-word stagger). Quick clusters
+  // for short groups, a longer hold before the emphasis (so the prior line lands first) and a small
+  // breath after a sentence-ending group. Returns the start time of each group.
+  const wordsStart = 0.5;
+  const intraStagger = 0.06; // within-group word stagger
+  const groupDur = 0.5; // entrance tween length
+  const groupStart: number[] = [];
+  let t = wordsStart;
+  for (let g = 0; g < groupCount; g++) {
+    groupStart.push(t);
+    const groupSize = groupOf.filter((x) => x === g).length;
+    const lastWord = groupOf.lastIndexOf(g);
+    const endsSentence = /[.;:]$/.test(words[lastWord].trim());
+    // base gap scales gently with group size; clusters stay quick.
+    let gap = 0.46 + (groupSize - 1) * intraStagger;
+    if (endsSentence) gap += 0.16; // breath after a full stop
+    if (g + 1 === emphGroup) gap += 0.5; // HELD beat before the emphasis climax
+    t += gap;
+  }
+  // The emphasis group's start, its pop, and the underline swipe.
+  const emphStartT = groupStart[emphGroup];
+  const emphSize = groupOf.filter((x) => x === emphGroup).length;
+  const emphSettled = emphStartT + (emphSize - 1) * intraStagger + groupDur;
+  const popAt = emphSettled - 0.08;
+  const emulAt = popAt + 0.16;
+  const lastGroupStart = groupStart[groupCount - 1];
+  const lastGroupSize = groupOf.filter((x) => x === groupCount - 1).length;
+  const wordsEnd = Math.max(emphSettled, lastGroupStart + (lastGroupSize - 1) * intraStagger + groupDur);
+  const ruleAt = wordsEnd + 0.3;
   const bylineAt = ruleAt + 0.42;
-  const minSec = bylineAt + 0.38 + (hasSource ? 0.40 : 0) + 3.2;
+  const minSec = bylineAt + 0.38 + (hasSource ? 0.4 : 0) + 3.6; // trailing reading hold ~9.5s total
   const totalSec = Math.max(durationMs / 1000, minSec);
+
+  // Emit the per-group entrance tweens (each targets [data-g="g"] words, minus the emphasis group
+  // which gets its own overshoot entrance). Built as JS strings injected into the timeline script.
+  const groupTweens = [];
+  for (let g = 0; g < groupCount; g++) {
+    if (g === emphGroup) continue;
+    const sty = palette[groupStyle[g]];
+    groupTweens.push(
+      `tl.from('[data-g="${g}"]', { ...${sty.from}, duration: ${groupDur.toFixed(2)}, ease: "${sty.ease}", stagger: ${intraStagger} }, ${groupStart[g].toFixed(2)});`
+    );
+  }
+  const groupTweenJs = groupTweens.join("\n      ");
 
   return `<!doctype html>
 <html lang="en">
@@ -231,9 +319,8 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       /* Oversized opening quotation mark — the lead-in ornament, pulled tight above the quote. */
       #qm { font-family: ${serif}; font-size: 200px; line-height: 0.62; font-weight: 700; color: ${data.accent}; height: 96px; margin-bottom: 2px; }
       #qt { font-family: ${serif}; font-size: ${fontSize}px; line-height: 1.34; font-weight: 500; letter-spacing: 0.004em; }
-      .ws { display: inline-block; overflow: hidden; vertical-align: bottom; height: ${slotH}px; }
-      .wc { display: inline-block; white-space: nowrap; }
-      .em .wc { color: ${data.accent}; font-weight: 700; }
+      .w { display: inline-block; white-space: nowrap; will-change: transform, opacity; }
+      .em { color: ${data.accent}; font-weight: 700; }
       /* Emphasis run wrapper: hosts the underline swipe directly under the accent phrase. */
       #emph { position: relative; display: inline; }
       #emul { position: absolute; left: 0; right: 0; bottom: -2px; height: 4px; background: ${data.accent}; border-radius: 2px; transform-origin: 0% 50%; }
@@ -260,26 +347,40 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
       window.__timelines = window.__timelines || {};
       const tl = gsap.timeline({ paused: true });
 
-      // Each word starts below its slot (clipped by overflow:hidden on .ws) and transparent.
-      gsap.set(".wc", { yPercent: 110, opacity: 0 });
+      // Words are revealed by the per-group from() tweens below — each applies its own hidden
+      // start state (opacity 0 + a vector) via immediateRender, so DON'T gsap.set(".w") to 0 here
+      // (that would poison every from() target to 0 and the words would never appear).
       gsap.set("#qm", { opacity: 0, y: -60, scale: 0.7, transformOrigin: "50% 100%" });
       gsap.set("#emul", { scaleX: 0, opacity: 0 });
       gsap.set("#rl", { scaleX: 0, opacity: 0, transformOrigin: "0% 50%" });
       gsap.set("#at", { opacity: 0, y: 18 });
       ${hasSource ? 'gsap.set("#sl", { opacity: 0 });' : ""}
 
+      // CONTINUOUS background life (low amplitude, whole duration) so the frame is never dead:
+      // a slow vignette breathe. The grain tile stays STATIC (re-painting the turbulence-filled
+      // tile every frame trips HyperFrames' capture-size limit) — the breathe alone keeps the
+      // frame alive. A FINITE repeat count (not -1) keeps the captured clip length bounded.
+      gsap.set("#vig", { opacity: 0.85 });
+      tl.to("#vig", { opacity: 1.0, duration: 3.4, ease: "sine.inOut", yoyo: true, repeat: ${Math.max(1, Math.ceil(totalSec / 3.4))} }, 0.0);
+
       // Oversized quote mark settles in with an elastic drop + scale.
       tl.to("#qm", { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "elastic.out(1.05, 0.6)" }, 0.0);
-      // Each word RISES through its slot and FADES in together — eased, never a hard cut.
-      tl.to(".wc", { yPercent: 0, opacity: 1, duration: ${wordDur.toFixed(2)}, stagger: ${wordStagger.toFixed(2)}, ease: "power3.out" }, ${wordsStart.toFixed(2)});
-      // The emphasis phrase lands with a brief scale/weight pop as it settles.
-      tl.fromTo("#emph", { scale: 1 }, { scale: 1.08, duration: 0.22, ease: "back.out(2.2)", transformOrigin: "50% 100%" }, ${popAt.toFixed(2)});
-      tl.to("#emph", { scale: 1, duration: 0.28, ease: "power2.out" }, ">-0.02");
+
+      // Phrase groups enter one at a time, each with its OWN vector + easing (rise / settle-from-
+      // above / horizontal drift / scale-from-94%), alternated so no two consecutive lines match.
+      ${groupTweenJs}
+
+      // HELD beat, then the EMPHASIS group lands as the climax: a distinct overshoot rise into
+      // place (accent color is already on .em), brighter and a touch slower than the other lines.
+      tl.from('[data-g="${emphGroup}"]', { y: 30, scale: 0.9, opacity: 0, transformOrigin: "50% 70%", duration: 0.6, ease: "back.out(2.4)", stagger: ${intraStagger} }, ${emphStartT.toFixed(2)});
+      // Scale/weight pop as it settles.
+      tl.to("#emph", { scale: 1.08, duration: 0.22, ease: "back.out(2.2)", transformOrigin: "50% 100%" }, ${popAt.toFixed(2)});
+      tl.to("#emph", { scale: 1, duration: 0.30, ease: "power2.out" }, ">-0.02");
       // Accent underline swipes left→right beneath the emphasis phrase.
       tl.to("#emul", { opacity: 1, scaleX: 1, duration: 0.34, ease: "power3.out" }, ${emulAt.toFixed(2)});
-      // House rule wipes in from the left.
+
+      // House rule wipes in from the left, then the byline rises in.
       tl.to("#rl", { opacity: 1, scaleX: 1, duration: 0.32, ease: "power3.out" }, ${ruleAt.toFixed(2)});
-      // Byline rises in.
       tl.to("#at", { opacity: 0.85, y: 0, duration: 0.36, ease: "power2.out" }, ${bylineAt.toFixed(2)});
       ${hasSource ? `tl.to("#sl", { opacity: 0.55, duration: 0.32, ease: "power1.in" }, ${(bylineAt + 0.42).toFixed(2)});` : ""}
       // Anchor end
