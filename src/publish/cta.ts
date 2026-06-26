@@ -44,16 +44,36 @@ export function loadCanonicalUrl(folder: string): string | null {
   }
 }
 
+// The content's `source_kind` from source.md (e.g. "substack-note"). Drives note-specific CTA
+// behavior below. Empty string when absent or unreadable.
+export function loadSourceKind(folder: string): string {
+  try {
+    const { fm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
+    return typeof fm.source_kind === "string" ? fm.source_kind.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 // Resolve a derivative's CTA to a concrete url + label. Mirrors the funnel rule: none/empty → no
 // link; `source` → the essay's canonical_url, falling back to the configured home; any other value
 // → a literal url. `usedFallback` lets callers note when `source` fell back to the homepage.
+//
+// Note-derived content (source_kind: substack-note) defaults to `source`: a Substack Note is itself
+// the destination, so a note card/post should link back to the original note. An empty `cta` on a
+// note resolves to the note's canonical_url instead of "no link". An explicit `cta: none` or a
+// literal url on the derivative still wins — only the EMPTY default is upgraded, and only for notes,
+// so non-note content (essays etc.) is completely unaffected.
 export function resolveCta(
   fm: Record<string, unknown>,
   canonicalUrl: string | null,
-  cfg: CtaConfig
+  cfg: CtaConfig,
+  sourceKind = ""
 ): { url: string | null; label: string; usedFallback: boolean } {
-  const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
+  let rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
   let label = typeof fm.cta_label === "string" ? fm.cta_label : "";
+  // Notes link to the original note by default: treat an empty cta as `source`.
+  if (sourceKind === "substack-note" && !rawCta) rawCta = "source";
   if (!rawCta || rawCta.toLowerCase() === "none") {
     return { url: null, label, usedFallback: false };
   }
