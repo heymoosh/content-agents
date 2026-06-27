@@ -32,10 +32,11 @@ function ingestNotes(notes: FetchedNote[]): number {
   const db = openDb();
   const now = new Date().toISOString();
   const upsertPost = db.prepare(`
-    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, source)
-    VALUES ('substack-note', ?, ?, ?, ?, 'note', 'organic')
+    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type, source)
+    VALUES ('substack-note', ?, ?, ?, ?, 'note', 'note', 'organic')
     ON CONFLICT(platform, platform_post_id) DO UPDATE SET
       content_text = excluded.content_text,
+      media_type = COALESCE(posts.media_type, excluded.media_type),
       source = COALESCE(posts.source, 'organic')
     RETURNING id
   `);
