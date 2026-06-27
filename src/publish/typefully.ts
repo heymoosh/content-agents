@@ -110,6 +110,25 @@ function buildPosts(
   return { posts: [{ text: body }, { text: ctaLine }], manualComment: null };
 }
 
+// Build the JSON body for POST /drafts. When `publishAt` is null we OMIT `publish_at` entirely,
+// which makes Typefully save an UNSCHEDULED draft (status not "scheduled", no scheduled_date) that
+// will NOT auto-post — it sits in the queue until a human schedules/publishes it. When `publishAt`
+// is a value (ISO time or "next-free-slot"), the draft IS scheduled and auto-fires at that time.
+// Exported so the unscheduled-draft contract is unit-testable and reused (notes-daily path).
+export function buildDraftPayload(opts: {
+  title: string;
+  platformKey: string;
+  posts: { text: string }[];
+  publishAt: string | null; // null/undefined → unscheduled saved draft (no auto-post)
+}): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    draft_title: opts.title,
+    platforms: { [opts.platformKey]: { enabled: true, posts: opts.posts } },
+  };
+  if (opts.publishAt) payload.publish_at = opts.publishAt;
+  return payload;
+}
+
 // Read-only: the live Typefully scheduled-draft queue, normalized for the unified view + --list.
 // No writes. Exported so queue-view.ts can merge it with the other channels.
 export type TypefullyScheduled = { whenIso: string; platforms: string[]; title: string };
@@ -184,6 +203,14 @@ async function main() {
     return;
   }
 
+  // UNSCHEDULED-draft mode: `--no-schedule` flag or TYPEFULLY_SCHEDULE=off. In this mode we skip
+  // claimSlots entirely and OMIT publish_at, so the created drafts are saved UNSCHEDULED and will
+  // NOT auto-post — they sit in Typefully until Muxin schedules/publishes the good ones by hand.
+  // Used by the daily notes cloud routine (src/cron/notes-daily.ts) so nothing fires automatically.
+  const noSchedule =
+    process.argv.includes("--no-schedule") ||
+    (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
+
   // Reuse guard: skip platforms where this slug was published too recently.
   // Pass --force-reuse to bypass the window and proceed anyway.
   const slug = basename(folder);
@@ -216,27 +243,32 @@ async function main() {
   // Claim an explicit publish time per row from the unified scheduler (config/platforms.yaml
   // cadence + shared ledger). Rows of a platform fill consecutive free slots; the ledger keeps
   // them from colliding with cards or a separate run. Platforms with no cadence → "next-free-slot".
+  // In --no-schedule mode we skip this entirely: no slot is claimed and publish_at stays unset.
   const byPlatform: Record<string, typeof approved> = {};
   for (const r of approved) (byPlatform[r.platform] ??= []).push(r);
   const slotByRow = new Map<string, string>(); // rowId → ISO publish_at | "next-free-slot"
   const whenByRow = new Map<string, string>(); // rowId → human label for logs
-  for (const [platform, rowsP] of Object.entries(byPlatform)) {
-    const { times, labels } = claimSlots({
-      windowKey: platform,
-      conflictPlatforms: [platform],
-      count: rowsP.length,
-      asset: `${basename(folder)}/${platform}`,
-      by: "typefully",
-    });
-    rowsP.forEach((r, i) => {
-      slotByRow.set(r.id, times[i] ?? "next-free-slot");
-      whenByRow.set(r.id, labels[i] ?? "next-free-slot");
-    });
-  }
-  console.log("Cadence schedule (PT):");
-  for (const [platform, rowsP] of Object.entries(byPlatform)) {
-    console.log(`  ${platform}:`);
-    for (const r of rowsP) console.log(`    ${r.id} → ${whenByRow.get(r.id)}`);
+  if (noSchedule) {
+    console.log("Unscheduled-draft mode (--no-schedule): no slots claimed, drafts saved without a publish time.");
+  } else {
+    for (const [platform, rowsP] of Object.entries(byPlatform)) {
+      const { times, labels } = claimSlots({
+        windowKey: platform,
+        conflictPlatforms: [platform],
+        count: rowsP.length,
+        asset: `${basename(folder)}/${platform}`,
+        by: "typefully",
+      });
+      rowsP.forEach((r, i) => {
+        slotByRow.set(r.id, times[i] ?? "next-free-slot");
+        whenByRow.set(r.id, labels[i] ?? "next-free-slot");
+      });
+    }
+    console.log("Cadence schedule (PT):");
+    for (const [platform, rowsP] of Object.entries(byPlatform)) {
+      console.log(`  ${platform}:`);
+      for (const r of rowsP) console.log(`    ${r.id} → ${whenByRow.get(r.id)}`);
+    }
   }
 
   for (const row of approved) {
@@ -263,13 +295,13 @@ async function main() {
       console.log(`  ↳ uploaded ${basename(mediaPath)} → media attached to ${row.id}`);
     }
 
-    const publishAt = slotByRow.get(row.id) ?? "next-free-slot";
-    const when = whenByRow.get(row.id) ?? "next-free-slot";
-    const draftBody = JSON.stringify({
-      draft_title: `${row.id} (content-agents)`,
-      publish_at: publishAt,
-      platforms: { [platformKey]: { enabled: true, posts } },
-    });
+    // Scheduled mode → claimed slot (or "next-free-slot"). Unscheduled mode → publishAt = null,
+    // so buildDraftPayload omits publish_at and Typefully saves a non-firing draft.
+    const publishAt = noSchedule ? null : slotByRow.get(row.id) ?? "next-free-slot";
+    const when = noSchedule ? "unscheduled" : whenByRow.get(row.id) ?? "next-free-slot";
+    const draftBody = JSON.stringify(
+      buildDraftPayload({ title: `${row.id} (content-agents)`, platformKey, posts, publishAt })
+    );
     // Uploaded video can still be transcoding for a few seconds — retry the draft on "processing".
     let draft: { id?: string | number; share_url?: string };
     for (let attempt = 0; ; attempt++) {
@@ -295,8 +327,9 @@ async function main() {
       appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
     }
     appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, body);
+    const verb = noSchedule ? "saved (unscheduled)" : "scheduled";
     console.log(
-      `scheduled: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
+      `${verb}: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
         (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
     );
   }
