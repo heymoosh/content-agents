@@ -185,20 +185,26 @@ async function main() {
   }
 
   // Reuse guard: skip platforms where this slug was published too recently.
+  // Pass --force-reuse to bypass the window and proceed anyway.
   const slug = basename(folder);
-  const reuseByPlatform = new Map<string, ReturnType<typeof checkReuse>>();
-  for (const r of approved) {
-    if (!reuseByPlatform.has(r.platform)) {
-      reuseByPlatform.set(r.platform, checkReuse(slug, r.platform));
+  const forceReuse = process.argv.includes("--force-reuse");
+  if (forceReuse) {
+    console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
+  } else {
+    const reuseByPlatform = new Map<string, ReturnType<typeof checkReuse>>();
+    for (const r of approved) {
+      if (!reuseByPlatform.has(r.platform)) {
+        reuseByPlatform.set(r.platform, checkReuse(slug, r.platform));
+      }
     }
-  }
-  for (const [, res] of reuseByPlatform) {
-    if (!res.allowed) console.warn(`reuse guard: ${res.reason} — skipping`);
-  }
-  approved = approved.filter((r) => reuseByPlatform.get(r.platform)?.allowed !== false);
-  if (approved.length === 0) {
-    console.log("no rows to publish: all platforms blocked by the reuse guard");
-    return;
+    for (const [, res] of reuseByPlatform) {
+      if (!res.allowed) console.warn(`reuse guard: ${res.reason} — skipping`);
+    }
+    approved = approved.filter((r) => reuseByPlatform.get(r.platform)?.allowed !== false);
+    if (approved.length === 0) {
+      console.log("no rows to publish: all platforms blocked by the reuse guard");
+      return;
+    }
   }
 
   const setId = await socialSetId();
