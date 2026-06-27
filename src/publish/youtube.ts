@@ -6,6 +6,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { claimSlots, fmtLa } from "./slots.js";
+import { checkReuse } from "./reuse-guard.js";
 
 // Upload approved video rows to YouTube as Shorts. A short is uploaded as a SCHEDULED publish: it
 // claims a slot from the UNIFIED scheduler (src/publish/slots.ts, windowKey "youtube") and sets
@@ -93,6 +94,15 @@ async function main() {
   );
   if (approved.length === 0) {
     console.log("no approved video rows in the review queue");
+    return;
+  }
+
+  // Reuse guard: skip if this slug was published to YouTube too recently.
+  const slug = basename(folder);
+  const reuseCheck = checkReuse(slug, "youtube");
+  if (!reuseCheck.allowed) {
+    console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
+    console.log("no rows to publish: youtube blocked by the reuse guard");
     return;
   }
 
