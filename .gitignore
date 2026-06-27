@@ -8,6 +8,8 @@ data/processed/**
 !data/processed/.gitkeep
 data/cost-log.csv
 data/publish-schedule.jsonl
+# notes-spread-ledger.jsonl is intentionally committed (cloud dedup memory) — keep it tracked
+!data/notes-spread-ledger.jsonl
 content/**/video/*.mp4
 content/**/video/*.wav
 content/**/video/*.mp3
