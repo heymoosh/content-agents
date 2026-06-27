@@ -34,6 +34,7 @@
     "publish:paste": "tsx src/publish/paste-files.ts",
     "publish:all": "tsx src/publish/all.ts",
     "queue": "tsx src/publish/queue-view.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck"
   },
