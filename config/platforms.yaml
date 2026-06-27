@@ -77,6 +77,7 @@ platforms:
     slot_time_pst: "12:00"
     style: One or two quotable lines pulled verbatim from the source.
   tiktok:
+    min_reuse_days: 14      # short-form video; faster cadence, consistent with x=14
     # TikTok video cadence for the unified scheduler (publish:tiktok), so the short shares the one
     # ledger as text + cards and never lands a PT day another TikTok post already took. Usually 1
     # short/piece, so the weekly cap is mostly headroom. TIKTOK_SCHEDULE_AT overrides for a one-off;
@@ -85,6 +86,7 @@ platforms:
     slot_days: [Tue, Wed, Thu, Fri]
     slot_time_pst: "17:00"
   youtube:
+    min_reuse_days: 30      # long-form/video cadence; same floor as quote-card
     # YouTube Shorts cadence for the unified scheduler (publish:youtube). The short is uploaded as a
     # SCHEDULED publish (status.publishAt = the claimed slot, private until then) so it auto-goes
     # public on the same clock as text/cards/TikTok. The same render also feeds TikTok under a

@@ -6,6 +6,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { claimSlots } from "./slots.js";
+import { checkReuse } from "./reuse-guard.js";
 
 // Schedule approved `tiktok` rows to TikTok via PostPeer (a sanctioned API relay that holds
 // TikTok's audited Content Posting access — we never touch TikTok's API or a browser directly).
@@ -153,6 +154,15 @@ async function main() {
   const approved = rows.filter((r) => r.status === "approve" && r.platform === "tiktok");
   if (approved.length === 0) {
     console.log("no approved tiktok rows in the review queue");
+    return;
+  }
+
+  // Reuse guard: skip if this slug was published to TikTok too recently.
+  const slug = basename(folder);
+  const reuseCheck = checkReuse(slug, "tiktok");
+  if (!reuseCheck.allowed) {
+    console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
+    console.log("no rows to publish: tiktok blocked by the reuse guard");
     return;
   }
 
