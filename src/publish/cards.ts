@@ -169,6 +169,7 @@ async function runCheck(folder: string | null): Promise<void> {
 async function main() {
   const args = process.argv.slice(2);
   const isCheck = args.includes("--check");
+  const forceReuse = args.includes("--force-reuse");
   const atIdx = args.indexOf("--at");
   const atOverride = atIdx !== -1 ? args[atIdx + 1] : undefined;
   const folderArg = args.find((a, i) => !a.startsWith("--") && (atIdx === -1 || i !== atIdx + 1));
@@ -192,11 +193,16 @@ async function main() {
   }
 
   // Reuse guard: check if this slug was already published as a quote-card recently.
+  // Pass --force-reuse to bypass the window and proceed anyway.
   const slug = basename(folder);
-  const reuseResult = checkReuse(slug, "quote-card");
-  if (!reuseResult.allowed) {
-    console.warn(`reuse guard: ${reuseResult.reason} — skipping cards`);
-    return;
+  if (forceReuse) {
+    console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
+  } else {
+    const reuseResult = checkReuse(slug, "quote-card");
+    if (!reuseResult.allowed) {
+      console.warn(`reuse guard: ${reuseResult.reason} — skipping cards`);
+      return;
+    }
   }
 
   const provider = await loadProvider();
