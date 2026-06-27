@@ -8,6 +8,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
+import { checkReuse } from "./reuse-guard.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
 // Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
@@ -177,9 +178,26 @@ async function main() {
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
   const { rows } = readQueue(folder);
-  const approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
+  let approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
   if (approved.length === 0) {
     console.log("no approved x/linkedin/bluesky rows in the review queue");
+    return;
+  }
+
+  // Reuse guard: skip platforms where this slug was published too recently.
+  const slug = basename(folder);
+  const reuseByPlatform = new Map<string, ReturnType<typeof checkReuse>>();
+  for (const r of approved) {
+    if (!reuseByPlatform.has(r.platform)) {
+      reuseByPlatform.set(r.platform, checkReuse(slug, r.platform));
+    }
+  }
+  for (const [, res] of reuseByPlatform) {
+    if (!res.allowed) console.warn(`reuse guard: ${res.reason} — skipping`);
+  }
+  approved = approved.filter((r) => reuseByPlatform.get(r.platform)?.allowed !== false);
+  if (approved.length === 0) {
+    console.log("no rows to publish: all platforms blocked by the reuse guard");
     return;
   }
 

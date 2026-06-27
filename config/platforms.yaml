@@ -15,8 +15,15 @@
 # every claim in a shared ledger (data/publish-schedule.jsonl), so text and cards never double-book a
 # platform's day across separate runs. A platform without these three fields falls back to
 # Typefully "next-free-slot".
+# Minimum days between re-publishing the same content slug to a platform. The per-platform
+# values below override this for their channel; anything not listed inherits this default.
+# Enforced by the reuse guard in src/publish/reuse-guard.ts (checked by publish:typefully
+# and publish:cards before claiming slots).
+min_reuse_days: 30
+
 platforms:
   x:
+    min_reuse_days: 14      # moves fast; a shorter reuse window is acceptable
     max_chars: 280
     derivative_count: [3, 5]
     best_times_pst: "Tue-Thu, 9-11am (primary), 1-2pm (secondary). Weaker on weekends, but posting keeps presence."
@@ -27,6 +34,7 @@ platforms:
       Short claims or provocations. Pick the sharpest sentence from the source and
       trim for 280-char energy. No hashtag spam; 0-1 hashtags max.
   linkedin:
+    min_reuse_days: 60      # professional audience; avoid feeling repetitive
     max_chars: 3000
     derivative_count: [1, 2]
     best_times_pst: "Tue-Thu, 8-10am. Business hours only; no evenings or weekends."
@@ -37,6 +45,7 @@ platforms:
       Lesson post, left-aligned narrative, practitioner voice. Insight-driven,
       not link-dump. Short paragraphs, line breaks between thoughts.
   bluesky:
+    min_reuse_days: 21
     max_chars: 300
     derivative_count: [2, 4]
     best_times_pst: "Daily 9-11am and 6-9pm. Evenings are lively for the AI/tech crowd, weekends included."
@@ -58,6 +67,7 @@ platforms:
       Hook in first line, 1-2 main points, call to action. Direct, thoughtful,
       not hype-y. Written to be spoken aloud.
   quote-card:
+    min_reuse_days: 30
     max_chars: 180
     # Card cadence for the unified scheduler (publish:cards). A card fans out to several platforms
     # at once, so it gets its own midday weekday window; it also de-conflicts against (and counts

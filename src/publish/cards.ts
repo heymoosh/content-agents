@@ -8,6 +8,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta, appendCtaLine, type CtaConfig } from "./cta.js";
 import { claimSlots } from "./slots.js";
+import { checkReuse } from "./reuse-guard.js";
 
 // Schedule approved `quote-card` (image) rows from a content folder's review queue to the social
 // platforms, via the swappable image-post provider chosen in config/providers.yaml (`image_post:
@@ -187,6 +188,14 @@ async function main() {
   const cards = approvedCards(folder);
   if (cards.length === 0) {
     console.log("no approved quote-card rows in the review queue");
+    return;
+  }
+
+  // Reuse guard: check if this slug was already published as a quote-card recently.
+  const slug = basename(folder);
+  const reuseResult = checkReuse(slug, "quote-card");
+  if (!reuseResult.allowed) {
+    console.warn(`reuse guard: ${reuseResult.reason} — skipping cards`);
     return;
   }
 

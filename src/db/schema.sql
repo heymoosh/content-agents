@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS posts (
   url TEXT,
   content_text TEXT,
   format TEXT,                         -- 'text' | 'thread' | 'image' | 'video' | 'newsletter'
+  media_type TEXT,                     -- 'text' | 'quote-card' | 'video' | 'note' | 'unknown'; populated on ingest, backfilled from format by migration
   pillar TEXT,                         -- 'human-ai' | 'claude-code' | 'civic-tech' | 'career-work' | 'builder' | 'other' | NULL = untagged
   bet_id TEXT,                         -- set by link-bet.ts when /strategy matches a post to a brief's bet (NULL = unattributed)
   source TEXT,                         -- 'atomized' (verbatim, shipped by /publish from a content folder) | 'atomized-spin' (audience-reframed variant, docs/spin-experiment.md) | 'organic' (posted natively / a note Muxin wrote) | NULL = unclassified; set by tag-source.ts
@@ -61,6 +62,9 @@ CREATE INDEX IF NOT EXISTS idx_posts_platform ON posts(platform);
 CREATE INDEX IF NOT EXISTS idx_posts_pillar ON posts(pillar);
 CREATE INDEX IF NOT EXISTS idx_posts_bet ON posts(bet_id);
 CREATE INDEX IF NOT EXISTS idx_metrics_post ON metrics(post_id);
+-- NOTE: idx_posts_media_type and idx_posts_source are omitted here intentionally.
+-- Both columns may be absent on legacy DBs until db.ts migrations add them, so indexing
+-- here would throw "no such column" on a legacy DB. The indexes are created in db.ts instead.
 -- NOTE: no idx_posts_source here on purpose. `source` is added by a migration in db.ts that runs
 -- AFTER this file executes, so indexing it here would throw "no such column: source" on a legacy
 -- DB. The index is created in that migration instead.
