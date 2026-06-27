@@ -37,8 +37,11 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
      Postiz fallback noted in `docs/setup-typefully.md`. Do not work around it.
 
 3. **Video** (youtube/short rows): `npm run publish:youtube -- <folder>`
-   - Uploads as PRIVATE by default; Muxin flips to public in YouTube Studio after a
-     spot-check (or sets YOUTUBE_PRIVACY=public once trust is established).
+   - SCHEDULED publish by default: claims a slot from the unified scheduler and sets
+     `status.publishAt`, so the video uploads private and YouTube auto-flips it to public at the
+     slot (no manual Studio step).
+   - With no `youtube` cadence configured, it falls back to a plain PRIVATE upload: Muxin flips it
+     public in YouTube Studio after a spot-check, or sets `YOUTUBE_PRIVACY=public` for instant public.
    - Requires `video/title.txt` and `video/description.txt` (written during /atomize).
 
 4. **TikTok** (`tiktok` rows): `npm run publish:tiktok -- <folder>`
