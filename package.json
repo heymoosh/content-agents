@@ -35,6 +35,7 @@
     "publish:all": "tsx src/publish/all.ts",
     "queue": "tsx src/publish/queue-view.ts",
     "notes-daily": "tsx src/cron/notes-daily.ts",
+    "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck"

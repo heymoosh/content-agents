@@ -121,3 +121,5 @@ extraction-first.
   cadence — Typefully gets explicit times, not its "next-free-slot"; TikTok still honors
   `TIKTOK_SCHEDULE_AT` as a manual one-off override.
 - Secrets in `.env` only (see `.env.example`). Never commit `.env` or `data/analytics.db`.
+- A freshly created git worktree has no `node_modules`. Run `npm run worktree:setup` (a plain
+  `npm ci` from the committed lockfile) once before running `npm test` or any script in it.
