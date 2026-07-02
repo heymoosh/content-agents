@@ -1,7 +1,11 @@
 # Spin experiment — give `/atomize` audience-fit latitude, measured against verbatim
 
-**Status:** approved 2026-06-24, scoped, not yet built. Build in a fresh session off `main`.
-**Not urgent:** run original-vs-spin for a few weeks before committing to spin as a default.
+**Status:** approved 2026-06-24, built, ran as an opt-in experiment through 2026-07-02.
+**Promoted to an always-on default 2026-07-02** — driven by Muxin approving a specific angle per
+channel (2026-06-30, `config/platforms.yaml` `spin_angles`), not by the A/B protocol below reaching
+a verdict (verbatim-vs-spin data was still accumulating). See "Promotion (2026-07-02)" near the end
+for what changed. Everything below this line is the original design and is kept as history; current
+behavior lives in `.claude/skills/atomize/references/spin-mode.md`.
 
 ## Why
 
@@ -24,7 +28,8 @@ derivatives **as an opt-in, tracked experiment**, never the default.
 2. **Voice guards stay on.** `config/voice.yaml` applies in full (no em dashes, no AI tells).
 3. **Review gate stays.** Nothing publishes without Muxin's `approve` in `review-queue.md`.
 4. **Opt-in only.** Verbatim extraction stays the default. Spin is produced only when asked, until
-   the experiment data says otherwise.
+   the experiment data says otherwise. *(Superseded 2026-07-02 — see "Promotion" below: spin is
+   now the default; `/atomize --no-spin` is the opt-out.)*
 
 ## Design
 
@@ -75,6 +80,28 @@ No DB migration needed.
 - How aggressive is "flavor"? Calibrate the invent-vs-reframe line with a few Muxin-reviewed
   before/afters before running at volume.
 - Does spin change the CTA logic at all? (Probably not — CTA stays per `config/cta.yaml`.)
+
+## Promotion (2026-07-02)
+
+Spin moved from an opt-in, tracked experiment to the always-on default for every `/atomize` run.
+This was driven by Muxin approving a specific angle per channel (2026-06-30), not by the A/B
+protocol above reaching a verdict — verbatim-vs-spin data was still accumulating toward the n≥10
+threshold. The four approved angles are internal generation config in `config/platforms.yaml`
+`spin_angles` (`x`, `linkedin`, `bluesky` active; `substack` reserved — it's the source channel,
+not an atomize output target, see `config/routing.yaml`).
+
+What changed:
+- Default flips: every X/LinkedIn/Bluesky derivative is now reframed through its channel's angle
+  unless the run is `/atomize --no-spin` (the new opt-out, producing strict verbatim as before).
+- A spun derivative now also carries `angle: <platform-key>` frontmatter (in addition to
+  `spin: true`), naming which approved angle shaped it. `src/atomize/validate.ts` enforces that the
+  angle is present and matches the derivative's own platform.
+- The guardrails above (never invent, voice guards, review gate) are unchanged and still
+  non-negotiable — only the on/off default and the per-channel angle mapping are new.
+
+Current default behavior lives in `.claude/skills/atomize/references/spin-mode.md`; this file
+stays as the historical record of why and how spin was built, and the experiment protocol above
+still applies if verbatim-vs-spin needs re-measuring later (e.g. via `--no-spin` runs).
 
 ## Related
 - The tracking substrate: `posts.source`, `tag-source.ts`, `origin-compare.ts` (built 2026-06-24).

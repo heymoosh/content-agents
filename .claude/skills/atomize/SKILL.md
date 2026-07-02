@@ -1,6 +1,6 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), or /atomize --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
@@ -22,10 +22,14 @@ real money, so it's opt-in per piece, not bundled here.
   text came from. If you can't point at lines, you wrote it — delete it.
 - If the source is too thin to atomize honestly, say so and stop. Do not pad.
 
-**This is the default and stays the default.** There is one opt-in, tracked exception:
-`/atomize --spin` lets you reframe and flavor a post for its audience (see `references/spin-mode.md`).
-It is OFF unless Muxin asks for it, and even then it may re-angle but never invent a claim Muxin
-didn't make. Do not spin unless the invocation says `--spin`.
+**Spin rides on top of this rule; it does not replace it.** Since 2026-07-02 Spin is the
+always-on default for every atomize run: no flag needed. Each derivative for a platform with a
+Muxin-approved angle in `config/platforms.yaml` `spin_angles` (x, linkedin, bluesky) is reframed
+through that channel's angle. Spin may re-angle the framing, hook, and register, but it may NEVER
+invent a claim, statistic, metaphor, or worldview Muxin did not express. `source_lines` tracing
+still applies (best-effort on spun derivatives: point at the lines and ideas you drew from). Read
+`references/spin-mode.md` before drafting. The opt-out is `/atomize --no-spin`, which produces
+strict verbatim extraction with no reframing.
 
 ## Voice & AI tells (non-negotiable — CLAUDE.md rule 5)
 
@@ -93,8 +97,9 @@ derivative, the video script, and the video title/description. The short version
      ---
      platform: x            # x | linkedin | bluesky | community | quote-card
      option: 1
-     source_lines: [12, 31-33]   # required normally; best-effort (the ideas drawn from) when spin: true
-     # spin: true           # ONLY on a --spin run — marks an audience-reframed variant (see references/spin-mode.md)
+     source_lines: [12, 31-33]   # hard-required on verbatim; best-effort (the ideas drawn from) when spin: true
+     spin: true             # the default for platforms with a spin_angles entry; omit on --no-spin runs
+     angle: x               # the config/platforms.yaml spin_angles key applied; must equal `platform` (see references/spin-mode.md)
      scores: { native: 4, brand: 5, cta: true }
      cta: source            # source | <literal-url> | none — stamped from config/cta.yaml (step 4.5)
      cta_label: "Full essay (free to subscribe):"   # short lead-in for the link; omit when cta is none
@@ -103,6 +108,12 @@ derivative, the video script, and the video title/description. The short version
      ---
      <the post text — nothing else>
      ```
+   - **Apply the channel's spin angle by default.** For each platform with a `spin_angles`
+     entry in `config/platforms.yaml` (x, linkedin, bluesky), reframe the derivative through
+     that approved angle and mark it `spin: true` + `angle: <platform>` per
+     `references/spin-mode.md`. Platforms with no configured angle (quote-card, community) stay
+     verbatim with no spin frontmatter. On a `--no-spin` run, skip all of this and draft every
+     derivative verbatim.
    - Text derivatives are ALWAYS Claude-authored and extraction-first. Do NOT pass them
      through `text-polish` — that provider (Grok) is reserved for video scripts, which now live
      in the `/video` skill.
@@ -133,8 +144,10 @@ derivative, the video script, and the video title/description. The short version
    - Score 1–2 → discard it yourself rather than queueing junk.
 
 6. **Validate.** `npm run validate -- <folder>` — must pass before queueing. Fix violations,
-   don't relax limits. (Validation enforces char/word limits for every derivative and requires
-   `source_lines` except on `spin: true` derivatives, where it's best-effort — see `references/spin-mode.md`.)
+   don't relax limits. (Validation enforces char/word limits for every derivative, requires
+   `source_lines` except on `spin: true` derivatives where it's best-effort, and requires every
+   `spin: true` derivative to carry an `angle` that matches its own platform's `spin_angles`
+   entry; see `references/spin-mode.md`.)
 
 7. **Generate the quote-card asset** (cheap, extraction-first):
    - `npm run render -- --still <folder> --quote quote-card-1`
@@ -165,7 +178,9 @@ invoked, read the corresponding file first and follow its instructions:
 
 - **`/atomize notes`** — pulls and spreads Substack Notes (not in RSS). Read
   `references/notes-mode.md` and follow it before doing anything else.
-- **`/atomize --spin <arg>`** — opt-in audience-fit experiment; reframes (but never invents)
-  for platform audience. Read `references/spin-mode.md` and follow it before doing anything else.
+- **`/atomize --no-spin <arg>`** opts out to strict verbatim extraction: no reframing, no
+  `spin`/`angle` frontmatter, `source_lines` hard-required on every text derivative. Spin itself
+  is not a mode anymore; it is the default flow above (angles in `config/platforms.yaml`
+  `spin_angles`, rules in `references/spin-mode.md`).
 - **`/atomize --revise <folder>`** — re-drafts derivatives flagged `revise` in review-queue.md.
   Read `references/revise-mode.md` and follow it before doing anything else.
