@@ -34,6 +34,11 @@ describe("checkDerivative: spin default-on angle consistency", () => {
     assert.deepEqual(violations, []);
   });
 
+  test("a truthy non-boolean spin (e.g. the string \"yes\") gets no exemption: source_lines still required", () => {
+    const violations = checkDerivative("x-1.md", { platform: "x", spin: "yes" }, "some text", PLATFORMS);
+    assert.ok(violations.some((v) => v.includes("missing source_lines")));
+  });
+
   test("spin:true without an angle field is flagged", () => {
     const violations = checkDerivative("x-1.md", { platform: "x", spin: true }, "some text", PLATFORMS);
     assert.ok(violations.some((v) => v.includes("missing angle frontmatter")));

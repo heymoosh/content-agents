@@ -29,17 +29,21 @@ export function checkDerivative(
     violations.push(`${file}: unknown or missing platform "${platform}" in frontmatter`);
     return violations;
   }
+  // Only a literal boolean `spin: true` counts as spun — a truthy non-boolean (e.g. the
+  // string "yes") must not silently earn the source_lines exemption while dodging the
+  // angle check below.
+  const spun = fm.spin === true;
   // Video scripts are the scoped exception to extraction-first (Grok-drafted from the
   // essay's ideas, reviewed before render — see CLAUDE.md rule 1), so no source_lines.
   // Spin variants (config/platforms.yaml spin_angles, default-on since 2026-07-02, see
   // docs/spin-experiment.md) reframe within guardrails, so source_lines is best-effort there too.
-  if (platform !== "video-script" && !fm.spin && !fm.source_lines) {
+  if (platform !== "video-script" && !spun && !fm.source_lines) {
     violations.push(`${file}: missing source_lines frontmatter (extraction-first traceability)`);
   }
   // A spun derivative must name the approved angle it applied, and that angle must actually
   // be configured for its own platform — catches a mismatched/copy-pasted angle (e.g. a
   // LinkedIn angle stamped on an X post).
-  if (fm.spin === true) {
+  if (spun) {
     const angleKey = typeof fm.angle === "string" ? fm.angle : "";
     if (!angleKey) {
       violations.push(`${file}: spin:true but missing angle frontmatter (which approved angle was applied)`);
