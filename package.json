@@ -37,6 +37,7 @@
     "publish:paste": "tsx src/publish/paste-files.ts",
     "publish:all": "tsx src/publish/all.ts",
     "queue": "tsx src/publish/queue-view.ts",
+    "review": "tsx src/review/serve.ts",
     "notes-daily": "tsx src/cron/notes-daily.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",

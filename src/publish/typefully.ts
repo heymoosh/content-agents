@@ -185,36 +185,38 @@ type TypefullyDraft = {
   mastodon_post_enabled?: boolean;
 };
 
-async function main() {
-  const arg = process.argv[2];
-  if (!arg) {
-    console.error("usage: tsx src/publish/typefully.ts <content-folder> | --list");
-    process.exit(1);
-  }
-  if (arg === "--list") {
-    await runList();
-    return;
-  }
-  const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
+export interface ScheduledRow {
+  id: string;
+  platform: string;
+  when: string; // human PT label, or "unscheduled"
+  draftId: string;
+  manualComment: string | null;
+}
+
+// Publish approved text rows (x/linkedin/bluesky) to Typefully as scheduled drafts. Extracted from
+// the CLI so the review GUI can schedule ONE row on approve (opts.onlyIds). With no opts it behaves
+// exactly as the CLI did — every approved text row in the folder — so the CLI + notes-daily paths
+// are unchanged.
+export async function publishText(
+  folder: string,
+  opts: { onlyIds?: string[]; noSchedule?: boolean; forceReuse?: boolean } = {}
+): Promise<ScheduledRow[]> {
   const { rows } = readQueue(folder);
   let approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
+  if (opts.onlyIds) approved = approved.filter((r) => opts.onlyIds!.includes(r.id));
   if (approved.length === 0) {
     console.log("no approved x/linkedin/bluesky rows in the review queue");
-    return;
+    return [];
   }
 
-  // UNSCHEDULED-draft mode: `--no-schedule` flag or TYPEFULLY_SCHEDULE=off. In this mode we skip
-  // claimSlots entirely and OMIT publish_at, so the created drafts are saved UNSCHEDULED and will
-  // NOT auto-post — they sit in Typefully until Muxin schedules/publishes the good ones by hand.
-  // Used by the daily notes cloud routine (src/cron/notes-daily.ts) so nothing fires automatically.
-  const noSchedule =
-    process.argv.includes("--no-schedule") ||
-    (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
+  // UNSCHEDULED-draft mode (opts.noSchedule): skip claimSlots + OMIT publish_at, so drafts are saved
+  // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them. Used by
+  // the daily notes cloud routine (src/cron/notes-daily.ts) so nothing fires automatically.
+  const noSchedule = opts.noSchedule ?? false;
 
   // Reuse guard: skip platforms where this slug was published too recently.
-  // Pass --force-reuse to bypass the window and proceed anyway.
   const slug = basename(folder);
-  const forceReuse = process.argv.includes("--force-reuse");
+  const forceReuse = opts.forceReuse ?? false;
   if (forceReuse) {
     console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
   } else {
@@ -230,7 +232,7 @@ async function main() {
     approved = approved.filter((r) => reuseByPlatform.get(r.platform)?.allowed !== false);
     if (approved.length === 0) {
       console.log("no rows to publish: all platforms blocked by the reuse guard");
-      return;
+      return [];
     }
   }
 
@@ -271,6 +273,7 @@ async function main() {
     }
   }
 
+  const results: ScheduledRow[] = [];
   for (const row of approved) {
     const assetPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
     const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
@@ -332,7 +335,27 @@ async function main() {
       `${verb}: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
         (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
     );
+    results.push({ id: row.id, platform: row.platform, when, draftId: String(draft.id ?? "?"), manualComment });
   }
+  return results;
+}
+
+async function main() {
+  const arg = process.argv[2];
+  if (!arg) {
+    console.error("usage: tsx src/publish/typefully.ts <content-folder> | --list");
+    process.exit(1);
+  }
+  if (arg === "--list") {
+    await runList();
+    return;
+  }
+  const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
+  const noSchedule =
+    process.argv.includes("--no-schedule") ||
+    (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
+  const forceReuse = process.argv.includes("--force-reuse");
+  await publishText(folder, { noSchedule, forceReuse });
 }
 
 // Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)
