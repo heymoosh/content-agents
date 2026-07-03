@@ -5,39 +5,36 @@ import { captureDiagnostics, looksLikeAuthWall } from "../diagnose.js";
 import { PullError } from "../errors.js";
 import type { PlatformPuller } from "../types.js";
 
-// X (Twitter) has no free per-post analytics API, so we drive the same export a human does.
-// The ingest step wants the per-post "Content" CSV (rows = individual posts, with impressions/
-// likes/etc.) dropped in data/inbox/x/ — NOT the account-overview daily totals (see parse-x.ts).
+// X has no free per-post analytics API, and its analytics GraphQL uses rotating query-id hashes
+// (too fragile to hardcode). But Analytics > Content has a "Download CSV" button that exports
+// exactly the per-post "Content" CSV parseX ingests (text + impressions + engagements per post).
 //
-// ── NEEDS LIVE VERIFICATION (first pass, 2026-07-03) ────────────────────────────────
-// X's analytics UI has moved repeatedly (analytics.twitter.com was sunset). The current premium
-// hub is /i/account_analytics, and the per-post export sits behind an "Export"/"Export data"
-// control you reach after clicking into the Posts/Content view. Muxin's note: "from there you'd
-// click around for what you want." So this is a best-effort first pass — run
-// `npm run pull -- x --headed`, then refine the URL + selectors from the diagnostics screenshot,
-// exactly as we did for LinkedIn.
-const ANALYTICS_URL = "https://x.com/i/account_analytics";
+// ── VERIFIED 2026-07-03 (drove the saved session) ──────────────────────────────────
+// The Content tab is a direct URL; the export control is <button aria-label="Download CSV">, and
+// clicking it downloads account_analytics_content_<from>_<to>.csv. `days=` sets the window (the UI
+// defaults to 7; we ask for 90 to get more history per pull). If a pull fails "THEIR SIDE", the two
+// things to re-check are this URL and the "Download CSV" accessible name.
+const CONTENT_URL = "https://x.com/i/account_analytics/content?type=posts&sort=date&dir=desc&days=90";
 
-// Match the export trigger by ARIA role + accessible name (robust to button-vs-link), the same
-// approach that made LinkedIn resilient. X may label it "Export" or "Export data".
+// The export control, whether X renders it as a button or a link.
 function exportControl(page: Page) {
   return page
-    .getByRole("button", { name: /export/i })
-    .or(page.getByRole("link", { name: /export/i }))
+    .getByRole("button", { name: /download csv/i })
+    .or(page.getByRole("link", { name: /download csv/i }))
     .first();
 }
 
-// Find the export control and capture the download it produces. Anything missing HERE — we're
-// logged in and on the analytics page — means the site's flow changed, so it's UI_CHANGED with a
-// saved diagnostics bundle, never a silent generic timeout.
+// Find the "Download CSV" control and capture the download it produces. Anything missing HERE — we
+// are logged in and on the Content tab — means the flow changed, so it's UI_CHANGED with a saved
+// diagnostics bundle, never a silent generic timeout.
 async function triggerAndCapture(page: Page): Promise<Download> {
   const trigger = exportControl(page);
   try {
-    await trigger.waitFor({ state: "visible", timeout: 15_000 });
+    await trigger.waitFor({ state: "visible", timeout: 20_000 });
   } catch (cause) {
     const diag = await captureDiagnostics(page, "x", "export-trigger-missing");
-    throw new PullError("UI_CHANGED", `Export control (role button/link matching /export/i) not found on ${page.url()}`, {
-      hint: `X likely changed its analytics UI, or the export sits behind another click (Posts/Content view). Re-check the URL + accessible name in src/pull/platforms/x.ts. Screenshot: ${join(diag, "screenshot.png")}`,
+    throw new PullError("UI_CHANGED", `"Download CSV" control not found on ${page.url()}`, {
+      hint: `X may have changed the Content-tab export — re-check the URL + button name in src/pull/platforms/x.ts. Screenshot: ${join(diag, "screenshot.png")}`,
       diagnosticsDir: diag,
       cause,
     });
@@ -51,8 +48,8 @@ async function triggerAndCapture(page: Page): Promise<Download> {
     return download;
   } catch (cause) {
     const diag = await captureDiagnostics(page, "x", "no-download");
-    throw new PullError("UI_CHANGED", `Clicked Export but no download started on ${page.url()}`, {
-      hint: `X's export may open a menu (by day / by post) or a dialog before downloading — check the flow in src/pull/platforms/x.ts. Screenshot: ${join(diag, "screenshot.png")}`,
+    throw new PullError("UI_CHANGED", `Clicked "Download CSV" but no download started on ${page.url()}`, {
+      hint: `The export may now open a menu/dialog — check the flow in src/pull/platforms/x.ts. Screenshot: ${join(diag, "screenshot.png")}`,
       diagnosticsDir: diag,
       cause,
     });
@@ -66,15 +63,16 @@ export const x: PlatformPuller = {
   async pull(context: BrowserContext): Promise<string[]> {
     const page = context.pages()[0] ?? (await context.newPage());
 
-    // 1) Navigate — a failure here is connectivity (our side), not a UI change.
+    // 1) Navigate straight to the Content tab — a failure here is connectivity (our side).
     try {
-      await page.goto(ANALYTICS_URL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await page.goto(CONTENT_URL, { waitUntil: "domcontentloaded", timeout: 30_000 });
     } catch (cause) {
-      throw new PullError("NETWORK", `Couldn't load ${ANALYTICS_URL}`, {
+      throw new PullError("NETWORK", `Couldn't load ${CONTENT_URL}`, {
         hint: "Check your connection / that X opens in a normal browser.",
         cause,
       });
     }
+    await page.waitForTimeout(4_000); // the analytics table + export button hydrate client-side
 
     // 2) Auth check — a login wall means the saved session lapsed (re-login), NOT a UI change.
     if (looksLikeAuthWall(page.url())) {
