@@ -1,0 +1,10 @@
+# paste into: community
+# delete these two header lines before posting
+
+I've been building a tool to help people evaluate their Congressmen based on donations and voting history. It evaluates actual behavior, not platform promises, and scores it based on how well aligned your Congressmen's behaviors are to your preferred stances on issues you care about.
+
+We elected representatives to do the job of governing and policy making for us so that we can focus on our own jobs and lives. We pay their salaries through our taxes.
+
+Yet Congress spends up to 70% of their time just fundraising for their next election instead of doing their jobs. Fundraising is the #1 predictor of a successful campaign, not whether they've done their actual jobs.
+
+I think it's time we fix that broken incentive system.
