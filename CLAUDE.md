@@ -21,9 +21,12 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      exception is video scripts only; it must never bleed into text/image derivatives.
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
-3. **No browser automation for posting.** Official APIs and sanctioned API relays (Typefully,
-   YouTube, AT Protocol, PostPeer for TikTok + quote cards, Upload-Post as the card failover) or
-   ready-to-paste files only.
+3. **Browser automation for posting is allowed only with Muxin's explicit approval.** Prefer
+   official APIs and sanctioned API relays (Typefully, YouTube, AT Protocol, PostPeer for TikTok +
+   quote cards, Upload-Post as the card failover) or ready-to-paste files — they're more reliable.
+   Where no usable API exists (e.g. Substack), a constrained browser agent MAY post, but only on
+   content Muxin has approved — rule 2 still governs, nothing posts unreviewed. Never auto-post via
+   browser without that approval.
 4. **Discrete verifiable outputs.** Every pipeline step writes a file or DB rows that can be
    inspected. Scripts do deterministic work; Claude does judgment (tagging, synthesis,
    extraction, scoring) inline while running skills.
@@ -34,6 +37,13 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    AI-processed `source.md` copy whose dashes were never in his original). Strip them to
    periods, commas, colons, or parentheses. Read it aloud; if it sounds like a brand instead of
    Muxin talking, rewrite it.
+6. **Prefer subscription / free model routes; minimize per-token API cost.** Default any model
+   call to the cheapest acceptable route: Claude via the Claude Code subscription (harness
+   subagents, $0 marginal — e.g. `/story` claude-native) and free-local media (Remotion / SVG /
+   HyperFrames, kokoro TTS) before paid APIs. Grok and GPT have no subscription API — their keys
+   bill per token via OpenRouter / direct — so use them ONLY where they add value Claude can't
+   (e.g. Grok's fiction voice, paid image step-ups): opt-in, logged to `data/cost-log.csv`, never
+   the silent default. New builds inherit this.
 
 ## Pipeline map
 

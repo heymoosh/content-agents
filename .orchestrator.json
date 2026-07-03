@@ -2,5 +2,5 @@
   "backlog": "docs/content-agents-backlog.md",
   "base_branch": "main",
   "deploy_workflow": "",
-  "ready_statuses": ["Backlog"]
+  "ready_statuses": ["To Do"]
 }
