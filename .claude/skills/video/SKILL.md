@@ -11,16 +11,17 @@ run `/video` only on the pieces worth turning into a short.
 
 ## The extraction-first rule still bounds this
 
-Video scripts are the **scoped exception** to extraction-first (CLAUDE.md rule 1): Grok drafts a
-hook-driven script from the essay's *ideas*, not verbatim lines. This is allowed ONLY because the
-storyboard is reviewed and approved as TEXT before any render, and nothing auto-publishes. The
-exception is the spoken script only — `title.txt`/`description.txt` stay extraction-first.
+Video scripts are the **scoped exception** to extraction-first (CLAUDE.md rule 1): Claude (via the
+`text-polish` provider, on Muxin's subscription) drafts a hook-driven script from the essay's
+*ideas*, not verbatim lines. This is allowed ONLY because the storyboard is reviewed and approved as
+TEXT before any render, and nothing auto-publishes. The exception is the spoken script only —
+`title.txt`/`description.txt` stay extraction-first.
 
 ## Cost gate — read before spending
 
 Video is the most expensive thing the pipeline does. It is **two-phase, money only in phase 2**:
 
-1. **Script + storyboard = cheap** — the only spend is one Grok text call. Reviewed as TEXT.
+1. **Script + storyboard = free** — the script is drafted by Claude on the subscription ($0). Reviewed as TEXT.
 2. **Render = real money** — scene generation + (local, free) voice + Remotion.
 
 **Never auto-escalate the model or engine — offer first** (policy: [[cost-escalation-offer-first]]).
@@ -57,13 +58,17 @@ evaluated and rejected (no start→end interpolation on the Gemini key); see
 2. **Tag + extract** (skip if the folder is already atomized and `extracts.md` exists). Identify
    the pillar (`config/pillars.yaml`); note the most video-worthy ideas.
 
-3. **Script (Grok — the cheap spend).** Call the script writer (Grok via the `text-polish`
-   provider) on the source/extracts: a 60–90s, hook-first spoken script (hook in line 1, 1–2
-   points, CTA), ≤220 words, conversational, not hype-y. **Pass the `config/voice.yaml` rules into
-   the Grok instructions** (no em dashes, no AI tells, Muxin's plain PM voice) — this is the one
-   place copy is generated non-verbatim, so it needs the voice guard most (CLAUDE.md rule 5).
-   Sanity-check it stays true to the essay's ideas AND clean of AI tells — reject and re-prompt if
-   it invents claims Muxin wouldn't make or slips in banned phrasing.
+3. **Script (Claude — $0 on the subscription).** Draft the spoken script with the `text-polish`
+   provider (now `claude-cli`: Claude Code on Muxin's subscription, $0 marginal, no API key —
+   CLAUDE.md rule 6). Run `npm run script:draft <folder>` (add `--model haiku` for the cheapest
+   run on a short script; default is `sonnet`, whose storytelling is plenty here). It reads the
+   source + `extracts.md`, drafts a 60–90s hook-first spoken script (hook in line 1, 1–2 points,
+   CTA), ≤220 words, conversational, and writes `video/script-draft.md`. The voice guard
+   (no em dashes, no AI tells, Muxin's plain PM voice) is baked into the drafting instructions —
+   this is the one place copy is generated non-verbatim, so it needs it most (CLAUDE.md rule 5).
+   Read the draft: reject and re-run if it invents claims Muxin wouldn't make or slips in banned
+   phrasing. (No `OPENROUTER_API_KEY` needed anymore; swap `text-polish` back to `grok-openrouter`
+   in `config/providers.yaml` only if you specifically want Grok's voice instead.)
 
 4. **Storyboard.** Read `config/style.yaml`. Storyboard the script into **5–7 scenes**. For each
    scene write a `beat` (one line), a `visual` (a scene prompt ending with `global.mood` + the
@@ -137,7 +142,7 @@ evaluated and rejected (no start→end interpolation on the Gemini key); see
 ## --revise <folder>
 
 Read `review-queue.md`, act on rows with status `revise` by `format`:
-- **storyboard**: re-script via Grok and/or re-storyboard per the `notes` (cheap; no image/audio
-  spend). Reset to `pending`.
+- **storyboard**: re-script (`npm run script:draft <folder>`, Claude on the subscription) and/or
+  re-storyboard per the `notes` (free; no image/audio spend). Reset to `pending`.
 - **short** (MP4): re-run `npm run render -- --render-video <folder>` (delete
   `images/video-*.png` first to force image regeneration past the cache). Reset to `pending`.

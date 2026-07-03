@@ -14,11 +14,12 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    lines from the source; light edits for platform format only. NEVER compose new claims,
    arguments, or worldview statements in Muxin's voice. Every such derivative must carry
    `source_lines` frontmatter tracing the lines it was built from.
-   - **Scoped exception — video scripts.** Video shorts are a deliberate exception: Grok (via the
-     `text-polish` provider, in the `/video` skill) drafts a hook-driven script from the essay's
-     *ideas* — not verbatim-traced. This is allowed ONLY because every storyboard is reviewed and
-     approved by Muxin in `review-queue.md` *before* any render, and nothing auto-publishes. The
-     exception is video scripts only; it must never bleed into text/image derivatives.
+   - **Scoped exception — video scripts.** Video shorts are a deliberate exception: Claude (via the
+     `text-polish` provider — `claude-cli`, on Muxin's subscription, $0; `npm run script:draft`, in
+     the `/video` skill) drafts a hook-driven script from the essay's *ideas* — not verbatim-traced.
+     This is allowed ONLY because every storyboard is reviewed and approved by Muxin in
+     `review-queue.md` *before* any render, and nothing auto-publishes. The exception is video
+     scripts only; it must never bleed into text/image derivatives.
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
 3. **Browser automation for posting is allowed only with Muxin's explicit approval.** Prefer
@@ -55,7 +56,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 | Route | inside `/atomize` (+ `/strategy`) | `npm run route` | pillar tag drives it; Muxin still approves what's queued | `content/<slug>/routing.md` |
 | Atomize | `/atomize <url\|file>`, `/atomize notes` | `npm run new-content`, `npm run new-notes`, `npm run validate` | extraction-first drafting + scoring (text posts + quote cards); `/atomize notes` pulls Substack Notes (not in RSS) and spreads picked ones; record `from_brief`/`directives_applied`; **only for routing `include` platforms** | `content/<slug>/derivatives/`, `review-queue.md` |
 | Quote cards | inside `/atomize` | `npm run render -- --still` | extraction-first quote line + cost-first image model | `images/` |
-| Video | `/video <file\|folder>` | `npm run render -- --render-video` | Grok script + 5–7 storyboard scenes/visual prompts; storyboard approved as TEXT before any render | `video/storyboard.md`, `video/short.mp4` |
+| Video | `/video <file\|folder>` | `npm run script:draft`, `npm run render -- --render-video` | Claude-drafted script ($0 subscription) + 5–7 storyboard scenes/visual prompts; storyboard approved as TEXT before any render | `video/storyboard.md`, `video/short.mp4` |
 | Review | **Muxin, by hand** | — | — | statuses in `review-queue.md` |
 | Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, TikTok scheduled post (PostPeer), quote-card scheduled post (PostPeer/Upload-Post, `publish:cards`), `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
 | Whole cycle | `/cycle` | all of the above | orchestration | — |
