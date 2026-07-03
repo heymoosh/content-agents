@@ -1,28 +1,34 @@
 import { join } from "node:path";
-import { mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
-import type { BrowserContext, Download, Page } from "playwright";
+import { writeFileSync } from "node:fs";
+import type { BrowserContext, Page } from "playwright";
 import { inboxDir } from "../paths.js";
 import { captureDiagnostics, looksLikeAuthWall } from "../diagnose.js";
 import { PullError } from "../errors.js";
 import type { PlatformPuller } from "../types.js";
 
-// Substack has no analytics API, so we drive the full data export a human does. It is the ONE
-// export ingest reads as a FOLDER: parseSubstackExport wants posts.csv + per-post event logs
-// (posts/<id>.opens.csv, posts/<id>.delivers.csv). The export is generated server-side and is
-// ASYNC — clicking "New export" queues a job and a Download link appears minutes later.
-//
-// ── NEEDS LIVE VERIFICATION (first pass, 2026-07-03) ────────────────────────────────
-// Muxin's route: "you go to Dashboard first — a button on the left above the profile." Clicking
-// Dashboard lands on the publication at https://<sub>.substack.com/publish/... which is how we
-// learn the subdomain (we can't hardcode it); the export lives under Settings → Exports. This is
-// a best-effort first pass — run `npm run pull -- substack --headed` and refine the nav + export
-// selectors from the diagnostics screenshot, exactly as we did for LinkedIn.
+// Substack has no public analytics API, and — crucially — its "data export" (Settings → Exports)
+// is the WRONG source for content analytics: it carries EMAIL deliver/open events only and misses
+// web views entirely, so it badly undercounts real reach. The REAL per-post analytics live in the
+// writer dashboard, which is backed by a clean internal JSON API. Discovered 2026-07-03 by sniffing
+// the dashboard's own XHRs against the saved session:
+//   GET /api/v1/post_management/published?offset=0&limit=N&order_by=post_date&order_direction=desc
+//   -> { posts: [ { id, title, slug, post_date, reaction_count, comment_count,
+//        stats: { views, opens, open_rate, clicks, shares, signups_within_1_day, ... } } ] }
+// (Real gap seen: a post the export showed as ~33 delivered actually had 56 real views here.)
+// So we fetch that endpoint with the authenticated context and write a CSV the existing
+// parseSubstack ingests — no export/zip/async, and richer data. Aggregate reach/growth is also
+// available at /api/v1/publish-dashboard/summary-v2?range=365 (subscribers + totalViews) for a
+// later audience/growth follow-up.
 const HOME_URL = "https://substack.com/home";
+// limit is capped server-side (100 → 400); 25 is what the dashboard itself requests. Muxin has
+// far fewer published posts than this, and it is ordered newest-first, so recent posts (the ones
+// that matter for fresh analytics) are always covered. Add offset paging here if the archive grows.
+const PUBLISHED_PATH =
+  "/api/v1/post_management/published?offset=0&limit=25&order_by=post_date&order_direction=desc";
 
 // Reach the publication dashboard via the "Dashboard" nav link, and read the subdomain off the
-// resulting /publish/ URL (we can't hardcode Muxin's subdomain).
+// resulting /publish/ URL (we can't hardcode Muxin's subdomain, and the analytics API is served
+// from the publication origin).
 async function publicationOrigin(page: Page): Promise<string> {
   const dashboard = page
     .getByRole("link", { name: /dashboard/i })
@@ -45,80 +51,10 @@ async function publicationOrigin(page: Page): Promise<string> {
   return new URL(page.url()).origin;
 }
 
-// Request a FRESH export in the Import/Export section, then poll for a NEW download link to show
-// up. Substack generates the export server-side; a finished one exposes a direct file link at
-// /api/v1/publication_export/<id>/file (aria-label "Download"). We snapshot the links present
-// BEFORE clicking so we grab OUR new export, not a stale earlier one. (Verified against the live
-// settings DOM 2026-07-03: the button is exactly "New export"; a broad /export/i match hit the
-// "Import / Export" section nav link instead and only scrolled the page.)
-async function exportAndDownload(page: Page, origin: string): Promise<Download> {
-  try {
-    await page.goto(`${origin}/publish/settings#import-export-settings`, {
-      waitUntil: "domcontentloaded",
-      timeout: 30_000,
-    });
-  } catch (cause) {
-    throw new PullError("NETWORK", `Couldn't load Substack settings (${origin}/publish/settings)`, {
-      hint: "Check your connection / that Substack opens in a normal browser.",
-      cause,
-    });
-  }
-
-  const exportHrefs = (): Promise<string[]> =>
-    page
-      .locator('a[href*="publication_export"]')
-      .evaluateAll((els) =>
-        els.map((e) => (e as HTMLAnchorElement).getAttribute("href") || "").filter(Boolean)
-      );
-  const before = new Set(await exportHrefs());
-
-  // "New export" builds the full data export: posts.csv + per-post event logs + email list.
-  const newExport = page
-    .getByRole("button", { name: /new export/i })
-    .or(page.getByRole("link", { name: /new export/i }))
-    .first();
-  try {
-    await newExport.waitFor({ state: "visible", timeout: 15_000 });
-    await newExport.click();
-  } catch (cause) {
-    const diag = await captureDiagnostics(page, "substack", "export-trigger-missing");
-    throw new PullError("UI_CHANGED", `"New export" button not found in Substack Import/Export (${page.url()})`, {
-      hint: `Check the "New export" button in the Import/Export section; update src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
-      diagnosticsDir: diag,
-      cause,
-    });
-  }
-
-  // Async: poll (up to 5 min) for an export link that wasn't present before the click.
-  const deadline = Date.now() + 5 * 60_000;
-  let freshHref: string | undefined;
-  while (Date.now() < deadline) {
-    freshHref = (await exportHrefs()).find((h) => !before.has(h));
-    if (freshHref) break;
-    await page.waitForTimeout(5_000);
-  }
-  if (!freshHref) {
-    const diag = await captureDiagnostics(page, "substack", "no-download");
-    throw new PullError("UI_CHANGED", `Export requested but no new download link appeared within 5 min on ${page.url()}`, {
-      hint: `Substack may still be generating it or emails it instead — re-run, or check src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
-      diagnosticsDir: diag,
-    });
-  }
-
-  try {
-    const [download] = await Promise.all([
-      page.waitForEvent("download", { timeout: 60_000 }),
-      page.locator(`a[href="${freshHref}"]`).first().click(),
-    ]);
-    return download;
-  } catch (cause) {
-    const diag = await captureDiagnostics(page, "substack", "download-click-failed");
-    throw new PullError("UI_CHANGED", `Found the export link but the download didn't start on ${page.url()}`, {
-      hint: `The Download link may open a new tab or serve inline — check src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
-      diagnosticsDir: diag,
-      cause,
-    });
-  }
+// Minimal CSV-cell escaping (titles can contain commas/quotes/newlines).
+function csvCell(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export const substack: PlatformPuller = {
@@ -145,35 +81,65 @@ export const substack: PlatformPuller = {
       });
     }
 
-    // 3) Dashboard → Settings → export (throws UI_CHANGED with diagnostics if the flow moved).
+    // 3) Resolve the publication origin (learns the subdomain), then fetch per-post analytics
+    //    JSON with the authenticated context.
     const origin = await publicationOrigin(page);
-    const download = await exportAndDownload(page, origin);
-
-    // 4) Save + unpack. The full export is a .zip (posts.csv + per-post event logs) that
-    //    parseSubstackExport reads as a FOLDER; a plain stats CSV is saved as-is for parseSubstack.
+    let posts: any[];
     try {
-      const stamp = new Date().toISOString().slice(0, 10);
-      const suggested = download.suggestedFilename();
-      // The full export serves as a .zip (posts.csv + posts/ event logs + email list); the API
-      // /file endpoint may not put ".zip" in the suggested name, so treat anything not-.csv as zip.
-      if (!/\.csv$/i.test(suggested)) {
-        const zipPath = join(tmpdir(), `substack-export-${stamp}.zip`);
-        await download.saveAs(zipPath);
-        const destDir = join(inboxDir("substack"), `substack-export-${stamp}`);
-        mkdirSync(destDir, { recursive: true });
-        // macOS ships `unzip`; preserve the posts/ subfolder structure the parser expects.
-        const unzip = spawnSync("unzip", ["-o", zipPath, "-d", destDir], { encoding: "utf8" });
-        if (unzip.status !== 0) {
-          throw new Error(`unzip failed: ${(unzip.stderr || unzip.stdout || "").trim()}`);
-        }
-        return [destDir];
+      const resp = await page.request.get(`${origin}${PUBLISHED_PATH}`);
+      if (!resp.ok()) {
+        throw new PullError("UI_CHANGED", `Substack analytics API returned ${resp.status()} (${origin}${PUBLISHED_PATH})`, {
+          hint: "The dashboard API shape/params may have changed — re-check the query in src/pull/platforms/substack.ts.",
+        });
       }
+      const json = (await resp.json()) as { posts?: any[] };
+      posts = json.posts ?? [];
+    } catch (cause) {
+      if (cause instanceof PullError) throw cause;
+      throw new PullError("UI_CHANGED", `Couldn't read the Substack analytics API (${origin}${PUBLISHED_PATH})`, {
+        hint: "The dashboard API may have moved — re-check src/pull/platforms/substack.ts.",
+        cause,
+      });
+    }
+    if (posts.length === 0) {
+      throw new PullError("UI_CHANGED", "Substack analytics API returned no published posts", {
+        hint: "Unexpected empty result — verify published posts exist / the API params in src/pull/platforms/substack.ts.",
+      });
+    }
+
+    // 4) Map to the CSV columns parseSubstack already understands and write it to the inbox.
+    try {
+      const header = [
+        "post_id", "title", "post_date", "url", "views", "opens",
+        "open_rate", "clicks", "signups", "reactions", "comments", "shares",
+      ];
+      const lines = [header.join(",")];
+      for (const p of posts) {
+        const s = p.stats ?? {};
+        lines.push(
+          [
+            p.id,
+            p.title,
+            p.post_date,
+            p.slug ? `${origin}/p/${p.slug}` : "",
+            s.views,
+            s.opens,
+            s.open_rate,
+            s.clicks,
+            s.signups_within_1_day ?? s.signups,
+            p.reaction_count,
+            p.comment_count,
+            s.shares,
+          ].map(csvCell).join(",")
+        );
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
       const dest = join(inboxDir("substack"), `substack-stats-${stamp}.csv`);
-      await download.saveAs(dest);
+      writeFileSync(dest, lines.join("\n") + "\n");
       return [dest];
     } catch (cause) {
-      throw new PullError("DOWNLOAD_FAILED", "Export downloaded but saving/unpacking it failed", {
-        hint: "Check disk space / write permission for data/inbox/substack/ (and that `unzip` is available).",
+      throw new PullError("DOWNLOAD_FAILED", "Fetched analytics but writing the CSV failed", {
+        hint: "Check disk space / write permission for data/inbox/substack/.",
         cause,
       });
     }
