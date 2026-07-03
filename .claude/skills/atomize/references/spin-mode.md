@@ -35,10 +35,13 @@ copy; it shapes the framing, the words still come from Muxin. `src/atomize/spin.
    `review-queue.md` approval gate are unchanged. Nothing publishes without Muxin's `approve`.
 
 **Which derivatives get spun:** every text derivative whose platform has a `spin_angles` entry,
-so X, LinkedIn, and Bluesky today. Platforms with no configured angle stay verbatim with no spin
-frontmatter: the quote card (its quote line is a verbatim quotable by definition), community
-variants, and anything else `resolveAngle` returns nothing for. A `--no-spin` run spins nothing:
-all derivatives are verbatim, `source_lines` hard-required, no `spin`/`angle` keys.
+so X, LinkedIn, and Bluesky today — INCLUDING a quote card's per-platform context captions
+(`quote-card-N-<target>.md`, whose `platform` is the target channel), since each is a real text
+post for that channel. What stays verbatim: the card's QUOTE itself (the `quote-card-N.md`
+definition that renders onto the image — a verbatim quotable by definition, `platform: quote-card`,
+no angle), community variants, and anything else `resolveAngle` returns nothing for. A `--no-spin`
+run spins nothing: all derivatives (captions included) are verbatim, `source_lines` hard-required,
+no `spin`/`angle` keys.
 
 **The invent-vs-flavor line, made concrete.** Say `source.md` line 14 reads:
 
