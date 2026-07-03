@@ -10,6 +10,7 @@
     "bluesky": "tsx src/ingest/fetch-bluesky.ts",
     "pull": "tsx src/pull/pull.ts",
     "pull:login": "tsx src/pull/login.ts",
+    "pull:weekly": "tsx src/cron/weekly-pull.ts",
     "snapshot": "tsx src/strategy/snapshot.ts",
     "resonance": "tsx src/strategy/resonance.ts",
     "audience": "tsx src/strategy/audience.ts",
