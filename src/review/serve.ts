@@ -17,6 +17,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { join, basename, extname } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
@@ -32,6 +35,11 @@ const SCHEDULABLE = new Set(["x", "linkedin", "bluesky"]);
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
 
+// "Revise with Claude": shell out to headless Claude Code (`claude -p`), which uses Muxin's
+// subscription ($0 marginal), to edit ONE derivative in place per a natural-language instruction.
+const execFileP = promisify(execFile);
+const REVISE_TIMEOUT_MS = 180_000;
+
 type Kind = "text" | "image" | "video" | "storyboard" | "unknown";
 
 interface EnrichedRow extends QueueRow {
@@ -42,6 +50,7 @@ interface EnrichedRow extends QueueRow {
   sourceLines?: unknown;
   assetUrl?: string; // image/video preview URL
   editable: boolean; // can the body be edited-and-saved here?
+  revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
   hasAsset: boolean;
 }
 
@@ -93,7 +102,13 @@ function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
   else if (row.format === "video") kind = "video";
   else if (row.format === "storyboard") kind = "storyboard";
 
-  const out: EnrichedRow = { ...row, kind, editable: false, hasAsset: false };
+  const out: EnrichedRow = {
+    ...row,
+    kind,
+    editable: false,
+    revisable: existsSync(join(folder, "derivatives", `${row.id}.md`)),
+    hasAsset: false,
+  };
   const assetUrl = (file: string) => `/asset?slug=${encodeURIComponent(slug)}&file=${encodeURIComponent(file)}`;
 
   const loadMd = (relPath: string) => {
@@ -188,6 +203,67 @@ function saveDerivative(slug: string, id: string, body: string): void {
   if (!existsSync(p)) throw new Error("no such derivative");
   const { header } = splitRaw(readFileSync(p, "utf8"));
   writeFileSync(p, header + body.trim() + "\n");
+}
+
+// Build the instruction for a single-file, extraction-first revision. Kept explicit + exported so
+// the guardrails (edit only this file, keep frontmatter, stay traceable, voice.yaml) can't drift.
+export function revisePrompt(slug: string, id: string, platform: string, instruction: string): string {
+  const isCardCaption = /^quote-card-\d+-[a-z]+$/i.test(id);
+  return [
+    `Revise ONE content derivative in place for Muxin Li's content pipeline. Do not run shell commands; just edit the one file, then stop.`,
+    ``,
+    `File to edit: content/${slug}/derivatives/${id}.md   (platform: ${platform || "?"})`,
+    `Muxin's request: "${instruction}"`,
+    ``,
+    `Rules:`,
+    `- Edit ONLY that one file. Touch nothing else.`,
+    `- Keep the YAML frontmatter block intact (platform, spin, angle, source_lines, cta, ...). Change only the body (the post text) unless the request is explicitly about frontmatter.`,
+    `- Extraction-first: the body must stay traceable to Muxin's source at content/${slug}/source.md. If the derivative has spin: true you may re-angle within its config/platforms.yaml spin_angles guardrails, but NEVER invent a claim, statistic, metaphor, or worldview Muxin did not express.`,
+    `- Follow config/voice.yaml: no em dashes, no AI tells, Muxin's plain PM voice.`,
+    `- Respect the platform's max_chars in config/platforms.yaml.`,
+    isCardCaption
+      ? `- This is a quote-card CAPTION: it gives CONTEXT around the quote shown on the image. Do not restate the quote; keep it context-only.`
+      : ``,
+    `- Be surgical: apply the request, do not rewrite what was not asked.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+// Run the revision through headless Claude Code (subscription, no per-token API cost), then return
+// the edited body. Failures (missing CLI, timeout, non-zero exit, no-op) surface as thrown messages
+// the GUI shows instead of crashing.
+async function reviseDerivative(slug: string, id: string, instruction: string): Promise<string> {
+  const folder = safeFolder(slug);
+  if (!/^[\w.-]+$/.test(id)) throw new Error("bad id");
+  if (!instruction.trim()) throw new Error("tell Claude what to change first");
+  const p = join(folder, "derivatives", `${id}.md`);
+  if (!existsSync(p)) throw new Error("no such derivative to revise");
+
+  const original = splitRaw(readFileSync(p, "utf8"));
+  const platform = typeof original.fm.platform === "string" ? original.fm.platform : "";
+  const prompt = revisePrompt(slug, id, platform, instruction.trim());
+
+  try {
+    await execFileP("claude", ["-p", prompt, "--permission-mode", "acceptEdits"], {
+      cwd: repoRoot,
+      timeout: REVISE_TIMEOUT_MS,
+      maxBuffer: 20_000_000,
+    });
+  } catch (e) {
+    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
+    if (err.code === "ENOENT") {
+      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
+    }
+    if (err.killed) throw new Error(`Claude timed out after ${REVISE_TIMEOUT_MS / 1000}s`);
+    throw new Error(`Claude revise failed: ${(err.stderr || err.message || "unknown").slice(0, 300)}`);
+  }
+
+  const after = splitRaw(readFileSync(p, "utf8")).body;
+  if (after === original.body) {
+    throw new Error("Claude ran but didn't change anything — try a more specific instruction");
+  }
+  return after;
 }
 
 function serveAsset(res: ServerResponse, slug: string, file: string): void {
@@ -300,17 +376,31 @@ const server = createServer(async (req, res) => {
       json(res, 200, { ok: true });
       return;
     }
+    if (req.method === "POST" && url.pathname === "/api/revise") {
+      const b = await readBody(req);
+      try {
+        const body = await reviseDerivative(String(b.slug ?? ""), String(b.id ?? ""), String(b.instruction ?? ""));
+        json(res, 200, { ok: true, body });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
     res.writeHead(404).end("not found");
   } catch (e) {
     json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`\n  Review queue → http://localhost:${PORT}\n`);
-  console.log("  Approve / revise / discard / edit every pending derivative in one place.");
-  console.log("  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.\n");
-});
+// Start the server only when run directly (npm run review), so tests can import revisePrompt et al.
+// without binding the port.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  server.listen(PORT, () => {
+    console.log(`\n  Review queue → http://localhost:${PORT}\n`);
+    console.log("  Approve / revise / discard / edit every pending derivative in one place.");
+    console.log("  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.\n");
+  });
+}
 
 // ── the page (self-contained, no build step, no external requests) ──────────────────────────
 const PAGE = /* html */ `<!doctype html>
@@ -384,6 +474,13 @@ const PAGE = /* html */ `<!doctype html>
   .revisebox { margin-top:9px; display:none; gap:7px; }
   .revisebox.show { display:flex; }
   .revisebox input { flex:1; font:inherit; padding:7px 10px; border:1px solid var(--muted); border-radius:7px; }
+  button.ai { border-color:#5b46b8; color:#5b46b8; }
+  button.ai:hover { background:#efeafd; }
+  .aibox { margin-top:9px; display:none; gap:7px; }
+  .aibox.show { display:flex; }
+  .aibox input { flex:1; font:inherit; padding:7px 10px; border:1px solid #5b46b8; border-radius:7px; }
+  .aibox button.send { border-color:#5b46b8; background:#5b46b8; color:#fff; }
+  .thinking { font-size:13px; color:#5b46b8; font-weight:600; padding:4px 0; }
   .flash { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent);
     color:var(--paper); padding:9px 16px; border-radius:8px; font-size:13px; opacity:0;
     transition:.2s; pointer-events:none; }
@@ -442,6 +539,7 @@ function rowEl(piece, row){
   const sched = row.scheduledWhen ? '<div class="scheduled">✓ scheduled · '+esc(row.scheduledWhen)+'</div>' : "";
   const manual = row.manualComment ? '<div class="notes">↳ add as first comment in Typefully: '+esc(row.manualComment)+'</div>' : "";
   const editBtn = row.editable ? '<button data-act="edit">Edit</button>' : "";
+  const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Ask Claude</button>' : "";
   const schedulable = ["x","linkedin","bluesky"].includes(row.platform);
   const approveLabel = schedulable ? "Approve → schedule" : "Approve";
 
@@ -456,9 +554,10 @@ function rowEl(piece, row){
       '<button class="approve'+(row.status==="approve"?" on":"")+'" data-act="approve">'+approveLabel+'</button>'+
       '<button class="revise'+(row.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(row.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
-      '<span class="spacer"></span>'+ editBtn +
+      '<span class="spacer"></span>'+ editBtn + aiBtn +
     '</div>'+
-    '<div class="revisebox"><input placeholder="what needs changing?" value="'+esc(row.notes||"")+'" /><button data-act="save-note">Save note</button></div>';
+    '<div class="revisebox"><input placeholder="what needs changing?" value="'+esc(row.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
+    '<div class="aibox"><input placeholder="tell Claude what to change…" /><button class="send" data-act="ai-send">Send to Claude</button></div>';
 
   el.addEventListener("click", (e)=>onAction(e, piece, row, el));
   return el;
@@ -490,6 +589,17 @@ async function onAction(e, piece, row, el){
     const ta = el.querySelector("textarea"); if(!ta) return;
     await post("/api/derivative",{slug:piece.slug,id:row.id,body:ta.value});
     row.body = ta.value.trim(); flash("Saved"); rerender();
+  } else if (act === "ai"){
+    const box = el.querySelector(".aibox"); box.classList.toggle("show");
+    const inp = el.querySelector(".aibox input"); if(inp && box.classList.contains("show")) inp.focus();
+  } else if (act === "ai-send"){
+    const inp = el.querySelector(".aibox input"); const instruction = inp ? inp.value.trim() : "";
+    if(!instruction){ flash("Type what you want changed first"); return; }
+    el.querySelector(".aibox").innerHTML = '<div class="thinking">✨ Claude is revising… (your subscription, ~10-30s)</div>';
+    const r = await post("/api/revise",{slug:piece.slug,id:row.id,instruction});
+    if(r.ok){ row.body = r.body; flash("Revised by Claude"); }
+    else { flash("Revise failed: "+(r.error||"error")); }
+    rerender();
   }
 }
 
