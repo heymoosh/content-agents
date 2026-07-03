@@ -96,26 +96,37 @@ function splitByPlacement(targets: ImageTarget[], cfg: CtaConfig): { withLink: I
   return { withLink, noLink };
 }
 
-// Quote line for a card = the verbatim body of derivatives/<row.id>.md. fm carries cta / cta_label
-// (for the link) plus from_brief / directives_applied (for the bet placement row).
-function cardCopy(folder: string, rowId: string): { quote: string; fm: Record<string, unknown> } {
+// A card row's platform is either legacy `quote-card` (one card fanned out to every connected
+// account) or per-platform `quote-card:<target>` (the current model: a card whose CAPTION is a
+// spun, context-only text post written for that one platform, so a quote never ships out of
+// context). basePlatform strips the suffix; cardTarget returns the destination (null when legacy).
+export const basePlatform = (p: string): string => p.split(":")[0];
+export function cardTarget(rowPlatform: string): string | null {
+  const parts = rowPlatform.split(":");
+  return parts.length > 1 && parts[1] ? parts[1] : null;
+}
+
+// The post BODY for a card = the body of derivatives/<row.id>.md. For a `quote-card:<target>` row
+// that's the per-platform CONTEXT caption (the quote itself lives on the image, rendered from the
+// separate quote-card-N.md definition derivative); for a legacy `quote-card` row it's the quote.
+function cardCopy(folder: string, rowId: string): { text: string; fm: Record<string, unknown> } {
   const path = join(folder, "derivatives", `${rowId}.md`);
   if (!existsSync(path)) {
     throw new Error(`missing card derivative ${path} — every quote-card row needs derivatives/<id>.md for its caption`);
   }
   const { fm, body } = splitFrontmatter(readFileSync(path, "utf8"));
-  const quote = body.trim();
-  if (!quote) throw new Error(`card derivative ${path} has no quote text in its body`);
-  return { quote, fm };
+  const text = body.trim();
+  if (!text) throw new Error(`card derivative ${path} has no caption text in its body`);
+  return { text, fm };
 }
 
 function approvedCards(folder: string) {
   const { rows } = readQueue(folder);
-  return rows.filter((r) => r.status === "approve" && r.platform === "quote-card");
+  return rows.filter((r) => r.status === "approve" && basePlatform(r.platform) === "quote-card");
 }
 
 // The destinations + caption for one card: inline-link group and/or no-link group per cta.yaml.
-function planGroups(
+export function planGroups(
   quote: string,
   targets: ImageTarget[],
   ctaUrl: string | null,
@@ -150,8 +161,11 @@ async function runCheck(folder: string | null): Promise<void> {
       for (const c of cards) {
         const imagePath = isAbsolute(c.asset) ? c.asset : join(folder, c.asset);
         const rendered = existsSync(imagePath) ? "rendered" : "NOT RENDERED — run `npm run render -- --still`";
-        const { url } = resolveCta(cardCopy(folder, c.id).fm, canonicalUrl, cfg, sourceKind);
-        console.log(`  • ${c.id}  ${c.asset} (${rendered})  ${url ? `link → ${url}` : "no link"}`);
+        const { text, fm } = cardCopy(folder, c.id);
+        const { url } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+        const target = cardTarget(c.platform) ?? "all platforms";
+        console.log(`  • ${c.id} → ${target}  ${c.asset} (${rendered})  ${url ? `link → ${url}` : "no link"}`);
+        console.log(`      caption: ${text.replace(/\s+/g, " ").slice(0, 100)}${text.length > 100 ? "…" : ""}`);
       }
     }
     console.log("");
@@ -211,42 +225,55 @@ async function main() {
   const canonicalUrl = loadCanonicalUrl(folder);
   const sourceKind = loadSourceKind(folder);
 
-  // Claim a slot per card from the unified scheduler (windowKey `quote-card`), de-conflicting
-  // against each target platform so a card never shares a day with a text post there. `--at`
-  // overrides for a one-off/test (bypasses the scheduler + ledger).
-  let times: string[];
+  // Validate a `--at` override once (one-off/test; bypasses the scheduler + ledger).
+  let atIso: string | null = null;
   if (atOverride) {
     const at = new Date(atOverride);
     if (Number.isNaN(at.getTime())) throw new Error(`--at is not a valid ISO date: ${atOverride}`);
     if (at.getTime() <= Date.now()) throw new Error(`--at is in the past: ${atOverride} — pick a future time`);
-    times = cards.map(() => at.toISOString());
-  } else {
-    times = claimSlots({
-      windowKey: "quote-card",
-      conflictPlatforms: conflictPlatforms(allTargets),
-      count: cards.length,
-      asset: `${basename(folder)}/cards`,
-      by: "cards",
-    }).times;
+    atIso = at.toISOString();
   }
 
   for (let i = 0; i < cards.length; i++) {
     const row = cards[i];
+    const target = cardTarget(row.platform); // "x" | "linkedin" | "bluesky" | null (legacy fan-out)
     const imagePath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
     if (!existsSync(imagePath)) {
       throw new Error(`missing ${imagePath} — render the card first: npm run render -- --still ${folder}`);
     }
-    const scheduledFor = times[i];
-    if (!scheduledFor || scheduledFor === "next-free-slot") {
-      throw new Error("no card slot available — give config/platforms.yaml a `quote-card` cadence (posts_per_week + slot_days + slot_time_pst)");
+
+    // Where this row posts: the single target's connected account(s), or every account (legacy).
+    const rowTargets = target ? allTargets.filter((t) => platformKey(t.platform) === target) : allTargets;
+    if (rowTargets.length === 0) {
+      console.warn(`  ⚠ ${row.id}: no connected ${target} account on ${provider.providerName} — skipping`);
+      continue;
     }
-    const { quote, fm } = cardCopy(folder, row.id);
+
+    // One card slot for this row, de-conflicting against the platform(s) it occupies so it never
+    // shares a day with a text post there. `--at` overrides the scheduler for a one-off.
+    let scheduledFor: string;
+    if (atIso) {
+      scheduledFor = atIso;
+    } else {
+      scheduledFor = claimSlots({
+        windowKey: "quote-card",
+        conflictPlatforms: conflictPlatforms(rowTargets),
+        count: 1,
+        asset: `${basename(folder)}/${row.id}`,
+        by: "cards",
+      }).times[0];
+      if (!scheduledFor || scheduledFor === "next-free-slot") {
+        throw new Error("no card slot available — give config/platforms.yaml a `quote-card` cadence (posts_per_week + slot_days + slot_time_pst)");
+      }
+    }
+
+    const { text: caption, fm } = cardCopy(folder, row.id);
     const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
     if (usedFallback) {
       console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
     }
 
-    const groups = planGroups(quote, allTargets, ctaUrl, ctaLabel, cfg);
+    const groups = planGroups(caption, rowTargets, ctaUrl, ctaLabel, cfg);
     const refs: string[] = [];
     for (const g of groups) {
       const dest = g.targets.map((t) => t.platform).join("+");
@@ -256,8 +283,12 @@ async function main() {
       appendPublishLog(folder, `${row.id} → ${provider.providerName} ${ref} [${dest}${link}] (scheduled ${scheduledFor})`);
     }
     setStatus(folder, row, "published");
-    appendBetPlacement(folder, row.id, row.platform, `${refs.join(" | ")} @ ${scheduledFor}`, fm, quote);
-    console.log(`scheduled: ${row.id} → ${provider.providerName} ${refs.join(" | ")} @ ${scheduledFor}`);
+    // Record the placement under the ACTUAL destination platform, with the CAPTION as the match key,
+    // so tag-source attributes the card post per platform (and fm.spin → the `| spin` marker →
+    // classified atomized-spin). Legacy fan-out rows keep the shared "quote-card" key.
+    const betPlatform = target ?? "quote-card";
+    appendBetPlacement(folder, row.id, betPlatform, `${refs.join(" | ")} @ ${scheduledFor}`, fm, caption);
+    console.log(`scheduled: ${row.id} (${target ?? "all platforms"}) → ${provider.providerName} ${refs.join(" | ")} @ ${scheduledFor}`);
   }
 }
 

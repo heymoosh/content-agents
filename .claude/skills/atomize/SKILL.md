@@ -91,7 +91,8 @@ derivative, the video script, and the video title/description. The short version
    - Community variants ONLY where routing **and** the brief agree there's a reason to post,
      e.g. `community-democratic-resilience.md`. Respect `config/platforms.yaml` community notes
      (ABC Builders: observe-only unless brief says otherwise).
-   - `quote-card-1.md` (a verbatim quotable line) — drives the quote-card asset (step 7).
+   - Quote cards are made in **step 7** (a verbatim quote line `quote-card-N.md` that renders the
+     image, plus a spun per-platform CONTEXT caption per routed channel) — not here.
    - File format:
      ```markdown
      ---
@@ -111,9 +112,10 @@ derivative, the video script, and the video title/description. The short version
    - **Apply the channel's spin angle by default.** For each platform with a `spin_angles`
      entry in `config/platforms.yaml` (x, linkedin, bluesky), reframe the derivative through
      that approved angle and mark it `spin: true` + `angle: <platform>` per
-     `references/spin-mode.md`. Platforms with no configured angle (quote-card, community) stay
-     verbatim with no spin frontmatter. On a `--no-spin` run, skip all of this and draft every
-     derivative verbatim.
+     `references/spin-mode.md`. This includes a quote card's per-platform context captions (step 7).
+     What stays verbatim with no spin frontmatter: the quote-card DEFINITION line (the image quote),
+     community variants, and anything with no `spin_angles` entry. On a `--no-spin` run, skip all of
+     this and draft every derivative verbatim.
    - Text derivatives are ALWAYS Claude-authored and extraction-first. Do NOT pass them
      through `text-polish` — that provider (Grok) is reserved for video scripts, which now live
      in the `/video` skill.
@@ -128,10 +130,10 @@ derivative, the video script, and the video title/description. The short version
    isn't a "go read the essay" invite, you may set its `cta` to a literal url or `none` instead.
    **Never write the link into the post body** — `/publish` places it per platform from
    `cta.yaml` `placement` (X → first reply, LinkedIn → first comment, Bluesky/community →
-   inline), so the body stays clean and dodges the in-post link penalty. The `quote-card` takes
-   the pillar CTA too (default `cta: source`); `publish:cards` places it INLINE on inline platforms
-   (Bluesky/LinkedIn) and OMITS it where placement is `reply` (X), since the image relays can't post
-   a reply. Set a card's `cta` to `none` only to deliberately ship it link-free.
+   inline), so the body stays clean and dodges the in-post link penalty. Each per-platform card
+   caption takes the pillar CTA too (default `cta: source`); `publish:cards` places it INLINE on
+   inline platforms (Bluesky/LinkedIn) and OMITS it where placement is `reply` (X), since the image
+   relays can't post a reply. Set a caption's `cta` to `none` only to deliberately ship it link-free.
    Donations are never the headline ask; the default CTA is "come read / subscribe."
    - **Check `canonical_url`.** If source.md has no `canonical_url` (a local draft, not yet
      published), tell Muxin to paste the published essay URL into source.md before `/publish` —
@@ -149,8 +151,30 @@ derivative, the video script, and the video title/description. The short version
    `spin: true` derivative to carry an `angle` that matches its own platform's `spin_angles`
    entry; see `references/spin-mode.md`.)
 
-7. **Generate the quote-card asset** (cheap, extraction-first):
-   - `npm run render -- --still <folder> --quote quote-card-1`
+7. **Generate the quote-card asset(s)** (cheap, extraction-first). A card is a bare-quote IMAGE
+   shared across platforms, each with its OWN per-platform CONTEXT caption — so the quote never
+   ships alone, out of context (Muxin, 2026-07-03). Three parts per card N:
+
+   a. **Definition derivative** `derivatives/quote-card-N.md` — the verbatim quote line that goes
+      ON the image. `platform: quote-card`, `source_lines: [<the quote's line>]`, no spin, body =
+      the quote (≤180 chars). This is NOT a posting row; it only drives rendering.
+   b. **Render it:** `npm run render -- --still <folder> --quote quote-card-N` → writes both
+      `images/quote-card-N.png` (still) and `images/quote-card-N.mp4` (animated companion).
+   c. **Per-platform context captions** `derivatives/quote-card-N-<target>.md`, one for EACH routed
+      text platform (x / linkedin / bluesky that routing marked `include`). Each is a normal spun
+      text derivative — `platform: <target>`, `spin: true`, `angle: <target>`, best-effort
+      `source_lines` (the lines AROUND the quote), `cta`/`cta_label` — whose body is the CONTEXT
+      that frames the quote: the setup, mechanism, or stakes drawn from the surrounding source
+      lines. **Context only: never repeat the quote that's already on the image.** Same spin
+      guardrails as any text post (reframe through the channel angle, never invent a claim). On a
+      `--no-spin` run, write the caption verbatim (no `spin`/`angle`, `source_lines` hard-required)
+      — still context-only. Char limit is the TARGET platform's (X 280, etc.), enforced by validate.
+
+   Then add one review-queue row per caption (step 8): `quote-card-N-<target> | quote-card:<target>
+   | image | images/quote-card-N.png | …`. `publish:cards` posts the shared image to that one
+   platform with that platform's caption, and records the placement under the real destination
+   platform so `tag-source` / `origin-compare` measure how each channel's card did.
+
    - **Image model policy — cost-first, escalate only on request, NEVER automatically.** Default
      is **Riverflow** (~$0.02). If Muxin dislikes a result, do NOT silently switch to a pricier
      model — **offer first**: *"we can try a different prompt on Riverflow, or step up to a more
@@ -158,13 +182,16 @@ derivative, the video script, and the video title/description. The short version
      `--hero` (gpt-5.4-image-2 ~$0.23). (Free option for flat conceptual spots: hand-author an
      SVG → `remotion-svg` path / `/bakeoff`.)
 
-   **Video shorts are a separate skill.** `/atomize` no longer scripts or renders video — that
-   keeps it cheap (text + quote cards). To turn this piece into a short, run **`/video <folder>`**
+   The **animated companion** (`images/quote-card-N.mp4`, from step 7b) reuses the SAME per-platform
+   context caption when posted as a native video, so the out-of-context fix applies to both.
+   **Video shorts are a separate skill.** `/atomize` no longer scripts or renders video — that keeps
+   it cheap (text + quote cards). To turn this piece into a short, run **`/video <folder>`**
    (script → storyboard → review → render).
 
 8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset that was
-   generated — the routing `include` text platforms plus the quote card
-   (id, platform, format, asset path, scores, status=pending). Then STOP. Do not publish.
+   generated — the routing `include` text platforms, plus ONE `quote-card:<target>` row per routed
+   platform for the card (each pointing at the shared `images/quote-card-N.png`, caption from its
+   own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending). Then STOP. Do not publish.
    Tell Muxin: the folder path, asset counts, which platforms routing skipped (and why, per
    `routing.md`), and anything else skipped. If Muxin wants a skipped platform anyway, they can
    say so (or adjust `config/routing.yaml`) and you'll generate it. If the piece is a good
