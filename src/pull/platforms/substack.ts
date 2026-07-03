@@ -45,11 +45,18 @@ async function publicationOrigin(page: Page): Promise<string> {
   return new URL(page.url()).origin;
 }
 
-// Request a fresh export, then poll the exports list for the Download link (it appears once the
-// job finishes — can take minutes) and capture the file it downloads.
+// Request a FRESH export in the Import/Export section, then poll for a NEW download link to show
+// up. Substack generates the export server-side; a finished one exposes a direct file link at
+// /api/v1/publication_export/<id>/file (aria-label "Download"). We snapshot the links present
+// BEFORE clicking so we grab OUR new export, not a stale earlier one. (Verified against the live
+// settings DOM 2026-07-03: the button is exactly "New export"; a broad /export/i match hit the
+// "Import / Export" section nav link instead and only scrolled the page.)
 async function exportAndDownload(page: Page, origin: string): Promise<Download> {
   try {
-    await page.goto(`${origin}/publish/settings`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.goto(`${origin}/publish/settings#import-export-settings`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30_000,
+    });
   } catch (cause) {
     throw new PullError("NETWORK", `Couldn't load Substack settings (${origin}/publish/settings)`, {
       hint: "Check your connection / that Substack opens in a normal browser.",
@@ -57,35 +64,57 @@ async function exportAndDownload(page: Page, origin: string): Promise<Download> 
     });
   }
 
+  const exportHrefs = (): Promise<string[]> =>
+    page
+      .locator('a[href*="publication_export"]')
+      .evaluateAll((els) =>
+        els.map((e) => (e as HTMLAnchorElement).getAttribute("href") || "").filter(Boolean)
+      );
+  const before = new Set(await exportHrefs());
+
+  // "New export" builds the full data export: posts.csv + per-post event logs + email list.
   const newExport = page
-    .getByRole("button", { name: /new export|create.*export|export/i })
-    .or(page.getByRole("link", { name: /new export|create.*export|export/i }))
+    .getByRole("button", { name: /new export/i })
+    .or(page.getByRole("link", { name: /new export/i }))
     .first();
   try {
     await newExport.waitFor({ state: "visible", timeout: 15_000 });
     await newExport.click();
   } catch (cause) {
     const diag = await captureDiagnostics(page, "substack", "export-trigger-missing");
-    throw new PullError("UI_CHANGED", `Export control not found in Substack settings (${page.url()})`, {
-      hint: `Find the "Exports" section / "New export" button and update src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
+    throw new PullError("UI_CHANGED", `"New export" button not found in Substack Import/Export (${page.url()})`, {
+      hint: `Check the "New export" button in the Import/Export section; update src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
       diagnosticsDir: diag,
       cause,
     });
   }
 
-  // Async: the Download link shows up once the export is built. Poll generously (5 min).
-  const downloadLink = page.getByRole("link", { name: /download/i }).first();
+  // Async: poll (up to 5 min) for an export link that wasn't present before the click.
+  const deadline = Date.now() + 5 * 60_000;
+  let freshHref: string | undefined;
+  while (Date.now() < deadline) {
+    freshHref = (await exportHrefs()).find((h) => !before.has(h));
+    if (freshHref) break;
+    await page.waitForTimeout(5_000);
+  }
+  if (!freshHref) {
+    const diag = await captureDiagnostics(page, "substack", "no-download");
+    throw new PullError("UI_CHANGED", `Export requested but no new download link appeared within 5 min on ${page.url()}`, {
+      hint: `Substack may still be generating it or emails it instead — re-run, or check src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
+      diagnosticsDir: diag,
+    });
+  }
+
   try {
-    await downloadLink.waitFor({ state: "visible", timeout: 5 * 60_000 });
     const [download] = await Promise.all([
       page.waitForEvent("download", { timeout: 60_000 }),
-      downloadLink.click(),
+      page.locator(`a[href="${freshHref}"]`).first().click(),
     ]);
     return download;
   } catch (cause) {
-    const diag = await captureDiagnostics(page, "substack", "no-download");
-    throw new PullError("UI_CHANGED", `Export requested but no Download link/download appeared on ${page.url()}`, {
-      hint: `Substack may email the export, place it elsewhere, or need more time. Re-check src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
+    const diag = await captureDiagnostics(page, "substack", "download-click-failed");
+    throw new PullError("UI_CHANGED", `Found the export link but the download didn't start on ${page.url()}`, {
+      hint: `The Download link may open a new tab or serve inline — check src/pull/platforms/substack.ts. Screenshot: ${join(diag, "screenshot.png")}`,
       diagnosticsDir: diag,
       cause,
     });
@@ -125,7 +154,9 @@ export const substack: PlatformPuller = {
     try {
       const stamp = new Date().toISOString().slice(0, 10);
       const suggested = download.suggestedFilename();
-      if (/\.zip$/i.test(suggested)) {
+      // The full export serves as a .zip (posts.csv + posts/ event logs + email list); the API
+      // /file endpoint may not put ".zip" in the suggested name, so treat anything not-.csv as zip.
+      if (!/\.csv$/i.test(suggested)) {
         const zipPath = join(tmpdir(), `substack-export-${stamp}.zip`);
         await download.saveAs(zipPath);
         const destDir = join(inboxDir("substack"), `substack-export-${stamp}`);
