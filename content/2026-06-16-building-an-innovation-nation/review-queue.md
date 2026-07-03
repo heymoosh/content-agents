@@ -42,7 +42,7 @@ human-ai. The data confirms LinkedIn rewards the builder/PM register (claude-cod
 | quote-card-4 | quote-card | image | images/quote-card-4.png | 5 | 5 | yes | published | NEW: someone worth betting on (L120) |
 | quote-card-5 | quote-card | image | images/quote-card-5.png | 5 | 5 | yes | published | NEW: we've made ourselves mechanical (L60) |
 | quote-card-6 | quote-card | image | images/quote-card-6.png | 5 | 5 | yes | approve | NEW: determination over intelligence (L106) |
-| video-script | video-script | storyboard | — | — | — | — | blocked | needs OPENROUTER_API_KEY (Grok); set it + re-run to draft script + storyboard |
+| video-script | video-script | storyboard | — | — | — | — | blocked | script drafted by Claude/sonnet ($0, no OPENROUTER needed) → video/script-draft.md. Next: run /video to storyboard it into video/storyboard.md for review |
 | qvid-x | x | video | derivatives/quote-inequality-video.md | 5 | 5 | source | published | animated quote video (silent) |
 | qvid-linkedin | linkedin | video | derivatives/quote-inequality-video.md | 5 | 5 | source | published | animated quote video (silent) |
 | qvid-bluesky | bluesky | video | derivatives/quote-inequality-video.md | 5 | 5 | source | published | animated quote video (silent) |
