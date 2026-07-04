@@ -4,7 +4,13 @@ import { openDb, repoRoot } from "../db/db.js";
 import { sha256File } from "../util/hash.js";
 import { ImportRow, AudienceRow } from "./types.js";
 import { parseX } from "./parse-x.js";
-import { parseSubstack, parseSubstackExport, parseSubstackAudience } from "./parse-substack.js";
+import {
+  parseSubstack,
+  parseSubstackExport,
+  parseSubstackAudience,
+  parseSubstackSummary,
+  isSubstackSummaryFile,
+} from "./parse-substack.js";
 import { parseLinkedIn, parseLinkedInAudience } from "./parse-linkedin.js";
 
 const INBOX = join(repoRoot, "data", "inbox");
@@ -33,6 +39,8 @@ async function parseEntry(platform: string, path: string, isDir: boolean): Promi
       }
       return parseLinkedIn(name, readFileSync(path));
     case "substack":
+      // The aggregate summary JSON carries audience rows only, no per-post rows (see parseAudienceFor).
+      if (isSubstackSummaryFile(name)) return [];
       // A full export is an unpacked folder (posts.csv + per-post event logs); a loose stats
       // download is a single CSV. Handle both.
       return isDir ? parseSubstackExport(path) : parseSubstack(name, readFileSync(path, "utf8"));
@@ -50,6 +58,9 @@ async function parseAudienceFor(platform: string, path: string, isDir: boolean):
   }
   if (platform === "substack" && isDir) {
     return parseSubstackAudience(path);
+  }
+  if (platform === "substack" && isSubstackSummaryFile(name)) {
+    return parseSubstackSummary(name, readFileSync(path, "utf8"));
   }
   return [];
 }

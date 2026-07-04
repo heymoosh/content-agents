@@ -25,6 +25,9 @@ const HOME_URL = "https://substack.com/home";
 // that matter for fresh analytics) are always covered. Add offset paging here if the archive grows.
 const PUBLISHED_PATH =
   "/api/v1/post_management/published?offset=0&limit=25&order_by=post_date&order_direction=desc";
+// Aggregate reach/growth (real subscriber total + views the per-post pull can't see). Written as
+// raw JSON for the ingest step (parseSubstackSummary) to turn into audience rows.
+const SUMMARY_PATH = "/api/v1/publish-dashboard/summary-v2?range=365";
 
 // Reach the publication dashboard via the "Dashboard" nav link, and read the subdomain off the
 // resulting /publish/ URL (we can't hardcode Muxin's subdomain, and the analytics API is served
@@ -108,6 +111,8 @@ export const substack: PlatformPuller = {
     }
 
     // 4) Map to the CSV columns parseSubstack already understands and write it to the inbox.
+    const stamp = new Date().toISOString().slice(0, 10);
+    let dest: string;
     try {
       const header = [
         "post_id", "title", "post_date", "url", "views", "opens",
@@ -133,15 +138,34 @@ export const substack: PlatformPuller = {
           ].map(csvCell).join(",")
         );
       }
-      const stamp = new Date().toISOString().slice(0, 10);
-      const dest = join(inboxDir("substack"), `substack-stats-${stamp}.csv`);
+      dest = join(inboxDir("substack"), `substack-stats-${stamp}.csv`);
       writeFileSync(dest, lines.join("\n") + "\n");
-      return [dest];
     } catch (cause) {
       throw new PullError("DOWNLOAD_FAILED", "Fetched analytics but writing the CSV failed", {
         hint: "Check disk space / write permission for data/inbox/substack/.",
         cause,
       });
     }
+
+    // 5) Aggregate reach/growth — the real subscriber total + views. Non-fatal: a summary hiccup
+    //    must not lose the per-post CSV we already wrote, so we warn and return what we have.
+    const out = [dest];
+    try {
+      const sResp = await page.request.get(`${origin}${SUMMARY_PATH}`);
+      if (sResp.ok()) {
+        const sDest = join(inboxDir("substack"), `substack-summary-${stamp}.json`);
+        writeFileSync(sDest, await sResp.text());
+        out.push(sDest);
+      } else {
+        console.warn(
+          `substack: summary-v2 returned ${sResp.status()} — skipping aggregate audience (per-post pull unaffected).`
+        );
+      }
+    } catch (cause) {
+      console.warn(
+        `substack: couldn't fetch summary-v2 (${cause instanceof Error ? cause.message : cause}) — skipping aggregate audience.`
+      );
+    }
+    return out;
   },
 };

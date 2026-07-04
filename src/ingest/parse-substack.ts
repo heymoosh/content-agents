@@ -147,6 +147,81 @@ export function parseSubstackAudience(dir: string): AudienceRow[] {
   ];
 }
 
+// Substack aggregate reach/growth from the writer dashboard's summary endpoint
+// (GET /api/v1/publish-dashboard/summary-v2?range=365, fetched by the puller). The per-post pull
+// undercounts the real audience — it only sees published posts — while this endpoint carries the
+// true subscriber total + aggregate views. The payload is a Substack-internal, undocumented shape,
+// so we search it defensively by candidate key names (any nesting) and preserve the ENTIRE raw JSON
+// for provenance and any fields we don't surface yet. If a real payload uses a key we don't list,
+// add it here — the raw JSON is never lost.
+const SUMMARY_FILE_RE = /^substack-summary.*\.json$/i;
+const SUB_KEYS = [
+  "subscriberCount", "totalSubscriptions", "totalSubscribers", "subscribers",
+  "emailSubscribers", "subscriptionCount", "activeSubscriptions",
+];
+const VIEW_KEYS = ["totalViews", "totalViewCount", "views", "viewCount"];
+const GROWTH_KEYS = ["subscriberGrowth", "netSubscriberGrowth", "subscribersGained", "netGrowth", "growth"];
+
+const normKey = (s: string) => s.toLowerCase().replace(/[_\s-]/g, "");
+
+// Depth-first search for the first key matching any candidate (normalized) whose value is a finite
+// number. Tolerates nesting like { stats: { subscribers: N } } without hardcoding the path.
+function findNum(node: unknown, candidates: string[]): number | null {
+  const wanted = new Set(candidates.map(normKey));
+  const stack: unknown[] = [node];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (!cur || typeof cur !== "object") continue;
+    for (const [k, v] of Object.entries(cur as Record<string, unknown>)) {
+      if (wanted.has(normKey(k)) && typeof v === "number" && Number.isFinite(v)) return v;
+      if (v && typeof v === "object") stack.push(v);
+    }
+  }
+  return null;
+}
+
+export function isSubstackSummaryFile(name: string): boolean {
+  return SUMMARY_FILE_RE.test(name);
+}
+
+export function parseSubstackSummary(fileName: string, content: string): AudienceRow[] {
+  let json: unknown;
+  try {
+    json = JSON.parse(content);
+  } catch (e) {
+    throw new ParseError(fileName, `not valid JSON (${e instanceof Error ? e.message : e})`);
+  }
+  const subscribers = findNum(json, SUB_KEYS);
+  if (subscribers == null) {
+    throw new ParseError(
+      fileName,
+      `no subscriber total found (looked for: ${SUB_KEYS.join(", ")}). The raw payload is preserved — ` +
+        `inspect it and add the real key to SUB_KEYS in parse-substack.ts.`
+    );
+  }
+  const views = findNum(json, VIEW_KEYS);
+  const growth = findNum(json, GROWTH_KEYS);
+
+  const capturedAt = new Date().toISOString();
+  const raw = (json && typeof json === "object" ? json : { value: json }) as Record<string, unknown>;
+  const base = { platform: "substack" as const, capturedAt, asOfDate: null, sourceFile: fileName };
+  const rows: AudienceRow[] = [
+    {
+      ...base, metricType: "follower_total", dimension: null, valueLabel: null,
+      valueCount: subscribers, valuePct: null, raw: { ...raw, _totalViews: views },
+    },
+  ];
+  // Growth over the range, when the endpoint exposes it directly. Otherwise the follower_total
+  // snapshot series (captured_at) still shows growth across weekly pulls, like Bluesky.
+  if (growth != null) {
+    rows.push({
+      ...base, metricType: "follower_delta", dimension: null, valueLabel: null,
+      valueCount: growth, valuePct: null, raw: {},
+    });
+  }
+  return rows;
+}
+
 export function parseSubstack(fileName: string, content: string): ImportRow[] {
   const rows = parseCsv(content);
   if (rows.length < 2) throw new ParseError(fileName, "no data rows found");
