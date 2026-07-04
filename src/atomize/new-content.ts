@@ -1,6 +1,7 @@
 import "../util/env.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, extname, basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { slugify } from "../util/slug.js";
 import { logCost } from "../util/cost-log.js";
@@ -63,6 +64,48 @@ function resolveText(text: string): {
   return { title, origin: "pasted-text", publishedAt: null, text };
 }
 
+export interface ScaffoldSource {
+  title: string;
+  origin: string;
+  publishedAt: string | null;
+  text: string;
+  sourceKind?: string; // e.g. "substack-note" — omitted for essays/files/audio
+}
+
+// Scaffold content/<date>-<slug>/ (source.md + subfolders + empty review queue) from a resolved
+// source. Shared by /atomize (essays/files/audio/paste) and /atomize notes (one folder per note).
+// Throws "already exists: <dir>" if the folder is already there, so callers can skip or abort.
+export function scaffoldContentFolder(src: ScaffoldSource): string {
+  const date = new Date().toISOString().slice(0, 10);
+  const dir = join(repoRoot, "content", `${date}-${slugify(src.title)}`);
+  if (existsSync(join(dir, "source.md"))) throw new Error(`already exists: ${dir}`);
+  for (const sub of ["derivatives", "images", "video", "ready-to-paste"]) {
+    mkdirSync(join(dir, sub), { recursive: true });
+  }
+
+  // canonical_url is the published piece's own URL — what "read more" CTAs (cta: source) point at.
+  // Auto-filled when the origin is a live URL (essay URL or note URL); left blank for local drafts.
+  const canonicalUrl = /^https?:\/\//.test(src.origin) ? src.origin : "";
+  const canonicalLine = canonicalUrl
+    ? `canonical_url: ${canonicalUrl}`
+    : `canonical_url:   # paste the published essay URL so "read more" CTAs point at it (else they fall back to the Substack home)`;
+  const sourceKindLine = src.sourceKind ? `source_kind: ${src.sourceKind}\n` : "";
+
+  const body = src.text.trim();
+  writeFileSync(
+    join(dir, "source.md"),
+    `---\ntitle: "${src.title.replace(/"/g, '\\"')}"\norigin: ${src.origin}\n${canonicalLine}\n${sourceKindLine}published_at: ${src.publishedAt ?? "null"}\ningested_at: ${new Date().toISOString()}\n---\n\n${body}\n`
+  );
+  const ctaReminder = canonicalUrl
+    ? ""
+    : `> CTA: this draft has no \`canonical_url\` yet. To send "read more" posts to the essay itself, paste the published URL into source.md \`canonical_url:\` before /publish — otherwise those CTAs fall back to the Substack home.\n\n`;
+  writeFileSync(
+    join(dir, "review-queue.md"),
+    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n> Routing: see routing.md — only platforms the router marked \`include\` are queued below.\n\n${ctaReminder}| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n`
+  );
+  return dir;
+}
+
 async function main() {
   const arg = process.argv[2];
   let src;
@@ -82,40 +125,14 @@ async function main() {
     }
     src = await resolveSource(arg);
   }
-  const date = new Date().toISOString().slice(0, 10);
-  const dir = join(repoRoot, "content", `${date}-${slugify(src.title)}`);
-  if (existsSync(join(dir, "source.md"))) {
-    console.error(`already exists: ${dir}`);
-    process.exit(1);
-  }
-  for (const sub of ["derivatives", "images", "video", "ready-to-paste"]) {
-    mkdirSync(join(dir, sub), { recursive: true });
-  }
-
-  // canonical_url is the published essay's own URL — what "read more" CTAs (cta: source) point
-  // at. Auto-filled when atomizing a live URL; left blank as a paste-in slot for local drafts.
-  const canonicalUrl = /^https?:\/\//.test(src.origin) ? src.origin : "";
-  const canonicalLine = canonicalUrl
-    ? `canonical_url: ${canonicalUrl}`
-    : `canonical_url:   # paste the published essay URL so "read more" CTAs point at it (else they fall back to the Substack home)`;
-
-  // Number the source lines so derivatives can cite source_lines precisely.
-  const body = src.text.trim();
-  writeFileSync(
-    join(dir, "source.md"),
-    `---\ntitle: "${src.title.replace(/"/g, '\\"')}"\norigin: ${src.origin}\n${canonicalLine}\npublished_at: ${src.publishedAt ?? "null"}\ningested_at: ${new Date().toISOString()}\n---\n\n${body}\n`
-  );
-  const ctaReminder = canonicalUrl
-    ? ""
-    : `> CTA: this draft has no \`canonical_url\` yet. To send "read more" posts to the essay itself, paste the published URL into source.md \`canonical_url:\` before /publish — otherwise those CTAs fall back to the Substack home.\n\n`;
-  writeFileSync(
-    join(dir, "review-queue.md"),
-    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n> Routing: see routing.md — only platforms the router marked \`include\` are queued below.\n\n${ctaReminder}| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n`
-  );
-  console.log(dir);
+  console.log(scaffoldContentFolder(src));
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+// Run only as a CLI entry point — importing scaffoldContentFolder (e.g. from new-notes.ts) must
+// not execute main().
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

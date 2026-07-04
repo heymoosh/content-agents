@@ -18,10 +18,11 @@ async function main() {
   const db = openDb();
   const now = new Date().toISOString();
   const upsertPost = db.prepare(`
-    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format)
-    VALUES ('bluesky', ?, ?, ?, ?, 'text')
+    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type)
+    VALUES ('bluesky', ?, ?, ?, ?, 'text', 'text')
     ON CONFLICT(platform, platform_post_id) DO UPDATE SET
-      content_text = excluded.content_text
+      content_text = excluded.content_text,
+      media_type = COALESCE(posts.media_type, excluded.media_type)
     RETURNING id
   `);
   const insertMetrics = db.prepare(`

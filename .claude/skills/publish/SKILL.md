@@ -16,6 +16,10 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
 
 2. **Text posts** (x / linkedin / bluesky): `npm run publish:typefully -- <folder>`
    - Creates SCHEDULED drafts — Typefully's queue is the second safety net.
+   - **Native video/image**: if a text-platform derivative declares `media: <path>` in its
+     frontmatter (e.g. an animated quote card → `media: video/quote-animated.mp4`), the file is
+     uploaded to Typefully and attached to the post — a native video post on X/LinkedIn/Bluesky.
+     The body stays the caption. `.mp4`/`.mov` for video.
    - LinkedIn's CTA link goes INLINE in the body (`config/cta.yaml` placement). The cleaner
      first-comment needs gated LinkedIn API access; inline keeps LinkedIn fully automated on
      Typefully like the rest. X's link goes in the first reply; Bluesky/community inline.
@@ -25,15 +29,19 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
      sends it to Typefully — ~1/day, never same-day, capped at `posts_per_week`. No manual
      dragging. It prints the full per-post schedule; relay that when you report. A platform with
      no cadence config falls back to "next-free-slot".
-   - Known limit (Phase 2): spacing is computed per `/publish` run; publishing two folders close
-     together can double-book a slot. Cross-run/cross-piece spacing from the rolling approved pool
-     is not built yet — note it if Muxin ships multiple pieces at once.
+   - Spacing is unified: the scheduler claims slots through a shared ledger
+     (`data/publish-schedule.jsonl`), so text AND cards de-conflict ACROSS runs and streams — a
+     platform never gets two posts on the same PT day. Remaining gap: no steady `posts_per_week`
+     pull from a cross-piece backlog (you still hand it one folder at a time).
    - On a 402 error: Typefully needs a paid plan — surface this to Muxin with the
      Postiz fallback noted in `docs/setup-typefully.md`. Do not work around it.
 
 3. **Video** (youtube/short rows): `npm run publish:youtube -- <folder>`
-   - Uploads as PRIVATE by default; Muxin flips to public in YouTube Studio after a
-     spot-check (or sets YOUTUBE_PRIVACY=public once trust is established).
+   - SCHEDULED publish by default: claims a slot from the unified scheduler and sets
+     `status.publishAt`, so the video uploads private and YouTube auto-flips it to public at the
+     slot (no manual Studio step).
+   - With no `youtube` cadence configured, it falls back to a plain PRIVATE upload: Muxin flips it
+     public in YouTube Studio after a spot-check, or sets `YOUTUBE_PRIVACY=public` for instant public.
    - Requires `video/title.txt` and `video/description.txt` (written during /atomize).
 
 4. **TikTok** (`tiktok` rows): `npm run publish:tiktok -- <folder>`
@@ -44,14 +52,34 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
      `npm run publish:tiktok -- --check`. The API can't set TikTok's "made with AI" label (it's an
      in-app per-post toggle) — disclose in the caption for AI-heavy shorts.
 
-5. **No-API platforms** (community / substack rows): `npm run publish:paste -- <folder>`
+5. **Quote cards** (`quote-card` rows): `npm run publish:cards -- <folder>`
+   - Schedules each approved card's `images/<id>.png` via the image-post provider in
+     `config/providers.yaml` (`image_post: postpeer` primary, `upload-post` failover on quota). A
+     card fans out to EVERY connected image-capable account (Bluesky / X / LinkedIn / …, auto-
+     discovered from the provider dashboard; video-only TikTok/YouTube excluded).
+   - **CTA follows `config/cta.yaml` (shared with text):** the article link goes INLINE on inline
+     platforms (Bluesky/LinkedIn) and is OMITTED where placement is `reply` (X) — the relays can't
+     post a reply, so omitting dodges X's in-body link penalty. The fan-out splits into one call per
+     placement group (X gets the bare quote; Bluesky/LinkedIn get quote + link).
+   - **Timing is unified with text** (same scheduler + ledger): a card claims the next `quote-card`
+     slot (`config/platforms.yaml`) and de-conflicts against EACH target platform's cap — so a card
+     series respects e.g. LinkedIn's 2/wk and never shares a platform's day with a text post.
+     `--at <ISO>` overrides for a one-off/test. SCHEDULED, never instant; cancel in the provider
+     dashboard before it fires.
+   - Prereqs: render the PNGs first (`npm run render -- --still <folder>` — gitignored), and connect
+     image accounts in the provider dashboard. Verify with `npm run publish:cards -- <folder> --check`
+     (read-only: rows + next slot + CTA plan + the accounts a card fans out to).
+   - On a 402/429: the provider's free quota is exhausted — surface it; swap `image_post` to the
+     other provider or top up. Do not work around it.
+
+6. **No-API platforms** (community / substack rows): `npm run publish:paste -- <folder>`
    - Emits `ready-to-paste/<id>.txt` files; Muxin copy-pastes when convenient.
 
-6. Each script flips published rows to `published` and appends to `publish-log.md` —
+7. Each script flips published rows to `published` and appends to `publish-log.md` —
    re-running /publish is a no-op for already-published rows. Each script also appends a `Placed
    log` row to `briefs/bets.md` (carrying the derivative's `from_brief` + `directives_applied`), so
    next cycle `/strategy` can match the post back to its analytics outcome and grade the bet. This
    is deterministic and deduped on `(folder, row id)` — do not edit those rows by hand.
 
-7. Report: what was scheduled/uploaded/emitted, with links from `publish-log.md`, and
+8. Report: what was scheduled/uploaded/emitted, with links from `publish-log.md`, and
    anything skipped because keys are missing.

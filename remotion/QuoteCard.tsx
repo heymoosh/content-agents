@@ -10,6 +10,7 @@ import { z } from "zod";
 export const quoteCardSchema = z.object({
   quote: z.string(),
   attribution: z.string(),
+  source: z.string().optional(), // article title, set under the attribution as the in-asset source line
   paper: z.string().optional(), // background
   ink: z.string().optional(), // type, keyline, attribution
   accent: z.string().optional(), // ornament + rule
@@ -25,6 +26,7 @@ const SERIF = "'Didot', 'Bodoni 72', 'Hoefler Text', Georgia, 'Times New Roman',
 export const QuoteCard: React.FC<z.infer<typeof quoteCardSchema>> = ({
   quote,
   attribution,
+  source,
   paper,
   ink,
   accent,
@@ -63,15 +65,16 @@ export const QuoteCard: React.FC<z.infer<typeof quoteCardSchema>> = ({
           color: INK,
         }}
       >
-        {/* Opening ornament — the one persimmon touch */}
+        {/* Opening ornament — the one accent touch. Sits tight above the quote (its tall glyph box
+            is pulled in close) so it reads as a lead-in, not a mark floating near the top edge. */}
         <div
           style={{
             fontFamily: SERIF,
-            fontSize: 150,
-            lineHeight: 0.2,
+            fontSize: 116,
+            lineHeight: 0.66,
             color: ACCENT,
-            height: 70,
-            marginBottom: 28,
+            height: 64,
+            marginBottom: 6,
           }}
         >
           &ldquo;
@@ -113,6 +116,30 @@ export const QuoteCard: React.FC<z.infer<typeof quoteCardSchema>> = ({
           {attribution}
         </div>
       </div>
+
+      {/* Article title — the in-asset source line, pinned near the BOTTOM of the card (inside the
+          keyline) rather than trailing the centered quote block. Tracked tighter than the
+          attribution so the long title reads more compact than the name. */}
+      {source ? (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 80,
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            fontFamily: SERIF,
+            fontSize: 32,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: INK,
+            opacity: 0.55,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {source}
+        </div>
+      ) : null}
     </AbsoluteFill>
   );
 };

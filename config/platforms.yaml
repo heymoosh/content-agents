@@ -11,10 +11,19 @@
 #   slot_days       — weekdays eligible for a slot (Sun..Sat); scheduler places ~1/day, never same-day
 #   slot_time_pst   — time of day (PST/PDT wall clock) for that day's slot, inside best_times_pst
 # Approved posts fill the next free future slots in queue order, spreading across weeks if there are
-# more than posts_per_week. (Cross-piece spacing across separate /publish runs is Phase 2.) A platform
-# without these three fields falls back to Typefully "next-free-slot".
+# more than posts_per_week. Cross-run + cross-stream spacing IS built: src/publish/slots.ts records
+# every claim in a shared ledger (data/publish-schedule.jsonl), so text and cards never double-book a
+# platform's day across separate runs. A platform without these three fields falls back to
+# Typefully "next-free-slot".
+# Minimum days between re-publishing the same content slug to a platform. The per-platform
+# values below override this for their channel; anything not listed inherits this default.
+# Enforced by the reuse guard in src/publish/reuse-guard.ts (checked by publish:typefully
+# and publish:cards before claiming slots).
+min_reuse_days: 30
+
 platforms:
   x:
+    min_reuse_days: 14      # moves fast; a shorter reuse window is acceptable
     max_chars: 280
     derivative_count: [3, 5]
     best_times_pst: "Tue-Thu, 9-11am (primary), 1-2pm (secondary). Weaker on weekends, but posting keeps presence."
@@ -25,6 +34,7 @@ platforms:
       Short claims or provocations. Pick the sharpest sentence from the source and
       trim for 280-char energy. No hashtag spam; 0-1 hashtags max.
   linkedin:
+    min_reuse_days: 60      # professional audience; avoid feeling repetitive
     max_chars: 3000
     derivative_count: [1, 2]
     best_times_pst: "Tue-Thu, 8-10am. Business hours only; no evenings or weekends."
@@ -35,6 +45,7 @@ platforms:
       Lesson post, left-aligned narrative, practitioner voice. Insight-driven,
       not link-dump. Short paragraphs, line breaks between thoughts.
   bluesky:
+    min_reuse_days: 21
     max_chars: 300
     derivative_count: [2, 4]
     best_times_pst: "Daily 9-11am and 6-9pm. Evenings are lively for the AI/tech crowd, weekends included."
@@ -56,8 +67,34 @@ platforms:
       Hook in first line, 1-2 main points, call to action. Direct, thoughtful,
       not hype-y. Written to be spoken aloud.
   quote-card:
+    min_reuse_days: 30
     max_chars: 180
+    # Card cadence for the unified scheduler (publish:cards). A card fans out to several platforms
+    # at once, so it gets its own midday weekday window; it also de-conflicts against (and counts
+    # toward) each target platform's cap, so a card series never pushes e.g. LinkedIn past its 2/wk.
+    posts_per_week: 7
+    slot_days: [Mon, Tue, Wed, Thu, Fri]
+    slot_time_pst: "12:00"
     style: One or two quotable lines pulled verbatim from the source.
+  tiktok:
+    min_reuse_days: 14      # short-form video; faster cadence, consistent with x=14
+    # TikTok video cadence for the unified scheduler (publish:tiktok), so the short shares the one
+    # ledger as text + cards and never lands a PT day another TikTok post already took. Usually 1
+    # short/piece, so the weekly cap is mostly headroom. TIKTOK_SCHEDULE_AT overrides for a one-off;
+    # with no entry here it falls back to TIKTOK_SCHEDULE_LEAD_MIN.
+    posts_per_week: 3
+    slot_days: [Tue, Wed, Thu, Fri]
+    slot_time_pst: "17:00"
+  youtube:
+    min_reuse_days: 30      # long-form/video cadence; same floor as quote-card
+    # YouTube Shorts cadence for the unified scheduler (publish:youtube). The short is uploaded as a
+    # SCHEDULED publish (status.publishAt = the claimed slot, private until then) so it auto-goes
+    # public on the same clock as text/cards/TikTok. The same render also feeds TikTok under a
+    # separate platform key, so the two can share a calendar day. Remove these three fields to revert
+    # to a plain private upload (manual flip in Studio).
+    posts_per_week: 3
+    slot_days: [Tue, Wed, Thu, Fri]
+    slot_time_pst: "16:00"
 
 communities:
   moral-ambition:
@@ -72,3 +109,31 @@ communities:
     notes: AI builder community. Presence not yet established — observe before posting heavily.
   lennys:
     notes: Product strategy, growth. Selective and occasional engagement only.
+
+# Spin angles (Muxin, approved 2026-06-30; promoted to always-on default 2026-07-02 — see
+# docs/spin-experiment.md and .claude/skills/atomize/references/spin-mode.md). Internal generation
+# config ONLY: these guide how /atomize reframes a platform derivative from the source essay. They
+# are never published verbatim as post copy — the post text must still trace back to something
+# Muxin actually wrote. `substack` is reserved: Substack is the source channel, not an atomize
+# output target (config/routing.yaml), so its angle isn't applied to any derivative today.
+spin_angles:
+  x:
+    audience: tech
+    angle: >-
+      Voice of the non-engineer OUTSIDE the SV tech bubble — what these AI tools are actually like
+      for the 96% of non-tech workers, and how the hidden assumptions baked in by that bubble
+      misfire for and harm them.
+  linkedin:
+    audience: business/career
+    angle: >-
+      Critiques business innovation broadly (NOT just product craft) — how corporate / business
+      norms quietly strangle the creative innovation they claim to want.
+  substack:
+    audience: society
+    angle: >-
+      Builder-philosopher: the real AI risk is not the machine, it is the unexamined human systems
+      we are about to automate at full speed.
+  bluesky:
+    audience: political
+    angle: >-
+      The PM who treats democracy as broken UX + AI as making the fairness gap unignorable.

@@ -1,16 +1,21 @@
 import "../util/env.js";
-import { readFileSync } from "node:fs";
-import { join, isAbsolute } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { join, isAbsolute, basename } from "node:path";
+import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
+import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
+import { claimSlots, fmtLa } from "./slots.js";
+import { checkReuse } from "./reuse-guard.js";
 
-// Push approved text posts (x / linkedin / bluesky) from a content folder's review queue
-// to Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish
-// time computed from the platform cadence in config/platforms.yaml (posts_per_week + slot_days +
-// slot_time_pst, anchored to PT/DST-aware); platforms without a cadence fall back to next-free-slot.
-//   tsx src/publish/typefully.ts <content-folder>
+// Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
+// Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
+// from the UNIFIED scheduler (src/publish/slots.ts + config/platforms.yaml cadence + the shared
+// slot ledger), so text and cards never double-book a platform on the same day — across runs and
+// streams. Platforms without a cadence fall back to Typefully "next-free-slot".
+//   tsx src/publish/typefully.ts <content-folder> | --list
 // Needs TYPEFULLY_API_KEY (and optionally TYPEFULLY_SOCIAL_SET_ID) in .env.
 
 const BASE = "https://api.typefully.com/v2";
@@ -49,39 +54,22 @@ async function socialSetId(): Promise<string> {
   return id;
 }
 
-// CTA config (config/cta.yaml): placement keeps the link out of the body where the platform
-// algorithm penalizes in-post links (X, LinkedIn); source_fallback is used when a `cta: source`
-// derivative has no published essay URL to point at. See Platform Reference.
-function loadCtaConfig(): {
-  placement: Record<string, string>;
-  fallbackUrl: string | null;
-  fallbackLabel: string;
-} {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "cta.yaml"), "utf8")) as {
-      placement?: Record<string, string>;
-      source_fallback?: { url?: string; label?: string };
-    };
-    return {
-      placement: cfg.placement ?? {},
-      fallbackUrl: cfg.source_fallback?.url ?? null,
-      fallbackLabel: cfg.source_fallback?.label ?? "",
-    };
-  } catch {
-    return { placement: {}, fallbackUrl: null, fallbackLabel: "" };
+// Upload a media file (mp4/mov/png/jpg/gif) to Typefully via its presigned-S3 flow, returning the
+// media_id to attach to a post. Used for native video posts (e.g. animated quote cards).
+async function uploadMedia(setId: string, filePath: string): Promise<string> {
+  const { media_id, upload_url } = (await api(`/social-sets/${setId}/media/upload`, {
+    method: "POST",
+    body: JSON.stringify({ file_name: basename(filePath) }),
+  })) as { media_id?: string; upload_url?: string };
+  if (!media_id || !upload_url) {
+    throw new Error(`typefully media/upload returned no media_id/upload_url for ${filePath}`);
   }
-}
-
-// The source essay's own URL — what `cta: source` derivatives point at. Pasted into source.md
-// `canonical_url` (auto-filled when atomized from a live URL). Null until it's a real http(s) url.
-function loadCanonicalUrl(folder: string): string | null {
-  try {
-    const { fm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
-    const u = typeof fm.canonical_url === "string" ? fm.canonical_url.trim() : "";
-    return /^https?:\/\//.test(u) ? u : null;
-  } catch {
-    return null;
+  // PUT the raw bytes to the presigned URL — NO auth or content-type headers (the signature validates it).
+  const put = await fetch(upload_url, { method: "PUT", body: readFileSync(filePath) });
+  if (!put.ok) {
+    throw new Error(`media upload PUT failed (${basename(filePath)}): ${put.status} ${await put.text()}`);
   }
+  return media_id;
 }
 
 function loadPlatformMax(): Record<string, number> {
@@ -95,94 +83,6 @@ function loadPlatformMax(): Record<string, number> {
   } catch {
     return {};
   }
-}
-
-// ── Cadence scheduler ──────────────────────────────────────────────────────
-// Compute an EXPLICIT publish time per post from config/platforms.yaml (posts_per_week +
-// slot_days + slot_time_pst), anchored to America/Los_Angeles (DST-aware), so Typefully
-// auto-publishes on schedule instead of dumping everything into "next-free-slot".
-const TZ = "America/Los_Angeles";
-const WEEKDAYS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-
-type PlatformSchedule = { postsPerWeek: number; days: number[]; timePst: string };
-
-function loadSchedule(): Record<string, PlatformSchedule> {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
-      platforms?: Record<string, { posts_per_week?: number; slot_days?: string[]; slot_time_pst?: string }>;
-    };
-    const out: Record<string, PlatformSchedule> = {};
-    for (const [k, v] of Object.entries(cfg.platforms ?? {})) {
-      if (!v.posts_per_week || !v.slot_days || !v.slot_time_pst) continue;
-      const days = v.slot_days
-        .map((s) => WEEKDAYS[s.toLowerCase().slice(0, 3)])
-        .filter((n): n is number => n !== undefined);
-      if (days.length) out[k] = { postsPerWeek: v.posts_per_week, days, timePst: v.slot_time_pst };
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-// The LA wall-clock parts (calendar day + weekday) of a given instant.
-function laParts(d: Date): { year: number; month: number; day: number; weekday: number } {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, weekday: "short", year: "numeric", month: "2-digit", day: "2-digit",
-  });
-  const p = Object.fromEntries(dtf.formatToParts(d).map((x) => [x.type, x.value]));
-  return { year: +p.year, month: +p.month, day: +p.day, weekday: WEEKDAYS[String(p.weekday).toLowerCase()] };
-}
-
-// LA's UTC offset (ms) at a given instant — accounts for PST vs PDT.
-function laOffsetMs(d: Date): number {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: TZ, hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
-  const p = Object.fromEntries(dtf.formatToParts(d).map((x) => [x.type, x.value]));
-  const hour = +p.hour === 24 ? 0 : +p.hour;
-  return Date.UTC(+p.year, +p.month - 1, +p.day, hour, +p.minute, +p.second) - d.getTime();
-}
-
-// The UTC instant for a given LA wall-clock date+time (DST-aware).
-function laWallToInstant(y: number, mo: number, d: number, h: number, mi: number): Date {
-  const guess = Date.UTC(y, mo - 1, d, h, mi, 0);
-  return new Date(guess - laOffsetMs(new Date(guess)));
-}
-
-// Monday-of-week key (LA) for the posts_per_week cap.
-function weekKey(y: number, mo: number, d: number, weekday: number): string {
-  const back = (weekday + 6) % 7; // days since Monday
-  return new Date(Date.UTC(y, mo - 1, d - back)).toISOString().slice(0, 10);
-}
-
-// `count` future slot instants for one platform, ~1/day on slot_days, ≤ posts_per_week per week.
-function computeSlots(cfg: PlatformSchedule, count: number, now: Date): Date[] {
-  const [hh, mm] = cfg.timePst.split(":").map(Number);
-  const slots: Date[] = [];
-  const perWeek: Record<string, number> = {};
-  for (let offset = 1; offset <= 180 && slots.length < count; offset++) {
-    const probe = new Date(now.getTime() + offset * 86_400_000);
-    const { year, month, day, weekday } = laParts(probe);
-    if (!cfg.days.includes(weekday)) continue;
-    const wk = weekKey(year, month, day, weekday);
-    if ((perWeek[wk] ?? 0) >= cfg.postsPerWeek) continue;
-    const instant = laWallToInstant(year, month, day, hh, mm);
-    if (instant.getTime() <= now.getTime()) continue;
-    slots.push(instant);
-    perWeek[wk] = (perWeek[wk] ?? 0) + 1;
-  }
-  return slots;
-}
-
-function fmtLa(d: Date): string {
-  return (
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: TZ, weekday: "short", month: "short", day: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true,
-    }).format(d) + " PT"
-  );
 }
 
 // Build the Typefully `posts` array, placing the CTA link per config so the body stays clean.
@@ -210,35 +110,66 @@ function buildPosts(
   return { posts: [{ text: body }, { text: ctaLine }], manualComment: null };
 }
 
-// Read-only: list what's currently scheduled in Typefully (sanity-check the queue). No writes.
-//   tsx src/publish/typefully.ts --list
-async function runList(): Promise<void> {
+// Build the JSON body for POST /drafts. When `publishAt` is null we OMIT `publish_at` entirely,
+// which makes Typefully save an UNSCHEDULED draft (status not "scheduled", no scheduled_date) that
+// will NOT auto-post — it sits in the queue until a human schedules/publishes it. When `publishAt`
+// is a value (ISO time or "next-free-slot"), the draft IS scheduled and auto-fires at that time.
+// Exported so the unscheduled-draft contract is unit-testable and reused (notes-daily path).
+export function buildDraftPayload(opts: {
+  title: string;
+  platformKey: string;
+  posts: { text: string }[];
+  publishAt: string | null; // null/undefined → unscheduled saved draft (no auto-post)
+}): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    draft_title: opts.title,
+    platforms: { [opts.platformKey]: { enabled: true, posts: opts.posts } },
+  };
+  if (opts.publishAt) payload.publish_at = opts.publishAt;
+  return payload;
+}
+
+// Read-only: the live Typefully scheduled-draft queue, normalized for the unified view + --list.
+// No writes. Exported so queue-view.ts can merge it with the other channels.
+export type TypefullyScheduled = { whenIso: string; platforms: string[]; title: string };
+
+export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
   const setId = await socialSetId();
   const res = (await api(`/social-sets/${setId}/drafts?limit=50`)) as
     | { results?: TypefullyDraft[] }
     | TypefullyDraft[];
   const list = Array.isArray(res) ? res : res.results ?? [];
-  const scheduled = list
+  return list
     .filter((d) => d.scheduled_date && (d.status === "scheduled" || new Date(d.scheduled_date) > new Date()))
-    .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime());
+    .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime())
+    .map((d) => ({
+      whenIso: d.scheduled_date!,
+      platforms: (
+        [
+          ["x", d.x_post_enabled],
+          ["linkedin", d.linkedin_post_enabled],
+          ["bluesky", d.bluesky_post_enabled],
+          ["threads", d.threads_post_enabled],
+          ["mastodon", d.mastodon_post_enabled],
+        ] as const
+      )
+        .filter(([, v]) => v)
+        .map(([k]) => k),
+      title: String(d.draft_title ?? d.id),
+    }));
+}
+
+// Read-only: list what's currently scheduled in Typefully (sanity-check the queue). No writes.
+//   tsx src/publish/typefully.ts --list
+async function runList(): Promise<void> {
+  const scheduled = await fetchScheduledDrafts();
   if (!scheduled.length) {
     console.log("No scheduled drafts found in Typefully.");
     return;
   }
   console.log(`Scheduled in Typefully (${scheduled.length}), times in PT:`);
   for (const d of scheduled) {
-    const plats =
-      [
-        ["x", d.x_post_enabled],
-        ["linkedin", d.linkedin_post_enabled],
-        ["bluesky", d.bluesky_post_enabled],
-        ["threads", d.threads_post_enabled],
-        ["mastodon", d.mastodon_post_enabled],
-      ]
-        .filter(([, v]) => v)
-        .map(([k]) => k)
-        .join(",") || "?";
-    console.log(`  ${fmtLa(new Date(d.scheduled_date!))}  [${plats}]  ${d.draft_title ?? d.id}`);
+    console.log(`  ${fmtLa(new Date(d.whenIso))}  [${d.platforms.join(",") || "?"}]  ${d.title}`);
   }
 }
 
@@ -254,6 +185,161 @@ type TypefullyDraft = {
   mastodon_post_enabled?: boolean;
 };
 
+export interface ScheduledRow {
+  id: string;
+  platform: string;
+  when: string; // human PT label, or "unscheduled"
+  draftId: string;
+  manualComment: string | null;
+}
+
+// Publish approved text rows (x/linkedin/bluesky) to Typefully as scheduled drafts. Extracted from
+// the CLI so the review GUI can schedule ONE row on approve (opts.onlyIds). With no opts it behaves
+// exactly as the CLI did — every approved text row in the folder — so the CLI + notes-daily paths
+// are unchanged.
+export async function publishText(
+  folder: string,
+  opts: { onlyIds?: string[]; noSchedule?: boolean; forceReuse?: boolean } = {}
+): Promise<ScheduledRow[]> {
+  const { rows } = readQueue(folder);
+  let approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
+  if (opts.onlyIds) approved = approved.filter((r) => opts.onlyIds!.includes(r.id));
+  if (approved.length === 0) {
+    console.log("no approved x/linkedin/bluesky rows in the review queue");
+    return [];
+  }
+
+  // UNSCHEDULED-draft mode (opts.noSchedule): skip claimSlots + OMIT publish_at, so drafts are saved
+  // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them. Used by
+  // the daily notes cloud routine (src/cron/notes-daily.ts) so nothing fires automatically.
+  const noSchedule = opts.noSchedule ?? false;
+
+  // Reuse guard: skip platforms where this slug was published too recently.
+  const slug = basename(folder);
+  const forceReuse = opts.forceReuse ?? false;
+  if (forceReuse) {
+    console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
+  } else {
+    const reuseByPlatform = new Map<string, ReturnType<typeof checkReuse>>();
+    for (const r of approved) {
+      if (!reuseByPlatform.has(r.platform)) {
+        reuseByPlatform.set(r.platform, checkReuse(slug, r.platform));
+      }
+    }
+    for (const [, res] of reuseByPlatform) {
+      if (!res.allowed) console.warn(`reuse guard: ${res.reason} — skipping`);
+    }
+    approved = approved.filter((r) => reuseByPlatform.get(r.platform)?.allowed !== false);
+    if (approved.length === 0) {
+      console.log("no rows to publish: all platforms blocked by the reuse guard");
+      return [];
+    }
+  }
+
+  const setId = await socialSetId();
+  const cfg = loadCtaConfig();
+  const canonicalUrl = loadCanonicalUrl(folder);
+  const sourceKind = loadSourceKind(folder);
+  const maxMap = loadPlatformMax();
+
+  // Claim an explicit publish time per row from the unified scheduler (config/platforms.yaml
+  // cadence + shared ledger). Rows of a platform fill consecutive free slots; the ledger keeps
+  // them from colliding with cards or a separate run. Platforms with no cadence → "next-free-slot".
+  // In --no-schedule mode we skip this entirely: no slot is claimed and publish_at stays unset.
+  const byPlatform: Record<string, typeof approved> = {};
+  for (const r of approved) (byPlatform[r.platform] ??= []).push(r);
+  const slotByRow = new Map<string, string>(); // rowId → ISO publish_at | "next-free-slot"
+  const whenByRow = new Map<string, string>(); // rowId → human label for logs
+  if (noSchedule) {
+    console.log("Unscheduled-draft mode (--no-schedule): no slots claimed, drafts saved without a publish time.");
+  } else {
+    for (const [platform, rowsP] of Object.entries(byPlatform)) {
+      const { times, labels } = claimSlots({
+        windowKey: platform,
+        conflictPlatforms: [platform],
+        count: rowsP.length,
+        asset: `${basename(folder)}/${platform}`,
+        by: "typefully",
+      });
+      rowsP.forEach((r, i) => {
+        slotByRow.set(r.id, times[i] ?? "next-free-slot");
+        whenByRow.set(r.id, labels[i] ?? "next-free-slot");
+      });
+    }
+    console.log("Cadence schedule (PT):");
+    for (const [platform, rowsP] of Object.entries(byPlatform)) {
+      console.log(`  ${platform}:`);
+      for (const r of rowsP) console.log(`    ${r.id} → ${whenByRow.get(r.id)}`);
+    }
+  }
+
+  const results: ScheduledRow[] = [];
+  for (const row of approved) {
+    const assetPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
+    const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
+    const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
+
+    // Resolve the CTA link (shared funnel layer — src/publish/cta.ts), then place it per cta.yaml.
+    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+    if (usedFallback) {
+      console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
+    }
+    const placement = cfg.placement[row.platform] ?? "inline";
+    const { posts, manualComment } = buildPosts(body, ctaUrl, ctaLabel, placement, maxMap[row.platform] ?? Infinity);
+
+    // Attach a video/image if the derivative declares one (frontmatter `media:`), e.g. an animated
+    // quote card → native video post. Uploaded once and attached to the first post.
+    const mediaRef = typeof fm.media === "string" ? fm.media.trim() : "";
+    if (mediaRef) {
+      const mediaPath = isAbsolute(mediaRef) ? mediaRef : join(folder, mediaRef);
+      if (!existsSync(mediaPath)) throw new Error(`media for ${row.id} not found: ${mediaPath}`);
+      const mediaId = await uploadMedia(setId, mediaPath);
+      (posts[0] as { text: string; media_ids?: string[] }).media_ids = [mediaId];
+      console.log(`  ↳ uploaded ${basename(mediaPath)} → media attached to ${row.id}`);
+    }
+
+    // Scheduled mode → claimed slot (or "next-free-slot"). Unscheduled mode → publishAt = null,
+    // so buildDraftPayload omits publish_at and Typefully saves a non-firing draft.
+    const publishAt = noSchedule ? null : slotByRow.get(row.id) ?? "next-free-slot";
+    const when = noSchedule ? "unscheduled" : whenByRow.get(row.id) ?? "next-free-slot";
+    const draftBody = JSON.stringify(
+      buildDraftPayload({ title: `${row.id} (content-agents)`, platformKey, posts, publishAt })
+    );
+    // Uploaded video can still be transcoding for a few seconds — retry the draft on "processing".
+    let draft: { id?: string | number; share_url?: string };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        draft = (await api(`/social-sets/${setId}/drafts`, { method: "POST", body: draftBody })) as {
+          id?: string | number;
+          share_url?: string;
+        };
+        break;
+      } catch (e) {
+        if (attempt < 12 && /processing/i.test((e as Error).message)) {
+          if (attempt === 0) console.log(`  ↳ media still transcoding, waiting…`);
+          await new Promise((r) => setTimeout(r, 5000));
+          continue;
+        }
+        throw e;
+      }
+    }
+    setStatus(folder, row, "published");
+    const placeNote = ctaUrl ? `, cta→${placement}` : "";
+    appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, ${when}${placeNote})`);
+    if (manualComment) {
+      appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
+    }
+    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, body);
+    const verb = noSchedule ? "saved (unscheduled)" : "scheduled";
+    console.log(
+      `${verb}: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
+        (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
+    );
+    results.push({ id: row.id, platform: row.platform, when, draftId: String(draft.id ?? "?"), manualComment });
+  }
+  return results;
+}
+
 async function main() {
   const arg = process.argv[2];
   if (!arg) {
@@ -265,104 +351,18 @@ async function main() {
     return;
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
-  const { rows } = readQueue(folder);
-  const approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
-  if (approved.length === 0) {
-    console.log("no approved x/linkedin/bluesky rows in the review queue");
-    return;
-  }
-
-  const setId = await socialSetId();
-  const { placement: placementMap, fallbackUrl, fallbackLabel } = loadCtaConfig();
-  const canonicalUrl = loadCanonicalUrl(folder);
-  const maxMap = loadPlatformMax();
-
-  // Assign an explicit publish time per row from the platform cadence (config/platforms.yaml).
-  // Rows fill future slots in queue order; platforms without a cadence fall back to next-free-slot.
-  const schedule = loadSchedule();
-  const now = new Date();
-  const byPlatform: Record<string, typeof approved> = {};
-  for (const r of approved) (byPlatform[r.platform] ??= []).push(r);
-  const slotByRow = new Map<string, string>(); // rowId → ISO publish_at | "next-free-slot"
-  const whenByRow = new Map<string, string>(); // rowId → human label for logs
-  for (const [platform, rowsP] of Object.entries(byPlatform)) {
-    const sched = schedule[platform];
-    const slots = sched ? computeSlots(sched, rowsP.length, now) : [];
-    rowsP.forEach((r, i) => {
-      if (i < slots.length) {
-        slotByRow.set(r.id, slots[i].toISOString());
-        whenByRow.set(r.id, fmtLa(slots[i]));
-      } else {
-        slotByRow.set(r.id, "next-free-slot");
-        whenByRow.set(r.id, "next-free-slot");
-      }
-    });
-  }
-  console.log("Cadence schedule (PT):");
-  for (const [platform, rowsP] of Object.entries(byPlatform)) {
-    const sched = schedule[platform];
-    console.log(`  ${platform}${sched ? ` (${sched.postsPerWeek}/wk)` : " (next-free-slot)"}:`);
-    for (const r of rowsP) console.log(`    ${r.id} → ${whenByRow.get(r.id)}`);
-  }
-
-  for (const row of approved) {
-    const assetPath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
-    const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
-    const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
-
-    // Resolve the CTA link: `none`/empty → none; `source` → the essay's own url (canonical_url),
-    // falling back to the Substack home when no essay url exists; any other value → a literal url.
-    const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
-    let ctaUrl: string | null;
-    let ctaLabel = typeof fm.cta_label === "string" ? fm.cta_label : "";
-    if (!rawCta || rawCta.toLowerCase() === "none") {
-      ctaUrl = null;
-    } else if (rawCta.toLowerCase() === "source") {
-      if (canonicalUrl) {
-        ctaUrl = canonicalUrl;
-      } else {
-        ctaUrl = fallbackUrl;
-        if (fallbackLabel) ctaLabel = fallbackLabel;
-        if (ctaUrl) {
-          console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
-        }
-      }
-    } else {
-      ctaUrl = rawCta;
-    }
-    const placement = placementMap[row.platform] ?? "inline";
-    const { posts, manualComment } = buildPosts(body, ctaUrl, ctaLabel, placement, maxMap[row.platform] ?? Infinity);
-
-    const publishAt = slotByRow.get(row.id) ?? "next-free-slot";
-    const when = whenByRow.get(row.id) ?? "next-free-slot";
-    const draft = await api(`/social-sets/${setId}/drafts`, {
-      method: "POST",
-      body: JSON.stringify({
-        draft_title: `${row.id} (content-agents)`,
-        publish_at: publishAt,
-        platforms: {
-          [platformKey]: {
-            enabled: true,
-            posts,
-          },
-        },
-      }),
-    }) as { id?: string | number; share_url?: string };
-    setStatus(folder, row, "published");
-    const placeNote = ctaUrl ? `, cta→${placement}` : "";
-    appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, ${when}${placeNote})`);
-    if (manualComment) {
-      appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
-    }
-    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"}`, fm, body);
-    console.log(
-      `scheduled: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
-        (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
-    );
-  }
+  const noSchedule =
+    process.argv.includes("--no-schedule") ||
+    (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
+  const forceReuse = process.argv.includes("--force-reuse");
+  await publishText(folder, { noSchedule, forceReuse });
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+// Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)
+// without triggering main()/process.exit. Matches tiktok.ts / cards.ts / youtube.ts.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}

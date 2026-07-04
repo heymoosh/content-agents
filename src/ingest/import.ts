@@ -4,12 +4,29 @@ import { openDb, repoRoot } from "../db/db.js";
 import { sha256File } from "../util/hash.js";
 import { ImportRow, AudienceRow } from "./types.js";
 import { parseX } from "./parse-x.js";
-import { parseSubstack, parseSubstackExport, parseSubstackAudience } from "./parse-substack.js";
+import {
+  parseSubstack,
+  parseSubstackExport,
+  parseSubstackAudience,
+  parseSubstackSummary,
+  isSubstackSummaryFile,
+} from "./parse-substack.js";
 import { parseLinkedIn, parseLinkedInAudience } from "./parse-linkedin.js";
 
 const INBOX = join(repoRoot, "data", "inbox");
 const PROCESSED = join(repoRoot, "data", "processed");
 const PLATFORMS = ["x", "linkedin", "substack"] as const;
+
+function toMediaType(format: ImportRow["format"]): "text" | "quote-card" | "video" | "note" | "unknown" {
+  switch (format) {
+    case "video": return "video";
+    case "image": return "quote-card";
+    case "text":
+    case "thread":
+    case "newsletter": return "text";
+    default: return "unknown";
+  }
+}
 
 async function parseEntry(platform: string, path: string, isDir: boolean): Promise<ImportRow[]> {
   const name = basename(path);
@@ -22,6 +39,8 @@ async function parseEntry(platform: string, path: string, isDir: boolean): Promi
       }
       return parseLinkedIn(name, readFileSync(path));
     case "substack":
+      // The aggregate summary JSON carries audience rows only, no per-post rows (see parseAudienceFor).
+      if (isSubstackSummaryFile(name)) return [];
       // A full export is an unpacked folder (posts.csv + per-post event logs); a loose stats
       // download is a single CSV. Handle both.
       return isDir ? parseSubstackExport(path) : parseSubstack(name, readFileSync(path, "utf8"));
@@ -40,6 +59,9 @@ async function parseAudienceFor(platform: string, path: string, isDir: boolean):
   if (platform === "substack" && isDir) {
     return parseSubstackAudience(path);
   }
+  if (platform === "substack" && isSubstackSummaryFile(name)) {
+    return parseSubstackSummary(name, readFileSync(path, "utf8"));
+  }
   return [];
 }
 
@@ -48,13 +70,14 @@ export async function runImport(): Promise<void> {
   const now = new Date().toISOString();
 
   const upsertPost = db.prepare(`
-    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format)
-    VALUES (@platform, @platformPostId, @postedAt, @url, @contentText, @format)
+    INSERT INTO posts (platform, platform_post_id, posted_at, url, content_text, format, media_type)
+    VALUES (@platform, @platformPostId, @postedAt, @url, @contentText, @format, @mediaType)
     ON CONFLICT(platform, platform_post_id) DO UPDATE SET
       posted_at = COALESCE(excluded.posted_at, posts.posted_at),
       url = COALESCE(excluded.url, posts.url),
       content_text = COALESCE(excluded.content_text, posts.content_text),
-      format = COALESCE(excluded.format, posts.format)
+      format = COALESCE(excluded.format, posts.format),
+      media_type = COALESCE(excluded.media_type, posts.media_type)
     RETURNING id
   `);
   const insertMetrics = db.prepare(`
@@ -97,7 +120,7 @@ export async function runImport(): Promise<void> {
         const audienceRows = await parseAudienceFor(platform, path, isDir);
         const tx = db.transaction(() => {
           for (const row of rows) {
-            const { id } = upsertPost.get(row) as { id: number };
+            const { id } = upsertPost.get({ ...row, mediaType: toMediaType(row.format) }) as { id: number };
             insertMetrics.run(
               id,
               now,

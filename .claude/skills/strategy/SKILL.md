@@ -35,7 +35,9 @@ makes `/cycle` compound instead of restarting every week.
      write one sentence defending why you're keeping it — silence is not allowed).
 
 1. **Freshness check.** Run `npm run ingest` if `data/inbox/` has files. If `.env` has Bluesky
-   creds, run `npm run bluesky`. If the DB is empty, stop and tell Muxin which exports to drop
+   creds, run `npm run bluesky`. If `.env` has `SUBSTACK_HANDLE`, run `npm run new-notes` to pull
+   the latest Substack Notes and refresh their engagement (Notes are Muxin's highest-engagement
+   surface and appear in no export). If the DB is empty, stop and tell Muxin which exports to drop
    (see `docs/analytics-export-howto.md`).
 
 2. **Tag untagged posts.** Run `npm run snapshot -- --untagged`. If any posts are returned,
@@ -47,6 +49,16 @@ makes `/cycle` compound instead of restarting every week.
 3. **Run the numbers.**
    - `npm run snapshot` → channel performance + data-confidence table
    - `npm run resonance` → pillar × platform map
+   - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
+     content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
+     `Placed log` + `posts.bet_id`.
+   - `npm run origin-compare` → verbatim-atomized vs spin vs organic engagement per platform.
+     Answers "is atomizing earning traction, or is Muxin better off posting natively?" Observational;
+     flags INSUFFICIENT groups — don't over-read a gap. It also prints a **Spin control readiness**
+     line: spin is the always-on default now, so the verbatim `--no-spin` control is what gets rare.
+     If it flags **Spin lift not yet measurable**, the verbatim control is too thin (< n=10) on a
+     platform where spin has volume — surface a nudge to run occasional `/atomize --no-spin` controls
+     (see Step 4). If control is adequate, just read the comparison off the table.
    - `npm run audience` → who follows you: LinkedIn demographics + follower/subscriber totals &
      growth (demographics are LinkedIn-only; X/Bluesky give counts, Substack free/paid)
    - `npm run route -- --all` → routing map (where each pillar should post; the include/skip
@@ -71,6 +83,17 @@ makes `/cycle` compound instead of restarting every week.
 
    ## Topic resonance map
    <resonance table + your interpretation; ignore cells with n<3; where rc << raw avg, the win is aging out>
+
+   ## Atomized vs organic
+   <origin-compare table + 1-2 sentences: are pipeline-distributed posts earning traction vs ones
+    Muxin posted natively (incl. Substack notes)? Observational — flag INSUFFICIENT groups and don't
+    over-read a gap. Where Muxin barely posts natively on a platform, read it as "do the cross-posts
+    land at all" rather than a head-to-head.
+    Spin is the always-on default, so this now compares spin against a verbatim `--no-spin` control.
+    If origin-compare printed **Spin lift not yet measurable**, add a one-line **[TEST] run --no-spin
+    controls** call to action here (and a matching TEST bet in Step 5): the verbatim control is too
+    thin to measure spin's lift, so run occasional `/atomize --no-spin` on the flagged platform(s).
+    If control is adequate, say nothing — don't manufacture a recommendation.>
 
    ## Audience (who you're reaching)
    <audience output: reach table + LinkedIn demographics + Substack tier. 1-2 sentences —

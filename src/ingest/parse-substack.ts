@@ -147,6 +147,56 @@ export function parseSubstackAudience(dir: string): AudienceRow[] {
   ];
 }
 
+// Substack aggregate reach/growth from the writer dashboard's summary endpoint
+// (GET /api/v1/publish-dashboard/summary-v2?range=365, fetched by the puller). The per-post pull
+// undercounts the real audience — it only sees published posts — while this endpoint carries the
+// true subscriber total + growth over the range. Real shape confirmed 2026-07-04 (live account,
+// subs 4→38, views 89→504):
+//   { totalSubscribersEnd, totalSubscribersStart, paidSubscribersEnd, paidSubscribersStart,
+//     arrEnd, arrStart, totalViewsEnd, totalViewsStart, pledgedArrEnd, pledgedArrStart }
+// Only subscriber total + growth are wired into the audience table (the card's ask); the paid/ARR
+// and view fields aren't modeled as rows yet, but the full payload is preserved in raw_json so nothing
+// is lost if a later card wants them.
+const SUMMARY_FILE_RE = /^substack-summary.*\.json$/i;
+
+export function isSubstackSummaryFile(name: string): boolean {
+  return SUMMARY_FILE_RE.test(name);
+}
+
+export function parseSubstackSummary(fileName: string, content: string): AudienceRow[] {
+  let json: unknown;
+  try {
+    json = JSON.parse(content);
+  } catch (e) {
+    throw new ParseError(fileName, `not valid JSON (${e instanceof Error ? e.message : e})`);
+  }
+  const p = (json && typeof json === "object" ? json : {}) as Record<string, unknown>;
+  const end = p.totalSubscribersEnd;
+  if (typeof end !== "number") {
+    throw new ParseError(
+      fileName,
+      `no "totalSubscribersEnd" number found. Substack's summary-v2 shape may have changed — ` +
+        `re-check the payload and update parseSubstackSummary in parse-substack.ts.`
+    );
+  }
+  const start = p.totalSubscribersStart;
+
+  const capturedAt = new Date().toISOString();
+  const base = { platform: "substack" as const, capturedAt, asOfDate: null, sourceFile: fileName };
+  const rows: AudienceRow[] = [
+    { ...base, metricType: "follower_total", dimension: null, valueLabel: null, valueCount: end, valuePct: null, raw: p },
+  ];
+  // Growth over the range, when the endpoint exposes a start figure. Otherwise the follower_total
+  // snapshot series (captured_at) still shows growth across weekly pulls, like Bluesky.
+  if (typeof start === "number") {
+    rows.push({
+      ...base, metricType: "follower_delta", dimension: null, valueLabel: null,
+      valueCount: end - start, valuePct: null, raw: {},
+    });
+  }
+  return rows;
+}
+
 export function parseSubstack(fileName: string, content: string): ImportRow[] {
   const rows = parseCsv(content);
   if (rows.length < 2) throw new ParseError(fileName, "no data rows found");

@@ -14,15 +14,20 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    lines from the source; light edits for platform format only. NEVER compose new claims,
    arguments, or worldview statements in Muxin's voice. Every such derivative must carry
    `source_lines` frontmatter tracing the lines it was built from.
-   - **Scoped exception — video scripts.** Video shorts are a deliberate exception: Grok (via the
-     `text-polish` provider, in the `/video` skill) drafts a hook-driven script from the essay's
-     *ideas* — not verbatim-traced. This is allowed ONLY because every storyboard is reviewed and
-     approved by Muxin in `review-queue.md` *before* any render, and nothing auto-publishes. The
-     exception is video scripts only; it must never bleed into text/image derivatives.
+   - **Scoped exception — video scripts.** Video shorts are a deliberate exception: Claude (via the
+     `text-polish` provider — `claude-cli`, on Muxin's subscription, $0; `npm run script:draft`, in
+     the `/video` skill) drafts a hook-driven script from the essay's *ideas* — not verbatim-traced.
+     This is allowed ONLY because every storyboard is reviewed and approved by Muxin in
+     `review-queue.md` *before* any render, and nothing auto-publishes. The exception is video
+     scripts only; it must never bleed into text/image derivatives.
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
-3. **No browser automation for posting.** Official APIs and sanctioned API relays (Typefully,
-   YouTube, AT Protocol, PostPeer for TikTok) or ready-to-paste files only.
+3. **Browser automation for posting is allowed only with Muxin's explicit approval.** Prefer
+   official APIs and sanctioned API relays (Typefully, YouTube, AT Protocol, PostPeer for TikTok +
+   quote cards, Upload-Post as the card failover) or ready-to-paste files — they're more reliable.
+   Where no usable API exists (e.g. Substack), a constrained browser agent MAY post, but only on
+   content Muxin has approved — rule 2 still governs, nothing posts unreviewed. Never auto-post via
+   browser without that approval.
 4. **Discrete verifiable outputs.** Every pipeline step writes a file or DB rows that can be
    inspected. Scripts do deterministic work; Claude does judgment (tagging, synthesis,
    extraction, scoring) inline while running skills.
@@ -33,6 +38,13 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    AI-processed `source.md` copy whose dashes were never in his original). Strip them to
    periods, commas, colons, or parentheses. Read it aloud; if it sounds like a brand instead of
    Muxin talking, rewrite it.
+6. **Prefer subscription / free model routes; minimize per-token API cost.** Default any model
+   call to the cheapest acceptable route: Claude via the Claude Code subscription (harness
+   subagents, $0 marginal — e.g. `/story` claude-native) and free-local media (Remotion / SVG /
+   HyperFrames, kokoro TTS) before paid APIs. Grok and GPT have no subscription API — their keys
+   bill per token via OpenRouter / direct — so use them ONLY where they add value Claude can't
+   (e.g. Grok's fiction voice, paid image step-ups): opt-in, logged to `data/cost-log.csv`, never
+   the silent default. New builds inherit this.
 
 ## Pipeline map
 
@@ -40,13 +52,13 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 |---|---|---|---|---|
 | Ingest analytics | files in `data/inbox/` | `npm run ingest`, `npm run bluesky` | — | rows in `data/analytics.db` |
 | Tag pillars | untagged posts exist | `npm run snapshot -- --untagged`, `tsx src/db/tag-posts.ts` | assign pillar per post (rubric: `config/pillars.yaml`) | `posts.pillar` |
-| Strategy | `/strategy` (weekly) | `npm run grade-bets`, `npm run snapshot`, `npm run resonance`, `npm run link-bet`, `npm run route -- --all` | grade last cycle's bets, synthesize brief citing real posts, record new bets | `briefs/YYYY-MM-DD-strategy-brief.md`, `briefs/bets.md` |
+| Strategy | `/strategy` (weekly) | `npm run grade-bets`, `npm run snapshot`, `npm run resonance`, `npm run tag-source`, `npm run origin-compare`, `npm run link-bet`, `npm run route -- --all` | grade last cycle's bets, synthesize brief citing real posts, compare atomized vs organic traction, record new bets | `briefs/YYYY-MM-DD-strategy-brief.md`, `briefs/bets.md` |
 | Route | inside `/atomize` (+ `/strategy`) | `npm run route` | pillar tag drives it; Muxin still approves what's queued | `content/<slug>/routing.md` |
-| Atomize | `/atomize <url\|file>` | `npm run new-content`, `npm run validate` | extraction-first drafting + scoring (text posts + quote cards); record `from_brief`/`directives_applied`; **only for routing `include` platforms** | `content/<slug>/derivatives/`, `review-queue.md` |
+| Atomize | `/atomize <url\|file>`, `/atomize notes` | `npm run new-content`, `npm run new-notes`, `npm run validate` | extraction-first drafting + scoring (text posts + quote cards); `/atomize notes` pulls Substack Notes (not in RSS) and spreads picked ones; record `from_brief`/`directives_applied`; **only for routing `include` platforms** | `content/<slug>/derivatives/`, `review-queue.md` |
 | Quote cards | inside `/atomize` | `npm run render -- --still` | extraction-first quote line + cost-first image model | `images/` |
-| Video | `/video <file\|folder>` | `npm run render -- --render-video` | Grok script + 5–7 storyboard scenes/visual prompts; storyboard approved as TEXT before any render | `video/storyboard.md`, `video/short.mp4` |
+| Video | `/video <file\|folder>` | `npm run script:draft`, `npm run render -- --render-video` | Claude-drafted script ($0 subscription) + 5–7 storyboard scenes/visual prompts; storyboard approved as TEXT before any render | `video/storyboard.md`, `video/short.mp4` |
 | Review | **Muxin, by hand** | — | — | statuses in `review-queue.md` |
-| Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, TikTok scheduled post (PostPeer), `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
+| Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, TikTok scheduled post (PostPeer), quote-card scheduled post (PostPeer/Upload-Post, `publish:cards`), `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
 | Whole cycle | `/cycle` | all of the above | orchestration | — |
 
 ## Build 2 — Fiction (composed prose, walled off)
@@ -111,4 +123,14 @@ extraction-first.
   gating generation in `/atomize` — not "post everywhere." Data narrows it; cold-start posts
   broadly to config defaults. Routing only gates what's *generated/queued*; Muxin's
   `review-queue.md` approval is still the only thing that publishes.
+- Publish timing is owned by ONE unified scheduler (`src/publish/slots.ts` + the `posts_per_week` /
+  `slot_days` / `slot_time_pst` cadence in `config/platforms.yaml` + the shared slot ledger
+  `data/publish-schedule.jsonl`), used by ALL scheduled channels — text (Typefully), cards (image
+  relays), and TikTok (PostPeer). It claims the next free, PT-anchored slot per platform, ≤1
+  post/platform/PT-day and ≤ `posts_per_week` across runs and streams. Cards (`quote-card` cadence)
+  also de-conflict against each platform they fan out to. Edit `config/platforms.yaml` to change
+  cadence — Typefully gets explicit times, not its "next-free-slot"; TikTok still honors
+  `TIKTOK_SCHEDULE_AT` as a manual one-off override.
 - Secrets in `.env` only (see `.env.example`). Never commit `.env` or `data/analytics.db`.
+- A freshly created git worktree has no `node_modules`. Run `npm run worktree:setup` (a plain
+  `npm ci` from the committed lockfile) once before running `npm test` or any script in it.

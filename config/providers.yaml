@@ -12,12 +12,13 @@ image_params: { model: sourceful/riverflow-v2-fast, modalities: ["image"] }     
 image_pro:   { provider: gemini-nano-banana, model: gemini-3-pro-image-preview }          # Nano Banana Pro ~$0.13/img (direct Google)
 image_hero:  { provider: openrouter-image, model: openai/gpt-5.4-image-2 }                # best look ~$0.23/img, slow
 transcription: gemini
-text-polish: grok-openrouter   # VIDEO SCRIPTS ONLY (atomize step 7a). Text posts stay extraction-first — see CLAUDE.md rule 1.
+text-polish: claude-cli   # VIDEO SCRIPTS ONLY (/video step 3). Claude Code on Muxin's subscription — $0 marginal, no API key (CLAUDE.md rule 6). Model = CLAUDE_POLISH_MODEL alias (default "sonnet"; "haiku" for the cheapest short-script run). Swap to "grok-openrouter" to draft on Grok instead (needs OPENROUTER_API_KEY, bills per token). Text posts stay extraction-first — see CLAUDE.md rule 1.
 prose: grok-openrouter         # BUILD 2 — FICTION ONLY. Composes original chapters (the /story skill). Swap to another model here, or per-series in stories/<slug>/series.yaml. Never used by Build 0/1.
 # Kept on OpenRouter on purpose: it lets us bake off prose across models behind one key. Once
 # the model is locked, moving to the direct xAI API (to skip OpenRouter's ~5% fee) is one new
 # file, src/providers/prose/grok-xai.ts, plus changing this line to `prose: grok-xai`.
 video-broll: openrouter-video   # animated scenes: Kling first+last-frame interpolation (OpenRouter). Used by /video.
+image_post: upload-post   # quote-card auto-publisher (publish:cards). On upload-post since PostPeer's 20/mo free quota ran out 2026-06 (cards 2 shipped via postpeer); switch back to "postpeer" once its cycle resets — see .env.example.
 # Animated scene-engine settings, passed to interpolate(). Kling v3.0 Std ~$0.08/s — cheaper than Veo,
 # and the one model verified to do start→end interpolation on the existing OPENROUTER_API_KEY.
 video_broll_params: { model: kwaivgi/kling-v3.0-std, resolution: 720p, cost_per_sec: 0.08 }

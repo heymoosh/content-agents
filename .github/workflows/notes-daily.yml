@@ -1,0 +1,70 @@
+name: notes-daily
+
+# Cloud-hosted replacement for the claude.ai "Routine" described in docs/setup-cloud-routine.md.
+# Runs on GitHub's own runners, so it fires whether or not Muxin's Mac is on. Fetches new
+# Substack Notes and marks them seen in the ledger (see src/cron/notes-daily.ts) — it drafts
+# NOTHING and never calls Typefully. Real per-platform drafting (Spin's per-channel reframing)
+# needs genuine Claude judgment, which only runs where Claude Code is authenticated — locally,
+# via the review GUI's "Pull Substack Notes" button. This job is pure ledger bookkeeping (no
+# content-generation logic touched), so it auto-merges like any other data-only change.
+
+on:
+  schedule:
+    # 14:07 UTC ~= 7:07am PT — off the exact hour, matching the doc's original review-with-coffee
+    # timing without landing on the same minute every other scheduled job in the world hits.
+    - cron: "7 14 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  notes-daily:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # GITHUB_TOKEN-authored pushes/PRs don't trigger other workflows (GitHub's anti-recursion
+          # rule), which would leave the required "check" status un-run and auto-merge stuck
+          # forever. A PAT triggers CI normally, so this PR ships through the exact same gate as
+          # every other PR in this repo.
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run notes-daily
+        env:
+          SUBSTACK_HANDLE: ${{ secrets.SUBSTACK_HANDLE }}
+        run: npm run notes-daily
+
+      - name: Open a PR with the updated ledger (skip if nothing new)
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Nothing new today — no PR to open."
+            exit 0
+          fi
+
+          today="$(date -u +%Y-%m-%d)"
+          branch="notes-daily/${today}-${GITHUB_RUN_NUMBER}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add data/notes-spread-ledger.jsonl
+          git commit -m "notes-daily: mark notes seen ${today}"
+          git push -u origin "$branch"
+
+          gh pr create \
+            --title "notes-daily: mark notes seen ${today}" \
+            --body "Automated (notes-daily cloud job). Marks newly-fetched Substack Notes as seen in the ledger — drafts nothing, calls no publish API. Run \"Pull Substack Notes\" in the review GUI locally to actually draft the good ones." \
+            --base main --head "$branch"
+          gh pr merge "$branch" --auto --squash
+          gh pr merge "$branch" --auto --squash

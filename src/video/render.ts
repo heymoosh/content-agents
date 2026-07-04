@@ -15,6 +15,8 @@ import { logCost } from "../util/cost-log.js";
 import { getImage, getTTS, getBroll, isEnabled, type ImageProfile } from "../providers/registry.js";
 import { charsToWordCaptions } from "./captions.js";
 import { charsOrWhisper } from "./align.js";
+import { renderMotionBg, renderCardAnimation } from "./hyperframes.js";
+import { resolveScheme } from "./card-schemes.js";
 
 // Render assets for a content folder.
 //   tsx src/video/render.ts --still <content-folder> --quote <derivative-name>
@@ -59,22 +61,7 @@ async function withJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): 
   }
 }
 
-// Named quote-card color schemes (house palette: cream/ink/persimmon/teal/ochre — memory:
-// image-style-newyorker). Consistent branding: every card uses DEFAULT_SCHEME unless its
-// frontmatter pins one with `scheme:`. The New Yorker DNA (serif type, keyline, ornament,
-// rule, small-caps attribution) is constant; only the three colors change per scheme.
-const CARD_SCHEMES: Record<string, { paper: string; ink: string; accent: string }> = {
-  classic: { paper: "#f2ead9", ink: "#1a1a1a", accent: "#e2552f" }, // beige paper, ink, persimmon
-  "teal-accent": { paper: "#f2ead9", ink: "#1a1a1a", accent: "#2f7e7e" }, // beige paper, ink, teal
-  "teal-block": { paper: "#2f7e7e", ink: "#f2ead9", accent: "#d8a23a" }, // teal paper, cream type, ochre
-  ink: { paper: "#1a1a1a", ink: "#f2ead9", accent: "#2f7e7e" }, // dark paper, cream type, teal
-};
-const DEFAULT_SCHEME = "teal-accent";
-
-function resolveScheme(fm: Record<string, unknown>): { paper: string; ink: string; accent: string } {
-  const name = typeof fm.scheme === "string" ? fm.scheme.toLowerCase() : "";
-  return CARD_SCHEMES[name] ?? CARD_SCHEMES[DEFAULT_SCHEME];
-}
+// Quote-card color schemes + resolveScheme live in ./card-schemes.ts (shared with `npm run card`).
 
 async function renderStill(
   folder: string,
@@ -85,20 +72,38 @@ async function renderStill(
     readFileSync(join(folder, "derivatives", `${quoteName}.md`), "utf8")
   );
   const slug = basename(folder);
+  const outPath = join(folder, "images", `${quoteName}.png`);
+  mkdirSync(join(folder, "images"), { recursive: true });
 
-  await withJob(async (jobDir, jobName) => {
-    // Quote cards are purely typographic (New Yorker style), no illustration background.
-    // (Muxin's call, June 2026: "just quotes, not illustrations.") The quote IS the design, so
-    // we skip the quote-card background image-gen entirely (the --pro/--hero profile and the
-    // image-model policy still apply to video b-roll, just not to quote cards).
-    const props = { quote, attribution: "Muxin Li", ...resolveScheme(fm) };
+  // The article title rides under the attribution as the in-asset source line. Pulled from
+  // source.md frontmatter (the published essay's title); empty → the line is omitted.
+  // Notes (source_kind: substack-note) have no article title — the first line of the note
+  // is not a title, so the source line is suppressed to keep the card clean.
+  let source = "";
+  try {
+    const { fm: srcFm } = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
+    if (typeof srcFm.title === "string" && srcFm.source_kind !== "substack-note") {
+      source = srcFm.title;
+    }
+  } catch {
+    // no source.md (e.g. a bare quote) — render without the source line
+  }
+  // Quote cards are purely typographic (New Yorker style), no illustration background.
+  // (Muxin's call, June 2026: "just quotes, not illustrations.") The quote IS the design.
+  const props = { quote, attribution: "Muxin Li", source, ...resolveScheme(fm) };
+
+  await withJob(async (jobDir, _jobName) => {
     const propsFile = join(jobDir, "props.json");
     writeFileSync(propsFile, JSON.stringify(props));
-    const outPath = join(folder, "images", `${quoteName}.png`);
-    mkdirSync(join(folder, "images"), { recursive: true });
     remotion(["still", ENTRY, "QuoteCard", outPath, `--props=${propsFile}`]);
     console.log(`quote card: ${outPath}`);
   });
+
+  // Animated companion — free (HyperFrames, local headless Chrome). Always produced alongside
+  // the static PNG so a notes card emits both without extra steps. The animation's accent climax
+  // is the verbatim closing sentence (chosen in hyperframes.ts), so no extra props are needed.
+  const animPath = join(folder, "images", `${quoteName}.mp4`);
+  renderCardAnimation(props, animPath);
 }
 
 async function renderVideo(folder: string, profile?: ImageProfile): Promise<void> {
@@ -275,15 +280,16 @@ async function synthVoiceAndCaptions(
   return { audioPath, captions, durationMs };
 }
 
-// ANIMATED engine: the storyboard's scene visuals become keyframe stills; the video provider
-// (Kling) animates BETWEEN consecutive keyframes; the clips are stitched under the voiceover +
-// captions. `keyframesOnly` generates just the stills and stops, so they can be approved before
-// any paid animation. Gated on the same approved storyboard row as the image-motion path.
-async function renderAnimatedFromStoryboard(
+// Shared front half of the animated + motion engines: validate the approved storyboard, write
+// video-script.md, and generate the scene keyframe stills WITH character/style consistency
+// (Nano Banana Pro + reference images). Returns null when keyframesOnly (stills written; stop for
+// approval before any paid render). Gated on the same approved storyboard row as image-motion.
+async function prepareScenes(
   folder: string,
-  profile?: ImageProfile,
-  keyframesOnly = false
-): Promise<void> {
+  profile: ImageProfile | undefined,
+  keyframesOnly: boolean,
+  singleStill = false
+): Promise<{ script: string; visuals: string[]; keyframes: string[]; slug: string; videoDir: string } | null> {
   const sbPath = join(folder, "video", "storyboard.md");
   if (!existsSync(sbPath)) throw new Error(`missing ${sbPath} — write the storyboard first (/video).`);
   if (storyboardStatus(folder) !== "approve") {
@@ -300,9 +306,7 @@ async function renderAnimatedFromStoryboard(
     .split("\n")
     .map((l) => l.match(/^\s*-\s*visual:\s*(.+)$/i)?.[1]?.trim())
     .filter((v): v is string => Boolean(v));
-  if (visuals.length < 2) {
-    throw new Error(`${sbPath}: animated mode needs ≥2 scene "- visual:" keyframes (got ${visuals.length}).`);
-  }
+  if (visuals.length < 1) throw new Error(`${sbPath}: no scene "- visual:" lines found.`);
 
   const slug = basename(folder);
   const videoDir = join(folder, "video");
@@ -315,18 +319,21 @@ async function renderAnimatedFromStoryboard(
     `---\nplatform: video-script\nsource_ref: ${sourceRef}\n---\n\n${script}\n`
   );
 
-  // 1. Keyframe stills — one per scene visual; the frames you approve before any Kling spend.
+  // Keyframe stills — one per scene visual; the frames you approve before any paid render.
   // Consistency: default to Nano Banana Pro (reference-image conditioning) so the character +
-  // style hold across scenes. Each keyframe references an anchor (a user-supplied
-  // images/reference.* if present, else scene 1) plus the previous frame for local continuity.
+  // style hold across scenes. Each references an anchor (a user-supplied images/reference.* if
+  // present, else scene 1) plus the previous frame for local continuity.
   const kfProfile: ImageProfile = profile ?? "pro";
   const { provider: image, params: imageParams } = await getImage(kfProfile);
   const userRef = ["reference.png", "reference.jpg", "reference.jpeg"]
     .map((n) => join(folder, "images", n))
     .find((p) => existsSync(p));
   if (userRef) console.log(`character reference: ${userRef}`);
+  // --motion needs only ONE base illustration — HyperFrames choreographs the motion on it, so it
+  // never pays for multiple stills. --animated needs one keyframe per scene to interpolate between.
+  const stillVisuals = singleStill ? visuals.slice(0, 1) : visuals;
   const keyframes: string[] = [];
-  for (let i = 0; i < visuals.length; i++) {
+  for (let i = 0; i < stillVisuals.length; i++) {
     const kfPath = join(folder, "images", `keyframe-${i + 1}.png`);
     if (!existsSync(kfPath)) {
       const refs = [
@@ -335,7 +342,7 @@ async function renderAnimatedFromStoryboard(
         ),
       ];
       const { costUsd } = await image.generate({
-        prompt: visuals[i],
+        prompt: stillVisuals[i],
         aspect: "9:16",
         outPath: kfPath,
         params: imageParams,
@@ -347,8 +354,24 @@ async function renderAnimatedFromStoryboard(
   }
   console.log(`keyframes: ${keyframes.length} stills → ${join(folder, "images")}`);
   if (keyframesOnly) {
-    console.log("--keyframes-only: review the keyframe-*.png stills, then re-run without the flag to animate.");
-    return;
+    console.log("--keyframes-only: review the keyframe-*.png stills, then re-run without the flag to render.");
+    return null;
+  }
+  return { script, visuals, keyframes, slug, videoDir };
+}
+
+// ANIMATED engine: the video provider (Kling) animates BETWEEN consecutive approved keyframes; the
+// clips are stitched under the voiceover + captions. Needs ≥2 keyframes (use --motion for one).
+async function renderAnimatedFromStoryboard(
+  folder: string,
+  profile?: ImageProfile,
+  keyframesOnly = false
+): Promise<void> {
+  const scenes = await prepareScenes(folder, profile, keyframesOnly);
+  if (!scenes) return;
+  const { script, visuals, keyframes, slug, videoDir } = scenes;
+  if (keyframes.length < 2) {
+    throw new Error(`animated mode needs ≥2 scene keyframes (got ${keyframes.length}); use --motion for one.`);
   }
 
   // 2. Voice + captions.
@@ -413,6 +436,58 @@ async function renderAnimatedFromStoryboard(
   });
 }
 
+// MOTION engine: the approved scene stills are choreographed into a SILENT motion-graphics visual
+// by HyperFrames (Ken Burns + crossfades — free, local, deterministic, perfectly consistent), then
+// the Kokoro voice + captions are laid on top via the same AnimatedShort composition. Cheapest
+// animated path; best for flat-editorial illustration. Same gate + --keyframes-only as --animated.
+async function renderMotionFromStoryboard(
+  folder: string,
+  profile?: ImageProfile,
+  keyframesOnly = false
+): Promise<void> {
+  const scenes = await prepareScenes(folder, profile, keyframesOnly, true); // one base still — HyperFrames adds the motion
+  if (!scenes) return;
+  const { script, keyframes, slug, videoDir } = scenes;
+
+  // 1. Voice + captions.
+  const { audioPath, captions, durationMs } = await synthVoiceAndCaptions(videoDir, script, slug);
+
+  // 2. HyperFrames renders the silent motion visual from the consistent stills.
+  const fps = 30;
+  const bgPath = join(videoDir, "motion-bg.mp4");
+  renderMotionBg(keyframes, durationMs, bgPath);
+
+  // 3. Lay the voiceover + captions over it via AnimatedShort (one full-length clip).
+  await withJob(async (jobDir, jobName) => {
+    copyFileSync(bgPath, join(jobDir, "motion-bg.mp4"));
+    copyFileSync(audioPath, join(jobDir, "voiceover.mp3"));
+    const props = {
+      audio: `${jobName}/voiceover.mp3`,
+      clips: [`${jobName}/motion-bg.mp4`],
+      clipFrames: [Math.ceil((durationMs / 1000) * fps)],
+      captions,
+      durationMs,
+    };
+    const propsFile = join(jobDir, "props.json");
+    writeFileSync(propsFile, JSON.stringify(props));
+
+    const mp4 = join(videoDir, "short.mp4");
+    remotion(["render", ENTRY, "AnimatedShort", mp4, `--props=${propsFile}`]);
+    remotion([
+      "still",
+      ENTRY,
+      "AnimatedShort",
+      join(videoDir, "thumbnail.png"),
+      `--props=${propsFile}`,
+      "--frame=15",
+    ]);
+    writeFileSync(join(videoDir, "transcript.txt"), script + "\n");
+    console.log(
+      `motion video: ${mp4} (${keyframes.length} scene(s), ${(durationMs / 1000).toFixed(1)}s, HyperFrames + Kokoro)`
+    );
+  });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const mode = args[0];
@@ -429,7 +504,9 @@ async function main() {
     await renderStill(folder, quoteName, profile);
   } else if (mode === "--render-video") {
     const folder = resolveFolder(args[1]);
-    if (args.includes("--animated")) {
+    if (args.includes("--motion")) {
+      await renderMotionFromStoryboard(folder, profile, args.includes("--keyframes-only"));
+    } else if (args.includes("--animated")) {
       await renderAnimatedFromStoryboard(folder, profile, args.includes("--keyframes-only"));
     } else {
       await renderVideoFromStoryboard(folder, profile);
@@ -438,7 +515,7 @@ async function main() {
     await renderVideo(resolveFolder(args[1]), profile);
   } else {
     console.error(
-      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]            (image-motion B-roll)\n  tsx src/video/render.ts --render-video <content-folder> --animated [--keyframes-only] [--pro|--hero]\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
+      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]            (image-motion B-roll)\n  tsx src/video/render.ts --render-video <content-folder> --motion [--keyframes-only] [--pro|--hero]   (HyperFrames)\n  tsx src/video/render.ts --render-video <content-folder> --animated [--keyframes-only] [--pro|--hero]  (Kling)\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
     );
     process.exit(1);
   }

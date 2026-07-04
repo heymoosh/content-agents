@@ -1,18 +1,25 @@
 node_modules/
 .env
-data/analytics.db
+data/analytics.db*
+data/notes-cache.json
 data/inbox/**
 !data/inbox/**/.gitkeep
 data/processed/**
 !data/processed/.gitkeep
 data/cost-log.csv
+data/publish-schedule.jsonl
+# notes-spread-ledger.jsonl is intentionally committed (cloud dedup memory) — keep it tracked
+!data/notes-spread-ledger.jsonl
+content/.inbox/
 content/**/video/*.mp4
 content/**/video/*.wav
 content/**/video/*.mp3
 content/**/images/*.png
 content/**/images/*.jpg
+content/**/images/*.mp4
 /bakeoff/
 .remotion/
 out/
 *.log
+docs/*.lock
 .DS_Store

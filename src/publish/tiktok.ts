@@ -1,10 +1,12 @@
 import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
-import { join, isAbsolute } from "node:path";
+import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
+import { claimSlots } from "./slots.js";
+import { checkReuse } from "./reuse-guard.js";
 
 // Schedule approved `tiktok` rows to TikTok via PostPeer (a sanctioned API relay that holds
 // TikTok's audited Content Posting access — we never touch TikTok's API or a browser directly).
@@ -26,24 +28,28 @@ function apiKey(): string {
   return key;
 }
 
-// PostPeer validates `scheduledFor` as RFC3339 (`format: date-time`) — it must carry the `Z`/offset.
-// We send a full UTC ISO timestamp plus `timezone: "UTC"`. Mirror the "scheduled, never instant"
-// house rule: TIKTOK_SCHEDULE_AT for a specific time (ISO-8601), else TIKTOK_SCHEDULE_LEAD_MIN out (60).
-function scheduledForUtc(): string {
+// Resolve scheduled time(s) from the UNIFIED scheduler (slots.ts, windowKey "tiktok"), so TikTok
+// shares ONE cadence + ledger with text and cards — no channel double-books a PT day. PostPeer
+// validates `scheduledFor` as RFC3339 (must carry the `Z`/offset); we send full UTC ISO + timezone
+// "UTC". Precedence: TIKTOK_SCHEDULE_AT (explicit ISO, manual one-off) → the "tiktok" cadence in
+// config/platforms.yaml → TIKTOK_SCHEDULE_LEAD_MIN out (default 60) when no cadence is configured.
+function resolveTimes(count: number, asset: string): string[] {
   const at = process.env.TIKTOK_SCHEDULE_AT?.trim();
-  let when: Date;
   if (at) {
-    when = new Date(at);
+    const when = new Date(at);
     if (Number.isNaN(when.getTime())) throw new Error(`TIKTOK_SCHEDULE_AT is not a valid ISO date: ${at}`);
     if (when.getTime() <= Date.now()) throw new Error(`TIKTOK_SCHEDULE_AT is in the past: ${at} — TikTok needs a future time`);
-  } else {
-    const leadMin = Number(process.env.TIKTOK_SCHEDULE_LEAD_MIN ?? "60");
+    return Array(count).fill(when.toISOString());
+  }
+  const { times } = claimSlots({ windowKey: "tiktok", conflictPlatforms: ["tiktok"], count, asset, by: "tiktok" });
+  return times.map((t, i) => {
+    if (t && t !== "next-free-slot") return t; // got a cadence slot from the shared scheduler
+    const leadMin = Number(process.env.TIKTOK_SCHEDULE_LEAD_MIN ?? "60"); // no tiktok cadence → lead-time fallback
     if (Number.isNaN(leadMin) || leadMin <= 0) {
       throw new Error(`TIKTOK_SCHEDULE_LEAD_MIN must be a positive number, got: ${process.env.TIKTOK_SCHEDULE_LEAD_MIN}`);
     }
-    when = new Date(Date.now() + leadMin * 60_000);
-  }
-  return when.toISOString(); // full RFC3339 with Z, e.g. "2026-06-16T20:00:00.000Z"
+    return new Date(Date.now() + leadMin * 60_000 + i * 86_400_000).toISOString();
+  });
 }
 
 // Two-step upload: ask PostPeer for a presigned URL, PUT the bytes to it, get back a public URL.
@@ -151,6 +157,15 @@ async function main() {
     return;
   }
 
+  // Reuse guard: skip if this slug was published to TikTok too recently.
+  const slug = basename(folder);
+  const reuseCheck = checkReuse(slug, "tiktok");
+  if (!reuseCheck.allowed) {
+    console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
+    console.log("no rows to publish: tiktok blocked by the reuse guard");
+    return;
+  }
+
   const videoPath = join(folder, "video", "short.mp4");
   const titlePath = join(folder, "video", "title.txt");
   for (const p of [videoPath, titlePath]) {
@@ -164,8 +179,10 @@ async function main() {
     ? splitFrontmatter(readFileSync(scriptPath, "utf8"))
     : { fm: {} as Record<string, unknown> };
 
-  const scheduledFor = scheduledForUtc();
-  for (const row of approved) {
+  const times = resolveTimes(approved.length, `${basename(folder)}/tiktok`);
+  for (let i = 0; i < approved.length; i++) {
+    const row = approved[i];
+    const scheduledFor = times[i];
     const ref = await scheduleToTikTok(videoPath, caption, scheduledFor);
     setStatus(folder, row, "published");
     appendPublishLog(folder, `${row.id} → tiktok ${ref} (scheduled ${scheduledFor})`);
