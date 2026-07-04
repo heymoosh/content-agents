@@ -137,7 +137,11 @@ function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
     // The quote text that backs the card usually lives in a companion derivative.
     loadMd(join("derivatives", `${row.id}.md`));
   } else if (kind === "storyboard") {
-    loadMd(join("video", "storyboard.md")) && (out.hasAsset = true);
+    // Prefer the storyboard once /video builds it; before then, surface the drafted script so the
+    // video-script row is reviewable in the GUI instead of showing "no asset generated yet".
+    if (loadMd(join("video", "storyboard.md")) || loadMd(join("video", "script-draft.md"))) {
+      out.hasAsset = true;
+    }
   }
 
   // A video derivative can also have a rendered file to preview.
