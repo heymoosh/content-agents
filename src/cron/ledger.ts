@@ -2,9 +2,10 @@ import { readFileSync, appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { repoRoot } from "../db/db.js";
 
-// Committed ledger for the daily cloud routine: tracks which Substack Notes have already been
-// spread to Typefully as scheduled drafts. Cloud machines clone fresh each run, so analytics.db
-// (gitignored) can't serve as memory — this file lives in data/ and IS committed.
+// Committed ledger for the daily cloud routine: tracks which Substack Notes the cloud job has
+// already seen (notes-daily.ts doesn't draft anything — see that file — so most entries just mark
+// "seen", not "spread"). Cloud machines clone fresh each run, so analytics.db (gitignored) can't
+// serve as memory — this file lives in data/ and IS committed.
 //
 // Format: JSONL — one JSON object per line, append-only. Never delete entries.
 
@@ -13,9 +14,9 @@ export const LEDGER_PATH = join(repoRoot, "data", "notes-spread-ledger.jsonl");
 export interface LedgerEntry {
   noteId: string;       // entity_key, e.g. "c-279240534"
   url: string;          // substack note URL
-  spreadAt: string;     // ISO timestamp of when this run spread the note
-  platforms: string[];  // text platforms it was spread to, e.g. ["x", "bluesky"]
-  contentFolder: string; // relative path, e.g. "content/2026-06-26-my-note"
+  spreadAt: string;     // ISO timestamp of when this run saw/spread the note
+  platforms: string[];  // text platforms it was spread to, e.g. ["x", "bluesky"]; [] if only seen
+  contentFolder?: string; // relative path, e.g. "content/2026-06-26-my-note" — omitted if none was scaffolded
 }
 
 // Read all ledger entries and return a Set of already-spread note IDs for fast dedup.
