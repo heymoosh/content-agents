@@ -1,0 +1,69 @@
+name: notes-daily
+
+# Cloud-hosted replacement for the claude.ai "Routine" described in docs/setup-cloud-routine.md.
+# Runs on GitHub's own runners, so it fires whether or not Muxin's Mac is on. Fetches new
+# Substack Notes and saves them as UNSCHEDULED Typefully drafts (see src/cron/notes-daily.ts) —
+# nothing auto-posts. Any ledger/content changes go through a normal PR so CI + auto-merge stay
+# the one path everything in this repo ships through.
+
+on:
+  schedule:
+    # 14:07 UTC ~= 7:07am PT — off the exact hour, matching the doc's original review-with-coffee
+    # timing without landing on the same minute every other scheduled job in the world hits.
+    - cron: "7 14 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  notes-daily:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # GITHUB_TOKEN-authored pushes/PRs don't trigger other workflows (GitHub's anti-recursion
+          # rule), which would leave the required "check" status un-run and auto-merge stuck
+          # forever. A PAT triggers CI normally, so this PR ships through the exact same gate as
+          # every other PR in this repo.
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run notes-daily
+        env:
+          SUBSTACK_HANDLE: ${{ secrets.SUBSTACK_HANDLE }}
+          TYPEFULLY_API_KEY: ${{ secrets.TYPEFULLY_API_KEY }}
+          TYPEFULLY_SOCIAL_SET_ID: ${{ secrets.TYPEFULLY_SOCIAL_SET_ID }}
+        run: npm run notes-daily
+
+      - name: Open a PR with the ledger + any new content folders (skip if nothing spread)
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Nothing new spread today — no PR to open."
+            exit 0
+          fi
+
+          today="$(date -u +%Y-%m-%d)"
+          branch="notes-daily/${today}-${GITHUB_RUN_NUMBER}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add data/notes-spread-ledger.jsonl content/
+          git commit -m "notes-daily: spread notes ${today}"
+          git push -u origin "$branch"
+
+          gh pr create \
+            --title "notes-daily: spread notes ${today}" \
+            --body "Automated (notes-daily cloud job). Creates UNSCHEDULED Typefully drafts for newly-spread Substack Notes — nothing auto-posts. Review/schedule the good ones in Typefully; the rest can be ignored or deleted." \
+            --base main --head "$branch"
+          gh pr merge "$branch" --auto --squash

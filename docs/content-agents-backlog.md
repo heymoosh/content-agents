@@ -73,6 +73,7 @@ Examples - use both Primary and a Secondary CTA
 - After the cloud routine is set up, confirm the FIRST real run creates Typefully drafts that land in Drafts (UNSCHEDULED), not the Scheduled queue.
 - The 'omit publish_at = unscheduled' contract was verified against the codebase's own logic (fetchScheduledDrafts filter), not a live Typefully API call.
 - If drafts appear Scheduled, adjust the --no-schedule payload in src/publish/typefully.ts before relying on the routine.
+- UPDATE (2026-07-04): the claude.ai Routine step is being replaced — `.github/workflows/notes-daily.yml` now runs this on GitHub Actions instead (see bd499018), which works regardless of whether Muxin's Mac is on. Once Muxin adds the 4 repo secrets and the workflow fires for real, re-run this smoke-test against the resulting PR/ledger entry.
 - STATUS: To Do
 - GROOMED: 2026-07-02 conductor re-groom: read-only verification probe of notes-daily drafts (unscheduled contract), unblocked by PR #52; fix path is an ordinary code change
 - PARKED: parked (unattended) 2026-07-02: inconclusive, routine has never fired. Ledger data/notes-spread-ledger.jsonl is 0 lines, no routine commits on any branch since PR #52 merged 2026-06-27 vs a daily 14:00 UTC schedule. Blocked on Muxin creating the claude.ai Routine (docs/setup-cloud-routine.md Step 3). Re-run once the ledger shows a first real-run entry.
@@ -83,6 +84,7 @@ Examples - use both Primary and a Secondary CTA
 - Add 'linkedin' if Muxin wants longer / essay-like notes echoed there.
 - Muxin's call on whether his notes fit the LinkedIn register.
 - STATUS: Backlog
+- DECISION: approved — LinkedIn gets the SAME platform-fit test the other spread platforms already use, not a blanket add: if a note is a good fit for a platform, it spreads there, and that rule now includes LinkedIn too (Muxin, 2026-07-04).
 <!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
 
 **Recurring weekly analytics pull (scheduler — "don't ask me")**
@@ -213,7 +215,8 @@ Examples - use both Primary and a Secondary CTA
 **Create the claude.ai Routine for notes-daily (manual UI step)**
 - - ORIGIN: follow-up auto-filed by the conductor from card 2972c204 (Smoke-test the notes-daily cloud routine), 2026-07-02.
 - The notes-daily code shipped in PR #52, but docs/setup-cloud-routine.md Step 3 (create the Routine in claude.ai -> Routines UI, daily 14:00 UTC) appears never done: the committed dedup ledger has zero entries and no routine commits exist on any branch 5-6 days after merge.
-- This is Muxin manual out-of-band action in the claude.ai web UI; nothing to build in this repo.
+- SUPERSEDED (Muxin, 2026-07-04): Muxin couldn't find the claude.ai Routines UI, and what he actually needs is "runs even if my Mac is off" — a genuine cloud job, not tied to any Claude session. Replaced with `.github/workflows/notes-daily.yml` (GitHub Actions, on his GitHub Pro plan — well within the included 3,000 min/month for a ~1-2 min/day job). Runs daily at 14:07 UTC + can be triggered manually via `workflow_dispatch`.
+- REMAINING MANUAL STEP: Muxin adds 4 repo secrets (Settings -> Secrets and variables -> Actions, or `gh secret set <NAME>`): `SUBSTACK_HANDLE`, `TYPEFULLY_API_KEY`, `TYPEFULLY_SOCIAL_SET_ID` (same 3 the old doc listed), plus `GH_PAT` (a fine-grained personal access token scoped to this repo, contents + pull-requests read/write) — needed because the built-in GITHUB_TOKEN can't trigger the CI workflow on the PR it opens (GitHub's anti-recursion rule), which would leave auto-merge stuck forever.
 - Once created and the first real run lands a ledger entry, the parked smoke-test card (2972c204) resumes.
 - STATUS: Backlog
 <!-- card-id: bd499018-a6fa-46a2-a419-cd5ed01139fd -->
