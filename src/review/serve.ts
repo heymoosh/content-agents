@@ -25,6 +25,7 @@ import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { publishText } from "../publish/typefully.js";
+import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 
 const CONTENT = join(repoRoot, "content");
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
@@ -286,7 +287,7 @@ const ATOMIZE_PERMISSION_MODE = process.env.ATOMIZE_PERMISSION_MODE ?? "acceptEd
 type JobStatus = "queued" | "running" | "done" | "failed";
 interface Job {
   id: string;
-  kind: "url" | "file" | "text" | "notes";
+  kind: "url" | "file" | "text" | "notes" | "continue";
   label: string;
   arg: string; // what /atomize receives: a url, a space-free .inbox path, or "notes"
   status: JobStatus;
@@ -524,10 +525,6 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/atomize") {
       const b = await readBody(req);
-      if (b.mode === "notes") {
-        json(res, 200, { ok: true, job: publicJob(addJob("notes", "notes", "Substack Notes")) });
-        return;
-      }
       const source = String(b.source ?? "");
       if (!source.trim()) {
         json(res, 400, { ok: false, error: "paste some text, a file path, or a URL first" });
@@ -536,6 +533,48 @@ const server = createServer(async (req, res) => {
       const c = classifySource(source);
       const job = c.kind === "text" ? addJob("text", "", c.label, source) : addJob(c.kind, c.arg, c.label);
       json(res, 200, { ok: true, job: publicJob(job) });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/notes") {
+      const limit = Math.max(1, parseInt(url.searchParams.get("limit") ?? "20", 10) || 20);
+      const handle = process.env.SUBSTACK_HANDLE;
+      if (!handle) {
+        json(res, 400, { ok: false, error: "set SUBSTACK_HANDLE in .env first" });
+        return;
+      }
+      const { notes } = await fetchNotesList(handle, limit);
+      json(res, 200, {
+        ok: true,
+        notes: notes.map((n, i) => ({
+          idx: i + 1,
+          url: n.url,
+          publishedAt: n.publishedAt,
+          text: n.text,
+          likes: n.likes,
+          reposts: n.reposts,
+          replies: n.replies,
+          eng: n.likes + n.replies * 3 + n.reposts * 2,
+          drafted: n.drafted,
+        })),
+      });
+      return;
+    }
+    // Muxin's manual pick (replaces the old one-click "Pull Substack Notes", which let headless
+    // Claude choose on its own): scaffold a folder per picked note, then queue each folder to
+    // resume the normal atomize pipeline via `/atomize --continue <folder>` (steps 2-8 only —
+    // the folder is already scaffolded, so no re-ingest).
+    if (req.method === "POST" && url.pathname === "/api/notes/pick") {
+      const b = await readBody(req);
+      const indices = Array.isArray(b.indices) ? b.indices.map(Number).filter(Number.isInteger) : [];
+      if (!indices.length) {
+        json(res, 400, { ok: false, error: "pick at least one note first" });
+        return;
+      }
+      const results = scaffoldPicked(indices);
+      const queued = results
+        .filter((r) => r.dir)
+        .map((r) => publicJob(addJob("continue", `--continue ${r.dir}`, `Note: ${r.title}`)));
+      json(res, 200, { ok: true, results, jobs: queued });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/jobs") {
@@ -649,6 +688,19 @@ const PAGE = /* html */ `<!doctype html>
   .ingest-actions { display:flex; gap:9px; align-items:center; margin-top:11px; flex-wrap:wrap; }
   button.primary { background:var(--accent); color:var(--paper); border-color:var(--accent); font-weight:600; }
   .hint { font-size:12px; color:var(--muted); flex:1; min-width:220px; line-height:1.4; }
+  .notes-panel { max-width:820px; margin:16px auto 0; background:var(--card); border:1px solid var(--line);
+    border-radius:10px; padding:14px 16px; }
+  .notes-head { display:flex; align-items:center; gap:12px; margin-bottom:8px; flex-wrap:wrap; }
+  .notes-head h3 { font:600 14px/1.3 Georgia,serif; margin:0; }
+  .notelist { max-height:420px; overflow:auto; }
+  .notepick { display:flex; align-items:flex-start; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line); }
+  .notepick:last-child { border-bottom:none; }
+  .notepick.drafted { opacity:.5; }
+  .notepick input[type=checkbox] { margin-top:3px; flex:0 0 auto; }
+  .notepick .ntext { flex:1; min-width:0; font-size:13.5px; line-height:1.45; }
+  .notepick .nmeta { font-size:11.5px; color:var(--muted); margin-bottom:2px; }
+  .notepick .nmeta .drafted-tag { color:var(--blue); font-weight:600; }
+  .notes-actions { display:flex; gap:9px; align-items:center; margin-top:12px; flex-wrap:wrap; }
   .jobs { max-width:820px; margin:24px auto 0; }
   .jobs > h3 { font:600 13px/1.3 Georgia,serif; color:var(--muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:.5px; }
   .job { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 15px;
@@ -684,8 +736,21 @@ const PAGE = /* html */ `<!doctype html>
       <textarea id="src" placeholder="Paste an idea, a file path to an Obsidian note, or a Substack URL, then Add to queue. (⌘/Ctrl+Enter)"></textarea>
       <div class="ingest-actions">
         <button class="primary" id="addBtn">Add to queue</button>
-        <button id="notesBtn">Pull Substack Notes</button>
+        <button id="notesBtn">Browse Substack Notes</button>
         <span class="hint">One source per add. Claude drafts it on your subscription ($0), one at a time, so keep adding while it works. LinkedIn/X posts aren't re-importable; paste the text to expand one.</span>
+      </div>
+    </div>
+    <div class="notes-panel" id="notesPanel" hidden>
+      <div class="notes-head">
+        <h3>Substack Notes</h3>
+        <label class="toggle"><input type="checkbox" id="notesShowDrafted" /> show already drafted</label>
+        <span class="grow"></span>
+        <button id="notesCloseBtn">Close</button>
+      </div>
+      <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
+      <div class="notes-actions">
+        <button class="primary" id="notesDraftBtn">Draft selected</button>
+        <span class="hint">Pick the notes worth cross-posting. Draft selected scaffolds a folder per note and runs the normal atomize pipeline (tag, route, draft, validate, queue) — nothing publishes without your review.</span>
       </div>
     </div>
     <div class="jobs" id="jobs"></div>
@@ -874,14 +939,53 @@ async function addSource(){
   if(r.ok){ ta.value=""; flash("Queued — Claude is drafting"); loadJobs(); }
   else flash(r.error || "Could not queue");
 }
-async function pullNotes(){
-  $("#notesBtn").disabled = true;
-  const r = await post("/api/atomize",{mode:"notes"});
-  $("#notesBtn").disabled = false;
-  if(r.ok){ flash("Pulling your Notes…"); loadJobs(); } else flash(r.error || "Failed");
+// ── Substack Notes checklist (manual pick, replaces the old one-click "Pull Substack Notes") ──
+let NOTES = [];
+let notesShowDrafted = false;
+function noteMeta(n){
+  const d = n.publishedAt ? n.publishedAt.slice(0,10) : "????-??-??";
+  const tag = n.drafted ? ' <span class="drafted-tag">already drafted</span>' : "";
+  return d+' · eng '+n.eng+' (♥'+n.likes+' ↻'+n.reposts+' 💬'+n.replies+')'+tag;
+}
+function renderNotes(){
+  const box = $("#notesList");
+  const visible = NOTES.filter(n => notesShowDrafted || !n.drafted);
+  if(!visible.length){ box.innerHTML = '<div class="empty">'+(NOTES.length? "All notes are already drafted." : "No notes found.")+'</div>'; return; }
+  box.innerHTML = "";
+  for(const n of visible){
+    const el = document.createElement("label");
+    el.className = "notepick" + (n.drafted ? " drafted" : "");
+    el.innerHTML = '<input type="checkbox" data-idx="'+n.idx+'" '+(n.drafted?"disabled":"")+'>'+
+      '<div class="ntext"><div class="nmeta">'+noteMeta(n)+'</div>'+esc(n.text.replace(/\\s+/g," ").slice(0,220))+'</div>';
+    box.appendChild(el);
+  }
+}
+async function openNotes(){
+  $("#notesPanel").hidden = false;
+  $("#notesList").innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/notes");
+  const data = await r.json();
+  if(!data.ok){ $("#notesList").innerHTML = '<div class="empty">'+esc(data.error||"Failed to load notes")+'</div>'; return; }
+  NOTES = data.notes;
+  renderNotes();
+}
+async function draftSelectedNotes(){
+  const indices = [...document.querySelectorAll('#notesList input[type=checkbox]:checked')].map(cb=>Number(cb.dataset.idx));
+  if(!indices.length){ flash("Pick at least one note"); return; }
+  $("#notesDraftBtn").disabled = true;
+  const r = await post("/api/notes/pick",{indices});
+  $("#notesDraftBtn").disabled = false;
+  if(r.ok){
+    flash(r.jobs.length+" note(s) queued");
+    $("#notesPanel").hidden = true;
+    loadJobs();
+  } else flash(r.error || "Failed");
 }
 $("#addBtn").addEventListener("click", addSource);
-$("#notesBtn").addEventListener("click", pullNotes);
+$("#notesBtn").addEventListener("click", openNotes);
+$("#notesCloseBtn").addEventListener("click", ()=>{ $("#notesPanel").hidden = true; });
+$("#notesShowDrafted").addEventListener("change",(e)=>{ notesShowDrafted = e.target.checked; renderNotes(); });
+$("#notesDraftBtn").addEventListener("click", draftSelectedNotes);
 $("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") addSource(); });
 setInterval(()=>{ if(JOBS.some(j=>j.status==="queued"||j.status==="running")) loadJobs(); }, 3000);
 

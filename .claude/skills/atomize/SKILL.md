@@ -1,6 +1,6 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), /atomize --continue <content-folder> (resume steps 2-8 on an already-scaffolded folder), or /atomize --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
@@ -211,3 +211,6 @@ invoked, read the corresponding file first and follow its instructions:
   `spin_angles`, rules in `references/spin-mode.md`).
 - **`/atomize --revise <folder>`** — re-drafts derivatives flagged `revise` in review-queue.md.
   Read `references/revise-mode.md` and follow it before doing anything else.
+- **`/atomize --continue <folder>`** — the folder is already scaffolded (source.md exists);
+  resume at step 2 instead of re-ingesting. Read `references/continue-mode.md` and follow it
+  before doing anything else.
