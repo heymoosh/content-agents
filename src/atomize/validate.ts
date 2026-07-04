@@ -63,6 +63,53 @@ export function checkDerivative(
   return violations;
 }
 
+// Platform-fit hard gate: parse routing.md's table into platform -> include|skip. The "why"
+// column can itself contain literal "|" characters (route.ts semicolon-joins multi-pillar
+// rationale precisely to avoid this), but platform/decision are always the first two columns,
+// so any stray pipe further down a row never shifts them.
+export function parseRoutingDecisions(md: string): Map<string, "include" | "skip"> {
+  const out = new Map<string, "include" | "skip">();
+  for (const line of md.split("\n")) {
+    if (!line.trim().startsWith("|")) continue;
+    const cells = line.split("|").map((c) => c.trim());
+    const platform = cells[1];
+    const decision = cells[2];
+    if (!platform || platform === "platform" || /^-+$/.test(platform)) continue;
+    if (decision === "include" || decision === "skip") out.set(platform, decision as "include" | "skip");
+  }
+  return out;
+}
+
+// A community derivative carries the generic `platform: community` in frontmatter (config/platforms.yaml
+// has one shared "community" rule); the specific room only lives in the filename, e.g.
+// community-democratic-resilience.md -> routing's community:democratic-resilience key.
+export function routingKeyFor(file: string, platform: string): string {
+  if (platform !== "community") return platform;
+  const id = file.replace(/^community-/, "").replace(/\.md$/, "");
+  return `community:${id}`;
+}
+
+// Bake the platform-fit check into the thing that gates queueing, instead of trusting Claude to
+// remember which platforms routing.md excluded while drafting. A derivative for a platform
+// routing.md marked `skip` fails validation outright — the same hard stop as a char-limit
+// violation. Unmapped keys (format assets like quote-card, or a folder with no routing.md yet)
+// are not flagged; only an explicit `skip` decision is a violation.
+export function checkRoutingGate(
+  files: { file: string; platform: string }[],
+  routingDecisions: Map<string, "include" | "skip">
+): string[] {
+  const violations: string[] = [];
+  for (const { file, platform } of files) {
+    const key = routingKeyFor(file, platform);
+    if (routingDecisions.get(key) === "skip") {
+      violations.push(
+        `${file}: drafted for "${key}", but routing.md marked it skip — platform-fit gate says this content shouldn't post there (see routing.md for why, or fix config/routing.yaml if that's wrong)`
+      );
+    }
+  }
+  return violations;
+}
+
 function main() {
   const dir = process.argv[2];
   if (!dir) {
@@ -85,9 +132,17 @@ function main() {
     process.exit(1);
   }
 
+  const routingFiles: { file: string; platform: string }[] = [];
   for (const file of files) {
     const { fm, body } = splitFrontmatter(readFileSync(join(derivDir, file), "utf8"));
     violations.push(...checkDerivative(file, fm, body, config.platforms));
+    routingFiles.push({ file, platform: String(fm.platform ?? "") });
+  }
+
+  const routingPath = join(dir.startsWith("/") ? dir : join(repoRoot, dir), "routing.md");
+  if (existsSync(routingPath)) {
+    const routingDecisions = parseRoutingDecisions(readFileSync(routingPath, "utf8"));
+    violations.push(...checkRoutingGate(routingFiles, routingDecisions));
   }
 
   if (violations.length) {

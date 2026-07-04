@@ -73,16 +73,23 @@ derivative, the video script, and the video title/description. The short version
    later, if this piece becomes a short).
 
 3.5. **Route — decide which platforms this piece is for.** Run
-   `npm run route -- --pillar <pillar> --folder <folder>` (once per tagged pillar). It writes
-   `<folder>/routing.md` and prints the include/skip decision per platform, informed by the
-   analytics (which platforms are receptive to this pillar) plus `config/routing.yaml`. Only
-   generate text derivatives in step 4 for platforms the router marked **`include`**; do not
-   produce assets for `skip` platforms — the point is to post where it makes sense, not
-   everywhere. If the piece spans two pillars, run the router per pillar and include a platform
-   if **either** pillar includes it. Layer the strategy brief (step 2) on top: the brief may
-   tighten further, but don't re-add a data-skipped platform without a stated reason.
-   Cold-start platforms come back `include` with low confidence — that's expected; routing
-   tightens as data accrues.
+   `npm run route -- --pillar <pillar> --folder <folder>` — pass **all** tagged pillars in ONE
+   call, comma-separated (e.g. `--pillar civic-tech,human-ai`), not one invocation per pillar.
+   The router merges across pillars itself (include if *either* pillar includes it, unless
+   *any* pillar's `config/routing.yaml` `never` rule vetoes it — that veto is a hard stop no
+   other pillar's include can override) and writes ONE `<folder>/routing.md`. Re-running route
+   overwrites the file, so don't call it twice for the same folder.
+   Only generate text derivatives in step 4 for platforms the router marked **`include`**; do
+   not produce assets for `skip` platforms — the point is to post where it makes sense, not
+   everywhere. This is a hard gate, not just a convention: **`npm run validate` (step 6) fails
+   outright if a derivative exists for a platform routing.md marked `skip`** — if that happens,
+   discard the derivative, don't relax the check. Layer the strategy brief (step 2) on top: the
+   brief may tighten further (e.g. a DO LESS directive), but don't re-add a data-skipped
+   platform without a stated reason — and if a category should durably never post to a given
+   platform (e.g. "this data doesn't support X as a political platform"), encode it as a
+   `rules.<pillar>.never` entry in `config/routing.yaml` rather than a one-off skip, so the gate
+   holds on every future piece in that pillar, not just this one. Cold-start platforms come back
+   `include` with low confidence — that's expected; routing tightens as data accrues.
 
 4. **Generate text derivatives** into `<folder>/derivatives/` per `config/platforms.yaml`
    (counts and style there), **only for the platforms `routing.md` marked `include`**:
@@ -147,9 +154,10 @@ derivative, the video script, and the video title/description. The short version
 
 6. **Validate.** `npm run validate -- <folder>` — must pass before queueing. Fix violations,
    don't relax limits. (Validation enforces char/word limits for every derivative, requires
-   `source_lines` except on `spin: true` derivatives where it's best-effort, and requires every
+   `source_lines` except on `spin: true` derivatives where it's best-effort, requires every
    `spin: true` derivative to carry an `angle` that matches its own platform's `spin_angles`
-   entry; see `references/spin-mode.md`.)
+   entry, and hard-fails any derivative drafted for a platform routing.md marked `skip` — the
+   platform-fit gate from step 3.5; see `references/spin-mode.md`.)
 
 7. **Generate the quote-card asset(s)** (cheap, extraction-first). A card is a bare-quote IMAGE
    shared across platforms, each with its OWN per-platform CONTEXT caption — so the quote never

@@ -15,20 +15,26 @@
 // Zero new deps: Node's built-in http + the existing queue parser.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { homedir } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
-import { repoRoot } from "../db/db.js";
+import { repoRoot, openDb } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { publishText } from "../publish/typefully.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 
 const CONTENT = join(repoRoot, "content");
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
+
+// Claude Code creates ephemeral dev worktrees under .claude/worktrees/<name> — each one has its
+// OWN gitignored data/ and content/, isolated from the real checkout, so a report run here can
+// come back looking empty even though nothing is actually broken. Surfaced as a banner (see PAGE)
+// so this is never silently confusing again (Muxin, 2026-07-04).
+const IS_DEV_WORKTREE = repoRoot.includes("/.claude/worktrees/");
 
 // A row is "decided" once it's out of the review inbox. Everything else needs Muxin's eyes.
 const DECIDED = new Set(["published", "discard"]);
@@ -270,6 +276,263 @@ async function reviseDerivative(slug: string, id: string, instruction: string): 
     throw new Error("Claude ran but didn't change anything — try a more specific instruction");
   }
   return after;
+}
+
+// ── Analytics & Strategy tab ─────────────────────────────────────────────────────────────────
+// Read-only reports + the latest strategy brief, surfaced so Muxin can see "what's working"
+// without dropping to a terminal. The brief is the one file this tab can edit (same headless-
+// Claude "Ask Claude" pattern as a derivative) — /atomize already reads the latest brief every
+// run (SKILL.md step 2) and routing already reads config/routing.yaml, so an edit here feeds
+// forward into atomize/routing with no new wiring needed.
+const BRIEFS_DIR = join(repoRoot, "briefs");
+const STRATEGY_TIMEOUT_MS = 90_000;
+const INSIGHTS_ASK_TIMEOUT_MS = 180_000; // a deep-dive answer may itself run 1-2 of the reports below
+
+// Allowlisted, read-only, no-arg report commands only — used server-side to build the insights
+// synthesis, never exposed directly by cmd string from the client (no argv injection surface).
+const REPORTS: Record<string, string[]> = {
+  snapshot: ["run", "snapshot"],
+  resonance: ["run", "resonance"],
+  audience: ["run", "audience"],
+  "origin-compare": ["run", "origin-compare"],
+};
+
+function latestBriefPath(): string | null {
+  if (!existsSync(BRIEFS_DIR)) return null;
+  const files = readdirSync(BRIEFS_DIR).filter((f) => /^\d{4}-\d{2}-\d{2}-strategy-brief\.md$/.test(f)).sort();
+  return files.length ? join(BRIEFS_DIR, files[files.length - 1]) : null;
+}
+
+async function runReport(cmd: string): Promise<string> {
+  const args = REPORTS[cmd];
+  if (!args) throw new Error(`unknown report "${cmd}"`);
+  try {
+    const { stdout } = await execFileP("npm", args, {
+      cwd: repoRoot,
+      timeout: STRATEGY_TIMEOUT_MS,
+      maxBuffer: 20_000_000,
+    });
+    return stdout;
+  } catch (e) {
+    const err = e as { stdout?: string; stderr?: string; message?: string };
+    throw new Error((err.stderr || err.message || "report failed").slice(0, 3000));
+  }
+}
+
+function postCount(): number {
+  const db = openDb();
+  try {
+    return (db.prepare("SELECT COUNT(*) AS n FROM posts").get() as { n: number }).n;
+  } finally {
+    db.close();
+  }
+}
+
+// "Generate insights": run the read-only reports ourselves (deterministic, no LLM variance on the
+// numbers), then hand the raw output + latest brief to Claude and ask for a short synthesis — not
+// another raw dump. This is a pure text answer (nothing written to disk), shown straight in the GUI.
+async function generateInsights(): Promise<string> {
+  // Fail loud and fast, before spending a Claude call: an empty posts table almost always means
+  // this checkout's data/analytics.db is a stale/isolated copy (gitignored, never synced between
+  // checkouts — see IS_DEV_WORKTREE), not that there's genuinely no data.
+  if (postCount() === 0) {
+    return (
+      `**No analytics data in this checkout (0 posts in data/analytics.db).**\n\n` +
+      (IS_DEV_WORKTREE
+        ? `This GUI is running from a Claude Code dev worktree, which has its own empty, gitignored ` +
+          `data/analytics.db — it's never synced with your real checkout. Run \`npm run review\` from ` +
+          `your main repo checkout instead to see live numbers.\n`
+        : `\`data/analytics.db\` is gitignored (per-checkout, never synced by git) — either this checkout ` +
+          `has never been ingested, or something pulled into a different copy. Run \`npm run ingest\` / ` +
+          `\`npm run pull\` here, or check you're in the checkout you expect.\n`)
+    );
+  }
+  const sections: string[] = [];
+  for (const key of Object.keys(REPORTS)) {
+    try {
+      sections.push(`### ${key}\n${await runReport(key)}`);
+    } catch (e) {
+      sections.push(`### ${key}\n(failed: ${e instanceof Error ? e.message : String(e)})`);
+    }
+  }
+  const briefPath = latestBriefPath();
+  const briefText = briefPath ? readFileSync(briefPath, "utf8") : "(no strategy brief exists yet)";
+  const prompt = [
+    `Muxin Li wants a quick read on his content pipeline's analytics. Below is raw output from the`,
+    `pipeline's own report scripts, plus his latest strategy brief. Do not run any commands or read`,
+    `any other files — just read what's given below and respond.`,
+    ``,
+    `Write a SHORT, high-level synthesis: what's working, what's not, 3-5 concrete numbers that`,
+    `actually matter, and one or two things worth doing next. This is a skim, not a re-statement of`,
+    `the brief — assume he will ask follow-up questions for anything he wants to dig into. Plain`,
+    `markdown (headers/bullets/bold only, no tables). No em dashes, no AI-tell filler phrases`,
+    `("it's not just X, it's Y", "let's unpack", etc.) — write like a sharp PM giving a 30-second`,
+    `verbal update.`,
+    ``,
+    `## Raw report output`,
+    sections.join("\n\n"),
+    ``,
+    `## Latest strategy brief`,
+    briefText,
+  ].join("\n");
+  try {
+    const { stdout } = await execFileP("claude", ["-p", prompt, "--permission-mode", "acceptEdits"], {
+      cwd: repoRoot,
+      timeout: STRATEGY_TIMEOUT_MS,
+      maxBuffer: 20_000_000,
+    });
+    return stdout.trim();
+  } catch (e) {
+    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
+    if (err.code === "ENOENT") {
+      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
+    }
+    if (err.killed) throw new Error(`Claude timed out after ${STRATEGY_TIMEOUT_MS / 1000}s`);
+    throw new Error(`Claude failed: ${(err.stderr || err.message || "unknown").slice(0, 300)}`);
+  }
+}
+
+// Deep-dive follow-up: unlike generateInsights (which we feed pre-fetched data), Claude is allowed
+// to go run one of the same read-only reports itself, or read briefs/config, if the question needs
+// something not already in the conversation. Read-only: it's told never to edit/write/delete.
+async function askInsights(question: string, history: { role: string; content: string }[]): Promise<string> {
+  if (!question.trim()) throw new Error("ask something first");
+  const transcript = history
+    .map((h) => `${h.role === "user" ? "Muxin" : "Claude"}: ${h.content}`)
+    .join("\n\n");
+  const prompt = [
+    `You are Muxin Li's analytics assistant for his content pipeline (data/analytics.db via`,
+    `npm run snapshot/resonance/audience/origin-compare, briefs/, config/*.yaml). He's asking a`,
+    `follow-up question after an insights summary. You MAY run those npm scripts, or read briefs/`,
+    `and config files, if the question needs something not already in the conversation below. Do`,
+    `NOT edit, write, or delete any file — this is read-only Q&A.`,
+    ``,
+    `## Conversation so far`,
+    transcript || "(nothing yet)",
+    ``,
+    `## New question`,
+    question.trim(),
+    ``,
+    `Answer directly and specifically, citing real numbers you find. Plain markdown, no em dashes,`,
+    `no AI-tell filler. Keep it as short as the question allows.`,
+  ].join("\n");
+  try {
+    const { stdout } = await execFileP("claude", ["-p", prompt, "--permission-mode", "acceptEdits"], {
+      cwd: repoRoot,
+      timeout: INSIGHTS_ASK_TIMEOUT_MS,
+      maxBuffer: 20_000_000,
+    });
+    return stdout.trim();
+  } catch (e) {
+    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
+    if (err.code === "ENOENT") {
+      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
+    }
+    if (err.killed) throw new Error(`Claude timed out after ${INSIGHTS_ASK_TIMEOUT_MS / 1000}s`);
+    throw new Error(`Claude failed: ${(err.stderr || err.message || "unknown").slice(0, 300)}`);
+  }
+}
+
+// ── Raw downloaded exports (data/inbox = not-yet-ingested, data/processed = archived after
+// ingest) — the actual CSV/JSON/XLSX files pulled from each platform, for Muxin to open and read
+// himself rather than trusting only the computed reports above.
+const RAW_ROOTS = ["inbox", "processed"];
+
+interface RawFile {
+  path: string; // relative to data/, e.g. "processed/foo.csv"
+  size: number;
+  mtime: number;
+}
+
+function listRawFiles(): RawFile[] {
+  const out: RawFile[] = [];
+  const walk = (dir: string, rel: string) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith(".")) continue;
+      const abs = join(dir, entry.name);
+      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(abs, relPath);
+      else {
+        const st = statSync(abs);
+        out.push({ path: relPath, size: st.size, mtime: st.mtimeMs });
+      }
+    }
+  };
+  for (const root of RAW_ROOTS) walk(join(repoRoot, "data", root), root);
+  return out.sort((a, b) => b.mtime - a.mtime);
+}
+
+// Exported so the path-traversal guard is unit-testable without touching the filesystem.
+export function isSafeRawPath(relPath: string): boolean {
+  if (!relPath || relPath.includes("..") || relPath.startsWith("/")) return false;
+  return RAW_ROOTS.some((root) => relPath === root || relPath.startsWith(`${root}/`));
+}
+
+function serveRawFile(res: ServerResponse, relPath: string): void {
+  if (!isSafeRawPath(relPath)) {
+    res.writeHead(400).end("bad path");
+    return;
+  }
+  const abs = join(repoRoot, "data", relPath);
+  if (!existsSync(abs) || !statSync(abs).isFile()) {
+    res.writeHead(404).end("not found");
+    return;
+  }
+  const ext = extname(abs).toLowerCase();
+  const inline = new Set([".csv", ".json", ".png", ".jpg", ".jpeg"]);
+  const types: Record<string, string> = {
+    ".csv": "text/csv", ".json": "application/json", ".png": "image/png",
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  };
+  res.writeHead(200, {
+    "content-type": types[ext] ?? "application/octet-stream",
+    "content-disposition": `${inline.has(ext) ? "inline" : "attachment"}; filename="${basename(abs)}"`,
+    "cache-control": "no-store",
+  });
+  res.end(readFileSync(abs));
+}
+
+function briefRevisePrompt(relPath: string, instruction: string): string {
+  return [
+    `Revise ONE file in place for Muxin Li's content pipeline: the current strategy brief. Do not run shell commands; just edit the one file, then stop.`,
+    ``,
+    `File to edit: ${relPath}`,
+    `Muxin's request: "${instruction}"`,
+    ``,
+    `Rules:`,
+    `- Edit ONLY that one file. Touch nothing else — no other briefs, no briefs/bets.md, no config.`,
+    `- Keep the existing structure/tables intact unless the request is explicitly about restructuring.`,
+    `- Follow config/voice.yaml: no em dashes, no AI tells, Muxin's plain PM voice.`,
+    `- Be surgical: apply the request, do not rewrite sections that were not asked about.`,
+  ].join("\n");
+}
+
+async function reviseBrief(instruction: string): Promise<{ path: string; content: string }> {
+  const abs = latestBriefPath();
+  if (!abs) throw new Error("no strategy brief exists yet — run /strategy first");
+  if (!instruction.trim()) throw new Error("tell Claude what to change first");
+  const relPath = abs.slice(repoRoot.length + 1);
+  const before = readFileSync(abs, "utf8");
+  const prompt = briefRevisePrompt(relPath, instruction.trim());
+  try {
+    await execFileP("claude", ["-p", prompt, "--permission-mode", "acceptEdits"], {
+      cwd: repoRoot,
+      timeout: REVISE_TIMEOUT_MS,
+      maxBuffer: 20_000_000,
+    });
+  } catch (e) {
+    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
+    if (err.code === "ENOENT") {
+      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
+    }
+    if (err.killed) throw new Error(`Claude timed out after ${REVISE_TIMEOUT_MS / 1000}s`);
+    throw new Error(`Claude revise failed: ${(err.stderr || err.message || "unknown").slice(0, 300)}`);
+  }
+  const after = readFileSync(abs, "utf8");
+  if (after === before) throw new Error("Claude ran but didn't change anything — try a more specific instruction");
+  return { path: relPath, content: after };
 }
 
 // ── Content ingestion: the GUI's front door ─────────────────────────────────────────────────
@@ -581,6 +844,54 @@ const server = createServer(async (req, res) => {
       json(res, 200, { jobs: jobs.map(publicJob) });
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/strategy/brief") {
+      const abs = latestBriefPath();
+      if (!abs) {
+        json(res, 200, { ok: false, error: "no strategy brief exists yet — run /strategy first" });
+        return;
+      }
+      json(res, 200, { ok: true, path: abs.slice(repoRoot.length + 1), content: readFileSync(abs, "utf8") });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/strategy/ask") {
+      const b = await readBody(req);
+      try {
+        const { path, content } = await reviseBrief(String(b.instruction ?? ""));
+        json(res, 200, { ok: true, path, content });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/strategy/insights") {
+      try {
+        const summary = await generateInsights();
+        json(res, 200, { ok: true, summary });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/strategy/ask-insights") {
+      const b = await readBody(req);
+      const question = String(b.question ?? "");
+      const history = Array.isArray(b.history) ? b.history : [];
+      try {
+        const answer = await askInsights(question, history);
+        json(res, 200, { ok: true, answer });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/strategy/raw") {
+      json(res, 200, { ok: true, files: listRawFiles() });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/strategy/raw-file") {
+      serveRawFile(res, url.searchParams.get("path") ?? "");
+      return;
+    }
     res.writeHead(404).end("not found");
   } catch (e) {
     json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -701,6 +1012,22 @@ const PAGE = /* html */ `<!doctype html>
   .notepick .nmeta { font-size:11.5px; color:var(--muted); margin-bottom:2px; }
   .notepick .nmeta .drafted-tag { color:var(--blue); font-weight:600; }
   .notes-actions { display:flex; gap:9px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  .strategy { max-width:820px; margin:0 auto; }
+  .strategy-actions { display:flex; gap:9px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
+  .md { font-size:14px; line-height:1.6; }
+  .md h1,.md h2,.md h3 { font-family:Georgia,"Times New Roman",serif; margin:16px 0 6px; }
+  .md h1 { font-size:18px; } .md h2 { font-size:15.5px; } .md h3 { font-size:14px; }
+  .md h1:first-child,.md h2:first-child,.md h3:first-child { margin-top:0; }
+  .md p { margin:7px 0; }
+  .md ul { margin:5px 0 10px 20px; padding:0; }
+  .md li { margin:3px 0; }
+  .md table { border-collapse:collapse; width:100%; margin:9px 0; font-size:12.5px; }
+  .md th,.md td { border:1px solid var(--line); padding:5px 9px; text-align:left; vertical-align:top; }
+  .md th { background:#f1ede3; font-weight:700; }
+  .md code { background:#efeae0; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .insights-panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:12px; }
+  .thread-turn { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+  .thread-turn.q { font-weight:600; color:var(--muted); font-size:13.5px; border-top:none; padding-top:0; }
   .jobs { max-width:820px; margin:24px auto 0; }
   .jobs > h3 { font:600 13px/1.3 Georgia,serif; color:var(--muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:.5px; }
   .job { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 15px;
@@ -717,14 +1044,18 @@ const PAGE = /* html */ `<!doctype html>
     color:var(--paper); padding:9px 16px; border-radius:8px; font-size:13px; opacity:0;
     transition:.2s; pointer-events:none; }
   .flash.show { opacity:1; }
+  .worktree-banner { background:var(--red-bg); color:var(--red); font-size:12.5px; font-weight:600;
+    text-align:center; padding:6px 16px; border-bottom:1px solid var(--red); }
 </style>
 </head>
 <body>
+${IS_DEV_WORKTREE ? `<div class="worktree-banner">⚠ Dev worktree checkout (${repoRoot}) — data/content here is isolated and gitignored, not synced with your main repo. Numbers may look empty/stale even when your real pipeline is fine.</div>` : ""}
 <header>
   <h1>Content studio</h1>
   <nav class="tabs">
     <button class="tab on" data-tab="ingest">Add / Queue</button>
     <button class="tab" data-tab="review">Review <span class="count" id="count">0</span></button>
+    <button class="tab" data-tab="strategy">Analytics</button>
   </nav>
   <span class="grow"></span>
   <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
@@ -757,6 +1088,44 @@ const PAGE = /* html */ `<!doctype html>
   </section>
   <section class="view" id="reviewView" hidden>
     <div id="reviewMain"><div class="empty">Loading…</div></div>
+  </section>
+  <section class="view" id="strategyView" hidden>
+    <div class="strategy">
+      <div class="strategy-actions">
+        <button class="primary" id="insightsBtn">Generate insights</button>
+        <span class="hint">Runs the analytics reports, then asks Claude (your subscription, $0) for a short skim: what's working, what's not, the numbers that matter. Nothing here writes data or publishes anything.</span>
+      </div>
+      <div class="insights-panel" id="insightsPanel" hidden>
+        <div class="md" id="insightsOut"></div>
+        <div id="insightsThread"></div>
+        <div class="aibox show">
+          <input placeholder="ask a follow-up… (e.g. why is X underperforming?)" id="insightsAskInput" />
+          <button class="send" id="insightsAskBtn">Ask</button>
+        </div>
+      </div>
+    </div>
+    <div class="notes-panel">
+      <div class="notes-head">
+        <h3>Latest strategy brief</h3>
+        <span class="grow"></span>
+        <span class="src" id="briefPath"></span>
+      </div>
+      <div class="md" id="briefBody">Loading…</div>
+      <div class="aibox show">
+        <input placeholder="tell Claude what to change in the brief…" id="briefAskInput" />
+        <button class="send" id="briefAskBtn">Send to Claude</button>
+      </div>
+      <span class="hint">Edits land in the brief file itself — /atomize and /strategy already read the latest brief every run, so a change here feeds forward with no extra step.</span>
+    </div>
+    <div class="notes-panel">
+      <div class="notes-head">
+        <h3>Raw downloaded exports</h3>
+        <span class="grow"></span>
+        <button id="rawRefreshBtn">Refresh</button>
+      </div>
+      <div id="rawList"><div class="empty">Loading…</div></div>
+      <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest) — open one yourself if you want to read the raw numbers rather than a computed report.</span>
+    </div>
   </section>
 </main>
 <div class="flash" id="flash"></div>
@@ -891,9 +1260,136 @@ function setTab(t){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
   $("#ingestView").hidden = t!=="ingest";
   $("#reviewView").hidden = t!=="review";
+  $("#strategyView").hidden = t!=="strategy";
   $("#decidedWrap").style.display = t==="review" ? "" : "none";
+  if (t==="strategy" && !briefLoaded){ loadBrief(); loadRaw(); }
 }
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>setTab(b.dataset.tab)));
+
+// ── Analytics & Strategy ──
+
+// Minimal markdown -> HTML for the brief + Claude's synthesis: headers, tables, bullet lists,
+// bold/code, paragraphs. Not a full CommonMark parser, just enough for the content this pipeline
+// itself generates. Escapes first, so no raw HTML from a derivative/brief ever executes.
+function mdToHtml(md){
+  const inline = s => esc(s).replace(/\\*\\*(.+?)\\*\\*/g, "<b>$1</b>").replace(/\`([^\`]+)\`/g, "<code>$1</code>");
+  const isTableRow = l => /^\\s*\\|.*\\|\\s*$/.test(l);
+  const isSepRow = l => /^[\\s|:-]+$/.test(l) && l.includes("-");
+  const cellsOf = l => l.trim().replace(/^\\|/,"").replace(/\\|$/,"").split("|").map(c=>c.trim());
+  const lines = md.split("\\n");
+  let html = "", i = 0, inList = false;
+  const closeList = () => { if(inList){ html += "</ul>"; inList = false; } };
+  while(i < lines.length){
+    const line = lines[i];
+    const h = line.match(/^(#{1,6})\\s+(.*)$/);
+    if(h){ closeList(); const lvl = h[1].length; html += "<h"+lvl+">"+inline(h[2])+"</h"+lvl+">"; i++; continue; }
+    if(isTableRow(line)){
+      closeList();
+      const rows = [];
+      while(i < lines.length && isTableRow(lines[i])){ rows.push(lines[i]); i++; }
+      let head = null, body = rows;
+      if(rows.length > 1 && isSepRow(rows[1])){ head = cellsOf(rows[0]); body = rows.slice(2); }
+      html += "<table>";
+      if(head) html += "<tr>"+head.map(c=>"<th>"+inline(c)+"</th>").join("")+"</tr>";
+      for(const r of body){ if(isSepRow(r)) continue; html += "<tr>"+cellsOf(r).map(c=>"<td>"+inline(c)+"</td>").join("")+"</tr>"; }
+      html += "</table>";
+      continue;
+    }
+    if(/^\\s*[-*]\\s+/.test(line)){
+      if(!inList){ html += "<ul>"; inList = true; }
+      html += "<li>"+inline(line.replace(/^\\s*[-*]\\s+/,""))+"</li>";
+      i++; continue;
+    }
+    closeList();
+    if(line.trim() === ""){ i++; continue; }
+    html += "<p>"+inline(line)+"</p>";
+    i++;
+  }
+  closeList();
+  return html;
+}
+
+let briefLoaded = false;
+async function loadBrief(){
+  briefLoaded = true;
+  const r = await fetch("/api/strategy/brief"); const d = await r.json();
+  if(!d.ok){ $("#briefBody").textContent = d.error; $("#briefPath").textContent = ""; return; }
+  $("#briefBody").innerHTML = mdToHtml(d.content);
+  $("#briefPath").textContent = d.path;
+}
+async function askBrief(){
+  const inp = $("#briefAskInput"); const instruction = inp.value.trim();
+  if(!instruction){ flash("Type what you want changed first"); return; }
+  $("#briefAskBtn").disabled = true;
+  const prevHtml = $("#briefBody").innerHTML;
+  $("#briefBody").textContent = "✨ Claude is revising the brief… (your subscription, ~10-30s)";
+  const r = await post("/api/strategy/ask", {instruction});
+  $("#briefAskBtn").disabled = false;
+  if(r.ok){ $("#briefBody").innerHTML = mdToHtml(r.content); $("#briefPath").textContent = r.path; inp.value = ""; flash("Brief revised by Claude"); }
+  else { $("#briefBody").innerHTML = prevHtml; flash("Revise failed: "+(r.error||"error")); }
+}
+$("#briefAskBtn").addEventListener("click", askBrief);
+
+// Insights: a Claude-written synthesis (not a raw report dump), plus a follow-up chat thread that
+// can ask Claude to dig into anything — Claude may re-run the reports itself to answer.
+let insightsHistory = [];
+async function generateInsights(){
+  $("#insightsBtn").disabled = true;
+  $("#insightsPanel").hidden = false;
+  insightsHistory = [];
+  $("#insightsThread").innerHTML = "";
+  $("#insightsOut").innerHTML = '<p class="hint">Running the reports, then asking Claude for a synthesis… (~20-40s)</p>';
+  const r = await post("/api/strategy/insights", {});
+  $("#insightsBtn").disabled = false;
+  if(r.ok){ $("#insightsOut").innerHTML = mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
+  else { $("#insightsOut").innerHTML = "<p>Failed: "+esc(r.error||"error")+"</p>"; }
+}
+$("#insightsBtn").addEventListener("click", generateInsights);
+
+function renderThread(){
+  const box = $("#insightsThread"); box.innerHTML = "";
+  for(const h of insightsHistory.slice(1)){ // [0] is the initial summary, already shown above
+    const el = document.createElement("div");
+    el.className = "thread-turn" + (h.role === "user" ? " q" : "");
+    el.innerHTML = h.role === "user" ? "You asked: "+esc(h.content) : mdToHtml(h.content);
+    box.appendChild(el);
+  }
+}
+async function askInsights(){
+  const inp = $("#insightsAskInput"); const q = inp.value.trim();
+  if(!q){ flash("Ask something first"); return; }
+  if(!insightsHistory.length){ flash("Generate insights first"); return; }
+  $("#insightsAskBtn").disabled = true;
+  insightsHistory.push({role:"user", content:q});
+  inp.value = "";
+  renderThread();
+  const thinking = document.createElement("div");
+  thinking.className = "thinking"; thinking.textContent = "✨ Claude is looking into it… (~10-60s, may re-run a report)";
+  $("#insightsThread").appendChild(thinking);
+  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory});
+  $("#insightsAskBtn").disabled = false;
+  insightsHistory.push({role:"assistant", content: r.ok ? r.answer : "Failed: "+(r.error||"error")});
+  renderThread();
+}
+$("#insightsAskBtn").addEventListener("click", askInsights);
+
+// Raw downloaded exports — the actual files, not a computed report.
+async function loadRaw(){
+  const box = $("#rawList");
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/strategy/raw"); const d = await r.json();
+  if(!d.files || !d.files.length){ box.innerHTML = '<div class="empty">No raw exports found in data/inbox or data/processed on this checkout.</div>'; return; }
+  box.innerHTML = "";
+  for(const f of d.files){
+    const el = document.createElement("div"); el.className = "notepick";
+    const kb = (f.size/1024).toFixed(1);
+    const when = new Date(f.mtime).toISOString().slice(0,10);
+    el.innerHTML = '<div class="ntext"><div class="nmeta">'+when+' · '+kb+' KB</div>'+
+      '<a href="/api/strategy/raw-file?path='+encodeURIComponent(f.path)+'" target="_blank">'+esc(f.path)+'</a></div>';
+    box.appendChild(el);
+  }
+}
+$("#rawRefreshBtn").addEventListener("click", loadRaw);
 
 // ── ingest + job queue ──
 let JOBS = [];
