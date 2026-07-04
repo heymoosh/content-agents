@@ -15,8 +15,9 @@
 // Zero new deps: Node's built-in http + the existing queue parser.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join, basename, extname } from "node:path";
+import { homedir } from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -266,6 +267,137 @@ async function reviseDerivative(slug: string, id: string, instruction: string): 
   return after;
 }
 
+// ── Content ingestion: the GUI's front door ─────────────────────────────────────────────────
+// The review page is an inbox; this is the door. Muxin drops a source — pasted text, a file path
+// (e.g. an Obsidian note), a Substack URL, or "pull my Notes" — and the GUI runs the REAL /atomize
+// headlessly via `claude -p` on his subscription ($0 marginal), one job at a time so he can keep
+// queueing while it works. Nothing here publishes: atomize only drafts + queues, and every
+// derivative still lands `pending` for review on the other tab (CLAUDE.md rule 2).
+const INBOX = join(CONTENT, ".inbox"); // pasted/copied sources live here (git-ignored)
+const ATOMIZE_TIMEOUT_MS = 15 * 60_000;
+// acceptEdits (not bypass) is enough: the project settings already allowlist `npm run:*`, which is
+// all atomize shells out to. Overridable for a setup that needs a different mode.
+const ATOMIZE_PERMISSION_MODE = process.env.ATOMIZE_PERMISSION_MODE ?? "acceptEdits";
+
+type JobStatus = "queued" | "running" | "done" | "failed";
+interface Job {
+  id: string;
+  kind: "url" | "file" | "text" | "notes";
+  label: string;
+  arg: string; // what /atomize receives: a url, a space-free .inbox path, or "notes"
+  status: JobStatus;
+  slugs: string[]; // content folders atomize created — linked back so the Review tab can jump to them
+  error: string | null;
+  createdAt: number;
+  startedAt: number | null;
+  finishedAt: number | null;
+}
+const jobs: Job[] = [];
+let jobSeq = 0;
+let draining = false;
+
+// How a raw source string should reach /atomize. Exported + `exists` injected so it's unit-testable
+// without touching the filesystem.
+export function classifySource(
+  raw: string,
+  exists: (p: string) => boolean = existsSync,
+): { kind: "url" | "file" | "text"; arg: string; label: string } {
+  const s = raw.trim();
+  if (/^https?:\/\//i.test(s)) return { kind: "url", arg: s, label: s };
+  const asPath = s.startsWith("~/") ? join(homedir(), s.slice(2)) : s;
+  // A short single-line string that resolves to a real file is a path (e.g. an Obsidian note).
+  if (s && !s.includes("\n") && s.length < 400 && exists(asPath)) {
+    return { kind: "file", arg: asPath, label: basename(asPath) };
+  }
+  const firstLine = s.split("\n").map((l) => l.trim()).find(Boolean) ?? "pasted text";
+  return { kind: "text", arg: "", label: firstLine.replace(/^#\s*/, "").slice(0, 80) };
+}
+
+function publicJob(j: Job) {
+  return {
+    id: j.id, kind: j.kind, label: j.label, status: j.status, slugs: j.slugs,
+    error: j.error, createdAt: j.createdAt, startedAt: j.startedAt, finishedAt: j.finishedAt,
+  };
+}
+
+function listSlugs(): string[] {
+  try {
+    return readdirSync(CONTENT, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && existsSync(join(CONTENT, d.name, "review-queue.md")))
+      .map((d) => d.name);
+  } catch {
+    return [];
+  }
+}
+
+// Materialize a source into a stable, space-free arg for /atomize, then queue it. Pasted text and
+// file sources are copied into .inbox (space-free names) so the skill's `npm run new-content -- <arg>`
+// never trips over spaces in an Obsidian path; urls and "notes" pass straight through.
+function addJob(kind: Job["kind"], rawArg: string, label: string, rawText?: string): Job {
+  const id = `job-${++jobSeq}`;
+  let arg = rawArg;
+  if (kind === "text" || kind === "file") {
+    mkdirSync(INBOX, { recursive: true });
+    if (kind === "text") {
+      arg = join(INBOX, `${id}.md`);
+      writeFileSync(arg, (rawText ?? "").trim() + "\n");
+    } else {
+      const content = readFileSync(rawArg, "utf8");
+      const stem = basename(rawArg).replace(/\.[^.]+$/, "");
+      const safe = stem.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "note";
+      arg = join(INBOX, `${safe}-${id}.md`);
+      // Keep the note's title: if it has no heading, seed one from the filename so /atomize doesn't
+      // fall back to the safe filename.
+      writeFileSync(arg, (/^#\s+/m.test(content) ? "" : `# ${stem}\n\n`) + content);
+    }
+  }
+  const job: Job = {
+    id, kind, label, arg, status: "queued", slugs: [], error: null,
+    createdAt: Date.now(), startedAt: null, finishedAt: null,
+  };
+  jobs.push(job);
+  void drain();
+  return job;
+}
+
+// Process the queue one job at a time. Each job shells the real /atomize; we diff the content
+// folders before/after to link the job to whatever it created (claude's stdout isn't reliable).
+async function drain(): Promise<void> {
+  if (draining) return;
+  const job = jobs.find((j) => j.status === "queued");
+  if (!job) return;
+  draining = true;
+  job.status = "running";
+  job.startedAt = Date.now();
+  const before = new Set(listSlugs());
+  try {
+    await execFileP("claude", ["-p", `/atomize ${job.arg}`, "--permission-mode", ATOMIZE_PERMISSION_MODE], {
+      cwd: repoRoot,
+      timeout: ATOMIZE_TIMEOUT_MS,
+      maxBuffer: 40_000_000,
+    });
+    job.slugs = listSlugs().filter((s) => !before.has(s));
+    job.status = "done";
+    if (!job.slugs.length) {
+      job.error = "atomize finished but created no new content folder — check the terminal running the GUI";
+    }
+  } catch (e) {
+    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
+    job.status = "failed";
+    if (err.code === "ENOENT") {
+      job.error = "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs";
+    } else if (err.killed) {
+      job.error = `atomize timed out after ${ATOMIZE_TIMEOUT_MS / 60000} min`;
+    } else {
+      job.error = `atomize failed: ${(err.stderr || err.message || "unknown").slice(0, 400)}`;
+    }
+    job.slugs = listSlugs().filter((s) => !before.has(s)); // link a partial scaffold if one appeared
+  }
+  job.finishedAt = Date.now();
+  draining = false;
+  void drain(); // next queued job
+}
+
 function serveAsset(res: ServerResponse, slug: string, file: string): void {
   let folder: string;
   try {
@@ -386,6 +518,26 @@ const server = createServer(async (req, res) => {
       }
       return;
     }
+    if (req.method === "POST" && url.pathname === "/api/atomize") {
+      const b = await readBody(req);
+      if (b.mode === "notes") {
+        json(res, 200, { ok: true, job: publicJob(addJob("notes", "notes", "Substack Notes")) });
+        return;
+      }
+      const source = String(b.source ?? "");
+      if (!source.trim()) {
+        json(res, 400, { ok: false, error: "paste some text, a file path, or a URL first" });
+        return;
+      }
+      const c = classifySource(source);
+      const job = c.kind === "text" ? addJob("text", "", c.label, source) : addJob(c.kind, c.arg, c.label);
+      json(res, 200, { ok: true, job: publicJob(job) });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/jobs") {
+      json(res, 200, { jobs: jobs.map(publicJob) });
+      return;
+    }
     res.writeHead(404).end("not found");
   } catch (e) {
     json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -481,6 +633,30 @@ const PAGE = /* html */ `<!doctype html>
   .aibox input { flex:1; font:inherit; padding:7px 10px; border:1px solid #5b46b8; border-radius:7px; }
   .aibox button.send { border-color:#5b46b8; background:#5b46b8; color:#fff; }
   .thinking { font-size:13px; color:#5b46b8; font-weight:600; padding:4px 0; }
+  nav.tabs { display:flex; gap:5px; }
+  .tab { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:6px 14px;
+    font-weight:600; color:var(--muted); display:flex; align-items:center; gap:7px; }
+  .tab.on { background:var(--accent); color:var(--paper); border-color:var(--accent); }
+  .tab.on .count { background:var(--paper); color:var(--accent); }
+  .view[hidden] { display:none; }
+  .ingest { max-width:820px; margin:0 auto; }
+  .ingest textarea { width:100%; min-height:130px; font:15px/1.6 inherit; padding:13px 15px;
+    border:1px solid var(--muted); border-radius:10px; background:#fff; resize:vertical; }
+  .ingest-actions { display:flex; gap:9px; align-items:center; margin-top:11px; flex-wrap:wrap; }
+  button.primary { background:var(--accent); color:var(--paper); border-color:var(--accent); font-weight:600; }
+  .hint { font-size:12px; color:var(--muted); flex:1; min-width:220px; line-height:1.4; }
+  .jobs { max-width:820px; margin:24px auto 0; }
+  .jobs > h3 { font:600 13px/1.3 Georgia,serif; color:var(--muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:.5px; }
+  .job { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 15px;
+    margin:9px 0; display:flex; align-items:center; gap:12px; }
+  .job .jlabel { flex:1; min-width:0; font-size:14px; }
+  .job .jlabel .txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
+  .job .jkind { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
+  .job .jerr { color:var(--red); font-size:12.5px; white-space:normal; margin-top:3px; }
+  .job a.jump { font-size:12.5px; color:var(--blue); text-decoration:none; font-weight:600; }
+  .spin-dot { width:9px; height:9px; border-radius:50%; background:var(--amber); flex:0 0 auto;
+    animation:pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
   .flash { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent);
     color:var(--paper); padding:9px 16px; border-radius:8px; font-size:13px; opacity:0;
     transition:.2s; pointer-events:none; }
@@ -489,13 +665,31 @@ const PAGE = /* html */ `<!doctype html>
 </head>
 <body>
 <header>
-  <h1>Review queue</h1>
-  <span class="count" id="count">0</span>
+  <h1>Content studio</h1>
+  <nav class="tabs">
+    <button class="tab on" data-tab="ingest">Add / Queue</button>
+    <button class="tab" data-tab="review">Review <span class="count" id="count">0</span></button>
+  </nav>
   <span class="grow"></span>
-  <label class="toggle"><input type="checkbox" id="showDecided" /> show published / discarded</label>
+  <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
   <button id="refresh">Refresh</button>
 </header>
-<main id="main"><div class="empty">Loading…</div></main>
+<main>
+  <section class="view" id="ingestView">
+    <div class="ingest">
+      <textarea id="src" placeholder="Paste an idea, a file path to an Obsidian note, or a Substack URL, then Add to queue. (⌘/Ctrl+Enter)"></textarea>
+      <div class="ingest-actions">
+        <button class="primary" id="addBtn">Add to queue</button>
+        <button id="notesBtn">Pull Substack Notes</button>
+        <span class="hint">One source per add. Claude drafts it on your subscription ($0), one at a time, so keep adding while it works. LinkedIn/X posts aren't re-importable; paste the text to expand one.</span>
+      </div>
+    </div>
+    <div class="jobs" id="jobs"></div>
+  </section>
+  <section class="view" id="reviewView" hidden>
+    <div id="reviewMain"><div class="empty">Loading…</div></div>
+  </section>
+</main>
 <div class="flash" id="flash"></div>
 <script>
 const $ = (s, r=document) => r.querySelector(s);
@@ -607,7 +801,7 @@ let rerenderScheduled=false;
 function rerender(){ if(rerenderScheduled) return; rerenderScheduled=true; requestAnimationFrame(()=>{rerenderScheduled=false; render();}); }
 
 function render(){
-  const main = $("#main"); main.innerHTML = "";
+  const main = $("#reviewMain"); main.innerHTML = "";
   let shown = 0, pending = 0;
   for (const piece of DATA.pieces){
     const rows = piece.rows.filter(r => showDecided || !DECIDED.has(r.status));
@@ -623,9 +817,75 @@ function render(){
   if (!shown) main.innerHTML = '<div class="empty">Nothing '+(showDecided?"here yet":"awaiting review")+'. 🎉</div>';
 }
 
-$("#refresh").addEventListener("click", load);
+// ── tabs ──
+function setTab(t){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
+  $("#ingestView").hidden = t!=="ingest";
+  $("#reviewView").hidden = t!=="review";
+  $("#decidedWrap").style.display = t==="review" ? "" : "none";
+}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>setTab(b.dataset.tab)));
+
+// ── ingest + job queue ──
+let JOBS = [];
+function jobPill(s){ return s==="done"?"published":s==="failed"?"blocked":s==="running"?"revise":"needs"; }
+function jobStatusText(s){ return s==="running"?"working…":s; }
+function renderJobs(){
+  const box = $("#jobs"); box.innerHTML = "";
+  if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above. 🌱</div>'; return; }
+  box.innerHTML = '<h3>Queue</h3>';
+  for(const j of [...JOBS].reverse()){
+    const el = document.createElement("div"); el.className = "job";
+    const dot = j.status==="running" ? '<span class="spin-dot"></span>' : "";
+    const err = j.error ? '<div class="jerr">'+esc(j.error)+'</div>' : "";
+    let right = '<span class="pill '+jobPill(j.status)+'">'+esc(jobStatusText(j.status))+'</span>';
+    if(j.status==="done" && j.slugs && j.slugs.length){
+      right = '<a class="jump" href="#" data-slug="'+esc(j.slugs[0])+'">→ review'+(j.slugs.length>1?" "+j.slugs.length+" pieces":"")+'</a>' + right;
+    }
+    el.innerHTML = dot + '<div class="jlabel"><span class="txt"><span class="jkind">'+esc(j.kind)+'</span> · '+esc(j.label)+'</span>'+err+'</div>' + right;
+    box.appendChild(el);
+  }
+  box.querySelectorAll("a.jump").forEach(a=>a.addEventListener("click",(e)=>{
+    e.preventDefault(); setTab("review");
+    load().then(()=>{
+      const d = [...document.querySelectorAll(".piece .slug")].find(x=>x.textContent===a.dataset.slug);
+      if(d) d.scrollIntoView({behavior:"smooth", block:"start"});
+    });
+  }));
+}
+async function loadJobs(){
+  try{
+    const before = JSON.stringify(JOBS.map(j=>[j.id,j.status]));
+    const r = await fetch("/api/jobs"); JOBS = (await r.json()).jobs || [];
+    renderJobs();
+    if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))) load(); // a job moved → refresh review rows
+  }catch(e){}
+}
+async function addSource(){
+  const ta = $("#src"); const source = ta.value.trim();
+  if(!source){ flash("Paste something first"); return; }
+  $("#addBtn").disabled = true;
+  const r = await post("/api/atomize",{source});
+  $("#addBtn").disabled = false;
+  if(r.ok){ ta.value=""; flash("Queued — Claude is drafting"); loadJobs(); }
+  else flash(r.error || "Could not queue");
+}
+async function pullNotes(){
+  $("#notesBtn").disabled = true;
+  const r = await post("/api/atomize",{mode:"notes"});
+  $("#notesBtn").disabled = false;
+  if(r.ok){ flash("Pulling your Notes…"); loadJobs(); } else flash(r.error || "Failed");
+}
+$("#addBtn").addEventListener("click", addSource);
+$("#notesBtn").addEventListener("click", pullNotes);
+$("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") addSource(); });
+setInterval(()=>{ if(JOBS.some(j=>j.status==="queued"||j.status==="running")) loadJobs(); }, 3000);
+
+$("#refresh").addEventListener("click", ()=>{ load(); loadJobs(); });
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
+setTab("ingest");
 load();
+loadJobs();
 </script>
 </body>
 </html>`;
