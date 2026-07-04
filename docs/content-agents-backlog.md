@@ -285,3 +285,11 @@ Examples - use both Primary and a Secondary CTA
 - OPEN QUESTIONS for Muxin: (1) publish the raw clip as-is, or add captions / light edit first? (2) which platforms are in-scope for native video by default? (3) delete immediately on publish, or after a short grace window / archive elsewhere first?
 - STATUS: Backlog
 <!-- card-id: b0e4ecc5-6120-4b40-a6dd-859c34ca332a -->
+
+**Guard the review GUI: don't allow Approve on a storyboard/video row with no rendered file**
+- The review GUI (`src/review/serve.ts`) writes `approve` straight into review-queue.md on any row's Approve click. A `video-script` / `storyboard`-type row can be approved even when its storyboard/video file doesn't exist yet (asset cell is `—`), producing a phantom approval that means nothing to `/publish` and reads as an unauthorized edit.
+- Observed 2026-07-04 (during repo sync): the innovation-nation `video-script` row was found flipped `blocked → approve` in the working tree with no storyboard file present — an uncommitted, unauthorized-looking edit traced back to a GUI Approve click on a not-yet-rendered row.
+- Fix: in `serve.ts`, guard the Approve action for storyboard/video rows whose asset file is missing (cell `—` / not on disk) — disable the button or reject the write, and surface why ("storyboard not rendered yet — run /video"). Text / image / quote-card rows unaffected. Small, local to `src/review/serve.ts`; no schema change.
+- ORIGIN: filed 2026-07-04 from the phantom-approve found during repo sync.
+- STATUS: Backlog
+<!-- card-id: 4bef9a7c-9148-4c59-afcf-04475ea11ff5 -->
