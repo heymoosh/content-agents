@@ -169,15 +169,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: approved — PRIORITY 2 (Muxin, 2026-07-04): work this second, right after 87cb6d93. Shapes how generated content is scored/hooked, so it holds for PR review per the content-generation standing directive.
 <!-- card-id: 8b00ab2e-31e4-4fe0-a1da-4d5ce9616ae1 -->
 
-**Create the claude.ai Routine for notes-daily (manual UI step)**
-- - ORIGIN: follow-up auto-filed by the conductor from card 2972c204 (Smoke-test the notes-daily cloud routine), 2026-07-02.
-- The notes-daily code shipped in PR #52, but docs/setup-cloud-routine.md Step 3 (create the Routine in claude.ai -> Routines UI, daily 14:00 UTC) appears never done: the committed dedup ledger has zero entries and no routine commits exist on any branch 5-6 days after merge.
-- SUPERSEDED (Muxin, 2026-07-04): Muxin couldn't find the claude.ai Routines UI, and what he actually needs is "runs even if my Mac is off" — a genuine cloud job, not tied to any Claude session. Replaced with `.github/workflows/notes-daily.yml` (GitHub Actions, on his GitHub Pro plan — well within the included 3,000 min/month for a ~1-2 min/day job). Runs daily at 14:07 UTC + can be triggered manually via `workflow_dispatch`.
-- REMAINING MANUAL STEP: Muxin adds 4 repo secrets (Settings -> Secrets and variables -> Actions, or `gh secret set <NAME>`): `SUBSTACK_HANDLE`, `TYPEFULLY_API_KEY`, `TYPEFULLY_SOCIAL_SET_ID` (same 3 the old doc listed), plus `GH_PAT` (a fine-grained personal access token scoped to this repo, contents + pull-requests read/write) — needed because the built-in GITHUB_TOKEN can't trigger the CI workflow on the PR it opens (GitHub's anti-recursion rule), which would leave auto-merge stuck forever.
-- Once created and the first real run lands a ledger entry, the parked smoke-test card (2972c204) resumes.
-- STATUS: Backlog
-<!-- card-id: bd499018-a6fa-46a2-a419-cd5ed01139fd -->
-
 **Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing**
 - Per the card's THREAD CHECK: every published piece must carry a visible thread back to the home-brand worldview — "I uncover harmful hidden beliefs and why they need to change before AI automates everything" (and the fuller unexamined-human-systems / who-benefits / building-the-right-thing statement behind it).
 - Operational test is NOT "is this about AI" — it's whether the piece connects back to that worldview; add this as an explicit check run before a piece reaches Muxin's review queue.
@@ -247,15 +238,6 @@ Examples - use both Primary and a Secondary CTA
 - GROOMED: ready — read-only reconciliation scope, explicit GOAL_CONDITION + 2026-07-04
 <!-- card-id: 383756f4-aae7-48c7-88a0-2b06b4a867dc -->
 
-**Substack blocks GitHub Actions runner IPs on notes-daily fetch — decide: paid proxy or drop cloud fetch**
-- ORIGIN: follow-up auto-filed from card 2972c204 (Smoke-test the notes-daily cloud routine), 2026-07-04.
-- The smoke test found the notes-daily GitHub Actions cron's Substack fetch (src/atomize/fetch-notes.ts) gets a 403 from Substack's WAF, and it is NOT a header/User-Agent issue: PR #77 added a browser UA, and a follow-up commit added a full realistic browser header set (accept, accept-language, referer, origin, sec-fetch-*, sec-ch-ua*) -- both produced the IDENTICAL 403, same step, same latency, no change at all. That signature points to IP-reputation blocking of GitHub Actions runner IPs by Substack's WAF, which no client-side request change can fix.
-- Two real options, both with tradeoffs -- this is Muxin's call, not something to silently implement: (1) route this one fetch through a paid residential/rotating-proxy or scraping-API service -- adds real recurring cost + a new vendor dependency; or (2) drop the cloud-fetch step from notes-daily.yml and keep Substack Notes fetching local-only (same posture the drafting step already has) -- costs nothing, needs no new code, but loses the 'runs even if my Mac is off' benefit that was the whole point of the GitHub Actions move (PR #75).
-- CHAIN: 1
-- GOAL_CONDITION: Muxin has chosen option (1) or (2) above; if (1), a proxy/scraping-API is wired into fetch-notes.ts's two calls and a real GH Actions run succeeds past the profile-fetch step; if (2), notes-daily.yml's fetch step is removed/disabled and the workflow's remaining scope (ledger-only, or retired entirely) reflects that decision.
-- STATUS: Backlog
-<!-- card-id: 1eda54e7-8e11-4e91-ab2d-f3c762542d88 -->
-
 **Periodically refresh the per-channel X-for-Y angles from Muxin's Obsidian content-ideas (surface drift, never auto-overwrite approved angles)**
 - Traces to the epic's STEP bullet: "run through Muxin's EXISTING Obsidian content-ideas to DERIVE (and periodically refresh) the X-for-Y angle per channel — the pipeline consults these, it does NOT invent new content streams." The one-time derivation is Done (33aa10f8 encoded the four 2026-06-30 approved angles verbatim into config/platforms.yaml); what's still unbuilt is the refresh loop that keeps those angles honest to what Muxin is actually writing.
 - Add an on-demand refresh step (fits the existing /strategy or /cycle pass — "periodically" = each strategy run, not a newly-invented timer) that reads the current Obsidian content-ideas plus config/pillars.yaml and re-derives a candidate X-for-Y angle per channel (X / LinkedIn / Substack / Bluesky).
@@ -269,13 +251,32 @@ Examples - use both Primary and a Secondary CTA
 - GROOMED: ready — clear scope (surface-only drift report, zero writes to platforms.yaml), stateable GOAL_CONDITION, no dependency overlaps + 2026-07-04
 <!-- card-id: 8ba83a4c-0903-4103-93cf-a7abea7ea99c -->
 
-**Smoke-test the notes-daily cloud routine on its first real run**
-- SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies at all. notes-daily drafts NOTHING now: it only fetches new Substack Notes and marks them seen in the ledger. Real per-platform drafting (Spin's per-channel reframing) needs genuine Claude judgment, which only runs locally (the review GUI's "Pull Substack Notes" button, `claude -p "/atomize notes"`, $0 on the subscription) — a GitHub Actions runner has no Claude Code session, so the cloud job stays deliberately dumb.
-- NEW test: confirm the first real cloud run (a) opens a PR that only touches data/notes-spread-ledger.jsonl (no content/ folders at all), (b) the ledger update means the same notes aren't re-flagged tomorrow, and (c) running "Pull Substack Notes" locally still drafts fresh (it doesn't consult this ledger, so nothing here blocks it).
-- RESOLVED (2026-07-04): replaced the claude.ai Routine with `.github/workflows/notes-daily.yml` on GitHub Actions (see bd499018) — works regardless of whether Muxin's Mac is on. The 4 repo secrets are set; unparking this card now that the routine-creation blocker no longer applies.
-- STATUS: Done
-- GROOMED: ready — cloud-job blocker resolved, NEW test (a/b/c) is a stateable observable + 2026-07-04
+**Smoke-test the notes-daily job on its first real run**
+- SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies at all. notes-daily drafts NOTHING now: it only fetches new Substack Notes and marks them seen in the ledger. Real per-platform drafting (Spin's per-channel reframing) needs genuine Claude judgment, which only runs locally (the review GUI's "Pull Substack Notes" button, `claude -p "/atomize notes"`, $0 on the subscription).
+- CORRECTION (2026-07-04, same day): the GitHub Actions replacement noted below never actually worked — Substack's WAF 403s every request from GitHub's runner IPs regardless of headers (see 1eda54e7). "Works regardless of whether Muxin's Mac is on" was wrong; that benefit was never real. `.github/workflows/notes-daily.yml` is deleted. Final design is local-only: `config/launchd/com.content-agents.notes-daily.plist` (daily 07:00 local) + `docs/setup-notes-daily-launchd.md`, same posture as the weekly-pull job (b2e1c9b6) — Mac must be on.
+- NEW test (supersedes the cloud-PR test above): after Muxin runs the launchd enable steps, confirm (a) `launchctl start com.content-agents.notes-daily` runs clean (check `~/.content-agents/logs/notes-daily.log`), (b) new notes get appended to data/notes-spread-ledger.jsonl and aren't re-flagged on a second run, and (c) running "Pull Substack Notes" in the review GUI still drafts fresh (it doesn't consult this ledger, so nothing here blocks it).
+- STATUS: Backlog
+- GROOMED: ready — local job shipped in code; PARKED pending Muxin's one-time launchd enable (persistent system config, deliberately not auto-installed) + 2026-07-04
 <!-- card-id: 2972c204-ca9e-4799-ae8f-b8fc71bddcde -->
+
+**Substack blocks GitHub Actions runner IPs on notes-daily fetch — decide: paid proxy or drop cloud fetch**
+- ORIGIN: follow-up auto-filed from card 2972c204 (Smoke-test the notes-daily cloud routine), 2026-07-04.
+- The smoke test found the notes-daily GitHub Actions cron's Substack fetch (src/atomize/fetch-notes.ts) gets a 403 from Substack's WAF, and it is NOT a header/User-Agent issue: PR #77 added a browser UA, and a follow-up commit added a full realistic browser header set (accept, accept-language, referer, origin, sec-fetch-*, sec-ch-ua*) -- both produced the IDENTICAL 403, same step, same latency, no change at all. That signature points to IP-reputation blocking of GitHub Actions runner IPs by Substack's WAF, which no client-side request change can fix.
+- Two real options, both with tradeoffs -- this is Muxin's call, not something to silently implement: (1) route this one fetch through a paid residential/rotating-proxy or scraping-API service -- adds real recurring cost + a new vendor dependency; or (2) drop the cloud-fetch step from notes-daily.yml and keep Substack Notes fetching local-only (same posture the drafting step already has) -- costs nothing, needs no new code, but loses the 'runs even if my Mac is off' benefit that was the whole point of the GitHub Actions move (PR #75).
+- CHAIN: 1
+- GOAL_CONDITION: Muxin has chosen option (1) or (2) above; if (1), a proxy/scraping-API is wired into fetch-notes.ts's two calls and a real GH Actions run succeeds past the profile-fetch step; if (2), notes-daily.yml's fetch step is removed/disabled and the workflow's remaining scope (ledger-only, or retired entirely) reflects that decision.
+- DECISION (Muxin, 2026-07-04): option (2) — "mac must be on job is acceptable." Dropped the cloud fetch entirely rather than pay for a proxy vendor. `.github/workflows/notes-daily.yml` deleted outright (no residual scope — the fetch fails from that IP range regardless of trigger, so even workflow_dispatch-only had no value). Replaced with a local launchd job, same pattern as the weekly-pull card (b2e1c9b6): `config/launchd/com.content-agents.notes-daily.plist` + `docs/setup-notes-daily-launchd.md`.
+- STATUS: Done
+<!-- card-id: 1eda54e7-8e11-4e91-ab2d-f3c762542d88 -->
+
+**Create the claude.ai Routine for notes-daily (manual UI step)**
+- - ORIGIN: follow-up auto-filed by the conductor from card 2972c204 (Smoke-test the notes-daily cloud routine), 2026-07-02.
+- The notes-daily code shipped in PR #52, but docs/setup-cloud-routine.md Step 3 (create the Routine in claude.ai -> Routines UI, daily 14:00 UTC) appears never done: the committed dedup ledger has zero entries and no routine commits exist on any branch 5-6 days after merge.
+- SUPERSEDED #1 (Muxin, 2026-07-04): Muxin couldn't find the claude.ai Routines UI, and what he actually needs is "runs even if my Mac is off" — a genuine cloud job, not tied to any Claude session. Replaced with `.github/workflows/notes-daily.yml` (GitHub Actions, on his GitHub Pro plan).
+- SUPERSEDED #2 (Muxin, 2026-07-04, same day): the GitHub Actions job never actually worked — Substack's WAF returns a flat 403 to every request from GitHub's runner IPs, confirmed on two live runs, unfixed by a browser User-Agent or a full realistic header set (see 1eda54e7). Muxin's call: "mac must be on job is acceptable" — dropped the cloud-fetch idea entirely. `.github/workflows/notes-daily.yml` is deleted; replaced with a local `launchd` job (`config/launchd/com.content-agents.notes-daily.plist`, daily 07:00 local), same pattern as the weekly-pull job (b2e1c9b6). Setup: `docs/setup-notes-daily-launchd.md`.
+- DONE (2026-07-04): local launchd plist + setup doc shipped. PENDING Muxin: run the 3-command enable in docs/setup-notes-daily-launchd.md (persistent system config — deliberately not auto-installed).
+- STATUS: Done
+<!-- card-id: bd499018-a6fa-46a2-a419-cd5ed01139fd -->
 
 **Unified review + approval GUI (one page for everything awaiting Muxin)**
 - Replace opening multiple windows + hand-editing review-queue.md. One web page shows everything pending review in one place.
