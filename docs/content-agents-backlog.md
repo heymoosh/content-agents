@@ -58,6 +58,7 @@ Examples - use both Primary and a Secondary CTA
 - Keeps the human-facing run-order guide in sync with the pipeline.
 - STATUS: Backlog
 - DECISION: defer — external; Muxin updates the Obsidian doc outside this repo using the markdown the conductor provides
+- DEPENDS ON: finishing everything else in backlog
 <!-- card-id: 5e86bf0e-10c6-4f59-8f3c-538596ee5e31 -->
 
 **Landing page**
@@ -69,7 +70,7 @@ Examples - use both Primary and a Secondary CTA
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
 **Smoke-test the notes-daily cloud routine on its first real run**
-- - After the cloud routine is set up, confirm the FIRST real run creates Typefully drafts that land in Drafts (UNSCHEDULED), not the Scheduled queue.
+- After the cloud routine is set up, confirm the FIRST real run creates Typefully drafts that land in Drafts (UNSCHEDULED), not the Scheduled queue.
 - The 'omit publish_at = unscheduled' contract was verified against the codebase's own logic (fetchScheduledDrafts filter), not a live Typefully API call.
 - If drafts appear Scheduled, adjust the --no-schedule payload in src/publish/typefully.ts before relying on the routine.
 - STATUS: To Do
@@ -78,11 +79,12 @@ Examples - use both Primary and a Secondary CTA
 <!-- card-id: 2972c204-ca9e-4799-ae8f-b8fc71bddcde -->
 
 **Add LinkedIn to the notes-daily spread platforms**
-- - notes-daily currently spreads to x + bluesky only (SPREAD_PLATFORMS in src/cron/notes-daily.ts).
+- notes-daily currently spreads to x + bluesky only (SPREAD_PLATFORMS in src/cron/notes-daily.ts).
 - Add 'linkedin' if Muxin wants longer / essay-like notes echoed there.
 - Muxin's call on whether his notes fit the LinkedIn register.
 - STATUS: Backlog
 <!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
+
 
 **Automate the analytics download for /cycle (constrained browser agent)**
 - The only manual blocker to an unattended weekly /cycle is hand-downloading the analytics export files before `npm run ingest`.
@@ -115,7 +117,7 @@ Examples - use both Primary and a Secondary CTA
 - Source: `GET /api/v1/publish-dashboard/summary-v2?range=365` on the writer dashboard (subscribers, total views, growth). Verified live this session: subs 4→38, views 89→504.
 - Wire it into the `audience` table (like LinkedIn demographics) so `npm run audience` and the strategy brief see real Substack subscriber totals + growth, not just the DB's undercounted per-post rows.
 - Small: the endpoint + auth path are already proven in src/pull/platforms/substack.ts; this adds an aggregate fetch + an audience-row writer.
-- STATUS: Backlog
+- STATUS: Done — PR #71 (merged): summary-v2 wired end-to-end, verified against Muxin's live account (ingest + audience showed substack | 38 | +34, matching the real 4→38 growth).
 <!-- card-id: 0f604c03-5e6c-467e-9bc2-6be45395dd42 -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
@@ -151,7 +153,9 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Review
 - BUILT v1 (2026-07-03): `npm run review` → local page (src/review/serve.ts, zero new deps, Node http) aggregating all 21 content/*/review-queue.md. Previews post text / quote-card image / video storyboard inline; surfaces spin + angle + source_lines; Approve / Revise(+note) / Discard write status back through the SAME cell /publish reads (verified byte-clean round-trip — only the status cell changes). Mobile-responsive. Reviewed live with Muxin.
 - DECISIONS (Muxin, 2026-07-03): (1) EDITING MODEL — KEEP inline edit-in-place (supersedes the earlier GitHub-PR-deeplink plan for now; Build-1 derivatives aren't in PRs yet — revisit if they move there). (2) APPROVE BEHAVIOR — Approve → AUTO-SCHEDULE, and it's BUILT for text rows: approving an x/linkedin/bluesky row now calls `publishText(folder, {onlyIds:[id]})` → a real Typefully SCHEDULED draft at the cadence slot → row flips to published; button reads "Approve → schedule"; schedule failures surface in the GUI instead of throwing. Done via a pure refactor of typefully.ts (new exported `publishText`; CLI + notes-daily paths unchanged; 48/48 tests green). Muxin takes the FIRST live Approve→schedule click (outward-facing) to watch it land.
-- STILL TO WIRE (follow-ups): cards / tiktok / video auto-schedule from Approve (still go via `/publish` for now); origin source-tags ("from /cycle" / "reply to mention"); live Typefully/PostPeer schedule reconciliation in the dashboard.
+- SHIPPED SINCE (2026-07-03/04): PR #67 added an "Add / Queue" tab — Muxin can drop a source (pasted text, Obsidian/file path, or Substack URL) or hit "Pull Substack Notes" straight from the GUI; a single-worker job queue runs the real `/atomize` headlessly (`claude -p`, subscription, $0), one at a time, and auto-refreshes the Review tab when a job finishes. This is the GUI's "creating our own content" half — feed the pipeline without leaving the page. PR #68 fixed the video-script row to show the drafted script (`video/script-draft.md`) before the storyboard exists.
+- STILL TO WIRE (follow-ups, this is the "publishing" half that's still manual): (1) cards / tiktok / video auto-schedule from Approve — still requires a separate `/publish` run, unlike text rows which already auto-schedule to Typefully on Approve; (2) origin source-tags ("from /cycle" / "reply to mention" / "from GUI queue"); (3) live Typefully/PostPeer schedule reconciliation in the dashboard (so the GUI reflects what's actually scheduled, not just what was approved).
+- PRIORITY (Muxin, 2026-07-04): next GUI work — wire (1) above (cards/tiktok/video auto-schedule from Approve) so the GUI's Approve action fully covers publishing, not just text. Note: this is a content-agents content-generation-adjacent surface (it triggers /publish, which sends real drafts) — treat per the content-agents generation-hold standing directive if the change touches what gets generated/sent, not just scheduling plumbing.
 - DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
 <!-- card-id: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9 -->
 
@@ -251,7 +255,7 @@ Examples - use both Primary and a Secondary CTA
 - .claude/skills/strategy/SKILL.md still tells /strategy to surface 'SPIN BASELINE READY / time to run /atomize --spin' when origin-compare says the verbatim baseline is ready. Spin is now the default, so that call-to-action is obsolete; reword to report verbatim-vs-spin-vs-organic and suggest --no-spin control runs instead.
 - Discovered while building card 33aa10f8 (Promote Spin to always-on default).
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: Done — PR #70 (merged): origin-compare.ts and the /strategy skill now report verbatim-vs-spin-vs-organic and nudge occasional --no-spin control runs instead of the old spin-readiness language.
 - DEPENDS ON: Promote Spin from opt-in experiment to always-on default, driven by the approved per-channel angles
 <!-- card-id: 2eb4ea51-3845-4d99-9501-2dbd9ac4548a -->
 
