@@ -20,21 +20,19 @@ wrong one faster.
 
 ## Where it runs
 
-This is intended as **atomize step 5.5**, right after scoring (step 5, `native`/`brand`/`cta`) and
-before validate (step 6) — the same slot the pillar tag (step 3) and CTA stamp (step 4.5) already
-occupy: Claude does the judgment inline while running `/atomize`, using `home_brand.signals` as the
-rubric, and stamps the verdict into the derivative's frontmatter:
+This is **atomize step 5.5** (`.claude/skills/atomize/SKILL.md`), right after scoring (step 5,
+`native`/`brand`/`cta`) and before validate (step 6) — the same slot the pillar tag (step 3) and
+CTA stamp (step 4.5) already occupy: Claude does the judgment inline while running `/atomize`,
+using `home_brand.signals` as the rubric, and stamps the verdict into the derivative's
+frontmatter:
 
 ```yaml
 thread_check: pass            # or: missing
 thread_spin_applied: true     # only present once Spin has attempted a redraft
 ```
 
-**Note (2026-07-04):** this doc exists because editing `.claude/skills/atomize/SKILL.md` directly
-requires an interactive permission grant this run didn't have. `SKILL.md` step 4's example
-frontmatter block and step 5.5 have NOT been added there yet — see the follow-up card. Until that
-lands, treat this file as the canonical spec for the step; a future `/atomize` run can wire it into
-`SKILL.md` by pointing at this file, mirroring how `spin-mode.md` documents the spin step.
+This file remains the detailed spec (rationale, fallback mechanics, examples); `SKILL.md` step 5.5
+is the short in-context pointer a live `/atomize` run actually reads.
 
 ## On a "missing" verdict
 
