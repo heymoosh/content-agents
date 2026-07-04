@@ -19,9 +19,24 @@ export interface FetchedNote {
 
 // A browser-like UA, not a custom one: Substack's WAF appears to block requests whose UA reads
 // as an obvious script/bot (seen 2026-07-04: a GitHub Actions runner got a 403 with a custom UA).
+// The UA alone didn't clear the WAF (still 403'd from GitHub Actions after #77), so round out the
+// header set to what a real Chrome tab sends on this exact XHR call: Accept for a JSON endpoint,
+// Accept-Language, sec-fetch-* (fetch metadata Chrome attaches to same-origin XHR), sec-ch-ua
+// (Client Hints matching the UA string above), and Referer/Origin since the real browser call is
+// made from a page on substack.com itself.
 const UA = {
   "user-agent":
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  accept: "application/json, text/plain, */*",
+  "accept-language": "en-US,en;q=0.9",
+  referer: "https://substack.com/",
+  origin: "https://substack.com",
+  "sec-fetch-site": "same-origin",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-dest": "empty",
+  "sec-ch-ua": '"Chromium";v="126", "Google Chrome";v="126", "Not.A/Brand";v="24"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"macOS"',
 };
 
 interface FeedComment {
