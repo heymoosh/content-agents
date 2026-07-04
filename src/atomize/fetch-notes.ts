@@ -17,7 +17,12 @@ export interface FetchedNote {
   replies: number; // children_count
 }
 
-const UA = { "user-agent": "content-agents/0.1" };
+// A browser-like UA, not a custom one: Substack's WAF appears to block requests whose UA reads
+// as an obvious script/bot (seen 2026-07-04: a GitHub Actions runner got a 403 with a custom UA).
+const UA = {
+  "user-agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+};
 
 interface FeedComment {
   id: number;
