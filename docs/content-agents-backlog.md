@@ -70,21 +70,19 @@ Examples - use both Primary and a Secondary CTA
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
 **Smoke-test the notes-daily cloud routine on its first real run**
-- After the cloud routine is set up, confirm the FIRST real run creates Typefully drafts that land in Drafts (UNSCHEDULED), not the Scheduled queue.
-- The 'omit publish_at = unscheduled' contract was verified against the codebase's own logic (fetchScheduledDrafts filter), not a live Typefully API call.
-- If drafts appear Scheduled, adjust the --no-schedule payload in src/publish/typefully.ts before relying on the routine.
-- UPDATE (2026-07-04): the claude.ai Routine step is being replaced — `.github/workflows/notes-daily.yml` now runs this on GitHub Actions instead (see bd499018), which works regardless of whether Muxin's Mac is on. Once Muxin adds the 4 repo secrets and the workflow fires for real, re-run this smoke-test against the resulting PR/ledger entry.
+- SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies at all. notes-daily drafts NOTHING now: it only fetches new Substack Notes and marks them seen in the ledger. Real per-platform drafting (Spin's per-channel reframing) needs genuine Claude judgment, which only runs locally (the review GUI's "Pull Substack Notes" button, `claude -p "/atomize notes"`, $0 on the subscription) — a GitHub Actions runner has no Claude Code session, so the cloud job stays deliberately dumb.
+- NEW test: confirm the first real cloud run (a) opens a PR that only touches data/notes-spread-ledger.jsonl (no content/ folders at all), (b) the ledger update means the same notes aren't re-flagged tomorrow, and (c) running "Pull Substack Notes" locally still drafts fresh (it doesn't consult this ledger, so nothing here blocks it).
+- RESOLVED (2026-07-04): replaced the claude.ai Routine with `.github/workflows/notes-daily.yml` on GitHub Actions (see bd499018) — works regardless of whether Muxin's Mac is on. The 4 repo secrets are set; unparking this card now that the routine-creation blocker no longer applies.
 - STATUS: To Do
 - GROOMED: 2026-07-02 conductor re-groom: read-only verification probe of notes-daily drafts (unscheduled contract), unblocked by PR #52; fix path is an ordinary code change
-- PARKED: parked (unattended) 2026-07-02: inconclusive, routine has never fired. Ledger data/notes-spread-ledger.jsonl is 0 lines, no routine commits on any branch since PR #52 merged 2026-06-27 vs a daily 14:00 UTC schedule. Blocked on Muxin creating the claude.ai Routine (docs/setup-cloud-routine.md Step 3). Re-run once the ledger shows a first real-run entry.
 <!-- card-id: 2972c204-ca9e-4799-ae8f-b8fc71bddcde -->
 
 **Add LinkedIn to the notes-daily spread platforms**
-- notes-daily currently spreads to x + bluesky only (SPREAD_PLATFORMS in src/cron/notes-daily.ts).
+- STALE REFERENCE (2026-07-04): notes-daily.ts no longer has a SPREAD_PLATFORMS list at all — it doesn't draft anything anymore (see the content-generation-review fix, same date). Real per-note platform selection now happens locally via `/atomize notes` (`.claude/skills/atomize/references/notes-mode.md`), which routes through the normal `config/routing.yaml` per-pillar logic like any other piece, not a notes-specific hardcoded list.
 - Add 'linkedin' if Muxin wants longer / essay-like notes echoed there.
 - Muxin's call on whether his notes fit the LinkedIn register.
 - STATUS: Backlog
-- DECISION: approved — LinkedIn gets the SAME platform-fit test the other spread platforms already use, not a blanket add: if a note is a good fit for a platform, it spreads there, and that rule now includes LinkedIn too (Muxin, 2026-07-04).
+- DECISION: approved — LinkedIn gets the SAME platform-fit test the other spread platforms already use, not a blanket add: if a note is a good fit for a platform, it spreads there, and that rule now includes LinkedIn too (Muxin, 2026-07-04). Check whether config/routing.yaml already covers this for notes, or needs a small adjustment there.
 <!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
 
 **Recurring weekly analytics pull (scheduler — "don't ask me")**
