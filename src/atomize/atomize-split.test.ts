@@ -56,6 +56,11 @@ describe("atomize skill split structure (#45)", () => {
     assert.ok(existsSync(p), `revise-mode.md missing at ${p}`);
   });
 
+  test("references/continue-mode.md exists", () => {
+    const p = join(skillDir, "references", "continue-mode.md");
+    assert.ok(existsSync(p), `continue-mode.md missing at ${p}`);
+  });
+
   test("SKILL.md dispatch block references notes-mode.md", () => {
     const content = readFileSync(skillMd, "utf8");
     assert.ok(
@@ -77,6 +82,14 @@ describe("atomize skill split structure (#45)", () => {
     assert.ok(
       content.includes("references/revise-mode.md"),
       "SKILL.md must reference references/revise-mode.md in its dispatch block"
+    );
+  });
+
+  test("SKILL.md dispatch block references continue-mode.md", () => {
+    const content = readFileSync(skillMd, "utf8");
+    assert.ok(
+      content.includes("references/continue-mode.md"),
+      "SKILL.md must reference references/continue-mode.md in its dispatch block"
     );
   });
 });
