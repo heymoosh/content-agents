@@ -56,6 +56,8 @@ interface EnrichedRow extends QueueRow {
   spin?: boolean;
   angle?: string;
   sourceLines?: unknown;
+  threadCheck?: string; // "pass" | "missing" — config/platforms.yaml home_brand thread-check
+  threadSpinApplied?: boolean; // Spin already drafted the worldview thread in on a "missing" verdict
   assetUrl?: string; // image/video preview URL
   editable: boolean; // can the body be edited-and-saved here?
   revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
@@ -127,6 +129,8 @@ function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
     out.spin = fm.spin === true;
     out.angle = typeof fm.angle === "string" ? fm.angle : undefined;
     out.sourceLines = fm.source_lines;
+    out.threadCheck = typeof fm.thread_check === "string" ? fm.thread_check : undefined;
+    out.threadSpinApplied = fm.thread_spin_applied === true;
     return true;
   };
 
@@ -958,6 +962,8 @@ const PAGE = /* html */ `<!doctype html>
   .pill.blocked{background:var(--red-bg);color:var(--red)}
   .pill.needs{background:#efe9db;color:#8a6d1e}
   .spin { font-size:11px; background:#efeafd; color:#5b46b8; padding:2px 8px; border-radius:5px; font-weight:600; }
+  .thread-pass { font-size:11px; background:var(--green-bg); color:var(--green); padding:2px 8px; border-radius:5px; font-weight:600; }
+  .thread-missing { font-size:11px; background:var(--amber-bg); color:var(--amber); padding:2px 8px; border-radius:5px; font-weight:600; }
   .src { font-size:11px; color:var(--muted); }
   .body { white-space:pre-wrap; font-size:14.5px; line-height:1.6; margin:4px 0 6px;
     padding:11px 13px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
@@ -1158,6 +1164,11 @@ function rowEl(piece, row){
 
   const spin = row.spin ? '<span class="spin">spin · '+esc(row.angle||"")+'</span>' : "";
   const src = row.sourceLines ? '<span class="src">lines '+esc(JSON.stringify(row.sourceLines))+'</span>' : "";
+  const thread = row.threadCheck === "missing"
+    ? '<span class="thread-missing">thread: missing'+(row.threadSpinApplied?" · spin-drafted":"")+'</span>'
+    : row.threadCheck === "pass"
+    ? '<span class="thread-pass">thread: pass</span>'
+    : "";
   let preview = "";
   if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
   else if (row.assetUrl && row.kind === "video") preview = '<video class="preview" src="'+row.assetUrl+'" controls muted></video>';
@@ -1178,7 +1189,7 @@ function rowEl(piece, row){
   el.innerHTML =
     '<div class="rowhead">'+
       '<span class="badge '+esc(row.platform.split(":")[0])+'">'+esc(row.platform)+'</span>'+
-      '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + src +
+      '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + thread + src +
       '<span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>'+
     '</div>'+
     preview + notes + sched + manual +
