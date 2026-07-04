@@ -2,9 +2,10 @@ name: notes-daily
 
 # Cloud-hosted replacement for the claude.ai "Routine" described in docs/setup-cloud-routine.md.
 # Runs on GitHub's own runners, so it fires whether or not Muxin's Mac is on. Fetches new
-# Substack Notes and saves them as UNSCHEDULED Typefully drafts (see src/cron/notes-daily.ts) —
-# nothing auto-posts. Any ledger/content changes go through a normal PR so CI + auto-merge stay
-# the one path everything in this repo ships through.
+# Substack Notes and queues them `pending` in the review GUI (see src/cron/notes-daily.ts) —
+# it never calls Typefully; Muxin approves in the GUI before anything goes out. The
+# ledger/content-folder commit this job opens is just repo-state sync (new pending candidates
+# becoming visible), not a publish action, so it still goes through the normal auto-merge path.
 
 on:
   schedule:
@@ -59,11 +60,11 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
           git add data/notes-spread-ledger.jsonl content/
-          git commit -m "notes-daily: spread notes ${today}"
+          git commit -m "notes-daily: queue notes for review ${today}"
           git push -u origin "$branch"
 
           gh pr create \
-            --title "notes-daily: spread notes ${today}" \
-            --body "Automated (notes-daily cloud job). Creates UNSCHEDULED Typefully drafts for newly-spread Substack Notes — nothing auto-posts. Review/schedule the good ones in Typefully; the rest can be ignored or deleted." \
+            --title "notes-daily: queue notes for review ${today}" \
+            --body "Automated (notes-daily cloud job). New Substack Notes queued as pending derivatives — nothing sent to Typefully. Review and Approve the good ones in the review GUI (npm run review); the rest can be discarded." \
             --base main --head "$branch"
           gh pr merge "$branch" --auto --squash

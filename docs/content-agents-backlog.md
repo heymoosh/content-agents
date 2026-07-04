@@ -70,9 +70,8 @@ Examples - use both Primary and a Secondary CTA
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
 **Smoke-test the notes-daily cloud routine on its first real run**
-- After the cloud routine is set up, confirm the FIRST real run creates Typefully drafts that land in Drafts (UNSCHEDULED), not the Scheduled queue.
-- The 'omit publish_at = unscheduled' contract was verified against the codebase's own logic (fetchScheduledDrafts filter), not a live Typefully API call.
-- If drafts appear Scheduled, adjust the --no-schedule payload in src/publish/typefully.ts before relying on the routine.
+- SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies. notes-daily now never calls Typefully at all; it queues rows `pending` in the review GUI, and only Muxin's Approve click creates a draft (see the content-generation-review fix on this same date, src/cron/notes-daily.ts).
+- NEW test: confirm the first real cloud run (a) opens a PR with new `content/<slug>/` folders whose review-queue.md rows are `pending` (not `approve`), (b) the ledger updates so the same notes aren't re-suggested tomorrow, and (c) approving one of those rows in `npm run review` correctly creates the real Typefully draft (exercising the existing schedule-on-approve path, not new code).
 - UPDATE (2026-07-04): the claude.ai Routine step is being replaced — `.github/workflows/notes-daily.yml` now runs this on GitHub Actions instead (see bd499018), which works regardless of whether Muxin's Mac is on. Once Muxin adds the 4 repo secrets and the workflow fires for real, re-run this smoke-test against the resulting PR/ledger entry.
 - STATUS: To Do
 - GROOMED: 2026-07-02 conductor re-groom: read-only verification probe of notes-daily drafts (unscheduled contract), unblocked by PR #52; fix path is an ordinary code change

@@ -1,24 +1,24 @@
-// notes-daily.ts — Daily cloud routine: fetch new Substack Notes → UNSCHEDULED Typefully drafts.
+// notes-daily.ts — Daily cloud routine: fetch new Substack Notes → queue for Muxin's review.
 //
-//   npm run notes-daily               # live run (needs SUBSTACK_HANDLE + TYPEFULLY_API_KEY in .env)
+//   npm run notes-daily               # live run (needs SUBSTACK_HANDLE in .env)
 //   npm run notes-daily -- --dry-run  # print plan only, no network calls, no file writes
 //   npm run notes-daily -- --limit 40 # fetch further back (default 20)
 //
 // Cloud-safe: all state lives in data/notes-spread-ledger.jsonl (committed to git).
 // The repo is cloned fresh each cloud run; on success, commit + push the updated ledger so the
-// next run knows which notes were already spread. See docs/setup-cloud-routine.md.
+// next run knows which notes were already surfaced. See docs/setup-cloud-routine.md.
 //
 // Flow: load ledger → fetch notes → filter new → score + pick top N → scaffold content folder
-//       → write derivatives → pre-approve in review-queue.md → publish:typefully --no-schedule
-//       → append ledger.
+//       → write derivatives → queue as `pending` in review-queue.md → append ledger.
 //
-// Drafts are created UNSCHEDULED (publish:typefully --no-schedule omits publish_at), so NOTHING
-// auto-posts. They sit in Typefully until Muxin manually schedules/publishes the good ones.
+// Muxin reviews EVERY note before anything goes out (his rule, 2026-07-04) — this script never
+// calls Typefully. Rows land `pending` in the same unified review GUI (`npm run review`) as
+// every other derivative; his Approve click on an x/bluesky row is what actually creates the
+// Typefully draft (the GUI's existing schedule-on-approve path), same as any other text post.
 
 import "../util/env.js";
 import { writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { spawnSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
 import { readLedger, appendLedger, LedgerEntry } from "./ledger.js";
 import { fetchSubstackNotes, FetchedNote } from "../atomize/fetch-notes.js";
@@ -87,15 +87,15 @@ function writeDerivative(folder: string, platform: Platform, noteText: string): 
 function writeReviewQueue(folder: string, title: string): void {
   const rows = SPREAD_PLATFORMS.map(
     (p) =>
-      `| ${p}-1 | ${p} | text | derivatives/${p}-1.md | 4 | 4 | yes | approve | auto-spread (verbatim note text) |`
+      `| ${p}-1 | ${p} | text | derivatives/${p}-1.md | 4 | 4 | yes | pending | auto-spread candidate (verbatim note text) |`
   ).join("\n");
   writeFileSync(
     join(folder, "review-queue.md"),
     [
       `# Review queue — ${title}`,
       "",
-      "> Auto-approved by notes-daily (verbatim note text, extraction-first).",
-      "> Drafts arrive UNSCHEDULED in Typefully — nothing auto-posts. Muxin schedules/publishes the good ones by hand.",
+      "> Queued by notes-daily (verbatim note text, extraction-first) — awaiting Muxin's review.",
+      "> Nothing goes to Typefully until he approves a row in the review GUI (`npm run review`).",
       "",
       "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |",
       "|----|----------|--------|-------|-------------|------------|-----|--------|-------|",
@@ -197,10 +197,10 @@ async function main() {
 
   // 5. Dry-run: print the plan and exit.
   if (isDryRun) {
-    const draftCount = selected.length * SPREAD_PLATFORMS.length;
+    const rowCount = selected.length * SPREAD_PLATFORMS.length;
     console.log(
-      `\nDry-run plan: would create ${selected.length} content folder(s) and ${draftCount} ` +
-        `UNSCHEDULED Typefully draft(s) (no auto-post — they sit until Muxin schedules them):`
+      `\nDry-run plan: would create ${selected.length} content folder(s) and queue ${rowCount} ` +
+        `row(s) as pending (nothing goes to Typefully until Muxin approves in the review GUI):`
     );
     for (const n of selected) {
       const title = noteTitle(n.text);
@@ -208,10 +208,10 @@ async function main() {
       console.log(`  Origin: ${n.url}`);
       for (const p of SPREAD_PLATFORMS) {
         const body = trimToLimit(n.text, PLATFORM_LIMITS[p] ?? Infinity);
-        console.log(`  ${p}: ${body.length}/${PLATFORM_LIMITS[p]} chars (unscheduled draft)`);
+        console.log(`  ${p}: ${body.length}/${PLATFORM_LIMITS[p]} chars (pending review)`);
       }
     }
-    console.log("\nDry-run complete — no files written, no Typefully drafts created, no network calls.");
+    console.log("\nDry-run complete — no files written, no review-queue rows created, no network calls.");
     return;
   }
 
@@ -260,39 +260,13 @@ async function main() {
     }
     console.log(`  derivatives written: ${SPREAD_PLATFORMS.join(", ")}`);
 
-    // c. Write review-queue.md with all rows pre-approved.
+    // c. Write review-queue.md with all rows `pending` — awaiting Muxin's review. Nothing here
+    //    calls Typefully; his Approve click in the review GUI is what creates the real draft.
     writeReviewQueue(folder, title);
-    console.log("  review-queue.md: all rows approve");
+    console.log("  review-queue.md: queued pending (awaiting Muxin's review)");
 
-    // d. Create UNSCHEDULED Typefully drafts via the existing publish:typefully script. The
-    //    --no-schedule flag omits publish_at, so drafts are SAVED but do NOT auto-post — they sit
-    //    in Typefully until Muxin manually schedules/publishes the good ones. Nothing fires
-    //    automatically. (Reuses the shared draft-creation path; no duplicated Typefully logic.)
-    console.log("  calling publish:typefully --no-schedule (unscheduled drafts)...");
-    const result = spawnSync(
-      "npm",
-      ["run", "publish:typefully", "--", folder, "--no-schedule"],
-      { encoding: "utf8", cwd: repoRoot, env: { ...process.env } }
-    );
-    if (result.status !== 0) {
-      const errOut = (result.stderr ?? "").trim();
-      console.error(`  publish:typefully failed (exit ${result.status ?? "?"}):\n${errOut}`);
-      // Still append to ledger so we don't retry this note; the content folder exists.
-      appendLedger({
-        noteId: note.noteId,
-        url: note.url,
-        spreadAt: new Date().toISOString(),
-        platforms: [],
-        contentFolder: relative(repoRoot, folder),
-      });
-      spreadCount.skipped++;
-      continue;
-    }
-    // Print each output line with indentation.
-    const lines = (result.stdout ?? "").trim().split("\n").filter(Boolean);
-    for (const line of lines) console.log(`  ↳ ${line}`);
-
-    // e. Append to the committed ledger so the next cloud run skips this note.
+    // d. Append to the committed ledger so the next cloud run doesn't re-suggest this note —
+    //    dedup is about "already surfaced for review," independent of what Muxin decides.
     const entry: LedgerEntry = {
       noteId: note.noteId,
       url: note.url,
@@ -306,7 +280,7 @@ async function main() {
   }
 
   console.log(
-    `\nnotes-daily done. Spread: ${spreadCount.success} note(s). ` +
+    `\nnotes-daily done. Queued for review: ${spreadCount.success} note(s). ` +
       `Skipped: ${spreadCount.skipped}. ` +
       `Commit and push data/notes-spread-ledger.jsonl to persist for the next run.`
   );
