@@ -110,6 +110,24 @@ communities:
   lennys:
     notes: Product strategy, growth. Selective and occasional engagement only.
 
+# Home-brand worldview line (Muxin, 2026-07-04). The thread-check (src/atomize/thread-check.ts,
+# run inline during /atomize step 5.5) judges whether a piece connects back to this line before it
+# reaches review-queue.md. The test is NOT "is this about AI" — it's whether the piece touches one
+# of the `signals` below. On a "missing" verdict, Spin (the same per-channel reframing below) weaves
+# `worldview_expanded` in — reusing this approved language, never inventing new claims. Surface/
+# suggest only: a missing or failing check never blocks a piece from being queued or published.
+home_brand:
+  worldview: >-
+    I uncover harmful hidden beliefs and why they need to change before AI automates everything.
+  worldview_expanded: >-
+    The real AI risk isn't the machine, it's the unexamined human systems we're about to automate
+    at full speed. I ship software as the proof.
+  signals:
+    - an unexamined human system, assumption, incentive, or norm
+    - who actually benefits or is harmed by an existing system, process, or institution
+    - a hidden belief that needs to change before it gets automated at scale
+    - building/shipping the right thing, not just automating the wrong one faster
+
 # Spin angles (Muxin, approved 2026-06-30; promoted to always-on default 2026-07-02 — see
 # docs/spin-experiment.md and .claude/skills/atomize/references/spin-mode.md). Internal generation
 # config ONLY: these guide how /atomize reframes a platform derivative from the source essay. They

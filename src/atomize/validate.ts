@@ -5,6 +5,7 @@ import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
+import { summarizeThreadChecks } from "./thread-check.js";
 
 // Validate every derivative in a content folder against config/platforms.yaml.
 //   tsx src/atomize/validate.ts content/2026-06-09-some-post
@@ -133,16 +134,27 @@ function main() {
   }
 
   const routingFiles: { file: string; platform: string }[] = [];
+  const threadInputs: { file: string; fm: Record<string, unknown> }[] = [];
   for (const file of files) {
     const { fm, body } = splitFrontmatter(readFileSync(join(derivDir, file), "utf8"));
     violations.push(...checkDerivative(file, fm, body, config.platforms));
     routingFiles.push({ file, platform: String(fm.platform ?? "") });
+    threadInputs.push({ file, fm });
   }
 
   const routingPath = join(dir.startsWith("/") ? dir : join(repoRoot, dir), "routing.md");
   if (existsSync(routingPath)) {
     const routingDecisions = parseRoutingDecisions(readFileSync(routingPath, "utf8"));
     violations.push(...checkRoutingGate(routingFiles, routingDecisions));
+  }
+
+  // Home-brand thread-check (config/platforms.yaml `home_brand`): advisory only, never a gate — a
+  // "missing" derivative still queues (CLAUDE.md rule via the thread-check card).
+  const thread = summarizeThreadChecks(threadInputs);
+  if (thread.missing > 0) {
+    console.log(
+      `home-brand thread-check: ${thread.pass} pass, ${thread.missing} missing (not blocking) — ${thread.missingFiles.join(", ")}`
+    );
   }
 
   if (violations.length) {

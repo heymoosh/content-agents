@@ -109,6 +109,8 @@ derivative, the video script, and the video title/description. The short version
      spin: true             # the default for platforms with a spin_angles entry; omit on --no-spin runs
      angle: x               # the config/platforms.yaml spin_angles key applied; must equal `platform` (see references/spin-mode.md)
      scores: { native: 4, brand: 5, cta: true }
+     thread_check: pass     # pass | missing — stamped in step 5.5, after scoring
+     thread_spin_applied: true   # only present once the step 5.5 fallback redraft ran
      cta: source            # source | <literal-url> | none — stamped from config/cta.yaml (step 4.5)
      cta_label: "Full essay (free to subscribe):"   # short lead-in for the link; omit when cta is none
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
@@ -151,6 +153,23 @@ derivative, the video script, and the video title/description. The short version
    - `brand`: does it represent human-centered AI values? (1–5)
    - `cta`: does it point somewhere useful? (true/false — CTA is optional, not mandatory)
    - Score 1–2 → discard it yourself rather than queueing junk.
+
+5.5. **Home-brand thread-check** (`config/platforms.yaml` `home_brand`; see `docs/thread-check.md`).
+   Judge — same inline-judgment pattern as pillar/spin/scores above — whether the derivative
+   connects back to the home-brand worldview line ("I uncover harmful hidden beliefs and why
+   they need to change before AI automates everything"). The operational test is NOT "is this
+   about AI" — it's whether the piece touches one of `home_brand.signals` (an unexamined human
+   system/assumption, who benefits or is harmed, or building/shipping the right thing). Stamp
+   the verdict into frontmatter: `thread_check: pass` if it connects.
+   - **If missing:** first try genuinely tightening the piece's own framing to draw out the
+     connection already latent in Muxin's argument (a real redraft, in her voice — never invent
+     a new claim). If that doesn't land, fall back to `draftThreadIn()`
+     (`src/atomize/thread-check.ts`) as a safe deterministic patch: it weaves
+     `home_brand.worldview_expanded` onto the body as a closing line (idempotent) and returns
+     `{ thread_check: "pass", thread_spin_applied: true }` — apply that frontmatter patch.
+   - **Never a hard gate.** If a piece still doesn't connect after a redraft attempt, leave
+     `thread_check: missing` and queue it anyway (step 8) — surface/suggest only, exactly like
+     every other score here.
 
 6. **Validate.** `npm run validate -- <folder>` — must pass before queueing. Fix violations,
    don't relax limits. (Validation enforces char/word limits for every derivative, requires
