@@ -26,6 +26,7 @@ import { repoRoot, openDb } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { publishText } from "../publish/typefully.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
+import { classifyThread } from "../atomize/thread-check.js";
 
 const CONTENT = join(repoRoot, "content");
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
@@ -129,7 +130,7 @@ function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
     out.spin = fm.spin === true;
     out.angle = typeof fm.angle === "string" ? fm.angle : undefined;
     out.sourceLines = fm.source_lines;
-    out.threadCheck = typeof fm.thread_check === "string" ? fm.thread_check : undefined;
+    out.threadCheck = classifyThread(fm);
     out.threadSpinApplied = fm.thread_spin_applied === true;
     return true;
   };
