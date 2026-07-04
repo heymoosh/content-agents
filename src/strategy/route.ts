@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
 
@@ -7,8 +8,11 @@ import { openDb, repoRoot } from "../db/db.js";
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
 // cold-start. Routing GATES generation in /atomize; Muxin's review stays the final gate.
 //
-//   tsx src/strategy/route.ts --pillar civic-tech [--folder content/<slug>]
-//        → prints JSON decisions; writes <folder>/routing.md when --folder is given
+//   tsx src/strategy/route.ts --pillar civic-tech[,human-ai,...] [--folder content/<slug>]
+//        → prints JSON decisions; writes <folder>/routing.md when --folder is given.
+//          Multiple comma-separated pillars are merged in ONE pass (include if any pillar
+//          includes, unless any pillar's `never` rule vetoes it) instead of overwriting
+//          routing.md per invocation — always route a multi-pillar piece in one call.
 //   tsx src/strategy/route.ts --all
 //        → full pillar × platform routing-map markdown (for the strategy brief)
 
@@ -28,9 +32,9 @@ interface RoutingConfig {
   };
 }
 
-type Confidence = "data" | "cold-start" | "rule" | "always";
+export type Confidence = "data" | "cold-start" | "rule" | "always";
 
-interface Decision {
+export interface Decision {
   platform: string;
   decision: "include" | "skip";
   score: number | null; // 0..1 normalized fit, null when not data-driven
@@ -182,17 +186,86 @@ function decideForPillar(
   return out;
 }
 
-function routingMd(pillar: string, decisions: Decision[]): string {
-  const fit = (d: Decision) => (d.score == null ? "—" : d.score.toFixed(2));
-  const rows = decisions
+// A platform is included if ANY listed pillar includes it, EXCEPT an explicit `never` rule from
+// ANY pillar is a hard veto that no other pillar's include can override — this is the enforcement
+// point for "if the data/strategy doesn't support this platform for this category, never draft
+// for it," applied once per multi-pillar piece instead of by hand-merging routing.md per pillar.
+export interface MergedDecision extends Decision {
+  pillars: string[]; // which pillar(s) this decision draws from
+}
+
+export function mergeDecisions(pillars: string[], perPillar: Map<string, Decision[]>): MergedDecision[] {
+  const platforms = new Set<string>();
+  for (const decs of perPillar.values()) for (const d of decs) platforms.add(d.platform);
+
+  const merged: MergedDecision[] = [];
+  for (const platform of platforms) {
+    const byPillar = pillars
+      .map((pillar) => ({ pillar, d: (perPillar.get(pillar) ?? []).find((x) => x.platform === platform) }))
+      .filter((x): x is { pillar: string; d: Decision } => !!x.d);
+
+    const veto = byPillar.find((p) => p.d.decision === "skip" && p.d.confidence === "rule");
+    if (veto) {
+      merged.push({
+        platform,
+        decision: "skip",
+        score: null,
+        confidence: "rule",
+        rationale: `hard veto: ${veto.pillar} editorial rule says never route here (overrides any other pillar's include)`,
+        pillars: [veto.pillar],
+      });
+      continue;
+    }
+
+    const includes = byPillar.filter((p) => p.d.decision === "include");
+    if (includes.length > 0) {
+      const confOrder: Confidence[] = ["always", "rule", "data", "cold-start"];
+      const confidence = confOrder.find((c) => includes.some((p) => p.d.confidence === c)) ?? "cold-start";
+      const scores = includes.map((p) => p.d.score).filter((s): s is number => s != null);
+      merged.push({
+        platform,
+        decision: "include",
+        score: scores.length ? Math.max(...scores) : null,
+        confidence,
+        // Semicolon-joined (not " | ") because this rationale lands in a markdown table cell —
+        // validate.ts's routing-gate parser splits table rows on "|", so a literal pipe here
+        // would shift columns. Platform/decision are still always columns 1/2 either way, but
+        // semicolons keep the row human-readable.
+        rationale: includes.map((p) => `${p.pillar}: ${p.d.rationale}`).join("; "),
+        pillars: includes.map((p) => p.pillar),
+      });
+    } else {
+      merged.push({
+        platform,
+        decision: "skip",
+        score: null,
+        confidence: byPillar[0]?.d.confidence ?? "cold-start",
+        rationale: byPillar.map((p) => `${p.pillar}: ${p.d.rationale}`).join("; ") || "no pillar considered this platform",
+        pillars: [],
+      });
+    }
+  }
+  return merged;
+}
+
+function routingMd(pillars: string[], merged: MergedDecision[]): string {
+  const fit = (d: MergedDecision) => (d.score == null ? "—" : d.score.toFixed(2));
+  const rows = merged
     .map((d) => `| ${d.platform} | ${d.decision} | ${fit(d)} | ${d.confidence} | ${d.rationale} |`)
     .join("\n");
-  return (
-    `# Routing — ${pillar} — ${new Date().toISOString().slice(0, 10)}\n\n` +
-    `Generated by \`npm run route\` from analytics + config/routing.yaml. Only \`include\` ` +
-    `platforms are atomized and queued; Muxin's review-queue approval stays the final gate.\n\n` +
-    `| platform | decision | fit | confidence | why |\n|---|---|---|---|---|\n${rows}\n`
-  );
+  const header =
+    pillars.length > 1
+      ? `# Routing — ${pillars.join(" + ")} — ${new Date().toISOString().slice(0, 10)}\n\n` +
+        `Generated by \`npm run route\` from analytics + config/routing.yaml, merged across ${pillars.length} pillars in one ` +
+        `pass: a platform is \`include\` if ANY pillar includes it, UNLESS any pillar's editorial \`never\` rule vetoes it ` +
+        `(that veto wins regardless of other pillars). Only \`include\` platforms are atomized and queued; Muxin's ` +
+        `review-queue approval stays the final gate. \`npm run validate\` hard-fails any derivative drafted for a ` +
+        `platform marked \`skip\` here.\n\n`
+      : `# Routing — ${pillars[0]} — ${new Date().toISOString().slice(0, 10)}\n\n` +
+        `Generated by \`npm run route\` from analytics + config/routing.yaml. Only \`include\` platforms are atomized ` +
+        `and queued; Muxin's review-queue approval stays the final gate. \`npm run validate\` hard-fails any derivative ` +
+        `drafted for a platform marked \`skip\` here.\n\n`;
+  return header + `| platform | decision | fit | confidence | why |\n|---|---|---|---|---|\n${rows}\n`;
 }
 
 function main() {
@@ -221,21 +294,32 @@ function main() {
   }
 
   const pi = args.indexOf("--pillar");
-  const pillar = pi >= 0 ? args[pi + 1] : undefined;
-  if (!pillar || !PILLARS.includes(pillar)) {
-    console.error(`usage: tsx src/strategy/route.ts --pillar <${PILLARS.join("|")}> [--folder <content-folder>]  |  --all`);
+  const pillarArg = pi >= 0 ? args[pi + 1] : undefined;
+  const pillars = pillarArg ? [...new Set(pillarArg.split(",").map((p) => p.trim()))] : undefined;
+  if (!pillars || pillars.length === 0 || pillars.some((p) => !PILLARS.includes(p))) {
+    console.error(
+      `usage: tsx src/strategy/route.ts --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all`
+    );
     process.exit(1);
   }
-  const decisions = decideForPillar(pillar, cfg, data);
+  const perPillar = new Map(pillars.map((p) => [p, decideForPillar(p, cfg, data)]));
+  const merged: MergedDecision[] =
+    pillars.length === 1
+      ? perPillar.get(pillars[0])!.map((d) => ({ ...d, pillars: [pillars[0]] }))
+      : mergeDecisions(pillars, perPillar);
 
   const fo = args.indexOf("--folder");
   if (fo >= 0 && args[fo + 1]) {
     const folder = args[fo + 1];
     const abs = folder.startsWith("/") ? folder : join(repoRoot, folder);
-    writeFileSync(join(abs, "routing.md"), routingMd(pillar, decisions));
+    writeFileSync(join(abs, "routing.md"), routingMd(pillars, merged));
     console.error(`wrote ${join(abs, "routing.md")}`);
   }
-  console.log(JSON.stringify({ pillar, decisions }, null, 2));
+  console.log(JSON.stringify({ pillars, decisions: merged }, null, 2));
 }
 
-main();
+// Run only as a CLI entry point — importing mergeDecisions/decideForPillar for tests must not
+// execute main() (which opens the db and calls process.exit on bad args).
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

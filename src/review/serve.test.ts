@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { revisePrompt, classifySource } from "./serve.js";
+import { revisePrompt, classifySource, isSafeRawPath } from "./serve.js";
 
 // "Revise with Claude" (Muxin, 2026-07-03): the GUI shells out to headless `claude -p` to edit one
 // derivative in place. The prompt is the only guardrail against Claude wandering — these lock it in.
@@ -42,4 +42,16 @@ test("classifySource routes urls, existing files, and pasted text", () => {
 
   // a path-looking string that doesn't resolve is pasted text, not a phantom file
   assert.equal(classifySource("/nope/missing.md", () => false).kind, "text");
+});
+
+// Analytics tab "raw downloaded exports" viewer (Muxin, 2026-07-04): serves files straight out of
+// data/inbox and data/processed by a client-supplied relative path — this guard is the only thing
+// standing between that and reading arbitrary files off disk.
+test("isSafeRawPath only allows paths under data/inbox or data/processed", () => {
+  assert.ok(isSafeRawPath("inbox/x/export.csv"));
+  assert.ok(isSafeRawPath("processed/foo.json"));
+  assert.ok(!isSafeRawPath("../../.env"));
+  assert.ok(!isSafeRawPath("/etc/passwd"));
+  assert.ok(!isSafeRawPath("config/voice.yaml")); // outside the two allowed roots
+  assert.ok(!isSafeRawPath(""));
 });
