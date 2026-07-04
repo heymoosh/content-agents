@@ -6,6 +6,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
 import { summarizeThreadChecks } from "./thread-check.js";
+import { summarizeStorytelling } from "./storytelling.js";
 
 // Validate every derivative in a content folder against config/platforms.yaml.
 //   tsx src/atomize/validate.ts content/2026-06-09-some-post
@@ -154,6 +155,19 @@ function main() {
   if (thread.missing > 0) {
     console.log(
       `home-brand thread-check: ${thread.pass} pass, ${thread.missing} missing (not blocking) — ${thread.missingFiles.join(", ")}`
+    );
+  }
+
+  // Storytelling (hook/narrative/resonance): advisory only, never a gate — a low-scoring
+  // derivative still queues, flagged in review-queue.md for a Spin pass (Muxin, 2026-06-30/07-04).
+  const storytelling = summarizeStorytelling(threadInputs);
+  if (storytelling.scored > 0) {
+    const detail = storytelling.flaggedFiles
+      .map(({ file, low }) => `${file} (low: ${low.join(", ")})`)
+      .join(", ");
+    console.log(
+      `storytelling: ${storytelling.scored} scored, ${storytelling.flagged} flagged for a Spin pass (not blocking)` +
+        (detail ? ` — ${detail}` : "")
     );
   }
 

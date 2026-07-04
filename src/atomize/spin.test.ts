@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { loadSpinAngles, resolveAngle, isSpinDefault } from "./spin.js";
+import { loadSpinAngles, resolveAngle, isSpinDefault, appliesRehook } from "./spin.js";
 
 describe("config/platforms.yaml spin_angles: the four Muxin-approved angles (2026-06-30)", () => {
   const angles = loadSpinAngles();
@@ -54,5 +54,27 @@ describe("isSpinDefault: spin is the always-on default, --no-spin is the only op
 
   test("--no-spin -> spin is off", () => {
     assert.equal(isSpinDefault(true), false);
+  });
+});
+
+describe("appliesRehook: storytelling re-hook/re-order latitude (Muxin, 2026-07-04), scoped to X/LinkedIn only", () => {
+  test("x and linkedin get the re-hook/re-order pass", () => {
+    assert.equal(appliesRehook("x", undefined), true);
+    assert.equal(appliesRehook("linkedin", undefined), true);
+  });
+
+  test("bluesky never gets it, even from a normal essay source", () => {
+    assert.equal(appliesRehook("bluesky", undefined), false);
+  });
+
+  test("a Notes-sourced derivative stays near-verbatim on every platform, including x/linkedin", () => {
+    assert.equal(appliesRehook("x", "substack-note"), false);
+    assert.equal(appliesRehook("linkedin", "substack-note"), false);
+    assert.equal(appliesRehook("bluesky", "substack-note"), false);
+  });
+
+  test("other platforms (community, quote-card) never get it", () => {
+    assert.equal(appliesRehook("community", undefined), false);
+    assert.equal(appliesRehook("quote-card", undefined), false);
   });
 });

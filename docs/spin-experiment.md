@@ -103,6 +103,37 @@ Current default behavior lives in `.claude/skills/atomize/references/spin-mode.m
 stays as the historical record of why and how spin was built, and the experiment protocol above
 still applies if verbatim-vs-spin needs re-measuring later (e.g. via `--no-spin` runs).
 
+## Storytelling extension (2026-07-04)
+
+A storytelling rubric (hook / narrative / resonance / overall) was tested against 10 real
+derivatives in `content/`. **Finding:** native/brand scored 4-5 while storytelling clustered at
+2-3 — the re-hook/re-order latitude in guardrail #1 above existed but was unused in the sample (no
+`spin: true` derivative had actually reframed its hook or order, only its angle).
+
+**DECISION (Muxin, 2026-06-30):** engagement is measured as resonance, not conversion. Practical
+angle and CTA are CONDITIONAL — present only when genuinely warranted by the source — never
+scored requirements. Never ask for engagement; a felt truth earns a reaction, asking for one is
+inauthentic (already banned, `config/voice.yaml`).
+
+Built in response (ship now, no guardrail change, pure upside):
+
+1. **`hook` / `narrative` / `resonance`** joined `native` / `brand` as scored dimensions
+   (`.claude/skills/atomize/SKILL.md` step 5, `src/atomize/storytelling.ts`). Soft-gated only: a
+   derivative scoring `<= 3` on any of the three gets a note appended to its review-queue.md row
+   suggesting a Spin pass — never a block. `native`/`brand`/`cta` low scores still mean "discard
+   it yourself"; storytelling low scores mean "flag it, Muxin still decides."
+2. **The re-hook/re-order latitude was made concrete and applied**, scoped to X and LinkedIn only
+   (`appliesRehook()` in `src/atomize/spin.ts`; worked example in
+   `.claude/skills/atomize/references/spin-mode.md`). Bluesky and any Notes-sourced derivative
+   (`source_kind: substack-note`) stay near-verbatim — this is not a broader invent-latitude, it's
+   the SAME reframe-never-invent guardrail from guardrail #1, just actually used on the two
+   platforms where audience-fit data (the 2026-06-24 finding, "Why" section above) says flavor
+   matters most.
+
+No schema change to review-queue.md's table (native/brand/cta stay a fixed 9-column layout —
+`src/publish/queue.ts`, `src/video/render.ts`, and `src/review/serve.ts` all parse it by column
+position). The storytelling flag rides in the existing free-text `notes` cell instead.
+
 ## Related
 - The tracking substrate: `posts.source`, `tag-source.ts`, `origin-compare.ts` (built 2026-06-24).
 - The guardrail it must not break: CLAUDE.md rule 1 (extraction-first) and rule 5 / `voice.yaml`.
