@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Daily Substack Notes fetch — runs `npm run notes-daily` every day at 07:00 local time so new
+  Notes are flagged before your morning review. Fetches + marks seen in the ledger; drafts
+  NOTHING and never publishes. Use the review GUI's "Pull Substack Notes" button to actually
+  draft the good ones with real per-platform Spin.
+
+  Local (not GitHub Actions) because Substack's WAF blocks GitHub's runner IPs outright (403,
+  confirmed even with a browser User-Agent) — same reasoning as the weekly-pull job.
+
+  Install (see docs/setup-notes-daily-launchd.md):
+    mkdir -p ~/.content-agents/logs
+    cp config/launchd/com.content-agents.notes-daily.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.content-agents.notes-daily.plist
+
+  Change the time in StartCalendarInterval below, then unload + load again.
+  bash -lc loads your profile so node/npm are on PATH under launchd's minimal environment.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.content-agents.notes-daily</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>cd /Users/Muxin/Documents/GitHub/content-agents &amp;&amp; npm run notes-daily</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>7</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/Muxin/.content-agents/logs/notes-daily.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/Muxin/.content-agents/logs/notes-daily.log</string>
+</dict>
+</plist>
