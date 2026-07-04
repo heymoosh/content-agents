@@ -93,3 +93,24 @@ describe("atomize skill split structure (#45)", () => {
     );
   });
 });
+
+describe("storytelling scoring dimension is documented (2026-07-04)", () => {
+  test("SKILL.md step 5 documents hook/narrative/resonance as scored dimensions", () => {
+    const content = readFileSync(skillMd, "utf8");
+    assert.match(content, /`hook`: does the opening line grab attention/);
+    assert.match(content, /`narrative`: is there an arc/);
+    assert.match(content, /`resonance`: does it state a felt truth/);
+  });
+
+  test("SKILL.md documents the soft-gate note, not a table schema change", () => {
+    const content = readFileSync(skillMd, "utf8");
+    assert.match(content, /spinPassNote\(\)/);
+    assert.match(content, /notes.*cell/);
+  });
+
+  test("references/spin-mode.md documents the re-hook/re-order latitude scoped to x/linkedin", () => {
+    const content = readFileSync(join(skillDir, "references", "spin-mode.md"), "utf8");
+    assert.match(content, /appliesRehook/);
+    assert.match(content, /Lead with the strongest existing line/);
+  });
+});

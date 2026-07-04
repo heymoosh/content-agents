@@ -108,7 +108,7 @@ derivative, the video script, and the video title/description. The short version
      source_lines: [12, 31-33]   # hard-required on verbatim; best-effort (the ideas drawn from) when spin: true
      spin: true             # the default for platforms with a spin_angles entry; omit on --no-spin runs
      angle: x               # the config/platforms.yaml spin_angles key applied; must equal `platform` (see references/spin-mode.md)
-     scores: { native: 4, brand: 5, cta: true }
+     scores: { native: 4, brand: 5, hook: 4, narrative: 3, resonance: 3, cta: true }
      thread_check: pass     # pass | missing — stamped in step 5.5, after scoring
      thread_spin_applied: true   # only present once the step 5.5 fallback redraft ran
      cta: source            # source | <literal-url> | none — stamped from config/cta.yaml (step 4.5)
@@ -125,6 +125,14 @@ derivative, the video script, and the video title/description. The short version
      What stays verbatim with no spin frontmatter: the quote-card DEFINITION line (the image quote),
      community variants, and anything with no `spin_angles` entry. On a `--no-spin` run, skip all of
      this and draft every derivative verbatim.
+   - **X and LinkedIn additionally get the storytelling re-hook/re-order pass** (Muxin,
+     2026-07-04) — still inside the same never-invent guardrail, not a new license: lead with the
+     strongest existing line (drop throat-clearing like "What I described in my essay..."),
+     re-order for a narrative arc instead of a list of facts, and do NOT trim concrete personal
+     specifics that ARE the story. Bluesky and any Notes-sourced derivative (`source_kind:
+     substack-note` in source.md) stay near-verbatim — no extra re-hook/re-order latitude there.
+     See `references/spin-mode.md` for the worked before/after and `appliesRehook()` in
+     `src/atomize/spin.ts` for the platform/source gate.
    - Text derivatives are ALWAYS Claude-authored and extraction-first. Do NOT pass them
      through `text-polish` — that provider (Grok) is reserved for video scripts, which now live
      in the `/video` skill.
@@ -151,8 +159,22 @@ derivative, the video script, and the video title/description. The short version
 5. **Score honestly** (the frontmatter `scores`):
    - `native`: does this read like a real human post on that platform? (1–5)
    - `brand`: does it represent human-centered AI values? (1–5)
+   - `hook`: does the opening line grab attention? (1–5)
+   - `narrative`: is there an arc — a beginning that sets something up and an ending that pays it
+     off — rather than a list of facts? (1–5)
+   - `resonance`: does it state a felt truth people react to? (1–5) This is NOT "does it ask for
+     engagement" — asking for engagement is banned as inauthentic (never ask; engagement is a
+     byproduct of resonance, not a request).
    - `cta`: does it point somewhere useful? (true/false — CTA is optional, not mandatory)
-   - Score 1–2 → discard it yourself rather than queueing junk.
+   - Score 1–2 on native/brand → discard it yourself rather than queueing junk.
+   - **Storytelling is a soft gate, never a hard one.** A derivative scoring `<= 3` on hook,
+     narrative, or resonance still queues — but append `spinPassNote()`'s exact text
+     (`src/atomize/storytelling.ts`, e.g. `flag: spin pass suggested (low: hook, resonance)`) to
+     its review-queue.md `notes` cell (step 8) so Muxin sees it needs a Spin re-hook pass, not a
+     rewrite of the table schema. A high-scoring derivative gets no flag.
+   - **Practical angle and CTA stay conditional, never scored requirements** (Muxin, 2026-06-30
+     DECISION): present them only when genuinely warranted by the source. Never manufacture a
+     takeaway or CTA that isn't there.
 
 5.5. **Home-brand thread-check** (`config/platforms.yaml` `home_brand`; see `docs/thread-check.md`).
    Judge — same inline-judgment pattern as pillar/spin/scores above — whether the derivative
@@ -218,11 +240,16 @@ derivative, the video script, and the video title/description. The short version
 8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset that was
    generated — the routing `include` text platforms, plus ONE `quote-card:<target>` row per routed
    platform for the card (each pointing at the shared `images/quote-card-N.png`, caption from its
-   own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending). Then STOP. Do not publish.
+   own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending). The
+   table schema itself doesn't grow a storytelling column (`native(1-5)` / `brand(1-5)` / `cta` stay
+   as-is — three separate scripts parse that table by fixed column position, see
+   `src/publish/queue.ts`); instead, a derivative flagged by step 5's soft gate gets
+   `spinPassNote()`'s text appended to its row's `notes` cell. Then STOP. Do not publish.
    Tell Muxin: the folder path, asset counts, which platforms routing skipped (and why, per
-   `routing.md`), and anything else skipped. If Muxin wants a skipped platform anyway, they can
-   say so (or adjust `config/routing.yaml`) and you'll generate it. If the piece is a good
-   candidate for a short, mention they can run `/video <folder>`.
+   `routing.md`), any derivative flagged for a Spin pass on storytelling, and anything else
+   skipped. If Muxin wants a skipped platform anyway, they can say so (or adjust
+   `config/routing.yaml`) and you'll generate it. If the piece is a good candidate for a short,
+   mention they can run `/video <folder>`.
 
 ## Mode dispatch
 

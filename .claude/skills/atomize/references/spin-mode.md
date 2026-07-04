@@ -57,3 +57,42 @@ marker, `tag-source` classifies the post `atomized-spin`, and `/strategy`'s `ori
 shows verbatim-atomized vs spin vs organic per platform. If verbatim-vs-spin ever needs
 re-measuring, `--no-spin` runs are the control arm; the original protocol is preserved in
 `docs/spin-experiment.md`.
+
+## Storytelling re-hook/re-order latitude (Muxin, 2026-07-04)
+
+A rubric run against 10 real derivatives (2026-06-30) found native/brand scoring 4-5 while
+storytelling — hook, narrative, resonance (see SKILL.md step 5) — clustered at 2-3. The spin
+latitude to re-angle a hook already existed (guardrail #1 above); it just wasn't being used. This
+extends it, concretely, on the two platforms Muxin asked for:
+
+- **Lead with the strongest existing line.** Cut throat-clearing openers like "What I described
+  in my essay..." or "I've been thinking about...". Open on the sentence that already has the
+  most charge.
+- **Re-order for a narrative arc**, not a list of facts restated in source order.
+- **Never trim concrete personal specifics that ARE the story.** A past mistake this corrects:
+  cutting a real detail (a number, a name, a moment) in favor of generic framing. The specific
+  IS the resonance; keep it even when reordering around it.
+- Still bound by every spin guardrail above: reframe, never invent.
+
+**Scoped to X and LinkedIn only.** `appliesRehook(platform, sourceKind)` in `src/atomize/spin.ts`
+is the gate: true only for `platform` in `{x, linkedin}` AND `sourceKind !== "substack-note"`.
+Bluesky derivatives don't get this pass — Bluesky already works close to verbatim (`docs/spin-experiment.md`).
+Neither does any derivative from a Notes-sourced folder (`source_kind: substack-note`), on ANY
+platform including x/linkedin — a note is already "the whole note is the extract" and near-verbatim
+by design (`references/notes-mode.md`); re-hooking it would fight that.
+
+**Before/after, concrete.** Say the source essay reads (in order): "What I described in my essay
+was a hiring process that looks fair on paper. Then last quarter I watched a manager reject a
+candidate for 'not being a culture fit' three interviews after her resume had already cleared the
+bar twice." A verbatim/pre-rehook X draft keeps that order and the throat-clearing opener — this
+is exactly the shape the eval scored 2-3 on hook/narrative. The re-hooked version leads with the
+charged specific and drops the preamble: "Last quarter I watched a manager reject a candidate for
+'not being a culture fit' — three interviews after her resume had already cleared the bar twice.
+That's what a hiring process that 'looks fair on paper' actually does." Same claim, same specifics
+(the manager, the quarter, "three interviews," the culture-fit line) — reordered and re-hooked, not
+invented.
+
+**The soft gate that motivates this:** a derivative scoring `<= 3` on hook, narrative, or resonance
+(`needsSpinPass()` in `src/atomize/storytelling.ts`) gets `spinPassNote()`'s text appended to its
+review-queue.md `notes` cell — a suggestion to run this pass, never a block. Muxin's `approve` in
+review-queue.md is still the only real gate.
