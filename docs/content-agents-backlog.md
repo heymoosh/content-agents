@@ -57,8 +57,8 @@ Examples - use both Primary and a Secondary CTA
 - Worked OUTSIDE this repo by Muxin. The conductor provides the markdown to paste.
 - Keeps the human-facing run-order guide in sync with the pipeline.
 - STATUS: Backlog
-- DECISION: defer — external; Muxin updates the Obsidian doc outside this repo using the markdown the conductor provides
 - DEPENDS ON: finishing everything else in backlog
+- DECISION: defer — external; Muxin updates the Obsidian doc outside this repo using the markdown the conductor provides
 <!-- card-id: 5e86bf0e-10c6-4f59-8f3c-538596ee5e31 -->
 
 **Landing page**
@@ -85,22 +85,12 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Backlog
 <!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
 
-
-**Automate the analytics download for /cycle (constrained browser agent)**
-- The only manual blocker to an unattended weekly /cycle is hand-downloading the analytics export files before `npm run ingest`.
-- Build a constrained browser agent (Hermes-style) that does ONE narrow job: log into the analytics source(s), follow a fixed path, and download the export files in the exact order/format the ingest step expects — nothing else.
-- This is the first concrete use of a general capability: a browser agent for sites with no usable API. The same pattern later serves Substack (no API) for publishing + listening.
-- Success: /cycle runs start-to-finish (ingest → strategy → atomize → review queue) without Muxin fetching any files.
-- STATUS: Done
-- DONE (2026-07-03): shipped as PR #55 (LinkedIn) + PR #56 (X + Substack). All three platforms auto-pull real per-post analytics via `npm run pull -- <platform>` (saved-session Playwright agent, no stored passwords, src/pull/). X pulls the Analytics > Content "Download CSV"; Substack pulls the writer dashboard JSON API (real per-post views), NOT the email-only data export. Self-triaging with diagnostics bundles.
-<!-- card-id: 0026b615-cc84-483a-8812-496eaf87aa00 -->
-
 **Recurring weekly analytics pull (scheduler — "don't ask me")**
 - Follow-up to 0026b615: the pull capability shipped, but nothing ran it on a schedule — on-demand only. A post gains traction over time, so stats need refreshing on a cadence without Muxin asking.
 - Must run LOCALLY: the saved browser session lives on Muxin's Mac (`~/.content-agents/browser-profiles/`); a claude.ai cloud routine has no session and would hit a login wall. So it's a macOS launchd job, not a cloud routine.
-- STATUS: Review
 - BUILT (2026-07-03): `npm run pull:weekly` (src/cron/weekly-pull.ts) chains `pull -- --ingest` (LinkedIn/X/Substack) + `bluesky` with per-step failure isolation and a loud "session lapsed → pull:login" summary. Ready-to-load LaunchAgent at config/launchd/com.content-agents.weekly-pull.plist (Sunday 07:00 local, before /strategy); 3-command enable in docs/setup-weekly-pull.md. PENDING: Muxin runs the enable (persistent system config — deliberately not auto-installed).
 - CONFIRMED SAFE for weekly re-pull: ingest upserts posts on (platform, platform_post_id) + APPENDS a timestamped metrics snapshot; snapshot.ts/resonance.ts read MAX(captured_at) per post and recency-weight by posted_at → traction refreshes, history kept, no double-count, old posts don't look artificially fresh.
+- STATUS: Review
 <!-- card-id: b2e1c9b6-fe3b-4f2c-8629-f5b5442c783f -->
 
 **Contextual per-platform card captions (a quote never ships out of context)**
@@ -108,25 +98,18 @@ Examples - use both Primary and a Secondary CTA
 - Built: a card is now a bare-quote IMAGE + a spun, CONTEXT-ONLY caption per platform. Rows become `quote-card:<target>` (x/linkedin/bluesky), each sharing `images/quote-card-N.png` with its own `derivatives/quote-card-N-<target>.md` caption (context drawn from the lines AROUND the quote, never the quote itself; spun through the channel angle; extraction-first, source_lines best-effort). The quote / image / animation are unchanged. The `quote-card-N.md` definition derivative keeps the verbatim quote for rendering.
 - ANALYTICS (Muxin's constraint — testing per-platform performance): each platform's card now has a DISTINCT caption = a distinct match key, and cards.ts records the placement under the REAL destination platform with the caption as the key (was the quote) + `fm.spin` → the `| spin` marker. So `tag-source` attributes each card post per platform and classifies it atomized-spin; `origin-compare` measures per-channel card performance. Strictly better than the old shared-quote model.
 - Code: `src/publish/cards.ts` (per-platform posting + caption + bet wiring), +4 tests (52 green). `validate.ts` + `render.ts` UNCHANGED (caption declares `platform:<target>` so it validates as a normal spun text post; render still reads the definition derivative's quote). Skill updated: SKILL.md steps 4/4.5/7/8 + references/spin-mode.md.
-- STATUS: Review
 - STILL TO WIRE (follow-ups): (1) ANIMATED cards — the `.mp4` companion reuses the same per-platform context caption, but /atomize doesn't yet auto-generate the per-platform animated PUBLISH rows (native video via Typefully, `media:` the mp4); small follow-up. (2) card rows don't auto-schedule on GUI Approve yet (still `publish:cards`) — same follow-up as the Unified review GUI card. (3) Notes cards keep the legacy single-caption fan-out (a note is self-contained; no surrounding context to extract).
+- STATUS: Review
 <!-- card-id: a3127104-aa8a-4e4e-a4fe-fe7db245d8d5 -->
-
-**Wire Substack aggregate reach/growth (summary-v2) into the audience table**
-- Follow-up to the analytics-pull work (card 0026b615, PR #56). The per-post Substack pull is live, but the aggregate reach/growth endpoint isn't ingested yet.
-- Source: `GET /api/v1/publish-dashboard/summary-v2?range=365` on the writer dashboard (subscribers, total views, growth). Verified live this session: subs 4→38, views 89→504.
-- Wire it into the `audience` table (like LinkedIn demographics) so `npm run audience` and the strategy brief see real Substack subscriber totals + growth, not just the DB's undercounted per-post rows.
-- Small: the endpoint + auth path are already proven in src/pull/platforms/substack.ts; this adds an aggregate fetch + an audience-row writer.
-- STATUS: Done — PR #71 (merged): summary-v2 wired end-to-end, verified against Muxin's live account (ingest + audience showed substack | 38 | +34, matching the real 4→38 growth).
-<!-- card-id: 0f604c03-5e6c-467e-9bc2-6be45395dd42 -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
 - We auto-publish to X/LinkedIn/Bluesky (Typefully), YouTube, TikTok (PostPeer), and quote cards, but there is NO automation for publishing to Substack. Substack has no usable publishing API (CLAUDE.md rule 3).
 - Build the POST side of the constrained browser agent we already use for analytics pull (src/pull/): drive the saved Substack session to publish or schedule an approved piece, and nothing else.
 - SAFETY (non-negotiable): only acts on content Muxin set to `approve` in review-queue.md (rule 2), and browser posting needs Muxin's explicit go-ahead (rule 3). Never auto-post unreviewed.
-- SCOPE QUESTION for Muxin: what should it publish to Substack? Substack is his HOME/origin where he authors originals, so the likely candidates are scheduling his OWN drafted posts and/or posting Notes, NOT AI-composed essays (extraction-first, rule 1). Decide this before building.
+- SCOPE ANSWERED (Muxin, 2026-07-04): NOTES ONLY. Muxin is good at writing his own essays/posts directly on Substack and wants to keep doing that himself — that stays manual. The actual gap is that Substack isn't part of the unified GUI's automated publishing flow yet; this card closes that gap for Notes.
 - Reuses: the saved-session stealth-Chrome agent + diagnostics from the pull build; the unified scheduler (src/publish/slots.ts) for timing.
 - STATUS: Backlog
+- DECISION: defer — scope answered (Notes only, fold into the unified GUI publishing flow; Muxin keeps writing/scheduling his own essays/posts himself) but deprioritized: a new channel, not part of the content-stack work he wants tackled first. 2026-07-04
 <!-- card-id: 8026f53c-0c52-46a2-aba1-e7e0bd416bdb -->
 
 **Per-channel positioning: one clear angle per platform ("Swizzle")**
@@ -150,12 +133,12 @@ Examples - use both Primary and a Secondary CTA
 - Covers /cycle output now; designed to also hold inbound voice-replies (see Inbound card) once those exist.
 - Overlaps with "Voice Notes to Published" (664189d9) — RESOLVED (Muxin, 2026-06-30): THIS card is the single review/approval surface; 664189d9 re-scoped to the upstream voice-note→/atomize→schedule orchestration that feeds this GUI.
 - EDITING MODEL (Muxin, 2026-06-30; DECIDED): keep the editing room SEPARATE from the GUI — reuse the /story GitHub-PR comment loop (Muxin comments on the exact line the agent wrote; agent makes SURGICAL edits to only that passage, no rehashing the location in chat). The GUI = the one-page dashboard (see everything pending, source-tagged, approve at a glance); items needing iteration live as GitHub PRs. CONVENIENCE (required): for each such item the GUI surfaces a DIRECT DEEP-LINK to the exact GitHub page she needs — the PR, ideally the specific file/line/comment thread — so one click from the dashboard lands her on the right spot, no hunting. Then approve/merge → publish.
-- STATUS: Review
 - BUILT v1 (2026-07-03): `npm run review` → local page (src/review/serve.ts, zero new deps, Node http) aggregating all 21 content/*/review-queue.md. Previews post text / quote-card image / video storyboard inline; surfaces spin + angle + source_lines; Approve / Revise(+note) / Discard write status back through the SAME cell /publish reads (verified byte-clean round-trip — only the status cell changes). Mobile-responsive. Reviewed live with Muxin.
 - DECISIONS (Muxin, 2026-07-03): (1) EDITING MODEL — KEEP inline edit-in-place (supersedes the earlier GitHub-PR-deeplink plan for now; Build-1 derivatives aren't in PRs yet — revisit if they move there). (2) APPROVE BEHAVIOR — Approve → AUTO-SCHEDULE, and it's BUILT for text rows: approving an x/linkedin/bluesky row now calls `publishText(folder, {onlyIds:[id]})` → a real Typefully SCHEDULED draft at the cadence slot → row flips to published; button reads "Approve → schedule"; schedule failures surface in the GUI instead of throwing. Done via a pure refactor of typefully.ts (new exported `publishText`; CLI + notes-daily paths unchanged; 48/48 tests green). Muxin takes the FIRST live Approve→schedule click (outward-facing) to watch it land.
 - SHIPPED SINCE (2026-07-03/04): PR #67 added an "Add / Queue" tab — Muxin can drop a source (pasted text, Obsidian/file path, or Substack URL) or hit "Pull Substack Notes" straight from the GUI; a single-worker job queue runs the real `/atomize` headlessly (`claude -p`, subscription, $0), one at a time, and auto-refreshes the Review tab when a job finishes. This is the GUI's "creating our own content" half — feed the pipeline without leaving the page. PR #68 fixed the video-script row to show the drafted script (`video/script-draft.md`) before the storyboard exists.
 - STILL TO WIRE (follow-ups, this is the "publishing" half that's still manual): (1) cards / tiktok / video auto-schedule from Approve — still requires a separate `/publish` run, unlike text rows which already auto-schedule to Typefully on Approve; (2) origin source-tags ("from /cycle" / "reply to mention" / "from GUI queue"); (3) live Typefully/PostPeer schedule reconciliation in the dashboard (so the GUI reflects what's actually scheduled, not just what was approved).
 - PRIORITY (Muxin, 2026-07-04): next GUI work — wire (1) above (cards/tiktok/video auto-schedule from Approve) so the GUI's Approve action fully covers publishing, not just text. Note: this is a content-agents content-generation-adjacent surface (it triggers /publish, which sends real drafts) — treat per the content-agents generation-hold standing directive if the change touches what gets generated/sent, not just scheduling plumbing.
+- STATUS: Review
 - DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
 <!-- card-id: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9 -->
 
@@ -166,6 +149,7 @@ Examples - use both Primary and a Secondary CTA
 - This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
 - STATUS: Backlog
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
+- DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequence AFTER 87cb6d93 and 8b00ab2e — those are the priority for right now. 2026-07-04
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Growth via borrowed audiences (other people's platforms), not just native social**
@@ -173,6 +157,7 @@ Examples - use both Primary and a Secondary CTA
 - Treat native social (X/LinkedIn/Bluesky) as inbound funnels; Substack is home. Borrowed audiences drive new people toward Substack.
 - Action seed: maintain a target list of podcasts / newsletters / platforms + a pitch angle aligned to the per-channel positioning card.
 - STATUS: Backlog
+- DECISION: defer — stays in Backlog, not now (Muxin, 2026-07-04).
 <!-- card-id: 30772ba1-3c4a-4823-85ad-3a79788ed867 -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
@@ -185,6 +170,7 @@ Examples - use both Primary and a Secondary CTA
 - Relates-to: Landing page (87c86b16, the work-with-me destination) + Smarter routing's work-with-me CTA. Sibling of the platform-finder card (same machinery, different target).
 - SHARED ENGINE (Muxin approved, 2026-06-30): build ONE "fit-finder engine" (profile → source → qualify → surface) ONCE; this card + platform-finder are its two configs (target = clients vs platforms). Don't build two divergent implementations.
 - STATUS: Backlog
+- DECISION: hold — shared fit-finder engine approach already approved 2026-06-30, but needs proper scoping/triage before a worker starts; not urgent right now. 2026-07-04
 <!-- card-id: ba9769af-f171-4f73-a373-2ca2cef5004c -->
 
 **Content agent: find platforms to appear on (podcasts, channels, newsletters)**
@@ -195,6 +181,7 @@ Examples - use both Primary and a Secondary CTA
 - SHARED ENGINE (Muxin approved, 2026-06-30): build ONE "fit-finder engine" (profile → source → qualify → surface) ONCE; client-finder + this card are its two configs (target = clients vs platforms). Don't build two divergent implementations.
 - STATUS: Backlog
 - DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
+- DECISION: hold — same as ba9769af (shared engine, needs scoping); also still blocked on the Swizzle epic dependency. Not urgent right now. 2026-07-04
 <!-- card-id: b7dcb608-4089-4f19-ba5c-df5dc1c75b7c -->
 
 **Minimize model API cost — prefer subscription / free routes over per-token API (retro review + standing policy)**
@@ -205,6 +192,7 @@ Examples - use both Primary and a Secondary CTA
 - Biggest concrete wins to evaluate: (a) video scripts on claude-native instead of grok-openrouter; (b) keep images free/cost-first, escalate only on request (already the policy); (c) confirm all Claude work routes through the harness subscription, not an Anthropic API key.
 - Applies to simple-kanban builds too ("all builds") — same policy belongs in the conductor config via the claude-config lane (handoff; that conductor is live).
 - STATUS: Backlog
+- DECISION: defer — deprioritized, not high priority right now. Keep in Backlog. Flag when picked up: part of its scope touches the shared ~/.claude conductor config (cross-repo blast radius). 2026-07-04
 <!-- card-id: a1a6f379-556f-4e46-83a8-5e70fbd3c2b4 -->
 
 **Strong storytelling for social posts (hooks, narrative, practical angle) — eval current + design approach**
@@ -219,6 +207,7 @@ Examples - use both Primary and a Secondary CTA
 - Key files: /atomize SKILL.md scoring (~lines 129-133), docs/spin-experiment.md (guardrail #1), config/voice.yaml.
 - STATUS: Backlog
 - DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
+- DECISION: approved — PRIORITY 2 (Muxin, 2026-07-04): work this second, right after 87cb6d93. Shapes how generated content is scored/hooked, so it holds for PR review per the content-generation standing directive.
 <!-- card-id: 8b00ab2e-31e4-4fe0-a1da-4d5ce9616ae1 -->
 
 **Create the claude.ai Routine for notes-daily (manual UI step)**
@@ -229,18 +218,6 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Backlog
 <!-- card-id: bd499018-a6fa-46a2-a419-cd5ed01139fd -->
 
-**Promote Spin from opt-in experiment to always-on default, driven by the approved per-channel angles**
-- Spin (docs/spin-experiment.md, /atomize --spin) already does platform reframing but is opt-in; per the goal card's stated scope, promote it to an always-on default for every publish — no --spin flag needed.
-- Encode the four APPROVED angles (Muxin, 2026-06-30) into config/platforms.yaml: X = voice of the non-engineer outside the SV tech bubble; LinkedIn = critiques business innovation broadly (how corporate norms strangle creative innovation); Substack = builder-philosopher (real AI risk is unexamined human systems, not the machine); Bluesky = the PM who treats democracy as broken UX + AI as making the fairness gap unignorable.
-- Publishing logic reads this channel→audience→angle map and enforces/surfaces it per platform at publish time, per the card.
-- Never invents new content streams — reframes what Muxin would already write, per her existing Obsidian content-ideas and config/pillars.yaml.
-- GOAL_CONDITION: Running /atomize with no --spin flag applies platform-specific angle reframing to all four channels (X, LinkedIn, Substack, Bluesky) by default; config/platforms.yaml contains the four 2026-06-30 approved angle statements verbatim.
-- ORIGIN: proposed by propose-cards 2026-07-02 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
-- STATUS: Done
-- DONE (2026-07-03): shipped as PR #54 (main 417d273). Spin is now the always-on default for every /atomize run; the four approved angles are encoded in config/platforms.yaml spin_angles; --no-spin is the opt-out; validate.ts enforces angle↔platform match. Reviewed live with Muxin (X/LinkedIn/Bluesky samples on "Building an Innovation Nation") before merge; review-queue approval gate unchanged.
-- GROOMED: 2026-07-02 pre-flight groom: decomposes the Swizzle epic's own stated scope (promote Spin to always-on default); four angles approved by Muxin 2026-06-30 verbatim in epic; verifiable GOAL_CONDITION present
-<!-- card-id: 33aa10f8-9b90-4e0c-8e4a-515432851926 -->
-
 **Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing**
 - Per the card's THREAD CHECK: every published piece must carry a visible thread back to the home-brand worldview — "I uncover harmful hidden beliefs and why they need to change before AI automates everything" (and the fuller unexamined-human-systems / who-benefits / building-the-right-thing statement behind it).
 - Operational test is NOT "is this about AI" — it's whether the piece connects back to that worldview; add this as an explicit check run before a piece reaches Muxin's review queue.
@@ -249,22 +226,80 @@ Examples - use both Primary and a Secondary CTA
 - GOAL_CONDITION: Each piece reaching Muxin's review queue carries a thread-check result (pass/missing) against the home-brand worldview line; any piece flagged missing already has a Spin-drafted thread inserted before Muxin sees it, and no piece is blocked from publishing solely due to a missing/failing check.
 - ORIGIN: proposed by propose-cards 2026-07-02 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
 - STATUS: Backlog
+- DECISION: approved — PRIORITY 1 (Muxin, 2026-07-04): work this first. Touches generated content (Spin auto-draft), so it holds for PR review per the content-generation standing directive regardless of this approval-to-build.
 <!-- card-id: 87cb6d93-5e6f-405f-9188-99c9d96434e2 -->
+
+**"Hit record" on-camera video as a first-class media type (auto-topic, auto-route, delete source)**
+- New input: Muxin records a raw talking-head / selfie video ("hit record", say a thing, stop) and drops it in. No script, no storyboard — this is the fast, human, face-to-camera lane, DISTINCT from /video (essay → scripted short) and from Voice Notes to Published (664189d9, audio → text).
+- AUTO-DETECT TOPIC from the recording itself: transcribe (existing transcription provider in config/providers.yaml) → classify pillar + topic (config/pillars.yaml rubric) → drive routing (route.ts) so it lands on the right platform(s) with no manual tagging.
+- PUBLISH natively where video performs (TikTok, YouTube Shorts, X, LinkedIn, Bluesky all accept native vertical video); optionally atomize a text post + quote card from the transcript so one recording fans out. Nothing auto-posts — review-queue.md approval still governs (rule 2).
+- DELETE the raw recording after it's live: once published, remove the source video file (no storage bloat). KEEP the published-asset reference + metadata + transcript, NOT the raw footage.
+- TRACK media_type (e.g. 'talking-head') in analytics — the media_type dimension already exists (PR #44/#46); this adds a new value so we learn which platforms engage with face-to-camera vs quote cards vs scripted shorts. Feeds "Keeping track of what we've posted... in what format" (b5897047).
+- Reuses: transcription (gemini), routing, unified scheduler + reuse guard, publish adapters (PostPeer / YouTube / Typefully). Same "drop raw input → auto-atomize → approve → schedule" orchestration as Voice Notes to Published (664189d9) and the Unified review GUI (a4a2ce27).
+- OPEN QUESTIONS for Muxin: (1) publish the raw clip as-is, or add captions / light edit first? (2) which platforms are in-scope for native video by default? (3) delete immediately on publish, or after a short grace window / archive elsewhere first?
+- STATUS: Backlog
+- DECISION: defer — deprioritized, lower priority, new media type. Keep in Backlog. 2026-07-04
+<!-- card-id: b0e4ecc5-6120-4b40-a6dd-859c34ca332a -->
+
+**Guard the review GUI: don't allow Approve on a storyboard/video row with no rendered file**
+- The review GUI (`src/review/serve.ts`) writes `approve` straight into review-queue.md on any row's Approve click. A `video-script` / `storyboard`-type row can be approved even when its storyboard/video file doesn't exist yet (asset cell is `—`), producing a phantom approval that means nothing to `/publish` and reads as an unauthorized edit.
+- Observed 2026-07-04 (during repo sync): the innovation-nation `video-script` row was found flipped `blocked → approve` in the working tree with no storyboard file present — an uncommitted, unauthorized-looking edit traced back to a GUI Approve click on a not-yet-rendered row.
+- Fix: in `serve.ts`, guard the Approve action for storyboard/video rows whose asset file is missing (cell `—` / not on disk) — disable the button or reject the write, and surface why ("storyboard not rendered yet — run /video"). Text / image / quote-card rows unaffected. Small, local to `src/review/serve.ts`; no schema change.
+- ORIGIN: filed 2026-07-04 from the phantom-approve found during repo sync.
+- STATUS: Backlog
+<!-- card-id: 4bef9a7c-9148-4c59-afcf-04475ea11ff5 -->
+
+**Wire cards/TikTok/video auto-schedule into GUI Approve**
+- Card a4a2ce27 (Unified review + approval GUI) flagged this as the explicit next-priority follow-up (2026-07-04): text rows already auto-schedule to Typefully on Approve via publishText (src/review/serve.ts /api/status handler, SCHEDULABLE set currently only x/linkedin/bluesky), but card/tiktok/video rows fall through to a plain approve status update and still require a separate manual /publish run.
+- Extend the same Approve handler so card rows call the existing src/publish/cards.ts scheduling path, tiktok rows call src/publish/tiktok.ts scheduleToTikTok, and video rows call src/publish/youtube.ts's scheduled-upload path -- mirroring the try/catch + scheduleError pattern already used for text so a failure leaves the row at approve with a visible reason instead of silently losing it.
+- Per the epic's own note: this triggers real sends (PostPeer/Upload-Post/YouTube), so treat it under the content-agents generation-hold standing directive if the change touches what gets sent, not just scheduling plumbing.
+- Out of scope (separate, not yet filed): origin source-tags and live Typefully/PostPeer schedule reconciliation in the dashboard -- both listed in the same epic as separate still-to-wire items.
+- GOAL_CONDITION: Approving a card, tiktok, or video row in the review GUI results in the same content folder's row being scheduled via its platform's existing publish function (cards.ts / tiktok.ts / youtube.ts) with no separate /publish invocation required -- verified by an Approve action producing a scheduled draft/post (or a visible scheduleError on the row) for at least one row of each of the three row types.
+- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
+- STATUS: To Do
+- DECISION: approved — build approach confirmed (each platform schedules through its own existing path: cards.ts/tiktok.ts/youtube.ts, not the text scheduler). Sequence AFTER 87cb6d93 and 8b00ab2e — those are the priority for right now. 2026-07-04
+- GROOMED: ready: clear outcome (wire cards/tiktok/video auto-schedule into GUI Approve), specific files named (serve.ts, cards.ts, tiktok.ts, youtube.ts), stateable GOAL_CONDITION already on the card, no dependency overlaps found + 2026-07-04
+<!-- card-id: d8a990a9-ffcd-46b6-849f-fcebf62e0ab6 -->
+
+**Wire Substack aggregate reach/growth (summary-v2) into the audience table**
+- Follow-up to the analytics-pull work (card 0026b615, PR #56). The per-post Substack pull is live, but the aggregate reach/growth endpoint isn't ingested yet.
+- Source: `GET /api/v1/publish-dashboard/summary-v2?range=365` on the writer dashboard (subscribers, total views, growth). Verified live this session: subs 4→38, views 89→504.
+- Wire it into the `audience` table (like LinkedIn demographics) so `npm run audience` and the strategy brief see real Substack subscriber totals + growth, not just the DB's undercounted per-post rows.
+- Small: the endpoint + auth path are already proven in src/pull/platforms/substack.ts; this adds an aggregate fetch + an audience-row writer.
+- DONE (2026-07-04): shipped as PR #71 (merged) — summary-v2 wired end-to-end, verified against Muxin's live account (ingest + audience showed substack | 38 | +34, matching the real 4→38 growth).
+- STATUS: Done
+<!-- card-id: 0f604c03-5e6c-467e-9bc2-6be45395dd42 -->
 
 **Retire stale spin-experiment prose in /strategy skill**
 - .claude/skills/strategy/SKILL.md still tells /strategy to surface 'SPIN BASELINE READY / time to run /atomize --spin' when origin-compare says the verbatim baseline is ready. Spin is now the default, so that call-to-action is obsolete; reword to report verbatim-vs-spin-vs-organic and suggest --no-spin control runs instead.
 - Discovered while building card 33aa10f8 (Promote Spin to always-on default).
 - CHAIN: 1
-- STATUS: Done — PR #70 (merged): origin-compare.ts and the /strategy skill now report verbatim-vs-spin-vs-organic and nudge occasional --no-spin control runs instead of the old spin-readiness language.
+- DONE (2026-07-04): shipped as PR #70 (merged) — origin-compare.ts and the /strategy skill now report verbatim-vs-spin-vs-organic and nudge occasional --no-spin control runs instead of the old spin-readiness language.
+- STATUS: Done
 - DEPENDS ON: Promote Spin from opt-in experiment to always-on default, driven by the approved per-channel angles
 <!-- card-id: 2eb4ea51-3845-4d99-9501-2dbd9ac4548a -->
 
-**Wire --no-spin through any atomize argument parsing scripts**
-- isSpinDefault exists in src/atomize/spin.ts but the atomize skill is prose-driven; if any script (new-content, validate CLI) later grows flag parsing, thread --no-spin through it so the opt-out is machine-enforced, not just skill-prose.
-- Discovered while building card 33aa10f8 (Promote Spin to always-on default).
-- CHAIN: 1
-- STATUS: Backlog
-<!-- card-id: 3c0d1956-9fcf-440f-86e8-de112e7c4d83 -->
+**Automate the analytics download for /cycle (constrained browser agent)**
+- The only manual blocker to an unattended weekly /cycle is hand-downloading the analytics export files before `npm run ingest`.
+- Build a constrained browser agent (Hermes-style) that does ONE narrow job: log into the analytics source(s), follow a fixed path, and download the export files in the exact order/format the ingest step expects — nothing else.
+- This is the first concrete use of a general capability: a browser agent for sites with no usable API. The same pattern later serves Substack (no API) for publishing + listening.
+- Success: /cycle runs start-to-finish (ingest → strategy → atomize → review queue) without Muxin fetching any files.
+- DONE (2026-07-03): shipped as PR #55 (LinkedIn) + PR #56 (X + Substack). All three platforms auto-pull real per-post analytics via `npm run pull -- <platform>` (saved-session Playwright agent, no stored passwords, src/pull/). X pulls the Analytics > Content "Download CSV"; Substack pulls the writer dashboard JSON API (real per-post views), NOT the email-only data export. Self-triaging with diagnostics bundles.
+- STATUS: Done
+<!-- card-id: 0026b615-cc84-483a-8812-496eaf87aa00 -->
+
+**Promote Spin from opt-in experiment to always-on default, driven by the approved per-channel angles**
+- Spin (docs/spin-experiment.md, /atomize --spin) already does platform reframing but is opt-in; per the goal card's stated scope, promote it to an always-on default for every publish — no --spin flag needed.
+- Encode the four APPROVED angles (Muxin, 2026-06-30) into config/platforms.yaml: X = voice of the non-engineer outside the SV tech bubble; LinkedIn = critiques business innovation broadly (how corporate norms strangle creative innovation); Substack = builder-philosopher (real AI risk is unexamined human systems, not the machine); Bluesky = the PM who treats democracy as broken UX + AI as making the fairness gap unignorable.
+- Publishing logic reads this channel→audience→angle map and enforces/surfaces it per platform at publish time, per the card.
+- Never invents new content streams — reframes what Muxin would already write, per her existing Obsidian content-ideas and config/pillars.yaml.
+- GOAL_CONDITION: Running /atomize with no --spin flag applies platform-specific angle reframing to all four channels (X, LinkedIn, Substack, Bluesky) by default; config/platforms.yaml contains the four 2026-06-30 approved angle statements verbatim.
+- ORIGIN: proposed by propose-cards 2026-07-02 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
+- DONE (2026-07-03): shipped as PR #54 (main 417d273). Spin is now the always-on default for every /atomize run; the four approved angles are encoded in config/platforms.yaml spin_angles; --no-spin is the opt-out; validate.ts enforces angle↔platform match. Reviewed live with Muxin (X/LinkedIn/Bluesky samples on "Building an Innovation Nation") before merge; review-queue approval gate unchanged.
+- STATUS: Done
+- GROOMED: 2026-07-02 pre-flight groom: decomposes the Swizzle epic's own stated scope (promote Spin to always-on default); four angles approved by Muxin 2026-06-30 verbatim in epic; verifiable GOAL_CONDITION present
+<!-- card-id: 33aa10f8-9b90-4e0c-8e4a-515432851926 -->
 
 **Let fresh worktrees run the test suite (node_modules)**
 - - Tests cannot run inside a freshly created worktree (no node_modules); the audit ran them from the main checkout instead.
@@ -278,22 +313,3 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Done
 - DECISION: approved — cloud routine. CODE COMPLETE + MERGED in PR #52 (main 74eaa3a): src/cron/notes-daily.ts + committed dedup ledger data/notes-spread-ledger.jsonl + typefully --no-schedule UNSCHEDULED-draft mode; 27/27 tests, typecheck clean; nothing auto-posts. PARKED awaiting Muxin: do the ~5-min claude.ai setup in docs/setup-cloud-routine.md (connect repo; add secrets SUBSTACK_HANDLE + TYPEFULLY_API_KEY; create daily routine running npm run notes-daily then commit/push ledger). SMOKE-TEST the first real run: confirm drafts land in Typefully DRAFTS (unscheduled), not Scheduled (follow-up card 2972c204). Worktree wt-cron-notes-cloud kept until this is Done. Mark Done once routine is live + first run verified.
 <!-- card-id: f26bf827-2833-43ec-b5dc-3c62da0ab3e5 -->
-
-**"Hit record" on-camera video as a first-class media type (auto-topic, auto-route, delete source)**
-- New input: Muxin records a raw talking-head / selfie video ("hit record", say a thing, stop) and drops it in. No script, no storyboard — this is the fast, human, face-to-camera lane, DISTINCT from /video (essay → scripted short) and from Voice Notes to Published (664189d9, audio → text).
-- AUTO-DETECT TOPIC from the recording itself: transcribe (existing transcription provider in config/providers.yaml) → classify pillar + topic (config/pillars.yaml rubric) → drive routing (route.ts) so it lands on the right platform(s) with no manual tagging.
-- PUBLISH natively where video performs (TikTok, YouTube Shorts, X, LinkedIn, Bluesky all accept native vertical video); optionally atomize a text post + quote card from the transcript so one recording fans out. Nothing auto-posts — review-queue.md approval still governs (rule 2).
-- DELETE the raw recording after it's live: once published, remove the source video file (no storage bloat). KEEP the published-asset reference + metadata + transcript, NOT the raw footage.
-- TRACK media_type (e.g. 'talking-head') in analytics — the media_type dimension already exists (PR #44/#46); this adds a new value so we learn which platforms engage with face-to-camera vs quote cards vs scripted shorts. Feeds "Keeping track of what we've posted... in what format" (b5897047).
-- Reuses: transcription (gemini), routing, unified scheduler + reuse guard, publish adapters (PostPeer / YouTube / Typefully). Same "drop raw input → auto-atomize → approve → schedule" orchestration as Voice Notes to Published (664189d9) and the Unified review GUI (a4a2ce27).
-- OPEN QUESTIONS for Muxin: (1) publish the raw clip as-is, or add captions / light edit first? (2) which platforms are in-scope for native video by default? (3) delete immediately on publish, or after a short grace window / archive elsewhere first?
-- STATUS: Backlog
-<!-- card-id: b0e4ecc5-6120-4b40-a6dd-859c34ca332a -->
-
-**Guard the review GUI: don't allow Approve on a storyboard/video row with no rendered file**
-- The review GUI (`src/review/serve.ts`) writes `approve` straight into review-queue.md on any row's Approve click. A `video-script` / `storyboard`-type row can be approved even when its storyboard/video file doesn't exist yet (asset cell is `—`), producing a phantom approval that means nothing to `/publish` and reads as an unauthorized edit.
-- Observed 2026-07-04 (during repo sync): the innovation-nation `video-script` row was found flipped `blocked → approve` in the working tree with no storyboard file present — an uncommitted, unauthorized-looking edit traced back to a GUI Approve click on a not-yet-rendered row.
-- Fix: in `serve.ts`, guard the Approve action for storyboard/video rows whose asset file is missing (cell `—` / not on disk) — disable the button or reject the write, and surface why ("storyboard not rendered yet — run /video"). Text / image / quote-card rows unaffected. Small, local to `src/review/serve.ts`; no schema change.
-- ORIGIN: filed 2026-07-04 from the phantom-approve found during repo sync.
-- STATUS: Backlog
-<!-- card-id: 4bef9a7c-9148-4c59-afcf-04475ea11ff5 -->
