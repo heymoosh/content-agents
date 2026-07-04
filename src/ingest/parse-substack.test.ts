@@ -14,46 +14,50 @@ describe("isSubstackSummaryFile", () => {
   });
 });
 
+// Real payload confirmed 2026-07-04 against Muxin's live account (subs 4->38, views 89->504):
+//   { totalSubscribersEnd, totalSubscribersStart, paidSubscribersEnd, paidSubscribersStart,
+//     arrEnd, arrStart, totalViewsEnd, totalViewsStart, pledgedArrEnd, pledgedArrStart }
+const REAL_PAYLOAD = {
+  totalSubscribersEnd: 38,
+  totalSubscribersStart: 4,
+  paidSubscribersEnd: 0,
+  paidSubscribersStart: 0,
+  arrEnd: 0,
+  arrStart: 0,
+  totalViewsEnd: 504,
+  totalViewsStart: 89,
+  pledgedArrEnd: 0,
+  pledgedArrStart: 0,
+};
+
 describe("parseSubstackSummary", () => {
-  test("extracts the subscriber total into a follower_total audience row", () => {
-    const rows = parseSubstackSummary("substack-summary.json", JSON.stringify({ subscriberCount: 38 }));
-    assert.equal(rows.length, 1);
-    const r = rows[0];
-    assert.equal(r.platform, "substack");
-    assert.equal(r.metricType, "follower_total");
-    assert.equal(r.valueCount, 38);
-    assert.equal(r.dimension, null);
-  });
-
-  test("finds the subscriber count even when nested, and preserves views + raw payload", () => {
-    const payload = { stats: { totalViews: 504, subscribers: 38 }, meta: { range: 365 } };
-    const rows = parseSubstackSummary("substack-summary.json", JSON.stringify(payload));
+  test("extracts the subscriber total into a follower_total row, and growth into follower_delta", () => {
+    const rows = parseSubstackSummary("substack-summary.json", JSON.stringify(REAL_PAYLOAD));
+    assert.equal(rows.length, 2);
     const total = rows.find((r) => r.metricType === "follower_total")!;
+    assert.equal(total.platform, "substack");
     assert.equal(total.valueCount, 38);
-    assert.equal(total.raw._totalViews, 504);
-    // Entire payload is preserved for provenance / future fields.
-    assert.deepEqual((total.raw as any).meta, { range: 365 });
+    assert.equal(total.dimension, null);
+    const delta = rows.find((r) => r.metricType === "follower_delta")!;
+    assert.equal(delta.valueCount, 34); // 38 - 4
   });
 
-  test("emits a follower_delta row when the payload exposes growth directly", () => {
-    const rows = parseSubstackSummary(
-      "substack-summary.json",
-      JSON.stringify({ subscriberCount: 38, subscriberGrowth: 34 })
-    );
-    const delta = rows.find((r) => r.metricType === "follower_delta");
-    assert.ok(delta, "expected a follower_delta row");
-    assert.equal(delta!.valueCount, 34);
+  test("preserves the entire raw payload on the follower_total row (paid/ARR/views, for provenance)", () => {
+    const rows = parseSubstackSummary("substack-summary.json", JSON.stringify(REAL_PAYLOAD));
+    const total = rows.find((r) => r.metricType === "follower_total")!;
+    assert.deepEqual(total.raw, REAL_PAYLOAD);
   });
 
-  test("no growth key -> only the follower_total row (growth accrues via snapshots instead)", () => {
-    const rows = parseSubstackSummary("substack-summary.json", JSON.stringify({ subscriberCount: 38 }));
-    assert.equal(rows.filter((r) => r.metricType === "follower_delta").length, 0);
+  test("no totalSubscribersStart -> only the follower_total row (growth accrues via snapshots instead)", () => {
+    const rows = parseSubstackSummary("substack-summary.json", JSON.stringify({ totalSubscribersEnd: 38 }));
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].metricType, "follower_total");
   });
 
-  test("throws a clear ParseError when no subscriber-like key is present", () => {
+  test("throws a clear ParseError when totalSubscribersEnd is missing", () => {
     assert.throws(
-      () => parseSubstackSummary("substack-summary.json", JSON.stringify({ nothing: 1 })),
-      /no subscriber total found/
+      () => parseSubstackSummary("substack-summary.json", JSON.stringify({ totalViewsEnd: 504 })),
+      /no "totalSubscribersEnd" number found/
     );
   });
 
