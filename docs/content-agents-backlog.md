@@ -256,6 +256,19 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Backlog
 <!-- card-id: 1eda54e7-8e11-4e91-ab2d-f3c762542d88 -->
 
+**Periodically refresh the per-channel X-for-Y angles from Muxin's Obsidian content-ideas (surface drift, never auto-overwrite approved angles)**
+- Traces to the epic's STEP bullet: "run through Muxin's EXISTING Obsidian content-ideas to DERIVE (and periodically refresh) the X-for-Y angle per channel — the pipeline consults these, it does NOT invent new content streams." The one-time derivation is Done (33aa10f8 encoded the four 2026-06-30 approved angles verbatim into config/platforms.yaml); what's still unbuilt is the refresh loop that keeps those angles honest to what Muxin is actually writing.
+- Add an on-demand refresh step (fits the existing /strategy or /cycle pass — "periodically" = each strategy run, not a newly-invented timer) that reads the current Obsidian content-ideas plus config/pillars.yaml and re-derives a candidate X-for-Y angle per channel (X / LinkedIn / Substack / Bluesky).
+- Compare each freshly-derived candidate against the encoded approved angle in config/platforms.yaml (spin_angles) and surface only the divergences for Muxin — matching the epic's stated posture that angles change only on Muxin's explicit approval (the four angles were APPROVED 2026-06-30) and that the pipeline never invents new content streams, only reframes what she'd already write.
+- Surface/suggest only: the step makes zero writes to config/platforms.yaml; an angle changes solely when Muxin approves the suggested refinement. Mirrors the "surface, never hard-block" posture used for the home-brand thread check (87cb6d93).
+- Out of scope: rewording the four approved angle statements themselves, and the home-brand THREAD CHECK (already filed as 87cb6d93).
+- GOAL_CONDITION: Running the refresh step reads the current Obsidian content-ideas plus config/pillars.yaml and emits a per-channel report (X, LinkedIn, Substack, Bluesky) comparing a freshly-derived candidate angle against the encoded approved angle in config/platforms.yaml. Before: angle drift can only be caught by Muxin manually re-reading. After: any divergence is flagged for Muxin's re-approval and the step makes zero writes to config/platforms.yaml (the four approved angles change only on Muxin's explicit approval).
+- PARENT: d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
+- STATUS: To Do
+- GROOMED: ready — clear scope (surface-only drift report, zero writes to platforms.yaml), stateable GOAL_CONDITION, no dependency overlaps + 2026-07-04
+<!-- card-id: 8ba83a4c-0903-4103-93cf-a7abea7ea99c -->
+
 **Smoke-test the notes-daily cloud routine on its first real run**
 - SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies at all. notes-daily drafts NOTHING now: it only fetches new Substack Notes and marks them seen in the ledger. Real per-platform drafting (Spin's per-channel reframing) needs genuine Claude judgment, which only runs locally (the review GUI's "Pull Substack Notes" button, `claude -p "/atomize notes"`, $0 on the subscription) — a GitHub Actions runner has no Claude Code session, so the cloud job stays deliberately dumb.
 - NEW test: confirm the first real cloud run (a) opens a PR that only touches data/notes-spread-ledger.jsonl (no content/ folders at all), (b) the ledger update means the same notes aren't re-flagged tomorrow, and (c) running "Pull Substack Notes" locally still drafts fresh (it doesn't consult this ledger, so nothing here blocks it).
