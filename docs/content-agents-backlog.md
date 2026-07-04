@@ -57,7 +57,6 @@ Examples - use both Primary and a Secondary CTA
 - Worked OUTSIDE this repo by Muxin. The conductor provides the markdown to paste.
 - Keeps the human-facing run-order guide in sync with the pipeline.
 - STATUS: Backlog
-- DEPENDS ON: finishing everything else in backlog
 - DECISION: defer — external; Muxin updates the Obsidian doc outside this repo using the markdown the conductor provides
 <!-- card-id: 5e86bf0e-10c6-4f59-8f3c-538596ee5e31 -->
 
@@ -69,14 +68,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer — external; built outside this repo. Mark Done when the landing page is live to unblock Smarter routing
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
-**Smoke-test the notes-daily cloud routine on its first real run**
-- SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies at all. notes-daily drafts NOTHING now: it only fetches new Substack Notes and marks them seen in the ledger. Real per-platform drafting (Spin's per-channel reframing) needs genuine Claude judgment, which only runs locally (the review GUI's "Pull Substack Notes" button, `claude -p "/atomize notes"`, $0 on the subscription) — a GitHub Actions runner has no Claude Code session, so the cloud job stays deliberately dumb.
-- NEW test: confirm the first real cloud run (a) opens a PR that only touches data/notes-spread-ledger.jsonl (no content/ folders at all), (b) the ledger update means the same notes aren't re-flagged tomorrow, and (c) running "Pull Substack Notes" locally still drafts fresh (it doesn't consult this ledger, so nothing here blocks it).
-- RESOLVED (2026-07-04): replaced the claude.ai Routine with `.github/workflows/notes-daily.yml` on GitHub Actions (see bd499018) — works regardless of whether Muxin's Mac is on. The 4 repo secrets are set; unparking this card now that the routine-creation blocker no longer applies.
-- STATUS: To Do
-- GROOMED: 2026-07-02 conductor re-groom: read-only verification probe of notes-daily drafts (unscheduled contract), unblocked by PR #52; fix path is an ordinary code change
-<!-- card-id: 2972c204-ca9e-4799-ae8f-b8fc71bddcde -->
-
 **Add LinkedIn to the notes-daily spread platforms**
 - STALE REFERENCE (2026-07-04): notes-daily.ts no longer has a SPREAD_PLATFORMS list at all — it doesn't draft anything anymore (see the content-generation-review fix, same date). Real per-note platform selection now happens locally via `/atomize notes` (`.claude/skills/atomize/references/notes-mode.md`), which routes through the normal `config/routing.yaml` per-pillar logic like any other piece, not a notes-specific hardcoded list.
 - Add 'linkedin' if Muxin wants longer / essay-like notes echoed there.
@@ -84,23 +75,6 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Backlog
 - DECISION: approved — LinkedIn gets the SAME platform-fit test the other spread platforms already use, not a blanket add: if a note is a good fit for a platform, it spreads there, and that rule now includes LinkedIn too (Muxin, 2026-07-04). Check whether config/routing.yaml already covers this for notes, or needs a small adjustment there.
 <!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
-
-**Recurring weekly analytics pull (scheduler — "don't ask me")**
-- Follow-up to 0026b615: the pull capability shipped, but nothing ran it on a schedule — on-demand only. A post gains traction over time, so stats need refreshing on a cadence without Muxin asking.
-- Must run LOCALLY: the saved browser session lives on Muxin's Mac (`~/.content-agents/browser-profiles/`); a claude.ai cloud routine has no session and would hit a login wall. So it's a macOS launchd job, not a cloud routine.
-- BUILT (2026-07-03): `npm run pull:weekly` (src/cron/weekly-pull.ts) chains `pull -- --ingest` (LinkedIn/X/Substack) + `bluesky` with per-step failure isolation and a loud "session lapsed → pull:login" summary. Ready-to-load LaunchAgent at config/launchd/com.content-agents.weekly-pull.plist (Sunday 07:00 local, before /strategy); 3-command enable in docs/setup-weekly-pull.md. PENDING: Muxin runs the enable (persistent system config — deliberately not auto-installed).
-- CONFIRMED SAFE for weekly re-pull: ingest upserts posts on (platform, platform_post_id) + APPENDS a timestamped metrics snapshot; snapshot.ts/resonance.ts read MAX(captured_at) per post and recency-weight by posted_at → traction refreshes, history kept, no double-count, old posts don't look artificially fresh.
-- STATUS: Review
-<!-- card-id: b2e1c9b6-fe3b-4f2c-8629-f5b5442c783f -->
-
-**Contextual per-platform card captions (a quote never ships out of context)**
-- Problem (Muxin, 2026-07-03): a quote card posted alone was the quote as an image + the same quote repeated as the caption — no anchor, easy to misread / dunk on out of context.
-- Built: a card is now a bare-quote IMAGE + a spun, CONTEXT-ONLY caption per platform. Rows become `quote-card:<target>` (x/linkedin/bluesky), each sharing `images/quote-card-N.png` with its own `derivatives/quote-card-N-<target>.md` caption (context drawn from the lines AROUND the quote, never the quote itself; spun through the channel angle; extraction-first, source_lines best-effort). The quote / image / animation are unchanged. The `quote-card-N.md` definition derivative keeps the verbatim quote for rendering.
-- ANALYTICS (Muxin's constraint — testing per-platform performance): each platform's card now has a DISTINCT caption = a distinct match key, and cards.ts records the placement under the REAL destination platform with the caption as the key (was the quote) + `fm.spin` → the `| spin` marker. So `tag-source` attributes each card post per platform and classifies it atomized-spin; `origin-compare` measures per-channel card performance. Strictly better than the old shared-quote model.
-- Code: `src/publish/cards.ts` (per-platform posting + caption + bet wiring), +4 tests (52 green). `validate.ts` + `render.ts` UNCHANGED (caption declares `platform:<target>` so it validates as a normal spun text post; render still reads the definition derivative's quote). Skill updated: SKILL.md steps 4/4.5/7/8 + references/spin-mode.md.
-- STILL TO WIRE (follow-ups): (1) ANIMATED cards — the `.mp4` companion reuses the same per-platform context caption, but /atomize doesn't yet auto-generate the per-platform animated PUBLISH rows (native video via Typefully, `media:` the mp4); small follow-up. (2) card rows don't auto-schedule on GUI Approve yet (still `publish:cards`) — same follow-up as the Unified review GUI card. (3) Notes cards keep the legacy single-caption fan-out (a note is self-contained; no surrounding context to extract).
-- STATUS: Review
-<!-- card-id: a3127104-aa8a-4e4e-a4fe-fe7db245d8d5 -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
 - We auto-publish to X/LinkedIn/Bluesky (Typefully), YouTube, TikTok (PostPeer), and quote cards, but there is NO automation for publishing to Substack. Substack has no usable publishing API (CLAUDE.md rule 3).
@@ -126,21 +100,6 @@ Examples - use both Primary and a Secondary CTA
 - THREAD CHECK (Muxin, 2026-06-30): Muxin won't always remember to include the thread, so the agent must CHECK every piece carries it at review time. Operational test: does the piece connect back to the HOME BRAND worldview (unexamined human systems we're automating / who benefits / building the right thing)? The AI lens is ONE facet of that home brand, not the whole test — do NOT reduce it to "is this about AI." If the thread is missing from a note/essay, Spin DRAFTS it in, then iterate with Muxin until it feels right via the GH editing loop (see the Unified review GUI card). Surface/suggest, never hard-block.
 - STATUS: Backlog
 <!-- card-id: d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4 -->
-
-**Unified review + approval GUI (one page for everything awaiting Muxin)**
-- Replace opening multiple windows + hand-editing review-queue.md. One web page shows everything pending review in one place.
-- Each item is source-tagged ("from /cycle", "reply to <comment/mention>", etc.), inline-editable, with one Approve action that then schedules/sends it on the right platform at the right cadence.
-- Covers /cycle output now; designed to also hold inbound voice-replies (see Inbound card) once those exist.
-- Overlaps with "Voice Notes to Published" (664189d9) — RESOLVED (Muxin, 2026-06-30): THIS card is the single review/approval surface; 664189d9 re-scoped to the upstream voice-note→/atomize→schedule orchestration that feeds this GUI.
-- EDITING MODEL (Muxin, 2026-06-30; DECIDED): keep the editing room SEPARATE from the GUI — reuse the /story GitHub-PR comment loop (Muxin comments on the exact line the agent wrote; agent makes SURGICAL edits to only that passage, no rehashing the location in chat). The GUI = the one-page dashboard (see everything pending, source-tagged, approve at a glance); items needing iteration live as GitHub PRs. CONVENIENCE (required): for each such item the GUI surfaces a DIRECT DEEP-LINK to the exact GitHub page she needs — the PR, ideally the specific file/line/comment thread — so one click from the dashboard lands her on the right spot, no hunting. Then approve/merge → publish.
-- BUILT v1 (2026-07-03): `npm run review` → local page (src/review/serve.ts, zero new deps, Node http) aggregating all 21 content/*/review-queue.md. Previews post text / quote-card image / video storyboard inline; surfaces spin + angle + source_lines; Approve / Revise(+note) / Discard write status back through the SAME cell /publish reads (verified byte-clean round-trip — only the status cell changes). Mobile-responsive. Reviewed live with Muxin.
-- DECISIONS (Muxin, 2026-07-03): (1) EDITING MODEL — KEEP inline edit-in-place (supersedes the earlier GitHub-PR-deeplink plan for now; Build-1 derivatives aren't in PRs yet — revisit if they move there). (2) APPROVE BEHAVIOR — Approve → AUTO-SCHEDULE, and it's BUILT for text rows: approving an x/linkedin/bluesky row now calls `publishText(folder, {onlyIds:[id]})` → a real Typefully SCHEDULED draft at the cadence slot → row flips to published; button reads "Approve → schedule"; schedule failures surface in the GUI instead of throwing. Done via a pure refactor of typefully.ts (new exported `publishText`; CLI + notes-daily paths unchanged; 48/48 tests green). Muxin takes the FIRST live Approve→schedule click (outward-facing) to watch it land.
-- SHIPPED SINCE (2026-07-03/04): PR #67 added an "Add / Queue" tab — Muxin can drop a source (pasted text, Obsidian/file path, or Substack URL) or hit "Pull Substack Notes" straight from the GUI; a single-worker job queue runs the real `/atomize` headlessly (`claude -p`, subscription, $0), one at a time, and auto-refreshes the Review tab when a job finishes. This is the GUI's "creating our own content" half — feed the pipeline without leaving the page. PR #68 fixed the video-script row to show the drafted script (`video/script-draft.md`) before the storyboard exists.
-- STILL TO WIRE (follow-ups, this is the "publishing" half that's still manual): (1) cards / tiktok / video auto-schedule from Approve — still requires a separate `/publish` run, unlike text rows which already auto-schedule to Typefully on Approve; (2) origin source-tags ("from /cycle" / "reply to mention" / "from GUI queue"); (3) live Typefully/PostPeer schedule reconciliation in the dashboard (so the GUI reflects what's actually scheduled, not just what was approved).
-- PRIORITY (Muxin, 2026-07-04): next GUI work — wire (1) above (cards/tiktok/video auto-schedule from Approve) so the GUI's Approve action fully covers publishing, not just text. Note: this is a content-agents content-generation-adjacent surface (it triggers /publish, which sends real drafts) — treat per the content-agents generation-hold standing directive if the change touches what gets generated/sent, not just scheduling plumbing.
-- STATUS: Review
-- DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
-<!-- card-id: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9 -->
 
 **Inbound listening + voice-replies (Build 3)**
 - New capability: listen for mentions/replies/DMs on the channels, and draft replies in Muxin's voice (config/voice.yaml) for her to approve.
@@ -226,8 +185,9 @@ Examples - use both Primary and a Secondary CTA
 - Surface/suggest only — never hard-block a piece from publishing over a missing thread.
 - GOAL_CONDITION: Each piece reaching Muxin's review queue carries a thread-check result (pass/missing) against the home-brand worldview line; any piece flagged missing already has a Spin-drafted thread inserted before Muxin sees it, and no piece is blocked from publishing solely due to a missing/failing check.
 - ORIGIN: proposed by propose-cards 2026-07-02 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
-- STATUS: Backlog
+- STATUS: To Do
 - DECISION: approved — PRIORITY 1 (Muxin, 2026-07-04): work this first. Touches generated content (Spin auto-draft), so it holds for PR review per the content-generation standing directive regardless of this approval-to-build.
+- GROOMED: ready — explicit GOAL_CONDITION, DECISION: approved PRIORITY 1 + 2026-07-04
 <!-- card-id: 87cb6d93-5e6f-405f-9188-99c9d96434e2 -->
 
 **"Hit record" on-camera video as a first-class media type (auto-topic, auto-route, delete source)**
@@ -260,8 +220,81 @@ Examples - use both Primary and a Secondary CTA
 - ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
 - STATUS: To Do
 - DECISION: approved — build approach confirmed (each platform schedules through its own existing path: cards.ts/tiktok.ts/youtube.ts, not the text scheduler). Sequence AFTER 87cb6d93 and 8b00ab2e — those are the priority for right now. 2026-07-04
-- GROOMED: ready: clear outcome (wire cards/tiktok/video auto-schedule into GUI Approve), specific files named (serve.ts, cards.ts, tiktok.ts, youtube.ts), stateable GOAL_CONDITION already on the card, no dependency overlaps found + 2026-07-04
+- GROOMED: ready — exact files/behavior specified, explicit GOAL_CONDITION + 2026-07-04
 <!-- card-id: d8a990a9-ffcd-46b6-849f-fcebf62e0ab6 -->
+
+**Origin source-tags on every review GUI row (from /cycle / reply to mention / from GUL queue)**
+- Wire item (2) of the review GUI's STILL TO WIRE list: every row awaiting Muxin carries an origin source-tag identifying which pipeline produced it — one of "from /cycle", "reply to mention", or "from GUI queue".
+- Set the origin at the point content enters the queue (whichever pipeline created the row) and persist it on the row so the GUI can render it without recomputing.
+- Render the origin as a visible badge/column on each awaiting-Muxin row.
+- Scope: data plumbing + display only. Does not change approve/reject behavior or scheduling.
+- GOAL_CONDITION: Load the review GUI with rows sourced from all three origins. Before: rows show no origin. After: every awaiting-Muxin row renders exactly one origin tag from {from /cycle, reply to mention, from GUI queue}, matching the pipeline that created it.
+- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
+- STATUS: To Do
+- GROOMED: ready — scoped to data plumbing + display, explicit GOAL_CONDITION + 2026-07-04
+<!-- card-id: edec9293-7b72-494e-99ce-3c2895637a94 -->
+
+**Live Typefully/PostPeer schedule reconciliation in the review GUI**
+- Wire item (3) of the review GUI's STILL TO WIRE list: the dashboard reflects what is actually scheduled at the providers, not just what Muxin approved.
+- Pull actual scheduled state from Typefully (text drafts) and PostPeer (TikTok/cards) and reconcile it against the GUI's approved rows.
+- For a row approved and scheduled at a provider, display the provider's real scheduled time/status; for a row approved but not found at the provider, flag an unscheduled/mismatch indicator.
+- Read-only reconciliation: it reflects provider state, it does not push or change schedules.
+- GOAL_CONDITION: With one known scheduled Typefully/PostPeer draft and one approved-but-unscheduled row: before, the GUI shows only approved/not-approved. After, the scheduled row displays the provider's actual scheduled time and the unscheduled row is flagged as a mismatch.
+- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
+- STATUS: To Do
+- GROOMED: ready — read-only reconciliation scope, explicit GOAL_CONDITION + 2026-07-04
+<!-- card-id: 383756f4-aae7-48c7-88a0-2b06b4a867dc -->
+
+**Substack blocks GitHub Actions runner IPs on notes-daily fetch — decide: paid proxy or drop cloud fetch**
+- ORIGIN: follow-up auto-filed from card 2972c204 (Smoke-test the notes-daily cloud routine), 2026-07-04.
+- The smoke test found the notes-daily GitHub Actions cron's Substack fetch (src/atomize/fetch-notes.ts) gets a 403 from Substack's WAF, and it is NOT a header/User-Agent issue: PR #77 added a browser UA, and a follow-up commit added a full realistic browser header set (accept, accept-language, referer, origin, sec-fetch-*, sec-ch-ua*) -- both produced the IDENTICAL 403, same step, same latency, no change at all. That signature points to IP-reputation blocking of GitHub Actions runner IPs by Substack's WAF, which no client-side request change can fix.
+- Two real options, both with tradeoffs -- this is Muxin's call, not something to silently implement: (1) route this one fetch through a paid residential/rotating-proxy or scraping-API service -- adds real recurring cost + a new vendor dependency; or (2) drop the cloud-fetch step from notes-daily.yml and keep Substack Notes fetching local-only (same posture the drafting step already has) -- costs nothing, needs no new code, but loses the 'runs even if my Mac is off' benefit that was the whole point of the GitHub Actions move (PR #75).
+- CHAIN: 1
+- GOAL_CONDITION: Muxin has chosen option (1) or (2) above; if (1), a proxy/scraping-API is wired into fetch-notes.ts's two calls and a real GH Actions run succeeds past the profile-fetch step; if (2), notes-daily.yml's fetch step is removed/disabled and the workflow's remaining scope (ledger-only, or retired entirely) reflects that decision.
+- STATUS: Backlog
+<!-- card-id: 1eda54e7-8e11-4e91-ab2d-f3c762542d88 -->
+
+**Smoke-test the notes-daily cloud routine on its first real run**
+- SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies at all. notes-daily drafts NOTHING now: it only fetches new Substack Notes and marks them seen in the ledger. Real per-platform drafting (Spin's per-channel reframing) needs genuine Claude judgment, which only runs locally (the review GUI's "Pull Substack Notes" button, `claude -p "/atomize notes"`, $0 on the subscription) — a GitHub Actions runner has no Claude Code session, so the cloud job stays deliberately dumb.
+- NEW test: confirm the first real cloud run (a) opens a PR that only touches data/notes-spread-ledger.jsonl (no content/ folders at all), (b) the ledger update means the same notes aren't re-flagged tomorrow, and (c) running "Pull Substack Notes" locally still drafts fresh (it doesn't consult this ledger, so nothing here blocks it).
+- RESOLVED (2026-07-04): replaced the claude.ai Routine with `.github/workflows/notes-daily.yml` on GitHub Actions (see bd499018) — works regardless of whether Muxin's Mac is on. The 4 repo secrets are set; unparking this card now that the routine-creation blocker no longer applies.
+- STATUS: Done
+- GROOMED: ready — cloud-job blocker resolved, NEW test (a/b/c) is a stateable observable + 2026-07-04
+<!-- card-id: 2972c204-ca9e-4799-ae8f-b8fc71bddcde -->
+
+**Unified review + approval GUI (one page for everything awaiting Muxin)**
+- Replace opening multiple windows + hand-editing review-queue.md. One web page shows everything pending review in one place.
+- Each item is source-tagged ("from /cycle", "reply to <comment/mention>", etc.), inline-editable, with one Approve action that then schedules/sends it on the right platform at the right cadence.
+- Covers /cycle output now; designed to also hold inbound voice-replies (see Inbound card) once those exist.
+- Overlaps with "Voice Notes to Published" (664189d9) — RESOLVED (Muxin, 2026-06-30): THIS card is the single review/approval surface; 664189d9 re-scoped to the upstream voice-note→/atomize→schedule orchestration that feeds this GUI.
+- EDITING MODEL (Muxin, 2026-06-30; DECIDED): keep the editing room SEPARATE from the GUI — reuse the /story GitHub-PR comment loop (Muxin comments on the exact line the agent wrote; agent makes SURGICAL edits to only that passage, no rehashing the location in chat). The GUI = the one-page dashboard (see everything pending, source-tagged, approve at a glance); items needing iteration live as GitHub PRs. CONVENIENCE (required): for each such item the GUI surfaces a DIRECT DEEP-LINK to the exact GitHub page she needs — the PR, ideally the specific file/line/comment thread — so one click from the dashboard lands her on the right spot, no hunting. Then approve/merge → publish.
+- BUILT v1 (2026-07-03): `npm run review` → local page (src/review/serve.ts, zero new deps, Node http) aggregating all 21 content/*/review-queue.md. Previews post text / quote-card image / video storyboard inline; surfaces spin + angle + source_lines; Approve / Revise(+note) / Discard write status back through the SAME cell /publish reads (verified byte-clean round-trip — only the status cell changes). Mobile-responsive. Reviewed live with Muxin.
+- DECISIONS (Muxin, 2026-07-03): (1) EDITING MODEL — KEEP inline edit-in-place (supersedes the earlier GitHub-PR-deeplink plan for now; Build-1 derivatives aren't in PRs yet — revisit if they move there). (2) APPROVE BEHAVIOR — Approve → AUTO-SCHEDULE, and it's BUILT for text rows: approving an x/linkedin/bluesky row now calls `publishText(folder, {onlyIds:[id]})` → a real Typefully SCHEDULED draft at the cadence slot → row flips to published; button reads "Approve → schedule"; schedule failures surface in the GUI instead of throwing. Done via a pure refactor of typefully.ts (new exported `publishText`; CLI + notes-daily paths unchanged; 48/48 tests green). Muxin takes the FIRST live Approve→schedule click (outward-facing) to watch it land.
+- SHIPPED SINCE (2026-07-03/04): PR #67 added an "Add / Queue" tab — Muxin can drop a source (pasted text, Obsidian/file path, or Substack URL) or hit "Pull Substack Notes" straight from the GUI; a single-worker job queue runs the real `/atomize` headlessly (`claude -p`, subscription, $0), one at a time, and auto-refreshes the Review tab when a job finishes. This is the GUI's "creating our own content" half — feed the pipeline without leaving the page. PR #68 fixed the video-script row to show the drafted script (`video/script-draft.md`) before the storyboard exists.
+- STILL TO WIRE (follow-ups, this is the "publishing" half that's still manual): (1) cards / tiktok / video auto-schedule from Approve — still requires a separate `/publish` run, unlike text rows which already auto-schedule to Typefully on Approve; (2) origin source-tags ("from /cycle" / "reply to mention" / "from GUI queue"); (3) live Typefully/PostPeer schedule reconciliation in the dashboard (so the GUI reflects what's actually scheduled, not just what was approved).
+- PRIORITY (Muxin, 2026-07-04): next GUI work — wire (1) above (cards/tiktok/video auto-schedule from Approve) so the GUI's Approve action fully covers publishing, not just text. Note: this is a content-agents content-generation-adjacent surface (it triggers /publish, which sends real drafts) — treat per the content-agents generation-hold standing directive if the change touches what gets generated/sent, not just scheduling plumbing.
+- STATUS: Done
+- DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
+<!-- card-id: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9 -->
+
+**Contextual per-platform card captions (a quote never ships out of context)**
+- Problem (Muxin, 2026-07-03): a quote card posted alone was the quote as an image + the same quote repeated as the caption — no anchor, easy to misread / dunk on out of context.
+- Built: a card is now a bare-quote IMAGE + a spun, CONTEXT-ONLY caption per platform. Rows become `quote-card:<target>` (x/linkedin/bluesky), each sharing `images/quote-card-N.png` with its own `derivatives/quote-card-N-<target>.md` caption (context drawn from the lines AROUND the quote, never the quote itself; spun through the channel angle; extraction-first, source_lines best-effort). The quote / image / animation are unchanged. The `quote-card-N.md` definition derivative keeps the verbatim quote for rendering.
+- ANALYTICS (Muxin's constraint — testing per-platform performance): each platform's card now has a DISTINCT caption = a distinct match key, and cards.ts records the placement under the REAL destination platform with the caption as the key (was the quote) + `fm.spin` → the `| spin` marker. So `tag-source` attributes each card post per platform and classifies it atomized-spin; `origin-compare` measures per-channel card performance. Strictly better than the old shared-quote model.
+- Code: `src/publish/cards.ts` (per-platform posting + caption + bet wiring), +4 tests (52 green). `validate.ts` + `render.ts` UNCHANGED (caption declares `platform:<target>` so it validates as a normal spun text post; render still reads the definition derivative's quote). Skill updated: SKILL.md steps 4/4.5/7/8 + references/spin-mode.md.
+- STILL TO WIRE (follow-ups): (1) ANIMATED cards — the `.mp4` companion reuses the same per-platform context caption, but /atomize doesn't yet auto-generate the per-platform animated PUBLISH rows (native video via Typefully, `media:` the mp4); small follow-up. (2) card rows don't auto-schedule on GUI Approve yet (still `publish:cards`) — same follow-up as the Unified review GUI card. (3) Notes cards keep the legacy single-caption fan-out (a note is self-contained; no surrounding context to extract).
+- STATUS: Done
+<!-- card-id: a3127104-aa8a-4e4e-a4fe-fe7db245d8d5 -->
+
+**Recurring weekly analytics pull (scheduler — "don't ask me")**
+- Follow-up to 0026b615: the pull capability shipped, but nothing ran it on a schedule — on-demand only. A post gains traction over time, so stats need refreshing on a cadence without Muxin asking.
+- Must run LOCALLY: the saved browser session lives on Muxin's Mac (`~/.content-agents/browser-profiles/`); a claude.ai cloud routine has no session and would hit a login wall. So it's a macOS launchd job, not a cloud routine.
+- BUILT (2026-07-03): `npm run pull:weekly` (src/cron/weekly-pull.ts) chains `pull -- --ingest` (LinkedIn/X/Substack) + `bluesky` with per-step failure isolation and a loud "session lapsed → pull:login" summary. Ready-to-load LaunchAgent at config/launchd/com.content-agents.weekly-pull.plist (Sunday 07:00 local, before /strategy); 3-command enable in docs/setup-weekly-pull.md. PENDING: Muxin runs the enable (persistent system config — deliberately not auto-installed).
+- CONFIRMED SAFE for weekly re-pull: ingest upserts posts on (platform, platform_post_id) + APPENDS a timestamped metrics snapshot; snapshot.ts/resonance.ts read MAX(captured_at) per post and recency-weight by posted_at → traction refreshes, history kept, no double-count, old posts don't look artificially fresh.
+- STATUS: Done
+<!-- card-id: b2e1c9b6-fe3b-4f2c-8629-f5b5442c783f -->
 
 **Wire Substack aggregate reach/growth (summary-v2) into the audience table**
 - Follow-up to the analytics-pull work (card 0026b615, PR #56). The per-post Substack pull is live, but the aggregate reach/growth endpoint isn't ingested yet.
