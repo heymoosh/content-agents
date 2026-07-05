@@ -196,7 +196,8 @@ async function renderVideo(folder: string, profile?: ImageProfile): Promise<void
 }
 
 // Read the status of the storyboard row in review-queue.md (the canonical approval gate).
-// Columns: id | platform | format | asset | native | brand | cta | status | notes.
+// Columns: id | platform | format | asset | native | brand | cta | status | notes | origin.
+// Origin is optional and trailing, so the fixed indices below are unaffected either way.
 function storyboardStatus(folder: string): string | null {
   const queuePath = join(folder, "review-queue.md");
   if (!existsSync(queuePath)) return null;

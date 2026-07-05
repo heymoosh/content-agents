@@ -3,7 +3,13 @@ import { join, basename, dirname } from "node:path";
 import { repoRoot } from "../db/db.js";
 
 // Parse and update the review-queue.md markdown table.
-// Columns: | id | platform | format | asset | native | brand | cta | status | notes |
+// Columns: | id | platform | format | asset | native | brand | cta | status | notes | origin |
+// `origin` is the 10th column, added 2026-07-04 — rows written before then have no origin cell.
+
+// Which pipeline created this row. Exactly one of these three, or undefined for a row written
+// before this field existed (or one carrying a value we don't recognize) — never guessed.
+export const QUEUE_ORIGINS = ["from /cycle", "reply to mention", "from GUI queue"] as const;
+export type QueueOrigin = (typeof QUEUE_ORIGINS)[number];
 
 export interface QueueRow {
   id: string;
@@ -12,7 +18,13 @@ export interface QueueRow {
   asset: string;
   status: string;
   notes: string;
+  origin?: QueueOrigin;
   lineIndex: number;
+}
+
+function parseOrigin(cell: string | undefined): QueueOrigin | undefined {
+  const value = cell?.trim();
+  return QUEUE_ORIGINS.find((o) => o === value);
 }
 
 export function readQueue(folder: string): { rows: QueueRow[]; lines: string[] } {
@@ -23,7 +35,7 @@ export function readQueue(folder: string): { rows: QueueRow[]; lines: string[] }
     const line = lines[i];
     if (!line.startsWith("|") || /^\|\s*-+/.test(line) || /^\|\s*id\s*\|/i.test(line)) continue;
     const cells = line.split("|").map((c) => c.trim());
-    // cells[0] is empty (leading |); expect 9 data cells
+    // cells[0] is empty (leading |); expect 9 data cells, plus an optional 10th (origin)
     if (cells.length < 10) continue;
     rows.push({
       id: cells[1],
@@ -32,6 +44,7 @@ export function readQueue(folder: string): { rows: QueueRow[]; lines: string[] }
       asset: cells[4].replace(/\[.*?\]\((.*?)\)/, "$1"),
       status: cells[8].toLowerCase(),
       notes: cells[9],
+      origin: parseOrigin(cells[10]),
       lineIndex: i,
     });
   }
@@ -44,6 +57,27 @@ export function setStatus(folder: string, row: QueueRow, status: string): void {
   const cells = lines[row.lineIndex].split("|");
   cells[8] = ` ${status} `;
   lines[row.lineIndex] = cells.join("|");
+  writeFileSync(path, lines.join("\n"));
+}
+
+// Force every row in folder's review-queue.md to carry `origin`, overwriting whatever the
+// /atomize subprocess wrote (or failed to write) for it. Called right after a GUI-triggered
+// atomize job finishes, on a folder we know with certainty came from that job — a code-side
+// guarantee that doesn't depend on the SKILL.md-driven run correctly detecting ATOMIZE_ORIGIN
+// and hand-transcribing it into every row it authors.
+export function stampOrigin(folder: string, origin: QueueOrigin): void {
+  const path = join(folder, "review-queue.md");
+  const lines = readFileSync(path, "utf8").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.startsWith("|") || /^\|\s*-+/.test(line) || /^\|\s*id\s*\|/i.test(line)) continue;
+    const cells = line.split("|");
+    if (cells.length < 11) continue; // not a data row
+    const stamped = ` ${origin} `;
+    if (cells.length === 11) cells.splice(cells.length - 1, 0, stamped); // legacy row: insert the column
+    else cells[cells.length - 2] = stamped; // already has one: overwrite it
+    lines[i] = cells.join("|");
+  }
   writeFileSync(path, lines.join("\n"));
 }
 

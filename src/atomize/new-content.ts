@@ -101,7 +101,7 @@ export function scaffoldContentFolder(src: ScaffoldSource): string {
     : `> CTA: this draft has no \`canonical_url\` yet. To send "read more" posts to the essay itself, paste the published URL into source.md \`canonical_url:\` before /publish — otherwise those CTAs fall back to the Substack home.\n\n`;
   writeFileSync(
     join(dir, "review-queue.md"),
-    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n> Routing: see routing.md — only platforms the router marked \`include\` are queued below.\n\n${ctaReminder}| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n`
+    `# Review queue — ${src.title}\n\nSet status to approve / revise / discard. Add a note for revise.\n\n> Routing: see routing.md — only platforms the router marked \`include\` are queued below.\n\n${ctaReminder}| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n`
   );
   return dir;
 }

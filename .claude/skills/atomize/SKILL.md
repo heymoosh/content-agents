@@ -240,11 +240,19 @@ derivative, the video script, and the video title/description. The short version
 8. **Queue for review.** Ensure `<folder>/review-queue.md` has one row per asset that was
    generated — the routing `include` text platforms, plus ONE `quote-card:<target>` row per routed
    platform for the card (each pointing at the shared `images/quote-card-N.png`, caption from its
-   own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending). The
-   table schema itself doesn't grow a storytelling column (`native(1-5)` / `brand(1-5)` / `cta` stay
-   as-is — three separate scripts parse that table by fixed column position, see
+   own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending,
+   origin). The table schema itself doesn't grow a storytelling column (`native(1-5)` / `brand(1-5)`
+   / `cta` stay as-is — three separate scripts parse that table by fixed column position, see
    `src/publish/queue.ts`); instead, a derivative flagged by step 5's soft gate gets
-   `spinPassNote()`'s text appended to its row's `notes` cell. Then STOP. Do not publish.
+   `spinPassNote()`'s text appended to its row's `notes` cell.
+   - **Origin tag (10th column).** Every row gets an `origin` cell so the review GUI can show
+     which pipeline produced it (`src/publish/queue.ts` `QUEUE_ORIGINS`). Check whether this
+     invocation set the `ATOMIZE_ORIGIN` environment variable (run `echo $ATOMIZE_ORIGIN`): if it
+     prints `gui-queue`, write `from GUI queue`; otherwise (an ordinary `/atomize` run, including
+     one driven by `/cycle`) write `from /cycle`. Never write `reply to mention` here — that value
+     belongs to the not-yet-built inbound-reply pipeline (see the backlog card "Inbound listening +
+     voice-replies").
+   Then STOP. Do not publish.
    Tell Muxin: the folder path, asset counts, which platforms routing skipped (and why, per
    `routing.md`), any derivative flagged for a Spin pass on storytelling, and anything else
    skipped. If Muxin wants a skipped platform anyway, they can say so (or adjust
