@@ -63,6 +63,7 @@ interface EnrichedRow extends QueueRow {
   editable: boolean; // can the body be edited-and-saved here?
   revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
   hasAsset: boolean;
+  approveBlocked: string | null; // reason Approve is disabled, if any
 }
 
 interface Piece {
@@ -105,6 +106,29 @@ function firstHeading(folder: string): string {
   return basename(folder).replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/-/g, " ");
 }
 
+// A "video-script" row (format=storyboard) drafts video/script-draft.md long before /video turns
+// it into video/storyboard.md — the one file src/video/render.ts's own render gate trusts. Approving
+// off the draft alone is a phantom approval: it means nothing to render.ts and misrepresents review
+// as having happened. Same risk for "video"/"short" rows (animated quote-videos, /video's rendered
+// short + its TikTok row — CLAUDE.md backlog card 4bef9a7c) if the row lands in review-queue.md
+// before its asset file does — so those are gated on their own `asset` cell existing on disk too.
+// `exists` is injected (mirrors classifySource below) so this is unit-testable without touching disk.
+export function approveBlockReason(
+  folder: string,
+  row: QueueRow,
+  exists: (p: string) => boolean = existsSync,
+): string | null {
+  if (row.format === "storyboard") {
+    return exists(join(folder, "video", "storyboard.md")) ? null : "storyboard not rendered yet — run /video";
+  }
+  if (row.format === "video" || row.format === "short") {
+    const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
+    if (!asset) return null; // no known gate file to check
+    return exists(join(folder, asset)) ? null : "video not rendered yet — run /video";
+  }
+  return null;
+}
+
 function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
   const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
   let kind: Kind = "unknown";
@@ -119,6 +143,7 @@ function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
     editable: false,
     revisable: existsSync(join(folder, "derivatives", `${row.id}.md`)),
     hasAsset: false,
+    approveBlocked: approveBlockReason(folder, row),
   };
   const assetUrl = (file: string) => `/asset?slug=${encodeURIComponent(slug)}&file=${encodeURIComponent(file)}`;
 
@@ -747,8 +772,23 @@ const server = createServer(async (req, res) => {
       const b = await readBody(req);
       const slug = String(b.slug ?? "");
       const id = String(b.id ?? "");
-      const status = b.status === undefined ? undefined : String(b.status);
+      // Trimmed + lowercased to match readQueue()'s own normalization (queue.ts trims every
+      // cell, then lowercases status) — otherwise a differently-cased or whitespace-padded
+      // "approve " would skip the block-check below yet still read back as a clean approved
+      // row on the next load, defeating the guard entirely.
+      const status = b.status === undefined ? undefined : String(b.status).trim().toLowerCase();
       const notes = b.notes === undefined ? undefined : String(b.notes);
+      // One lookup, reused by both the block-check and the schedule-check below — updateRow()
+      // only ever touches the status/notes cells, so platform/format stay valid across the write.
+      const approveFolder = status === "approve" ? safeFolder(slug) : undefined;
+      const approveRow = approveFolder ? readQueue(approveFolder).rows.find((r) => r.id === id) : undefined;
+      if (approveFolder && approveRow) {
+        const blocked = approveBlockReason(approveFolder, approveRow);
+        if (blocked) {
+          json(res, 200, { ok: false, error: blocked });
+          return;
+        }
+      }
       const ok = updateRow(slug, id, status, notes);
       if (!ok) {
         json(res, 404, { ok: false });
@@ -760,16 +800,12 @@ const server = createServer(async (req, res) => {
       // returned (not thrown) so the row stays "approve" and the GUI can show why.
       let scheduled: unknown = null;
       let scheduleError: string | null = null;
-      if (status === "approve") {
-        const folder = safeFolder(slug);
-        const row = readQueue(folder).rows.find((r) => r.id === id);
-        if (row && SCHEDULABLE.has(row.platform)) {
-          try {
-            const done = await publishText(folder, { onlyIds: [id] });
-            scheduled = done[0] ?? null;
-          } catch (e) {
-            scheduleError = e instanceof Error ? e.message : String(e);
-          }
+      if (approveFolder && approveRow && SCHEDULABLE.has(approveRow.platform)) {
+        try {
+          const done = await publishText(approveFolder, { onlyIds: [id] });
+          scheduled = done[0] ?? null;
+        } catch (e) {
+          scheduleError = e instanceof Error ? e.message : String(e);
         }
       }
       json(res, 200, { ok: true, scheduled, scheduleError });
@@ -974,6 +1010,7 @@ const PAGE = /* html */ `<!doctype html>
   img.preview { max-width:340px; width:100%; border-radius:8px; border:1px solid var(--line); display:block; }
   video.preview { max-width:340px; width:100%; border-radius:8px; border:1px solid var(--line); display:block; }
   .notes { font-size:12.5px; color:var(--amber); margin:4px 0 0; }
+  .approve-blocked { font-size:12.5px; color:var(--red); margin:4px 0 0; font-weight:600; }
   .scheduled { font-size:12.5px; color:var(--green); font-weight:600; margin:4px 0 0; }
   .actions { display:flex; gap:7px; margin-top:11px; flex-wrap:wrap; align-items:center; }
   .actions .spacer { flex:1; }
@@ -1143,7 +1180,7 @@ let showDecided = false;
 const DECIDED = new Set(["published","discard"]);
 
 function flash(msg){ const f=$("#flash"); f.textContent=msg; f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1400); }
-function esc(s){ return (s??"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function esc(s){ return (s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 async function load(){
   const r = await fetch("/api/queue"); DATA = await r.json();
@@ -1186,6 +1223,10 @@ function rowEl(piece, row){
   const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Ask Claude</button>' : "";
   const schedulable = ["x","linkedin","bluesky"].includes(row.platform);
   const approveLabel = schedulable ? "Approve → schedule" : "Approve";
+  // Keep warning + disabled state even once status is "approve" — that's the phantom-approval
+  // case (hand-edited row, or the asset removed after a valid approval) this guard exists to catch.
+  const approveDisabled = !!row.approveBlocked;
+  const blockedNote = approveDisabled ? '<div class="approve-blocked">⚠ '+esc(row.approveBlocked)+'</div>' : "";
 
   el.innerHTML =
     '<div class="rowhead">'+
@@ -1193,9 +1234,10 @@ function rowEl(piece, row){
       '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + thread + src +
       '<span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>'+
     '</div>'+
-    preview + notes + sched + manual +
+    preview + notes + sched + manual + blockedNote +
     '<div class="actions">'+
-      '<button class="approve'+(row.status==="approve"?" on":"")+'" data-act="approve">'+approveLabel+'</button>'+
+      '<button class="approve'+(row.status==="approve"?" on":"")+'" data-act="approve"'+
+        (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>'+approveLabel+'</button>'+
       '<button class="revise'+(row.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(row.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
       '<span class="spacer"></span>'+ editBtn + aiBtn +
@@ -1213,7 +1255,8 @@ async function onAction(e, piece, row, el){
     e.target.disabled = true;
     const r = await post("/api/status",{slug:piece.slug,id:row.id,status:act});
     if (act === "approve"){
-      if (r.scheduled){ row.status="published"; row.scheduledWhen=r.scheduled.when; row.manualComment=r.scheduled.manualComment||""; flash("Scheduled · "+r.scheduled.when); }
+      if (r.ok === false){ flash(r.error || "Approve blocked"); }
+      else if (r.scheduled){ row.status="published"; row.scheduledWhen=r.scheduled.when; row.manualComment=r.scheduled.manualComment||""; flash("Scheduled · "+r.scheduled.when); }
       else if (r.scheduleError){ row.status="approve"; flash("Approved — schedule failed: "+r.scheduleError); }
       else { row.status="approve"; flash("Approved"); }
     } else { row.status="discard"; flash("Discarded"); }
