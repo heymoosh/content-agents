@@ -1,3 +1,65 @@
+**[P0] Ask Claude buggy on the GUI?**
+- I used Ask Claude to edit a Blue Sky post and turn it into an X post - I wanted it to ALSO create an X post based on the source content. Nothing’s working?
+- Also I had my vault dashboard running at the same time which also uses Claude subscription for responses - I went back to it after submitting a task to it, and I noticed it didn’t finish its original task. I wonder if it’s because I triggered Ask Claude in the content GUI. Am I only able to ask for 1 single Claude task at a time? I’d want to be able to launch both my vault dashboard and content agents GUI and use them whenever I want - so if there’s conflicts, I don’t understand why. Isn’t each ‘request’ just a separate Claude task?
+- I tried getting the GUI to create content from Substack notes that I selected - it’s been stuck on ‘working’ for like 10 mins. I can’t tell if it’s actually doing anything. I’m waiting for it to land on the Review tab.
+- STATUS: Backlog
+<!-- card-id: 9304e4a5-38f7-47dc-9b58-75e595b90fa7 -->
+
+**[P2] Video script to Storyboard gap on GUI**
+- If I approve the script, what happens next? Right now on the GUI I can’t even hit ‘approve’ to approve the script. 
+- STATUS: Backlog
+<!-- card-id: 9e20a616-3e13-4194-ab39-863acd5d53be -->
+
+**[P1] Refresh button on GUI - purpose?**
+- What does hitting Refresh on the GUI do?
+- If I hit refresh on each tab - Add/Queue, Review, Analytics - what does it do and does it automatically update everything in the pipeline to sync?
+- STATUS: Backlog
+<!-- card-id: 3625b185-8025-4329-82d4-cb3b35c6ee70 -->
+
+**[P0] GUI error - no content folder created**
+- atomize finished but created no new content folder — check the terminal running the GUI
+- This is all that the terminal said: Last login: Sun Jul  5 11:37:57 on ttys002
+You have mail.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+MacBook-Pro-2:~ Muxin$ create-content
+
+> content-agents@0.1.0 review
+> tsx src/review/serve.ts
+
+
+  Review queue → http://localhost:4600
+
+  Approve / revise / discard / edit every pending derivative in one place.
+  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.
+
+Cadence schedule (PT):
+  bluesky:
+    bluesky-2 → Wed, Jul 15, 6:30 PM PT
+  ↳ note: bluesky-2 cta:source → homepage (no canonical_url in source.md)
+scheduled: bluesky-2 (bluesky) → Wed, Jul 15, 6:30 PM PT → typefully draft 9778798, cta→inline
+scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e06966cb7011183ad79 → x @ 2026-07-21T19:00:00.000Z
+- STATUS: Backlog
+<!-- card-id: c43a8041-60f9-4bea-b365-bc5d684eaca8 -->
+
+**[P0] Use browser automation for image uploads**
+- Instead of relying on the 3rd party, can’t I login to the sites on chrome, have that securely stashed, and we can just upload images that way? We do it for the analytics already.
+- STATUS: Backlog
+<!-- card-id: ca75b2e0-aad3-4b2e-a069-660b64938029 -->
+
+**Use Opus for animating quote cards**
+- Let’s compare how Opus vs Sonnet 5 does handling quote card animations
+- STATUS: Backlog
+<!-- card-id: 05ad98aa-06c4-4c74-9793-79ab9a142a4e -->
+
+**Create quote and image cards**
+- Combine both image gen and quote
+- I created an img folder - I’ll be using either ChatGPT or a free app to add images to it 
+- STATUS: Backlog
+<!-- card-id: 1653734b-8eea-480b-93ea-3c5926159f81 -->
+
 **Voice Notes to Published**
 - Allow me to just drop a voice note (or typed) into Claude, we figure out what it should say at the end, and then it automatically runs /atomize or whatever the skills are to create good content out of
 - Orchestrator level - I stay out of entering commands, Claude handles figuring out which skill to use. Still checks with me on approving content before they go out, but handles all the scheduling and making sure the right content goes on the right platform at the right cadence and publishing times etc..
@@ -50,6 +112,7 @@ Examples - use both Primary and a Secondary CTA
 | Case study                 | See projects / work with me | Read the essay behind it         |
 - STATUS: Backlog
 - DEPENDS ON: Landing page
+- DECISION: hold (Muxin, 2026-07-04): agreed to hold pre-flight rec — needs real destination URLs for project/landing-page + work-with-me CTAs, and the tie-breaker rule for ambiguous posts, before this can be built.
 <!-- card-id: 6dcaee98-1a54-4fc8-b170-92611872676f -->
 
 **Add skill run-order quick-reference to the Obsidian Content Agents doc**
@@ -108,7 +171,7 @@ Examples - use both Primary and a Secondary CTA
 - This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
 - STATUS: Backlog
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
-- DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequence AFTER 87cb6d93 and 8b00ab2e — those are the priority for right now. 2026-07-04
+- DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Growth via borrowed audiences (other people's platforms), not just native social**
@@ -154,33 +217,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer — deprioritized, not high priority right now. Keep in Backlog. Flag when picked up: part of its scope touches the shared ~/.claude conductor config (cross-repo blast radius). 2026-07-04
 <!-- card-id: a1a6f379-556f-4e46-83a8-5e70fbd3c2b4 -->
 
-**Strong storytelling for social posts (hooks, narrative, practical angle) — eval current + design approach**
-- Social posts need HOOKS, NARRATIVE, and PRACTICAL ANGLES — strong storytelling is a must (Muxin). The current workflow is basic on this.
-- EVAL FIRST: build a storytelling rubric (hook strength / narrative arc / practical takeaway / overall storytelling) and TEST current output against it — score a sample of real content/<slug>/derivatives/, find where extraction-first posts fall flat on hook + narrative. THEN design the approach.
-- KEY TENSION to resolve: extraction-first (CLAUDE.md rule 1 — never compose new claims) vs strong storytelling (hooks/narratives usually need crafted connective tissue + a real hook). Spin already carves the middle path — "re-angle, re-order, change the framing and the HOOK to fit the audience, but never introduce a new claim/argument/worldview" (docs/spin-experiment.md). So storytelling likely = lean into Spin's latitude + a storytelling rubric/score, NOT a new claim-composing mode. Decide how much latitude is allowed.
-- OVERLAPS Spin / Swizzle (d23bfc5d): coordinate so storytelling is PART of the Spin engine (make the post engaging), not a separate pass. Add a STORYTELLING / HOOK dimension to /atomize's scoring (today: native/brand/cta) so weak hooks get caught pre-queue.
-- Deliverable: (1) storytelling rubric, (2) eval of current output with gaps, (3) recommended approach — how Spin optimizes hook + narrative + practical-angle within the no-new-claims guardrail + the new score dimension.
-- EVAL DONE (2026-06-30): rubric = hook / narrative / practical-angle / overall. Tested 10 real derivatives. FINDING: brand/native score 4-5 but storytelling clusters at 2-3 — the pipeline rewards the wrong thing; the 2 posts that DO tell a story (Trillionaire, Congress) score well only by accident (their SOURCE already had a hook/action). Spin's re-hook/re-order latitude is BUILT but UNUSED (no `spin: true` derivative in the sample) — so much of the gap is just "Spin isn't on." Ties directly to the Swizzle card (promote Spin to always-on).
-- APPROACH — ship now (pure upside, no guardrail change): (A) add a `storytelling` score to /atomize (today: native/brand/cta). DIMENSIONS = HOOK + NARRATIVE + RESONANCE (does it state a truth people are feeling / give them something to react to — NOT "does it ask for engagement", which is false). PRACTICAL ANGLE + CTA are CONDITIONAL, never scored requirements — present only when Muxin genuinely has something useful or a CTA truly fits; never penalize a society/economy post for lacking them. Soft-gate the queue on hook/narrative/resonance (low → flag for a Spin pass; Muxin's approve stays final). (B) apply Spin's existing latitude on X + LinkedIn — re-hook (lead with the strongest existing line, drop "What I described in my essay…"), re-order for arc, and STOP trimming the concrete personal specifics that ARE the story (e.g. the cut ADHD / "14 projects" details). Leave Bluesky/Notes near-verbatim.
-- DECISION (Muxin, 2026-06-30): engagement = RESONANCE, not conversion. NEVER ask for engagement (false/inauthentic) — her best Substack notes don't; they state a felt truth and THAT is what people react to, and she wants to stay that way. So practical-angle is NOT always required for society/economy posts — only when she actually has something useful to share (and that comes from HER source, so extraction-first stays intact). CTA = selective, ONLY where it genuinely makes sense; never the default, never turn every post into a conversion (cringey). REJECTED: blanket-CTA (was option ii-as-default) and relaxing extraction-first to manufacture takeaways (option iii). Each post should be a conversation / something to react to.
-- Key files: /atomize SKILL.md scoring (~lines 129-133), docs/spin-experiment.md (guardrail #1), config/voice.yaml.
-- STATUS: Backlog
-- DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
-- DECISION: approved — PRIORITY 2 (Muxin, 2026-07-04): work this second, right after 87cb6d93. Shapes how generated content is scored/hooked, so it holds for PR review per the content-generation standing directive.
-<!-- card-id: 8b00ab2e-31e4-4fe0-a1da-4d5ce9616ae1 -->
-
-**Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing**
-- Per the card's THREAD CHECK: every published piece must carry a visible thread back to the home-brand worldview — "I uncover harmful hidden beliefs and why they need to change before AI automates everything" (and the fuller unexamined-human-systems / who-benefits / building-the-right-thing statement behind it).
-- Operational test is NOT "is this about AI" — it's whether the piece connects back to that worldview; add this as an explicit check run before a piece reaches Muxin's review queue.
-- If the thread is missing, Spin drafts it in, then the piece routes through the existing GH editing loop (see Unified review + approval GUI card) for Muxin to iterate until it feels right.
-- Surface/suggest only — never hard-block a piece from publishing over a missing thread.
-- GOAL_CONDITION: Each piece reaching Muxin's review queue carries a thread-check result (pass/missing) against the home-brand worldview line; any piece flagged missing already has a Spin-drafted thread inserted before Muxin sees it, and no piece is blocked from publishing solely due to a missing/failing check.
-- ORIGIN: proposed by propose-cards 2026-07-02 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
-- STATUS: To Do
-- DECISION: approved — PRIORITY 1 (Muxin, 2026-07-04): work this first. Touches generated content (Spin auto-draft), so it holds for PR review per the content-generation standing directive regardless of this approval-to-build.
-- GROOMED: ready — explicit GOAL_CONDITION, DECISION: approved PRIORITY 1 + 2026-07-04
-<!-- card-id: 87cb6d93-5e6f-405f-9188-99c9d96434e2 -->
-
 **"Hit record" on-camera video as a first-class media type (auto-topic, auto-route, delete source)**
 - New input: Muxin records a raw talking-head / selfie video ("hit record", say a thing, stop) and drops it in. No script, no storyboard — this is the fast, human, face-to-camera lane, DISTINCT from /video (essay → scripted short) and from Voice Notes to Published (664189d9, audio → text).
 - AUTO-DETECT TOPIC from the recording itself: transcribe (existing transcription provider in config/providers.yaml) → classify pillar + topic (config/pillars.yaml rubric) → drive routing (route.ts) so it lands on the right platform(s) with no manual tagging.
@@ -193,50 +229,49 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer — deprioritized, lower priority, new media type. Keep in Backlog. 2026-07-04
 <!-- card-id: b0e4ecc5-6120-4b40-a6dd-859c34ca332a -->
 
-**Guard the review GUI: don't allow Approve on a storyboard/video row with no rendered file**
-- The review GUI (`src/review/serve.ts`) writes `approve` straight into review-queue.md on any row's Approve click. A `video-script` / `storyboard`-type row can be approved even when its storyboard/video file doesn't exist yet (asset cell is `—`), producing a phantom approval that means nothing to `/publish` and reads as an unauthorized edit.
-- Observed 2026-07-04 (during repo sync): the innovation-nation `video-script` row was found flipped `blocked → approve` in the working tree with no storyboard file present — an uncommitted, unauthorized-looking edit traced back to a GUI Approve click on a not-yet-rendered row.
-- Fix: in `serve.ts`, guard the Approve action for storyboard/video rows whose asset file is missing (cell `—` / not on disk) — disable the button or reject the write, and surface why ("storyboard not rendered yet — run /video"). Text / image / quote-card rows unaffected. Small, local to `src/review/serve.ts`; no schema change.
-- ORIGIN: filed 2026-07-04 from the phantom-approve found during repo sync.
+**Routing drift flag: surface data-vs-brand platform divergence in /strategy (never auto-gate)**
+- Resolves the routing-authority question (Muxin, 2026-07-04): today `config/routing.yaml`'s per-pillar platform `defaults` only govern cold-start (<4wks/<3 posts); once real data accrues, `route.ts` lets the fit score hard-override them — a pillar can get SKIPPED on a platform Muxin considers its brand home if it underperforms there. DECISION: routing.yaml's defaults become the PINNED editorial call instead — Muxin's own definition of which topics belong on which platform, never hard-overridden by score.
+- Change `route.ts`'s `decideForPillar`: decision always follows `routing.yaml` defaults (like cold-start logic today), regardless of data volume. The fit score is still computed and shown, but stops driving include/skip.
+- Add a flag step (fits `/strategy` or `route.ts --all`, same cadence as the angle refresh below) that compares each pillar's live fit score against its assigned platform(s) and surfaces a loud divergence warning when a pillar persistently scores under `skip_below_score` on its assigned platform, or unusually high on a non-assigned one. Muxin decides by hand whether to edit routing.yaml; the step makes zero writes to it.
+- Mirrors the "surface, never auto-overwrite" posture already agreed for the per-channel angle refresh (8ba83a4c) — same posture, sibling config (routing.yaml topic-fit vs platforms.yaml angle/slant). The two could plausibly share one refresh pass in /strategy; scope that when picked up.
+- Touches `validate.ts`'s platform-fit hard gate (00dea0f, shipped 2026-07-04) only in that routing.md's underlying decisions change from score-driven to defaults-driven — the gate itself (hard-fail on `skip`) is unaffected.
+- EXPERIMENTAL RIGOR (Muxin, 2026-07-04): the flag must be run as a deliberate experiment, not a single noisy look. Reuses the n≥3 / ≥4wks sample floor already standard across route.ts/grade-bets.ts/snapshot.ts — do NOT invent a new threshold — but that floor alone is thin (one viral or one flop post can flip a 3-post average), and checking 6 pillars × ~7 platforms at once means some cells will look divergent from noise alone (multiple-comparisons problem). Requirements:
+  1. PERSISTENCE: only flag a pillar/platform pair when the divergence holds across ≥2 independent snapshots/windows, not one look.
+  2. ISOLATE SPIN FROM TOPIC-FIT: spin is always-on (33aa10f8) so there is currently no live baseline to tell "wrong platform for this topic" apart from "angle isn't landing." Systematize the `--no-spin` control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.
+  3. SEPARATE THE TWO HYPOTHESES AT FLAG TIME: when a flag fires, surface (a) the actual n and whether it clears a persistence check, and (b) whether a no-spin control exists for that cell — so Muxin can judge "move the topic" vs. "fix the angle" vs. "not enough data yet" instead of one ambiguous score.
+- GOAL_CONDITION: `route.ts --pillar <p>` never returns `skip` for a platform in that pillar's `routing.yaml` defaults solely due to a low fit score; the score is still visible in the decision output. `/strategy` (or `route.ts --all`) emits a divergence flag ONLY for pillar/platform pairs meeting the persistence check above, each flag stating n, window count, and no-spin-control availability; zero writes are made to routing.yaml or platforms.yaml by the flag step itself.
+- PRIORITY (Muxin, 2026-07-04): bumped to top priority, first of a small measurement-scaffolding group (with 92bb2ae6 and ffa6491d) — decided in the same conversation as, and independent of, 87cb6d93/8b00ab2e/d8a990a9 (all since shipped separately). Still worth prioritizing: no experiment-design/measurement layer exists yet for routing decisions.
 - STATUS: Backlog
-<!-- card-id: 4bef9a7c-9148-4c59-afcf-04475ea11ff5 -->
+- DEPENDS ON: Periodically refresh the per-channel X-for-Y angles from Muxin's Obsidian content-ideas (siblings; may share one refresh pass)
+- DECISION: approved — hybrid model chosen (Muxin, 2026-07-04): routing.yaml stays brand-pinned; data flags divergence for manual review, never auto-gates. Experimental-rigor requirements (persistence check, no-spin controls, hypothesis separation) added same day.
+<!-- card-id: 7e550e48-adcf-44d3-83ea-626ee079b9ef -->
 
-**Wire cards/TikTok/video auto-schedule into GUI Approve**
-- Card a4a2ce27 (Unified review + approval GUI) flagged this as the explicit next-priority follow-up (2026-07-04): text rows already auto-schedule to Typefully on Approve via publishText (src/review/serve.ts /api/status handler, SCHEDULABLE set currently only x/linkedin/bluesky), but card/tiktok/video rows fall through to a plain approve status update and still require a separate manual /publish run.
-- Extend the same Approve handler so card rows call the existing src/publish/cards.ts scheduling path, tiktok rows call src/publish/tiktok.ts scheduleToTikTok, and video rows call src/publish/youtube.ts's scheduled-upload path -- mirroring the try/catch + scheduleError pattern already used for text so a failure leaves the row at approve with a visible reason instead of silently losing it.
-- Per the epic's own note: this triggers real sends (PostPeer/Upload-Post/YouTube), so treat it under the content-agents generation-hold standing directive if the change touches what gets sent, not just scheduling plumbing.
-- Out of scope (separate, not yet filed): origin source-tags and live Typefully/PostPeer schedule reconciliation in the dashboard -- both listed in the same epic as separate still-to-wire items.
-- GOAL_CONDITION: Approving a card, tiktok, or video row in the review GUI results in the same content folder's row being scheduled via its platform's existing publish function (cards.ts / tiktok.ts / youtube.ts) with no separate /publish invocation required -- verified by an Approve action producing a scheduled draft/post (or a visible scheduleError on the row) for at least one row of each of the three row types.
-- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
-- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
-- STATUS: To Do
-- DECISION: approved — build approach confirmed (each platform schedules through its own existing path: cards.ts/tiktok.ts/youtube.ts, not the text scheduler). Sequence AFTER 87cb6d93 and 8b00ab2e — those are the priority for right now. 2026-07-04
-- GROOMED: ready — exact files/behavior specified, explicit GOAL_CONDITION + 2026-07-04
-<!-- card-id: d8a990a9-ffcd-46b6-849f-fcebf62e0ab6 -->
+**Exploration budget: periodically test off-assignment pillars per platform to find missed coverage (separate from spin, separate from drift monitoring)**
+- Distinct problem from the routing-drift flag (7e550e48): that card only monitors pillar/platform pairs ALREADY assigned in `routing.yaml` defaults — it can never discover whether an UNassigned pillar would also work on a platform, because pinning defaults to brand means that pillar never gets posted there at all. This card is the deliberate probe that fills that gap.
+- CATCH-22 (Muxin, 2026-07-04): if LinkedIn only ever gets career-work content, that's the only data you can ever analyze from LinkedIn — you don't learn whether LinkedIn is ALSO good for other topics. Resolve via a small, deliberate, LABELED exploration budget, not a change to the default pinned assignment (brand consistency stays the day-to-day default; this is a rare, tagged probe on top of it).
+- SPIN NOTE (Muxin, 2026-07-04): explicitly NOT about spin-vs-no-spin — Muxin considers spin necessary and isn't worried about isolating it. This card is purely about TOPIC coverage (untested pillar/platform pairs), not angle execution. The `--no-spin` control-run idea from 7e550e48 stays there, low-priority, decoupled from this card.
+- ACTUAL UNTESTED SURFACE (derived from `config/routing.yaml` defaults, 2026-07-04): X already gets all 6 pillars by default (exploration doesn't apply there — full coverage exists). LinkedIn is untested for civic-tech and other (2 pillars). Bluesky is untested for career-work, builder, and other (3 pillars). Re-derive this list if routing.yaml's defaults change.
+- CADENCE (Muxin, 2026-07-04, resolved same day): MONTHLY, not quarterly — quarterly was rejected as too slow (round-robining one platform's untested pillars would take ~1.5yrs to reach n=3 on any single pillar, effectively never resolving). Monthly, rotating through only the platform's actual untested pillars (2-3, not all 6), reaches n=3 per pillar in roughly 4-9 months depending on platform. Biweekly was raised as a faster alternative if monthly proves too slow in practice — leave as an easy dial to turn, not a redesign, if picked up later.
+- MECHANISM: once a month per platform (LinkedIn, Bluesky — skip X, no gap there), pick whichever untested pillar has gone longest without a probe, draft ONE derivative for it tagged as an explicit exploration probe (distinct from a normal routed post), queue for Muxin's normal review-queue approval like anything else (rule 2 still governs — nothing auto-posts).
+- DATA HANDLING: an exploration probe's result must NOT get folded into the platform/pillar's "official" resonance average used by route.ts or the drift flag — track it as its own coverage-data bucket so one exploratory flop/win doesn't skew the assigned-pillar signal. Surface accumulated exploration results (n, avg engagement per untested pillar) in `/strategy` once enough data exists to say anything.
+- GOAL_CONDITION: each of LinkedIn's 2 and Bluesky's 3 untested pillars gets one tagged exploration probe roughly monthly; exploration-probe engagement data is tracked separately from (never merged into) the pillar/platform resonance figures route.ts and the drift flag use; `/strategy` surfaces accumulated exploration coverage once any untested pillar reaches n≥3.
+- PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 as part of the same measurement-scaffolding group; same design conversation, likely shares one `/strategy` step with the drift flag and the angle refresh.
+- STATUS: Backlog
+- DEPENDS ON: Routing drift flag: surface data-vs-brand platform divergence in /strategy (sibling; shares the pinned-defaults model this card probes around)
+- DECISION: approved (Muxin, 2026-07-04) — build the exploration budget; monthly cadence; scope limited to topic coverage, not spin isolation.
+<!-- card-id: 92bb2ae6-936c-4d23-a72a-1b838f7434be -->
 
-**Origin source-tags on every review GUI row (from /cycle / reply to mention / from GUL queue)**
-- Wire item (2) of the review GUI's STILL TO WIRE list: every row awaiting Muxin carries an origin source-tag identifying which pipeline produced it — one of "from /cycle", "reply to mention", or "from GUI queue".
-- Set the origin at the point content enters the queue (whichever pipeline created the row) and persist it on the row so the GUI can render it without recomputing.
-- Render the origin as a visible badge/column on each awaiting-Muxin row.
-- Scope: data plumbing + display only. Does not change approve/reject behavior or scheduling.
-- GOAL_CONDITION: Load the review GUI with rows sourced from all three origins. Before: rows show no origin. After: every awaiting-Muxin row renders exactly one origin tag from {from /cycle, reply to mention, from GUI queue}, matching the pipeline that created it.
-- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
-- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
-- STATUS: To Do
-- GROOMED: ready — scoped to data plumbing + display, explicit GOAL_CONDITION + 2026-07-04
-<!-- card-id: edec9293-7b72-494e-99ce-3c2895637a94 -->
-
-**Live Typefully/PostPeer schedule reconciliation in the review GUI**
-- Wire item (3) of the review GUI's STILL TO WIRE list: the dashboard reflects what is actually scheduled at the providers, not just what Muxin approved.
-- Pull actual scheduled state from Typefully (text drafts) and PostPeer (TikTok/cards) and reconcile it against the GUI's approved rows.
-- For a row approved and scheduled at a provider, display the provider's real scheduled time/status; for a row approved but not found at the provider, flag an unscheduled/mismatch indicator.
-- Read-only reconciliation: it reflects provider state, it does not push or change schedules.
-- GOAL_CONDITION: With one known scheduled Typefully/PostPeer draft and one approved-but-unscheduled row: before, the GUI shows only approved/not-approved. After, the scheduled row displays the provider's actual scheduled time and the unscheduled row is flagged as a mismatch.
-- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
-- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
-- STATUS: To Do
-- GROOMED: ready — read-only reconciliation scope, explicit GOAL_CONDITION + 2026-07-04
-<!-- card-id: 383756f4-aae7-48c7-88a0-2b06b4a867dc -->
+**Evaluate raising per-platform posting caps (X, LinkedIn, Bluesky) for more volume**
+- Muxin's read from real-world experience (2026-07-04), not yet reconciled with config: X can handle a LOT more than the current `posts_per_week: 5`; LinkedIn can comfortably run 5/week (current cap: 2/week, Tue/Thu only); Bluesky — no strong opinion, Muxin only checks it occasionally for political updates, open to review; Substack — sees daily to multiple Notes/day in the wild, but N/A here (see below).
+- SUBSTACK IS NOT IN SCOPE: `config/platforms.yaml` has no `substack` entry because Substack is the SOURCE channel, not a routing target (see `config/routing.yaml` header) — the pipeline doesn't automate or cap Muxin's own Notes posting there at all; that stays entirely manual and outside this card.
+- ARCHITECTURE CONSTRAINT (found 2026-07-04): the unified scheduler enforces ≤1 post/platform/PT-day via the shared ledger (`data/publish-schedule.jsonl`, `src/publish/slots.ts`). Bluesky's current `posts_per_week: 7` with all 7 `slot_days` is ALREADY at the ceiling this architecture supports (one/day, every day) — going beyond daily on any platform needs real multiple-slots-per-day scheduler work, not a config number change. Before scoping, confirm whether "X can do a lot per day" means (a) more days/week within the existing ≤1/day model (a config bump, e.g. 5→7-10/wk within slot_days), or (b) literally multiple posts/day (needs new scheduler logic) — these are very different sized changes.
+- CONTENT-SUPPLY CHECK: raising caps only helps if there's enough distinct original source material weekly to fill the added slots without violating each platform's `min_reuse_days` (x:14, linkedin:60, bluesky:21) or thinning derivative quality by over-atomizing the same source. Check actual weekly essay/note output against proposed new caps before locking numbers in.
+- WHY THIS MATTERS BEYOND VOLUME: more posts/week directly speeds up how fast pillar/platform cells reach the n≥3 sample floor used by route.ts, grade-bets.ts, and the two sibling cards above (routing drift flag 7e550e48, exploration budget 92bb2ae6) — this isn't purely a growth lever, it also shortens the wait on every data-driven decision in the pipeline.
+- OPEN QUESTIONS for whoever picks this up: (1) confirm X daily-multiple vs. weekly-bump scope per above; (2) pick actual new `posts_per_week` + `slot_days` numbers per platform with Muxin; (3) decide if Bluesky needs anything beyond its current daily ceiling, or stays as-is given Muxin's lack of strong opinion; (4) verify source-content supply supports the new volume.
+- GOAL_CONDITION: Muxin has picked explicit new `posts_per_week`/`slot_days` values for X and LinkedIn (Bluesky stays or changes per his call once reviewed); if any platform needs more than 1 post/PT-day, that scheduler gap is either resolved or explicitly deferred as its own follow-up; config/platforms.yaml reflects the decided numbers.
+- PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 and 92bb2ae6 as part of the same measurement-scaffolding group: more volume speeds up how fast every experiment above reaches a usable sample size, so the cap decision is scaffolding too, not just a growth lever.
+- STATUS: Backlog
+<!-- card-id: ffa6491d-46f9-416f-b521-1fb15e1a391b -->
 
 **Periodically refresh the per-channel X-for-Y angles from Muxin's Obsidian content-ideas (surface drift, never auto-overwrite approved angles)**
 - Traces to the epic's STEP bullet: "run through Muxin's EXISTING Obsidian content-ideas to DERIVE (and periodically refresh) the X-for-Y angle per channel — the pipeline consults these, it does NOT invent new content streams." The one-time derivation is Done (33aa10f8 encoded the four 2026-06-30 approved angles verbatim into config/platforms.yaml); what's still unbuilt is the refresh loop that keeps those angles honest to what Muxin is actually writing.
@@ -247,15 +282,115 @@ Examples - use both Primary and a Secondary CTA
 - GOAL_CONDITION: Running the refresh step reads the current Obsidian content-ideas plus config/pillars.yaml and emits a per-channel report (X, LinkedIn, Substack, Bluesky) comparing a freshly-derived candidate angle against the encoded approved angle in config/platforms.yaml. Before: angle drift can only be caught by Muxin manually re-reading. After: any divergence is flagged for Muxin's re-approval and the step makes zero writes to config/platforms.yaml (the four approved angles change only on Muxin's explicit approval).
 - PARENT: d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4
 - ORIGIN: proposed by propose-cards 2026-07-04 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
-- STATUS: To Do
+- STATUS: Review
 - GROOMED: ready — clear scope (surface-only drift report, zero writes to platforms.yaml), stateable GOAL_CONDITION, no dependency overlaps + 2026-07-04
 <!-- card-id: 8ba83a4c-0903-4103-93cf-a7abea7ea99c -->
+
+**Surface the thread-check advisory in review-queue.md itself, not just validate output and the GUI badge**
+- - Follow-up from card 87cb6d93 (Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing).
+- Currently the pass/missing signal lives in derivative frontmatter (thread_check/thread_spin_applied, read by the review GUI badge) and in npm run validate's advisory console summary. Someone skimming the raw review-queue.md markdown directly (not the GUI, not validate output) sees nothing.
+- Consider appending a short note to review-queue.md's notes column when a piece is queued with thread_check: missing after a Spin-draft attempt, so the raw markdown itself surfaces it too.
+- Small, additive, no schema break — extends the existing notes column convention.
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: 4c3eb6be-fbf4-4a6c-ae25-992009f9b848 -->
+
+**Validate storytelling rubric against real /atomize output**
+- - Run the new storytelling rubric (hook/narrative/resonance) against the next real /atomize
+- output to get real scores and validate the soft-gate against live data, not just the test
+- fixture used to build it.
+- - Depends on: nothing — ready now, just needs an actual /atomize scoring pass on real content.
+- - CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: 9be7688d-a41d-4e58-9fce-a9c8df8e4644 -->
+
+**Track a storytelling-improved bucket in bets.md / origin-compare**
+- - Consider whether origin-compare / briefs/bets.md should eventually track a
+- "storytelling-improved" bucket the way spin/verbatim is tracked, so Muxin can measure
+- whether the rehook pass actually lifts resonance.
+- - Depends on: enough published volume with the new storytelling dimension scored.
+- - CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: f77b6670-d39d-4c13-b9be-004084510e58 -->
+
+**Live Typefully/PostPeer schedule reconciliation in the review GUI**
+- Wire item (3) of the review GUI's STILL TO WIRE list: the dashboard reflects what is actually scheduled at the providers, not just what Muxin approved.
+- Pull actual scheduled state from Typefully (text drafts) and PostPeer (TikTok/cards) and reconcile it against the GUI's approved rows.
+- For a row approved and scheduled at a provider, display the provider's real scheduled time/status; for a row approved but not found at the provider, flag an unscheduled/mismatch indicator.
+- Read-only reconciliation: it reflects provider state, it does not push or change schedules.
+- GOAL_CONDITION: With one known scheduled Typefully/PostPeer draft and one approved-but-unscheduled row: before, the GUI shows only approved/not-approved. After, the scheduled row displays the provider's actual scheduled time and the unscheduled row is flagged as a mismatch.
+- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
+- STATUS: Done
+- GROOMED: ready — read-only reconciliation scope, explicit GOAL_CONDITION + 2026-07-04
+<!-- card-id: 383756f4-aae7-48c7-88a0-2b06b4a867dc -->
+
+**Origin source-tags on every review GUI row (from /cycle / reply to mention / from GUL queue)**
+- Wire item (2) of the review GUI's STILL TO WIRE list: every row awaiting Muxin carries an origin source-tag identifying which pipeline produced it — one of "from /cycle", "reply to mention", or "from GUI queue".
+- Set the origin at the point content enters the queue (whichever pipeline created the row) and persist it on the row so the GUI can render it without recomputing.
+- Render the origin as a visible badge/column on each awaiting-Muxin row.
+- Scope: data plumbing + display only. Does not change approve/reject behavior or scheduling.
+- GOAL_CONDITION: Load the review GUI with rows sourced from all three origins. Before: rows show no origin. After: every awaiting-Muxin row renders exactly one origin tag from {from /cycle, reply to mention, from GUI queue}, matching the pipeline that created it.
+- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
+- STATUS: Done
+- GROOMED: ready — scoped to data plumbing + display, explicit GOAL_CONDITION + 2026-07-04
+<!-- card-id: edec9293-7b72-494e-99ce-3c2895637a94 -->
+
+**Wire cards/TikTok/video auto-schedule into GUI Approve**
+- Card a4a2ce27 (Unified review + approval GUI) flagged this as the explicit next-priority follow-up (2026-07-04): text rows already auto-schedule to Typefully on Approve via publishText (src/review/serve.ts /api/status handler, SCHEDULABLE set currently only x/linkedin/bluesky), but card/tiktok/video rows fall through to a plain approve status update and still require a separate manual /publish run.
+- Extend the same Approve handler so card rows call the existing src/publish/cards.ts scheduling path, tiktok rows call src/publish/tiktok.ts scheduleToTikTok, and video rows call src/publish/youtube.ts's scheduled-upload path -- mirroring the try/catch + scheduleError pattern already used for text so a failure leaves the row at approve with a visible reason instead of silently losing it.
+- Per the epic's own note: this triggers real sends (PostPeer/Upload-Post/YouTube), so treat it under the content-agents generation-hold standing directive if the change touches what gets sent, not just scheduling plumbing.
+- Out of scope (separate, not yet filed): origin source-tags and live Typefully/PostPeer schedule reconciliation in the dashboard -- both listed in the same epic as separate still-to-wire items.
+- GOAL_CONDITION: Approving a card, tiktok, or video row in the review GUI results in the same content folder's row being scheduled via its platform's existing publish function (cards.ts / tiktok.ts / youtube.ts) with no separate /publish invocation required -- verified by an Approve action producing a scheduled draft/post (or a visible scheduleError on the row) for at least one row of each of the three row types.
+- PARENT: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Unified review + approval GUI (one page for everything awaiting Muxin) (a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9)
+- STATUS: Done
+- DECISION: approved — build approach confirmed (each platform schedules through its own existing path: cards.ts/tiktok.ts/youtube.ts, not the text scheduler). Sequence AFTER 87cb6d93 and 8b00ab2e — those are the priority for right now. 2026-07-04
+- GROOMED: ready — exact files/behavior specified, explicit GOAL_CONDITION + 2026-07-04
+<!-- card-id: d8a990a9-ffcd-46b6-849f-fcebf62e0ab6 -->
+
+**Guard the review GUI: don't allow Approve on a storyboard/video row with no rendered file**
+- The review GUI (`src/review/serve.ts`) writes `approve` straight into review-queue.md on any row's Approve click. A `video-script` / `storyboard`-type row can be approved even when its storyboard/video file doesn't exist yet (asset cell is `—`), producing a phantom approval that means nothing to `/publish` and reads as an unauthorized edit.
+- Observed 2026-07-04 (during repo sync): the innovation-nation `video-script` row was found flipped `blocked → approve` in the working tree with no storyboard file present — an uncommitted, unauthorized-looking edit traced back to a GUI Approve click on a not-yet-rendered row.
+- Fix: in `serve.ts`, guard the Approve action for storyboard/video rows whose asset file is missing (cell `—` / not on disk) — disable the button or reject the write, and surface why ("storyboard not rendered yet — run /video"). Text / image / quote-card rows unaffected. Small, local to `src/review/serve.ts`; no schema change.
+- ORIGIN: filed 2026-07-04 from the phantom-approve found during repo sync.
+- STATUS: Done
+- GROOMED: ready — small, well-scoped guard fix, local to src/review/serve.ts, no schema change, clear repro + fix approach + 2026-07-04
+<!-- card-id: 4bef9a7c-9148-4c59-afcf-04475ea11ff5 -->
+
+**Strong storytelling for social posts (hooks, narrative, practical angle) — eval current + design approach**
+- Social posts need HOOKS, NARRATIVE, and PRACTICAL ANGLES — strong storytelling is a must (Muxin). The current workflow is basic on this.
+- EVAL FIRST: build a storytelling rubric (hook strength / narrative arc / practical takeaway / overall storytelling) and TEST current output against it — score a sample of real content/<slug>/derivatives/, find where extraction-first posts fall flat on hook + narrative. THEN design the approach.
+- KEY TENSION to resolve: extraction-first (CLAUDE.md rule 1 — never compose new claims) vs strong storytelling (hooks/narratives usually need crafted connective tissue + a real hook). Spin already carves the middle path — "re-angle, re-order, change the framing and the HOOK to fit the audience, but never introduce a new claim/argument/worldview" (docs/spin-experiment.md). So storytelling likely = lean into Spin's latitude + a storytelling rubric/score, NOT a new claim-composing mode. Decide how much latitude is allowed.
+- OVERLAPS Spin / Swizzle (d23bfc5d): coordinate so storytelling is PART of the Spin engine (make the post engaging), not a separate pass. Add a STORYTELLING / HOOK dimension to /atomize's scoring (today: native/brand/cta) so weak hooks get caught pre-queue.
+- Deliverable: (1) storytelling rubric, (2) eval of current output with gaps, (3) recommended approach — how Spin optimizes hook + narrative + practical-angle within the no-new-claims guardrail + the new score dimension.
+- EVAL DONE (2026-06-30): rubric = hook / narrative / practical-angle / overall. Tested 10 real derivatives. FINDING: brand/native score 4-5 but storytelling clusters at 2-3 — the pipeline rewards the wrong thing; the 2 posts that DO tell a story (Trillionaire, Congress) score well only by accident (their SOURCE already had a hook/action). Spin's re-hook/re-order latitude is BUILT but UNUSED (no `spin: true` derivative in the sample) — so much of the gap is just "Spin isn't on." Ties directly to the Swizzle card (promote Spin to always-on).
+- APPROACH — ship now (pure upside, no guardrail change): (A) add a `storytelling` score to /atomize (today: native/brand/cta). DIMENSIONS = HOOK + NARRATIVE + RESONANCE (does it state a truth people are feeling / give them something to react to — NOT "does it ask for engagement", which is false). PRACTICAL ANGLE + CTA are CONDITIONAL, never scored requirements — present only when Muxin genuinely has something useful or a CTA truly fits; never penalize a society/economy post for lacking them. Soft-gate the queue on hook/narrative/resonance (low → flag for a Spin pass; Muxin's approve stays final). (B) apply Spin's existing latitude on X + LinkedIn — re-hook (lead with the strongest existing line, drop "What I described in my essay…"), re-order for arc, and STOP trimming the concrete personal specifics that ARE the story (e.g. the cut ADHD / "14 projects" details). Leave Bluesky/Notes near-verbatim.
+- DECISION (Muxin, 2026-06-30): engagement = RESONANCE, not conversion. NEVER ask for engagement (false/inauthentic) — her best Substack notes don't; they state a felt truth and THAT is what people react to, and she wants to stay that way. So practical-angle is NOT always required for society/economy posts — only when she actually has something useful to share (and that comes from HER source, so extraction-first stays intact). CTA = selective, ONLY where it genuinely makes sense; never the default, never turn every post into a conversion (cringey). REJECTED: blanket-CTA (was option ii-as-default) and relaxing extraction-first to manufacture takeaways (option iii). Each post should be a conversation / something to react to.
+- Key files: /atomize SKILL.md scoring (~lines 129-133), docs/spin-experiment.md (guardrail #1), config/voice.yaml.
+- STATUS: Done
+- DECISION: approved — PRIORITY 2 (Muxin, 2026-07-04): work this second, right after 87cb6d93. Shapes how generated content is scored/hooked, so it holds for PR review per the content-generation standing directive.
+- GROOMED: ready — eval already done (2026-06-30), approach decided (storytelling score dimension + selective Spin latitude), exact files named + 2026-07-04
+<!-- card-id: 8b00ab2e-31e4-4fe0-a1da-4d5ce9616ae1 -->
+
+**Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing**
+- Per the card's THREAD CHECK: every published piece must carry a visible thread back to the home-brand worldview — "I uncover harmful hidden beliefs and why they need to change before AI automates everything" (and the fuller unexamined-human-systems / who-benefits / building-the-right-thing statement behind it).
+- Operational test is NOT "is this about AI" — it's whether the piece connects back to that worldview; add this as an explicit check run before a piece reaches Muxin's review queue.
+- If the thread is missing, Spin drafts it in, then the piece routes through the existing GH editing loop (see Unified review + approval GUI card) for Muxin to iterate until it feels right.
+- Surface/suggest only — never hard-block a piece from publishing over a missing thread.
+- GOAL_CONDITION: Each piece reaching Muxin's review queue carries a thread-check result (pass/missing) against the home-brand worldview line; any piece flagged missing already has a Spin-drafted thread inserted before Muxin sees it, and no piece is blocked from publishing solely due to a missing/failing check.
+- ORIGIN: proposed by propose-cards 2026-07-02 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
+- STATUS: Done
+- DECISION: approved — PRIORITY 1 (Muxin, 2026-07-04): work this first. Touches generated content (Spin auto-draft), so it holds for PR review per the content-generation standing directive regardless of this approval-to-build.
+- GROOMED: ready — explicit GOAL_CONDITION, DECISION: approved PRIORITY 1 + 2026-07-04
+<!-- card-id: 87cb6d93-5e6f-405f-9188-99c9d96434e2 -->
 
 **Smoke-test the notes-daily job on its first real run**
 - SUPERSEDED premise (Muxin, 2026-07-04): the original test — "confirm drafts land UNSCHEDULED, not Scheduled" — no longer applies at all. notes-daily drafts NOTHING now: it only fetches new Substack Notes and marks them seen in the ledger. Real per-platform drafting (Spin's per-channel reframing) needs genuine Claude judgment, which only runs locally (the review GUI's "Pull Substack Notes" button, `claude -p "/atomize notes"`, $0 on the subscription).
 - CORRECTION (2026-07-04, same day): the GitHub Actions replacement noted below never actually worked — Substack's WAF 403s every request from GitHub's runner IPs regardless of headers (see 1eda54e7). "Works regardless of whether Muxin's Mac is on" was wrong; that benefit was never real. `.github/workflows/notes-daily.yml` is deleted. Final design is local-only: `config/launchd/com.content-agents.notes-daily.plist` (daily 07:00 local) + `docs/setup-notes-daily-launchd.md`, same posture as the weekly-pull job (b2e1c9b6) — Mac must be on.
 - NEW test (supersedes the cloud-PR test above): after Muxin runs the launchd enable steps, confirm (a) `launchctl start com.content-agents.notes-daily` runs clean (check `~/.content-agents/logs/notes-daily.log`), (b) new notes get appended to data/notes-spread-ledger.jsonl and aren't re-flagged on a second run, and (c) running "Pull Substack Notes" in the review GUI still drafts fresh (it doesn't consult this ledger, so nothing here blocks it).
-- STATUS: Backlog
+- STATUS: Done
 - GROOMED: ready — local job shipped in code; PARKED pending Muxin's one-time launchd enable (persistent system config, deliberately not auto-installed) + 2026-07-04
 <!-- card-id: 2972c204-ca9e-4799-ae8f-b8fc71bddcde -->
 
@@ -288,7 +423,8 @@ Examples - use both Primary and a Secondary CTA
 - DECISIONS (Muxin, 2026-07-03): (1) EDITING MODEL — KEEP inline edit-in-place (supersedes the earlier GitHub-PR-deeplink plan for now; Build-1 derivatives aren't in PRs yet — revisit if they move there). (2) APPROVE BEHAVIOR — Approve → AUTO-SCHEDULE, and it's BUILT for text rows: approving an x/linkedin/bluesky row now calls `publishText(folder, {onlyIds:[id]})` → a real Typefully SCHEDULED draft at the cadence slot → row flips to published; button reads "Approve → schedule"; schedule failures surface in the GUI instead of throwing. Done via a pure refactor of typefully.ts (new exported `publishText`; CLI + notes-daily paths unchanged; 48/48 tests green). Muxin takes the FIRST live Approve→schedule click (outward-facing) to watch it land.
 - SHIPPED SINCE (2026-07-03/04): PR #67 added an "Add / Queue" tab — Muxin can drop a source (pasted text, Obsidian/file path, or Substack URL) or hit "Pull Substack Notes" straight from the GUI; a single-worker job queue runs the real `/atomize` headlessly (`claude -p`, subscription, $0), one at a time, and auto-refreshes the Review tab when a job finishes. This is the GUI's "creating our own content" half — feed the pipeline without leaving the page. PR #68 fixed the video-script row to show the drafted script (`video/script-draft.md`) before the storyboard exists.
 - STILL TO WIRE (follow-ups, this is the "publishing" half that's still manual): (1) cards / tiktok / video auto-schedule from Approve — still requires a separate `/publish` run, unlike text rows which already auto-schedule to Typefully on Approve; (2) origin source-tags ("from /cycle" / "reply to mention" / "from GUI queue"); (3) live Typefully/PostPeer schedule reconciliation in the dashboard (so the GUI reflects what's actually scheduled, not just what was approved).
-- PRIORITY (Muxin, 2026-07-04): next GUI work — wire (1) above (cards/tiktok/video auto-schedule from Approve) so the GUI's Approve action fully covers publishing, not just text. Note: this is a content-agents content-generation-adjacent surface (it triggers /publish, which sends real drafts) — treat per the content-agents generation-hold standing directive if the change touches what gets generated/sent, not just scheduling plumbing.
+- RESOLVED (2026-07-05): all three STILL-TO-WIRE items above have since shipped as their own Done cards — (1) cards/tiktok/video auto-schedule from Approve → `d8a990a9`, (2) origin source-tags → `edec9293`, (3) live Typefully/PostPeer reconciliation → `383756f4`. The GUI's Approve action now covers publishing for every row type, not just text.
+- PRIORITY (Muxin, 2026-07-04): next GUI work — wire (1) above (cards/tiktok/video auto-schedule from Approve) so the GUI's Approve action fully covers publishing, not just text. Note: this is a content-agents content-generation-adjacent surface (it triggers /publish, which sends real drafts) — treat per the content-agents generation-hold standing directive if the change touches what gets generated/sent, not just scheduling plumbing. SUPERSEDED — see RESOLVED note above.
 - STATUS: Done
 - DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
 <!-- card-id: a4a2ce27-d4c4-4084-85b5-7e8b3c563dd9 -->
