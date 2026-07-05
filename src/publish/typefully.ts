@@ -131,9 +131,20 @@ export function buildDraftPayload(opts: {
   return payload;
 }
 
+// The draft title publishText gives every row it schedules — the ONE identifier that ties a live
+// Typefully draft back to a specific review-queue.md row (Typefully has no other place to stash a
+// caller-supplied id). Exported so src/review/reconcile.ts matches a row to its live draft by this
+// exact string instead of re-deriving the format and risking drift.
+export function rowDraftTitle(rowId: string): string {
+  return `${rowId} (content-agents)`;
+}
+
 // Read-only: the live Typefully scheduled-draft queue, normalized for the unified view + --list.
-// No writes. Exported so queue-view.ts can merge it with the other channels.
-export type TypefullyScheduled = { whenIso: string; platforms: string[]; title: string };
+// No writes. Exported so queue-view.ts can merge it with the other channels. `id` is the draft id
+// Typefully itself assigns (also the one logged to publish-log.md as `typefully draft <id>`) — the
+// stable, provider-unique key src/review/reconcile.ts matches a row against, since `title` alone
+// (row-id-derived) isn't guaranteed unique across different content folders.
+export type TypefullyScheduled = { id: string; whenIso: string; platforms: string[]; title: string };
 
 export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
   const setId = await socialSetId();
@@ -145,6 +156,7 @@ export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
     .filter((d) => d.scheduled_date && (d.status === "scheduled" || new Date(d.scheduled_date) > new Date()))
     .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime())
     .map((d) => ({
+      id: String(d.id),
       whenIso: d.scheduled_date!,
       platforms: (
         [
@@ -305,7 +317,7 @@ export async function publishText(
     const publishAt = noSchedule ? null : slotByRow.get(row.id) ?? "next-free-slot";
     const when = noSchedule ? "unscheduled" : whenByRow.get(row.id) ?? "next-free-slot";
     const draftBody = JSON.stringify(
-      buildDraftPayload({ title: `${row.id} (content-agents)`, platformKey, posts, publishAt })
+      buildDraftPayload({ title: rowDraftTitle(row.id), platformKey, posts, publishAt })
     );
     // Uploaded video can still be transcoding for a few seconds — retry the draft on "processing".
     let draft: { id?: string | number; share_url?: string };

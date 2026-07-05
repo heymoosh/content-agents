@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   revisePrompt,
   classifySource,
@@ -7,8 +10,10 @@ import {
   approveBlockReason,
   scheduleKind,
   scheduleApproved,
+  enrich,
   type SchedulerDeps,
 } from "./serve.js";
+import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
 
 // "Revise with Claude" (Muxin, 2026-07-03): the GUI shells out to headless `claude -p` to edit one
@@ -231,4 +236,57 @@ test("scheduleApproved surfaces a scheduleError when the publisher runs but sche
   const out = await scheduleApproved("/f", row({ id: "tiktok-1", platform: "tiktok", format: "short" }), deps);
   assert.equal(out.scheduled, null);
   assert.match(out.scheduleError ?? "", /reuse guard|connected account/);
+});
+
+// Live Typefully/PostPeer schedule reconciliation (Muxin, 2026-07-04): GET /api/queue calls
+// enrich() per row to attach row.reconciled — this exercises that REAL function (not a
+// reimplementation) against a temp folder, proving the GOAL_CONDITION end to end: one published
+// row whose draft is genuinely live at the provider shows its real time, one approved row with
+// nothing scheduled is flagged as a mismatch. No network — the live provider state is injected.
+function tmpContentFolder(): string {
+  return mkdtempSync(join(tmpdir(), "reconcile-serve-test-"));
+}
+
+test("enrich() attaches the provider's real time to a row that's genuinely live", () => {
+  const folder = tmpContentFolder();
+  try {
+    const live: LiveProviderState = {
+      typefullyDrafts: [{ id: "98765", whenIso: "2026-07-10T16:00:00.000Z", platforms: ["x"], title: "x-1 (content-agents)" }],
+      postpeerPosts: [],
+    };
+    const log = { text: "- 2026-07-04T00:00:00.000Z — x-1 → typefully draft 98765 (x, Fri 9:00am PT)\n" };
+    const r = row({ id: "x-1", platform: "x", format: "text", status: "published" });
+    const out = enrich(folder, "2026-07-04-demo", r, log, live);
+    assert.equal(out.reconciled?.provider, "typefully");
+    assert.equal(out.reconciled?.state, "scheduled");
+    assert.ok(out.reconciled?.when, "should carry the provider's real scheduled time");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("enrich() flags an approved row with nothing scheduled at the provider as a mismatch", () => {
+  const folder = tmpContentFolder();
+  try {
+    const live: LiveProviderState = { typefullyDrafts: [], postpeerPosts: [] };
+    const r = row({ id: "tiktok-1", platform: "tiktok", format: "short", status: "approve" });
+    const out = enrich(folder, "2026-07-04-demo", r, { text: "" }, live);
+    assert.equal(out.reconciled?.provider, "postpeer");
+    assert.equal(out.reconciled?.state, "mismatch");
+    assert.match(out.reconciled?.reason ?? "", /no scheduled PostPeer post recorded/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("enrich() omits reconciled entirely for a row that isn't approved yet", () => {
+  const folder = tmpContentFolder();
+  try {
+    const live: LiveProviderState = { typefullyDrafts: [], postpeerPosts: [] };
+    const r = row({ id: "x-2", platform: "x", format: "text", status: "pending" });
+    const out = enrich(folder, "2026-07-04-demo", r, { text: "" }, live);
+    assert.equal(out.reconciled, undefined);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
