@@ -27,10 +27,12 @@ import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { repoRoot, openDb } from "../db/db.js";
 import { readQueue, stampOrigin, type QueueRow } from "../publish/queue.js";
-import { publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
+import { publishText, TEXT_PLATFORMS, fetchScheduledDrafts } from "../publish/typefully.js";
 import { publishCards, isQuoteCardRow } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
+import { fetchScheduledPosts } from "../publish/postpeer-status.js";
+import { reconcileRow, needsReconciliation, type LiveProviderState, type ReconciledStatus, type PublishLogRead } from "./reconcile.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import { classifyThread } from "../atomize/thread-check.js";
 
@@ -68,6 +70,7 @@ interface EnrichedRow extends QueueRow {
   revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
   hasAsset: boolean;
   approveBlocked: string | null; // reason Approve is disabled, if any
+  reconciled?: ReconciledStatus; // live Typefully/PostPeer reconciliation — omitted when not applicable
 }
 
 interface Piece {
@@ -202,7 +205,41 @@ export async function scheduleApproved(
   }
 }
 
-function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
+// Read-only publish-log.md text for a folder — the only place a provider draft/post id is
+// persisted (see src/review/reconcile.ts). A missing file (ENOENT — no log yet) just has no
+// entries to find; any OTHER read failure (permissions, fd exhaustion, ...) is carried as `error`
+// so reconcileRow reports "unavailable" instead of misreading it as "nothing ever scheduled".
+function readPublishLogSafe(folder: string): PublishLogRead {
+  try {
+    return { text: readFileSync(join(folder, "publish-log.md"), "utf8") };
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return { text: "" };
+    return { text: "", error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// Fetch one provider's live list, degrading to `items: null` + an error string on failure (missing
+// credentials, network error, non-2xx) instead of throwing — a reconciliation check that can't
+// reach a provider must say so ("unavailable"), never silently read as "not scheduled" (mismatch).
+async function safeFetch<T>(fn: () => Promise<T[]>): Promise<{ items: T[] | null; error?: string }> {
+  try {
+    return { items: await fn() };
+  } catch (e) {
+    return { items: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// The live Typefully + PostPeer state, fetched ONCE per /api/queue request (not per row/folder) —
+// both are account-wide reads, not scoped to one content folder. Read-only: never schedules,
+// cancels, or modifies anything at either provider.
+async function fetchLiveProviderState(): Promise<LiveProviderState> {
+  const [tf, pp] = await Promise.all([safeFetch(fetchScheduledDrafts), safeFetch(fetchScheduledPosts)]);
+  return { typefullyDrafts: tf.items, typefullyError: tf.error, postpeerPosts: pp.items, postpeerError: pp.error };
+}
+
+// Exported so the reconciliation wiring (row.reconciled) is testable against the REAL code path
+// /api/queue uses — a temp folder + a crafted publish-log.md + injected live state, no server/network.
+export function enrich(folder: string, slug: string, row: QueueRow, publishLog: PublishLogRead, live: LiveProviderState): EnrichedRow {
   const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
   let kind: Kind = "unknown";
   if (row.format === "text") kind = "text";
@@ -217,6 +254,7 @@ function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
     revisable: existsSync(join(folder, "derivatives", `${row.id}.md`)),
     hasAsset: false,
     approveBlocked: approveBlockReason(folder, row),
+    reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live) : undefined,
   };
   const assetUrl = (file: string) => `/asset?slug=${encodeURIComponent(slug)}&file=${encodeURIComponent(file)}`;
 
@@ -264,7 +302,7 @@ function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
   return out;
 }
 
-function listPieces(): Piece[] {
+async function listPieces(): Promise<Piece[]> {
   let dirs: string[] = [];
   try {
     dirs = readdirSync(CONTENT, { withFileTypes: true })
@@ -273,10 +311,20 @@ function listPieces(): Piece[] {
   } catch {
     dirs = [];
   }
-  const pieces = dirs.map((slug) => {
+  // Read every folder's rows up front (sync, no network) so a live Typefully/PostPeer fetch only
+  // happens when there's actually an approved row somewhere to reconcile.
+  const folderRows = dirs.map((slug) => {
     const folder = join(CONTENT, slug);
-    const { rows } = readQueue(folder);
-    const enriched = rows.map((r) => enrich(folder, slug, r));
+    return { slug, folder, rows: readQueue(folder).rows };
+  });
+  const anyNeedsReconcile = folderRows.some(({ rows }) => rows.some(needsReconciliation));
+  const live: LiveProviderState = anyNeedsReconcile
+    ? await fetchLiveProviderState()
+    : { typefullyDrafts: [], postpeerPosts: [] };
+
+  const pieces = folderRows.map(({ slug, folder, rows }) => {
+    const publishLog: PublishLogRead = rows.some(needsReconciliation) ? readPublishLogSafe(folder) : { text: "" };
+    const enriched = rows.map((r) => enrich(folder, slug, r, publishLog, live));
     return {
       slug,
       title: firstHeading(folder),
@@ -847,7 +895,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/queue") {
-      const pieces = listPieces();
+      const pieces = await listPieces();
       json(res, 200, { pieces, pending: pieces.reduce((n, p) => n + p.pending, 0) });
       return;
     }
@@ -1111,6 +1159,9 @@ const PAGE = /* html */ `<!doctype html>
   .notes { font-size:12.5px; color:var(--amber); margin:4px 0 0; }
   .approve-blocked { font-size:12.5px; color:var(--red); margin:4px 0 0; font-weight:600; }
   .scheduled { font-size:12.5px; color:var(--green); font-weight:600; margin:4px 0 0; }
+  .recon-ok { font-size:12.5px; color:var(--green); font-weight:600; margin:4px 0 0; }
+  .recon-mismatch { font-size:12.5px; color:var(--red); font-weight:600; margin:4px 0 0; }
+  .recon-unknown { font-size:12.5px; color:var(--muted); margin:4px 0 0; }
   .actions { display:flex; gap:7px; margin-top:11px; flex-wrap:wrap; align-items:center; }
   .actions .spacer { flex:1; }
   button.approve{border-color:var(--green);color:var(--green)}
@@ -1320,6 +1371,17 @@ function rowEl(piece, row){
 
   const notes = row.notes && row.notes.trim() ? '<div class="notes">note: '+esc(row.notes)+'</div>' : "";
   const sched = row.scheduledWhen ? '<div class="scheduled">✓ scheduled · '+esc(row.scheduledWhen)+'</div>' : "";
+  // Live reconciliation against the real provider (Typefully/PostPeer) — the authoritative check,
+  // unlike sched above which is just what the client remembers asking for at approve-time.
+  const recon = row.reconciled;
+  let reconHtml = "";
+  if (recon && recon.state === "scheduled") {
+    reconHtml = '<div class="recon-ok">✓ live at '+esc(recon.provider)+(recon.when ? ' · '+esc(recon.when) : '')+'</div>';
+  } else if (recon && recon.state === "mismatch") {
+    reconHtml = '<div class="recon-mismatch">⚠ not found at '+esc(recon.provider)+' — '+esc(recon.reason||"mismatch")+'</div>';
+  } else if (recon && recon.state === "unavailable") {
+    reconHtml = '<div class="recon-unknown">provider check unavailable ('+esc(recon.provider)+') — '+esc(recon.reason||"")+'</div>';
+  }
   const manual = row.manualComment ? '<div class="notes">↳ add as first comment in Typefully: '+esc(row.manualComment)+'</div>' : "";
   const editBtn = row.editable ? '<button data-act="edit">Edit</button>' : "";
   const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Ask Claude</button>' : "";
@@ -1336,7 +1398,7 @@ function rowEl(piece, row){
       '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + thread + origin + src +
       '<span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>'+
     '</div>'+
-    preview + notes + sched + manual + blockedNote +
+    preview + notes + sched + reconHtml + manual + blockedNote +
     '<div class="actions">'+
       '<button class="approve'+(row.status==="approve"?" on":"")+'" data-act="approve"'+
         (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>'+approveLabel+'</button>'+

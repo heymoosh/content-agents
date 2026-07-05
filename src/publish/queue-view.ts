@@ -34,7 +34,9 @@ interface SourceResult {
   ok: boolean; // did we successfully reach the service? drift only cross-checks reachable sources
 }
 
-const POSTPEER_API = "https://api.postpeer.dev/v1";
+// Exported so src/publish/postpeer-status.ts (the review GUI's live reconciliation) hits the same
+// base URL instead of keeping its own copy that could drift.
+export const POSTPEER_API = "https://api.postpeer.dev/v1";
 
 // LA calendar day (YYYY-MM-DD) for an ISO time — matches the ledger's `day` key so live posts and
 // claims compare on the same per-platform-per-day grain the scheduler enforces.
@@ -103,7 +105,9 @@ interface PostPeerPost {
   mediaItems?: { type?: string }[];
 }
 
-function extractPostPeerList(json: unknown): PostPeerPost[] {
+// Exported so postpeer-status.ts reuses this SAME defensive parsing instead of guessing PostPeer's
+// undocumented response shape a second, independently-maintained time.
+export function extractPostPeerList(json: unknown): PostPeerPost[] {
   if (Array.isArray(json)) return json as PostPeerPost[];
   const o = json as Record<string, unknown>;
   for (const key of ["posts", "data", "results", "items"]) {
