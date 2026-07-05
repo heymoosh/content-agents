@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { revisePrompt, classifySource, isSafeRawPath } from "./serve.js";
+import { revisePrompt, classifySource, isSafeRawPath, approveBlockReason } from "./serve.js";
+import type { QueueRow } from "../publish/queue.js";
 
 // "Revise with Claude" (Muxin, 2026-07-03): the GUI shells out to headless `claude -p` to edit one
 // derivative in place. The prompt is the only guardrail against Claude wandering — these lock it in.
@@ -47,6 +48,62 @@ test("classifySource routes urls, existing files, and pasted text", () => {
 // Analytics tab "raw downloaded exports" viewer (Muxin, 2026-07-04): serves files straight out of
 // data/inbox and data/processed by a client-supplied relative path — this guard is the only thing
 // standing between that and reading arbitrary files off disk.
+// Approve guard (Muxin, 2026-07-04): the "video-script" row (format=storyboard) drafts
+// video/script-draft.md long before /video turns it into video/storyboard.md — the one file
+// src/video/render.ts's own render gate trusts. Approving off the draft alone is a phantom
+// approval. `exists` is injected so these don't touch the real filesystem.
+const storyboardRow: QueueRow = {
+  id: "video-script", platform: "video-script", format: "storyboard", asset: "—",
+  status: "blocked", notes: "", lineIndex: 0,
+};
+
+test("approveBlockReason blocks a storyboard row when video/storyboard.md doesn't exist", () => {
+  const reason = approveBlockReason("/content/2026-06-16-foo", storyboardRow, () => false);
+  assert.match(reason ?? "", /storyboard not rendered yet/);
+  assert.match(reason ?? "", /\/video/); // tells Muxin what to run
+});
+
+test("approveBlockReason allows the same storyboard row once video/storyboard.md exists", () => {
+  const reason = approveBlockReason(
+    "/content/2026-06-16-foo",
+    storyboardRow,
+    (p) => p === "/content/2026-06-16-foo/video/storyboard.md",
+  );
+  assert.equal(reason, null);
+});
+
+test("approveBlockReason never blocks text/image/quote-card rows, even with nothing on disk", () => {
+  const textRow: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 1 };
+  const imageRow: QueueRow = { id: "quote-card-1", platform: "quote-card", format: "image", asset: "images/quote-card-1.png", status: "pending", notes: "", lineIndex: 2 };
+  const cardCaptionRow: QueueRow = { id: "quote-card-6-x", platform: "quote-card:x", format: "image", asset: "images/quote-card-6.png", status: "pending", notes: "", lineIndex: 3 };
+  const alwaysFalse = () => false;
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", textRow, alwaysFalse), null);
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", imageRow, alwaysFalse), null);
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", cardCaptionRow, alwaysFalse), null);
+});
+
+// "video"/"short" rows carry the same missing-render risk as the video-script row above (the
+// rendered short + its TikTok row are also added to review-queue.md right after a /video render —
+// docs/content-agents-backlog.md card 4bef9a7c calls this out by name as "storyboard/video rows").
+test("approveBlockReason blocks a video/short row whose asset isn't rendered yet", () => {
+  const videoRow: QueueRow = { id: "qvid-x", platform: "x", format: "video", asset: "video/short.mp4", status: "pending", notes: "", lineIndex: 4 };
+  const shortRow: QueueRow = { id: "tiktok-1", platform: "tiktok", format: "short", asset: "video/short.mp4", status: "pending", notes: "", lineIndex: 5 };
+  const alwaysFalse = () => false;
+  assert.match(approveBlockReason("/content/2026-06-16-foo", videoRow, alwaysFalse) ?? "", /not rendered yet/);
+  assert.match(approveBlockReason("/content/2026-06-16-foo", shortRow, alwaysFalse) ?? "", /not rendered yet/);
+});
+
+test("approveBlockReason allows a video/short row once its asset exists", () => {
+  const videoRow: QueueRow = { id: "qvid-x", platform: "x", format: "video", asset: "video/short.mp4", status: "pending", notes: "", lineIndex: 4 };
+  const exists = (p: string) => p === "/content/2026-06-16-foo/video/short.mp4";
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", videoRow, exists), null);
+});
+
+test("approveBlockReason doesn't block a video/short row with no asset cell yet (nothing to check)", () => {
+  const noAssetRow: QueueRow = { id: "tiktok-1", platform: "tiktok", format: "short", asset: "—", status: "pending", notes: "", lineIndex: 5 };
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", noAssetRow, () => false), null);
+});
+
 test("isSafeRawPath only allows paths under data/inbox or data/processed", () => {
   assert.ok(isSafeRawPath("inbox/x/export.csv"));
   assert.ok(isSafeRawPath("processed/foo.json"));
