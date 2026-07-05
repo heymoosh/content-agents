@@ -139,7 +139,37 @@ makes `/cycle` compound instead of restarting every week.
 
    (`/publish` appends `Placed log` rows here automatically when assets ship — leave those alone.)
 
-6. **Honesty rules.**
+6. **Refresh per-channel angles (drift check).** On-demand, not a hard requirement of every run:
+   skip this step if Muxin doesn't have his Obsidian content-ideas notes handy this cycle, and say
+   so in the summary (Step 8) rather than blocking the rest of the brief.
+   - The four `spin_angles` in `config/platforms.yaml` (x, linkedin, substack, bluesky) were derived
+     from Muxin's Obsidian content-ideas and approved 2026-06-30. This step re-checks whether they
+     still hold — it never rewrites them. There is no configured path to the vault in this repo, so
+     ask Muxin for the current content-ideas (a file path, or pasted notes) if it isn't already in
+     this conversation.
+   - Read those notes plus `config/pillars.yaml`. For each of the four channels, judge (your own
+     inline call, same as pillar tagging / storytelling scores / the home-brand thread-check
+     elsewhere in this pipeline) what candidate X-for-Y angle the current content-ideas most
+     support for that channel's audience — reframing what Muxin is already writing about, never
+     inventing a new stream. Then judge `verdict: "match"` if that candidate is still substantively
+     the same claim as the encoded angle in `config/platforms.yaml`, or `"drift"` if it's
+     meaningfully different, with a one-line `rationale` citing what shifted in the notes.
+   - Run the comparison (deterministic plumbing only — it never touches `config/platforms.yaml`).
+     `candidate`/`rationale` are free-form prose, so (same as Step 2's large batches) write the
+     array to a temp file and pass the path rather than inlining it as a single-quoted shell arg —
+     an apostrophe in the text ("doesn't", "Muxin's") would otherwise break the shell command:
+     ```
+     npm run angle-refresh -- /tmp/angle-candidates.json
+     ```
+   - Show the printed report to Muxin, and append it verbatim under a `## Angle drift check` section
+     at the end of this cycle's `briefs/YYYY-MM-DD-strategy-brief.md` (or a one-line "skipped — no
+     content-ideas notes this cycle" if this step didn't run) so a later read of the brief file shows
+     whether the check ran and what it found, not just the chat transcript. A "no drift" result needs
+     no follow-up. A drifted channel is a suggestion for Muxin's own re-approval, same posture as the
+     home-brand thread-check — it never edits `config/platforms.yaml` itself and never blocks the
+     rest of `/strategy`.
+
+7. **Honesty rules.**
    - A channel flagged INSUFFICIENT gets at most a [TEST] recommendation, never [DO MORE].
    - A bet graded on n<3 (insufficient-sample) may be carried as a TEST but NEVER promoted to a
      [DO MORE] directive — thin data caps confidence.
@@ -149,4 +179,5 @@ makes `/cycle` compound instead of restarting every week.
      recommend consistent posting for N more weeks instead.
    - This brief informs Muxin's judgment; it does not replace it. Flag uncertainty plainly.
 
-7. Show Muxin a 3-bullet summary of the brief, the scorecard verdicts, and where it was written.
+8. Show Muxin a 3-bullet summary of the brief, the scorecard verdicts, and where it was written
+   (plus the angle-refresh result from Step 6, if it ran).
