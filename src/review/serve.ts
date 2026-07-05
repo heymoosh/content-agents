@@ -26,7 +26,7 @@ import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { repoRoot, openDb } from "../db/db.js";
-import { readQueue, type QueueRow } from "../publish/queue.js";
+import { readQueue, stampOrigin, type QueueRow } from "../publish/queue.js";
 import { publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
 import { publishCards, isQuoteCardRow } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
@@ -742,12 +742,26 @@ async function drain(): Promise<void> {
   job.startedAt = Date.now();
   const before = new Set(listSlugs());
   try {
+    // ATOMIZE_ORIGIN=gui-queue tells the /atomize skill's step 8 to tag every row it appends
+    // "from GUI queue" instead of the default "from /cycle" — the origin source-tag the review
+    // GUI renders per row (src/publish/queue.ts QUEUE_ORIGINS).
     await execFileP("claude", ["-p", `/atomize ${job.arg}`, "--permission-mode", ATOMIZE_PERMISSION_MODE], {
       cwd: repoRoot,
       timeout: ATOMIZE_TIMEOUT_MS,
       maxBuffer: 40_000_000,
+      env: { ...process.env, ATOMIZE_ORIGIN: "gui-queue" },
     });
     job.slugs = listSlugs().filter((s) => !before.has(s));
+    // Belt-and-suspenders: force the origin tag on every row of every folder this job created,
+    // rather than trusting the subprocess's own SKILL.md-driven bookkeeping to have landed it
+    // (e.g. if `echo $ATOMIZE_ORIGIN` wasn't an allowlisted Bash command in that run).
+    for (const slug of job.slugs) {
+      try {
+        stampOrigin(join(CONTENT, slug), "from GUI queue");
+      } catch {
+        // best-effort tagging only — never fail the job over it
+      }
+    }
     job.status = "done";
     if (!job.slugs.length) {
       job.error = "atomize finished but created no new content folder — check the terminal running the GUI";
@@ -1085,6 +1099,7 @@ const PAGE = /* html */ `<!doctype html>
   .spin { font-size:11px; background:#efeafd; color:#5b46b8; padding:2px 8px; border-radius:5px; font-weight:600; }
   .thread-pass { font-size:11px; background:var(--green-bg); color:var(--green); padding:2px 8px; border-radius:5px; font-weight:600; }
   .thread-missing { font-size:11px; background:var(--amber-bg); color:var(--amber); padding:2px 8px; border-radius:5px; font-weight:600; }
+  .origin { font-size:11px; background:#e9e5da; color:#6b6355; padding:2px 8px; border-radius:5px; font-weight:600; }
   .src { font-size:11px; color:var(--muted); }
   .body { white-space:pre-wrap; font-size:14.5px; line-height:1.6; margin:4px 0 6px;
     padding:11px 13px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
@@ -1291,6 +1306,9 @@ function rowEl(piece, row){
     : row.threadCheck === "pass"
     ? '<span class="thread-pass">thread: pass</span>'
     : "";
+  // Origin source-tag (Muxin, 2026-07-04): which pipeline created this row. Omitted (not guessed)
+  // for a row written before this field existed — see src/publish/queue.ts QUEUE_ORIGINS.
+  const origin = row.origin ? '<span class="origin">'+esc(row.origin)+'</span>' : "";
   let preview = "";
   if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
   else if (row.assetUrl && row.kind === "video") preview = '<video class="preview" src="'+row.assetUrl+'" controls muted></video>';
@@ -1315,7 +1333,7 @@ function rowEl(piece, row){
   el.innerHTML =
     '<div class="rowhead">'+
       '<span class="badge '+esc(row.platform.split(":")[0])+'">'+esc(row.platform)+'</span>'+
-      '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + thread + src +
+      '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + thread + origin + src +
       '<span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>'+
     '</div>'+
     preview + notes + sched + manual + blockedNote +
