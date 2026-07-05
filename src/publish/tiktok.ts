@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { claimSlots } from "./slots.js";
+import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 
 // Schedule approved `tiktok` rows to TikTok via PostPeer (a sanctioned API relay that holds
@@ -139,22 +139,30 @@ async function runCheck(): Promise<void> {
   console.log(`✓ POSTPEER_TIKTOK_ACCOUNT_ID=${want} is a connected TikTok account — ready to schedule.`);
 }
 
-async function main() {
-  const arg = process.argv[2];
-  if (!arg) {
-    console.error("usage: tsx src/publish/tiktok.ts <content-folder> | --check");
-    process.exit(1);
-  }
-  if (arg === "--check") {
-    await runCheck();
-    return;
-  }
-  const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
+export interface ScheduledTikTok {
+  id: string;
+  platform: string; // always "tiktok"
+  when: string; // human PT label (matches publishText/publishShorts, not a raw ISO string)
+  ref: string; // provider post ref
+}
+
+// Exported so serve.ts's scheduleKind() routes to publishTikTok using this SAME predicate, instead
+// of keeping its own independently-maintained copy that could drift out of sync with this one.
+export const isTikTokRow = (platform: string): boolean => platform === "tiktok";
+
+// Schedule approved `tiktok` rows from a folder to TikTok via PostPeer (scheduleToTikTok). Extracted
+// from the CLI (like publishText) so the review GUI can schedule ONE row on approve via opts.onlyIds.
+// With no opts it behaves exactly as the CLI did — every approved tiktok row — so /publish is unchanged.
+export async function publishTikTok(
+  folder: string,
+  opts: { onlyIds?: string[] } = {}
+): Promise<ScheduledTikTok[]> {
   const { rows } = readQueue(folder);
-  const approved = rows.filter((r) => r.status === "approve" && r.platform === "tiktok");
+  let approved = rows.filter((r) => r.status === "approve" && isTikTokRow(r.platform));
+  if (opts.onlyIds) approved = approved.filter((r) => opts.onlyIds!.includes(r.id));
   if (approved.length === 0) {
     console.log("no approved tiktok rows in the review queue");
-    return;
+    return [];
   }
 
   // Reuse guard: skip if this slug was published to TikTok too recently.
@@ -163,7 +171,7 @@ async function main() {
   if (!reuseCheck.allowed) {
     console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
     console.log("no rows to publish: tiktok blocked by the reuse guard");
-    return;
+    return [];
   }
 
   const videoPath = join(folder, "video", "short.mp4");
@@ -180,6 +188,7 @@ async function main() {
     : { fm: {} as Record<string, unknown> };
 
   const times = resolveTimes(approved.length, `${basename(folder)}/tiktok`);
+  const results: ScheduledTikTok[] = [];
   for (let i = 0; i < approved.length; i++) {
     const row = approved[i];
     const scheduledFor = times[i];
@@ -188,7 +197,23 @@ async function main() {
     appendPublishLog(folder, `${row.id} → tiktok ${ref} (scheduled ${scheduledFor})`);
     appendBetPlacement(folder, row.id, "tiktok", `${ref} @ ${scheduledFor}`, fm, caption);
     console.log(`scheduled: ${row.id} → tiktok ${ref} @ ${scheduledFor}`);
+    results.push({ id: row.id, platform: "tiktok", when: fmtLa(new Date(scheduledFor)), ref });
   }
+  return results;
+}
+
+async function main() {
+  const arg = process.argv[2];
+  if (!arg) {
+    console.error("usage: tsx src/publish/tiktok.ts <content-folder> | --check");
+    process.exit(1);
+  }
+  if (arg === "--check") {
+    await runCheck();
+    return;
+  }
+  const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
+  await publishTikTok(folder);
 }
 
 // Run the CLI only when executed directly, so the module can be imported (e.g. in tests) without

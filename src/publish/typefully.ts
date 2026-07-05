@@ -19,7 +19,9 @@ import { checkReuse } from "./reuse-guard.js";
 // Needs TYPEFULLY_API_KEY (and optionally TYPEFULLY_SOCIAL_SET_ID) in .env.
 
 const BASE = "https://api.typefully.com/v2";
-const TEXT_PLATFORMS = new Set(["x", "linkedin", "bluesky"]);
+// Exported so serve.ts's scheduleKind() routes to publishText using this SAME set, instead of
+// keeping its own independently-maintained copy that could drift out of sync with this one.
+export const TEXT_PLATFORMS = new Set(["x", "linkedin", "bluesky"]);
 
 async function api(path: string, init?: RequestInit): Promise<unknown> {
   const key = process.env.TYPEFULLY_API_KEY;

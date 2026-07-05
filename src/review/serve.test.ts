@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { revisePrompt, classifySource, isSafeRawPath, approveBlockReason } from "./serve.js";
+import {
+  revisePrompt,
+  classifySource,
+  isSafeRawPath,
+  approveBlockReason,
+  scheduleKind,
+  scheduleApproved,
+  type SchedulerDeps,
+} from "./serve.js";
 import type { QueueRow } from "../publish/queue.js";
 
 // "Revise with Claude" (Muxin, 2026-07-03): the GUI shells out to headless `claude -p` to edit one
@@ -111,4 +119,116 @@ test("isSafeRawPath only allows paths under data/inbox or data/processed", () =>
   assert.ok(!isSafeRawPath("/etc/passwd"));
   assert.ok(!isSafeRawPath("config/voice.yaml")); // outside the two allowed roots
   assert.ok(!isSafeRawPath(""));
+});
+
+// Approve → auto-schedule for cards / tiktok / video (Muxin, 2026-07-04): approving one of these
+// rows in the GUI now schedules it via its platform's existing publish function (no separate
+// /publish run), mirroring the text→Typefully path. `SchedulerDeps` is injected so these route/error
+// tests NEVER touch a real PostPeer / Upload-Post / YouTube network call.
+const row = (over: Partial<QueueRow>): QueueRow => ({
+  id: "r", platform: "x", format: "text", asset: "—", status: "approve", notes: "", lineIndex: 0, ...over,
+});
+
+test("scheduleKind routes each row type to the publisher that owns its filter", () => {
+  assert.equal(scheduleKind(row({ platform: "x", format: "text" })), "text");
+  assert.equal(scheduleKind(row({ platform: "linkedin" })), "text");
+  assert.equal(scheduleKind(row({ platform: "bluesky" })), "text");
+  // a native-video post on a text platform (the animated quote video: {x|linkedin|bluesky, video})
+  // still goes via Typefully, NOT youtube — text platforms are matched first, which is required so
+  // these real qvid rows don't fall to youtube.ts (whose filter is format==="short", not "video").
+  assert.equal(scheduleKind(row({ platform: "x", format: "video" })), "text");
+  assert.equal(scheduleKind(row({ platform: "quote-card", format: "image" })), "card");
+  assert.equal(scheduleKind(row({ platform: "quote-card:linkedin", format: "image" })), "card");
+  assert.equal(scheduleKind(row({ platform: "tiktok", format: "short" })), "tiktok"); // matched before video
+  // the YouTube Short row (format "short" only ever appears on youtube/tiktok rows, never a text platform)
+  assert.equal(scheduleKind(row({ platform: "youtube", format: "short" })), "video");
+  assert.equal(scheduleKind(row({ platform: "youtube", format: "video" })), "video");
+  // a row no scheduler owns just gets the plain approve status (e.g. substack, or the storyboard row)
+  assert.equal(scheduleKind(row({ platform: "substack", format: "text" })), null);
+  assert.equal(scheduleKind(row({ platform: "video-script", format: "storyboard" })), null);
+});
+
+// Stub deps: record which publisher fired + return a marker so we can assert the row's scheduled
+// info came back. Any dep NOT overridden throws if called, proving routing hit exactly one path.
+function stubDeps(): { deps: SchedulerDeps; calls: Record<string, { folder: string; onlyIds?: string[] }[]> } {
+  const calls: Record<string, { folder: string; onlyIds?: string[] }[]> = {
+    publishText: [], publishCards: [], publishTikTok: [], publishShorts: [],
+  };
+  const rec = (name: string) => async (folder: string, opts?: { onlyIds?: string[] }) => {
+    calls[name].push({ folder, onlyIds: opts?.onlyIds });
+    return [{ scheduledBy: name }];
+  };
+  return {
+    calls,
+    deps: {
+      publishText: rec("publishText"),
+      publishCards: rec("publishCards"),
+      publishTikTok: rec("publishTikTok"),
+      publishShorts: rec("publishShorts"),
+    },
+  };
+}
+
+test("scheduleApproved schedules a TEXT row via publishText only (mocked, no network)", async () => {
+  const { deps, calls } = stubDeps();
+  const out = await scheduleApproved("/content/2026-06-16-foo", row({ id: "x-1", platform: "x", format: "text" }), deps);
+  assert.deepEqual(out, { scheduled: { scheduledBy: "publishText" }, scheduleError: null });
+  assert.deepEqual(calls.publishText, [{ folder: "/content/2026-06-16-foo", onlyIds: ["x-1"] }]);
+  assert.equal(calls.publishCards.length + calls.publishTikTok.length + calls.publishShorts.length, 0);
+});
+
+test("scheduleApproved schedules a CARD row via publishCards only (mocked, no network)", async () => {
+  const { deps, calls } = stubDeps();
+  const out = await scheduleApproved("/content/2026-06-16-foo", row({ id: "quote-card-1", platform: "quote-card:x", format: "image" }), deps);
+  assert.deepEqual(out, { scheduled: { scheduledBy: "publishCards" }, scheduleError: null });
+  assert.deepEqual(calls.publishCards, [{ folder: "/content/2026-06-16-foo", onlyIds: ["quote-card-1"] }]);
+  assert.equal(calls.publishTikTok.length + calls.publishShorts.length + calls.publishText.length, 0);
+});
+
+test("scheduleApproved schedules a TIKTOK row via publishTikTok only (mocked, no network)", async () => {
+  const { deps, calls } = stubDeps();
+  const out = await scheduleApproved("/f", row({ id: "tiktok-1", platform: "tiktok", format: "short" }), deps);
+  assert.deepEqual(out, { scheduled: { scheduledBy: "publishTikTok" }, scheduleError: null });
+  assert.deepEqual(calls.publishTikTok, [{ folder: "/f", onlyIds: ["tiktok-1"] }]);
+  assert.equal(calls.publishCards.length + calls.publishShorts.length + calls.publishText.length, 0);
+});
+
+test("scheduleApproved schedules a VIDEO (Short) row via publishShorts only (mocked, no network)", async () => {
+  const { deps, calls } = stubDeps();
+  const out = await scheduleApproved("/f", row({ id: "yt-1", platform: "youtube", format: "short" }), deps);
+  assert.deepEqual(out, { scheduled: { scheduledBy: "publishShorts" }, scheduleError: null });
+  assert.deepEqual(calls.publishShorts, [{ folder: "/f", onlyIds: ["yt-1"] }]);
+  assert.equal(calls.publishCards.length + calls.publishTikTok.length + calls.publishText.length, 0);
+});
+
+test("scheduleApproved surfaces a scheduleError (row stays approve) when the publisher throws", async () => {
+  const { deps } = stubDeps();
+  deps.publishTikTok = async () => {
+    throw new Error("PostPeer returned 402 — free-tier posts exhausted");
+  };
+  const out = await scheduleApproved("/f", row({ id: "tiktok-1", platform: "tiktok", format: "short" }), deps);
+  assert.equal(out.scheduled, null);
+  assert.match(out.scheduleError ?? "", /402/); // visible reason, not a crash
+});
+
+test("scheduleApproved does nothing for a row no scheduler owns", async () => {
+  const { deps, calls } = stubDeps();
+  const out = await scheduleApproved("/f", row({ platform: "substack", format: "text" }), deps);
+  assert.deepEqual(out, { scheduled: null, scheduleError: null });
+  assert.equal(
+    calls.publishText.length + calls.publishCards.length + calls.publishTikTok.length + calls.publishShorts.length,
+    0,
+  );
+});
+
+// A publisher can skip a row WITHOUT throwing (the reuse guard, or cards.ts finding no connected
+// account for the row's target) — it just returns []. That must surface as a scheduleError, not the
+// same {scheduled:null, scheduleError:null} shape as "no scheduler owns this row" — otherwise the GUI
+// shows a bare "Approved" for both a harmless no-op AND a real, silently-skipped schedule attempt.
+test("scheduleApproved surfaces a scheduleError when the publisher runs but schedules nothing", async () => {
+  const { deps } = stubDeps();
+  deps.publishTikTok = async () => [];
+  const out = await scheduleApproved("/f", row({ id: "tiktok-1", platform: "tiktok", format: "short" }), deps);
+  assert.equal(out.scheduled, null);
+  assert.match(out.scheduleError ?? "", /reuse guard|connected account/);
 });
