@@ -79,22 +79,34 @@ async function uploadShort(
   return ((await res.json()) as { id: string }).id;
 }
 
-async function main() {
-  const arg = process.argv[2];
-  if (!arg) {
-    console.error("usage: tsx src/publish/youtube.ts <content-folder>");
-    process.exit(1);
-  }
-  const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
+export interface ScheduledShort {
+  id: string;
+  platform: string; // always "youtube"
+  when: string; // human PT label or privacy note
+  ref: string; // youtube shorts url
+  autoPublishes: boolean; // false = private upload (no youtube cadence configured) — needs a manual flip in YouTube Studio, unlike a real scheduled slot
+}
+
+// Exported so serve.ts's scheduleKind() routes to publishShorts using this SAME predicate, instead
+// of keeping its own independently-maintained copy that could drift out of sync with this one.
+export const isShortRow = (platform: string, format: string): boolean =>
+  platform !== "tiktok" && (platform === "youtube" || format === "short");
+
+// Upload approved video (YouTube Short) rows from a folder. Extracted from the CLI (like publishText)
+// so the review GUI can schedule ONE row on approve via opts.onlyIds. With no opts it behaves exactly
+// as the CLI did — every approved video row in the folder — so /publish is unchanged.
+export async function publishShorts(
+  folder: string,
+  opts: { onlyIds?: string[] } = {}
+): Promise<ScheduledShort[]> {
   const { rows } = readQueue(folder);
   // The same render also feeds TikTok via a separate `tiktok` row (src/publish/tiktok.ts);
   // exclude it so a short isn't double-posted here.
-  const approved = rows.filter(
-    (r) => r.status === "approve" && r.platform !== "tiktok" && (r.platform === "youtube" || r.format === "short")
-  );
+  let approved = rows.filter((r) => r.status === "approve" && isShortRow(r.platform, r.format));
+  if (opts.onlyIds) approved = approved.filter((r) => opts.onlyIds!.includes(r.id));
   if (approved.length === 0) {
     console.log("no approved video rows in the review queue");
-    return;
+    return [];
   }
 
   // Reuse guard: skip if this slug was published to YouTube too recently.
@@ -103,7 +115,7 @@ async function main() {
   if (!reuseCheck.allowed) {
     console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
     console.log("no rows to publish: youtube blocked by the reuse guard");
-    return;
+    return [];
   }
 
   const videoPath = join(folder, "video", "short.mp4");
@@ -133,6 +145,7 @@ async function main() {
     by: "youtube",
   });
 
+  const results: ScheduledShort[] = [];
   for (let i = 0; i < approved.length; i++) {
     const row = approved[i];
     const slot = times[i];
@@ -144,7 +157,19 @@ async function main() {
     appendPublishLog(folder, `${row.id} → youtube ${url} (${when})`);
     appendBetPlacement(folder, row.id, "youtube", publishAt ? `${url} @ ${labels[i]}` : url, fm, title);
     console.log(publishAt ? `scheduled: ${url} → goes public ${labels[i]}` : `uploaded: ${url}`);
+    results.push({ id: row.id, platform: "youtube", when, ref: url, autoPublishes: !!publishAt });
   }
+  return results;
+}
+
+async function main() {
+  const arg = process.argv[2];
+  if (!arg) {
+    console.error("usage: tsx src/publish/youtube.ts <content-folder>");
+    process.exit(1);
+  }
+  const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
+  await publishShorts(folder);
 }
 
 // Read-only: list the channel's currently-scheduled Shorts (status.publishAt in the future) for the

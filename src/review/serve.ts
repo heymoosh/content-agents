@@ -5,9 +5,12 @@
 // approve / revise / discard / edit in place — instead of hand-editing 20+ markdown tables.
 //
 // It READS through the same readQueue() the publish step uses and WRITES status back into the
-// exact same table cell setStatus() targets, so an "approve" here is byte-identical to an
-// "approve" typed by hand — /publish sees no difference. Nothing here publishes anything; it
-// only sets the review-queue status that /publish later gates on (CLAUDE.md rule 2).
+// exact same table cell setStatus() targets, so an "approve" here starts from the same place an
+// "approve" typed by hand would. For rows a scheduler owns (text/card/tiktok/video — see
+// scheduleApproved below), approving here ALSO immediately fires the real publish call — the same
+// thing a manual `/publish` run would do, just triggered by the approve click instead of a
+// separate step. Rows no scheduler owns just get the plain approve status, still gated by
+// CLAUDE.md rule 2 (Muxin approved it; nothing publishes without that).
 //
 //   npm run review            # http://localhost:4600
 //   REVIEW_PORT=5000 npm run review
@@ -24,7 +27,10 @@ import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { repoRoot, openDb } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
-import { publishText } from "../publish/typefully.js";
+import { publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
+import { publishCards, isQuoteCardRow } from "../publish/cards.js";
+import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
+import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import { classifyThread } from "../atomize/thread-check.js";
 
@@ -39,8 +45,6 @@ const IS_DEV_WORKTREE = repoRoot.includes("/.claude/worktrees/");
 
 // A row is "decided" once it's out of the review inbox. Everything else needs Muxin's eyes.
 const DECIDED = new Set(["published", "discard"]);
-// Platforms whose approval auto-schedules a Typefully draft (Muxin's "Approve → auto-schedule").
-const SCHEDULABLE = new Set(["x", "linkedin", "bluesky"]);
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
 
@@ -127,6 +131,75 @@ export function approveBlockReason(
     return exists(join(folder, asset)) ? null : "video not rendered yet — run /video";
   }
   return null;
+}
+
+// Approve → auto-schedule routing. Which platform scheduler an approved row belongs to. Each check
+// calls the OWNING publisher's own exported predicate (isQuoteCardRow, isTikTokRow, isShortRow,
+// TEXT_PLATFORMS) instead of re-encoding that publisher's row filter here a second time — so this
+// can't silently drift out of sync if a publisher's own definition of "which rows are mine" changes:
+//   text (x/linkedin/bluesky, incl. native-video posts) → Typefully (publishText)
+//   quote-card / quote-card:<target>                     → cards.ts   (publishCards)
+//   tiktok                                               → tiktok.ts  (publishTikTok → scheduleToTikTok)
+//   YouTube Short (platform youtube OR format short)     → youtube.ts (publishShorts)
+// Returns null for a row no scheduler owns — it just gets the plain approve status (CLAUDE.md rule 2
+// is preserved: the row was already set to approve; scheduling only mirrors what /publish would do).
+export type ScheduleKind = "text" | "card" | "tiktok" | "video";
+export function scheduleKind(row: QueueRow): ScheduleKind | null {
+  if (TEXT_PLATFORMS.has(row.platform)) return "text";
+  if (isQuoteCardRow(row.platform)) return "card";
+  if (isTikTokRow(row.platform)) return "tiktok"; // checked before "video" — a tiktok row is also a short
+  if (isShortRow(row.platform, row.format)) return "video";
+  return null;
+}
+
+// The four folder-level publish functions the dispatch routes to. Injected (default = the real ones)
+// so scheduleApproved is unit-testable WITHOUT any real PostPeer / Upload-Post / YouTube network call.
+export interface SchedulerDeps {
+  publishText: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+  publishCards: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+  publishTikTok: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+  publishShorts: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+}
+const DEFAULT_SCHEDULER_DEPS: SchedulerDeps = { publishText, publishCards, publishTikTok, publishShorts };
+
+// Rows (keyed `${slug}/${id}`) currently mid-schedule — see the in-flight guard in the /api/status
+// handler below, which prevents a double-click/retry from firing a duplicate real provider call.
+const schedulingInFlight = new Set<string>();
+
+// Schedule ONE approved row via its platform's existing publish function (scoped by onlyIds),
+// mirroring the text path exactly: on success the row's scheduled info comes back; on failure a
+// scheduleError is RETURNED (never thrown) so the row stays `approve` and the GUI shows why instead
+// of silently losing the approval or crashing the request.
+//
+// A publisher can also skip a row WITHOUT throwing (the reuse guard, or cards.ts finding no
+// connected account for the row's target) — it just logs a console.warn and returns []. That must
+// still surface as a scheduleError, not fall through silently: `done[0] ?? null` alone can't tell
+// "no scheduler owns this row" (kind === null, a genuine no-op) apart from "a scheduler ran but
+// skipped this row" (kind set, done === []) — and the GUI showed a bare "Approved" for both.
+export async function scheduleApproved(
+  folder: string,
+  row: QueueRow,
+  deps: SchedulerDeps = DEFAULT_SCHEDULER_DEPS
+): Promise<{ scheduled: unknown; scheduleError: string | null }> {
+  const kind = scheduleKind(row);
+  if (!kind) return { scheduled: null, scheduleError: null };
+  const fn =
+    kind === "text" ? deps.publishText
+    : kind === "card" ? deps.publishCards
+    : kind === "tiktok" ? deps.publishTikTok
+    : deps.publishShorts;
+  try {
+    const done = await fn(folder, { onlyIds: [row.id] });
+    if (done.length === 0) {
+      return {
+        scheduled: null,
+        scheduleError: "not scheduled — blocked by the reuse guard or no connected account (check the server log for the reason)",
+      };
+    }
+    return { scheduled: done[0], scheduleError: null };
+  } catch (e) {
+    return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 function enrich(folder: string, slug: string, row: QueueRow): EnrichedRow {
@@ -794,18 +867,29 @@ const server = createServer(async (req, res) => {
         json(res, 404, { ok: false });
         return;
       }
-      // Approve → auto-schedule (Muxin's choice): a text row goes straight to a Typefully SCHEDULED
-      // draft at its cadence slot, and publishText flips the row to "published". Non-text rows just
-      // get marked approve (cards/tiktok/video still schedule via /publish). A scheduling failure is
-      // returned (not thrown) so the row stays "approve" and the GUI can show why.
+      // Approve → auto-schedule (Muxin's choice): the row goes straight to a SCHEDULED post/draft via
+      // its platform's existing publish function — text → Typefully, quote-card → cards.ts, tiktok →
+      // tiktok.ts, YouTube Short → youtube.ts — which flips the row to "published". No separate
+      // /publish run needed. A scheduling failure is returned (not thrown) so the row stays "approve"
+      // and the GUI can show why. Rows no scheduler owns just get the plain approve status.
       let scheduled: unknown = null;
       let scheduleError: string | null = null;
-      if (approveFolder && approveRow && SCHEDULABLE.has(approveRow.platform)) {
+      if (approveFolder && approveRow) {
+        // In-flight guard: a publisher only flips the row to "published" AFTER its real network
+        // call, so two near-simultaneous approve requests for the same row (a double-click, a
+        // client retry) would otherwise both read status="approve" and both fire a duplicate
+        // PostPeer/YouTube/Typefully call before either write lands. Keyed per row so unrelated
+        // rows/folders keep scheduling concurrently.
+        const inFlightKey = `${slug}/${id}`;
+        if (schedulingInFlight.has(inFlightKey)) {
+          json(res, 200, { ok: true, scheduled: null, scheduleError: "already scheduling this row — try again in a moment" });
+          return;
+        }
+        schedulingInFlight.add(inFlightKey);
         try {
-          const done = await publishText(approveFolder, { onlyIds: [id] });
-          scheduled = done[0] ?? null;
-        } catch (e) {
-          scheduleError = e instanceof Error ? e.message : String(e);
+          ({ scheduled, scheduleError } = await scheduleApproved(approveFolder, approveRow));
+        } finally {
+          schedulingInFlight.delete(inFlightKey);
         }
       }
       json(res, 200, { ok: true, scheduled, scheduleError });
@@ -1256,7 +1340,13 @@ async function onAction(e, piece, row, el){
     const r = await post("/api/status",{slug:piece.slug,id:row.id,status:act});
     if (act === "approve"){
       if (r.ok === false){ flash(r.error || "Approve blocked"); }
-      else if (r.scheduled){ row.status="published"; row.scheduledWhen=r.scheduled.when; row.manualComment=r.scheduled.manualComment||""; flash("Scheduled · "+r.scheduled.when); }
+      else if (r.scheduled){
+        row.status="published"; row.scheduledWhen=r.scheduled.when; row.manualComment=r.scheduled.manualComment||"";
+        // A YouTube Short with no "youtube" cadence configured uploads PRIVATE instead of on a real
+        // publish schedule (see publishShorts) — flag that distinctly instead of a generic "Scheduled"
+        // that reads the same as an actually-scheduled post.
+        flash(r.scheduled.autoPublishes === false ? "Uploaded (still PRIVATE — flip it manually in YouTube Studio) · "+r.scheduled.when : "Scheduled · "+r.scheduled.when);
+      }
       else if (r.scheduleError){ row.status="approve"; flash("Approved — schedule failed: "+r.scheduleError); }
       else { row.status="approve"; flash("Approved"); }
     } else { row.status="discard"; flash("Discarded"); }

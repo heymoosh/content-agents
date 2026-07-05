@@ -7,7 +7,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta, appendCtaLine, type CtaConfig } from "./cta.js";
-import { claimSlots } from "./slots.js";
+import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 
 // Schedule approved `quote-card` (image) rows from a content folder's review queue to the social
@@ -120,9 +120,13 @@ function cardCopy(folder: string, rowId: string): { text: string; fm: Record<str
   return { text, fm };
 }
 
+// Exported so serve.ts's scheduleKind() routes to publishCards using this SAME predicate, instead
+// of keeping its own independently-maintained copy that could drift out of sync with this one.
+export const isQuoteCardRow = (platform: string): boolean => basePlatform(platform) === "quote-card";
+
 function approvedCards(folder: string) {
   const { rows } = readQueue(folder);
-  return rows.filter((r) => r.status === "approve" && basePlatform(r.platform) === "quote-card");
+  return rows.filter((r) => r.status === "approve" && isQuoteCardRow(r.platform));
 }
 
 // The destinations + caption for one card: inline-link group and/or no-link group per cta.yaml.
@@ -180,42 +184,37 @@ async function runCheck(folder: string | null): Promise<void> {
   }
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  const isCheck = args.includes("--check");
-  const forceReuse = args.includes("--force-reuse");
-  const atIdx = args.indexOf("--at");
-  const atOverride = atIdx !== -1 ? args[atIdx + 1] : undefined;
-  const folderArg = args.find((a, i) => !a.startsWith("--") && (atIdx === -1 || i !== atIdx + 1));
+export interface ScheduledCard {
+  id: string;
+  platform: string; // destination platform (single target) or "quote-card" for legacy fan-out
+  when: string; // human PT label (matches publishText/publishShorts, not a raw ISO string)
+  ref: string; // provider post ref(s)
+}
 
-  if (isCheck) {
-    const folder = folderArg ? (isAbsolute(folderArg) ? folderArg : join(repoRoot, folderArg)) : null;
-    await runCheck(folder);
-    return;
-  }
-
-  if (!folderArg) {
-    console.error("usage: tsx src/publish/cards.ts <content-folder> [--check] [--at <ISO>]");
-    process.exit(1);
-  }
-  const folder = isAbsolute(folderArg) ? folderArg : join(repoRoot, folderArg);
-
-  const cards = approvedCards(folder);
+// Schedule approved quote-card rows from a folder to the image relays. Extracted from the CLI (like
+// publishText) so the review GUI can schedule ONE row on approve via opts.onlyIds. With no opts it
+// behaves exactly as the CLI did — every approved card in the folder — so /publish is unchanged.
+export async function publishCards(
+  folder: string,
+  opts: { onlyIds?: string[]; atOverride?: string; forceReuse?: boolean } = {}
+): Promise<ScheduledCard[]> {
+  let cards = approvedCards(folder);
+  if (opts.onlyIds) cards = cards.filter((r) => opts.onlyIds!.includes(r.id));
   if (cards.length === 0) {
     console.log("no approved quote-card rows in the review queue");
-    return;
+    return [];
   }
 
   // Reuse guard: check if this slug was already published as a quote-card recently.
-  // Pass --force-reuse to bypass the window and proceed anyway.
+  // Pass forceReuse to bypass the window and proceed anyway.
   const slug = basename(folder);
-  if (forceReuse) {
+  if (opts.forceReuse) {
     console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
   } else {
     const reuseResult = checkReuse(slug, "quote-card");
     if (!reuseResult.allowed) {
       console.warn(`reuse guard: ${reuseResult.reason} — skipping cards`);
-      return;
+      return [];
     }
   }
 
@@ -227,13 +226,14 @@ async function main() {
 
   // Validate a `--at` override once (one-off/test; bypasses the scheduler + ledger).
   let atIso: string | null = null;
-  if (atOverride) {
-    const at = new Date(atOverride);
-    if (Number.isNaN(at.getTime())) throw new Error(`--at is not a valid ISO date: ${atOverride}`);
-    if (at.getTime() <= Date.now()) throw new Error(`--at is in the past: ${atOverride} — pick a future time`);
+  if (opts.atOverride) {
+    const at = new Date(opts.atOverride);
+    if (Number.isNaN(at.getTime())) throw new Error(`--at is not a valid ISO date: ${opts.atOverride}`);
+    if (at.getTime() <= Date.now()) throw new Error(`--at is in the past: ${opts.atOverride} — pick a future time`);
     atIso = at.toISOString();
   }
 
+  const results: ScheduledCard[] = [];
   for (let i = 0; i < cards.length; i++) {
     const row = cards[i];
     const target = cardTarget(row.platform); // "x" | "linkedin" | "bluesky" | null (legacy fan-out)
@@ -289,7 +289,31 @@ async function main() {
     const betPlatform = target ?? "quote-card";
     appendBetPlacement(folder, row.id, betPlatform, `${refs.join(" | ")} @ ${scheduledFor}`, fm, caption);
     console.log(`scheduled: ${row.id} (${target ?? "all platforms"}) → ${provider.providerName} ${refs.join(" | ")} @ ${scheduledFor}`);
+    results.push({ id: row.id, platform: betPlatform, when: fmtLa(new Date(scheduledFor)), ref: refs.join(" | ") });
   }
+  return results;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const isCheck = args.includes("--check");
+  const forceReuse = args.includes("--force-reuse");
+  const atIdx = args.indexOf("--at");
+  const atOverride = atIdx !== -1 ? args[atIdx + 1] : undefined;
+  const folderArg = args.find((a, i) => !a.startsWith("--") && (atIdx === -1 || i !== atIdx + 1));
+
+  if (isCheck) {
+    const folder = folderArg ? (isAbsolute(folderArg) ? folderArg : join(repoRoot, folderArg)) : null;
+    await runCheck(folder);
+    return;
+  }
+
+  if (!folderArg) {
+    console.error("usage: tsx src/publish/cards.ts <content-folder> [--check] [--at <ISO>]");
+    process.exit(1);
+  }
+  const folder = isAbsolute(folderArg) ? folderArg : join(repoRoot, folderArg);
+  await publishCards(folder, { atOverride, forceReuse });
 }
 
 // Run the CLI only when executed directly, so the module can be imported (e.g. in tests) without
