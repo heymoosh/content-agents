@@ -137,23 +137,30 @@ function buildCardMotionComposition(data: CardData, durationMs: number): string 
   const hasSource = !!(data.source && data.source.length > 0);
 
   // Sentences drive the reveal; the LAST sentence is the emphasis/climax (verbatim, so extraction-
-  // first holds trivially). Its words carry .em (accent color); the run wraps in #emph for one
-  // underline swipe. The whole closing sentence is the accent beat.
+  // first holds trivially). Its words carry .em (accent color); the closing sentence is the accent
+  // beat, and its final word wraps in #emph for the underline swipe (see wordHtml build below).
   const sentOf = splitSentences(words);
   const sentCount = sentOf[sentOf.length - 1] + 1;
   const emphSent = sentCount - 1;
-  const emphStart = sentOf.indexOf(emphSent);
   const emphEnd = sentOf.lastIndexOf(emphSent);
 
-  // Each word carries its sentence index (data-s). Final-sentence words add .em (accent color); the
-  // run is wrapped in #emph so one underline swipe sits under the whole closing sentence. Real-text-
-  // node spaces between words keep natural line wrapping.
+  // Each word carries its sentence index (data-s); final-sentence words add .em (accent color).
+  // The underline swipe (#emul) is scoped to ONLY the final WORD of the closing sentence, not the
+  // whole (usually multi-line) sentence: position:absolute + left:0/right:0 on a child of a
+  // multi-line `display: inline` ancestor has undefined/inconsistent containing-block behavior in
+  // Chromium, so wrapping the entire wrapped run made the swipe collapse to invisible in every
+  // render (verified: rendered a real card, the underline never appeared under any frame). A single
+  // word is always one non-wrapping fragment (`.w` is `white-space: nowrap`), so #emph reliably
+  // generates one box and the swipe renders under that closing word. Real-text-node spaces between
+  // words keep natural line wrapping.
   let wordHtml = "";
   for (let i = 0; i < words.length; i++) {
-    if (i === emphStart) wordHtml += `<span id="emph"><span id="emul"></span>`;
     const cls = sentOf[i] === emphSent ? "w em" : "w";
-    wordHtml += `<span class="${cls}" data-s="${sentOf[i]}">${esc(words[i])}</span>`;
-    if (i === emphEnd) wordHtml += `</span>`;
+    if (i === emphEnd) {
+      wordHtml += `<span id="emph"><span id="emul"></span><span class="${cls}" data-s="${sentOf[i]}">${esc(words[i])}</span></span>`;
+    } else {
+      wordHtml += `<span class="${cls}" data-s="${sentOf[i]}">${esc(words[i])}</span>`;
+    }
     if (i < words.length - 1) wordHtml += " ";
   }
 
