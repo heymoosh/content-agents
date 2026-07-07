@@ -62,7 +62,14 @@ makes `/cycle` compound instead of restarting every week.
    - `npm run audience` → who follows you: LinkedIn demographics + follower/subscriber totals &
      growth (demographics are LinkedIn-only; X/Bluesky give counts, Substack free/paid)
    - `npm run route -- --all` → routing map (where each pillar should post; the include/skip
-     gate `/atomize` applies, from this data + `config/routing.yaml`)
+     gate `/atomize` applies, from this data + `config/routing.yaml`). Decisions are always
+     defaults-driven now (score never overrides `config/routing.yaml`'s defaults list, in either
+     direction) — see the next line for how a persistent data/defaults mismatch surfaces instead.
+   - `npm run route -- --flags` → routing drift flags: pillar/platform pairs where the fit score
+     persistently diverges from `config/routing.yaml`'s defaults across two independent ~4-week
+     windows (not one noisy snapshot). Computed/printed only — never writes to
+     `config/routing.yaml` or `config/platforms.yaml`. A flag is a prompt for Muxin to reconsider
+     the defaults by hand, not an auto-change.
    - Read `data/community-log.md` (manual observations — treat as qualitative signal)
 
 4. **Write the brief** to `briefs/YYYY-MM-DD-strategy-brief.md`:
@@ -103,7 +110,16 @@ makes `/cycle` compound instead of restarting every week.
 
    ## Routing map (what to post where)
    <route --all table — which pillars route to which platforms, and why. Note where the
-    gate is data-driven vs cold-start. This is the include/skip rule /atomize enforces.>
+    gate is data-driven vs cold-start. This is the include/skip rule /atomize enforces. The
+    decision itself is always defaults-driven (config/routing.yaml); a persistent score/defaults
+    mismatch shows up in Routing drift flags below, not here.>
+
+   ## Routing drift flags
+   <route --flags output verbatim — pillar/platform pairs where the fit score has persistently
+    diverged from config/routing.yaml's defaults across both independent windows checked. "No
+    persistent divergences" needs no follow-up. A flag is a suggestion for Muxin's own
+    re-approval of the defaults list, same posture as the Angle drift check below — it never
+    edits config/routing.yaml itself and never blocks the rest of /strategy.>
 
    ## Community signals
    <synthesis of community-log.md: what sparked conversation vs silence, per community>

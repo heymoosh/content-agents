@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
+import { runDriftCheck } from "./routing-drift.js";
 
 // Intelligent content router: decide which platforms a piece should be posted to,
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
@@ -15,14 +16,17 @@ import { openDb, repoRoot } from "../db/db.js";
 //          routing.md per invocation — always route a multi-pillar piece in one call.
 //   tsx src/strategy/route.ts --all
 //        → full pillar × platform routing-map markdown (for the strategy brief)
+//   tsx src/strategy/route.ts --flags
+//        → routing-drift.ts's persistent divergence flags (data vs config/routing.yaml
+//          defaults, over two independent windows) — computed/printed only, never written back.
 
-const PILLARS = ["human-ai", "claude-code", "civic-tech", "career-work", "builder", "other"];
+export const PILLARS = ["human-ai", "claude-code", "civic-tech", "career-work", "builder", "other"];
 // Derivative target platforms routing chooses among. Substack is the source channel,
 // not a target. Community targets come from config (defaults / rules), not the DB.
-const CORE_TEXT = ["x", "linkedin", "bluesky"];
+export const CORE_TEXT = ["x", "linkedin", "bluesky"];
 const WEEK = 7 * 24 * 3600 * 1000;
 
-interface RoutingConfig {
+export interface RoutingConfig {
   defaults: Record<string, string[]>;
   rules: Record<string, { always?: string[]; never?: string[] }>;
   thresholds: {
@@ -42,9 +46,22 @@ export interface Decision {
   rationale: string;
 }
 
-interface Cell {
+export interface Cell {
   n: number;
   avg_eng: number;
+}
+
+// A date-bounded window (ms since epoch, half-open [startMs, endMs)) for scoping loadData to a
+// slice of history — used by routing-drift.ts to score two independent windows separately.
+export interface WindowRange {
+  startMs: number;
+  endMs: number;
+}
+
+export interface LoadedData {
+  cells: Map<string, Cell>; // key: `${platform}|${pillar}`
+  weeks: Map<string, number>; // key: platform
+  baselines: Map<string, number>; // key: platform → avg engagement per post on that platform
 }
 
 function loadConfig(): RoutingConfig {
@@ -56,12 +73,14 @@ function loadConfig(): RoutingConfig {
 // engagement baseline. The baseline matters because engagement scales are NOT comparable across
 // platforms: X is a weighted replies/reposts/likes score (single digits) while LinkedIn carries
 // one lumped "Engagements" count per post (often 100+). We judge each platform on its own scale.
-function loadData(): {
-  cells: Map<string, Cell>; // key: `${platform}|${pillar}`
-  weeks: Map<string, number>; // key: platform
-  baselines: Map<string, number>; // key: platform → avg engagement per post on that platform
-} {
+//
+// `range`, when given, scopes every query to posts with posted_at in [range.startMs, range.endMs)
+// — used by routing-drift.ts to load two independent windows of history separately, through this
+// SAME function, rather than duplicating the score math.
+export function loadData(range?: WindowRange): LoadedData {
   const db = openDb();
+  const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
+  const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
   const rows = db
     .prepare(
       `SELECT p.platform, p.pillar,
@@ -73,14 +92,16 @@ function loadData(): {
          JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
            ON m.post_id = lm.post_id AND m.captured_at = lm.mc
        ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL
+       WHERE p.pillar IS NOT NULL ${dateClause}
        GROUP BY p.platform, p.pillar`
     )
-    .all() as { platform: string; pillar: string; n: number; avg_eng: number }[];
+    .all(...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
 
   const dates = db
-    .prepare(`SELECT platform, posted_at FROM posts WHERE posted_at IS NOT NULL`)
-    .all() as { platform: string; posted_at: string }[];
+    .prepare(
+      `SELECT platform, posted_at FROM posts p WHERE posted_at IS NOT NULL ${dateClause}`
+    )
+    .all(...dateParams) as { platform: string; posted_at: string }[];
   db.close();
 
   const cells = new Map<string, Cell>();
@@ -106,24 +127,45 @@ function loadData(): {
     list.push(t);
     byPlatform.set(d.platform, list);
   }
-  const now = Date.now();
+  const cap = range?.endMs ?? Date.now();
   const weeks = new Map<string, number>();
   for (const [pl, ts] of byPlatform) {
-    weeks.set(pl, Math.max(1, Math.round((Math.min(now, Math.max(...ts)) - Math.min(...ts)) / WEEK)));
+    weeks.set(pl, Math.max(1, Math.round((Math.min(cap, Math.max(...ts)) - Math.min(...ts)) / WEEK)));
   }
   return { cells, weeks, baselines };
 }
 
-function decideForPillar(
-  pillar: string,
-  cfg: RoutingConfig,
-  data: { cells: Map<string, Cell>; weeks: Map<string, number>; baselines: Map<string, number> }
-): Decision[] {
+// Fit = this pillar's avg engagement relative to the platform's average post. Each platform is
+// scored on its OWN scale, so X (small weighted scores) and LinkedIn (large lumped engagement
+// counts) are never compared in absolute terms. A pillar at the platform's norm scores ~1.0;
+// skip_below_score is the fraction-of-norm floor. `hasData` reuses the exact same sample floor
+// everywhere it's checked (route.ts and routing-drift.ts): n >= min_posts_for_data AND weeks >= 4.
+//
+// NOTE: this score is for VISIBILITY/CONFIDENCE only — it no longer drives the include/skip
+// decision (see decideForPillar). routing-drift.ts's persistent-divergence flags are the intended
+// place to act on a data/defaults mismatch, as a surfaced-for-review flag, not an auto-override.
+export interface FitResult {
+  hasData: boolean;
+  score: number | null; // 0..1 normalized fit, null when data is insufficient
+  n: number;
+  weeks: number;
+}
+
+export function computeFit(platform: string, pillar: string, cfg: RoutingConfig, data: LoadedData): FitResult {
+  const cell = data.cells.get(`${platform}|${pillar}`); // only core text platforms carry data
+  const weeks = data.weeks.get(platform) ?? 0;
+  const hasData = !!cell && cell.n >= cfg.thresholds.min_posts_for_data && weeks >= 4;
+  if (!cell) return { hasData, score: null, n: 0, weeks };
+  const baseline = data.baselines.get(platform) ?? 0;
+  const score = baseline > 0 ? cell.avg_eng / baseline : 0;
+  return { hasData, score, n: cell.n, weeks };
+}
+
+export function decideForPillar(pillar: string, cfg: RoutingConfig, data: LoadedData): Decision[] {
   const defaults = cfg.defaults[pillar] ?? [];
   const rule = cfg.rules[pillar] ?? {};
   const always = new Set(rule.always ?? []);
   const never = new Set(rule.never ?? []);
-  const { min_posts_for_data, skip_below_score } = cfg.thresholds;
 
   // Candidate targets: the core text platforms + anything config names for this pillar.
   const candidates = [...new Set([...CORE_TEXT, ...defaults, ...always, ...never])];
@@ -138,38 +180,30 @@ function decideForPillar(
       out.push({ platform, decision: "include", score: null, confidence: "rule", rationale: "editorial rule: always route here" });
       continue;
     }
-    const cell = data.cells.get(`${platform}|${pillar}`); // only core text platforms carry data
-    const weeks = data.weeks.get(platform) ?? 0;
-    const hasData = !!cell && cell.n >= min_posts_for_data && weeks >= 4;
-    if (hasData && cell) {
-      // Fit = this pillar's avg engagement relative to the platform's average post. Each platform
-      // is scored on its OWN scale, so X (small weighted scores) and LinkedIn (large lumped
-      // engagement counts) are never compared in absolute terms. A pillar at the platform's norm
-      // scores ~1.0; skip_below_score is the fraction-of-norm floor under which we drop it.
-      const baseline = data.baselines.get(platform) ?? 0;
-      const score = baseline > 0 ? cell.avg_eng / baseline : 0;
-      const decision = score >= skip_below_score ? "include" : "skip";
+
+    // The decision is ALWAYS defaults-driven — config/routing.yaml's defaults list is the single
+    // source of truth for include/skip, at any data volume. Score is computed and attached below
+    // (when data is sufficient) for visibility/confidence only; it never flips the decision.
+    // (Muxin's locked call, card 7e550e48: a fit score overriding the editorial defaults list —
+    // in either direction — was surprising Muxin. Persistent divergences are surfaced separately
+    // by routing-drift.ts's `--flags` mode, as a review prompt, not an auto-override.)
+    const inDefaults = defaults.includes(platform);
+    const decision: "include" | "skip" = inDefaults ? "include" : "skip";
+    const fit = computeFit(platform, pillar, cfg, data);
+
+    if (fit.hasData) {
       out.push({
         platform,
         decision,
-        score,
+        score: fit.score,
         confidence: "data",
-        rationale:
-          decision === "include"
-            ? `data: ${score.toFixed(2)}× platform norm (n=${cell.n}) — receptive to this topic`
-            : `data: ${score.toFixed(2)}× platform norm (n=${cell.n}) — underperforms here`,
+        rationale: `config default: ${decision} — data shows ${fit.score!.toFixed(2)}× platform norm (n=${fit.n})`,
       });
     } else {
-      // Cold start: post broadly to the configured defaults to gather signal; otherwise hold.
-      const inDefaults = defaults.includes(platform);
-      const why = !cell
-        ? "no tagged data yet"
-        : weeks < 4
-          ? "<4wks data"
-          : `only n=${cell.n} posts`;
+      const why = fit.n === 0 ? "no tagged data yet" : fit.weeks < 4 ? "<4wks data" : `only n=${fit.n} posts`;
       out.push({
         platform,
-        decision: inDefaults ? "include" : "skip",
+        decision,
         score: null,
         confidence: "cold-start",
         rationale: inDefaults
@@ -271,6 +305,15 @@ function routingMd(pillars: string[], merged: MergedDecision[]): string {
 function main() {
   const args = process.argv.slice(2);
   const cfg = loadConfig();
+
+  if (args.includes("--flags")) {
+    // Persistent divergence flags: data vs config/routing.yaml's defaults, over two independent
+    // windows. Computed/printed only — see routing-drift.ts; makes zero writes to any config file.
+    const { report } = runDriftCheck(PILLARS, cfg);
+    console.log(report);
+    return;
+  }
+
   const data = loadData();
 
   if (args.includes("--all")) {
@@ -298,7 +341,7 @@ function main() {
   const pillars = pillarArg ? [...new Set(pillarArg.split(",").map((p) => p.trim()))] : undefined;
   if (!pillars || pillars.length === 0 || pillars.some((p) => !PILLARS.includes(p))) {
     console.error(
-      `usage: tsx src/strategy/route.ts --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all`
+      `usage: tsx src/strategy/route.ts --pillar <${PILLARS.join("|")}>[,<pillar2>,...] [--folder <content-folder>]  |  --all  |  --flags`
     );
     process.exit(1);
   }
