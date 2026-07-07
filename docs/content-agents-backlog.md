@@ -1,3 +1,15 @@
+# ⏸ PUBLISHING FREEZE (Muxin, 2026-07-04)
+
+`/cycle` and `/publish` are PAUSED — no further content goes out (including GUI-Approve
+auto-scheduling on text rows, per `a4a2ce27`) until the measurement scaffolding below ships:
+`7e550e48` (routing drift flag), `92bb2ae6` (exploration budget), `ffa6491d` (posting-cap
+decision). Rationale: don't build out further pipeline features or publish more content on an
+unmeasured setup — get the experiment design in first. All other Backlog/To Do build-out waits
+behind this group; it isn't cancelled, just sequenced after. Lift this banner once all three
+scaffolding cards are Done and Muxin confirms resuming.
+
+---
+
 **[P0] Ask Claude buggy on the GUI?**
 - I used Ask Claude to edit a Blue Sky post and turn it into an X post - I wanted it to ALSO create an X post based on the source content. Nothing’s working?
 - Also I had my vault dashboard running at the same time which also uses Claude subscription for responses - I went back to it after submitting a task to it, and I noticed it didn’t finish its original task. I wonder if it’s because I triggered Ask Claude in the content GUI. Am I only able to ask for 1 single Claude task at a time? I’d want to be able to launch both my vault dashboard and content agents GUI and use them whenever I want - so if there’s conflicts, I don’t understand why. Isn’t each ‘request’ just a separate Claude task?
