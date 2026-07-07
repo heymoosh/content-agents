@@ -14,17 +14,20 @@ scaffolding cards are Done and Muxin confirms resuming.
 - I used Ask Claude to edit a Blue Sky post and turn it into an X post - I wanted it to ALSO create an X post based on the source content. Nothing’s working?
 - Also I had my vault dashboard running at the same time which also uses Claude subscription for responses - I went back to it after submitting a task to it, and I noticed it didn’t finish its original task. I wonder if it’s because I triggered Ask Claude in the content GUI. Am I only able to ask for 1 single Claude task at a time? I’d want to be able to launch both my vault dashboard and content agents GUI and use them whenever I want - so if there’s conflicts, I don’t understand why. Isn’t each ‘request’ just a separate Claude task?
 - I tried getting the GUI to create content from Substack notes that I selected - it’s been stuck on ‘working’ for like 10 mins. I can’t tell if it’s actually doing anything. I’m waiting for it to land on the Review tab.
+- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §1-3. Ask Claude is hard-scoped to editing one existing derivative body in place (its prompt forbids platform changes and new files, serve.ts:373-394), so both requests were impossible by design and the "didn't change anything" error only flashes for 1.4s. No hard one-Claude-task limit exists: only atomize jobs queue; the vault dashboard shares nothing with this GUI except subscription rate limits. The 10-min "working" is a black box because job output is buffered and discarded (no logs, no progress, 15-min timeout). Fix plan: persist+stream job logs, heartbeat in the jobs pill, durable inline errors, a per-row "Duplicate to platform" action, all Claude spawns through the one job queue.
 - STATUS: Backlog
 <!-- card-id: 9304e4a5-38f7-47dc-9b58-75e595b90fa7 -->
 
 **[P2] Video script to Storyboard gap on GUI**
 - If I approve the script, what happens next? Right now on the GUI I can’t even hit ‘approve’ to approve the script. 
+- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §6. Approve is deliberately blocked until video/storyboard.md exists (the phantom-approve guard from card 4bef9a7c, correct as-is), but the GUI has no way to run /video — its job queue only runs /atomize — so the video path dead-ends. Fix: add a "Generate storyboard" button on video-script rows that enqueues /video through the same job queue, making it a two-stage flow: script review → storyboard generation → storyboard approval → render.
 - STATUS: Backlog
 <!-- card-id: 9e20a616-3e13-4194-ab39-863acd5d53be -->
 
 **[P1] Refresh button on GUI - purpose?**
 - What does hitting Refresh on the GUI do?
 - If I hit refresh on each tab - Add/Queue, Review, Analytics - what does it do and does it automatically update everything in the pipeline to sync?
+- ANSWERED (2026-07-07): see docs/codebase-review.md Part 1 §5. One global Refresh (not per-tab): it re-scans every content/*/review-queue.md from disk, live-reconciles Typefully/PostPeer scheduled state when needed, and re-fetches the job list. It does NOT refresh the Analytics tab (brief loads once per page load; raw exports have their own button) and triggers no pipeline work. Fix: make it tab-aware, label it, show a last-refreshed timestamp.
 - STATUS: Backlog
 <!-- card-id: 3625b185-8025-4329-82d4-cb3b35c6ee70 -->
 
@@ -53,24 +56,40 @@ Cadence schedule (PT):
   ↳ note: bluesky-2 cta:source → homepage (no canonical_url in source.md)
 scheduled: bluesky-2 (bluesky) → Wed, Jul 15, 6:30 PM PT → typefully draft 9778798, cta→inline
 scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e06966cb7011183ad79 → x @ 2026-07-21T19:00:00.000Z
+- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §4. "Finished" only means the claude subprocess exited 0 (which it does even when /atomize accomplishes nothing); folder detection requires review-queue.md to exist, so a partially scaffolded folder reads as "no folder"; and the job's stdout is buffered then discarded, never reaching the terminal — the schedule lines seen were from unrelated approve actions. Fix: persist per-job log files, verify success by artifact (new folder + review-queue.md rows, or a machine-readable final line from /atomize), attach the log tail to the job error.
 - STATUS: Backlog
 <!-- card-id: c43a8041-60f9-4bea-b365-bc5d684eaca8 -->
 
 **[P0] Use browser automation for image uploads**
 - Instead of relying on the 3rd party, can’t I login to the sites on chrome, have that securely stashed, and we can just upload images that way? We do it for the analytics already.
+- RECOMMENDATION (2026-07-07): don't build browser posting — see docs/codebase-review.md Part 1 §7. Pull is read-with-download-proof; posting is a fragile multi-step composer against platforms that fingerprint automation, with ToS exposure and no scheduling (breaks the scheduled-draft safety posture). The cheaper path is already in the repo: Typefully's v2 API officially supports image upload (verified in their migration-guide feature matrix 2026-07-07), and typefully.ts uploadMedia + media: frontmatter already implements that exact flow — proven live once with the animated-card mp4 (draft 9638763). PNG not yet exercised from this repo: do ONE supervised test card first, then rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. Keep PostPeer only for TikTok (its audited API beats any browser). Bluesky could optionally go direct AT Proto (SDK already a dependency).
 - STATUS: Backlog
+- DECISION: hold (Muxin, 2026-07-07) — confirmed the Typefully-native-image-upload recommendation above is clear as written. Build it and open the PR, but watch the first supervised test card (one PNG through Typefully) before rewiring cards.ts further or retiring PostPeer/Upload-Post for cards. Implementation tracked as its own child card, see Codebase-review fix — Phase 4.
 <!-- card-id: ca75b2e0-aad3-4b2e-a069-660b64938029 -->
 
 **Use Opus for animating quote cards**
 - Let’s compare how Opus vs Sonnet 5 does handling quote card animations
-- STATUS: Backlog
+- STATUS: Review
+- DECISION: approved (Muxin, 2026-07-07) — both models route through the Claude Code subscription ($0 marginal, CLAUDE.md rule 6), so this is a capped-cost eval, not paid-API spend. Sequence: try Sonnet 5 first; only spend an Opus run if the Sonnet 5 result isn't good enough.
+- GROOMED: ready — DECISION: approved, capped-cost model comparison (Sonnet 5 first, Opus only if insufficient), $0 marginal via subscription
 <!-- card-id: 05ad98aa-06c4-4c74-9793-79ab9a142a4e -->
 
 **Create quote and image cards**
-- Combine both image gen and quote
-- I created an img folder - I’ll be using either ChatGPT or a free app to add images to it 
+- Combine both image gen and quote — an image post that carries BOTH a quote and a generated image, distinct from the existing text-only quote-card pipeline (a3127104, Done).
+- I created an img folder - I’ll be using either ChatGPT or a free app to add images to it
+- SCOPE CLARIFIED (Muxin, 2026-07-07): NOT the API image pipeline (config/providers.yaml image provider, ~$0.02-0.23/gen) — deliberately cheaper, using tools Muxin already has for free: ChatGPT (his own account, iterate on the image concept there) or a free/open-source local model. Not superseded by a3127104 (contextual per-platform captions) — that's a different feature (caption text), this is quote+image combined in one post.
+- LIKELY PATTERN: Claude suggests an image concept/prompt from the source content; Muxin iterates externally (ChatGPT or his open-source model) until he likes a result; drops the file in; the pipeline assembles it into a quote+image card (verbatim quote + Muxin-provided image, no API image-gen call). May need to generalize into a "non-API image gen" pattern — wait for Muxin to hand off a file he likes, then assemble — rather than a generate-in-pipeline step.
+- PRIORITY (Muxin, 2026-07-07): lower priority — revisit after the current content-stack work.
 - STATUS: Backlog
 <!-- card-id: 1653734b-8eea-480b-93ea-3c5926159f81 -->
+
+**Explore Draw Things (free local) for short-form video gen as a Kling cost-saver**
+- ORIGIN: raised by Muxin 2026-07-07 alongside the quote+image card discussion — a tangent, not scoped yet.
+- Draw Things is a free, local (on-device) image/video-gen app. Worth a bakeoff-style eval against Kling (currently ~$0.08/s via OpenRouter, used for video-broll first+last-frame animation) to see if it can do first+last-frame or general short-clip animation at comparable quality for $0.
+- Unverified: whether Draw Things actually supports video generation (vs. image-only) — confirm this before scoping further.
+- PRIORITY (Muxin, 2026-07-07): low — exploratory, not blocking anything.
+- STATUS: Backlog
+<!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
 
 **Voice Notes to Published**
 - Allow me to just drop a voice note (or typed) into Claude, we figure out what it should say at the end, and then it automatically runs /atomize or whatever the skills are to create good content out of
@@ -147,8 +166,9 @@ Examples - use both Primary and a Secondary CTA
 - STALE REFERENCE (2026-07-04): notes-daily.ts no longer has a SPREAD_PLATFORMS list at all — it doesn't draft anything anymore (see the content-generation-review fix, same date). Real per-note platform selection now happens locally via `/atomize notes` (`.claude/skills/atomize/references/notes-mode.md`), which routes through the normal `config/routing.yaml` per-pillar logic like any other piece, not a notes-specific hardcoded list.
 - Add 'linkedin' if Muxin wants longer / essay-like notes echoed there.
 - Muxin's call on whether his notes fit the LinkedIn register.
-- STATUS: Backlog
+- STATUS: To Do
 - DECISION: approved — LinkedIn gets the SAME platform-fit test the other spread platforms already use, not a blanket add: if a note is a good fit for a platform, it spreads there, and that rule now includes LinkedIn too (Muxin, 2026-07-04). Check whether config/routing.yaml already covers this for notes, or needs a small adjustment there.
+- GROOMED: ready — DECISION: approved, LinkedIn gets same platform-fit test as other spread platforms via config/routing.yaml, small bounded check/adjustment
 <!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
@@ -157,24 +177,10 @@ Examples - use both Primary and a Secondary CTA
 - SAFETY (non-negotiable): only acts on content Muxin set to `approve` in review-queue.md (rule 2), and browser posting needs Muxin's explicit go-ahead (rule 3). Never auto-post unreviewed.
 - SCOPE ANSWERED (Muxin, 2026-07-04): NOTES ONLY. Muxin is good at writing his own essays/posts directly on Substack and wants to keep doing that himself — that stays manual. The actual gap is that Substack isn't part of the unified GUI's automated publishing flow yet; this card closes that gap for Notes.
 - Reuses: the saved-session stealth-Chrome agent + diagnostics from the pull build; the unified scheduler (src/publish/slots.ts) for timing.
+- RENEWED INTEREST (Muxin, 2026-07-07): flagged wanting Substack posting automation while discussing posting caps; target cap if/when built = 1 post/day max on Substack. Still deferred per the 2026-07-04 call below — revisit priority explicitly before starting, don't silently pick this up.
 - STATUS: Backlog
 - DECISION: defer — scope answered (Notes only, fold into the unified GUI publishing flow; Muxin keeps writing/scheduling his own essays/posts himself) but deprioritized: a new channel, not part of the content-stack work he wants tackled first. 2026-07-04
 <!-- card-id: 8026f53c-0c52-46a2-aba1-e7e0bd416bdb -->
-
-**Per-channel positioning: one clear angle per platform ("Swizzle")**
-- "Swizzle" = a publish-time lens: before publishing to a platform, write the post from the perspective of "this audience cares about XYZ — how does this content relate to XYZ?" Borrow Muxin's OWN language and ideas, but tailor the POV / point of the post to that specific audience. Distinct from CTA routing — this shapes the argument itself, not just where to send people.
-- Goal: make each platform consistently signal "Muxin is X for Y audience" so the algorithm can pin her fast (she believes reach is largely decided in the first ~24h / first ~50 viewers). Today's publishing logic doesn't make the per-channel angle explicit.
-- Channel map (starting point): X = tech, LinkedIn = business/career, Substack = society (and her home base), Bluesky = political. Then narrow each to a specific recurring angle.
-- STEP: run through Muxin's EXISTING Obsidian content-ideas to DERIVE (and periodically refresh) the X-for-Y angle per channel — the pipeline consults these, it does NOT invent new content streams. Keep riding what she'd write anyway, reframed per channel.
-- Encode the channel → audience → angle map and have publishing logic surface/enforce it per platform at publish time; stay consistent over time.
-- Substack = home (most "her"); X/LinkedIn/Bluesky are inbound funnels back to Substack. Relates to "Smarter routing" (CTA-by-content-type, 6dcaee98) and the Landing page card.
-- EXISTING (don't reinvent): this IS the "Spin" idea — docs/spin-experiment.md + /atomize --spin (reframe/re-angle for the platform, never invent claims). Per-channel audience/angle notes already live in config/platforms.yaml; content pillars in config/pillars.yaml. Scope = promote Spin from an opt-in experiment to an always-on default driven by an explicit X-for-Y angle per channel, fed by the Obsidian content ideas.
-- APPROVED ANGLES (Muxin, 2026-06-30; X + LinkedIn sharpened): X = voice of the non-engineer OUTSIDE the SV tech bubble — what these AI tools are actually like for the 96% of non-tech workers, and how the hidden assumptions baked in by that bubble misfire for and harm them (tech audience). LinkedIn = critiques business innovation broadly (NOT just product craft) — how corporate / business norms quietly strangle the creative innovation they claim to want (business/career). Substack = builder-philosopher: the real AI risk isn't the machine, it's the unexamined human systems we're about to automate at full speed (society). Bluesky = the PM who treats democracy as broken UX + AI as making the fairness gap unignorable (political).
-- HOME-BRAND THREAD (Muxin, required): the HOME BRAND is the core WORLDVIEW — "the real AI risk isn't the machine, it's the unexamined human systems we're about to automate at full speed; I ship software as the proof." The Substack ANGLE is its fullest expression, but Substack is still a newsletter CHANNEL, not the home. (A separate future Landing page will be the actual home that drives CTAs.) The angle core per channel is right, but every per-channel piece must carry a visible thread back to this home brand; no channel may read as a standalone/disconnected identity — the four are one worldview pointed at different audiences.
-- HOME-BRAND LINE EVOLVED (Muxin, 2026-07-01): the home-brand line is now **"I uncover harmful hidden beliefs and why they need to change before AI automates everything."** This IS the worldview and the home brand, in mission voice. The prior line ("the real AI risk isn't the machine, it's the unexamined human systems we're about to automate at full speed; I ship software as the proof") remains the expanded worldview statement behind it and the Substack angle's fullest expression. THREAD CHECK below unchanged — "building the right thing" stays part of the test, so the ship-as-proof half is still enforced per piece. Site docs synced same day (`Branding/Human Inference/` in Obsidian).
-- THREAD CHECK (Muxin, 2026-06-30): Muxin won't always remember to include the thread, so the agent must CHECK every piece carries it at review time. Operational test: does the piece connect back to the HOME BRAND worldview (unexamined human systems we're automating / who benefits / building the right thing)? The AI lens is ONE facet of that home brand, not the whole test — do NOT reduce it to "is this about AI." If the thread is missing from a note/essay, Spin DRAFTS it in, then iterate with Muxin until it feels right via the GH editing loop (see the Unified review GUI card). Surface/suggest, never hard-block.
-- STATUS: Backlog
-<!-- card-id: d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4 -->
 
 **Inbound listening + voice-replies (Build 3)**
 - New capability: listen for mentions/replies/DMs on the channels, and draft replies in Muxin's voice (config/voice.yaml) for her to approve.
@@ -253,9 +259,9 @@ Examples - use both Primary and a Secondary CTA
   3. SEPARATE THE TWO HYPOTHESES AT FLAG TIME: when a flag fires, surface (a) the actual n and whether it clears a persistence check, and (b) whether a no-spin control exists for that cell — so Muxin can judge "move the topic" vs. "fix the angle" vs. "not enough data yet" instead of one ambiguous score.
 - GOAL_CONDITION: `route.ts --pillar <p>` never returns `skip` for a platform in that pillar's `routing.yaml` defaults solely due to a low fit score; the score is still visible in the decision output. `/strategy` (or `route.ts --all`) emits a divergence flag ONLY for pillar/platform pairs meeting the persistence check above, each flag stating n, window count, and no-spin-control availability; zero writes are made to routing.yaml or platforms.yaml by the flag step itself.
 - PRIORITY (Muxin, 2026-07-04): bumped to top priority, first of a small measurement-scaffolding group (with 92bb2ae6 and ffa6491d) — decided in the same conversation as, and independent of, 87cb6d93/8b00ab2e/d8a990a9 (all since shipped separately). Still worth prioritizing: no experiment-design/measurement layer exists yet for routing decisions.
-- STATUS: Backlog
-- DEPENDS ON: Periodically refresh the per-channel X-for-Y angles from Muxin's Obsidian content-ideas (siblings; may share one refresh pass)
+- STATUS: To Do
 - DECISION: approved — hybrid model chosen (Muxin, 2026-07-04): routing.yaml stays brand-pinned; data flags divergence for manual review, never auto-gates. Experimental-rigor requirements (persistence check, no-spin controls, hypothesis separation) added same day.
+- GROOMED: ready — DECISION: approved, explicit GOAL_CONDITION (routing.yaml defaults-driven, persistence-checked divergence flag, zero writes to config)
 <!-- card-id: 7e550e48-adcf-44d3-83ea-626ee079b9ef -->
 
 **Exploration budget: periodically test off-assignment pillars per platform to find missed coverage (separate from spin, separate from drift monitoring)**
@@ -282,21 +288,15 @@ Examples - use both Primary and a Secondary CTA
 - OPEN QUESTIONS for whoever picks this up: (1) confirm X daily-multiple vs. weekly-bump scope per above; (2) pick actual new `posts_per_week` + `slot_days` numbers per platform with Muxin; (3) decide if Bluesky needs anything beyond its current daily ceiling, or stays as-is given Muxin's lack of strong opinion; (4) verify source-content supply supports the new volume.
 - GOAL_CONDITION: Muxin has picked explicit new `posts_per_week`/`slot_days` values for X and LinkedIn (Bluesky stays or changes per his call once reviewed); if any platform needs more than 1 post/PT-day, that scheduler gap is either resolved or explicitly deferred as its own follow-up; config/platforms.yaml reflects the decided numbers.
 - PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 and 92bb2ae6 as part of the same measurement-scaffolding group: more volume speeds up how fast every experiment above reaches a usable sample size, so the cap decision is scaffolding too, not just a growth lever.
-- STATUS: Backlog
+- LIGHT RESEARCH (2026-07-07): checked Muxin's read against current best-practice guidance. X: data-backed guides put the sustainable sweet spot at 3-5 posts/day (accounts posting 1-3x/day see the strongest growth; beyond ~5x/day shows diminishing returns) — Muxin's "post a lot more" instinct is directionally right, but the architecture (≤1 post/platform/PT-day via the shared ledger) can't do more than 1/day today, so hitting even the low end of that range needs the multi-slot-per-day scheduler work this card's ARCHITECTURE CONSTRAINT already flags, not a config number. LinkedIn: guidance ranges 2-5x/week; Muxin's real-world experience running 5x/week is within the credible range. Bluesky: no frequency-specific guidance found beyond "consistency over volume, don't overpost" — nothing pushes for more than the current daily ceiling.
+- DECISION (Muxin, 2026-07-07):
+  - LinkedIn → posts_per_week: 5, slot_days: [Mon, Tue, Wed, Thu, Fri] (stays business-hours-only, spread across the work week). Fits inside the existing ≤1/day model — pure config change, no scheduler work needed. min_reuse_days:60 is unaffected (governs same-slug reuse, not distinct-post volume) — worth watching content supply after the bump, per this card's own CONTENT-SUPPLY CHECK.
+  - X → immediate step: posts_per_week 5 → 7 (slot_days already all 7 days) — the max the current 1-post/PT-day architecture supports. Muxin's actual ask (multiple posts/day) needs the multi-slot-per-day scheduler work called out in this card's ARCHITECTURE CONSTRAINT; that's a separate, bigger follow-up, not bundled into this config bump.
+  - Bluesky → no change. Already at the architecture's daily ceiling (7/wk, all days); Muxin has no strong opinion and the research doesn't push for more.
+  - Substack → confirmed NOT automated today (no posting path exists in the pipeline; card 8026f53c scopes Notes-only browser-agent posting and is currently deferred/deprioritized). Muxin flagged renewed interest 2026-07-07 with a target cap of 1 post/day max if/when built — recorded on 8026f53c, still deferred for now (see that card). Muxin's own essays stay fully manual either way.
+- STATUS: To Do
+- GROOMED: ready — Muxin resolved concrete numbers (LinkedIn 5/wk Mon-Fri, X 5->7/wk, Bluesky unchanged), pure config/platforms.yaml change, multi-slot-per-day scheduler work explicitly deferred as separate follow-up
 <!-- card-id: ffa6491d-46f9-416f-b521-1fb15e1a391b -->
-
-**Periodically refresh the per-channel X-for-Y angles from Muxin's Obsidian content-ideas (surface drift, never auto-overwrite approved angles)**
-- Traces to the epic's STEP bullet: "run through Muxin's EXISTING Obsidian content-ideas to DERIVE (and periodically refresh) the X-for-Y angle per channel — the pipeline consults these, it does NOT invent new content streams." The one-time derivation is Done (33aa10f8 encoded the four 2026-06-30 approved angles verbatim into config/platforms.yaml); what's still unbuilt is the refresh loop that keeps those angles honest to what Muxin is actually writing.
-- Add an on-demand refresh step (fits the existing /strategy or /cycle pass — "periodically" = each strategy run, not a newly-invented timer) that reads the current Obsidian content-ideas plus config/pillars.yaml and re-derives a candidate X-for-Y angle per channel (X / LinkedIn / Substack / Bluesky).
-- Compare each freshly-derived candidate against the encoded approved angle in config/platforms.yaml (spin_angles) and surface only the divergences for Muxin — matching the epic's stated posture that angles change only on Muxin's explicit approval (the four angles were APPROVED 2026-06-30) and that the pipeline never invents new content streams, only reframes what she'd already write.
-- Surface/suggest only: the step makes zero writes to config/platforms.yaml; an angle changes solely when Muxin approves the suggested refinement. Mirrors the "surface, never hard-block" posture used for the home-brand thread check (87cb6d93).
-- Out of scope: rewording the four approved angle statements themselves, and the home-brand THREAD CHECK (already filed as 87cb6d93).
-- GOAL_CONDITION: Running the refresh step reads the current Obsidian content-ideas plus config/pillars.yaml and emits a per-channel report (X, LinkedIn, Substack, Bluesky) comparing a freshly-derived candidate angle against the encoded approved angle in config/platforms.yaml. Before: angle drift can only be caught by Muxin manually re-reading. After: any divergence is flagged for Muxin's re-approval and the step makes zero writes to config/platforms.yaml (the four approved angles change only on Muxin's explicit approval).
-- PARENT: d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4
-- ORIGIN: proposed by propose-cards 2026-07-04 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
-- STATUS: Review
-- GROOMED: ready — clear scope (surface-only drift report, zero writes to platforms.yaml), stateable GOAL_CONDITION, no dependency overlaps + 2026-07-04
-<!-- card-id: 8ba83a4c-0903-4103-93cf-a7abea7ea99c -->
 
 **Surface the thread-check advisory in review-queue.md itself, not just validate output and the GUI badge**
 - - Follow-up from card 87cb6d93 (Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing).
@@ -304,7 +304,8 @@ Examples - use both Primary and a Secondary CTA
 - Consider appending a short note to review-queue.md's notes column when a piece is queued with thread_check: missing after a Spin-draft attempt, so the raw markdown itself surfaces it too.
 - Small, additive, no schema break — extends the existing notes column convention.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: ready — small additive review-queue.md notes-column change (surface thread_check:missing), no schema break, CHAIN:1
 <!-- card-id: 4c3eb6be-fbf4-4a6c-ae25-992009f9b848 -->
 
 **Validate storytelling rubric against real /atomize output**
@@ -313,7 +314,8 @@ Examples - use both Primary and a Secondary CTA
 - fixture used to build it.
 - - Depends on: nothing — ready now, just needs an actual /atomize scoring pass on real content.
 - - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: ready — bounded validation task (run storytelling rubric against real /atomize output, compare to fixture baseline), CHAIN:1, no blocking dependency
 <!-- card-id: 9be7688d-a41d-4e58-9fce-a9c8df8e4644 -->
 
 **Track a storytelling-improved bucket in bets.md / origin-compare**
@@ -324,6 +326,141 @@ Examples - use both Primary and a Secondary CTA
 - - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: f77b6670-d39d-4c13-b9be-004084510e58 -->
+
+**Codebase-review fix — Phase 1: job observability (persist + stream Claude job logs)**
+- Persist every Claude/atomize job's stdout/stderr to a log file (e.g. ~/.content-agents/logs/gui-jobs/<jobId>.log), streaming as it arrives (spawn with piped streams, not execFile's 40MB in-memory buffer, serve.ts:796-801).
+- Add elapsed time + last-stdout-line heartbeat to /api/jobs; render both in the jobs pill (serve.ts:735-740, 1622-1629).
+- Add a "view log" link per job serving the log file.
+- Replace the 1.4s auto-hiding toast (serve.ts:1332, 1458) with durable inline error text on the row.
+- Verify success by artifact, not exit code: after the subprocess exits, check a new folder + review-queue.md rows exist (or parse a machine-readable final line /atomize prints); attach the last ~30 log lines to job.error on failure.
+- Closes cards c43a8041 (no content folder created) and the stuck-working + invisible-error halves of 9304e4a5 (Ask Claude buggy) — see docs/codebase-review.md Part 1 §3-4 for full root cause.
+- ORIGIN: docs/codebase-review.md Part 3, Phase 1 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: To Do
+- GROOMED: ready — detailed technical fix (persist/stream job logs, heartbeat, durable errors, artifact-based success check), exact files/lines named, no external/cost/security surface
+<!-- card-id: efae4554-cc52-4aec-ad32-9475d6aa4fdf -->
+
+**Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)**
+- Add a "Generate storyboard" button on video-script rows that enqueues `claude -p "/video <folder>"` through the existing job queue (serve.ts:796) — turns the video path into script review → storyboard generation → storyboard approval → render, all inside the GUI. Closes 9e20a616.
+- Add a per-row "Duplicate to platform..." action: copies the derivative, respins it for the target platform's angle via the existing spin path, appends a new review-queue row, lands back in Review. This is the missing "create a post" affordance behind the rest of 9304e4a5's Ask Claude complaint.
+- Route ALL Claude spawns (revise serve.ts:411, insights 530, ask 571, brief revise 671) through the one existing job queue so GUI concurrency is bounded and every run gets a log (built in Phase 1).
+- Teach Ask Claude to refuse out-of-scope requests (platform change, new post) with a one-line reason instead of silently no-op'ing.
+- Make Refresh tab-aware (refresh whichever tab is active, including the brief), label it, show a "last refreshed HH:MM" stamp. Closes 3625b185.
+- ORIGIN: docs/codebase-review.md Part 3, Phase 2 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Backlog
+- DEPENDS ON: Codebase-review fix — Phase 1: job observability (uses the job queue + logs Phase 1 builds)
+<!-- card-id: 4e7cb5d3-a032-41db-8c49-474a48779261 -->
+
+**Codebase-review fix — Phase 3a: publish idempotency (fix the multi-group double-post window)**
+- R1: /publish's only idempotency guard is flipping the review-queue row to `published` (queue.ts:54), which happens AFTER provider calls. Worst case: cards.ts:278-285 posts a withLink group (Bluesky/LinkedIn) then a noLink group (X); if group 2 fails transiently, group 1 is already live, the row stays `approve`, and the next /publish re-posts BOTH groups.
+- Fix: consult publish-log.md before posting (the parser + findLoggedRef already exist in src/review/reconcile.ts); write a per-group placement marker immediately after each successful provider call; skip already-logged groups on re-run.
+- Sequence BEFORE raising posting caps (ffa6491d) — more volume makes this failure mode more likely, not less.
+- ORIGIN: docs/codebase-review.md Part 2 R1, Part 3 Phase 3 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: To Do
+- GROOMED: ready — concrete idempotency fix (consult publish-log before posting, per-group markers), exact files named, no new external/cost/security surface
+<!-- card-id: a47073b9-85e0-4c44-8afd-ba87724a462e -->
+
+**Codebase-review fix — Phase 3b: provider retry/backoff + orphaned slot cleanup**
+- R2: no retry/backoff on any of the 28 provider fetch sites — a single 429/5xx/network blip aborts the row (the only existing retry is Typefully media transcoding, typefully.ts:324-338), and these transient blips are what turn into Phase 3a's partial-post states. Fix: one small shared fetchWithRetry (exponential backoff on 429/5xx/network) wrapped around publish + provider adapters.
+- R3: slots are claimed in the ledger BEFORE posting (slots.ts:132-197); a mid-run abort leaves a future claim with no post behind it. pruneLedger only drops past days; queue --sync detects this as claimedNotLive drift (queue-view.ts:296-298) but doesn't clean it, so every failed run permanently shifts later posts. Fix: extend --sync to release future claimedNotLive claims (print the diff), and/or release a claim in a `finally` when its post never happened.
+- P2 (fold in while touching slots.ts): pruneLedger's single writeFileSync rewrite of publish-schedule.jsonl (slots.ts:110-119) isn't atomic — a crash mid-write truncates the ledger. Write-temp-then-rename.
+- Sequence BEFORE raising posting caps (ffa6491d), same reasoning as Phase 3a. Can run in parallel with 3a (touches slots.ts/provider adapters vs. cards.ts/queue.ts).
+- ORIGIN: docs/codebase-review.md Part 2 R2/R3/P2, Part 3 Phase 3 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: To Do
+- GROOMED: ready — shared retry/backoff wrapper + orphaned-slot cleanup + atomic ledger write, exact files named, no new external/cost/security surface
+<!-- card-id: 5f039a7e-c4f0-48d5-930f-c1700c4f57c4 -->
+
+**Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts**
+- Attach card PNGs as `media:` on Typefully drafts (uploadMedia + media: frontmatter already implemented, typefully.ts:61-75, 304-313, proven once for an animated mp4). Rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. PostPeer stays for TikTok only (audited API, genuinely better there).
+- This IS the build implementing ca75b2e0's recommendation (don't build browser posting — use Typefully's existing image-upload path instead).
+- HOLD (inherits ca75b2e0's DECISION, 2026-07-07): do ONE supervised test card first (a real PNG through Typefully, confirm it renders on X/LinkedIn/Bluesky drafts) — Muxin watches that first live test — before rewiring cards.ts fully or retiring the relays.
+- ORIGIN: docs/codebase-review.md Part 1 §7, Part 3 Phase 4 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Backlog
+- DEPENDS ON: Use browser automation for image uploads (shares the same recommendation/decision; this card is its implementation)
+<!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
+
+**Codebase-review fix — Phase 5a: config validation & loaders (zod, memoized loader, slots/cta tests)**
+- R4: zod is a dependency but used nowhere. Configs load as `parse(readFileSync(...)) as T` inside bare `catch {}` blocks that silently return defaults — one YAML typo silently disables behavior: typefully.ts:77-89 (max_chars → Infinity, over-length posts ship), cta.ts:19-33 (CTAs vanish), slots.ts:25-42 (cadence falls back to next-free-slot), reuse-guard.ts:26-40 (reuse limits off). Fix: per-config zod schema validated once at load; ENOENT → defaults, anything else → loud throw naming the file + reason.
+- M3: config/platforms.yaml is independently read + cast in 6 files (thread-check.ts:21, validate.ts:126, spin.ts:15, typefully.ts:79, reuse-guard.ts:28, slots.ts:27), each with its own partial `as {...}` shape that can drift. Fix: one memoized loadPlatforms() returning the R4-validated object; same pattern for other config files.
+- R5 (fold in, same touched files): zero tests on slots.claimSlots (decides every post's send time — DST math, weekly caps, daily uniqueness) and cta.ts. Add table-driven tests for both while hardening their config loading — pure logic, nothing to mock.
+- ORIGIN: docs/codebase-review.md Part 2 R4/M3/R5, Part 3 Phase 5 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: To Do
+- GROOMED: ready — zod config validation + memoized loader + tests, exact files named, no external/cost/security surface
+<!-- card-id: 5b3a258b-202d-4036-8a6f-f797a4def753 -->
+
+**Codebase-review fix — Phase 5b: unify review-queue.md column parsing**
+- M2: the 10-column review-queue.md table (the approval database) is decoded by hard-coded `cells[N]` offsets in 3 independent places: src/publish/queue.ts:29-52 (canonical), src/review/serve.ts:339-361 (updateRow reimplements the write path), src/video/render.ts:198-211 (a third parser). The 2026-07-04 origin-column addition already required hand-hunting all three. Fix: one typed review-queue module (grow queue.ts) exposing readRows/writeCell; route serve.ts and render.ts through it.
+- M4 (fold in, adjacent code): serve.ts:85-95 (splitRaw) forks src/util/frontmatter.ts to keep the raw header for byte-preserving edits. Fix: extend splitFrontmatter with an option to return the raw header; delete the fork.
+- ORIGIN: docs/codebase-review.md Part 2 M2/M4, Part 3 Phase 5 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: To Do
+- GROOMED: ready — unify 3 independent review-queue.md column parsers into one typed module, exact files named, no schema break
+<!-- card-id: 570e8c90-c081-49b8-b77e-dc5c1080bd2b -->
+
+**Codebase-review fix — Phase 5c: split serve.ts into page/jobs/rows/routes**
+- M1: serve.ts is a 1,720-line monolith — the HTTP server (~15 routes, 889-1086), a ~620-line inlined HTML/CSS/JS template (1099-1720, including a hand-rolled markdown renderer whose regexes need double-escaping inside the template literal), fs mutation, and Claude subprocess orchestration all in one file. Everything behind the Phase 1/2 complaint fixes is untestable while it's tangled with I/O.
+- Mechanical split, no behavior change: page.ts (client), jobs.ts (queue + claude runner), rows.ts (fs read/write), serve.ts (routes only).
+- P1 (fold in, same file): /api/queue re-reads + re-parses every content folder synchronously on every request (listPieces, serve.ts:305-336), sometimes plus a live Typefully/PostPeer fetch — fine at ~33 folders, degrades linearly as content accumulates. Fix while splitting: cache parsed rows keyed by file mtime; run provider reconciliation on a background interval with a staleness stamp instead of inline per-request.
+- DO THIS BEFORE further GUI feature work piles onto serve.ts (per the doc's own recommendation) — ideally right after Phase 1/2 ship, not deferred indefinitely.
+- ORIGIN: docs/codebase-review.md Part 2 M1/P1, Part 3 Phase 5 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: To Do
+- GROOMED: ready — mechanical serve.ts split (page/jobs/rows/routes) + request caching for /api/queue, no behavior change intended
+<!-- card-id: c310160b-d296-4219-ab28-4cd50c0a3b40 -->
+
+**Adopt the codebase-review fix plan (docs/codebase-review.md)**
+- ORIGIN: filed 2026-07-07 from a full codebase review (docs/codebase-review.md) that root-caused the P0/P1/P2 complaint cards above (each now carries its diagnosis inline) and audited src/ for maintainability, reliability, and performance.
+- This card covers the GENERAL improvements from Part 2/3 of that doc, in its suggested phase order. Phases 1-2 (job observability, GUI actions) close the complaint cards directly; the rest hardens the pipeline:
+- Phase 3 — publish integrity BEFORE raising posting caps (ffa6491d): fix the multi-group card double-post window (cards.ts posts group 1, fails group 2, re-run re-posts both — idempotency via publish-log consultation + per-group markers), add a shared fetchWithRetry for transient 429/5xx, clean up orphaned future slot claims in queue --sync.
+- Phase 4 — quote cards via Typefully media: attach card PNGs as media: on Typefully drafts; retires PostPeer/Upload-Post for cards (see the browser-automation card's recommendation); PostPeer stays for TikTok only.
+- Phase 5 — structure + guardrails: zod-validate config YAML loads and stop bare catch{} from swallowing parse errors (a typo in platforms.yaml currently disables max_chars/CTAs/cadence silently); unify the 3 independent review-queue.md column-index parsers into one typed module; one memoized loader for platforms.yaml (read+cast in 6 files today); split the 1,720-line serve.ts into page/jobs/rows/routes; add tests for slots.claimSlots and cta.ts (zero coverage on the code that decides every send time).
+- Each phase is sized in the doc's Part 3 table; split into per-phase cards when picked up rather than working this card whole.
+- SPLIT (Muxin, 2026-07-07): split into 8 per-phase cards per the doc's own recommendation, sequenced per Part 3's fix order. This epic card is now just the index; work happens on the child cards below.
+  1. Job observability — efae4554-cc52-4aec-ad32-9475d6aa4fdf
+  2. GUI actions — 4e7cb5d3-a032-41db-8c49-474a48779261
+  3a. Publish idempotency (R1) — a47073b9-85e0-4c44-8afd-ba87724a462e
+  3b. Provider retry/backoff + orphaned slot cleanup (R2/R3) — 5f039a7e-c4f0-48d5-930f-c1700c4f57c4
+  4. Quote cards via Typefully media — 1829fdf9-4b9e-4cad-9744-cb42e094300d (implements ca75b2e0's recommendation; holds on ca75b2e0's supervised test first)
+  5a. Config validation & loaders (R4) — 5b3a258b-202d-4036-8a6f-f797a4def753
+  5b. Unify review-queue.md parsing (M2) — 570e8c90-c081-49b8-b77e-dc5c1080bd2b
+  5c. Split serve.ts (M1) — c310160b-d296-4219-ab28-4cd50c0a3b40
+- ORDER: 1 → 2 (close the complaint cards) → 3a/3b (publish integrity, before ffa6491d raises posting caps) → 4 (overlaps ca75b2e0, gated on its supervised test) → 5a/5b/5c (hardening, can trail behind or interleave once 1-4 are stable).
+- STATUS: Done
+<!-- card-id: 5ec087d4-fd64-4932-b5cd-4e9edeec5460 -->
+
+**Per-channel positioning: one clear angle per platform ("Swizzle")**
+- "Swizzle" = a publish-time lens: before publishing to a platform, write the post from the perspective of "this audience cares about XYZ — how does this content relate to XYZ?" Borrow Muxin's OWN language and ideas, but tailor the POV / point of the post to that specific audience. Distinct from CTA routing — this shapes the argument itself, not just where to send people.
+- Goal: make each platform consistently signal "Muxin is X for Y audience" so the algorithm can pin her fast (she believes reach is largely decided in the first ~24h / first ~50 viewers). Today's publishing logic doesn't make the per-channel angle explicit.
+- Channel map (starting point): X = tech, LinkedIn = business/career, Substack = society (and her home base), Bluesky = political. Then narrow each to a specific recurring angle.
+- STEP: run through Muxin's EXISTING Obsidian content-ideas to DERIVE (and periodically refresh) the X-for-Y angle per channel — the pipeline consults these, it does NOT invent new content streams. Keep riding what she'd write anyway, reframed per channel.
+- Encode the channel → audience → angle map and have publishing logic surface/enforce it per platform at publish time; stay consistent over time.
+- Substack = home (most "her"); X/LinkedIn/Bluesky are inbound funnels back to Substack. Relates to "Smarter routing" (CTA-by-content-type, 6dcaee98) and the Landing page card.
+- EXISTING (don't reinvent): this IS the "Spin" idea — docs/spin-experiment.md + /atomize --spin (reframe/re-angle for the platform, never invent claims). Per-channel audience/angle notes already live in config/platforms.yaml; content pillars in config/pillars.yaml. Scope = promote Spin from an opt-in experiment to an always-on default driven by an explicit X-for-Y angle per channel, fed by the Obsidian content ideas.
+- APPROVED ANGLES (Muxin, 2026-06-30; X + LinkedIn sharpened): X = voice of the non-engineer OUTSIDE the SV tech bubble — what these AI tools are actually like for the 96% of non-tech workers, and how the hidden assumptions baked in by that bubble misfire for and harm them (tech audience). LinkedIn = critiques business innovation broadly (NOT just product craft) — how corporate / business norms quietly strangle the creative innovation they claim to want (business/career). Substack = builder-philosopher: the real AI risk isn't the machine, it's the unexamined human systems we're about to automate at full speed (society). Bluesky = the PM who treats democracy as broken UX + AI as making the fairness gap unignorable (political).
+- HOME-BRAND THREAD (Muxin, required): the HOME BRAND is the core WORLDVIEW — "the real AI risk isn't the machine, it's the unexamined human systems we're about to automate at full speed; I ship software as the proof." The Substack ANGLE is its fullest expression, but Substack is still a newsletter CHANNEL, not the home. (A separate future Landing page will be the actual home that drives CTAs.) The angle core per channel is right, but every per-channel piece must carry a visible thread back to this home brand; no channel may read as a standalone/disconnected identity — the four are one worldview pointed at different audiences.
+- HOME-BRAND LINE EVOLVED (Muxin, 2026-07-01): the home-brand line is now **"I uncover harmful hidden beliefs and why they need to change before AI automates everything."** This IS the worldview and the home brand, in mission voice. The prior line ("the real AI risk isn't the machine, it's the unexamined human systems we're about to automate at full speed; I ship software as the proof") remains the expanded worldview statement behind it and the Substack angle's fullest expression. THREAD CHECK below unchanged — "building the right thing" stays part of the test, so the ship-as-proof half is still enforced per piece. Site docs synced same day (`Branding/Human Inference/` in Obsidian).
+- THREAD CHECK (Muxin, 2026-06-30): Muxin won't always remember to include the thread, so the agent must CHECK every piece carries it at review time. Operational test: does the piece connect back to the HOME BRAND worldview (unexamined human systems we're automating / who benefits / building the right thing)? The AI lens is ONE facet of that home brand, not the whole test — do NOT reduce it to "is this about AI." If the thread is missing from a note/essay, Spin DRAFTS it in, then iterate with Muxin until it feels right via the GH editing loop (see the Unified review GUI card). Surface/suggest, never hard-block.
+- RESOLVED (Muxin, 2026-07-07): every explicit to-do in this epic's own text now has its own Done card — Spin promoted to always-on default (33aa10f8, Done), home-brand thread check + auto-draft (87cb6d93, Done), angle refresh loop from Obsidian content-ideas (8ba83a4c, Done). The small review-queue.md surfacing follow-up (4c3eb6be) is tracked separately and doesn't block closing the epic. No open scope remains here.
+- STATUS: Done
+<!-- card-id: d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4 -->
+
+**Periodically refresh the per-channel X-for-Y angles from Muxin's Obsidian content-ideas (surface drift, never auto-overwrite approved angles)**
+- Traces to the epic's STEP bullet: "run through Muxin's EXISTING Obsidian content-ideas to DERIVE (and periodically refresh) the X-for-Y angle per channel — the pipeline consults these, it does NOT invent new content streams." The one-time derivation is Done (33aa10f8 encoded the four 2026-06-30 approved angles verbatim into config/platforms.yaml); what's still unbuilt is the refresh loop that keeps those angles honest to what Muxin is actually writing.
+- Add an on-demand refresh step (fits the existing /strategy or /cycle pass — "periodically" = each strategy run, not a newly-invented timer) that reads the current Obsidian content-ideas plus config/pillars.yaml and re-derives a candidate X-for-Y angle per channel (X / LinkedIn / Substack / Bluesky).
+- Compare each freshly-derived candidate against the encoded approved angle in config/platforms.yaml (spin_angles) and surface only the divergences for Muxin — matching the epic's stated posture that angles change only on Muxin's explicit approval (the four angles were APPROVED 2026-06-30) and that the pipeline never invents new content streams, only reframes what she'd already write.
+- Surface/suggest only: the step makes zero writes to config/platforms.yaml; an angle changes solely when Muxin approves the suggested refinement. Mirrors the "surface, never hard-block" posture used for the home-brand thread check (87cb6d93).
+- Out of scope: rewording the four approved angle statements themselves, and the home-brand THREAD CHECK (already filed as 87cb6d93).
+- GOAL_CONDITION: Running the refresh step reads the current Obsidian content-ideas plus config/pillars.yaml and emits a per-channel report (X, LinkedIn, Substack, Bluesky) comparing a freshly-derived candidate angle against the encoded approved angle in config/platforms.yaml. Before: angle drift can only be caught by Muxin manually re-reading. After: any divergence is flagged for Muxin's re-approval and the step makes zero writes to config/platforms.yaml (the four approved angles change only on Muxin's explicit approval).
+- PARENT: d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4
+- ORIGIN: proposed by propose-cards 2026-07-04 from epic Per-channel positioning: one clear angle per platform ("Swizzle") (d23bfc5d-da2d-4dba-9a8e-d761e6cac0e4)
+- STATUS: Done
+- GROOMED: ready — clear scope (surface-only drift report, zero writes to platforms.yaml), stateable GOAL_CONDITION, no dependency overlaps + 2026-07-04
+<!-- card-id: 8ba83a4c-0903-4103-93cf-a7abea7ea99c -->
 
 **Live Typefully/PostPeer schedule reconciliation in the review GUI**
 - Wire item (3) of the review GUI's STILL TO WIRE list: the dashboard reflects what is actually scheduled at the providers, not just what Muxin approved.
