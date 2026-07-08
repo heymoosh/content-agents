@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { basePlatform, cardTarget, planGroups } from "./cards.js";
+import { basePlatform, cardTarget, planGroups, alreadyLoggedGroup } from "./cards.js";
 import type { CtaConfig } from "./cta.js";
 
 // The per-platform card model (Muxin, 2026-07-03): a card row is `quote-card:<target>` — one card
@@ -48,4 +48,96 @@ test("planGroups with no CTA is a single group carrying the bare context caption
   const groups = planGroups(caption, [{ platform: "bluesky" }], null, "", cfg);
   assert.equal(groups.length, 1);
   assert.equal(groups[0].caption, caption); // exactly the context — this is the analytics match key
+});
+
+// R1 idempotency (docs/codebase-review.md Part 2): publishCards posts a row's targets in GROUPS
+// (inline-link group + no-link group). If group 1 posts+logs but group 2 then THROWS, the row stays
+// `approve`, so the NEXT /publish re-enters the loop. Without a per-group guard it would RE-POST the
+// already-successful group 1 — a real duplicate public post. alreadyLoggedGroup parses cards.ts's own
+// publish-log line shape and returns the logged ref for an EXACT row+dest match so the loop can skip
+// re-posting while still collecting that ref for refs/appendBetPlacement.
+const SAMPLE_LOG = [
+  "# Publish log",
+  "",
+  "- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [bluesky+linkedin +link] (scheduled 2026-07-08T18:00:00.000Z)",
+  "",
+].join("\n");
+
+test("alreadyLoggedGroup finds the logged ref for the exact row+dest", () => {
+  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "bluesky+linkedin"), "post 12345");
+});
+
+test("alreadyLoggedGroup returns null for a different dest on the same row (that group must still post)", () => {
+  // The no-link group (X/twitter) was NOT logged — treating it as posted would silently drop the post.
+  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "twitter"), null);
+});
+
+test("alreadyLoggedGroup requires an EXACT platform-set match, not a subset", () => {
+  // A single-platform dest must not match a logged multi-platform group, or we'd wrongly skip and
+  // drop the post for whichever platform the logged group did NOT cover.
+  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "bluesky"), null);
+  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "linkedin"), null);
+});
+
+test("alreadyLoggedGroup returns null for a row with no log entries (and for empty log text)", () => {
+  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-2", "bluesky+linkedin"), null);
+  assert.equal(alreadyLoggedGroup("", "card-1", "bluesky+linkedin"), null);
+});
+
+test("alreadyLoggedGroup handles the no-link bracket (no ` +link`) and multiple logged groups", () => {
+  const log = [
+    "# Publish log",
+    "",
+    "- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [bluesky+linkedin +link] (scheduled 2026-07-08T18:00:00.000Z)",
+    "- 2026-07-06T18:00:01.000Z — card-1 → postpeer post 67890 [twitter] (scheduled 2026-07-08T19:00:00.000Z)",
+    "",
+  ].join("\n");
+  assert.equal(alreadyLoggedGroup(log, "card-1", "bluesky+linkedin"), "post 12345");
+  assert.equal(alreadyLoggedGroup(log, "card-1", "twitter"), "post 67890");
+});
+
+test("alreadyLoggedGroup mirrors the loop's partial-failure state: group 1 skip, group 2 post", () => {
+  // Simulate a prior run that posted+logged the inline-link group then threw before the X group.
+  // dest is computed exactly the way publishCards's loop computes it: sorted, so it's stable
+  // regardless of provider.listTargets()'s return order across runs.
+  const withLinkTargets = [{ platform: "bluesky" }, { platform: "linkedin" }];
+  const noLinkTargets = [{ platform: "twitter" }];
+  const destOf = (ts: { platform: string }[]) => ts.map((t) => t.platform).sort().join("+");
+  const priorLog = [
+    "# Publish log",
+    "",
+    `- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [${destOf(withLinkTargets)} +link] (scheduled 2026-07-08T18:00:00.000Z)`,
+    "",
+  ].join("\n");
+  // group 1: already logged → loop reuses this ref, must NOT call the provider again (no duplicate)
+  assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(withLinkTargets)), "post 12345");
+  // group 2: not logged → loop MUST still post it (no silent drop)
+  assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(noLinkTargets)), null);
+});
+
+test("alreadyLoggedGroup: dest is order-independent across a retry, even if listTargets() reorders", () => {
+  // The bug this guards against: provider.listTargets() returns connected accounts in whatever
+  // order the provider API gives them, which isn't guaranteed stable between the failed run and the
+  // retry. If dest weren't sorted, "linkedin+bluesky" (retry) wouldn't match a logged
+  // "bluesky+linkedin" (original run), and the guard would silently re-post the already-live group.
+  const destOf = (ts: { platform: string }[]) => ts.map((t) => t.platform).sort().join("+");
+  const originalOrder = [{ platform: "bluesky" }, { platform: "linkedin" }];
+  const retryOrder = [{ platform: "linkedin" }, { platform: "bluesky" }];
+  const priorLog = [
+    "# Publish log",
+    "",
+    `- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [${destOf(originalOrder)} +link] (scheduled 2026-07-08T18:00:00.000Z)`,
+    "",
+  ].join("\n");
+  assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(retryOrder)), "post 12345");
+});
+
+test("alreadyLoggedGroup keys on the row id, not another row's identical dest", () => {
+  const log = [
+    "# Publish log",
+    "",
+    "- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [bluesky+linkedin +link] (scheduled 2026-07-08T18:00:00.000Z)",
+    "",
+  ].join("\n");
+  assert.equal(alreadyLoggedGroup(log, "card-9", "bluesky+linkedin"), null);
 });

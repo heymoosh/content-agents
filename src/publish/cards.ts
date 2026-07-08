@@ -145,6 +145,47 @@ export function planGroups(
   return groups;
 }
 
+// Escape a string for literal use inside a RegExp — dest joins platforms with "+", a regex metachar.
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Idempotency for the multi-group posting loop below. A card row posts its targets in GROUPS
+// (inline-link group + no-link group). If group 1 posts+logs but group 2 then THROWS, the row stays
+// `approve`, so the next /publish re-enters the loop — without this guard it would RE-POST the
+// already-successful group 1 (a real duplicate public post to Bluesky/LinkedIn). Given the current
+// publish-log.md text, this returns the logged provider ref for THIS row's group identified by its
+// exact `dest` platform-set, so the loop can reuse that ref instead of calling the provider again.
+//
+// Parses cards.ts's OWN log-line shape only: `- <ISO> — <rowId> → <provider> <ref> [<dest>[ +link]]
+// (scheduled ...)` (written by appendPublishLog above). The `[dest]` bracket is unique to this file —
+// typefully.ts/tiktok.ts use a bracket-less shape, and findLoggedRef (reconcile.ts) keys only on
+// rowId with no dest concept, so it can't tell one group's ref from another's here. Pure string in,
+// no fs — the caller supplies the log text. Match is EXACT: a partial or superset dest returns null
+// (only the identical platform set counts as "already posted"), so a group that was NOT actually
+// posted is never wrongly skipped. Returns null when the row+dest has no logged line.
+export function alreadyLoggedGroup(logText: string, rowId: string, dest: string): string | null {
+  const re = new RegExp(
+    `^-\\s+\\S+\\s+—\\s+${escapeRe(rowId)}\\s+→\\s+\\S+\\s+(.+?)\\s+\\[${escapeRe(dest)}(?: \\+link)?\\]`
+  );
+  let found: string | null = null;
+  for (const line of logText.split("\n")) {
+    const m = line.match(re);
+    if (m) found = m[1]; // last logged wins, mirroring findLoggedRef
+  }
+  return found;
+}
+
+// The row's publish-log.md text (for the idempotency check), or "" when the file doesn't exist yet
+// (first run — nothing has been posted). Same folder/filename convention as appendPublishLog.
+function readPublishLog(folder: string): string {
+  try {
+    return readFileSync(join(folder, "publish-log.md"), "utf8");
+  } catch {
+    return "";
+  }
+}
+
 async function runCheck(folder: string | null): Promise<void> {
   const name = imagePostName();
   console.log(`image_post provider (config/providers.yaml): ${name}`);
@@ -274,9 +315,21 @@ export async function publishCards(
     }
 
     const groups = planGroups(caption, rowTargets, ctaUrl, ctaLabel, cfg);
+    const priorLog = readPublishLog(folder); // prior runs' log lines, for the per-group idempotency check
     const refs: string[] = [];
     for (const g of groups) {
-      const dest = g.targets.map((t) => t.platform).join("+");
+      // Sorted so `dest` is stable regardless of provider.listTargets()'s return order — a retry run
+      // whose provider lists connected accounts in a different order must still produce the SAME
+      // dest string as the original run, or the idempotency check below misses the match and re-posts.
+      const dest = g.targets.map((t) => t.platform).sort().join("+");
+      // If a prior run already posted+logged THIS exact group but then threw on a later group, the
+      // row is still `approve` and we're re-entering this loop — reuse the logged ref, don't re-post.
+      const priorRef = alreadyLoggedGroup(priorLog, row.id, dest);
+      if (priorRef) {
+        console.log(`  ↳ ${row.id} [${dest}] already scheduled on a prior run (${priorRef}) — skipping re-post`);
+        refs.push(priorRef);
+        continue;
+      }
       const link = g.caption.includes("\n") ? " +link" : "";
       const ref = await provider.scheduleImagePost({ imagePath, caption: g.caption, scheduledFor, targets: g.targets });
       refs.push(ref);
