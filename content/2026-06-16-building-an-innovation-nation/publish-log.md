@@ -30,3 +30,4 @@
 - 2026-06-24T22:37:38.501Z — qvid-x → typefully draft 9638763 (x, Fri, Jun 26, 9:30 AM PT, cta→reply)
 - 2026-06-24T22:37:45.739Z — qvid-linkedin → typefully draft 9638768 (linkedin, Tue, Jun 30, 8:30 AM PT, cta→inline)
 - 2026-06-24T22:37:52.591Z — qvid-bluesky → typefully draft 9638769 (bluesky, Fri, Jun 26, 6:30 PM PT, cta→inline)
+- 2026-07-05T16:50:53.072Z — quote-card-6-x → upload-post upload-post job 090360eb3d464e06966cb7011183ad79 → x [x] (scheduled 2026-07-21T19:00:00.000Z)
