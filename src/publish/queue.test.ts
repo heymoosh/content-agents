@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readQueue, setStatus, stampOrigin, writeCell, storyboardRowStatus, type QueueRow } from "./queue.js";
+import { readQueue, setStatus, stampOrigin, writeCell, storyboardRowStatus, appendRow, type QueueRow } from "./queue.js";
 
 // Origin source-tags (Muxin, 2026-07-04): every row awaiting review carries an origin — one of
 // QUEUE_ORIGINS — set at the pipeline that created it. Rows written before this change have no
@@ -208,5 +208,80 @@ test("storyboardRowStatus returns null when there is no storyboard row", () => {
 test("storyboardRowStatus returns null when review-queue.md doesn't exist", () => {
   const dir = mkdtempSync(join(tmpdir(), "queue-test-"));
   assert.equal(storyboardRowStatus(dir), null);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+// appendRow — the "Duplicate to platform" GUI action's write path (src/review/jobs.ts
+// duplicateToPlatform): a brand-new row for a brand-new derivative, appended deterministically by
+// the server rather than trusting the Claude subprocess to also hand-edit the queue table.
+
+test("appendRow adds a full 10-column row that readQueue parses back correctly", () => {
+  const dir = tmpFolder(
+    `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
+      `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n` +
+      `| x-1 | x | text | derivatives/x-1.md | 4 | 5 | yes | pending | | from /cycle |\n`
+  );
+  appendRow(dir, {
+    id: "linkedin-2",
+    platform: "linkedin",
+    format: "text",
+    asset: "derivatives/linkedin-2.md",
+    status: "pending",
+    notes: "duplicated from x-1 for linkedin",
+    origin: "from GUI queue",
+  });
+  const { rows } = readQueue(dir);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].id, "x-1"); // untouched
+  const added = rows[1];
+  assert.equal(added.id, "linkedin-2");
+  assert.equal(added.platform, "linkedin");
+  assert.equal(added.format, "text");
+  assert.equal(added.asset, "derivatives/linkedin-2.md");
+  assert.equal(added.status, "pending");
+  assert.equal(added.notes, "duplicated from x-1 for linkedin");
+  assert.equal(added.origin, "from GUI queue");
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("appendRow onto a legacy 9-column table (no origin header) still parses, origin undefined only if omitted", () => {
+  const dir = tmpFolder(
+    `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n` +
+      `|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n` +
+      `| x-1 | x | text | derivatives/x-1.md | 4 | 5 | yes | pending | old note |\n`
+  );
+  appendRow(dir, { id: "bluesky-1", platform: "bluesky", format: "text", asset: "derivatives/bluesky-1.md", status: "pending" });
+  const { rows } = readQueue(dir);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].id, "bluesky-1");
+  assert.equal(rows[1].notes, "");
+  assert.equal(rows[1].origin, undefined); // no origin passed
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("appendRow leaves every existing row byte-identical (no rewrite of prior lines)", () => {
+  const dir = tmpFolder(
+    `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
+      `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n` +
+      `| x-1 | x | text | derivatives/x-1.md | 4 | 5 | yes | approve | | from /cycle |\n`
+  );
+  const before = readFileSync(join(dir, "review-queue.md"), "utf8");
+  appendRow(dir, { id: "x-2", platform: "x", format: "text", asset: "derivatives/x-2.md", status: "pending", origin: "from GUI queue" });
+  const after = readFileSync(join(dir, "review-queue.md"), "utf8");
+  assert.ok(after.startsWith(before.replace(/\n*$/, "\n")));
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("appendRow strips stray pipes/newlines out of notes so column boundaries can't shift", () => {
+  const dir = tmpFolder(
+    `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
+      `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n`
+  );
+  appendRow(dir, {
+    id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending",
+    notes: "line one\nline two | with a pipe",
+  });
+  const { rows } = readQueue(dir);
+  assert.equal(rows[0].notes, "line one line two   with a pipe");
   rmSync(dir, { recursive: true, force: true });
 });

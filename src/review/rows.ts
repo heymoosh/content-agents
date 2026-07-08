@@ -41,6 +41,13 @@ interface EnrichedRow extends QueueRow {
   hasAsset: boolean;
   approveBlocked: string | null; // reason Approve is disabled, if any
   reconciled?: ReconciledStatus; // live Typefully/PostPeer reconciliation — omitted when not applicable
+  // "Generate storyboard" button (card 9e20a616): true for a video-script row whose storyboard
+  // hasn't been generated yet — the one case Approve is blocked with no way in the GUI to fix it.
+  canGenerateStoryboard: boolean;
+  // "Duplicate to platform" button (card 9304e4a5's missing "create a post for another platform"
+  // affordance): true for any real text derivative — the dropdown itself is scoped to the actual
+  // spin-eligible target platforms server-side (duplicateToPlatform / TEXT_PLATFORMS).
+  duplicatable: boolean;
 }
 
 export interface Piece {
@@ -142,6 +149,8 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     hasAsset: false,
     approveBlocked: approveBlockReason(folder, row),
     reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live) : undefined,
+    canGenerateStoryboard: kind === "storyboard" && !existsSync(join(folder, "video", "storyboard.md")),
+    duplicatable: false, // finalized below, once hasAsset is known
   };
   const assetUrl = (file: string) => `/asset?slug=${encodeURIComponent(slug)}&file=${encodeURIComponent(file)}`;
 
@@ -186,6 +195,9 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
       out.hasAsset = true;
     }
   }
+  // "Duplicate to platform" only makes sense on a real text post — not an empty draft, and not an
+  // asset row (image/video/storyboard) that has no body of its own to re-angle.
+  out.duplicatable = kind === "text" && out.hasAsset;
   return out;
 }
 

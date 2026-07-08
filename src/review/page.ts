@@ -92,6 +92,15 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .aibox button.send { border-color:#5b46b8; background:#5b46b8; color:#fff; }
   .aierr { flex-basis:100%; color:var(--red); font-size:12.5px; font-weight:600; }
   .thinking { font-size:13px; color:#5b46b8; font-weight:600; padding:4px 0; }
+  button.storyboard { border-color:var(--blue); color:var(--blue); }
+  button.storyboard:hover { background:var(--blue-bg); }
+  button.dup { border-color:#7a5a1c; color:#7a5a1c; }
+  button.dup:hover { background:#f3ecdf; }
+  .dupbox { margin-top:9px; display:none; gap:7px; flex-wrap:wrap; align-items:center; }
+  .dupbox.show { display:flex; }
+  .dupbox select { font:inherit; padding:7px 10px; border:1px solid #7a5a1c; border-radius:7px; background:#fff; }
+  .dupbox button.send { border-color:#7a5a1c; background:#7a5a1c; color:#fff; }
+  .duperr { flex-basis:100%; color:var(--red); font-size:12.5px; font-weight:600; }
   nav.tabs { display:flex; gap:5px; }
   .tab { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:6px 14px;
     font-weight:600; color:var(--muted); display:flex; align-items:center; gap:7px; }
@@ -167,7 +176,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   </nav>
   <span class="grow"></span>
   <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
-  <button id="refresh">Refresh</button>
+  <span class="hint" id="lastRefreshed" style="min-width:0"></span>
+  <button id="refresh" title="Refreshes only the tab you're looking at">Refresh queue</button>
 </header>
 <main>
   <section class="view" id="ingestView">
@@ -299,6 +309,23 @@ function rowEl(piece, row){
   const manual = row.manualComment ? '<div class="notes">↳ add as first comment in Typefully: '+esc(row.manualComment)+'</div>' : "";
   const editBtn = row.editable ? '<button data-act="edit">Edit</button>' : "";
   const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Ask Claude</button>' : "";
+  // "Generate storyboard" (card 9e20a616): the video-path dead end — a video-script row you can't
+  // approve because storyboard.md doesn't exist yet, and no way to run /video without a terminal.
+  // row.storyboardQueued is a client-only flag (survives until the next full /api/queue refresh,
+  // same pattern as row.aiError) so a queued job reads as queued, not as a dead button.
+  const storyboardBtn = row.canGenerateStoryboard
+    ? (row.storyboardQueued
+        ? '<span class="hint">✨ generating storyboard… (Add / Queue tab has progress)</span>'
+        : '<button class="storyboard" data-act="gen-storyboard">🎬 Generate storyboard</button>')
+    : "";
+  // "Duplicate to platform" (card 9304e4a5's missing "create a post for another platform"):
+  // options come from DATA.textPlatforms (server's TEXT_PLATFORMS), excluding this row's own
+  // platform so the dropdown only ever offers an actual new target.
+  const dupBtn = row.duplicatable ? '<button class="dup" data-act="dup">⧉ Duplicate to platform…</button>' : "";
+  const dupOptions = (DATA.textPlatforms || [])
+    .filter((p) => p !== row.platform)
+    .map((p) => '<option value="'+esc(p)+'">'+esc(p)+'</option>')
+    .join("");
   const schedulable = ["x","linkedin","bluesky"].includes(row.platform);
   const approveLabel = schedulable ? "Approve → schedule" : "Approve";
   // Keep warning + disabled state even once status is "approve" — that's the phantom-approval
@@ -318,14 +345,21 @@ function rowEl(piece, row){
         (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>'+approveLabel+'</button>'+
       '<button class="revise'+(row.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(row.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
-      '<span class="spacer"></span>'+ editBtn + aiBtn +
+      '<span class="spacer"></span>'+ storyboardBtn + editBtn + aiBtn + dupBtn +
     '</div>'+
     '<div class="revisebox"><input placeholder="what needs changing?" value="'+esc(row.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
     // Reopens (and stays open) when a prior "Ask Claude" attempt failed, so the error — durable
     // now, not a 1.4s toast — is still visible after the row's next rerender, not wiped by it.
+    // Also durably shows Claude's REFUSAL reason (card 9304e4a5 part 4) — same mechanism, a real
+    // explanation instead of a silent no-op.
     '<div class="aibox'+(row.aiError?" show":"")+'"><input placeholder="tell Claude what to change…" /><button class="send" data-act="ai-send">Send to Claude</button>'+
       (row.aiError ? '<div class="aierr">⚠ '+esc(row.aiError)+'</div>' : "")+
-    '</div>';
+    '</div>'+
+    (row.duplicatable
+      ? '<div class="dupbox'+(row.dupError?" show":"")+'"><select>'+dupOptions+'</select><button class="send" data-act="dup-send">Duplicate</button>'+
+        (row.dupError ? '<div class="duperr">⚠ '+esc(row.dupError)+'</div>' : "")+
+      '</div>'
+      : "");
 
   el.addEventListener("click", (e)=>onAction(e, piece, row, el));
   return el;
@@ -380,6 +414,24 @@ async function onAction(e, piece, row, el){
     if(r.ok){ row.body = r.body; flash("Revised by Claude"); }
     else { row.aiError = r.error || "error"; }
     rerender();
+  } else if (act === "gen-storyboard"){
+    e.target.disabled = true;
+    const r = await post("/api/video/generate",{slug:piece.slug});
+    if(r.ok){ row.storyboardQueued = true; flash("Queued — generating storyboard (Add / Queue tab has progress)"); loadJobs(); }
+    else { e.target.disabled = false; flash(r.error || "Could not queue /video"); }
+    rerender();
+  } else if (act === "dup"){
+    const box = el.querySelector(".dupbox"); box.classList.toggle("show");
+    if(!box.classList.contains("show")) row.dupError = null; // closing dismisses any stale error
+  } else if (act === "dup-send"){
+    const sel = el.querySelector(".dupbox select");
+    const platform = sel ? sel.value : "";
+    if(!platform){ flash("No other platform to duplicate to"); return; }
+    row.dupError = null;
+    el.querySelector(".dupbox").innerHTML = '<div class="thinking">✨ Claude is drafting the '+esc(platform)+' version… (~10-60s)</div>';
+    const r = await post("/api/duplicate",{slug:piece.slug,id:row.id,platform});
+    if(r.ok){ flash("Duplicated to "+platform+" — new pending row added"); await load(); }
+    else { row.dupError = r.error || "error"; rerender(); }
   }
 }
 
@@ -404,15 +456,44 @@ function render(){
 }
 
 // ── tabs ──
+// Refresh used to always do the same global rescan (load() + loadJobs()) no matter which tab was
+// open, and never touched the Analytics tab at all — confusing (backlog card 3625b185: "what does
+// Refresh even do?"). It's now tab-aware: doRefresh() below only re-reads whatever the CURRENT tab
+// shows, labeled per tab, with a "last refreshed HH:MM" stamp so its effect is visible.
+let currentTab = "ingest";
+function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="strategy" ? "Refresh brief + exports" : "Refresh queue"; }
 function setTab(t){
+  currentTab = t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
   $("#ingestView").hidden = t!=="ingest";
   $("#reviewView").hidden = t!=="review";
   $("#strategyView").hidden = t!=="strategy";
   $("#decidedWrap").style.display = t==="review" ? "" : "none";
+  $("#refresh").textContent = refreshLabelFor(t);
   if (t==="strategy" && !briefLoaded){ loadBrief(); loadRaw(); }
 }
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>setTab(b.dataset.tab)));
+
+let lastRefreshedAt = null;
+function fmtHHMM(ms){ const d = new Date(ms); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+function markRefreshed(){ lastRefreshedAt = Date.now(); $("#lastRefreshed").textContent = "last refreshed "+fmtHHMM(lastRefreshedAt); }
+
+// Re-reads only what the ACTIVE tab shows — never a Claude spawn, never the other tabs' data.
+// Ingest: the job queue. Review: the full review-queue.md + live-provider rescan (load()) that used
+// to be Refresh's only behavior. Strategy: the brief + raw-exports list (NOT "Generate insights" —
+// that's a real Claude call and stays a deliberate button click, never auto-fired by Refresh).
+async function doRefresh(){
+  $("#refresh").disabled = true;
+  try {
+    if (currentTab === "review") { await load(); await loadJobs(); }
+    else if (currentTab === "strategy") { await loadBrief(); await loadRaw(); }
+    else { await loadJobs(); }
+  } finally {
+    $("#refresh").disabled = false;
+    markRefreshed();
+  }
+}
+$("#refresh").addEventListener("click", doRefresh);
 
 // ── Analytics & Strategy ──
 
@@ -643,11 +724,11 @@ $("#notesDraftBtn").addEventListener("click", draftSelectedNotes);
 $("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") addSource(); });
 setInterval(()=>{ if(JOBS.some(j=>j.status==="queued"||j.status==="running")) loadJobs(); }, 3000);
 
-$("#refresh").addEventListener("click", ()=>{ load(); loadJobs(); });
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
 setTab("ingest");
-load();
-loadJobs();
+// Match doRefresh()'s ordering: stamp "last refreshed" once the initial data has actually
+// landed, not the instant the page starts loading it (load()/loadJobs() are async).
+Promise.all([load(), loadJobs()]).finally(markRefreshed);
 </script>
 </body>
 </html>`;
