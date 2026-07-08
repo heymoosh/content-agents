@@ -201,12 +201,21 @@ current state derived by folding. Git-friendly, human-readable, no new storage t
 
 ```
 config/outreach.yaml          # knobs: batch cap per run (default 5), follow-up windows per bucket,
-                              # abandon threshold, JSA_DB_PATH env name, channels list
+                              # abandon threshold, JSA_DB_PATH env name, channels list, mid-tail
+                              # size bands + research search budget (§9/§10)
 config/outreach/clients.md    # client fit profile: turnaround/greenfield/disqualifying evidence
                               # taxonomy (verbatim from c308a8cf step 2) + the HARD qualifier
                               # (open to changing their mind) from ba9769af
 config/outreach/platforms.md  # platform fit profile: topic overlap, audience reality check,
                               # values, guest-friendliness/pitch-path, recency (active ≤90 days)
+config/outreach/worldview-map.md  # 10–20 belief statements distilled from Muxin's essays, each
+                              # with paraphrase variants per community dialect — the query-
+                              # generation source for discovery (§9). Refreshed suggest-only,
+                              # same posture as angle-refresh; Muxin approves changes.
+config/outreach/anchors.md    # Muxin-seeded people/orgs she already trusts (e.g. Audrey Tang,
+                              # the Collective Intelligence Project) — the seeds for anchor-graph
+                              # expansion (§9). Grows as pursued leads lock; every entry carries
+                              # a one-line "why this anchor" note.
 ```
 
 Fit profiles are prose markdown (Claude-judgment rubrics, like `config/pillars.yaml`'s role),
@@ -304,6 +313,10 @@ GUI reads lead review-queues. Definition of done: Muxin runs `/outreach add` on 
 and gets a cited, classified pitch report she can judge cold; "unclear" demonstrably surfaces as
 unclear on at least one thin-evidence lead. **No discovery, no drafting yet** — this validates
 research quality, the riskiest judgment surface, before anything composes prose.
+Phase 1 build requirements from §9/§10: the quote-required worldview match (a values claim in a
+pitch report must quote the candidate's own words with a link, or classify unclear), the
+disconfirmation pass, the closed-checklist research prompt with per-signal search budget and
+hard subprocess timeout, `--from-jsa` bulk-refusal, and the per-run research log line.
 
 **Phase 2 — Decision gate → draft → lock → /atomize reuse (c308a8cf core)**
 `draft.ts`, `validate.ts` (message half: two-sided guard), `lock.ts`, GUI approve-equals-lock
@@ -325,11 +338,14 @@ locked text, extraction-first, per stage 9). The inbound bucket ships schema-rea
 until db22283f lands.
 
 **Phase 5 — Discovery + batch hardening (ba9769af/b7dcb608 completion)**
-`discover.ts` (web-search sourcing per fit profile, dedup against all lead folders), batch caps +
-rate-limit backoff exercised for real (this is where multi-lead sittings actually happen).
-Deliberately last: seeded leads prove the qualify/draft pipeline first; discovery quality is the
-least verifiable stage and benefits from months of Muxin's pursue/pass decisions as a
-calibration record. Pull it earlier only if Phase 1–3 throughput runs dry of seeded candidates.
+`discover.ts` built to the §9 discovery methodology (worldview-map query generation, anchor-graph
+expansion, mid-tail size bands, lens rotation, pass-reason anti-examples — NOT naive keyword
+search), dedup against all lead folders, batch caps + rate-limit backoff exercised for real
+(this is where multi-lead sittings actually happen). Deliberately last: seeded leads prove the
+qualify/draft pipeline first; discovery quality is the least verifiable stage and benefits from
+months of Muxin's pursue/pass decisions as a calibration record. Pull it earlier only if
+Phase 1–3 throughput runs dry of seeded candidates. The worldview-map and anchors config files
+land earlier (Phase 1) since qualify scores against the map from day one.
 
 Sequencing rationale in one line: **value lands at every phase boundary** — after Phase 1 Muxin
 gets research reports, after 2 she's sending real messages, after 3 she's pitching podcasts,
@@ -362,4 +378,132 @@ after 4 nothing falls through the cracks, after 5 the top of the funnel fills it
 3. The Phase 0 seed list (3–5 clients + 3–5 platforms from her own head/JSA TARGETs).
    **STILL PENDING — the only remaining input.** Muxin supplies names, or Phase 0 pulls
    TARGET-verdict companies from `manual_research.db` via the ratified `--from-jsa` path.
+   Anchor seeds for §9 count too (first two on file from Muxin, 2026-07-08: Audrey Tang, the
+   Collective Intelligence Project).
 4. This plan's phase ordering (specifically: discovery last). **RATIFIED 2026-07-08.**
+
+---
+
+## 9. Discovery methodology (how SOURCE finds worldview matches) — added 2026-07-08, approved by Muxin
+
+Approved direction (Muxin, 2026-07-08) with two refinements folded in: (a) never rely on literal
+phrase matching — feed the search process from a belief map, not a keyword list; (b) generalize
+the recommendation-graph idea to every graph an anchor sits in, for platforms AND client-people.
+
+### 9a. Why naive search fails here
+
+"Shares my worldview" is not a searchable attribute; it's latent. Generic category queries
+("best AI/product podcasts", "AI startups") return whoever owns the SEO — the same hot list
+everyone is pitching. And Muxin's own distinctive phrases won't recur verbatim in other people's
+writing, so dumb keyword search on essay quotes misses too. Two mechanisms replace both.
+
+### 9b. The worldview map: beliefs × dialects × modality, queries generated per run
+
+`config/outreach/worldview-map.md` distills Muxin's essays into 10–20 belief statements (e.g.
+"automating an unexamined process entrenches its flaws", "product failure usually traces to an
+untested assumption, not bad execution", "AI tooling is designed inside a bubble the other 96%
+don't live in"). For each belief, the map lists paraphrase variants in the dialects different
+communities actually use — the same idea is "paving the cowpath" to practitioners,
+"sociotechnical systems" / "algorithmic accountability" to academics, "value lock-in" to the
+AI-safety crowd, "digital democracy" / "participatory design" to civic tech, "Conway's law
+shipping the org chart" to org-design people.
+
+Discovery queries are **generated fresh each run** by Claude from (one belief) × (one dialect) ×
+(one modality: episode-level podcast search, newsletter search, founder-post search) — never a
+static phrase list. Claude is the query-expansion engine; that's what feeds the search process.
+The map itself refreshes on the angle-refresh rhythm (suggest-only, Muxin approves edits), and
+belief/dialect slices are rotated across runs (§9e) so successive runs probe different cells of
+the matrix instead of re-running the same searches.
+
+A second query family: **named anchors as proxies**. Worldview-adjacent people cite the same
+books, thinkers, frameworks, and orgs. Searching who cites/discusses an anchor (a book like
+Seeing Like a State, a person like Audrey Tang, a framework like plurality/collective
+intelligence) surfaces belief-holders whose own vocabulary matches none of Muxin's phrases.
+
+### 9c. Anchor-graph expansion (the recommendation-graph idea, generalized)
+
+`config/outreach/anchors.md` holds people/orgs Muxin already trusts. Discovery expands each
+anchor 1–2 hops along every public graph it sits in, then scores every node found against the
+worldview map before anything is surfaced:
+
+- **Co-appearance graph:** podcasts/panels/conferences that featured the anchor → those shows are
+  themselves platform candidates (they've proven appetite for exactly these themes), and their
+  other guests are candidate people/anchors.
+- **Collaboration/citation graph:** co-authors, project contributors, partner orgs, advisors;
+  funders' other grantees.
+- **Engagement graph:** who the anchor publicly follows/boosts/recommends (Substack
+  recommendations, Bluesky/Mastodon follows) — the original Substack-graph idea, applied to
+  every network with public follow/recommend data.
+- **Alumni graph (client-people):** people who worked at values-aligned orgs and now lead
+  product/strategy elsewhere are warm client-person leads — the values fit travels with the
+  person, and their new employer inherits a decision-maker who already shares the worldview.
+
+Worked example (Muxin's own seed, 2026-07-08): **Audrey Tang + the Collective Intelligence
+Project.** Co-appearance: every podcast/conference that hosted Tang is a platform candidate, and
+its co-panelists/other guests enter the pool. Collaboration: the Plurality book's open-source
+contributor network; CIP's co-founders, research collaborators, partner orgs, and the adjacent
+org cluster (RadicalxChange, Metagov, New_ Public, vTaiwan/g0v community, plurality institutes);
+each org's team pages and event speaker lists. Engagement: who Tang and CIP's researchers boost
+and recommend. Alumni: ex-CIP/g0v/civic-tech people now in product roles at startups — client-
+person leads with the worldview already on board. Every pursued lead that locks becomes a new
+anchor, so the frontier compounds instead of re-searching flat.
+
+### 9d. Client discovery targets PEOPLE, not companies
+
+A company's public voice is marketing; a person's is a worldview trail. The richest client seam
+is reflective founder/exec writing: postmortems, "what I got wrong" essays, podcast appearances
+saying "we spent a year building the wrong thing" — one artifact that proves worldview match,
+fit situation (turnaround), and the HARD qualifier (openness to changing their mind)
+simultaneously. Job-post language analysis ("founding PM", "help us figure out what to build"
+vs "execute our roadmap") is the secondary seam. Once db22283f (inbound listening) lands,
+people already engaging with Muxin's content are a third, pre-qualified seam. The company a
+person leads is researched AFTER the person qualifies, not before.
+
+### 9e. Anti-convergence: never the same list twice
+
+1. **Dedup ledger is a hard exclusion** — every candidate ever surfaced (pursued or passed) is
+   excluded from future runs; run N+1 starts past run N's frontier by construction.
+2. **Lens rotation** — each run is assigned one modality + one worldview-map slice + one anchor
+   subset (logged in the run log), so the engine never quietly reverts to generic queries.
+3. **Mid-tail size bands as disqualifiers** (config knobs): podcasts ≳50k listeners, newsletters
+   ≳50k subs, companies past Series B or on current hype lists are downgraded/excluded — everyone
+   is vying for them and Muxin can hand-add a big name herself; the engine exists for the
+   mid-tail she'd never have time to scan.
+4. **Pass-reasons as anti-examples** — Muxin's pass decisions (with one-line reasons, from the
+   lead Decision logs) are fed into the discovery prompt as negative few-shots so lookalikes of
+   rejected leads stop surfacing.
+
+### 9f. Match verification before anything reaches Muxin
+
+- **Quote-required worldview match:** a values-fit claim in a pitch report must quote the
+  candidate's own words (with link) demonstrating the shared belief — the qualification analog
+  of `source_lines`. No quote → classify unclear, never "seems aligned".
+- **Disconfirmation pass:** qualify explicitly searches for counter-evidence (execution-only
+  language, roadmap-locked signals, worldview-opposed statements) and reports what was found or
+  not found; the pitch report shows evidence for AND against.
+- **Calibration loop:** on the grade-bets rhythm, compare discovery output against Muxin's
+  actual pursue/pass record; pursue rate is the precision metric (healthy ≈ 20–40% on platforms,
+  lower on clients). A cold streak recalibrates the fit profile/worldview map before another
+  discovery run spends the rate-limit window.
+
+## 10. Research anti-churn guards — added 2026-07-08, approved by Muxin
+
+The token/rate-limit exposure lives in the research pass, not intake (intake is a deterministic
+SQLite read + file write, zero model calls). Build requirements:
+
+1. **Pull ≠ research.** `outreach:research` is its own explicit command; nothing auto-researches
+   on intake. `--from-jsa` with no argument refuses to bulk-import — it requires a company name
+   or `--verdict TARGET --limit N`.
+2. **Closed-checklist research prompt.** The evidence pass walks the finite signal taxonomy from
+   `config/outreach/clients.md`/`platforms.md` — never an open-ended "research this company".
+   Per-signal search budget (default 2 searches/signal, config knob); an unfound signal is
+   recorded as "no evidence found" and the pass moves on. "Unclear" is a legal terminal verdict,
+   so the model is never incentivized to keep digging to force a classification.
+3. **Hard subprocess timeout** (5–8 min, config), same pattern as the polish provider's 180s cap.
+   A run that hits the wall keeps what it wrote (checkpointing) and stops cleanly.
+4. **Batch cap + backoff** (already §1 gap 3): default 5 leads/run; rate-limit detection by exit
+   code/output size with backoff, per JSA's V14 lesson. The real currency is Muxin's Claude Max
+   5-hour rolling window, not dollars — exhausting it locks her out of every other Claude use.
+5. **Run log:** every research/discovery run appends one line (lead/lens, duration, searches
+   used, evidence found) to `data/outreach/run-log.jsonl` so churn is visible in a file, not
+   discovered at the rate limit.
