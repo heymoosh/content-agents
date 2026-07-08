@@ -11,6 +11,10 @@ import {
   scheduleKind,
   scheduleApproved,
   enrich,
+  jobLogPath,
+  lastNonEmptyLine,
+  tailLines,
+  jobElapsedMs,
   type SchedulerDeps,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
@@ -289,4 +293,53 @@ test("enrich() omits reconciled entirely for a row that isn't approved yet", () 
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
+});
+
+// Job observability (Codebase-review fix Phase 1, 2026-07-08): persist + stream Claude job logs,
+// heartbeat + elapsed in the jobs pill, durable errors instead of a black box.
+
+test("jobLogPath keeps every job's log under one dir, one file per job id", () => {
+  const a = jobLogPath("job-1");
+  const b = jobLogPath("job-2");
+  assert.match(a, /gui-jobs[/\\]job-1\.log$/);
+  assert.match(b, /gui-jobs[/\\]job-2\.log$/);
+  assert.notEqual(a, b);
+});
+
+test("lastNonEmptyLine: the heartbeat is the last real line, ignoring trailing blank lines", () => {
+  assert.equal(lastNonEmptyLine("line one\nline two\n"), "line two");
+  assert.equal(lastNonEmptyLine("only line"), "only line");
+  assert.equal(lastNonEmptyLine("line one\n\n   \n"), "line one");
+});
+
+test("lastNonEmptyLine: no output yet is null, not an empty string", () => {
+  assert.equal(lastNonEmptyLine(""), null);
+  assert.equal(lastNonEmptyLine("\n\n"), null);
+});
+
+test("tailLines: keeps the last N non-blank lines, dropping earlier ones", () => {
+  const text = Array.from({ length: 50 }, (_, i) => `line ${i}`).join("\n");
+  const tail = tailLines(text, 30);
+  const lines = tail.split("\n");
+  assert.equal(lines.length, 30);
+  assert.equal(lines[0], "line 20");
+  assert.equal(lines[29], "line 49");
+});
+
+test("tailLines: shorter input than N returns everything, blank lines dropped", () => {
+  assert.equal(tailLines("a\n\nb\nc", 30), "a\nb\nc");
+});
+
+test("jobElapsedMs: null for a job that hasn't started yet", () => {
+  assert.equal(jobElapsedMs({ status: "queued", startedAt: null, finishedAt: null }), null);
+});
+
+test("jobElapsedMs: keeps ticking against `now` while running", () => {
+  const ms = jobElapsedMs({ status: "running", startedAt: 1000, finishedAt: null }, 4500);
+  assert.equal(ms, 3500);
+});
+
+test("jobElapsedMs: freezes at finishedAt-startedAt once the job lands", () => {
+  const ms = jobElapsedMs({ status: "done", startedAt: 1000, finishedAt: 6000 }, 999_999);
+  assert.equal(ms, 5000);
 });
