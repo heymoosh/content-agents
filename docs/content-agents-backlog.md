@@ -281,17 +281,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
 <!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
 
-**Codebase-review fix — Phase 5c: split serve.ts into page/jobs/rows/routes**
-- M1: serve.ts is a 1,720-line monolith — the HTTP server (~15 routes, 889-1086), a ~620-line inlined HTML/CSS/JS template (1099-1720, including a hand-rolled markdown renderer whose regexes need double-escaping inside the template literal), fs mutation, and Claude subprocess orchestration all in one file. Everything behind the Phase 1/2 complaint fixes is untestable while it's tangled with I/O.
-- Mechanical split, no behavior change: page.ts (client), jobs.ts (queue + claude runner), rows.ts (fs read/write), serve.ts (routes only).
-- P1 (fold in, same file): /api/queue re-reads + re-parses every content folder synchronously on every request (listPieces, serve.ts:305-336), sometimes plus a live Typefully/PostPeer fetch — fine at ~33 folders, degrades linearly as content accumulates. Fix while splitting: cache parsed rows keyed by file mtime; run provider reconciliation on a background interval with a staleness stamp instead of inline per-request.
-- DO THIS BEFORE further GUI feature work piles onto serve.ts (per the doc's own recommendation) — ideally right after Phase 1/2 ship, not deferred indefinitely.
-- ORIGIN: docs/codebase-review.md Part 2 M1/P1, Part 3 Phase 5 (split from 5ec087d4, 2026-07-07)
-- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: To Do
-- GROOMED: ready — mechanical serve.ts split (page/jobs/rows/routes) + request caching for /api/queue, no behavior change intended
-<!-- card-id: c310160b-d296-4219-ab28-4cd50c0a3b40 -->
-
 **Multi-slot-per-day scheduler: support >1 post/platform/PT-day, starting with X**
 - ORIGIN: split out of ffa6491d's own DECISION (2026-07-07) — Muxin's actual ask for X is multiple posts/day, but the unified scheduler (src/publish/slots.ts + data/publish-schedule.jsonl) enforces ≤1 post/platform/PT-day; ffa6491d explicitly called this 'a separate, bigger follow-up, not bundled into this config bump' and shipped only the X posts_per_week 5→7 config change instead.
 - Bluesky is already at this architecture's ceiling (7/wk, all slot_days) with no headroom left — confirms the limit is structural, not a config number.
@@ -337,6 +326,17 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: c18c39a9-72d7-4e51-a05e-e13fa57ae601 -->
+
+**Codebase-review fix — Phase 5c: split serve.ts into page/jobs/rows/routes**
+- M1: serve.ts is a 1,720-line monolith — the HTTP server (~15 routes, 889-1086), a ~620-line inlined HTML/CSS/JS template (1099-1720, including a hand-rolled markdown renderer whose regexes need double-escaping inside the template literal), fs mutation, and Claude subprocess orchestration all in one file. Everything behind the Phase 1/2 complaint fixes is untestable while it's tangled with I/O.
+- Mechanical split, no behavior change: page.ts (client), jobs.ts (queue + claude runner), rows.ts (fs read/write), serve.ts (routes only).
+- P1 (fold in, same file): /api/queue re-reads + re-parses every content folder synchronously on every request (listPieces, serve.ts:305-336), sometimes plus a live Typefully/PostPeer fetch — fine at ~33 folders, degrades linearly as content accumulates. Fix while splitting: cache parsed rows keyed by file mtime; run provider reconciliation on a background interval with a staleness stamp instead of inline per-request.
+- DO THIS BEFORE further GUI feature work piles onto serve.ts (per the doc's own recommendation) — ideally right after Phase 1/2 ship, not deferred indefinitely.
+- ORIGIN: docs/codebase-review.md Part 2 M1/P1, Part 3 Phase 5 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Done
+- GROOMED: ready — mechanical serve.ts split (page/jobs/rows/routes) + request caching for /api/queue, no behavior change intended
+<!-- card-id: c310160b-d296-4219-ab28-4cd50c0a3b40 -->
 
 **Codebase-review fix — Phase 5b: unify review-queue.md column parsing**
 - M2: the 10-column review-queue.md table (the approval database) is decoded by hard-coded `cells[N]` offsets in 3 independent places: src/publish/queue.ts:29-52 (canonical), src/review/serve.ts:339-361 (updateRow reimplements the write path), src/video/render.ts:198-211 (a third parser). The 2026-07-04 origin-column addition already required hand-hunting all three. Fix: one typed review-queue module (grow queue.ts) exposing readRows/writeCell; route serve.ts and render.ts through it.
