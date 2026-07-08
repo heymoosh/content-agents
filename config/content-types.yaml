@@ -1,0 +1,93 @@
+# Content-type -> CTA routing (Smarter routing, card 6dcaee98). No more one CTA per pillar --
+# /atomize classifies each derivative by CONTENT TYPE (which of the 8 types below fit, possibly
+# more than one) instead of by pillar, and src/publish/cta.ts resolves the CTA(s) at PUBLISH time
+# so a later landing-page launch is a pure config change here, never a re-atomize.
+#
+# Each type has a documented `primary` (the main ask) and `secondary` (the follow-up), verbatim
+# from the card's table. Four types' primary needs the not-yet-built landing page / work-with-me
+# page (card 87c86b16, "Landing page"): until landing_page_live flips true, those four ship their
+# secondary ALONE as the sole CTA (it's already Substack-reachable) instead of a primary that has
+# nowhere to send anyone. The other four ship primary + secondary as documented; their secondary
+# happens to reference a project too, but with no landing page live yet it falls back to the same
+# Substack link as the primary (a real line of text, a working link).
+#
+# `destination: source` resolves like any other CTA today (the essay's own canonical_url, falling
+# back to source_fallback in cta.yaml). `destination: landing_page` / `work_with_me` resolves to
+# `url` below once landing_page_live is true and a real url is filled in; until then it falls back
+# to the same source/homepage link as `source` does, so no CTA is ever a dead end.
+
+landing_page_live: false
+
+types:
+  essay_excerpt:
+    primary:
+      text: "Read full essay on Substack"
+      destination: source
+    secondary:
+      text: "See related project"
+      destination: landing_page
+      url: ""
+
+  society_capitalism_piece:
+    primary:
+      text: "Subscribe/read more"
+      destination: source
+    secondary:
+      text: "Optional: explore projects"
+      destination: landing_page
+      url: ""
+
+  ai_agency_thesis:
+    primary:
+      text: "Read full essay"
+      destination: source
+    secondary:
+      text: "See what I'm building"
+      destination: landing_page
+      url: ""
+
+  personal_career_reflection:
+    primary:
+      text: "Subscribe/follow"
+      destination: source
+    secondary:
+      text: "Maybe: see my job-search project"
+      destination: landing_page
+      url: ""
+
+  product_builder_insight:
+    primary:
+      text: "See how I think/work"
+      destination: landing_page
+      url: ""
+    secondary:
+      text: "Read related essay"
+      destination: source
+
+  project_demo:
+    primary:
+      text: "Explore the project"
+      destination: landing_page
+      url: ""
+    secondary:
+      text: "Work with me"
+      destination: work_with_me
+      url: ""
+
+  offer_adjacent_post:
+    primary:
+      text: "Work with me / landing page"
+      destination: work_with_me
+      url: ""
+    secondary:
+      text: "Read my thinking"
+      destination: source
+
+  case_study:
+    primary:
+      text: "See projects / work with me"
+      destination: work_with_me
+      url: ""
+    secondary:
+      text: "Read the essay behind it"
+      destination: source

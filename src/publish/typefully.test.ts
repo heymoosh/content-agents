@@ -12,7 +12,7 @@
 
 import { test, describe, after } from "node:test";
 import assert from "node:assert/strict";
-import { buildDraftPayload, fetchScheduledDrafts } from "./typefully.js";
+import { buildDraftPayload, buildPosts, fetchScheduledDrafts } from "./typefully.js";
 
 const POSTS = [{ text: "Verbatim note text spread to a text channel." }];
 
@@ -71,6 +71,119 @@ describe("typefully buildDraftPayload: scheduled vs unscheduled contract", () =>
       publishAt: "",
     });
     assert.ok(!("publish_at" in payload), "empty publishAt must not schedule the draft");
+  });
+});
+
+// buildPosts now takes a LIST of CTAs (Smarter routing, card 6dcaee98) instead of one url/label,
+// so a post matching 2+ content types can stack every applicable CTA instead of picking a winner.
+describe("buildPosts: stacked CTA lines (Smarter routing, card 6dcaee98)", () => {
+  test("no CTAs: body ships alone, exactly like the old ctaUrl=null case", () => {
+    const { posts, manualComment } = buildPosts("body text", [], "inline", 280);
+    assert.deepEqual(posts, [{ text: "body text" }]);
+    assert.equal(manualComment, null);
+  });
+
+  test("a single CTA renders identically to the old single url/label contract", () => {
+    const { posts } = buildPosts(
+      "body text",
+      [{ url: "https://example.com/essay", label: "Full essay:" }],
+      "inline",
+      280
+    );
+    assert.equal(posts[0].text, "body text\n\nFull essay: https://example.com/essay");
+  });
+
+  test("2+ CTAs stack as separate lines with a blank line between each, inline placement", () => {
+    const { posts } = buildPosts(
+      "body text",
+      [
+        { url: "https://example.com/essay", label: "Read full essay:" },
+        { url: "https://example.com/project", label: "See related project:" },
+      ],
+      "inline",
+      280
+    );
+    assert.equal(
+      posts[0].text,
+      "body text\n\nRead full essay: https://example.com/essay\n\nSee related project: https://example.com/project"
+    );
+  });
+
+  test("2+ CTAs on X (reply placement): all stacked into the single reply post, blank line between", () => {
+    const { posts } = buildPosts(
+      "body text",
+      [
+        { url: "https://example.com/essay", label: "Read full essay:" },
+        { url: "https://example.com/project", label: "See related project:" },
+      ],
+      "reply",
+      280
+    );
+    assert.equal(posts.length, 2);
+    assert.equal(
+      posts[1].text,
+      "Read full essay: https://example.com/essay\n\nSee related project: https://example.com/project"
+    );
+  });
+
+  test("2+ CTAs on LinkedIn (comment placement): all stacked into the manual comment string", () => {
+    const { manualComment } = buildPosts(
+      "body text",
+      [
+        { url: "https://example.com/essay", label: "Read full essay:" },
+        { url: "https://example.com/project", label: "See related project:" },
+      ],
+      "comment",
+      280
+    );
+    assert.equal(
+      manualComment,
+      "Read full essay: https://example.com/essay\n\nSee related project: https://example.com/project"
+    );
+  });
+
+  test("inline placement overflow still spills the (now multi-line) CTA block into a second post", () => {
+    const longBody = "x".repeat(270);
+    const { posts } = buildPosts(
+      longBody,
+      [{ url: "https://example.com/essay", label: "Read full essay:" }],
+      "inline",
+      280
+    );
+    assert.equal(posts.length, 2, "combined body+cta exceeds max, so it must split like the single-CTA case did");
+    assert.equal(posts[1].text, "Read full essay: https://example.com/essay");
+  });
+
+  test("reply placement: 2+ stacked CTAs that alone overflow max split into one reply post per CTA", () => {
+    const longLabel = "x".repeat(200);
+    const { posts } = buildPosts(
+      "body text",
+      [
+        { url: "https://example.com/essay", label: longLabel },
+        { url: "https://example.com/project", label: longLabel },
+      ],
+      "reply",
+      280
+    );
+    assert.equal(posts.length, 3, "body + one reply post per CTA, never a truncated combined block");
+    assert.equal(posts[1].text, `${longLabel} https://example.com/essay`);
+    assert.equal(posts[2].text, `${longLabel} https://example.com/project`);
+  });
+
+  test("inline placement: 2+ stacked CTAs that alone overflow max split into one reply post per CTA", () => {
+    const longLabel = "x".repeat(200);
+    const { posts } = buildPosts(
+      "body text",
+      [
+        { url: "https://example.com/essay", label: longLabel },
+        { url: "https://example.com/project", label: longLabel },
+      ],
+      "inline",
+      280
+    );
+    assert.equal(posts.length, 3, "body + one reply post per CTA, never a truncated combined block");
+    assert.equal(posts[1].text, `${longLabel} https://example.com/essay`);
+    assert.equal(posts[2].text, `${longLabel} https://example.com/project`);
   });
 });
 

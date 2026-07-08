@@ -6,7 +6,7 @@ import { repoRoot } from "../db/db.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
+import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, loadContentTypesConfig, resolveCtaLines } from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
@@ -89,31 +89,39 @@ export function loadPlatformMax(): Record<string, number> {
   return out;
 }
 
-// Build the Typefully `posts` array, placing the CTA link per config so the body stays clean.
+// Build the Typefully `posts` array, placing the CTA link(s) per config so the body stays clean.
 // Returns a manual-comment string when the platform needs the link added by hand (LinkedIn).
 // Exported so cards.ts (native quote-card image posts) places its CTA link identically to text
 // posts instead of re-deriving reply/comment/inline placement a second time.
+//
+// `ctas` is a LIST (Smarter routing, card 6dcaee98): a derivative can match 2+ content types, and
+// every applicable CTA stacks as its own line with a blank line between — never picking one
+// winner. An empty list behaves exactly like the old "no CTA" case; a single-entry list renders
+// identically to the old ctaUrl/ctaLabel contract.
 export function buildPosts(
   body: string,
-  ctaUrl: string | null,
-  ctaLabel: string,
+  ctas: { url: string; label: string }[],
   placement: string,
   max: number
 ): { posts: { text: string }[]; manualComment: string | null } {
-  if (!ctaUrl) return { posts: [{ text: body }], manualComment: null };
-  const ctaLine = `${ctaLabel} ${ctaUrl}`.trim();
+  if (ctas.length === 0) return { posts: [{ text: body }], manualComment: null };
+  const ctaBlock = ctas.map((c) => `${c.label} ${c.url}`.trim()).join("\n\n");
 
   if (placement === "comment") {
     // LinkedIn: links are suppressed in-body and the API can't post a first comment for us.
-    return { posts: [{ text: body }], manualComment: ctaLine };
+    return { posts: [{ text: body }], manualComment: ctaBlock };
   }
   if (placement === "inline") {
-    const combined = `${body}\n\n${ctaLine}`;
+    const combined = `${body}\n\n${ctaBlock}`;
     if (combined.length <= max) return { posts: [{ text: combined }], manualComment: null };
-    return { posts: [{ text: body }, { text: ctaLine }], manualComment: null }; // would overflow → reply
+    if (ctaBlock.length <= max) return { posts: [{ text: body }, { text: ctaBlock }], manualComment: null }; // would overflow → reply
+    // Stacked CTAs even alone overflow max → one reply post per CTA instead of a truncated block.
+    return { posts: [{ text: body }, ...ctas.map((c) => ({ text: `${c.label} ${c.url}`.trim() }))], manualComment: null };
   }
-  // "reply" (X) or any unknown placement → link in the first reply
-  return { posts: [{ text: body }, { text: ctaLine }], manualComment: null };
+  // "reply" (X) or any unknown placement → link(s) in the first reply, split into one post per
+  // CTA when 2+ stacked CTAs would overflow that platform's max as a single combined block.
+  if (ctaBlock.length <= max) return { posts: [{ text: body }, { text: ctaBlock }], manualComment: null };
+  return { posts: [{ text: body }, ...ctas.map((c) => ({ text: `${c.label} ${c.url}`.trim() }))], manualComment: null };
 }
 
 // Build the JSON body for POST /drafts. When `publishAt` is null we OMIT `publish_at` entirely,
@@ -313,6 +321,7 @@ export async function publishText(
 
   const setId = await socialSetId();
   const cfg = loadCtaConfig();
+  const ctCfg = loadContentTypesConfig();
   const canonicalUrl = loadCanonicalUrl(folder);
   const sourceKind = loadSourceKind(folder);
   const maxMap = loadPlatformMax();
@@ -354,13 +363,14 @@ export async function publishText(
     const { fm, body } = splitFrontmatter(readFileSync(assetPath, "utf8"));
     const platformKey = row.platform === "x" ? "x" : row.platform; // typefully platform keys: x, linkedin, bluesky
 
-    // Resolve the CTA link (shared funnel layer — src/publish/cta.ts), then place it per cta.yaml.
-    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+    // Resolve the CTA line(s) (shared funnel layer — src/publish/cta.ts), then place them per
+    // cta.yaml. A derivative can carry 2+ stacked CTAs when it matched multiple content types.
+    const { ctas, usedFallback } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
     if (usedFallback) {
-      console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
+      console.log(`  ↳ note: ${row.id} cta → homepage (no canonical_url in source.md)`);
     }
     const placement = cfg.placement[row.platform] ?? "inline";
-    const { posts, manualComment } = buildPosts(body, ctaUrl, ctaLabel, placement, maxMap[row.platform] ?? Infinity);
+    const { posts, manualComment } = buildPosts(body, ctas, placement, maxMap[row.platform] ?? Infinity);
 
     // Attach a video/image if the derivative declares one (frontmatter `media:`), e.g. an animated
     // quote card → native video post. Uploaded once and attached to the first post.
@@ -382,7 +392,7 @@ export async function publishText(
       buildDraftPayload({ title: rowDraftTitle(row.id), platformKey, posts, publishAt })
     );
     setStatus(folder, row, "published");
-    const placeNote = ctaUrl ? `, cta→${placement}` : "";
+    const placeNote = ctas.length > 0 ? `, cta→${placement}` : "";
     appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, ${when}${placeNote})`);
     if (manualComment) {
       appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
