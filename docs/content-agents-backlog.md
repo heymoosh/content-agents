@@ -70,7 +70,8 @@ Examples - use both Primary and a Secondary CTA
 | Case study                 | See projects / work with me | Read the essay behind it         |
 - PARTIAL SCOPE APPROVED (Muxin, 2026-07-08): build everything that does NOT require the landing page now. That's the content-type classification + CTA routing logic for every row above, with any branch whose destination is project/landing-page/work-with-me falling back to the Substack CTA (read full essay / subscribe) until the landing page is live — swap in the real URL then, no reclassification needed. Concretely ships now: essay excerpt, society/capitalism piece, AI agency thesis, personal career reflection (all Substack-only CTAs). "Product/builder insight," "project demo," "offer-adjacent post," and "case study" ship with their primary CTA downgraded to their Substack-reachable secondary until Landing page is live.
 - TIE-BREAKER RESOLVED (Muxin, 2026-07-08): no tie-breaker needed — when a post plausibly fits more than one content type, stack ALL its applicable CTAs as separate lines with a blank line between each (e.g. "Read my newsletter" / blank / "Work with me"), instead of picking one. Common, normal pattern; don't force a single choice.
-- STATUS: To Do
+- PR #140 open (held/draft) per standing content-generation review policy — content-type classification engine built and tested (394/394 passing), .claude/skills/atomize/SKILL.md step 4.5 rewritten to classify by content type instead of pillar. Before/after CTA samples in the PR body. One follow-up filed (e889e512, code dedup, depends on this card).
+- STATUS: Review
 - GROOMED: partial scope approved (Substack-only CTAs, landing-page branches downgraded to fallback), tie-breaker resolved (stack CTAs), no dependency overlaps + 2026-07-08
 <!-- card-id: 6dcaee98-1a54-4fc8-b170-92611872676f -->
 
@@ -226,6 +227,15 @@ GOAL_CONDITION: with the Landing page live, the four downgraded content types ro
 - STATUS: Backlog
 - DEPENDS ON: Create quote and image cards
 <!-- card-id: 503a0065-8ddf-4e3f-8a90-af0b671a8572 -->
+
+**Unify resolveCta and resolveEntryUrl's duplicated source/fallback chain**
+- ORIGIN: follow-up auto-filed while building card 6dcaee98 (Smarter routing).
+- src/publish/cta.ts has two parallel implementations of "resolve a source-style URL, falling back to canonicalUrl ?? cfg.fallbackUrl": resolveCta (the pre-existing pillar/explicit-cta path) and resolveEntryUrl (the new content-type path). They currently agree, but if the source/fallback rule ever changes (e.g. adding a UTM param, changing the homepage fallback), someone has to remember to update both.
+- GOAL_CONDITION: resolveCta and resolveEntryUrl share one primitive for the source/fallback resolution (e.g. resolveEntryUrl calls into resolveCta's fallback logic, or both call a shared helper), with src/publish/cta.test.ts and content-type-cta.test.ts still passing unmodified.
+- CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Smarter routing
+<!-- card-id: e889e512-92fb-40dd-9669-fdcb51c6be11 -->
 
 **Verify quote+image card --with-image against the real paid image provider (OpenRouter)**
 - ORIGIN: follow-up auto-filed while building card 1653734b (Create quote and image cards).
