@@ -14,6 +14,7 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - PRIORITY (Muxin, 2026-07-07): lower priority — revisit after the current content-stack work.
 - REPRIORITIZED (Muxin, 2026-07-08): content-stack work (Phase 1-4 GUI/Typefully fixes) is now shipped — no longer deprioritized.
 - HAND-OFF RESOLVED (Muxin, 2026-07-08): superseding the 2026-07-07 "NOT the API image pipeline" note above — just use the image-gen system already in place (the same config/providers.yaml image provider the existing quote-card pipeline uses), no separate ChatGPT/free-local-model hand-off needed. Per-token cost is already governed by the standing model-cost policy card (a1a6f379) — not a separate concern here.
+- SUPERVISED TEST PASSED (Muxin, 2026-07-08): real quote+image card (real Riverflow illustration, $0.02) scheduled as a real Typefully draft (9826674) on X — Muxin confirmed it looked correct. PR #135 still held/draft per standing content-generation review policy; merge whenever ready.
 - STATUS: Review
 - GROOMED: reprioritized + hand-off pattern resolved (use existing image-gen system), no dependency overlaps + 2026-07-08
 <!-- card-id: 1653734b-8eea-480b-93ea-3c5926159f81 -->
@@ -216,15 +217,6 @@ GOAL_CONDITION: with the Landing page live, the four downgraded content types ro
 - DEPENDS ON: Landing page
 <!-- card-id: ae602c84-18ed-4532-8f1b-3bd716e1a10e -->
 
-**Verify quote+image card --with-image against the real paid image provider (OpenRouter)**
-- ORIGIN: follow-up auto-filed while building card 1653734b (Create quote and image cards).
-- The build/review sandbox had no OPENROUTER_API_KEY configured, so the new --with-image render path was verified end-to-end using the free remotion-svg provider standing in for the paid one (proves the compositing/render wiring works). The real paid provider call (getImage()/generate() against OpenRouter, ~$0.02-0.23/gen per the existing quote-card cost model) was never actually billed or exercised.
-- GOAL_CONDITION: run npm run render -- --still <folder> --quote <name> --with-image with a real OPENROUTER_API_KEY configured, confirm it produces a real generated illustration (not the local stand-in) and logs a cost row to data/cost-log.csv with step image:<provider>.
-- CHAIN: 1
-- STATUS: Backlog
-- DEPENDS ON: Create quote and image cards
-<!-- card-id: 015d4651-9e1f-406e-9da1-8cb9fc36de57 -->
-
 **Animated HyperFrames companion for the quote+image card variant**
 - ORIGIN: follow-up auto-filed while building card 1653734b (Create quote and image cards).
 - The existing typographic-only quote card gets a free animated .mp4 companion (renderCardAnimation via HyperFrames) alongside its still PNG. The new quote+image variant (--with-image) was scoped to the still PNG only — no animated companion was built for it.
@@ -233,6 +225,15 @@ GOAL_CONDITION: with the Landing page live, the four downgraded content types ro
 - STATUS: Backlog
 - DEPENDS ON: Create quote and image cards
 <!-- card-id: 503a0065-8ddf-4e3f-8a90-af0b671a8572 -->
+
+**Verify quote+image card --with-image against the real paid image provider (OpenRouter)**
+- ORIGIN: follow-up auto-filed while building card 1653734b (Create quote and image cards).
+- The build/review sandbox had no OPENROUTER_API_KEY configured, so the new --with-image render path was verified end-to-end using the free remotion-svg provider standing in for the paid one (proves the compositing/render wiring works). The real paid provider call (getImage()/generate() against OpenRouter, ~$0.02-0.23/gen per the existing quote-card cost model) was never actually billed or exercised.
+- GOAL_CONDITION: run npm run render -- --still <folder> --quote <name> --with-image with a real OPENROUTER_API_KEY configured, confirm it produces a real generated illustration (not the local stand-in) and logs a cost row to data/cost-log.csv with step image:<provider>.
+- CHAIN: 1
+- DONE (2026-07-08): ran the real render against content/2026-07-04-250th-anniversary-question quote-card-1 with a real OPENROUTER_API_KEY — produced a real Riverflow illustration (not the free stand-in), logged $0.0200 to data/cost-log.csv (step image:openrouter-image). Went further: scheduled it as a real Typefully draft (9826674, X, Thu Jul 9 12:00 PM PT) via a throwaway review-queue row on PR #135's branch; Muxin confirmed it looked correct on X. Throwaway test row/derivative reverted afterward, not part of the PR diff.
+- STATUS: Done
+<!-- card-id: 015d4651-9e1f-406e-9da1-8cb9fc36de57 -->
 
 **Add skill run-order quick-reference to the Obsidian Content Agents doc**
 - Add a 'when to run each skill' quick-reference table to the external doc Personal Obsidian/Content Agents.md.
