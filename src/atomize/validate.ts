@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
-import { loadPlatforms } from "../config/platforms.js";
+import { loadPlatforms, type PlatformRule } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
 import { summarizeThreadChecks } from "./thread-check.js";
@@ -12,10 +12,7 @@ import { summarizeStorytelling } from "./storytelling.js";
 //   tsx src/atomize/validate.ts content/2026-06-09-some-post
 // Exit non-zero with a list of violations. Frontmatter must declare `platform`.
 
-export interface PlatformRule {
-  max_chars?: number;
-  max_words?: number;
-}
+export type { PlatformRule };
 
 // Pure per-file check, exported so it can be unit-tested without a content folder on disk.
 export function checkDerivative(

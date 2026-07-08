@@ -1,3 +1,4 @@
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { repoRoot } from "../db/db.js";
@@ -43,13 +44,18 @@ const communitySchema = z
 // No `.default()` on the nested records here — combined with `.passthrough()` it defeats
 // TypeScript's inference (a known zod v3 pitfall). Missing sections are optional at the schema
 // level; loadPlatforms() below fills the empty-object defaults after validation instead.
+// z.string().min(1) (not bare z.string()) on every record key below — the `yaml` package parses
+// an unquoted null-literal key (`null:`, `~:`, ...) to the empty string, which a bare z.string()
+// key type accepts silently, letting a config typo land under e.g. platforms[""] with no error.
+const nonEmptyKey = z.string().min(1);
+
 const platformsConfigSchema = z
   .object({
     min_reuse_days: z.number().optional(),
-    platforms: z.record(z.string(), platformRuleSchema).optional(),
-    communities: z.record(z.string(), communitySchema).optional(),
+    platforms: z.record(nonEmptyKey, platformRuleSchema).optional(),
+    communities: z.record(nonEmptyKey, communitySchema).optional(),
     home_brand: homeBrandSchema.optional(),
-    spin_angles: z.record(z.string(), spinAngleSchema).optional(),
+    spin_angles: z.record(nonEmptyKey, spinAngleSchema).optional(),
   })
   .passthrough();
 
@@ -68,12 +74,21 @@ export interface PlatformsConfig {
 const CONFIG_PATH = join(repoRoot, "config", "platforms.yaml");
 
 let cached: PlatformsConfig | null = null;
+let cachedMtimeMs: number | null = null;
 
-// Read once per process (some call sites run in tight loops). A repo with no config/platforms.yaml
-// falls back to an empty config (an intentional "no overrides" case); anything else wrong with the
-// file throws loudly via loadYamlConfig.
+function configMtimeMs(): number | null {
+  return existsSync(CONFIG_PATH) ? statSync(CONFIG_PATH).mtimeMs : null;
+}
+
+// Cached until config/platforms.yaml's mtime changes, instead of re-reading + re-parsing on every
+// call (some call sites run in tight loops). The mtime check is what keeps this correct for the one
+// long-running process in the repo (`npm run review`'s server) — without it, a config edit made
+// while that server is up would silently keep serving the pre-edit cadence/limits until restart. A
+// repo with no config/platforms.yaml falls back to an empty config (an intentional "no overrides"
+// case); anything else wrong with the file throws loudly via loadYamlConfig.
 export function loadPlatforms(): PlatformsConfig {
-  if (!cached) {
+  const mtimeMs = configMtimeMs();
+  if (!cached || mtimeMs !== cachedMtimeMs) {
     const raw = loadYamlConfig(CONFIG_PATH, platformsConfigSchema, {});
     cached = {
       min_reuse_days: raw.min_reuse_days,
@@ -82,6 +97,7 @@ export function loadPlatforms(): PlatformsConfig {
       home_brand: raw.home_brand,
       spin_angles: raw.spin_angles ?? {},
     };
+    cachedMtimeMs = mtimeMs;
   }
   return cached;
 }
