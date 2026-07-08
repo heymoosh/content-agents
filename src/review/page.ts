@@ -726,9 +726,9 @@ setInterval(()=>{ if(JOBS.some(j=>j.status==="queued"||j.status==="running")) lo
 
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
 setTab("ingest");
-load();
-loadJobs();
-markRefreshed();
+// Match doRefresh()'s ordering: stamp "last refreshed" once the initial data has actually
+// landed, not the instant the page starts loading it (load()/loadJobs() are async).
+Promise.all([load(), loadJobs()]).finally(markRefreshed);
 </script>
 </body>
 </html>`;
