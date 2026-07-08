@@ -120,7 +120,7 @@ derivative, the video script, and the video title/description. The short version
      thread_check: pass     # pass | missing — stamped in step 5.5, after scoring
      thread_spin_applied: true   # only present once the step 5.5 fallback redraft ran
      content_type: [essay_excerpt]   # 1+ of the 8 keys in config/content-types.yaml — classifies what job this post does; drives its CTA(s) at publish time (step 4.5). Omit ONLY when setting an explicit cta override below.
-     project_url: https://example.com/my-project   # OPTIONAL, per-post: only set when this derivative's content type(s) include a `project`-destination entry AND Muxin gave you a URL when you asked (step 4.5). Omit when she has none — that CTA line is simply dropped, never defaulted to the essay link.
+     project_url: https://example.com/my-project   # OPTIONAL, per-post: only set when Muxin confirmed a SPECIFIC project genuinely relevant to THIS post's content (step 4.5 — ask her, never guess/reuse a project just because the content type matched). Omit when she has none or none applies — that CTA line is simply dropped, never defaulted to the essay link or an unrelated project.
      cta: source            # OPTIONAL override: source | <literal-url> | none — wins over content_type when set (e.g. civic-tech's voting-tool link, or a deliberate none). Omit to let content_type drive the CTA.
      cta_label: "Full essay (free to subscribe):"   # only needed alongside an explicit cta override; content_type-driven CTAs carry their own label from config/content-types.yaml
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
@@ -173,11 +173,21 @@ derivative, the video script, and the video title/description. The short version
 
    Stamp every type that plausibly applies as `content_type: [<key>, ...]` (a single-item array is
    fine and the common case). `src/publish/cta.ts`'s `resolveContentTypeCtas()` resolves the
-   actual CTA text/url(s) at PUBLISH time from `config/content-types.yaml` — you never hand-pick
-   CTA copy here. It stacks every matched type's CTA(s) as separate lines (a post matching 2 types
-   gets both, never one winner) and automatically downgrades a landing-page-dependent primary to
-   its already-Substack-reachable secondary until the landing page ships (`landing_page_live` in
-   that config) — nothing for you to reason about per post, just classify honestly.
+   actual CTA text at PUBLISH time from `config/content-types.yaml` — you never hand-pick CTA copy
+   here. It stacks every matched type's CTA(s) as separate lines (a post matching 2 types gets
+   both, never one winner).
+   - **`project`-destination CTAs need a `project_url` you supply — and it must be genuinely
+     RELEVANT, never just any project Muxin has built.** `product_builder_insight`, `project_demo`,
+     and `case_study` (plus the optional secondary on the other four types) resolve to a `project`
+     link. That link is only correct when THIS SPECIFIC derivative's content actually discusses,
+     demonstrates, or is about that particular project — the content-type bucket alone (e.g. "this
+     reads like builder insight") does NOT tell you which project, or whether one applies at all.
+     Never invent that connection yourself (the same never-invent guardrail as extraction-first
+     text) — if the source material doesn't make the relevant project obvious, ASK MUXIN DIRECTLY:
+     "This looks like it could link to a specific project — is there one that's actually relevant
+     here, and if so what's the URL?" Stamp `project_url` only with what she gives you. If she has
+     none, or none is genuinely relevant to this post, omit `project_url` entirely — that CTA line
+     is simply dropped, never filled with an unrelated project just to have a link.
    - **The literal-URL override still exists, and still wins.** Civic-tech pieces (and community
      rooms posting civic content) keep pointing at the voting tool exactly as before: set
      `cta: <voting-tool-url>` (+ `cta_label`) directly and skip `content_type` — an explicit `cta`
