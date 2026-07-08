@@ -89,7 +89,7 @@ Examples - use both Primary and a Secondary CTA
 - Drafts surface in the unified review GUI as suggested replies. SAFETY: draft-only, never auto-send — mirror the notes-daily pattern (unscheduled drafts, human sends).
 - This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
 - PRIORITIZED (Muxin, 2026-07-08): moved ahead of Substack publishing automation — content-generation-affecting work goes first next session.
-- STATUS: To Do
+- STATUS: In Progress
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
 - DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
 - GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
@@ -260,6 +260,33 @@ GOAL_CONDITION: with the Landing page live, the four downgraded content types ro
 - STATUS: Backlog
 - DEPENDS ON: Smarter routing
 <!-- card-id: e889e512-92fb-40dd-9669-fdcb51c6be11 -->
+
+**Inbound listening: X (mentions/replies/DMs)**
+- ORIGIN: follow-up auto-filed while scoping card db22283f (Inbound listening + voice-replies, Build 3) to a Bluesky-only v1.
+- X has ZERO read access today: the existing browser agent (src/pull/platforms/x.ts) only drives X's own Analytics "Download CSV" export button. There is no code path anywhere that reads mentions, replies, or DMs for X. Building this means either a paid X API tier (mentions/DM read access is not on X's free tier) or new browser-agent scraping of the notifications page -- both substantial, separate undertakings, not a small extension of what exists.
+- GOAL_CONDITION: X inbound listening (mentions/replies, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for which access path (paid API vs. browser-agent scraping) was chosen and why, given CLAUDE.md rule 6 (prefer subscription/free routes, minimize per-token/per-service cost).
+- CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Inbound listening + voice-replies (Build 3)
+<!-- card-id: ec217518-9bc8-4ccd-ab37-3eecb78a0406 -->
+
+**Inbound listening: LinkedIn (mentions/comments/DMs)**
+- ORIGIN: follow-up auto-filed while scoping card db22283f (Inbound listening + voice-replies, Build 3) to a Bluesky-only v1.
+- LinkedIn has ZERO read access today: the existing browser agent (src/pull/platforms/linkedin.ts) only triggers LinkedIn's own Analytics "Export" button for an xlsx download. There is no code path that reads mentions, comments, or DMs. LinkedIn's official API for this is restricted/partner-gated in practice -- likely means new browser-agent scraping of the notifications/messaging surface, a separate undertaking from what exists today.
+- GOAL_CONDITION: LinkedIn inbound listening (mentions/comments, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for the access approach given LinkedIn's API restrictions.
+- CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Inbound listening + voice-replies (Build 3)
+<!-- card-id: aab14467-ac5a-4786-9c93-3bf3b8919222 -->
+
+**Inbound listening: Substack (comment replies)**
+- ORIGIN: follow-up auto-filed while scoping card db22283f (Inbound listening + voice-replies, Build 3) to a Bluesky-only v1.
+- Substack's browser-agent auth/session plumbing (src/pull/browser.ts, login.ts) is reusable, but it currently only reads two analytics JSON endpoints (post_management/published, publish-dashboard/summary-v2) -- it never opens a post's comment thread or reads comment/reply text, and never touches any DM/chat surface. Reading actual comment-reply text is genuinely new browser-agent code (different pages/selectors, not yet built). Whether Substack DMs are even a real product surface is unconfirmed -- worth checking before scoping this card further.
+- GOAL_CONDITION: Substack inbound listening (new comment replies on Muxin's posts, at minimum) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, reusing src/pull/browser.ts's session/auth plumbing extended to a comments-reading page.
+- CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Inbound listening + voice-replies (Build 3)
+<!-- card-id: 81808fa0-7e30-4fd1-9b61-03951b0041bc -->
 
 **Verify quote+image card --with-image against the real paid image provider (OpenRouter)**
 - ORIGIN: follow-up auto-filed while building card 1653734b (Create quote and image cards).
