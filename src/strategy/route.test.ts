@@ -208,4 +208,10 @@ describe("applyExplorationOverride: the exploration-budget's routing hook (card 
     const out = applyExplorationOverride(merged, "civic-tech", "linkedin");
     assert.deepEqual(out, merged);
   });
+
+  test("a platform under an explicit editorial `never` rule (confidence 'rule') is left as-is — a probe must never punch through a hard veto", () => {
+    const merged = [md({ platform: "linkedin", decision: "skip", confidence: "rule", rationale: "editorial rule: never route here" })];
+    const out = applyExplorationOverride(merged, "civic-tech", "linkedin");
+    assert.deepEqual(out, merged, "a hard veto must not be relabeled 'exploration'");
+  });
 });

@@ -1,6 +1,6 @@
-import { test, describe, after } from "node:test";
+import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { repoRoot } from "../db/db.js";
@@ -128,12 +128,30 @@ describe("nextExplorationProbe: longest-since-last-probe selection, gated to onc
 describe("exploration ledger: JSONL read + append, same convention as data/notes-spread-ledger.jsonl", () => {
   const TEST_LEDGER = join(repoRoot, "data", ".exploration-ledger-test.jsonl");
 
+  before(() => {
+    // Guard against a stale file left behind by a prior run whose after() never fired (crash/kill).
+    if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
+  });
+
   after(() => {
     if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
   });
 
   test("readExplorationLedger on a missing file returns an empty array, no throw", () => {
     assert.deepEqual(readExplorationLedger(join(repoRoot, "data", ".exploration-ledger-nonexistent.jsonl")), []);
+  });
+
+  test("malformed JSON lines in the ledger are skipped gracefully", () => {
+    const malformedPath = join(repoRoot, "data", ".exploration-ledger-malformed.jsonl");
+    const valid: ExplorationLedgerEntry = { platform: "linkedin", pillar: "civic-tech", probedAt: "2026-07-07T00:00:00.000Z" };
+    writeFileSync(malformedPath, JSON.stringify(valid) + "\nNOT_VALID_JSON\n");
+    try {
+      const entries = readExplorationLedger(malformedPath);
+      assert.equal(entries.length, 1, "the malformed line should be silently skipped");
+      assert.deepEqual(entries[0], valid);
+    } finally {
+      if (existsSync(malformedPath)) unlinkSync(malformedPath);
+    }
   });
 
   test("appendExplorationLedger writes a line that readExplorationLedger picks back up", () => {

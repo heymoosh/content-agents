@@ -87,6 +87,15 @@ makes `/cycle` compound instead of restarting every week.
      from the pillar/platform resonance figures and the routing drift flag above — a control run's
      engagement never feeds either. Prints nothing until a pair reaches n>=3 control runs; a bare
      "no pair has reached n>=3" needs no brief section.
+   - `npm run explore` → exploration budget (card 92bb2ae6): picks and records this month's due
+     off-assignment probe for LinkedIn and for Bluesky (idempotent, a platform already probed
+     this calendar month just prints a skip line). When it prints a pick, add a [TEST]
+     recommendation in Step 4 naming the platform + pillar: next time Muxin atomizes a piece,
+     route ONE derivative for that platform with
+     `tsx src/strategy/route.ts --pillar <pillar> --explore <platform> --folder <folder>` and
+     stamp that derivative's frontmatter `exploration_probe: true` before it reaches
+     `review-queue.md` (see `.claude/skills/atomize/SKILL.md` step 3.5). `/strategy` only
+     surfaces the pick, it never drafts content itself.
    - `npm run explore -- --coverage` → exploration-budget coverage (card 92bb2ae6): accumulated
      engagement (n, avg) per off-assignment pillar/platform pair probed by `npm run explore`
      (LinkedIn/Bluesky's untested pillars, derived live from `config/routing.yaml`'s defaults).

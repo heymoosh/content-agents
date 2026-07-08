@@ -90,6 +90,14 @@ derivative, the video script, and the video title/description. The short version
    `rules.<pillar>.never` entry in `config/routing.yaml` rather than a one-off skip, so the gate
    holds on every future piece in that pillar, not just this one. Cold-start platforms come back
    `include` with low confidence — that's expected; routing tightens as data accrues.
+   **Exploration probe (card 92bb2ae6):** if the latest strategy brief's [TEST] recommendations
+   name an off-assignment platform + pillar probe still due this month, and this piece's tagged
+   pillar matches, add `--explore <platform>` to the same route call (e.g.
+   `--pillar civic-tech --explore linkedin --folder <folder>`) to force that ONE platform's
+   decision to `include` for this piece only, even though `config/routing.yaml` doesn't default
+   it there. Draft that platform's derivative same as any other in step 4, but stamp its
+   frontmatter `exploration_probe: true`. Everything else about the piece (other platforms,
+   scoring, review) is unaffected.
 
 4. **Generate text derivatives** into `<folder>/derivatives/` per `config/platforms.yaml`
    (counts and style there), **only for the platforms `routing.md` marked `include`**:
@@ -116,6 +124,7 @@ derivative, the video script, and the video title/description. The short version
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
      directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
      control_run: true      # only on the one derivative drafted for a due spin-control pick (card f444f440); omit otherwise
+     exploration_probe: true   # only on the one derivative routed via step 3.5's --explore flag (card 92bb2ae6)
      ---
      <the post text — nothing else>
      ```

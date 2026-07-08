@@ -2,7 +2,15 @@ import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "../db/db.js";
-import { EXPLORATION_SOURCE, PILLARS, loadConfig, type RoutingConfig, type WindowRange } from "./route.js";
+import { EXPLORATION_SOURCE, PILLARS, loadConfig, type Cell, type RoutingConfig, type WindowRange } from "./route.js";
+
+// Same PT anchor as the unified publish scheduler (src/publish/slots.ts's TZ) — the "calendar
+// month" a probe counts against is Muxin's local month, not UTC's.
+const TZ = "America/Los_Angeles";
+function ptMonthKey(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: TZ, year: "numeric", month: "2-digit" }).formatToParts(d);
+  return `${parts.find((p) => p.type === "year")!.value}-${parts.find((p) => p.type === "month")!.value}`;
+}
 
 // Exploration budget (card 92bb2ae6): a small, deliberate, LABELED probe mechanism that tests
 // off-assignment pillar/platform pairs config/routing.yaml's defaults never route to. Without it,
@@ -100,9 +108,9 @@ export function nextExplorationProbe(
   const untested = untestedPillars(platform, cfg, pillars);
   if (untested.length === 0) return null;
 
-  const nowKey = new Date(now).toISOString().slice(0, 7); // YYYY-MM
+  const nowKey = ptMonthKey(new Date(now));
   const platformEntries = entries.filter((e) => e.platform === platform);
-  const usedThisMonth = platformEntries.some((e) => e.probedAt.slice(0, 7) === nowKey);
+  const usedThisMonth = platformEntries.some((e) => ptMonthKey(new Date(e.probedAt)) === nowKey);
   if (usedThisMonth) return null;
 
   const lastProbedMs = (pillar: string): number => {
@@ -116,16 +124,11 @@ export function nextExplorationProbe(
 
 // ---- data separation: the exploration bucket, kept OUT of route.ts's main resonance figures ----
 
-export interface ExplorationCell {
-  n: number;
-  avg_eng: number;
-}
-
 // Same engagement weighting as route.ts's loadData / resonance.ts, but scoped to
 // EXPLORATION_SOURCE rows only — the mirror image of loadData()'s exclusion, so a probe's
 // engagement is trackable as its own bucket without ever touching the main pillar/platform cells.
 // `db` is injectable for tests (see routing-drift.ts's hasNoSpinControl for the same pattern).
-export function loadExplorationData(db: ReturnType<typeof openDb>, range?: WindowRange): Map<string, ExplorationCell> {
+export function loadExplorationData(db: ReturnType<typeof openDb>, range?: WindowRange): Map<string, Cell> {
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
   const rows = db
@@ -144,7 +147,7 @@ export function loadExplorationData(db: ReturnType<typeof openDb>, range?: Windo
     )
     .all(EXPLORATION_SOURCE, ...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
 
-  const cells = new Map<string, ExplorationCell>();
+  const cells = new Map<string, Cell>();
   for (const r of rows) cells.set(`${r.platform}|${r.pillar}`, { n: r.n, avg_eng: r.avg_eng });
   return cells;
 }
@@ -154,7 +157,7 @@ const COVERAGE_MIN_N = 3;
 
 // Markdown block for /strategy's brief. Only lists untested pillar/platform cells that have
 // reached COVERAGE_MIN_N probes — everything below that stays silent rather than emit noise.
-export function formatExplorationCoverage(cells: Map<string, ExplorationCell>, cfg: RoutingConfig): string {
+export function formatExplorationCoverage(cells: Map<string, Cell>, cfg: RoutingConfig): string {
   const rows: string[] = [];
   for (const platform of EXPLORATION_PLATFORMS) {
     for (const pillar of untestedPillars(platform, cfg)) {

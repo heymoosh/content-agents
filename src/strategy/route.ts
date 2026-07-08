@@ -137,7 +137,9 @@ export function queryEngagementCells(
 // — used by routing-drift.ts to load two independent windows of history separately, through this
 // SAME function, rather than duplicating the score math.
 // `injectedDb`, when given, is used instead of opening the real analytics.db (and is left open —
-// caller owns its lifecycle). Test-only hook, same pattern as routing-drift.ts's hasNoSpinControl.
+// caller owns its lifecycle). Test-only hook — unlike routing-drift.ts's hasNoSpinControl or
+// exploration.ts's loadExplorationData (both take db as a required FIRST param), this one is an
+// optional LAST param that self-opens/closes when omitted.
 //
 // CONTROL_RUN_SOURCE and EXPLORATION_SOURCE rows are both excluded from BOTH queries below — a
 // deliberate --no-spin control run (card f444f440) or an exploration-budget probe (card 92bb2ae6)
@@ -312,7 +314,7 @@ export function mergeDecisions(pillars: string[], perPillar: Map<string, Decisio
 
     const includes = byPillar.filter((p) => p.d.decision === "include");
     if (includes.length > 0) {
-      const confOrder: Confidence[] = ["always", "rule", "data", "cold-start"];
+      const confOrder: Confidence[] = ["always", "rule", "data", "cold-start", "exploration"];
       const confidence = confOrder.find((c) => includes.some((p) => p.d.confidence === c)) ?? "cold-start";
       const scores = includes.map((p) => p.d.score).filter((s): s is number => s != null);
       merged.push({
@@ -346,12 +348,14 @@ export function mergeDecisions(pillars: string[], perPillar: Map<string, Decisio
 // routing.yaml's defaults don't list it there. Pure and additive — a platform already `include`d
 // by the normal defaults-driven decision is left untouched (an exploration probe only matters for
 // an off-assignment pair; overriding an already-included one would be a no-op that muddies the
-// rationale). The distinct "exploration" confidence + rationale is what lets the drafted
-// derivative be stamped `exploration_probe: true` and later excluded from resonance figures
-// (see EXPLORATION_SOURCE / loadData).
+// rationale), and a platform under an explicit editorial `never` rule (confidence "rule") is also
+// left untouched — an exploration probe must never punch through a hard veto Muxin set on purpose.
+// The distinct "exploration" confidence + rationale is what lets the drafted derivative be stamped
+// `exploration_probe: true` and later excluded from resonance figures (see EXPLORATION_SOURCE /
+// loadData).
 export function applyExplorationOverride(merged: MergedDecision[], pillar: string, platform: string): MergedDecision[] {
   return merged.map((d) => {
-    if (d.platform !== platform || d.decision === "include") return d;
+    if (d.platform !== platform || d.decision === "include" || d.confidence === "rule") return d;
     return {
       ...d,
       decision: "include",
@@ -434,12 +438,23 @@ function main() {
       : mergeDecisions(pillars, perPillar);
 
   const exploreIdx = args.indexOf("--explore");
-  if (exploreIdx >= 0 && args[exploreIdx + 1]) {
+  if (exploreIdx >= 0) {
+    const explorePlatform = args[exploreIdx + 1];
+    if (!explorePlatform) {
+      console.error("--explore requires a platform argument, e.g. --explore linkedin");
+      process.exit(1);
+    }
     if (pillars.length !== 1) {
       console.error("--explore requires exactly one --pillar (an exploration probe targets one pillar/platform pair)");
       process.exit(1);
     }
-    merged = applyExplorationOverride(merged, pillars[0], args[exploreIdx + 1]);
+    if (!merged.some((d) => d.platform === explorePlatform)) {
+      console.error(
+        `--explore: "${explorePlatform}" is not a candidate platform for pillar "${pillars[0]}" (candidates: ${merged.map((d) => d.platform).join(", ")})`
+      );
+      process.exit(1);
+    }
+    merged = applyExplorationOverride(merged, pillars[0], explorePlatform);
   }
 
   const fo = args.indexOf("--folder");
