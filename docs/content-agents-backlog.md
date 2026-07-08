@@ -20,8 +20,9 @@ scaffolding cards are Done and Muxin confirms resuming.
 - DATA HANDLING: an exploration probe's result must NOT get folded into the platform/pillar's "official" resonance average used by route.ts or the drift flag — track it as its own coverage-data bucket so one exploratory flop/win doesn't skew the assigned-pillar signal. Surface accumulated exploration results (n, avg engagement per untested pillar) in `/strategy` once enough data exists to say anything.
 - GOAL_CONDITION: each of LinkedIn's 2 and Bluesky's 3 untested pillars gets one tagged exploration probe roughly monthly; exploration-probe engagement data is tracked separately from (never merged into) the pillar/platform resonance figures route.ts and the drift flag use; `/strategy` surfaces accumulated exploration coverage once any untested pillar reaches n≥3.
 - PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 as part of the same measurement-scaffolding group; same design conversation, likely shares one `/strategy` step with the drift flag and the angle refresh.
-- STATUS: Backlog
+- STATUS: In Progress
 - DECISION: approved (Muxin, 2026-07-04) — build the exploration budget; monthly cadence; scope limited to topic coverage, not spin isolation.
+- GROOMED: ready — DECISION: approved, explicit GOAL_CONDITION (monthly probe cadence, separate coverage-data bucket, /strategy surfacing threshold); last of the 3 publishing-freeze scaffolding cards, prioritized ahead of other backlog build-out per the freeze banner
 <!-- card-id: 92bb2ae6-936c-4d23-a72a-1b838f7434be -->
 
 **[P0] Ask Claude buggy on the GUI?**
@@ -269,16 +270,6 @@ Examples - use both Primary and a Secondary CTA
 - DEPENDS ON: Codebase-review fix — Phase 1: job observability (uses the job queue + logs Phase 1 builds)
 <!-- card-id: 4e7cb5d3-a032-41db-8c49-474a48779261 -->
 
-**Codebase-review fix — Phase 3a: publish idempotency (fix the multi-group double-post window)**
-- R1: /publish's only idempotency guard is flipping the review-queue row to `published` (queue.ts:54), which happens AFTER provider calls. Worst case: cards.ts:278-285 posts a withLink group (Bluesky/LinkedIn) then a noLink group (X); if group 2 fails transiently, group 1 is already live, the row stays `approve`, and the next /publish re-posts BOTH groups.
-- Fix: consult publish-log.md before posting (the parser + findLoggedRef already exist in src/review/reconcile.ts); write a per-group placement marker immediately after each successful provider call; skip already-logged groups on re-run.
-- Sequence BEFORE raising posting caps (ffa6491d) — more volume makes this failure mode more likely, not less.
-- ORIGIN: docs/codebase-review.md Part 2 R1, Part 3 Phase 3 (split from 5ec087d4, 2026-07-07)
-- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: To Do
-- GROOMED: ready — concrete idempotency fix (consult publish-log before posting, per-group markers), exact files named, no new external/cost/security surface
-<!-- card-id: a47073b9-85e0-4c44-8afd-ba87724a462e -->
-
 **Codebase-review fix — Phase 3b: provider retry/backoff + orphaned slot cleanup**
 - R2: no retry/backoff on any of the 28 provider fetch sites — a single 429/5xx/network blip aborts the row (the only existing retry is Typefully media transcoding, typefully.ts:324-338), and these transient blips are what turn into Phase 3a's partial-post states. Fix: one small shared fetchWithRetry (exponential backoff on 429/5xx/network) wrapped around publish + provider adapters.
 - R3: slots are claimed in the ledger BEFORE posting (slots.ts:132-197); a mid-run abort leaves a future claim with no post behind it. pruneLedger only drops past days; queue --sync detects this as claimedNotLive drift (queue-view.ts:296-298) but doesn't clean it, so every failed run permanently shifts later posts. Fix: extend --sync to release future claimedNotLive claims (print the diff), and/or release a claim in a `finally` when its post never happened.
@@ -366,6 +357,16 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
+
+**Codebase-review fix — Phase 3a: publish idempotency (fix the multi-group double-post window)**
+- R1: /publish's only idempotency guard is flipping the review-queue row to `published` (queue.ts:54), which happens AFTER provider calls. Worst case: cards.ts:278-285 posts a withLink group (Bluesky/LinkedIn) then a noLink group (X); if group 2 fails transiently, group 1 is already live, the row stays `approve`, and the next /publish re-posts BOTH groups.
+- Fix: consult publish-log.md before posting (the parser + findLoggedRef already exist in src/review/reconcile.ts); write a per-group placement marker immediately after each successful provider call; skip already-logged groups on re-run.
+- Sequence BEFORE raising posting caps (ffa6491d) — more volume makes this failure mode more likely, not less.
+- ORIGIN: docs/codebase-review.md Part 2 R1, Part 3 Phase 3 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Done
+- GROOMED: ready — concrete idempotency fix (consult publish-log before posting, per-group markers), exact files named, no new external/cost/security surface
+<!-- card-id: a47073b9-85e0-4c44-8afd-ba87724a462e -->
 
 **Validate storytelling rubric against real /atomize output**
 - - Run the new storytelling rubric (hook/narrative/resonance) against the next real /atomize
