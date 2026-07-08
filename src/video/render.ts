@@ -18,9 +18,12 @@ import { charsToWordCaptions } from "./captions.js";
 import { charsOrWhisper } from "./align.js";
 import { renderMotionBg, renderCardAnimation } from "./hyperframes.js";
 import { resolveScheme } from "./card-schemes.js";
+import { readImagePrompt, withImageOutPath, buildQuoteImageProps } from "./quote-image-card.js";
 
 // Render assets for a content folder.
 //   tsx src/video/render.ts --still <content-folder> --quote <derivative-name>
+//   tsx src/video/render.ts --still <content-folder> --quote <derivative-name> --with-image
+//     (ADDITIONAL quote+image card — needs derivatives/<name>-image-prompt.txt; see quote-image-card.ts)
 //   tsx src/video/render.ts --render-video <content-folder>   (storyboard-driven; gated on approval)
 //   tsx src/video/render.ts --video <content-folder>          (low-level; expects the two files below)
 // --video mode expects:
@@ -67,7 +70,8 @@ async function withJob<T>(fn: (jobDir: string, jobName: string) => Promise<T>): 
 async function renderStill(
   folder: string,
   quoteName: string,
-  profile?: ImageProfile
+  profile?: ImageProfile,
+  withImage = false
 ): Promise<void> {
   const { fm, body: quote } = splitFrontmatter(
     readFileSync(join(folder, "derivatives", `${quoteName}.md`), "utf8")
@@ -91,7 +95,8 @@ async function renderStill(
   }
   // Quote cards are purely typographic (New Yorker style), no illustration background.
   // (Muxin's call, June 2026: "just quotes, not illustrations.") The quote IS the design.
-  const props = { quote, attribution: "Muxin Li", source, ...resolveScheme(fm) };
+  const scheme = resolveScheme(fm);
+  const props = { quote, attribution: "Muxin Li", source, ...scheme };
 
   await withJob(async (jobDir, _jobName) => {
     const propsFile = join(jobDir, "props.json");
@@ -105,6 +110,46 @@ async function renderStill(
   // is the verbatim closing sentence (chosen in hyperframes.ts), so no extra props are needed.
   const animPath = join(folder, "images", `${quoteName}.mp4`);
   renderCardAnimation(props, animPath);
+
+  // --with-image: an ADDITIONAL, distinct asset — the same verbatim quote composited over a
+  // generated illustration (images/<quoteName>-image.png). Does not touch the typographic PNG/mp4
+  // above. Needs a sibling image concept prompt written during /atomize step 7 (see
+  // quote-image-card.ts).
+  if (withImage) {
+    await renderQuoteImageCard(folder, quoteName, { quote, source, accent: scheme.accent }, profile);
+  }
+}
+
+async function renderQuoteImageCard(
+  folder: string,
+  quoteName: string,
+  card: { quote: string; source: string; accent: string },
+  profile?: ImageProfile
+): Promise<void> {
+  const slug = basename(folder);
+  const prompt = readImagePrompt(folder, quoteName);
+  const outPath = withImageOutPath(folder, quoteName);
+  // The raw generated illustration is kept alongside the composited card so it isn't
+  // regenerated (and re-billed) on a re-render of the same quote.
+  const bgPath = join(folder, "images", `${quoteName}-bg.png`);
+  if (!existsSync(bgPath)) {
+    const { provider: image, params: imageParams } = await getImage(profile);
+    const { costUsd } = await image.generate({ prompt, aspect: "1:1", outPath: bgPath, params: imageParams });
+    logCost({ step: `image:${image.name}`, detail: `${slug}/${quoteName}`, costUsd });
+  }
+
+  await withJob(async (jobDir, jobName) => {
+    const jobImg = "bg.png";
+    copyFileSync(bgPath, join(jobDir, jobImg));
+    const props = buildQuoteImageProps(
+      { quote: card.quote, attribution: "Muxin Li", source: card.source || undefined, accent: card.accent },
+      `${jobName}/${jobImg}`
+    );
+    const propsFile = join(jobDir, "props.json");
+    writeFileSync(propsFile, JSON.stringify(props));
+    remotion(["still", ENTRY, "QuoteImageCard", outPath, `--props=${propsFile}`]);
+    console.log(`quote+image card: ${outPath}`);
+  });
 }
 
 async function renderVideo(folder: string, profile?: ImageProfile): Promise<void> {
@@ -489,7 +534,7 @@ async function main() {
     const folder = resolveFolder(args[1]);
     const quoteIdx = args.indexOf("--quote");
     const quoteName = quoteIdx !== -1 ? args[quoteIdx + 1] : "quote-card-1";
-    await renderStill(folder, quoteName, profile);
+    await renderStill(folder, quoteName, profile, args.includes("--with-image"));
   } else if (mode === "--render-video") {
     const folder = resolveFolder(args[1]);
     if (args.includes("--motion")) {
@@ -503,7 +548,7 @@ async function main() {
     await renderVideo(resolveFolder(args[1]), profile);
   } else {
     console.error(
-      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]            (image-motion B-roll)\n  tsx src/video/render.ts --render-video <content-folder> --motion [--keyframes-only] [--pro|--hero]   (HyperFrames)\n  tsx src/video/render.ts --render-video <content-folder> --animated [--keyframes-only] [--pro|--hero]  (Kling)\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
+      "usage:\n  tsx src/video/render.ts --still <content-folder> [--quote <name>] [--with-image] [--pro|--hero]\n  tsx src/video/render.ts --render-video <content-folder> [--pro|--hero]            (image-motion B-roll)\n  tsx src/video/render.ts --render-video <content-folder> --motion [--keyframes-only] [--pro|--hero]   (HyperFrames)\n  tsx src/video/render.ts --render-video <content-folder> --animated [--keyframes-only] [--pro|--hero]  (Kling)\n  tsx src/video/render.ts --video <content-folder> [--pro|--hero]"
     );
     process.exit(1);
   }
