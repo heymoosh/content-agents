@@ -10,23 +10,6 @@ scaffolding cards are Done and Muxin confirms resuming.
 
 ---
 
-**Routing drift flag: surface data-vs-brand platform divergence in /strategy (never auto-gate)**
-- Resolves the routing-authority question (Muxin, 2026-07-04): today `config/routing.yaml`'s per-pillar platform `defaults` only govern cold-start (<4wks/<3 posts); once real data accrues, `route.ts` lets the fit score hard-override them — a pillar can get SKIPPED on a platform Muxin considers its brand home if it underperforms there. DECISION: routing.yaml's defaults become the PINNED editorial call instead — Muxin's own definition of which topics belong on which platform, never hard-overridden by score.
-- Change `route.ts`'s `decideForPillar`: decision always follows `routing.yaml` defaults (like cold-start logic today), regardless of data volume. The fit score is still computed and shown, but stops driving include/skip.
-- Add a flag step (fits `/strategy` or `route.ts --all`, same cadence as the angle refresh below) that compares each pillar's live fit score against its assigned platform(s) and surfaces a loud divergence warning when a pillar persistently scores under `skip_below_score` on its assigned platform, or unusually high on a non-assigned one. Muxin decides by hand whether to edit routing.yaml; the step makes zero writes to it.
-- Mirrors the "surface, never auto-overwrite" posture already agreed for the per-channel angle refresh (8ba83a4c) — same posture, sibling config (routing.yaml topic-fit vs platforms.yaml angle/slant). The two could plausibly share one refresh pass in /strategy; scope that when picked up.
-- Touches `validate.ts`'s platform-fit hard gate (00dea0f, shipped 2026-07-04) only in that routing.md's underlying decisions change from score-driven to defaults-driven — the gate itself (hard-fail on `skip`) is unaffected.
-- EXPERIMENTAL RIGOR (Muxin, 2026-07-04): the flag must be run as a deliberate experiment, not a single noisy look. Reuses the n≥3 / ≥4wks sample floor already standard across route.ts/grade-bets.ts/snapshot.ts — do NOT invent a new threshold — but that floor alone is thin (one viral or one flop post can flip a 3-post average), and checking 6 pillars × ~7 platforms at once means some cells will look divergent from noise alone (multiple-comparisons problem). Requirements:
-  1. PERSISTENCE: only flag a pillar/platform pair when the divergence holds across ≥2 independent snapshots/windows, not one look.
-  2. ISOLATE SPIN FROM TOPIC-FIT: spin is always-on (33aa10f8) so there is currently no live baseline to tell "wrong platform for this topic" apart from "angle isn't landing." Systematize the `--no-spin` control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.
-  3. SEPARATE THE TWO HYPOTHESES AT FLAG TIME: when a flag fires, surface (a) the actual n and whether it clears a persistence check, and (b) whether a no-spin control exists for that cell — so Muxin can judge "move the topic" vs. "fix the angle" vs. "not enough data yet" instead of one ambiguous score.
-- GOAL_CONDITION: `route.ts --pillar <p>` never returns `skip` for a platform in that pillar's `routing.yaml` defaults solely due to a low fit score; the score is still visible in the decision output. `/strategy` (or `route.ts --all`) emits a divergence flag ONLY for pillar/platform pairs meeting the persistence check above, each flag stating n, window count, and no-spin-control availability; zero writes are made to routing.yaml or platforms.yaml by the flag step itself.
-- PRIORITY (Muxin, 2026-07-04): bumped to top priority, first of a small measurement-scaffolding group (with 92bb2ae6 and ffa6491d) — decided in the same conversation as, and independent of, 87cb6d93/8b00ab2e/d8a990a9 (all since shipped separately). Still worth prioritizing: no experiment-design/measurement layer exists yet for routing decisions.
-- STATUS: To Do
-- DECISION: approved — hybrid model chosen (Muxin, 2026-07-04): routing.yaml stays brand-pinned; data flags divergence for manual review, never auto-gates. Experimental-rigor requirements (persistence check, no-spin controls, hypothesis separation) added same day.
-- GROOMED: ready — DECISION: approved, explicit GOAL_CONDITION (routing.yaml defaults-driven, persistence-checked divergence flag, zero writes to config)
-<!-- card-id: 7e550e48-adcf-44d3-83ea-626ee079b9ef -->
-
 **Exploration budget: periodically test off-assignment pillars per platform to find missed coverage (separate from spin, separate from drift monitoring)**
 - Distinct problem from the routing-drift flag (7e550e48): that card only monitors pillar/platform pairs ALREADY assigned in `routing.yaml` defaults — it can never discover whether an UNassigned pillar would also work on a platform, because pinning defaults to brand means that pillar never gets posted there at all. This card is the deliberate probe that fills that gap.
 - CATCH-22 (Muxin, 2026-07-04): if LinkedIn only ever gets career-work content, that's the only data you can ever analyze from LinkedIn — you don't learn whether LinkedIn is ALSO good for other topics. Resolve via a small, deliberate, LABELED exploration budget, not a change to the default pinned assignment (brand consistency stays the day-to-day default; this is a rare, tagged probe on top of it).
@@ -38,28 +21,8 @@ scaffolding cards are Done and Muxin confirms resuming.
 - GOAL_CONDITION: each of LinkedIn's 2 and Bluesky's 3 untested pillars gets one tagged exploration probe roughly monthly; exploration-probe engagement data is tracked separately from (never merged into) the pillar/platform resonance figures route.ts and the drift flag use; `/strategy` surfaces accumulated exploration coverage once any untested pillar reaches n≥3.
 - PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 as part of the same measurement-scaffolding group; same design conversation, likely shares one `/strategy` step with the drift flag and the angle refresh.
 - STATUS: Backlog
-- DEPENDS ON: Routing drift flag: surface data-vs-brand platform divergence in /strategy (sibling; shares the pinned-defaults model this card probes around)
 - DECISION: approved (Muxin, 2026-07-04) — build the exploration budget; monthly cadence; scope limited to topic coverage, not spin isolation.
 <!-- card-id: 92bb2ae6-936c-4d23-a72a-1b838f7434be -->
-
-**Evaluate raising per-platform posting caps (X, LinkedIn, Bluesky) for more volume**
-- Muxin's read from real-world experience (2026-07-04), not yet reconciled with config: X can handle a LOT more than the current `posts_per_week: 5`; LinkedIn can comfortably run 5/week (current cap: 2/week, Tue/Thu only); Bluesky — no strong opinion, Muxin only checks it occasionally for political updates, open to review; Substack — sees daily to multiple Notes/day in the wild, but N/A here (see below).
-- SUBSTACK IS NOT IN SCOPE: `config/platforms.yaml` has no `substack` entry because Substack is the SOURCE channel, not a routing target (see `config/routing.yaml` header) — the pipeline doesn't automate or cap Muxin's own Notes posting there at all; that stays entirely manual and outside this card.
-- ARCHITECTURE CONSTRAINT (found 2026-07-04): the unified scheduler enforces ≤1 post/platform/PT-day via the shared ledger (`data/publish-schedule.jsonl`, `src/publish/slots.ts`). Bluesky's current `posts_per_week: 7` with all 7 `slot_days` is ALREADY at the ceiling this architecture supports (one/day, every day) — going beyond daily on any platform needs real multiple-slots-per-day scheduler work, not a config number change. Before scoping, confirm whether "X can do a lot per day" means (a) more days/week within the existing ≤1/day model (a config bump, e.g. 5→7-10/wk within slot_days), or (b) literally multiple posts/day (needs new scheduler logic) — these are very different sized changes.
-- CONTENT-SUPPLY CHECK: raising caps only helps if there's enough distinct original source material weekly to fill the added slots without violating each platform's `min_reuse_days` (x:14, linkedin:60, bluesky:21) or thinning derivative quality by over-atomizing the same source. Check actual weekly essay/note output against proposed new caps before locking numbers in.
-- WHY THIS MATTERS BEYOND VOLUME: more posts/week directly speeds up how fast pillar/platform cells reach the n≥3 sample floor used by route.ts, grade-bets.ts, and the two sibling cards above (routing drift flag 7e550e48, exploration budget 92bb2ae6) — this isn't purely a growth lever, it also shortens the wait on every data-driven decision in the pipeline.
-- OPEN QUESTIONS for whoever picks this up: (1) confirm X daily-multiple vs. weekly-bump scope per above; (2) pick actual new `posts_per_week` + `slot_days` numbers per platform with Muxin; (3) decide if Bluesky needs anything beyond its current daily ceiling, or stays as-is given Muxin's lack of strong opinion; (4) verify source-content supply supports the new volume.
-- GOAL_CONDITION: Muxin has picked explicit new `posts_per_week`/`slot_days` values for X and LinkedIn (Bluesky stays or changes per his call once reviewed); if any platform needs more than 1 post/PT-day, that scheduler gap is either resolved or explicitly deferred as its own follow-up; config/platforms.yaml reflects the decided numbers.
-- PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 and 92bb2ae6 as part of the same measurement-scaffolding group: more volume speeds up how fast every experiment above reaches a usable sample size, so the cap decision is scaffolding too, not just a growth lever.
-- LIGHT RESEARCH (2026-07-07): checked Muxin's read against current best-practice guidance. X: data-backed guides put the sustainable sweet spot at 3-5 posts/day (accounts posting 1-3x/day see the strongest growth; beyond ~5x/day shows diminishing returns) — Muxin's "post a lot more" instinct is directionally right, but the architecture (≤1 post/platform/PT-day via the shared ledger) can't do more than 1/day today, so hitting even the low end of that range needs the multi-slot-per-day scheduler work this card's ARCHITECTURE CONSTRAINT already flags, not a config number. LinkedIn: guidance ranges 2-5x/week; Muxin's real-world experience running 5x/week is within the credible range. Bluesky: no frequency-specific guidance found beyond "consistency over volume, don't overpost" — nothing pushes for more than the current daily ceiling.
-- DECISION (Muxin, 2026-07-07):
-  - LinkedIn → posts_per_week: 5, slot_days: [Mon, Tue, Wed, Thu, Fri] (stays business-hours-only, spread across the work week). Fits inside the existing ≤1/day model — pure config change, no scheduler work needed. min_reuse_days:60 is unaffected (governs same-slug reuse, not distinct-post volume) — worth watching content supply after the bump, per this card's own CONTENT-SUPPLY CHECK.
-  - X → immediate step: posts_per_week 5 → 7 (slot_days already all 7 days) — the max the current 1-post/PT-day architecture supports. Muxin's actual ask (multiple posts/day) needs the multi-slot-per-day scheduler work called out in this card's ARCHITECTURE CONSTRAINT; that's a separate, bigger follow-up, not bundled into this config bump.
-  - Bluesky → no change. Already at the architecture's daily ceiling (7/wk, all days); Muxin has no strong opinion and the research doesn't push for more.
-  - Substack → confirmed NOT automated today (no posting path exists in the pipeline; card 8026f53c scopes Notes-only browser-agent posting and is currently deferred/deprioritized). Muxin flagged renewed interest 2026-07-07 with a target cap of 1 post/day max if/when built — recorded on 8026f53c, still deferred for now (see that card). Muxin's own essays stay fully manual either way.
-- STATUS: To Do
-- GROOMED: ready — Muxin resolved concrete numbers (LinkedIn 5/wk Mon-Fri, X 5->7/wk, Bluesky unchanged), pure config/platforms.yaml change, multi-slot-per-day scheduler work explicitly deferred as separate follow-up
-<!-- card-id: ffa6491d-46f9-416f-b521-1fb15e1a391b -->
 
 **[P0] Ask Claude buggy on the GUI?**
 - I used Ask Claude to edit a Blue Sky post and turn it into an X post - I wanted it to ALSO create an X post based on the source content. Nothing’s working?
@@ -125,6 +88,7 @@ scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e0696
 - LIKELY PATTERN: Claude suggests an image concept/prompt from the source content; Muxin iterates externally (ChatGPT or his open-source model) until he likes a result; drops the file in; the pipeline assembles it into a quote+image card (verbatim quote + Muxin-provided image, no API image-gen call). May need to generalize into a "non-API image gen" pattern — wait for Muxin to hand off a file he likes, then assemble — rather than a generate-in-pipeline step.
 - PRIORITY (Muxin, 2026-07-07): lower priority — revisit after the current content-stack work.
 - STATUS: Backlog
+- DECISION: defer (pre-flight, 2026-07-07) — Muxin already marked this lower priority, revisit after current content-stack work; hand-off pattern (ChatGPT vs free local model) not yet settled.
 <!-- card-id: 1653734b-8eea-480b-93ea-3c5926159f81 -->
 
 **Explore Draw Things (free local) for short-form video gen as a Kling cost-saver**
@@ -133,6 +97,7 @@ scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e0696
 - Unverified: whether Draw Things actually supports video generation (vs. image-only) — confirm this before scoping further.
 - PRIORITY (Muxin, 2026-07-07): low — exploratory, not blocking anything.
 - STATUS: Backlog
+- DECISION: defer (pre-flight, 2026-07-07) — exploratory, unverified whether Draw Things even does video gen; Muxin marked low priority, not blocking anything.
 <!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
 
 **Voice Notes to Published**
@@ -205,15 +170,6 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Backlog
 - DECISION: defer — external; built outside this repo. Mark Done when the landing page is live to unblock Smarter routing
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
-
-**Add LinkedIn to the notes-daily spread platforms**
-- STALE REFERENCE (2026-07-04): notes-daily.ts no longer has a SPREAD_PLATFORMS list at all — it doesn't draft anything anymore (see the content-generation-review fix, same date). Real per-note platform selection now happens locally via `/atomize notes` (`.claude/skills/atomize/references/notes-mode.md`), which routes through the normal `config/routing.yaml` per-pillar logic like any other piece, not a notes-specific hardcoded list.
-- Add 'linkedin' if Muxin wants longer / essay-like notes echoed there.
-- Muxin's call on whether his notes fit the LinkedIn register.
-- STATUS: To Do
-- DECISION: approved — LinkedIn gets the SAME platform-fit test the other spread platforms already use, not a blanket add: if a note is a good fit for a platform, it spreads there, and that rule now includes LinkedIn too (Muxin, 2026-07-04). Check whether config/routing.yaml already covers this for notes, or needs a small adjustment there.
-- GROOMED: ready — DECISION: approved, LinkedIn gets same platform-fit test as other spread platforms via config/routing.yaml, small bounded check/adjustment
-<!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
 - We auto-publish to X/LinkedIn/Bluesky (Typefully), YouTube, TikTok (PostPeer), and quote cards, but there is NO automation for publishing to Substack. Substack has no usable publishing API (CLAUDE.md rule 3).
@@ -291,16 +247,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer — deprioritized, lower priority, new media type. Keep in Backlog. 2026-07-04
 <!-- card-id: b0e4ecc5-6120-4b40-a6dd-859c34ca332a -->
 
-**Surface the thread-check advisory in review-queue.md itself, not just validate output and the GUI badge**
-- - Follow-up from card 87cb6d93 (Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing).
-- Currently the pass/missing signal lives in derivative frontmatter (thread_check/thread_spin_applied, read by the review GUI badge) and in npm run validate's advisory console summary. Someone skimming the raw review-queue.md markdown directly (not the GUI, not validate output) sees nothing.
-- Consider appending a short note to review-queue.md's notes column when a piece is queued with thread_check: missing after a Spin-draft attempt, so the raw markdown itself surfaces it too.
-- Small, additive, no schema break — extends the existing notes column convention.
-- CHAIN: 1
-- STATUS: To Do
-- GROOMED: ready — small additive review-queue.md notes-column change (surface thread_check:missing), no schema break, CHAIN:1
-<!-- card-id: 4c3eb6be-fbf4-4a6c-ae25-992009f9b848 -->
-
 **Validate storytelling rubric against real /atomize output**
 - - Run the new storytelling rubric (hook/narrative/resonance) against the next real /atomize
 - output to get real scores and validate the soft-gate against live data, not just the test
@@ -308,6 +254,7 @@ Examples - use both Primary and a Secondary CTA
 - - Depends on: nothing — ready now, just needs an actual /atomize scoring pass on real content.
 - - CHAIN: 1
 - STATUS: To Do
+- DECISION: unparked (Muxin, 2026-07-07) — validate against `content/2026-07-05-what-i-ve-described-in-my-essay-building-an-inno/` (most recent /atomize output at time of decision).
 - GROOMED: ready — bounded validation task (run storytelling rubric against real /atomize output, compare to fixture baseline), CHAIN:1, no blocking dependency
 <!-- card-id: 9be7688d-a41d-4e58-9fce-a9c8df8e4644 -->
 
@@ -318,20 +265,8 @@ Examples - use both Primary and a Secondary CTA
 - - Depends on: enough published volume with the new storytelling dimension scored.
 - - CHAIN: 1
 - STATUS: Backlog
+- DECISION: defer (pre-flight, 2026-07-07) — data-gated (CHAIN:1 follow-up), needs published volume with the storytelling dimension scored that does not exist yet; nothing to build tonight.
 <!-- card-id: f77b6670-d39d-4c13-b9be-004084510e58 -->
-
-**Codebase-review fix — Phase 1: job observability (persist + stream Claude job logs)**
-- Persist every Claude/atomize job's stdout/stderr to a log file (e.g. ~/.content-agents/logs/gui-jobs/<jobId>.log), streaming as it arrives (spawn with piped streams, not execFile's 40MB in-memory buffer, serve.ts:796-801).
-- Add elapsed time + last-stdout-line heartbeat to /api/jobs; render both in the jobs pill (serve.ts:735-740, 1622-1629).
-- Add a "view log" link per job serving the log file.
-- Replace the 1.4s auto-hiding toast (serve.ts:1332, 1458) with durable inline error text on the row.
-- Verify success by artifact, not exit code: after the subprocess exits, check a new folder + review-queue.md rows exist (or parse a machine-readable final line /atomize prints); attach the last ~30 log lines to job.error on failure.
-- Closes cards c43a8041 (no content folder created) and the stuck-working + invisible-error halves of 9304e4a5 (Ask Claude buggy) — see docs/codebase-review.md Part 1 §3-4 for full root cause.
-- ORIGIN: docs/codebase-review.md Part 3, Phase 1 (split from 5ec087d4, 2026-07-07)
-- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: To Do
-- GROOMED: ready — detailed technical fix (persist/stream job logs, heartbeat, durable errors, artifact-based success check), exact files/lines named, no external/cost/security surface
-<!-- card-id: efae4554-cc52-4aec-ad32-9475d6aa4fdf -->
 
 **Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)**
 - Add a "Generate storyboard" button on video-script rows that enqueues `claude -p "/video <folder>"` through the existing job queue (serve.ts:796) — turns the video path into script review → storyboard generation → storyboard approval → render, all inside the GUI. Closes 9e20a616.
@@ -374,6 +309,7 @@ Examples - use both Primary and a Secondary CTA
 - PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
 - STATUS: Backlog
 - DEPENDS ON: Use browser automation for image uploads (shares the same recommendation/decision; this card is its implementation)
+- DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
 <!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
 
 **Codebase-review fix — Phase 5a: config validation & loaders (zod, memoized loader, slots/cta tests)**
@@ -405,6 +341,77 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: To Do
 - GROOMED: ready — mechanical serve.ts split (page/jobs/rows/routes) + request caching for /api/queue, no behavior change intended
 <!-- card-id: c310160b-d296-4219-ab28-4cd50c0a3b40 -->
+
+**Codebase-review fix — Phase 1: job observability (persist + stream Claude job logs)**
+- Persist every Claude/atomize job's stdout/stderr to a log file (e.g. ~/.content-agents/logs/gui-jobs/<jobId>.log), streaming as it arrives (spawn with piped streams, not execFile's 40MB in-memory buffer, serve.ts:796-801).
+- Add elapsed time + last-stdout-line heartbeat to /api/jobs; render both in the jobs pill (serve.ts:735-740, 1622-1629).
+- Add a "view log" link per job serving the log file.
+- Replace the 1.4s auto-hiding toast (serve.ts:1332, 1458) with durable inline error text on the row.
+- Verify success by artifact, not exit code: after the subprocess exits, check a new folder + review-queue.md rows exist (or parse a machine-readable final line /atomize prints); attach the last ~30 log lines to job.error on failure.
+- Closes cards c43a8041 (no content folder created) and the stuck-working + invisible-error halves of 9304e4a5 (Ask Claude buggy) — see docs/codebase-review.md Part 1 §3-4 for full root cause.
+- ORIGIN: docs/codebase-review.md Part 3, Phase 1 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Done
+- DECISION: merged (Muxin, 2026-07-07) — PR #99 reviewed and merged.
+- GROOMED: ready — detailed technical fix (persist/stream job logs, heartbeat, durable errors, artifact-based success check), exact files/lines named, no external/cost/security surface
+<!-- card-id: efae4554-cc52-4aec-ad32-9475d6aa4fdf -->
+
+**Surface the thread-check advisory in review-queue.md itself, not just validate output and the GUI badge**
+- - Follow-up from card 87cb6d93 (Home-brand-thread check at review time, with Spin auto-drafting the thread in when missing).
+- Currently the pass/missing signal lives in derivative frontmatter (thread_check/thread_spin_applied, read by the review GUI badge) and in npm run validate's advisory console summary. Someone skimming the raw review-queue.md markdown directly (not the GUI, not validate output) sees nothing.
+- Consider appending a short note to review-queue.md's notes column when a piece is queued with thread_check: missing after a Spin-draft attempt, so the raw markdown itself surfaces it too.
+- Small, additive, no schema break — extends the existing notes column convention.
+- CHAIN: 1
+- STATUS: Done
+- GROOMED: ready — small additive review-queue.md notes-column change (surface thread_check:missing), no schema break, CHAIN:1
+<!-- card-id: 4c3eb6be-fbf4-4a6c-ae25-992009f9b848 -->
+
+**Add LinkedIn to the notes-daily spread platforms**
+- STALE REFERENCE (2026-07-04): notes-daily.ts no longer has a SPREAD_PLATFORMS list at all — it doesn't draft anything anymore (see the content-generation-review fix, same date). Real per-note platform selection now happens locally via `/atomize notes` (`.claude/skills/atomize/references/notes-mode.md`), which routes through the normal `config/routing.yaml` per-pillar logic like any other piece, not a notes-specific hardcoded list.
+- Add 'linkedin' if Muxin wants longer / essay-like notes echoed there.
+- Muxin's call on whether his notes fit the LinkedIn register.
+- VERIFIED (conductor, 2026-07-07): already covered, no code change needed. `/atomize notes` (notes-mode.md step 3) routes every note through the exact same `config/routing.yaml` per-pillar logic as any other content — grepped `src/atomize/new-notes.ts` and `src/cron/notes-daily.ts`, no LinkedIn-specific filter exists anywhere. LinkedIn is already a default platform for 4 of 6 pillars (human-ai, claude-code, career-work, builder) in `config/routing.yaml`, excluded only for civic-tech/other — exactly the DECISION's "same platform-fit test, not a blanket add." Expanding LinkedIn into civic-tech/other's defaults would be a separate routing-config judgment call (the exploration-budget card 92bb2ae6 is the deliberate mechanism for probing that), out of scope here.
+- STATUS: Done
+- DECISION: approved — LinkedIn gets the SAME platform-fit test the other spread platforms already use, not a blanket add: if a note is a good fit for a platform, it spreads there, and that rule now includes LinkedIn too (Muxin, 2026-07-04). Check whether config/routing.yaml already covers this for notes, or needs a small adjustment there.
+- GROOMED: ready — DECISION: approved, LinkedIn gets same platform-fit test as other spread platforms via config/routing.yaml, small bounded check/adjustment
+<!-- card-id: 48df9ed1-1e90-4cc5-84f5-29750bffa5bb -->
+
+**Evaluate raising per-platform posting caps (X, LinkedIn, Bluesky) for more volume**
+- Muxin's read from real-world experience (2026-07-04), not yet reconciled with config: X can handle a LOT more than the current `posts_per_week: 5`; LinkedIn can comfortably run 5/week (current cap: 2/week, Tue/Thu only); Bluesky — no strong opinion, Muxin only checks it occasionally for political updates, open to review; Substack — sees daily to multiple Notes/day in the wild, but N/A here (see below).
+- SUBSTACK IS NOT IN SCOPE: `config/platforms.yaml` has no `substack` entry because Substack is the SOURCE channel, not a routing target (see `config/routing.yaml` header) — the pipeline doesn't automate or cap Muxin's own Notes posting there at all; that stays entirely manual and outside this card.
+- ARCHITECTURE CONSTRAINT (found 2026-07-04): the unified scheduler enforces ≤1 post/platform/PT-day via the shared ledger (`data/publish-schedule.jsonl`, `src/publish/slots.ts`). Bluesky's current `posts_per_week: 7` with all 7 `slot_days` is ALREADY at the ceiling this architecture supports (one/day, every day) — going beyond daily on any platform needs real multiple-slots-per-day scheduler work, not a config number change. Before scoping, confirm whether "X can do a lot per day" means (a) more days/week within the existing ≤1/day model (a config bump, e.g. 5→7-10/wk within slot_days), or (b) literally multiple posts/day (needs new scheduler logic) — these are very different sized changes.
+- CONTENT-SUPPLY CHECK: raising caps only helps if there's enough distinct original source material weekly to fill the added slots without violating each platform's `min_reuse_days` (x:14, linkedin:60, bluesky:21) or thinning derivative quality by over-atomizing the same source. Check actual weekly essay/note output against proposed new caps before locking numbers in.
+- WHY THIS MATTERS BEYOND VOLUME: more posts/week directly speeds up how fast pillar/platform cells reach the n≥3 sample floor used by route.ts, grade-bets.ts, and the two sibling cards above (routing drift flag 7e550e48, exploration budget 92bb2ae6) — this isn't purely a growth lever, it also shortens the wait on every data-driven decision in the pipeline.
+- OPEN QUESTIONS for whoever picks this up: (1) confirm X daily-multiple vs. weekly-bump scope per above; (2) pick actual new `posts_per_week` + `slot_days` numbers per platform with Muxin; (3) decide if Bluesky needs anything beyond its current daily ceiling, or stays as-is given Muxin's lack of strong opinion; (4) verify source-content supply supports the new volume.
+- GOAL_CONDITION: Muxin has picked explicit new `posts_per_week`/`slot_days` values for X and LinkedIn (Bluesky stays or changes per his call once reviewed); if any platform needs more than 1 post/PT-day, that scheduler gap is either resolved or explicitly deferred as its own follow-up; config/platforms.yaml reflects the decided numbers.
+- PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 and 92bb2ae6 as part of the same measurement-scaffolding group: more volume speeds up how fast every experiment above reaches a usable sample size, so the cap decision is scaffolding too, not just a growth lever.
+- LIGHT RESEARCH (2026-07-07): checked Muxin's read against current best-practice guidance. X: data-backed guides put the sustainable sweet spot at 3-5 posts/day (accounts posting 1-3x/day see the strongest growth; beyond ~5x/day shows diminishing returns) — Muxin's "post a lot more" instinct is directionally right, but the architecture (≤1 post/platform/PT-day via the shared ledger) can't do more than 1/day today, so hitting even the low end of that range needs the multi-slot-per-day scheduler work this card's ARCHITECTURE CONSTRAINT already flags, not a config number. LinkedIn: guidance ranges 2-5x/week; Muxin's real-world experience running 5x/week is within the credible range. Bluesky: no frequency-specific guidance found beyond "consistency over volume, don't overpost" — nothing pushes for more than the current daily ceiling.
+- DECISION (Muxin, 2026-07-07):
+  - LinkedIn → posts_per_week: 5, slot_days: [Mon, Tue, Wed, Thu, Fri] (stays business-hours-only, spread across the work week). Fits inside the existing ≤1/day model — pure config change, no scheduler work needed. min_reuse_days:60 is unaffected (governs same-slug reuse, not distinct-post volume) — worth watching content supply after the bump, per this card's own CONTENT-SUPPLY CHECK.
+  - X → immediate step: posts_per_week 5 → 7 (slot_days already all 7 days) — the max the current 1-post/PT-day architecture supports. Muxin's actual ask (multiple posts/day) needs the multi-slot-per-day scheduler work called out in this card's ARCHITECTURE CONSTRAINT; that's a separate, bigger follow-up, not bundled into this config bump.
+  - Bluesky → no change. Already at the architecture's daily ceiling (7/wk, all days); Muxin has no strong opinion and the research doesn't push for more.
+  - Substack → confirmed NOT automated today (no posting path exists in the pipeline; card 8026f53c scopes Notes-only browser-agent posting and is currently deferred/deprioritized). Muxin flagged renewed interest 2026-07-07 with a target cap of 1 post/day max if/when built — recorded on 8026f53c, still deferred for now (see that card). Muxin's own essays stay fully manual either way.
+- STATUS: Done
+- DECISION: approved (Muxin, 2026-07-07) — LinkedIn: posts_per_week 5, slot_days Mon-Fri (config-only change). X: posts_per_week 5->7 (multi-slot/day scheduler work for Muxin's full ask deferred as separate follow-up). Bluesky: no change (already at daily ceiling). Substack: confirmed not automated (see 8026f53c, still deferred).
+- GROOMED: ready — Muxin resolved concrete numbers (LinkedIn 5/wk Mon-Fri, X 5->7/wk, Bluesky unchanged), pure config/platforms.yaml change, multi-slot-per-day scheduler work explicitly deferred as separate follow-up
+<!-- card-id: ffa6491d-46f9-416f-b521-1fb15e1a391b -->
+
+**Routing drift flag: surface data-vs-brand platform divergence in /strategy (never auto-gate)**
+- Resolves the routing-authority question (Muxin, 2026-07-04): today `config/routing.yaml`'s per-pillar platform `defaults` only govern cold-start (<4wks/<3 posts); once real data accrues, `route.ts` lets the fit score hard-override them — a pillar can get SKIPPED on a platform Muxin considers its brand home if it underperforms there. DECISION: routing.yaml's defaults become the PINNED editorial call instead — Muxin's own definition of which topics belong on which platform, never hard-overridden by score.
+- Change `route.ts`'s `decideForPillar`: decision always follows `routing.yaml` defaults (like cold-start logic today), regardless of data volume. The fit score is still computed and shown, but stops driving include/skip.
+- Add a flag step (fits `/strategy` or `route.ts --all`, same cadence as the angle refresh below) that compares each pillar's live fit score against its assigned platform(s) and surfaces a loud divergence warning when a pillar persistently scores under `skip_below_score` on its assigned platform, or unusually high on a non-assigned one. Muxin decides by hand whether to edit routing.yaml; the step makes zero writes to it.
+- Mirrors the "surface, never auto-overwrite" posture already agreed for the per-channel angle refresh (8ba83a4c) — same posture, sibling config (routing.yaml topic-fit vs platforms.yaml angle/slant). The two could plausibly share one refresh pass in /strategy; scope that when picked up.
+- Touches `validate.ts`'s platform-fit hard gate (00dea0f, shipped 2026-07-04) only in that routing.md's underlying decisions change from score-driven to defaults-driven — the gate itself (hard-fail on `skip`) is unaffected.
+- EXPERIMENTAL RIGOR (Muxin, 2026-07-04): the flag must be run as a deliberate experiment, not a single noisy look. Reuses the n≥3 / ≥4wks sample floor already standard across route.ts/grade-bets.ts/snapshot.ts — do NOT invent a new threshold — but that floor alone is thin (one viral or one flop post can flip a 3-post average), and checking 6 pillars × ~7 platforms at once means some cells will look divergent from noise alone (multiple-comparisons problem). Requirements:
+  1. PERSISTENCE: only flag a pillar/platform pair when the divergence holds across ≥2 independent snapshots/windows, not one look.
+  2. ISOLATE SPIN FROM TOPIC-FIT: spin is always-on (33aa10f8) so there is currently no live baseline to tell "wrong platform for this topic" apart from "angle isn't landing." Systematize the `--no-spin` control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.
+  3. SEPARATE THE TWO HYPOTHESES AT FLAG TIME: when a flag fires, surface (a) the actual n and whether it clears a persistence check, and (b) whether a no-spin control exists for that cell — so Muxin can judge "move the topic" vs. "fix the angle" vs. "not enough data yet" instead of one ambiguous score.
+- GOAL_CONDITION: `route.ts --pillar <p>` never returns `skip` for a platform in that pillar's `routing.yaml` defaults solely due to a low fit score; the score is still visible in the decision output. `/strategy` (or `route.ts --all`) emits a divergence flag ONLY for pillar/platform pairs meeting the persistence check above, each flag stating n, window count, and no-spin-control availability; zero writes are made to routing.yaml or platforms.yaml by the flag step itself.
+- PRIORITY (Muxin, 2026-07-04): bumped to top priority, first of a small measurement-scaffolding group (with 92bb2ae6 and ffa6491d) — decided in the same conversation as, and independent of, 87cb6d93/8b00ab2e/d8a990a9 (all since shipped separately). Still worth prioritizing: no experiment-design/measurement layer exists yet for routing decisions.
+- STATUS: Done
+- DECISION: approved — hybrid model chosen (Muxin, 2026-07-04): routing.yaml stays brand-pinned; data flags divergence for manual review, never auto-gates. Experimental-rigor requirements (persistence check, no-spin controls, hypothesis separation) added same day.
+- GROOMED: ready — DECISION: approved, explicit GOAL_CONDITION (routing.yaml defaults-driven, persistence-checked divergence flag, zero writes to config)
+<!-- card-id: 7e550e48-adcf-44d3-83ea-626ee079b9ef -->
 
 **Use Opus for animating quote cards**
 - Let’s compare how Opus vs Sonnet 5 does handling quote card animations
