@@ -104,6 +104,33 @@ export function writeCell(folder: string, id: string, updates: QueueCellUpdate):
   return false;
 }
 
+// Append a brand-new data row to review-queue.md (e.g. the "Duplicate to platform" GUI action,
+// which creates a new derivative + queue row from an existing one — src/review/jobs.ts
+// duplicateToPlatform). Always writes the full 10-column layout (native/brand/cta/origin included,
+// "—" for the three scores this action doesn't compute) regardless of what column count the rest
+// of the table happens to use — readQueue()/writeCell() parse each line independently by its own
+// cell count, so a table mixing legacy 9-col and fresh 10-col rows parses fine.
+export interface NewQueueRow {
+  id: string;
+  platform: string;
+  format: string;
+  asset: string;
+  status: string;
+  notes?: string;
+  origin?: QueueOrigin;
+}
+
+export function appendRow(folder: string, row: NewQueueRow): void {
+  const path = join(folder, "review-queue.md");
+  const text = readFileSync(path, "utf8").replace(/\n*$/, "\n");
+  const cells = [
+    row.id, row.platform, row.format, row.asset,
+    "—", "—", "—", // native/brand/cta — unscored; this action doesn't run the scoring rubric
+    row.status, row.notes ?? "", row.origin ?? "",
+  ].map((c) => formatCell(String(c).replace(/[|\n\r]/g, " ").trim()));
+  writeFileSync(path, text + "|" + cells.join("|") + "|\n");
+}
+
 // Status of the (at most one) storyboard row in folder's review-queue.md — the render gate
 // src/video/render.ts checks before any paid generation runs. Routed through readQueue so this
 // stays in lockstep with every other reader of the table instead of re-parsing cells by hand.
