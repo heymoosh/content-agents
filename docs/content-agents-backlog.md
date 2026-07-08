@@ -232,19 +232,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer (pre-flight, 2026-07-07) — data-gated (CHAIN:1 follow-up), needs published volume with the storytelling dimension scored that does not exist yet; nothing to build tonight.
 <!-- card-id: f77b6670-d39d-4c13-b9be-004084510e58 -->
 
-**Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)**
-- Add a "Generate storyboard" button on video-script rows that enqueues `claude -p "/video <folder>"` through the existing job queue (serve.ts:796) — turns the video path into script review → storyboard generation → storyboard approval → render, all inside the GUI. Closes 9e20a616.
-- Add a per-row "Duplicate to platform..." action: copies the derivative, respins it for the target platform's angle via the existing spin path, appends a new review-queue row, lands back in Review. This is the missing "create a post" affordance behind the rest of 9304e4a5's Ask Claude complaint.
-- Route ALL Claude spawns (revise serve.ts:411, insights 530, ask 571, brief revise 671) through the one existing job queue so GUI concurrency is bounded and every run gets a log (built in Phase 1).
-- Teach Ask Claude to refuse out-of-scope requests (platform change, new post) with a one-line reason instead of silently no-op'ing.
-- Make Refresh tab-aware (refresh whichever tab is active, including the brief), label it, show a "last refreshed HH:MM" stamp. Closes 3625b185.
-- ORIGIN: docs/codebase-review.md Part 3, Phase 2 (split from 5ec087d4, 2026-07-07)
-- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: Review
-- DEPENDS ON: Codebase-review fix — Phase 1: job observability (uses the job queue + logs Phase 1 builds)
-- GROOMED: ready — detailed spec (exact files/lines), dependency (Phase 1) Done, closes 9e20a616 + 3625b185, no external/cost/security surface + 2026-07-08
-<!-- card-id: 4e7cb5d3-a032-41db-8c49-474a48779261 -->
-
 **Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts**
 - Attach card PNGs as `media:` on Typefully drafts (uploadMedia + media: frontmatter already implemented, typefully.ts:61-75, 304-313, proven once for an animated mp4). Rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. PostPeer stays for TikTok only (audited API, genuinely better there).
 - This IS the build implementing ca75b2e0's recommendation (don't build browser posting — use Typefully's existing image-upload path instead).
@@ -274,7 +261,6 @@ Examples - use both Primary and a Secondary CTA
 - GOAL_CONDITION: the 6 call sites share one extracted error-decoding helper (enoent/timedOut/nonzero-exit), no behavior change, npm test stays green.
 - CHAIN: 1
 - STATUS: Backlog
-- DEPENDS ON: Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)
 <!-- card-id: 84afb9e3-1394-4f15-945c-00d6ee32c613 -->
 
 **duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
@@ -284,8 +270,20 @@ Examples - use both Primary and a Secondary CTA
 - GOAL_CONDITION: duplicateToPlatform() checks for an existing file at the target path BEFORE invoking the claude subprocess (not just after), and a test proves it refuses to overwrite instead of silently clobbering.
 - CHAIN: 1
 - STATUS: Backlog
-- DEPENDS ON: Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)
 <!-- card-id: d1ebdd71-ba9f-4fd3-9aa2-f9cbbd4726d3 -->
+
+**Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)**
+- Add a "Generate storyboard" button on video-script rows that enqueues `claude -p "/video <folder>"` through the existing job queue (serve.ts:796) — turns the video path into script review → storyboard generation → storyboard approval → render, all inside the GUI. Closes 9e20a616.
+- Add a per-row "Duplicate to platform..." action: copies the derivative, respins it for the target platform's angle via the existing spin path, appends a new review-queue row, lands back in Review. This is the missing "create a post" affordance behind the rest of 9304e4a5's Ask Claude complaint.
+- Route ALL Claude spawns (revise serve.ts:411, insights 530, ask 571, brief revise 671) through the one existing job queue so GUI concurrency is bounded and every run gets a log (built in Phase 1).
+- Teach Ask Claude to refuse out-of-scope requests (platform change, new post) with a one-line reason instead of silently no-op'ing.
+- Make Refresh tab-aware (refresh whichever tab is active, including the brief), label it, show a "last refreshed HH:MM" stamp. Closes 3625b185.
+- ORIGIN: docs/codebase-review.md Part 3, Phase 2 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Done
+- DEPENDS ON: Codebase-review fix — Phase 1: job observability (uses the job queue + logs Phase 1 builds)
+- GROOMED: ready — detailed spec (exact files/lines), dependency (Phase 1) Done, closes 9e20a616 + 3625b185, no external/cost/security surface + 2026-07-08
+<!-- card-id: 4e7cb5d3-a032-41db-8c49-474a48779261 -->
 
 **[P0] Use browser automation for image uploads**
 - Instead of relying on the 3rd party, can’t I login to the sites on chrome, have that securely stashed, and we can just upload images that way? We do it for the analytics already.
