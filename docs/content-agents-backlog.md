@@ -240,7 +240,7 @@ Examples - use both Primary and a Secondary CTA
 - Make Refresh tab-aware (refresh whichever tab is active, including the brief), label it, show a "last refreshed HH:MM" stamp. Closes 3625b185.
 - ORIGIN: docs/codebase-review.md Part 3, Phase 2 (split from 5ec087d4, 2026-07-07)
 - PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: In Progress
+- STATUS: Review
 - DEPENDS ON: Codebase-review fix — Phase 1: job observability (uses the job queue + logs Phase 1 builds)
 - GROOMED: ready — detailed spec (exact files/lines), dependency (Phase 1) Done, closes 9e20a616 + 3625b185, no external/cost/security surface + 2026-07-08
 <!-- card-id: 4e7cb5d3-a032-41db-8c49-474a48779261 -->
