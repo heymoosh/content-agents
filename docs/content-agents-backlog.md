@@ -20,7 +20,7 @@ scaffolding cards are Done and Muxin confirms resuming.
 - DATA HANDLING: an exploration probe's result must NOT get folded into the platform/pillar's "official" resonance average used by route.ts or the drift flag — track it as its own coverage-data bucket so one exploratory flop/win doesn't skew the assigned-pillar signal. Surface accumulated exploration results (n, avg engagement per untested pillar) in `/strategy` once enough data exists to say anything.
 - GOAL_CONDITION: each of LinkedIn's 2 and Bluesky's 3 untested pillars gets one tagged exploration probe roughly monthly; exploration-probe engagement data is tracked separately from (never merged into) the pillar/platform resonance figures route.ts and the drift flag use; `/strategy` surfaces accumulated exploration coverage once any untested pillar reaches n≥3.
 - PRIORITY (Muxin, 2026-07-04): sequences alongside 7e550e48 as part of the same measurement-scaffolding group; same design conversation, likely shares one `/strategy` step with the drift flag and the angle refresh.
-- STATUS: In Progress
+- STATUS: Review
 - DECISION: approved (Muxin, 2026-07-04) — build the exploration budget; monthly cadence; scope limited to topic coverage, not spin isolation.
 - GROOMED: ready — DECISION: approved, explicit GOAL_CONDITION (monthly probe cadence, separate coverage-data bucket, /strategy surfacing threshold); last of the 3 publishing-freeze scaffolding cards, prioritized ahead of other backlog build-out per the freeze banner
 <!-- card-id: 92bb2ae6-936c-4d23-a72a-1b838f7434be -->
@@ -270,17 +270,6 @@ Examples - use both Primary and a Secondary CTA
 - DEPENDS ON: Codebase-review fix — Phase 1: job observability (uses the job queue + logs Phase 1 builds)
 <!-- card-id: 4e7cb5d3-a032-41db-8c49-474a48779261 -->
 
-**Codebase-review fix — Phase 3b: provider retry/backoff + orphaned slot cleanup**
-- R2: no retry/backoff on any of the 28 provider fetch sites — a single 429/5xx/network blip aborts the row (the only existing retry is Typefully media transcoding, typefully.ts:324-338), and these transient blips are what turn into Phase 3a's partial-post states. Fix: one small shared fetchWithRetry (exponential backoff on 429/5xx/network) wrapped around publish + provider adapters.
-- R3: slots are claimed in the ledger BEFORE posting (slots.ts:132-197); a mid-run abort leaves a future claim with no post behind it. pruneLedger only drops past days; queue --sync detects this as claimedNotLive drift (queue-view.ts:296-298) but doesn't clean it, so every failed run permanently shifts later posts. Fix: extend --sync to release future claimedNotLive claims (print the diff), and/or release a claim in a `finally` when its post never happened.
-- P2 (fold in while touching slots.ts): pruneLedger's single writeFileSync rewrite of publish-schedule.jsonl (slots.ts:110-119) isn't atomic — a crash mid-write truncates the ledger. Write-temp-then-rename.
-- Sequence BEFORE raising posting caps (ffa6491d), same reasoning as Phase 3a. Can run in parallel with 3a (touches slots.ts/provider adapters vs. cards.ts/queue.ts).
-- ORIGIN: docs/codebase-review.md Part 2 R2/R3/P2, Part 3 Phase 3 (split from 5ec087d4, 2026-07-07)
-- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: To Do
-- GROOMED: ready — shared retry/backoff wrapper + orphaned-slot cleanup + atomic ledger write, exact files named, no new external/cost/security surface
-<!-- card-id: 5f039a7e-c4f0-48d5-930f-c1700c4f57c4 -->
-
 **Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts**
 - Attach card PNGs as `media:` on Typefully drafts (uploadMedia + media: frontmatter already implemented, typefully.ts:61-75, 304-313, proven once for an animated mp4). Rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. PostPeer stays for TikTok only (audited API, genuinely better there).
 - This IS the build implementing ca75b2e0's recommendation (don't build browser posting — use Typefully's existing image-upload path instead).
@@ -357,6 +346,27 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
+
+**queue --sync orphan-release can misfire past a live-service pagination limit**
+- - ORIGIN: follow-up auto-filed while building card 5f039a7e (Phase 3b: provider retry/backoff + orphaned slot cleanup).
+- syncLedger releases a future ledger claim once reconcile() confirms no live post matches it, but the live-post lists it checks against are paginated at the source (Typefully fetchScheduledDrafts limit=50, YouTube listScheduledUploads maxResults=25). A genuinely-live post sitting beyond that page would misreport as claimedNotLive and get released, letting a later run double-book that slot.
+- Not realistically triggerable today (posts_per_week caps are well under 50/25 and the ledger only ever holds a few weeks of future claims), so shipped as a documented, low-probability limitation rather than blocking Phase 3b on it.
+- Fix is a product/design call, not mechanical: options include full pagination on both list calls, a grace period before releasing a claimedNotLive claim (skip release until it has been unmatched across 2+ consecutive --sync runs), or reverting --sync to advisory-only (report, never release).
+- GOAL_CONDITION: pick one of the three mitigations above (or an equivalent), implement it, and add a test proving a live post beyond the current pagination limit is never wrongly released by --sync.
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: c18c39a9-72d7-4e51-a05e-e13fa57ae601 -->
+
+**Codebase-review fix — Phase 3b: provider retry/backoff + orphaned slot cleanup**
+- R2: no retry/backoff on any of the 28 provider fetch sites — a single 429/5xx/network blip aborts the row (the only existing retry is Typefully media transcoding, typefully.ts:324-338), and these transient blips are what turn into Phase 3a's partial-post states. Fix: one small shared fetchWithRetry (exponential backoff on 429/5xx/network) wrapped around publish + provider adapters.
+- R3: slots are claimed in the ledger BEFORE posting (slots.ts:132-197); a mid-run abort leaves a future claim with no post behind it. pruneLedger only drops past days; queue --sync detects this as claimedNotLive drift (queue-view.ts:296-298) but doesn't clean it, so every failed run permanently shifts later posts. Fix: extend --sync to release future claimedNotLive claims (print the diff), and/or release a claim in a `finally` when its post never happened.
+- P2 (fold in while touching slots.ts): pruneLedger's single writeFileSync rewrite of publish-schedule.jsonl (slots.ts:110-119) isn't atomic — a crash mid-write truncates the ledger. Write-temp-then-rename.
+- Sequence BEFORE raising posting caps (ffa6491d), same reasoning as Phase 3a. Can run in parallel with 3a (touches slots.ts/provider adapters vs. cards.ts/queue.ts).
+- ORIGIN: docs/codebase-review.md Part 2 R2/R3/P2, Part 3 Phase 3 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Done
+- GROOMED: ready — shared retry/backoff wrapper + orphaned-slot cleanup + atomic ledger write, exact files named, no new external/cost/security surface
+<!-- card-id: 5f039a7e-c4f0-48d5-930f-c1700c4f57c4 -->
 
 **Codebase-review fix — Phase 3a: publish idempotency (fix the multi-group double-post window)**
 - R1: /publish's only idempotency guard is flipping the review-queue row to `published` (queue.ts:54), which happens AFTER provider calls. Worst case: cards.ts:278-285 posts a withLink group (Bluesky/LinkedIn) then a noLink group (X); if group 2 fails transiently, group 1 is already live, the row stays `approve`, and the next /publish re-posts BOTH groups.
