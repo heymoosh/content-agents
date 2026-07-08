@@ -10,7 +10,7 @@ import { loadYamlConfig } from "./load.js";
 // YAML. They now all call loadPlatforms() below. `.passthrough()` on nested objects tolerates
 // fields a caller doesn't read yet, without weakening validation of the fields callers DO read.
 
-const platformRuleSchema = z
+export const platformRuleSchema = z
   .object({
     min_reuse_days: z.number().optional(),
     max_chars: z.number().optional(),
@@ -20,6 +20,12 @@ const platformRuleSchema = z
     posts_per_week: z.number().optional(),
     slot_days: z.array(z.string()).optional(),
     slot_time_pst: z.string().optional(),
+    // Max claimed slots per PT-calendar-day for this platform (src/publish/slots.ts). Absent means
+    // 1, today's behavior for every platform. >1 opts a platform into multiple same-day slots,
+    // spaced across the day instead of all landing at slot_time_pst. Must be a positive integer —
+    // 0/negative would silently block every future claim, and a fraction would let the day's
+    // uniqueness check round up instead of down.
+    max_slots_per_day: z.number().int().positive().optional(),
     style: z.string().optional(),
   })
   .passthrough();

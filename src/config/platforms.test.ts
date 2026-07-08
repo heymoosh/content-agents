@@ -5,7 +5,7 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { loadPlatforms } from "./platforms.js";
+import { loadPlatforms, platformRuleSchema } from "./platforms.js";
 
 describe("loadPlatforms: validates the real config/platforms.yaml without behavior change", () => {
   test("loads all known top-level sections with the shapes callers rely on", () => {
@@ -29,5 +29,34 @@ describe("loadPlatforms: validates the real config/platforms.yaml without behavi
     const a = loadPlatforms();
     const b = loadPlatforms();
     assert.equal(a, b, "loadPlatforms should return the cached object, not re-read the file");
+  });
+
+  test("the real config/platforms.yaml does not set max_slots_per_day on any platform (mechanism-only card)", () => {
+    const cfg = loadPlatforms();
+    for (const [name, rule] of Object.entries(cfg.platforms)) {
+      assert.equal(rule.max_slots_per_day, undefined, `${name} should not have max_slots_per_day set yet`);
+    }
+  });
+});
+
+describe("platformRuleSchema: max_slots_per_day", () => {
+  test("parses a valid max_slots_per_day as a typed number", () => {
+    const rule = platformRuleSchema.parse({ max_slots_per_day: 3 });
+    assert.equal(rule.max_slots_per_day, 3);
+  });
+
+  test("leaves max_slots_per_day undefined when absent (default-of-1 is applied by the scheduler, not the schema)", () => {
+    const rule = platformRuleSchema.parse({});
+    assert.equal(rule.max_slots_per_day, undefined);
+  });
+
+  test("rejects a non-number max_slots_per_day instead of silently passing it through", () => {
+    assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: "three" }));
+  });
+
+  test("rejects zero, negative, and fractional max_slots_per_day (would silently starve or off-by-one the day cap)", () => {
+    assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: 0 }));
+    assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: -1 }));
+    assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: 1.5 }));
   });
 });

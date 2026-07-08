@@ -20,8 +20,8 @@ import { checkReuse } from "./reuse-guard.js";
 //   tsx src/publish/cards.ts --check                       provider auth/account preflight only
 //
 // Timing comes from the UNIFIED scheduler (src/publish/slots.ts, windowKey `quote-card` in
-// config/platforms.yaml) + the shared ledger, so a card never lands on a platform the same day a
-// text post (or another card) already did. The quote line is the verbatim body of
+// config/platforms.yaml) + the shared ledger, so a card never exceeds a platform's per-day slot cap
+// (default 1) already claimed by a text post (or another card) that day. The quote line is the verbatim body of
 // derivatives/<id>.md (CLAUDE.md rule 1). The article CTA follows config/cta.yaml exactly like text
 // (shared cta.ts): link INLINE on inline platforms (Bluesky/LinkedIn), OMITTED where placement is
 // `reply` (X) — the relays can't post a reply, so omitting dodges X's penalty. PNG is images/<id>.png
@@ -78,7 +78,8 @@ function platformKey(platform: string): string {
 }
 
 // The real platforms a card occupies (deduped, mapped to shared keys) — what the scheduler
-// de-conflicts against so a card never lands on a platform a text post already took that day.
+// de-conflicts against so a card never exceeds a platform's per-day slot cap (default 1) already
+// claimed by a text post that day.
 function conflictPlatforms(targets: ImageTarget[]): string[] {
   return [...new Set(targets.map((t) => platformKey(t.platform)))];
 }

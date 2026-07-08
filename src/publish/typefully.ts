@@ -14,8 +14,8 @@ import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
 // Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
 // from the UNIFIED scheduler (src/publish/slots.ts + config/platforms.yaml cadence + the shared
-// slot ledger), so text and cards never double-book a platform on the same day — across runs and
-// streams. Platforms without a cadence fall back to Typefully "next-free-slot".
+// slot ledger), so text and cards never exceed a platform's per-day slot cap (default 1) on the same
+// day — across runs and streams. Platforms without a cadence fall back to Typefully "next-free-slot".
 //   tsx src/publish/typefully.ts <content-folder> | --list
 // Needs TYPEFULLY_API_KEY (and optionally TYPEFULLY_SOCIAL_SET_ID) in .env.
 
