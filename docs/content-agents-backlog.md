@@ -262,19 +262,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
 <!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
 
-**Systematize periodic --no-spin control runs per pillar/platform pair (feeds the routing drift flag's spin/topic-fit isolation)**
-- ORIGIN: 7e550e48's own EXPERIMENTAL RIGOR requirement #2 — 'Systematize the --no-spin control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.' The shipped drift flag (7e550e48, Done) only reports whether a no-spin control exists per pillar/platform pair; it doesn't generate those controls itself, so every pair currently reports 'no control available' with nothing to change that.
-- Without a live no-spin baseline the flag can't separate 'wrong platform for this topic' from 'angle isn't landing' — the exact ambiguity 7e550e48 was designed to resolve for Muxin.
-- Scope: on a periodic cadence (fits the /strategy pass, same rhythm as the angle refresh (8ba83a4c) and exploration budget (92bb2ae6)), pick one pillar/platform pair and draft one derivative with --no-spin, tagged as a control run distinct from normal spin-on posts; queue it through the normal review-queue.md approval like any other derivative.
-- Data handling: track control-run engagement in its own bucket, same posture as 92bb2ae6's exploration-probe bucket — never folded into the pillar/platform's official resonance average.
-- Once ≥1 control run exists for a pair, route.ts --all's divergence flag should report no-spin-control availability as true for that pair instead of permanently false.
-- GOAL_CONDITION: Running the control-run step produces a --no-spin derivative tagged as a control run for one pillar/platform pair on each periodic pass, tracked separately from spin-on engagement data; after at least one control run exists for a pair, route.ts --all's divergence flag reports no-spin-control availability as true for that pair (previously always false, since no mechanism produced these controls).
-- PARENT: 7e550e48-adcf-44d3-83ea-626ee079b9ef
-- ORIGIN: proposed by propose-cards 2026-07-07 from epic Routing drift flag: surface data-vs-brand platform divergence in /strategy (never auto-gate) (7e550e48-adcf-44d3-83ea-626ee079b9ef)
-- STATUS: Review
-- GROOMED: ready — cadence/selection explicitly inherits sibling card 92bb2ae6's MECHANISM (monthly, longest-since-last-control rule), concrete GOAL_CONDITION, output goes through normal review-queue.md approval (rule 2 still governs) + 2026-07-07
-<!-- card-id: f444f440-7221-4741-a682-254f27f66e29 -->
-
 **Re-validate storytelling rubric once broader real-data sample exists (n>=20 across >=3 sources)**
 - ORIGIN: follow-up from card 9be7688d (Validate storytelling rubric against real /atomize output) — docs/storytelling-rubric-validation.md.
 - That validation found the live sample (n=6, ONE source, 2026-07-05-hey-substack) does not reproduce the original eval's all-three-dimension 2-3 clustering: hook is 4 on every real derivative so far, resonance is 4-5, only narrative actually clusters at the LOW_SCORE_THRESHOLD=3 soft-gate (3 on 4 of 6, correctly flagged).
@@ -285,6 +272,19 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
+
+**Systematize periodic --no-spin control runs per pillar/platform pair (feeds the routing drift flag's spin/topic-fit isolation)**
+- ORIGIN: 7e550e48's own EXPERIMENTAL RIGOR requirement #2 — 'Systematize the --no-spin control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.' The shipped drift flag (7e550e48, Done) only reports whether a no-spin control exists per pillar/platform pair; it doesn't generate those controls itself, so every pair currently reports 'no control available' with nothing to change that.
+- Without a live no-spin baseline the flag can't separate 'wrong platform for this topic' from 'angle isn't landing' — the exact ambiguity 7e550e48 was designed to resolve for Muxin.
+- Scope: on a periodic cadence (fits the /strategy pass, same rhythm as the angle refresh (8ba83a4c) and exploration budget (92bb2ae6)), pick one pillar/platform pair and draft one derivative with --no-spin, tagged as a control run distinct from normal spin-on posts; queue it through the normal review-queue.md approval like any other derivative.
+- Data handling: track control-run engagement in its own bucket, same posture as 92bb2ae6's exploration-probe bucket — never folded into the pillar/platform's official resonance average.
+- Once ≥1 control run exists for a pair, route.ts --all's divergence flag should report no-spin-control availability as true for that pair instead of permanently false.
+- GOAL_CONDITION: Running the control-run step produces a --no-spin derivative tagged as a control run for one pillar/platform pair on each periodic pass, tracked separately from spin-on engagement data; after at least one control run exists for a pair, route.ts --all's divergence flag reports no-spin-control availability as true for that pair (previously always false, since no mechanism produced these controls).
+- PARENT: 7e550e48-adcf-44d3-83ea-626ee079b9ef
+- ORIGIN: proposed by propose-cards 2026-07-07 from epic Routing drift flag: surface data-vs-brand platform divergence in /strategy (never auto-gate) (7e550e48-adcf-44d3-83ea-626ee079b9ef)
+- STATUS: Done
+- GROOMED: ready — cadence/selection explicitly inherits sibling card 92bb2ae6's MECHANISM (monthly, longest-since-last-control rule), concrete GOAL_CONDITION, output goes through normal review-queue.md approval (rule 2 still governs) + 2026-07-07
+<!-- card-id: f444f440-7221-4741-a682-254f27f66e29 -->
 
 **Exploration budget: periodically test off-assignment pillars per platform to find missed coverage (separate from spin, separate from drift monitoring)**
 - Distinct problem from the routing-drift flag (7e550e48): that card only monitors pillar/platform pairs ALREADY assigned in `routing.yaml` defaults — it can never discover whether an UNassigned pillar would also work on a platform, because pinning defaults to brand means that pillar never gets posted there at all. This card is the deliberate probe that fills that gap.
