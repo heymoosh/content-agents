@@ -1,6 +1,10 @@
 # Fit-finder + outreach engine — implementation plan
 
 **Date:** 2026-07-08
+**Status:** RATIFIED (Muxin, 2026-07-08) — all recommendations agreed (§2a handoff format, §2b
+tracker ownership, §6 phase ordering). The build is unblocked; the one remaining input is the
+Phase 0 seed list (§8 item 3), which can also come straight from JSA TARGET verdicts via the
+ratified `--from-jsa` path.
 **What this is:** the implementation-scoping pass Muxin asked for on the client/platform/job-outreach
 backlog cluster ("Muxin wants a different/stronger model to do that scoping before a worker starts").
 It assesses the approved architecture, closes the open decisions with concrete recommendations, and
@@ -60,7 +64,7 @@ as-is. What it gets right, verified against the codebase:
 
 ## 2. Recommendations on the open decisions
 
-### 2a. JSA → content-agents handoff format: **snapshot-on-intake, file-based**
+### 2a. JSA → content-agents handoff format: **snapshot-on-intake, file-based** — RATIFIED (Muxin, 2026-07-08)
 
 A lead enters the engine as a folder + `lead.md` file, created by `/outreach add`, which accepts
 the same input shapes `/atomize` does (a name, a URL, pasted notes). For JSA-sourced candidates,
@@ -77,7 +81,7 @@ This answers c308a8cf's "minimum JSA hands off" question: **company name + domai
 its reasoning/sources, snapshotted at intake.** Nothing else is required; everything else this
 engine needs (turnaround/greenfield evidence) is its own research pass by design.
 
-### 2b. JSA Level 2 Networking ownership: **content-agents owns outreach + follow-up tracking (option b), built pluggable**
+### 2b. JSA Level 2 Networking ownership: **content-agents owns outreach + follow-up tracking (option b), built pluggable** — RATIFIED (Muxin, 2026-07-08)
 
 Recommendation: option (b) from c308a8cf — content-agents' engine is the single place all four
 reason-buckets' outreach and follow-up state lives; JSA hands off Level-1 verdicts only and never
@@ -95,9 +99,10 @@ builds its own Level 2 *for Muxin's use*. Reasoning:
   a read-only pull of JSA state (the same reconciliation shape the GUI already does for
   Typefully/PostPeer) with no change to the other three buckets.
 
-This is a recommendation with JSA-roadmap implications outside this repo — **Muxin ratifies it**,
-but nothing in Phases 1–3 depends on the answer, so the build does not block on it. Only Phase 4's
-job-search bucket cares, and the pluggable design absorbs either answer.
+This is a recommendation with JSA-roadmap implications outside this repo — ratified by Muxin
+2026-07-08: the Follow-ups tab tracks the jobsearch bucket natively; JSA hands off Level-1
+verdicts only. The pluggable design stays (a future JSA product tracker can still swap that
+bucket to a read-only pull without touching the other three).
 
 ### 2c. JSA values-depth question: **check it in Phase 0, don't block on it; content-agents is the worldview source of truth either way**
 
@@ -351,8 +356,10 @@ after 4 nothing falls through the cracks, after 5 the top of the funnel fills it
 
 ## 8. What Muxin ratifies before Phase 1 starts
 
-1. §2a handoff format (snapshot-on-intake via `--from-jsa`).
+1. §2a handoff format (snapshot-on-intake via `--from-jsa`). **RATIFIED 2026-07-08.**
 2. §2b tracker ownership (content-agents owns all four buckets; JSA hands off Level-1 only).
-   Has JSA roadmap implications — her call; Phases 1–3 proceed regardless.
+   Has JSA roadmap implications — her call; Phases 1–3 proceed regardless. **RATIFIED 2026-07-08.**
 3. The Phase 0 seed list (3–5 clients + 3–5 platforms from her own head/JSA TARGETs).
-4. This plan's phase ordering (specifically: discovery last).
+   **STILL PENDING — the only remaining input.** Muxin supplies names, or Phase 0 pulls
+   TARGET-verdict companies from `manual_research.db` via the ratified `--from-jsa` path.
+4. This plan's phase ordering (specifically: discovery last). **RATIFIED 2026-07-08.**
