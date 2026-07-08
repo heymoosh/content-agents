@@ -18,10 +18,10 @@
 // Zero new deps: Node's built-in http + the existing queue parser.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, statSync, createWriteStream } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { homedir } from "node:os";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
@@ -38,6 +38,29 @@ import { classifyThread } from "../atomize/thread-check.js";
 
 const CONTENT = join(repoRoot, "content");
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
+
+// Per-job stdout/stderr logs for the atomize job queue (see the Job interface below) — persisted
+// to disk so a job's real output survives past the 40MB in-memory buffer execFile used to impose,
+// and so a "view log" link + failure log-tail have something to read.
+const JOB_LOG_DIR = join(homedir(), ".content-agents", "logs", "gui-jobs");
+export function jobLogPath(jobId: string): string {
+  return join(JOB_LOG_DIR, `${jobId}.log`);
+}
+
+// The last non-empty line of accumulated output — the "heartbeat" shown in the jobs pill so a
+// long-running job doesn't read as a silent black box. Pure/testable: takes the buffer directly
+// rather than reading a file.
+export function lastNonEmptyLine(text: string): string | null {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines.length ? lines[lines.length - 1] : null;
+}
+
+// Last `n` lines of `text`, joined back with newlines — used to attach a bounded log tail to
+// job.error on failure instead of the whole (potentially large) log.
+export function tailLines(text: string, n: number): string {
+  const lines = text.split("\n").filter((l) => l.trim().length > 0);
+  return lines.slice(-n).join("\n");
+}
 
 // Claude Code creates ephemeral dev worktrees under .claude/worktrees/<name> — each one has its
 // OWN gitignored data/ and content/, isolated from the real checkout, so a report run here can
@@ -710,6 +733,7 @@ interface Job {
   createdAt: number;
   startedAt: number | null;
   finishedAt: number | null;
+  lastStdoutLine: string | null; // heartbeat — last non-empty line seen so far, updated as output streams in
 }
 const jobs: Job[] = [];
 let jobSeq = 0;
@@ -732,10 +756,17 @@ export function classifySource(
   return { kind: "text", arg: "", label: firstLine.replace(/^#\s*/, "").slice(0, 80) };
 }
 
+// Wall-clock time the job has taken so far — still ticking while running, frozen once it lands.
+export function jobElapsedMs(j: Pick<Job, "status" | "startedAt" | "finishedAt">, now: number = Date.now()): number | null {
+  if (!j.startedAt) return null;
+  return (j.status === "running" ? now : j.finishedAt ?? now) - j.startedAt;
+}
+
 function publicJob(j: Job) {
   return {
     id: j.id, kind: j.kind, label: j.label, status: j.status, slugs: j.slugs,
     error: j.error, createdAt: j.createdAt, startedAt: j.startedAt, finishedAt: j.finishedAt,
+    elapsedMs: jobElapsedMs(j), lastStdoutLine: j.lastStdoutLine,
   };
 }
 
@@ -772,11 +803,61 @@ function addJob(kind: Job["kind"], rawArg: string, label: string, rawText?: stri
   }
   const job: Job = {
     id, kind, label, arg, status: "queued", slugs: [], error: null,
-    createdAt: Date.now(), startedAt: null, finishedAt: null,
+    createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
   };
   jobs.push(job);
   void drain();
   return job;
+}
+
+interface AtomizeRunResult {
+  code: number | null;
+  timedOut: boolean;
+  enoent: boolean;
+}
+
+// Spawn the real /atomize headlessly, streaming stdout+stderr straight to the job's log file
+// (persist + stream, not execFile's 40MB in-memory buffer) while updating job.lastStdoutLine as a
+// live heartbeat. Resolves once the process closes; never rejects — outcome is read off the
+// returned result plus the persisted log file.
+function runAtomizeJob(job: Job): Promise<AtomizeRunResult> {
+  mkdirSync(JOB_LOG_DIR, { recursive: true });
+  const log = createWriteStream(jobLogPath(job.id), { flags: "a" });
+  let tailBuf = "";
+  const onChunk = (chunk: Buffer) => {
+    const text = chunk.toString("utf8");
+    log.write(chunk);
+    tailBuf = (tailBuf + text).slice(-4000); // bounded tail buffer — heartbeat only needs the last line
+    const line = lastNonEmptyLine(tailBuf);
+    if (line) job.lastStdoutLine = line;
+  };
+  return new Promise((resolve) => {
+    // ATOMIZE_ORIGIN=gui-queue tells the /atomize skill's step 8 to tag every row it appends
+    // "from GUI queue" instead of the default "from /cycle" — the origin source-tag the review
+    // GUI renders per row (src/publish/queue.ts QUEUE_ORIGINS).
+    const child = spawn("claude", ["-p", `/atomize ${job.arg}`, "--permission-mode", ATOMIZE_PERMISSION_MODE], {
+      cwd: repoRoot,
+      timeout: ATOMIZE_TIMEOUT_MS,
+      killSignal: "SIGTERM",
+      env: { ...process.env, ATOMIZE_ORIGIN: "gui-queue" },
+    });
+    let enoent = false;
+    child.on("error", (e) => {
+      enoent = (e as { code?: string }).code === "ENOENT";
+    });
+    child.stdout?.on("data", onChunk);
+    child.stderr?.on("data", onChunk);
+    child.on("close", (code, signal) => {
+      // Wait for the write stream to actually flush before resolving — drain() reads the log
+      // file back synchronously right after this promise settles (for the failure tail), and
+      // log.end() alone doesn't guarantee the last chunk has hit disk yet.
+      log.end(() => {
+        // Node's own `timeout` option kills with `killSignal` once ATOMIZE_TIMEOUT_MS elapses —
+        // that's the one signal we ever send, so seeing it back means we timed out, not a crash.
+        resolve({ code, timedOut: signal === "SIGTERM", enoent });
+      });
+    });
+  });
 }
 
 // Process the queue one job at a time. Each job shells the real /atomize; we diff the content
@@ -789,17 +870,11 @@ async function drain(): Promise<void> {
   job.status = "running";
   job.startedAt = Date.now();
   const before = new Set(listSlugs());
-  try {
-    // ATOMIZE_ORIGIN=gui-queue tells the /atomize skill's step 8 to tag every row it appends
-    // "from GUI queue" instead of the default "from /cycle" — the origin source-tag the review
-    // GUI renders per row (src/publish/queue.ts QUEUE_ORIGINS).
-    await execFileP("claude", ["-p", `/atomize ${job.arg}`, "--permission-mode", ATOMIZE_PERMISSION_MODE], {
-      cwd: repoRoot,
-      timeout: ATOMIZE_TIMEOUT_MS,
-      maxBuffer: 40_000_000,
-      env: { ...process.env, ATOMIZE_ORIGIN: "gui-queue" },
-    });
-    job.slugs = listSlugs().filter((s) => !before.has(s));
+  const result = await runAtomizeJob(job);
+  job.slugs = listSlugs().filter((s) => !before.has(s)); // artifact check — real folders, not exit code
+  const ran = result.code === 0 && !result.timedOut && !result.enoent;
+  job.status = ran ? "done" : "failed";
+  if (ran && job.slugs.length) {
     // Belt-and-suspenders: force the origin tag on every row of every folder this job created,
     // rather than trusting the subprocess's own SKILL.md-driven bookkeeping to have landed it
     // (e.g. if `echo $ATOMIZE_ORIGIN` wasn't an allowlisted Bash command in that run).
@@ -810,21 +885,23 @@ async function drain(): Promise<void> {
         // best-effort tagging only — never fail the job over it
       }
     }
-    job.status = "done";
-    if (!job.slugs.length) {
-      job.error = "atomize finished but created no new content folder — check the terminal running the GUI";
-    }
-  } catch (e) {
-    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
-    job.status = "failed";
-    if (err.code === "ENOENT") {
+  } else {
+    const tail = (() => {
+      try {
+        return tailLines(readFileSync(jobLogPath(job.id), "utf8"), 30);
+      } catch {
+        return "";
+      }
+    })();
+    if (result.enoent) {
       job.error = "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs";
-    } else if (err.killed) {
-      job.error = `atomize timed out after ${ATOMIZE_TIMEOUT_MS / 60000} min`;
-    } else {
-      job.error = `atomize failed: ${(err.stderr || err.message || "unknown").slice(0, 400)}`;
+    } else if (result.timedOut) {
+      job.error = `atomize timed out after ${ATOMIZE_TIMEOUT_MS / 60000} min` + (tail ? `\n---\n${tail}` : "");
+    } else if (result.code !== 0) {
+      job.error = `atomize failed (exit ${result.code})` + (tail ? `\n---\n${tail}` : "");
+    } else if (!job.slugs.length) {
+      job.error = "atomize finished but created no new content folder — check the view-log link" + (tail ? `\n---\n${tail}` : "");
     }
-    job.slugs = listSlugs().filter((s) => !before.has(s)); // link a partial scaffold if one appeared
   }
   job.finishedAt = Date.now();
   draining = false;
@@ -1031,6 +1108,22 @@ const server = createServer(async (req, res) => {
       json(res, 200, { jobs: jobs.map(publicJob) });
       return;
     }
+    if (req.method === "GET" && /^\/api\/jobs\/[^/]+\/log$/.test(url.pathname)) {
+      const jobId = url.pathname.split("/")[3];
+      if (!jobs.some((j) => j.id === jobId)) {
+        res.writeHead(404).end("no such job");
+        return;
+      }
+      let text: string;
+      try {
+        text = readFileSync(jobLogPath(jobId), "utf8");
+      } catch {
+        text = "(no log yet — the job hasn't produced output)";
+      }
+      res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+      res.end(text);
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/api/strategy/brief") {
       const abs = latestBriefPath();
       if (!abs) {
@@ -1176,10 +1269,11 @@ const PAGE = /* html */ `<!doctype html>
   .revisebox input { flex:1; font:inherit; padding:7px 10px; border:1px solid var(--muted); border-radius:7px; }
   button.ai { border-color:#5b46b8; color:#5b46b8; }
   button.ai:hover { background:#efeafd; }
-  .aibox { margin-top:9px; display:none; gap:7px; }
+  .aibox { margin-top:9px; display:none; gap:7px; flex-wrap:wrap; }
   .aibox.show { display:flex; }
   .aibox input { flex:1; font:inherit; padding:7px 10px; border:1px solid #5b46b8; border-radius:7px; }
   .aibox button.send { border-color:#5b46b8; background:#5b46b8; color:#fff; }
+  .aierr { flex-basis:100%; color:var(--red); font-size:12.5px; font-weight:600; }
   .thinking { font-size:13px; color:#5b46b8; font-weight:600; padding:4px 0; }
   nav.tabs { display:flex; gap:5px; }
   .tab { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:6px 14px;
@@ -1230,6 +1324,9 @@ const PAGE = /* html */ `<!doctype html>
   .job .jlabel .txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
   .job .jkind { font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); }
   .job .jerr { color:var(--red); font-size:12.5px; white-space:normal; margin-top:3px; }
+  .job .jheartbeat { color:var(--muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .job .jelapsed { color:var(--muted); font-size:12px; }
+  .job a.jlog { font-size:12px; color:var(--blue); text-decoration:none; }
   .job a.jump { font-size:12.5px; color:var(--blue); text-decoration:none; font-weight:600; }
   .spin-dot { width:9px; height:9px; border-radius:50%; background:var(--amber); flex:0 0 auto;
     animation:pulse 1s ease-in-out infinite; }
@@ -1407,7 +1504,11 @@ function rowEl(piece, row){
       '<span class="spacer"></span>'+ editBtn + aiBtn +
     '</div>'+
     '<div class="revisebox"><input placeholder="what needs changing?" value="'+esc(row.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
-    '<div class="aibox"><input placeholder="tell Claude what to change…" /><button class="send" data-act="ai-send">Send to Claude</button></div>';
+    // Reopens (and stays open) when a prior "Ask Claude" attempt failed, so the error — durable
+    // now, not a 1.4s toast — is still visible after the row's next rerender, not wiped by it.
+    '<div class="aibox'+(row.aiError?" show":"")+'"><input placeholder="tell Claude what to change…" /><button class="send" data-act="ai-send">Send to Claude</button>'+
+      (row.aiError ? '<div class="aierr">⚠ '+esc(row.aiError)+'</div>' : "")+
+    '</div>';
 
   el.addEventListener("click", (e)=>onAction(e, piece, row, el));
   return el;
@@ -1448,14 +1549,19 @@ async function onAction(e, piece, row, el){
     row.body = ta.value.trim(); flash("Saved"); rerender();
   } else if (act === "ai"){
     const box = el.querySelector(".aibox"); box.classList.toggle("show");
+    if(!box.classList.contains("show")) row.aiError = null; // closing dismisses any stale error
     const inp = el.querySelector(".aibox input"); if(inp && box.classList.contains("show")) inp.focus();
   } else if (act === "ai-send"){
     const inp = el.querySelector(".aibox input"); const instruction = inp ? inp.value.trim() : "";
     if(!instruction){ flash("Type what you want changed first"); return; }
+    row.aiError = null;
     el.querySelector(".aibox").innerHTML = '<div class="thinking">✨ Claude is revising… (your subscription, ~10-30s)</div>';
     const r = await post("/api/revise",{slug:piece.slug,id:row.id,instruction});
+    // Durable inline error on the row (survives rerender) instead of a 1.4s auto-hiding toast —
+    // the toast alone made a real failure ("Claude ran but didn't change anything") vanish before
+    // it registered as anything but "nothing's working."
     if(r.ok){ row.body = r.body; flash("Revised by Claude"); }
-    else { flash("Revise failed: "+(r.error||"error")); }
+    else { row.aiError = r.error || "error"; }
     rerender();
   }
 }
@@ -1620,6 +1726,11 @@ $("#rawRefreshBtn").addEventListener("click", loadRaw);
 let JOBS = [];
 function jobPill(s){ return s==="done"?"published":s==="failed"?"blocked":s==="running"?"revise":"needs"; }
 function jobStatusText(s){ return s==="running"?"working…":s; }
+function fmtElapsed(ms){
+  if(ms==null) return "";
+  const s = Math.round(ms/1000);
+  return s<60 ? s+"s" : Math.floor(s/60)+"m "+(s%60)+"s";
+}
 function renderJobs(){
   const box = $("#jobs"); box.innerHTML = "";
   if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above. 🌱</div>'; return; }
@@ -1628,11 +1739,16 @@ function renderJobs(){
     const el = document.createElement("div"); el.className = "job";
     const dot = j.status==="running" ? '<span class="spin-dot"></span>' : "";
     const err = j.error ? '<div class="jerr">'+esc(j.error)+'</div>' : "";
-    let right = '<span class="pill '+jobPill(j.status)+'">'+esc(jobStatusText(j.status))+'</span>';
+    // Heartbeat: last line of real output, shown only while running, so a long /atomize pass never
+    // reads as a silent black box — the whole point of persisting + streaming the job log.
+    const heartbeat = (j.status==="running" && j.lastStdoutLine) ? '<div class="jheartbeat">'+esc(j.lastStdoutLine)+'</div>' : "";
+    const elapsed = j.elapsedMs!=null ? '<span class="jelapsed">'+fmtElapsed(j.elapsedMs)+'</span>' : "";
+    const viewLog = j.startedAt ? '<a class="jlog" href="/api/jobs/'+encodeURIComponent(j.id)+'/log" target="_blank">log</a>' : "";
+    let right = elapsed + '<span class="pill '+jobPill(j.status)+'">'+esc(jobStatusText(j.status))+'</span>' + viewLog;
     if(j.status==="done" && j.slugs && j.slugs.length){
       right = '<a class="jump" href="#" data-slug="'+esc(j.slugs[0])+'">→ review'+(j.slugs.length>1?" "+j.slugs.length+" pieces":"")+'</a>' + right;
     }
-    el.innerHTML = dot + '<div class="jlabel"><span class="txt"><span class="jkind">'+esc(j.kind)+'</span> · '+esc(j.label)+'</span>'+err+'</div>' + right;
+    el.innerHTML = dot + '<div class="jlabel"><span class="txt"><span class="jkind">'+esc(j.kind)+'</span> · '+esc(j.label)+'</span>'+heartbeat+err+'</div>' + right;
     box.appendChild(el);
   }
   box.querySelectorAll("a.jump").forEach(a=>a.addEventListener("click",(e)=>{
