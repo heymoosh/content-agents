@@ -7,6 +7,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
+import { fetchWithRetry } from "../util/fetch-retry.js";
 
 // Schedule approved `tiktok` rows to TikTok via PostPeer (a sanctioned API relay that holds
 // TikTok's audited Content Posting access — we never touch TikTok's API or a browser directly).
@@ -55,7 +56,7 @@ function resolveTimes(count: number, asset: string): string[] {
 // Two-step upload: ask PostPeer for a presigned URL, PUT the bytes to it, get back a public URL.
 // The presign response nests the URLs under `data`.
 export async function uploadVideo(videoPath: string): Promise<string> {
-  const presign = await fetch(`${API}/media/upload`, {
+  const presign = await fetchWithRetry(`${API}/media/upload`, {
     method: "POST",
     headers: { "x-access-key": apiKey(), "content-type": "application/json" },
     body: JSON.stringify({ filename: "short.mp4", mimeType: "video/mp4" }),
@@ -69,7 +70,7 @@ export async function uploadVideo(videoPath: string): Promise<string> {
   const { uploadUrl, publicUrl } = body.data ?? body;
   if (!uploadUrl || !publicUrl) throw new Error("postpeer media/upload returned no uploadUrl/publicUrl");
 
-  const put = await fetch(uploadUrl, {
+  const put = await fetchWithRetry(uploadUrl, {
     method: "PUT",
     headers: { "content-type": "video/mp4" },
     body: readFileSync(videoPath),
@@ -85,17 +86,24 @@ export async function scheduleToTikTok(videoPath: string, caption: string, sched
   }
 
   const mediaUrl = await uploadVideo(videoPath);
-  const res = await fetch(`${API}/posts`, {
-    method: "POST",
-    headers: { "x-access-key": apiKey(), "content-type": "application/json" },
-    body: JSON.stringify({
-      content: caption,
-      mediaItems: [{ type: "video", url: mediaUrl }],
-      platforms: [{ platform: "tiktok", accountId }],
-      scheduledFor,
-      timezone: "UTC",
-    }),
-  });
+  const res = await fetchWithRetry(
+    `${API}/posts`,
+    {
+      method: "POST",
+      headers: { "x-access-key": apiKey(), "content-type": "application/json" },
+      body: JSON.stringify({
+        content: caption,
+        mediaItems: [{ type: "video", url: mediaUrl }],
+        platforms: [{ platform: "tiktok", accountId }],
+        scheduledFor,
+        timezone: "UTC",
+      }),
+    },
+    // Creates a real scheduled TikTok post — a lost-response network error OR a 5xx must not
+    // retry this and risk a duplicate (a 5xx can arrive after PostPeer already committed the
+    // post). Only 429 still retries (an explicit rejection, never processed).
+    { retryOnNetworkError: false }
+  );
   if (res.status === 402 || res.status === 429) {
     throw new Error(
       `PostPeer returned ${res.status} — likely the free-tier posts (20/mo) are exhausted; top up ` +
@@ -111,7 +119,7 @@ export async function scheduleToTikTok(videoPath: string, caption: string, sched
 // Read-only preflight: confirm the API key authenticates and POSTPEER_TIKTOK_ACCOUNT_ID is a
 // connected TikTok account. No upload, no post, no quota. Run `npm run publish:tiktok -- --check`.
 async function runCheck(): Promise<void> {
-  const res = await fetch(`${API}/connect/integrations`, { headers: { "x-access-key": apiKey() } });
+  const res = await fetchWithRetry(`${API}/connect/integrations`, { headers: { "x-access-key": apiKey() } });
   if (!res.ok) {
     throw new Error(`postpeer connect/integrations → ${res.status} ${await res.text()} (401 = bad/missing POSTPEER_API_KEY)`);
   }

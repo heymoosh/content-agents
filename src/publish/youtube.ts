@@ -7,6 +7,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
+import { fetchWithRetry } from "../util/fetch-retry.js";
 
 // Upload approved video rows to YouTube as Shorts. A short is uploaded as a SCHEDULED publish: it
 // claims a slot from the UNIFIED scheduler (src/publish/slots.ts, windowKey "youtube") and sets
@@ -22,7 +23,7 @@ export async function accessToken(): Promise<string> {
   if (!YOUTUBE_CLIENT_ID || !YOUTUBE_CLIENT_SECRET || !YOUTUBE_REFRESH_TOKEN) {
     throw new Error("YouTube OAuth env vars missing — see docs/setup-youtube-oauth.md");
   }
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetchWithRetry("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -63,7 +64,7 @@ async function uploadShort(
   const tail = Buffer.from(`\r\n--${boundary}--`);
   const body = Buffer.concat([head, readFileSync(videoPath), tail]);
 
-  const res = await fetch(
+  const res = await fetchWithRetry(
     "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status&uploadType=multipart",
     {
       method: "POST",
@@ -73,7 +74,12 @@ async function uploadShort(
         "content-length": String(body.length),
       },
       body,
-    }
+    },
+    // Creates a real scheduled video upload — a lost-response network error (very plausible on a
+    // large multipart upload) OR a 5xx (e.g. a fronting proxy timing out after YouTube already
+    // committed the upload) must not retry this and risk a duplicate video. Only 429 still
+    // retries (an explicit rejection, never processed).
+    { retryOnNetworkError: false }
   );
   if (!res.ok) throw new Error(`upload failed: ${res.status} ${await res.text()}`);
   return ((await res.json()) as { id: string }).id;
@@ -182,7 +188,7 @@ type YtVideo = {
 export async function listScheduledUploads(): Promise<{ publishAt: string; title: string; videoId: string }[]> {
   const token = await accessToken();
   const get = async (path: string): Promise<Record<string, unknown>> => {
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/${path}`, {
+    const res = await fetchWithRetry(`https://www.googleapis.com/youtube/v3/${path}`, {
       headers: { authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`youtube ${path} → ${res.status} ${await res.text()}`);

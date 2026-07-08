@@ -2,6 +2,7 @@ import "../../util/env.js";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { VideoBrollProvider } from "../types.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // Animated scene generation via OpenRouter's video API — default Kling v3.0 (first+last-frame
 // interpolation). Give it a start and end still; it animates the transition between them.
@@ -25,21 +26,27 @@ export const provider: VideoBrollProvider = {
     const costPerSec = (params?.cost_per_sec as number) ?? DEFAULT_COST_PER_SEC;
     const auth = { authorization: `Bearer ${key}` };
 
-    const submit = await fetch(`${BASE}/videos`, {
-      method: "POST",
-      headers: { ...auth, "content-type": "application/json" },
-      body: JSON.stringify({
-        model,
-        prompt,
-        frame_images: [
-          { type: "image_url", image_url: { url: dataUri(firstFramePath) }, frame_type: "first_frame" },
-          { type: "image_url", image_url: { url: dataUri(lastFramePath) }, frame_type: "last_frame" },
-        ],
-        aspect_ratio: aspect,
-        resolution,
-        duration: durationSeconds,
-      }),
-    });
+    const submit = await fetchWithRetry(
+      `${BASE}/videos`,
+      {
+        method: "POST",
+        headers: { ...auth, "content-type": "application/json" },
+        body: JSON.stringify({
+          model,
+          prompt,
+          frame_images: [
+            { type: "image_url", image_url: { url: dataUri(firstFramePath) }, frame_type: "first_frame" },
+            { type: "image_url", image_url: { url: dataUri(lastFramePath) }, frame_type: "last_frame" },
+          ],
+          aspect_ratio: aspect,
+          resolution,
+          duration: durationSeconds,
+        }),
+      },
+      // Submits a real billed video-generation job — a lost-response network error or 5xx must
+      // not retry this and risk a second billed job (only one id ever gets tracked/polled).
+      { retryOnNetworkError: false }
+    );
     const sd = (await submit.json()) as { id?: string };
     if (!submit.ok || !sd.id) {
       throw new Error(`openrouter video submit failed: ${submit.status} ${JSON.stringify(sd).slice(0, 300)}`);
@@ -49,7 +56,7 @@ export const provider: VideoBrollProvider = {
     let pd: { status?: string; unsigned_urls?: string[] } = {};
     for (let i = 0; i < 90; i++) {
       await new Promise((r) => setTimeout(r, 10000));
-      const pr = await fetch(`${BASE}/videos/${sd.id}`, { headers: auth });
+      const pr = await fetchWithRetry(`${BASE}/videos/${sd.id}`, { headers: auth });
       pd = (await pr.json()) as typeof pd;
       if (pd.status === "completed" || pd.unsigned_urls) break;
       if (pd.status === "failed") {
@@ -57,7 +64,7 @@ export const provider: VideoBrollProvider = {
       }
     }
     const url = pd.unsigned_urls?.[0] ?? `${BASE}/videos/${sd.id}/content?index=0`;
-    const vid = await fetch(url, { headers: auth });
+    const vid = await fetchWithRetry(url, { headers: auth });
     if (!vid.ok) throw new Error(`openrouter video download failed: ${vid.status}`);
     mkdirSync(dirname(outPath), { recursive: true });
     writeFileSync(outPath, Buffer.from(await vid.arrayBuffer()));

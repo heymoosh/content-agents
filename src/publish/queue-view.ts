@@ -3,7 +3,8 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
-import { readLedger, pruneLedger, fmtLa, type Claim } from "./slots.js";
+import { readLedger, pruneLedger, releaseClaims, fmtLa, type Claim } from "./slots.js";
+import { fetchWithRetry } from "../util/fetch-retry.js";
 import { fetchScheduledDrafts } from "./typefully.js";
 import { listScheduledUploads } from "./youtube.js";
 
@@ -20,7 +21,7 @@ import { listScheduledUploads } from "./youtube.js";
 // with no claim). House rules are untouched: this view is READ-ONLY except `--sync`, which only
 // compacts already-past ledger rows. It never schedules or publishes anything.
 
-interface QueueItem {
+export interface QueueItem {
   whenIso: string; // scheduled publish time (ISO)
   platform: string; // x | linkedin | bluesky | tiktok | youtube | …
   media: "text" | "card" | "video";
@@ -127,7 +128,7 @@ async function listPostPeer(): Promise<SourceResult> {
   if (!key) return { items: [], note: "PostPeer: POSTPEER_API_KEY not set — skipped", ok: false };
   let res: Response;
   try {
-    res = await fetch(`${POSTPEER_API}/posts`, { headers: { "x-access-key": key } });
+    res = await fetchWithRetry(`${POSTPEER_API}/posts`, { headers: { "x-access-key": key } });
   } catch (e) {
     return { items: [], note: `PostPeer: request failed (${(e as Error).message}) — see ledger below`, ok: false };
   }
@@ -222,6 +223,26 @@ function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<string, 
   return { claimedNotLive, liveNotClaimed, uncheckable };
 }
 
+// --- sync ----------------------------------------------------------------------------------------
+
+export interface SyncResult {
+  prunedPast: number;
+  keptFuture: number;
+  releasedOrphans: Claim[]; // future claims released because reconcile() found no live post behind them
+}
+
+// The --sync action: prune past-dated claims, then release orphaned future claims (a run claimed a
+// slot and aborted before the post actually happened, so reconcile() would otherwise report it
+// "claimed but not live" forever). Extracted from main() so it's unit-testable without hitting the
+// live services main() gathers via Promise.all; main() just prints the result.
+export function syncLedger(live: QueueItem[], ok: Record<string, boolean>, nowMs: number = Date.now()): SyncResult {
+  const { removed: prunedPast, kept: keptFuture } = pruneLedger(nowMs);
+  const future = readLedger().filter((c) => new Date(c.time).getTime() > nowMs);
+  const { claimedNotLive } = reconcile(live, future, ok);
+  const { removedClaims } = releaseClaims(claimedNotLive);
+  return { prunedPast, keptFuture, releasedOrphans: removedClaims };
+}
+
 // --- render --------------------------------------------------------------------------------------
 
 const MEDIA_TAG: Record<QueueItem["media"], string> = { text: "text ", card: "card ", video: "video" };
@@ -292,10 +313,15 @@ async function main(): Promise<void> {
     }
   }
 
-  // --sync: compact past-dated rows out of the ledger.
+  // --sync: compact past-dated rows out of the ledger, and release orphaned future claims (drift
+  // reported above with no live post behind them).
   if (sync) {
-    const { removed, kept } = pruneLedger(now);
-    console.log(`\n--sync: pruned ${removed} past-dated claim(s) from the ledger (${kept} future kept).`);
+    const result = syncLedger(live, ok, now);
+    console.log(`\n--sync: pruned ${result.prunedPast} past-dated claim(s) from the ledger (${result.keptFuture} future kept).`);
+    if (result.releasedOrphans.length) {
+      console.log(`--sync: released ${result.releasedOrphans.length} orphaned future claim(s) (claimed, never went live):`);
+      for (const c of result.releasedOrphans) console.log(`    • ${c.platform}  ${fmtLa(new Date(c.time))}  ${c.asset} (by ${c.by})`);
+    }
   } else if (past > 0) {
     console.log(`\n  note: ${past} past-dated claim(s) still in the ledger — run \`npm run queue -- --sync\` to compact.`);
   }

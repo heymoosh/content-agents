@@ -1,5 +1,6 @@
 import "../../util/env.js";
 import type { ProseProvider } from "../types.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // Grok via OpenRouter chat-completions, for Build 2 fiction prose. This is the deliberate
 // composition path (NOT extraction-first): it drafts original chapters from the story bible +
@@ -15,18 +16,24 @@ export const provider: ProseProvider = {
     const key = process.env.OPENROUTER_API_KEY;
     if (!key) throw new Error("OPENROUTER_API_KEY missing in .env (see .env.example)");
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: `${context}\n\n---\n\n# Write this chapter\n\n${instructions}` },
-        ],
-        temperature: TEMPERATURE,
-      }),
-    });
+    const res = await fetchWithRetry(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: `${context}\n\n---\n\n# Write this chapter\n\n${instructions}` },
+          ],
+          temperature: TEMPERATURE,
+        }),
+      },
+      // A real billed generation call — a lost-response network error or 5xx must not retry this
+      // and risk a second billed (and possibly different, temperature > 0) draft.
+      { retryOnNetworkError: false }
+    );
     if (!res.ok) throw new Error(`openrouter request failed: ${res.status} ${await res.text()}`);
 
     const data = (await res.json()) as {

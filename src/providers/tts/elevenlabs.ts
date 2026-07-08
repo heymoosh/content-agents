@@ -2,6 +2,7 @@ import "../../util/env.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { TTSProvider } from "../types.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // ElevenLabs with-timestamps endpoint → mp3 + character-level alignment.
 // Flash v2.5 ≈ $0.05 per 1k chars. Override model via ELEVENLABS_MODEL.
@@ -16,13 +17,16 @@ export const provider: TTSProvider = {
     if (!key) throw new Error("ELEVENLABS_API_KEY missing in .env");
     if (!voice) throw new Error("ELEVENLABS_VOICE_ID missing in .env (pick one at elevenlabs.io/voices)");
 
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `https://api.elevenlabs.io/v1/text-to-speech/${voice}/with-timestamps`,
       {
         method: "POST",
         headers: { "content-type": "application/json", "xi-api-key": key },
         body: JSON.stringify({ text, model_id: MODEL }),
-      }
+      },
+      // A real billed synthesis call — a lost-response network error or 5xx must not retry this
+      // and risk a second billed synthesis.
+      { retryOnNetworkError: false }
     );
     if (!res.ok) throw new Error(`elevenlabs request failed: ${res.status} ${await res.text()}`);
     const data = (await res.json()) as {

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
@@ -87,7 +87,13 @@ export function fmtLa(d: Date): string {
 
 // --- ledger (append-only JSONL of every claimed (platform, LA day)) ---
 
-const LEDGER = join(repoRoot, "data", "publish-schedule.jsonl");
+// Resolved lazily (not a top-level const) so tests can point it at an isolated file via
+// CONTENT_AGENTS_TEST_LEDGER before exercising claimSlots/pruneLedger/releaseClaims, instead of
+// racing each other against the real, shared data/publish-schedule.jsonl.
+function ledgerPath(): string {
+  return process.env.CONTENT_AGENTS_TEST_LEDGER ?? join(repoRoot, "data", "publish-schedule.jsonl");
+}
+
 export interface Claim {
   platform: string;
   day: string; // LA YYYY-MM-DD
@@ -98,30 +104,76 @@ export interface Claim {
 
 // Read back every claim in the shared ledger. Exported so the unified queue view (queue-view.ts)
 // can reconcile live service state against what we claimed, without re-implementing the claim logic.
+// Skips (rather than throws on) a line that fails to parse — appendLedger's appendFileSync isn't
+// atomic, so a crash mid-append can leave a truncated final line; one bad line shouldn't take down
+// every ledger consumer (claimSlots, pruneLedger, releaseClaims, --sync) until someone hand-edits it.
 export function readLedger(): Claim[] {
-  if (!existsSync(LEDGER)) return [];
-  return readFileSync(LEDGER, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as Claim);
+  const ledger = ledgerPath();
+  if (!existsSync(ledger)) return [];
+  const claims: Claim[] = [];
+  for (const line of readFileSync(ledger, "utf8").split("\n").filter(Boolean)) {
+    try {
+      claims.push(JSON.parse(line) as Claim);
+    } catch {
+      console.error(`publish-schedule.jsonl: skipping unparseable line: ${line.slice(0, 120)}`);
+    }
+  }
+  return claims;
+}
+
+// Atomic ledger rewrite: write to a temp file in the same directory, then rename() over the real
+// path — rename() is atomic on the same filesystem, so a crash between the two steps leaves an
+// orphaned temp file but never truncates the real ledger. `deps` exists only so tests can inject a
+// throwing write/rename and prove the real file survives; production callers never pass it.
+export function writeLedgerAtomic(
+  claims: Claim[],
+  deps: { writeFileSync: typeof writeFileSync; renameSync: typeof renameSync } = { writeFileSync, renameSync }
+): void {
+  const ledger = ledgerPath();
+  mkdirSync(dirname(ledger), { recursive: true });
+  const content = claims.length ? claims.map((c) => JSON.stringify(c)).join("\n") + "\n" : "";
+  const tmp = `${ledger}.${process.pid}.tmp`;
+  deps.writeFileSync(tmp, content);
+  deps.renameSync(tmp, ledger);
 }
 
 // Compact the ledger by dropping claims whose scheduled time has already passed (the unified queue
 // view's `--sync`). Past claims have either published or lapsed downstream, so they no longer
 // constrain new claims; keeping the file to FUTURE slots only keeps it honest and small. Append-only
-// during normal runs; this is the one intentional rewrite.
+// during normal runs; this and releaseClaims are the only intentional rewrites.
 export function pruneLedger(nowMs: number = Date.now()): { removed: number; kept: number } {
   const claims = readLedger();
   const future = claims.filter((c) => new Date(c.time).getTime() > nowMs);
   const removed = claims.length - future.length;
-  if (removed > 0) {
-    mkdirSync(dirname(LEDGER), { recursive: true });
-    writeFileSync(LEDGER, future.length ? future.map((c) => JSON.stringify(c)).join("\n") + "\n" : "");
-  }
+  if (removed > 0) writeLedgerAtomic(future);
   return { removed, kept: future.length };
+}
+
+function claimKey(c: Claim): string {
+  return `${c.platform}|${c.day}|${c.time}|${c.asset}|${c.by}`;
+}
+
+// Release specific claims from the ledger — e.g. --sync dropping a future claim reconcile() found
+// "claimed but not live" (a run claimed a slot and aborted before the post it was for actually
+// happened, so nothing will ever fill it). Matches by full claim identity; the ledger has no
+// synthetic id. Returns the claims ACTUALLY found + removed (not just `toRelease` echoed back) —
+// the ledger is shared across runs/streams, so by the time this re-reads it, some of `toRelease`
+// may already be gone (or never were there); callers must not assume every requested release landed.
+export function releaseClaims(toRelease: Claim[]): { removed: number; removedClaims: Claim[] } {
+  if (!toRelease.length) return { removed: 0, removedClaims: [] };
+  const claims = readLedger();
+  const drop = new Set(toRelease.map(claimKey));
+  const removedClaims = claims.filter((c) => drop.has(claimKey(c)));
+  const remaining = claims.filter((c) => !drop.has(claimKey(c)));
+  if (removedClaims.length > 0) writeLedgerAtomic(remaining);
+  return { removed: removedClaims.length, removedClaims };
 }
 
 function appendLedger(claims: Claim[]): void {
   if (!claims.length) return;
-  mkdirSync(dirname(LEDGER), { recursive: true });
-  appendFileSync(LEDGER, claims.map((c) => JSON.stringify(c)).join("\n") + "\n");
+  const ledger = ledgerPath();
+  mkdirSync(dirname(ledger), { recursive: true });
+  appendFileSync(ledger, claims.map((c) => JSON.stringify(c)).join("\n") + "\n");
 }
 
 // Claim `count` slots. Candidate days + time + weekly cap come from `windowKey` (a platforms.yaml

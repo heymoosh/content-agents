@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { extname } from "node:path";
 import type { ImageProvider } from "../types.js";
 import { writeImageFile } from "./_write.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 function mimeFor(path: string): string {
   const ext = extname(path).toLowerCase();
@@ -37,7 +38,7 @@ export const provider: ImageProvider = {
         inlineData: { mimeType: mimeFor(p), data: readFileSync(p).toString("base64") },
       }));
 
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
@@ -49,7 +50,10 @@ export const provider: ImageProvider = {
             imageConfig: { aspectRatio: aspect },
           },
         }),
-      }
+      },
+      // A real billed generation call — a lost-response network error or 5xx must not retry this
+      // and risk a second billed image (this is the highest per-call cost provider in the diff).
+      { retryOnNetworkError: false }
     );
     if (!res.ok) {
       throw new Error(`nano-banana request failed: ${res.status} ${await res.text()}`);

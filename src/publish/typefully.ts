@@ -9,6 +9,7 @@ import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./qu
 import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
+import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
 // Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
@@ -23,17 +24,21 @@ const BASE = "https://api.typefully.com/v2";
 // keeping its own independently-maintained copy that could drift out of sync with this one.
 export const TEXT_PLATFORMS = new Set(["x", "linkedin", "bluesky"]);
 
-async function api(path: string, init?: RequestInit): Promise<unknown> {
+async function api(path: string, init?: RequestInit, retryOpts?: FetchRetryOptions): Promise<unknown> {
   const key = process.env.TYPEFULLY_API_KEY;
   if (!key) throw new Error("TYPEFULLY_API_KEY missing in .env (generate at typefully.com settings)");
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      authorization: `Bearer ${key}`,
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
+  const res = await fetchWithRetry(
+    `${BASE}${path}`,
+    {
+      ...init,
+      headers: {
+        authorization: `Bearer ${key}`,
+        "content-type": "application/json",
+        ...(init?.headers ?? {}),
+      },
     },
-  });
+    retryOpts
+  );
   if (res.status === 402) {
     throw new Error(
       "Typefully returned 402 — API drafts need a paid plan (or the account is paused). " +
@@ -59,15 +64,18 @@ async function socialSetId(): Promise<string> {
 // Upload a media file (mp4/mov/png/jpg/gif) to Typefully via its presigned-S3 flow, returning the
 // media_id to attach to a post. Used for native video posts (e.g. animated quote cards).
 async function uploadMedia(setId: string, filePath: string): Promise<string> {
-  const { media_id, upload_url } = (await api(`/social-sets/${setId}/media/upload`, {
-    method: "POST",
-    body: JSON.stringify({ file_name: basename(filePath) }),
-  })) as { media_id?: string; upload_url?: string };
+  // Creates a real Typefully media object — a lost-response network error or 5xx must not retry
+  // this and risk an orphaned duplicate upload consuming Typefully's media quota.
+  const { media_id, upload_url } = (await api(
+    `/social-sets/${setId}/media/upload`,
+    { method: "POST", body: JSON.stringify({ file_name: basename(filePath) }) },
+    { retryOnNetworkError: false }
+  )) as { media_id?: string; upload_url?: string };
   if (!media_id || !upload_url) {
     throw new Error(`typefully media/upload returned no media_id/upload_url for ${filePath}`);
   }
   // PUT the raw bytes to the presigned URL — NO auth or content-type headers (the signature validates it).
-  const put = await fetch(upload_url, { method: "PUT", body: readFileSync(filePath) });
+  const put = await fetchWithRetry(upload_url, { method: "PUT", body: readFileSync(filePath) });
   if (!put.ok) {
     throw new Error(`media upload PUT failed (${basename(filePath)}): ${put.status} ${await put.text()}`);
   }
@@ -323,7 +331,15 @@ export async function publishText(
     let draft: { id?: string | number; share_url?: string };
     for (let attempt = 0; ; attempt++) {
       try {
-        draft = (await api(`/social-sets/${setId}/drafts`, { method: "POST", body: draftBody })) as {
+        draft = (await api(
+          `/social-sets/${setId}/drafts`,
+          { method: "POST", body: draftBody },
+          // Creates a real scheduled draft — a lost-response network error OR a 5xx must not
+          // retry this and risk a duplicate scheduled post landing later (a 5xx can arrive after
+          // Typefully already committed the draft). Only 429 still retries (an explicit
+          // rejection, never processed).
+          { retryOnNetworkError: false }
+        )) as {
           id?: string | number;
           share_url?: string;
         };

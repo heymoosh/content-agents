@@ -2,6 +2,7 @@ import "../../util/env.js";
 import { readFileSync, statSync } from "node:fs";
 import { extname } from "node:path";
 import type { TranscriptionProvider } from "../types.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // Gemini multimodal transcription (audio inline, fine for voice memos < ~19MB).
 // Override model via GEMINI_TRANSCRIBE_MODEL.
@@ -28,7 +29,7 @@ export const provider: TranscriptionProvider = {
       );
     }
 
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
       {
         method: "POST",
@@ -45,7 +46,10 @@ export const provider: TranscriptionProvider = {
             },
           ],
         }),
-      }
+      },
+      // A real billed transcription call — a lost-response network error or 5xx must not retry
+      // this and risk a second billed transcription.
+      { retryOnNetworkError: false }
     );
     if (!res.ok) throw new Error(`gemini transcription failed: ${res.status} ${await res.text()}`);
     const data = (await res.json()) as {
