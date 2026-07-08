@@ -125,11 +125,11 @@ export function formatDriftFlags(flags: DriftFlag[]): string {
 // (through loadData, never duplicated), runs detectDrift, and looks up no-spin-control
 // availability over the combined lookback (both windows together).
 export function runDriftCheck(pillars: string[], cfg: RoutingConfig): { flags: DriftFlag[]; report: string } {
-  const windows = driftWindows();
-  const windowData = windows.map((w) => loadData(w));
-  const lookback: WindowRange = { startMs: windows[1].startMs, endMs: windows[0].endMs };
   const db = openDb();
   try {
+    const windows = driftWindows();
+    const windowData = windows.map((w) => loadData(w, db));
+    const lookback: WindowRange = { startMs: windows[1].startMs, endMs: windows[0].endMs };
     const flags = detectDrift(pillars, cfg, windowData, (pillar, platform) => hasNoSpinControl(db, pillar, platform, lookback));
     return { flags, report: formatDriftFlags(flags) };
   } finally {

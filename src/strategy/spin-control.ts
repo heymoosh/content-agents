@@ -2,7 +2,15 @@ import { existsSync, readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "../db/db.js";
-import { CONTROL_RUN_SOURCE, PILLARS, loadConfig, type Cell, type RoutingConfig, type WindowRange } from "./route.js";
+import {
+  CONTROL_RUN_SOURCE,
+  PILLARS,
+  loadConfig,
+  queryEngagementCells,
+  type Cell,
+  type RoutingConfig,
+  type WindowRange,
+} from "./route.js";
 
 // Spin-control runs (card f444f440): a small, deliberate, periodic --no-spin mechanism that keeps
 // a live verbatim baseline for pillar/platform pairs config/routing.yaml's defaults ALREADY route
@@ -28,7 +36,10 @@ import { CONTROL_RUN_SOURCE, PILLARS, loadConfig, type Cell, type RoutingConfig,
 //
 // Integration with /atomize (documented, not auto-wired end-to-end — same posture as exploration.ts):
 //   1. `npm run spin-control` picks this month's due pair and appends the ledger.
-//   2. Draft ONE `/atomize --no-spin` derivative for that pillar/platform pair.
+//   2. On that pillar's next /atomize run, draft ONLY that one platform's derivative verbatim
+//      (.claude/skills/atomize/SKILL.md step 3.5) — every other routed platform for the same
+//      piece still gets its normal spin treatment. This is NOT a full `/atomize --no-spin`
+//      invocation, which would strip spin from the whole piece instead of just this one platform.
 //   3. Stamp its frontmatter `control_run: true`. Downstream, appendBetPlacement
 //      (src/publish/queue.ts) writes a `| control-run` Placed-log marker for that row, and
 //      tag-source.ts reads it back to classify the resulting post's DB row
@@ -60,14 +71,18 @@ export interface ControlRunLedgerEntry {
 }
 
 // Read all ledger entries. `ledgerPath` is injectable for testing (defaults to the committed
-// ledger file). Malformed lines are skipped silently, same posture as notes-spread-ledger's reader.
+// ledger file). Malformed lines are skipped silently, same posture as notes-spread-ledger's
+// reader — this includes JSON that parses fine but carries an unparseable `ranAt`, since
+// nextControlRun's month-key/recency math would otherwise throw on that entry's Invalid Date.
 export function readControlLedger(ledgerPath = LEDGER_PATH): ControlRunLedgerEntry[] {
   if (!existsSync(ledgerPath)) return [];
   const lines = readFileSync(ledgerPath, "utf8").split("\n").filter(Boolean);
   const entries: ControlRunLedgerEntry[] = [];
   for (const line of lines) {
     try {
-      entries.push(JSON.parse(line) as ControlRunLedgerEntry);
+      const entry = JSON.parse(line) as ControlRunLedgerEntry;
+      if (Number.isNaN(new Date(entry.ranAt).getTime())) continue;
+      entries.push(entry);
     } catch {
       // skip malformed lines silently — don't crash if the file gets a stray newline
     }
@@ -86,17 +101,20 @@ export interface AssignedPair {
   platform: string;
 }
 
-// Every (pillar, platform) pair config/routing.yaml's `defaults` section lists, in pillar-then-
-// platform order. Always derived from the live cfg (never hardcoded), so an edit to routing.yaml's
-// defaults is picked up automatically the next time this runs.
+// Every (pillar, platform) pair config/routing.yaml treats as a permanently-routed target, in
+// pillar-then-platform order: the `defaults` list, plus any `rules.<pillar>.always` platform not
+// already in defaults (route.ts's decideForPillar treats both as equally "assigned" — see its
+// `always` handling). Always derived from the live cfg (never hardcoded), so an edit to
+// routing.yaml is picked up automatically the next time this runs.
 export function assignedPairs(cfg: RoutingConfig, pillars: string[] = PILLARS): AssignedPair[] {
-  return pillars.flatMap((pillar) => (cfg.defaults[pillar] ?? []).map((platform) => ({ pillar, platform })));
+  return pillars.flatMap((pillar) => {
+    const defaults = cfg.defaults[pillar] ?? [];
+    const always = (cfg.rules[pillar]?.always ?? []).filter((platform) => !defaults.includes(platform));
+    return [...defaults, ...always].map((platform) => ({ pillar, platform }));
+  });
 }
 
-export interface ControlPick {
-  pillar: string;
-  platform: string;
-}
+export type ControlPick = AssignedPair;
 
 // Longest-since-last-control-run selection, gated to ONE pick per calendar month across ALL
 // assigned pairs (not per-pair/per-platform — see the module comment for why). Never-run pairs
@@ -116,15 +134,19 @@ export function nextControlRun(
   const usedThisMonth = entries.some((e) => ptMonthKey(new Date(e.ranAt)) === nowKey);
   if (usedThisMonth) return null;
 
-  const lastRunMs = (pair: AssignedPair): number => {
-    const times = entries
-      .filter((e) => e.pillar === pair.pillar && e.platform === pair.platform)
-      .map((e) => new Date(e.ranAt).getTime());
-    return times.length ? Math.max(...times) : -Infinity; // never-run = the longest possible wait
-  };
+  // One pass over entries to find each pair's most recent run, instead of re-filtering the full
+  // entries array once per pair being ranked. Never-run pairs (absent from the map) count as the
+  // longest possible wait.
+  const lastRun = new Map<string, number>();
+  for (const e of entries) {
+    const key = `${e.pillar}|${e.platform}`;
+    const t = new Date(e.ranAt).getTime();
+    lastRun.set(key, Math.max(lastRun.get(key) ?? -Infinity, t));
+  }
+  const lastRunMs = (pair: AssignedPair): number => lastRun.get(`${pair.pillar}|${pair.platform}`) ?? -Infinity;
 
-  const ranked = [...pairs].sort((a, b) => lastRunMs(a) - lastRunMs(b));
-  return { pillar: ranked[0].pillar, platform: ranked[0].platform };
+  const oldest = pairs.reduce((best, pair) => (lastRunMs(pair) < lastRunMs(best) ? pair : best));
+  return { pillar: oldest.pillar, platform: oldest.platform };
 }
 
 // ---- data separation: the control-run bucket, kept OUT of route.ts's main resonance figures ----
@@ -136,21 +158,7 @@ export function nextControlRun(
 export function loadControlData(db: ReturnType<typeof openDb>, range?: WindowRange): Map<string, Cell> {
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
-  const rows = db
-    .prepare(
-      `SELECT p.platform, p.pillar,
-              COUNT(*) AS n,
-              AVG(COALESCE(m.likes,0) + 3*COALESCE(m.replies,0) + 2*COALESCE(m.reposts,0)) AS avg_eng
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL AND p.source = ? ${dateClause}
-       GROUP BY p.platform, p.pillar`
-    )
-    .all(CONTROL_RUN_SOURCE, ...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
+  const rows = queryEngagementCells(db, "AND p.source = ?", [CONTROL_RUN_SOURCE], dateClause, dateParams);
 
   const cells = new Map<string, Cell>();
   for (const r of rows) cells.set(`${r.platform}|${r.pillar}`, { n: r.n, avg_eng: r.avg_eng });
@@ -225,9 +233,10 @@ function main() {
     console.log("\nDry-run complete — no ledger entry written.");
   } else if (pick) {
     console.log(
-      `\nNext: draft ONE derivative for this pair with:\n` +
-        `  /atomize --no-spin <arg>\n` +
-        `then stamp the drafted derivative's frontmatter control_run: true before it reaches review-queue.md.`
+      `\nNext: on this pillar's next /atomize run, draft ONLY the ${pick.platform} derivative verbatim\n` +
+        `(no spin: true, no angle — .claude/skills/atomize/SKILL.md step 3.5; NOT a full /atomize --no-spin\n` +
+        `invocation, which would strip spin from every routed platform, not just this one), then stamp\n` +
+        `that one derivative's frontmatter control_run: true before it reaches review-queue.md.`
     );
   }
 }

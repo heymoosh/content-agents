@@ -75,6 +75,14 @@ function readPlaced(): Placed[] {
   return out;
 }
 
+// Single source of truth for the controlRun > spin > plain priority: drives both the DB source
+// value and the sanity-check log line so they can't drift apart from independently-edited ternaries.
+function classifyHit(hit: Placed | undefined): { value: string; tag: string } {
+  if (hit?.controlRun) return { value: CONTROL_RUN_SOURCE, tag: " (control-run)" };
+  if (hit?.spin) return { value: "atomized-spin", tag: " (spin)" };
+  return { value: "atomized", tag: "" };
+}
+
 function main() {
   const placed = readPlaced();
   const db = openDb();
@@ -104,10 +112,10 @@ function main() {
         const matched = !!p.bet_id || !!hit;
         // bet_id-only matches (text edited before posting) lose the spin/control-run signal →
         // default atomized. control-run takes priority over spin — see CONTROL_RUN_SOURCE.
-        value = matched ? (hit?.controlRun ? CONTROL_RUN_SOURCE : hit?.spin ? "atomized-spin" : "atomized") : "organic";
+        const classified = matched ? classifyHit(hit) : { value: "organic", tag: "" };
+        value = classified.value;
         if (matched) {
-          const tag = hit?.controlRun ? " (control-run)" : hit?.spin ? " (spin)" : "";
-          matches.push(`  #${p.id} ${p.platform}${tag}: ${(p.content_text ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
+          matches.push(`  #${p.id} ${p.platform}${classified.tag}: ${(p.content_text ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
         }
       } else if (NATIVE_ONLY.has(p.platform)) {
         value = "organic";

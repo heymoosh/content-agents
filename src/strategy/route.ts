@@ -75,6 +75,42 @@ export function loadConfig(): RoutingConfig {
   return parse(readFileSync(join(repoRoot, "config", "routing.yaml"), "utf8")) as RoutingConfig;
 }
 
+interface EngagementCellRow {
+  platform: string;
+  pillar: string;
+  n: number;
+  avg_eng: number;
+}
+
+// Shared pillar × platform engagement query (same weighting + latest-metrics CTE used by
+// resonance.ts) behind a `sourceClause`/`sourceParams` the caller supplies — loadData() below
+// uses it to EXCLUDE CONTROL_RUN_SOURCE rows, spin-control.ts's loadControlData uses it to
+// REQUIRE them, over the exact same join/formula so the two buckets can never silently drift
+// apart on an engagement-weighting change (only one query to update).
+export function queryEngagementCells(
+  db: ReturnType<typeof openDb>,
+  sourceClause: string,
+  sourceParams: unknown[],
+  dateClause: string,
+  dateParams: unknown[]
+): EngagementCellRow[] {
+  return db
+    .prepare(
+      `SELECT p.platform, p.pillar,
+              COUNT(*) AS n,
+              AVG(COALESCE(m.likes,0) + 3*COALESCE(m.replies,0) + 2*COALESCE(m.reposts,0)) AS avg_eng
+       FROM posts p
+       JOIN (
+         SELECT m.* FROM metrics m
+         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
+           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
+       ) m ON m.post_id = p.id
+       WHERE p.pillar IS NOT NULL ${sourceClause} ${dateClause}
+       GROUP BY p.platform, p.pillar`
+    )
+    .all(...sourceParams, ...dateParams) as EngagementCellRow[];
+}
+
 // Pillar × platform engagement (same weighting + latest-metrics CTE as resonance.ts),
 // plus weeks-of-data per platform (same as snapshot.ts) for confidence, plus a per-platform
 // engagement baseline. The baseline matters because engagement scales are NOT comparable across
@@ -95,21 +131,13 @@ export function loadData(range?: WindowRange, injectedDb?: ReturnType<typeof ope
   const db = injectedDb ?? openDb();
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
-  const rows = db
-    .prepare(
-      `SELECT p.platform, p.pillar,
-              COUNT(*) AS n,
-              AVG(COALESCE(m.likes,0) + 3*COALESCE(m.replies,0) + 2*COALESCE(m.reposts,0)) AS avg_eng
-       FROM posts p
-       JOIN (
-         SELECT m.* FROM metrics m
-         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
-           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
-       ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL AND (p.source IS NULL OR p.source != ?) ${dateClause}
-       GROUP BY p.platform, p.pillar`
-    )
-    .all(CONTROL_RUN_SOURCE, ...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
+  const rows = queryEngagementCells(
+    db,
+    "AND (p.source IS NULL OR p.source != ?)",
+    [CONTROL_RUN_SOURCE],
+    dateClause,
+    dateParams
+  );
 
   const dates = db
     .prepare(
