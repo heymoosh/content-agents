@@ -98,10 +98,11 @@ test("alreadyLoggedGroup handles the no-link bracket (no ` +link`) and multiple 
 
 test("alreadyLoggedGroup mirrors the loop's partial-failure state: group 1 skip, group 2 post", () => {
   // Simulate a prior run that posted+logged the inline-link group then threw before the X group.
-  // dest is computed exactly the way publishCards's loop computes it.
+  // dest is computed exactly the way publishCards's loop computes it: sorted, so it's stable
+  // regardless of provider.listTargets()'s return order across runs.
   const withLinkTargets = [{ platform: "bluesky" }, { platform: "linkedin" }];
   const noLinkTargets = [{ platform: "twitter" }];
-  const destOf = (ts: { platform: string }[]) => ts.map((t) => t.platform).join("+");
+  const destOf = (ts: { platform: string }[]) => ts.map((t) => t.platform).sort().join("+");
   const priorLog = [
     "# Publish log",
     "",
@@ -112,6 +113,23 @@ test("alreadyLoggedGroup mirrors the loop's partial-failure state: group 1 skip,
   assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(withLinkTargets)), "post 12345");
   // group 2: not logged → loop MUST still post it (no silent drop)
   assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(noLinkTargets)), null);
+});
+
+test("alreadyLoggedGroup: dest is order-independent across a retry, even if listTargets() reorders", () => {
+  // The bug this guards against: provider.listTargets() returns connected accounts in whatever
+  // order the provider API gives them, which isn't guaranteed stable between the failed run and the
+  // retry. If dest weren't sorted, "linkedin+bluesky" (retry) wouldn't match a logged
+  // "bluesky+linkedin" (original run), and the guard would silently re-post the already-live group.
+  const destOf = (ts: { platform: string }[]) => ts.map((t) => t.platform).sort().join("+");
+  const originalOrder = [{ platform: "bluesky" }, { platform: "linkedin" }];
+  const retryOrder = [{ platform: "linkedin" }, { platform: "bluesky" }];
+  const priorLog = [
+    "# Publish log",
+    "",
+    `- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [${destOf(originalOrder)} +link] (scheduled 2026-07-08T18:00:00.000Z)`,
+    "",
+  ].join("\n");
+  assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(retryOrder)), "post 12345");
 });
 
 test("alreadyLoggedGroup keys on the row id, not another row's identical dest", () => {

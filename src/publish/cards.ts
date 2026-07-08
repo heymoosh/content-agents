@@ -318,7 +318,10 @@ export async function publishCards(
     const priorLog = readPublishLog(folder); // prior runs' log lines, for the per-group idempotency check
     const refs: string[] = [];
     for (const g of groups) {
-      const dest = g.targets.map((t) => t.platform).join("+");
+      // Sorted so `dest` is stable regardless of provider.listTargets()'s return order — a retry run
+      // whose provider lists connected accounts in a different order must still produce the SAME
+      // dest string as the original run, or the idempotency check below misses the match and re-posts.
+      const dest = g.targets.map((t) => t.platform).sort().join("+");
       // If a prior run already posted+logged THIS exact group but then threw on a later group, the
       // row is still `approve` and we're re-entering this loop — reuse the logged ref, don't re-post.
       const priorRef = alreadyLoggedGroup(priorLog, row.id, dest);
