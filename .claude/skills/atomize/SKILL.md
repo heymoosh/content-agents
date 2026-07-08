@@ -120,6 +120,7 @@ derivative, the video script, and the video title/description. The short version
      thread_check: pass     # pass | missing — stamped in step 5.5, after scoring
      thread_spin_applied: true   # only present once the step 5.5 fallback redraft ran
      content_type: [essay_excerpt]   # 1+ of the 8 keys in config/content-types.yaml — classifies what job this post does; drives its CTA(s) at publish time (step 4.5). Omit ONLY when setting an explicit cta override below.
+     project_url: https://example.com/my-project   # OPTIONAL, per-post: only set when this derivative's content type(s) include a `project`-destination entry AND Muxin gave you a URL when you asked (step 4.5). Omit when she has none — that CTA line is simply dropped, never defaulted to the essay link.
      cta: source            # OPTIONAL override: source | <literal-url> | none — wins over content_type when set (e.g. civic-tech's voting-tool link, or a deliberate none). Omit to let content_type drive the CTA.
      cta_label: "Full essay (free to subscribe):"   # only needed alongside an explicit cta override; content_type-driven CTAs carry their own label from config/content-types.yaml
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)

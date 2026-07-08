@@ -41,48 +41,46 @@ export function loadCtaConfig(): CtaConfig {
 // --- Content-type CTA routing (Smarter routing, card 6dcaee98) -------------------------------
 // A derivative is classified by CONTENT TYPE (frontmatter `content_type`, an array — possibly
 // more than one type applies), not pillar. config/content-types.yaml carries each type's
-// documented primary + secondary CTA text. Four types' primary needs the not-yet-built landing
-// page: until `landing_page_live` flips true, those four ship their secondary alone; the other
-// four ship primary + secondary as documented. This lives in code (not just skill judgment, like
-// the old pillar `targets:` block) so flipping the flag later updates every already-drafted
-// derivative at publish time, with no re-atomize.
+// documented primary + (optional) secondary CTA text. This lives in code (not just skill
+// judgment, like the old pillar `targets:` block) so the routing table is one source of truth.
+//
+// Two destinations only: `source` (the essay/Substack link) and `project` (a PER-POST url read
+// from the derivative's OWN `project_url` frontmatter — no config-level url, no shared landing
+// page). "Work with me" is out of scope for this release (deferred to card ae602c84) — see
+// config/content-types.yaml's header comment.
 
-export type CtaDestination = "source" | "landing_page" | "work_with_me";
+export type CtaDestination = "source" | "project";
 
 export interface ContentTypeCtaEntry {
   text: string;
   destination: CtaDestination;
-  url?: string;
 }
 
 export interface ContentTypeDef {
   primary: ContentTypeCtaEntry;
-  secondary: ContentTypeCtaEntry;
+  secondary?: ContentTypeCtaEntry;
 }
 
 export interface ContentTypesConfig {
-  landingPageLive: boolean;
   types: Record<string, ContentTypeDef>;
 }
 
 const ctaEntrySchema = z.object({
   text: z.string(),
-  destination: z.enum(["source", "landing_page", "work_with_me"]),
-  url: z.string().optional(),
+  destination: z.enum(["source", "project"]),
 });
 
-const contentTypeDefSchema = z.object({ primary: ctaEntrySchema, secondary: ctaEntrySchema });
+const contentTypeDefSchema = z.object({ primary: ctaEntrySchema, secondary: ctaEntrySchema.optional() });
 
 const contentTypesYamlSchema = z
   .object({
-    landing_page_live: z.boolean().optional(),
     types: z.record(z.string(), contentTypeDefSchema).optional(),
   })
   .passthrough();
 
 export function loadContentTypesConfig(): ContentTypesConfig {
   const cfg = loadYamlConfig(join(repoRoot, "config", "content-types.yaml"), contentTypesYamlSchema, {});
-  return { landingPageLive: cfg.landing_page_live ?? false, types: cfg.types ?? {} };
+  return { types: cfg.types ?? {} };
 }
 
 export interface ResolvedCta {
@@ -91,18 +89,17 @@ export interface ResolvedCta {
 }
 
 // A `source` destination resolves exactly like resolveCta's `source` case (the essay's own
-// canonical_url, else the configured homepage). A `landing_page`/`work_with_me` destination
-// resolves to its real `url` once the landing page is live; until then it falls back to the same
-// source/homepage link, so a CTA is never a dead end. `usedFallback` mirrors resolveCta's own
-// flag: true whenever this entry needed canonicalUrl and didn't have one.
+// canonical_url, else the configured homepage/fallback). A `project` destination resolves ONLY to
+// this derivative's own `project_url` frontmatter value; a missing project_url means "omit this
+// CTA," never a fallback to the essay link (that would mislabel the essay as "the project").
 function resolveEntryUrl(
   entry: ContentTypeCtaEntry,
-  landingPageLive: boolean,
+  projectUrl: string | null,
   canonicalUrl: string | null,
   cfg: CtaConfig
 ): { url: string | null; usedFallback: boolean } {
-  if (entry.destination !== "source" && landingPageLive && entry.url) {
-    return { url: entry.url, usedFallback: false };
+  if (entry.destination === "project") {
+    return { url: projectUrl && projectUrl.trim() ? projectUrl.trim() : null, usedFallback: false };
   }
   return { url: canonicalUrl ?? cfg.fallbackUrl, usedFallback: canonicalUrl == null };
 }
@@ -111,20 +108,19 @@ function resolveOneContentType(
   typeKey: string,
   ctCfg: ContentTypesConfig,
   cfg: CtaConfig,
-  canonicalUrl: string | null
+  canonicalUrl: string | null,
+  projectUrl: string | null
 ): { ctas: ResolvedCta[]; usedFallback: boolean } {
   const def = ctCfg.types[typeKey];
   if (!def) {
     console.warn(`  ↳ warning: content_type "${typeKey}" not found in config/content-types.yaml — no CTA for it`);
     return { ctas: [], usedFallback: false };
   }
-  const primaryNeedsLandingPage = def.primary.destination !== "source";
-  const entries =
-    primaryNeedsLandingPage && !ctCfg.landingPageLive ? [def.secondary] : [def.primary, def.secondary];
+  const entries = def.secondary ? [def.primary, def.secondary] : [def.primary];
   const resolved: ResolvedCta[] = [];
   let usedFallback = false;
   for (const e of entries) {
-    const { url, usedFallback: uf } = resolveEntryUrl(e, ctCfg.landingPageLive, canonicalUrl, cfg);
+    const { url, usedFallback: uf } = resolveEntryUrl(e, projectUrl, canonicalUrl, cfg);
     if (url) {
       resolved.push({ url, label: e.text });
       if (uf) usedFallback = true;
@@ -136,7 +132,8 @@ function resolveOneContentType(
 // Resolve every content type a derivative was classified as (frontmatter `content_type`, a string
 // or array of strings) into its CTA lines, stacking ALL matched types' CTAs — never picking one
 // winner when a piece plausibly fits more than one type. Empty/missing `content_type` resolves to
-// no CTAs (the caller's job to fall back to the plain `cta` path).
+// no CTAs (the caller's job to fall back to the plain `cta` path). `project` entries resolve from
+// this derivative's own `project_url` frontmatter (per-post, not shared config).
 export function resolveContentTypeCtas(
   fm: Record<string, unknown>,
   canonicalUrl: string | null,
@@ -149,7 +146,8 @@ export function resolveContentTypeCtas(
     : typeof raw === "string" && raw.trim()
       ? [raw.trim()]
       : [];
-  const results = types.map((t) => resolveOneContentType(t, ctCfg, cfg, canonicalUrl));
+  const projectUrl = typeof fm.project_url === "string" ? fm.project_url.trim() || null : null;
+  const results = types.map((t) => resolveOneContentType(t, ctCfg, cfg, canonicalUrl, projectUrl));
   return {
     ctas: results.flatMap((r) => r.ctas),
     usedFallback: results.some((r) => r.usedFallback),
