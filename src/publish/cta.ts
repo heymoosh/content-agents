@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parse as parseYaml } from "yaml";
+import { z } from "zod";
 import { repoRoot } from "../db/db.js";
+import { loadYamlConfig } from "../config/load.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 
 // Shared funnel layer for ALL publishers (typefully text posts + cards image posts), so the CTA
@@ -16,20 +17,25 @@ export interface CtaConfig {
   fallbackLabel: string;
 }
 
+const ctaYamlSchema = z
+  .object({
+    placement: z.record(z.string(), z.string()).optional(),
+    source_fallback: z
+      .object({
+        url: z.string().optional(),
+        label: z.string().optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
+
 export function loadCtaConfig(): CtaConfig {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "cta.yaml"), "utf8")) as {
-      placement?: Record<string, string>;
-      source_fallback?: { url?: string; label?: string };
-    };
-    return {
-      placement: cfg.placement ?? {},
-      fallbackUrl: cfg.source_fallback?.url ?? null,
-      fallbackLabel: cfg.source_fallback?.label ?? "",
-    };
-  } catch {
-    return { placement: {}, fallbackUrl: null, fallbackLabel: "" };
-  }
+  const cfg = loadYamlConfig(join(repoRoot, "config", "cta.yaml"), ctaYamlSchema, {});
+  return {
+    placement: cfg.placement ?? {},
+    fallbackUrl: cfg.source_fallback?.url ?? null,
+    fallbackLabel: cfg.source_fallback?.label ?? "",
+  };
 }
 
 // The source essay's own URL — what `cta: source` derivatives point at. Pasted into source.md

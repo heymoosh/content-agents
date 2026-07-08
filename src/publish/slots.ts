@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
+import { loadPlatforms } from "../config/platforms.js";
 
 // The shared cadence scheduler — one source of truth for WHEN every post goes out, used by both
 // text (Typefully) and quote cards (image relays). It extends main's per-run cadence (config/
@@ -23,22 +23,15 @@ const WEEKDAYS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 
 export type PlatformSchedule = { postsPerWeek: number; days: number[]; timePst: string };
 
 export function loadSchedule(): Record<string, PlatformSchedule> {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
-      platforms?: Record<string, { posts_per_week?: number; slot_days?: string[]; slot_time_pst?: string }>;
-    };
-    const out: Record<string, PlatformSchedule> = {};
-    for (const [k, v] of Object.entries(cfg.platforms ?? {})) {
-      if (!v.posts_per_week || !v.slot_days || !v.slot_time_pst) continue;
-      const days = v.slot_days
-        .map((s) => WEEKDAYS[s.toLowerCase().slice(0, 3)])
-        .filter((n): n is number => n !== undefined);
-      if (days.length) out[k] = { postsPerWeek: v.posts_per_week, days, timePst: v.slot_time_pst };
-    }
-    return out;
-  } catch {
-    return {};
+  const out: Record<string, PlatformSchedule> = {};
+  for (const [k, v] of Object.entries(loadPlatforms().platforms)) {
+    if (!v.posts_per_week || !v.slot_days || !v.slot_time_pst) continue;
+    const days = v.slot_days
+      .map((s) => WEEKDAYS[s.toLowerCase().slice(0, 3)])
+      .filter((n): n is number => n !== undefined);
+    if (days.length) out[k] = { postsPerWeek: v.posts_per_week, days, timePst: v.slot_time_pst };
   }
+  return out;
 }
 
 // --- LA timezone helpers (DST-aware), ported from main's typefully cadence scheduler ---
@@ -188,8 +181,10 @@ export function claimSlots(opts: {
   asset: string;
   by: string;
   dryRun?: boolean;
+  schedule?: Record<string, PlatformSchedule>; // test-only override; defaults to loadSchedule()
+  now?: Date; // test-only override; defaults to new Date()
 }): { times: string[]; labels: string[] } {
-  const schedule = loadSchedule();
+  const schedule = opts.schedule ?? loadSchedule();
   const sched = schedule[opts.windowKey];
   if (!sched) {
     return { times: Array(opts.count).fill("next-free-slot"), labels: Array(opts.count).fill("next-free-slot") };
@@ -217,7 +212,7 @@ export function claimSlots(opts: {
   }
 
   const [hh, mm] = sched.timePst.split(":").map(Number);
-  const now = new Date();
+  const now = opts.now ?? new Date();
   const newClaims: Claim[] = [];
   const times: string[] = [];
   const labels: string[] = [];

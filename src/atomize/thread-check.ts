@@ -1,7 +1,4 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { parse } from "yaml";
-import { repoRoot } from "../db/db.js";
+import { loadPlatforms, type HomeBrand } from "../config/platforms.js";
 
 // Home-brand worldview thread-check (Muxin, 2026-07-04): every piece reaching review-queue.md
 // should thread back to the line in config/platforms.yaml `home_brand`. Claude judges the
@@ -11,18 +8,12 @@ import { repoRoot } from "../db/db.js";
 // safely, and (on "missing") weave in the already-approved worldview language via Spin — never
 // the content judgment itself, and never a hard gate (surface/suggest only).
 
-export interface HomeBrand {
-  worldview: string;
-  worldview_expanded: string;
-  signals: string[];
-}
+export type { HomeBrand };
 
 export function loadHomeBrand(): HomeBrand {
-  const config = parse(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
-    home_brand?: HomeBrand;
-  };
-  if (!config.home_brand) throw new Error("config/platforms.yaml is missing home_brand");
-  return config.home_brand;
+  const homeBrand = loadPlatforms().home_brand;
+  if (!homeBrand) throw new Error("config/platforms.yaml is missing home_brand");
+  return homeBrand;
 }
 
 export type ThreadStatus = "pass" | "missing";
