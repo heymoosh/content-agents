@@ -82,6 +82,18 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer — external; built outside this repo. Mark Done when the landing page is live to unblock Smarter routing
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
+**Inbound listening + voice-replies (Build 3)**
+- New capability: listen for mentions/replies/DMs on the channels, and draft replies in Muxin's voice (config/voice.yaml) for her to approve.
+- Where a platform has no API (e.g. Substack), reuse the constrained browser-agent capability (see analytics-download card) to read/post.
+- Drafts surface in the unified review GUI as suggested replies. SAFETY: draft-only, never auto-send — mirror the notes-daily pattern (unscheduled drafts, human sends).
+- This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
+- PRIORITIZED (Muxin, 2026-07-08): moved ahead of Substack publishing automation — content-generation-affecting work goes first next session.
+- STATUS: To Do
+- DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
+- DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
+- GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
+<!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
+
 **Substack publishing automation (constrained browser agent, approved content only)**
 - We auto-publish to X/LinkedIn/Bluesky (Typefully), YouTube, TikTok (PostPeer), and quote cards, but there is NO automation for publishing to Substack. Substack has no usable publishing API (CLAUDE.md rule 3).
 - Build the POST side of the constrained browser agent we already use for analytics pull (src/pull/): drive the saved Substack session to publish or schedule an approved piece, and nothing else.
@@ -93,17 +105,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: approved (Muxin, 2026-07-08) — reprioritized; scope already answered (Notes only, fold into the unified GUI publishing flow), content-stack work that was blocking it is now shipped. Target cap 1 post/day max on Substack per the 2026-07-07 note.
 - GROOMED: reprioritized + scope already answered (Notes only), no dependency overlaps, no open questions + 2026-07-08
 <!-- card-id: 8026f53c-0c52-46a2-aba1-e7e0bd416bdb -->
-
-**Inbound listening + voice-replies (Build 3)**
-- New capability: listen for mentions/replies/DMs on the channels, and draft replies in Muxin's voice (config/voice.yaml) for her to approve.
-- Where a platform has no API (e.g. Substack), reuse the constrained browser-agent capability (see analytics-download card) to read/post.
-- Drafts surface in the unified review GUI as suggested replies. SAFETY: draft-only, never auto-send — mirror the notes-daily pattern (unscheduled drafts, human sends).
-- This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
-- STATUS: To Do
-- DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
-- DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
-- GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
-<!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Growth via borrowed audiences (other people's platforms), not just native social**
 - Strategy note to fold into the weekly strategy brief: prioritize getting in front of OTHER people's existing audiences — podcast guest spots, guest essays / features in other newsletters, collabs, interviews, cross-posts — over grinding native social. Typically far more effective for reach and trust. NOT podcast-specific; any borrowed-audience channel counts.
