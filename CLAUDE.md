@@ -45,6 +45,19 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    bill per token via OpenRouter / direct — so use them ONLY where they add value Claude can't
    (e.g. Grok's fiction voice, paid image step-ups): opt-in, logged to `data/cost-log.csv`, never
    the silent default. New builds inherit this.
+7. **PR auto-merge: hold only for changes to content-generation LOGIC, never for generated
+   content itself.** The conductor auto-merges any green-CI PR by default. The ONLY reason to hold
+   a PR open for Muxin's explicit review is a change to the *code/prompts that decide what content
+   says* — `src/atomize/` extraction or spin logic, quote-card copy/image-prompt generation logic,
+   video script/storyboard drafting logic, `src/strategy/` brief-synthesis logic, Build 2 fiction
+   chapter-drafting logic. That is judgment-affecting and needs her eyes every time. Everything
+   else auto-merges on green CI, full stop — including: the generated content itself committed to
+   git (derivatives, quote-card text, drafted chapters), review-queue/publish-log/ledger state,
+   backlog bookkeeping, docs, scripts, infra, config. Committing already-generated or
+   already-decided content to git is not "publishing" (rule 2 still gates actual publish via
+   `review-queue.md`) and is not a logic change, so it never needs a held PR. If in doubt whether a
+   diff is "logic" or "content," ask: does this diff change what future runs will generate, or is
+   it just this run's output/state? Only the former holds.
 
 ## Pipeline map
 
