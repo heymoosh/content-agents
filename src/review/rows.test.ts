@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, utimesSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readQueueCached } from "./rows.js";
+import { readQueueCached, enrich } from "./rows.js";
 import type { QueueRow } from "../publish/queue.js";
+import type { LiveProviderState } from "./reconcile.js";
 
 // GET /api/queue used to re-read + re-parse EVERY content folder's review-queue.md synchronously
 // on every request (Codebase review Phase 5c, P1). readQueueCached caches the parsed rows per
@@ -73,6 +74,88 @@ test("readQueueCached: invalidates once the file's mtime changes, returning fres
     const second = readQueueCached(folder, parse);
     assert.equal(calls, 2, "a changed mtime must trigger a fresh parse");
     assert.equal(second[0].status, "approve", "the second read must reflect the new content, not the stale cache");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+// canGenerateStoryboard / duplicatable (Codebase review Phase 2, "GUI actions"): the two new
+// per-row flags that drive the "Generate storyboard" and "Duplicate to platform" buttons.
+
+const NO_LIVE: LiveProviderState = { typefullyDrafts: [], postpeerPosts: [] };
+const videoScriptRow = (): QueueRow => ({
+  id: "video-script", platform: "video-script", format: "storyboard", asset: "—",
+  status: "pending", notes: "", lineIndex: 0,
+});
+
+test("canGenerateStoryboard is true for a video-script row before video/storyboard.md exists", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-storyboard-test-"));
+  try {
+    mkdirSync(join(folder, "video"), { recursive: true });
+    writeFileSync(join(folder, "video", "script-draft.md"), "---\nkind: video-script-draft\n---\n\nsome script\n");
+    const out = enrich(folder, "demo", videoScriptRow(), { text: "" }, NO_LIVE);
+    assert.equal(out.canGenerateStoryboard, true);
+    assert.equal(out.duplicatable, false); // storyboard rows are never duplicatable
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("canGenerateStoryboard is false once video/storyboard.md already exists", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-storyboard-test-"));
+  try {
+    mkdirSync(join(folder, "video"), { recursive: true });
+    writeFileSync(join(folder, "video", "storyboard.md"), "---\nkind: storyboard\n---\n\n## Script\nhi\n");
+    const out = enrich(folder, "demo", videoScriptRow(), { text: "" }, NO_LIVE);
+    assert.equal(out.canGenerateStoryboard, false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("canGenerateStoryboard is false for a non-storyboard row (never offered outside the video path)", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-storyboard-test-"));
+  try {
+    const textRow: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 0 };
+    const out = enrich(folder, "demo", textRow, { text: "" }, NO_LIVE);
+    assert.equal(out.canGenerateStoryboard, false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("duplicatable is true for a real text derivative with a body on disk", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-duplicate-test-"));
+  try {
+    mkdirSync(join(folder, "derivatives"), { recursive: true });
+    writeFileSync(join(folder, "derivatives", "x-1.md"), "---\nplatform: x\nspin: true\nangle: x\n---\n\nSome post body.\n");
+    const row: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 0 };
+    const out = enrich(folder, "demo", row, { text: "" }, NO_LIVE);
+    assert.equal(out.duplicatable, true);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("duplicatable is false for a text row whose derivative file doesn't exist yet (nothing to duplicate)", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-duplicate-test-"));
+  try {
+    const row: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 0 };
+    const out = enrich(folder, "demo", row, { text: "" }, NO_LIVE);
+    assert.equal(out.duplicatable, false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("duplicatable is false for an image (quote-card) row, even with an asset on disk", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-duplicate-test-"));
+  try {
+    mkdirSync(join(folder, "images"), { recursive: true });
+    writeFileSync(join(folder, "images", "quote-card-1.png"), Buffer.from([0]));
+    const row: QueueRow = { id: "quote-card-1", platform: "quote-card", format: "image", asset: "images/quote-card-1.png", status: "pending", notes: "", lineIndex: 0 };
+    const out = enrich(folder, "demo", row, { text: "" }, NO_LIVE);
+    assert.equal(out.duplicatable, false);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
