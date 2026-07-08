@@ -4,8 +4,8 @@
 // derivative inline (post text, quote-card image, video storyboard), and lets Muxin
 // approve / revise / discard / edit in place — instead of hand-editing 20+ markdown tables.
 //
-// It READS through the same readQueue() the publish step uses and WRITES status back into the
-// exact same table cell setStatus() targets, so an "approve" here starts from the same place an
+// It READS through the same readQueue() the publish step uses and WRITES status back through the
+// same writeCell() setStatus() also targets, so an "approve" here starts from the same place an
 // "approve" typed by hand would. For rows a scheduler owns (text/card/tiktok/video — see
 // scheduleApproved below), approving here ALSO immediately fires the real publish call — the same
 // thing a manual `/publish` run would do, just triggered by the approve click instead of a
@@ -24,9 +24,9 @@ import { homedir } from "node:os";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
-import { parse as parseYaml } from "yaml";
 import { repoRoot, openDb } from "../db/db.js";
-import { readQueue, stampOrigin, type QueueRow } from "../publish/queue.js";
+import { readQueue, stampOrigin, writeCell, type QueueRow } from "../publish/queue.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
 import { publishText, TEXT_PLATFORMS, fetchScheduledDrafts } from "../publish/typefully.js";
 import { publishCards, isQuoteCardRow } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
@@ -101,20 +101,6 @@ interface Piece {
   title: string;
   rows: EnrichedRow[];
   pending: number;
-}
-
-// Split frontmatter but KEEP the raw header text so a body edit can be written back without
-// re-serializing (and thus reordering / reformatting) the YAML the pipeline wrote.
-function splitRaw(text: string): { header: string; body: string; fm: Record<string, unknown> } {
-  const m = text.match(/^(---\n[\s\S]*?\n---\n?)([\s\S]*)$/);
-  if (!m) return { header: "", body: text.trim(), fm: {} };
-  let fm: Record<string, unknown> = {};
-  try {
-    fm = (parseYaml(m[1].replace(/^---\n/, "").replace(/\n---\n?$/, "")) as Record<string, unknown>) ?? {};
-  } catch {
-    fm = {};
-  }
-  return { header: m[1], body: m[2].trim(), fm };
 }
 
 // Resolve a slug to its content folder, refusing anything that isn't a real review-queue folder
@@ -284,7 +270,7 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
   const loadMd = (relPath: string) => {
     const p = join(folder, relPath);
     if (!existsSync(p)) return false;
-    const { body, fm } = splitRaw(readFileSync(p, "utf8"));
+    const { body, fm } = splitFrontmatter(readFileSync(p, "utf8"));
     out.body = body;
     out.spin = fm.spin === true;
     out.angle = typeof fm.angle === "string" ? fm.angle : undefined;
@@ -360,25 +346,11 @@ async function listPieces(): Promise<Piece[]> {
 }
 
 // Rewrite one row's status and/or notes in review-queue.md, matched by id (not a stale line
-// index), preserving every other cell. Mirrors setStatus()'s cells[8] target so /publish reads
-// it identically; also updates the notes cell (cells[9]) which setStatus() doesn't touch.
+// index). Delegates to queue.ts's writeCell() — the one write path this and /publish's
+// setStatus() both funnel through.
 function updateRow(slug: string, id: string, status?: string, notes?: string): boolean {
   const folder = safeFolder(slug);
-  const path = join(folder, "review-queue.md");
-  const lines = readFileSync(path, "utf8").split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.startsWith("|") || /^\|\s*-+/.test(line) || /^\|\s*id\s*\|/i.test(line)) continue;
-    const cells = line.split("|");
-    if (cells.length < 11) continue; // leading "" + 9 data cells + trailing ""
-    if (cells[1].trim() !== id) continue;
-    if (status !== undefined) cells[8] = ` ${status} `;
-    if (notes !== undefined) cells[9] = ` ${notes.replace(/[|\n\r]/g, " ").trim()} `;
-    lines[i] = cells.join("|");
-    writeFileSync(path, lines.join("\n"));
-    return true;
-  }
-  return false;
+  return writeCell(folder, id, { status, notes });
 }
 
 // Save an edited derivative body, keeping its frontmatter block byte-for-byte.
@@ -387,7 +359,7 @@ function saveDerivative(slug: string, id: string, body: string): void {
   if (!/^[\w.-]+$/.test(id)) throw new Error("bad id");
   const p = join(folder, "derivatives", `${id}.md`);
   if (!existsSync(p)) throw new Error("no such derivative");
-  const { header } = splitRaw(readFileSync(p, "utf8"));
+  const { header } = splitFrontmatter(readFileSync(p, "utf8"), { raw: true });
   writeFileSync(p, header + body.trim() + "\n");
 }
 
@@ -426,7 +398,7 @@ async function reviseDerivative(slug: string, id: string, instruction: string): 
   const p = join(folder, "derivatives", `${id}.md`);
   if (!existsSync(p)) throw new Error("no such derivative to revise");
 
-  const original = splitRaw(readFileSync(p, "utf8"));
+  const original = splitFrontmatter(readFileSync(p, "utf8"));
   const platform = typeof original.fm.platform === "string" ? original.fm.platform : "";
   const prompt = revisePrompt(slug, id, platform, instruction.trim());
 
@@ -445,7 +417,7 @@ async function reviseDerivative(slug: string, id: string, instruction: string): 
     throw new Error(`Claude revise failed: ${(err.stderr || err.message || "unknown").slice(0, 300)}`);
   }
 
-  const after = splitRaw(readFileSync(p, "utf8")).body;
+  const after = splitFrontmatter(readFileSync(p, "utf8")).body;
   if (after === original.body) {
     throw new Error("Claude ran but didn't change anything — try a more specific instruction");
   }

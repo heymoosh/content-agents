@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { repoRoot } from "../db/db.js";
 
@@ -58,6 +58,43 @@ export function setStatus(folder: string, row: QueueRow, status: string): void {
   cells[8] = ` ${status} `;
   lines[row.lineIndex] = cells.join("|");
   writeFileSync(path, lines.join("\n"));
+}
+
+export interface QueueCellUpdate {
+  status?: string;
+  notes?: string;
+}
+
+// Rewrite one row's status and/or notes cell in review-queue.md, matched by id rather than a
+// line index — for a caller that only has the row's id on hand (e.g. the review GUI's REST
+// endpoint, which receives an id from the browser, not a freshly-read QueueRow). Preserves every
+// other cell, including origin, untouched. The one write path the review GUI's /api/status
+// handler routes through instead of reimplementing its own cells[N] offsets.
+export function writeCell(folder: string, id: string, updates: QueueCellUpdate): boolean {
+  const path = join(folder, "review-queue.md");
+  const lines = readFileSync(path, "utf8").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.startsWith("|") || /^\|\s*-+/.test(line) || /^\|\s*id\s*\|/i.test(line)) continue;
+    const cells = line.split("|");
+    if (cells.length < 11) continue; // leading "" + 9 data cells + trailing ""
+    if (cells[1].trim() !== id) continue;
+    if (updates.status !== undefined) cells[8] = ` ${updates.status} `;
+    if (updates.notes !== undefined) cells[9] = ` ${updates.notes.replace(/[|\n\r]/g, " ").trim()} `;
+    lines[i] = cells.join("|");
+    writeFileSync(path, lines.join("\n"));
+    return true;
+  }
+  return false;
+}
+
+// Status of the (at most one) storyboard row in folder's review-queue.md — the render gate
+// src/video/render.ts checks before any paid generation runs. Routed through readQueue so this
+// stays in lockstep with every other reader of the table instead of re-parsing cells by hand.
+export function storyboardRowStatus(folder: string): string | null {
+  if (!existsSync(join(folder, "review-queue.md"))) return null;
+  const row = readQueue(folder).rows.find((r) => r.format === "storyboard");
+  return row ? row.status : null;
 }
 
 // Force every row in folder's review-queue.md to carry `origin`, overwriting whatever the
