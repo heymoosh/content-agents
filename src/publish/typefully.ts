@@ -147,13 +147,32 @@ export function rowDraftTitle(rowId: string): string {
 // (row-id-derived) isn't guaranteed unique across different content folders.
 export type TypefullyScheduled = { id: string; whenIso: string; platforms: string[]; title: string };
 
+// Typefully v2 uses limit/offset pagination ({ count, limit, offset, next, previous, results },
+// max limit 50 per their API docs) — a bare array response has no `next` and is always a single page.
+const DRAFTS_PAGE_LIMIT = 50;
+const DRAFTS_MAX_PAGES = 10; // sane upper bound so a pathological account can't loop forever / hammer the API
+
 export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
   const setId = await socialSetId();
-  const res = (await api(`/social-sets/${setId}/drafts?limit=50`)) as
-    | { results?: TypefullyDraft[] }
-    | TypefullyDraft[];
-  const list = Array.isArray(res) ? res : res.results ?? [];
-  return list
+  const all: TypefullyDraft[] = [];
+  let offset = 0;
+  let more = true;
+  for (let page = 0; more; page++) {
+    const res = (await api(`/social-sets/${setId}/drafts?limit=${DRAFTS_PAGE_LIMIT}&offset=${offset}`)) as
+      | { results?: TypefullyDraft[]; next?: string | null }
+      | TypefullyDraft[];
+    const list = Array.isArray(res) ? res : res.results ?? [];
+    all.push(...list);
+    offset += DRAFTS_PAGE_LIMIT;
+    more = !Array.isArray(res) && !!res.next && list.length > 0;
+    if (more && page + 1 >= DRAFTS_MAX_PAGES) {
+      console.warn(
+        `fetchScheduledDrafts: hit the ${DRAFTS_MAX_PAGES}-page cap (${all.length} drafts fetched) — more scheduled drafts may exist and were not fetched`
+      );
+      more = false;
+    }
+  }
+  return all
     .filter((d) => d.scheduled_date && (d.status === "scheduled" || new Date(d.scheduled_date) > new Date()))
     .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime())
     .map((d) => ({
