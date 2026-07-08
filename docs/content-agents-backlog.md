@@ -238,7 +238,7 @@ Examples - use both Primary and a Secondary CTA
 - HOLD (inherits ca75b2e0's DECISION, 2026-07-07): do ONE supervised test card first (a real PNG through Typefully, confirm it renders on X/LinkedIn/Bluesky drafts) — Muxin watches that first live test — before rewiring cards.ts fully or retiring the relays.
 - ORIGIN: docs/codebase-review.md Part 1 §7, Part 3 Phase 4 (split from 5ec087d4, 2026-07-07)
 - PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: To Do
+- STATUS: Review
 - DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
 - GROOMED: ready — DECISION inherited from ca75b2e0 (now Done): build + open PR, supervised test card before full rewire; dependency cleared + 2026-07-08
 <!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
@@ -271,6 +271,22 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: d1ebdd71-ba9f-4fd3-9aa2-f9cbbd4726d3 -->
+
+**Update .claude/skills/publish + atomize SKILL.md for the Typefully card rewire**
+- ORIGIN: follow-up auto-filed while building card 1829fdf9 (Phase 4: quote cards via Typefully).
+The /publish and /atomize skill docs (.claude/skills/publish/SKILL.md, .claude/skills/atomize/SKILL.md) still describe the retired PostPeer/Upload-Post image_post provider flow for quote cards. The delegated build/review workers could not edit them (writes under .claude/skills/ require interactive permission not available to a headless worker). Update them to describe native Typefully image posts for quote cards on X/LinkedIn/Bluesky, matching the config/cta.yaml, config/providers.yaml, .env.example, and CLAUDE.md rule 3 updates already made in PR for card 1829fdf9.
+GOAL_CONDITION: both SKILL.md files describe quote cards shipping as native Typefully image posts (not PostPeer/Upload-Post) for X/LinkedIn/Bluesky, with PostPeer still correctly described for TikTok only.
+CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts
+<!-- card-id: ebe652a7-f1db-477f-9856-3e11aec6f5fc -->
+
+**Muxin: run the one supervised live test card for the Typefully quote-card rewire**
+- ORIGIN: follow-up auto-filed while building card 1829fdf9 (Phase 4: quote cards via Typefully). This IS this card's own inherited DECISION (from ca75b2e0, 2026-07-07): before this rewire is treated as fully proven in practice, run one real quote-card PNG through the new publish:cards path against real Typefully credentials (npm run publish:cards -- <folder>, or the GUI) and confirm it renders correctly as a native image post on X/LinkedIn/Bluesky drafts. This step needs Muxin present -- it cannot be automated or mocked. Note: the build already fully deletes the PostPeer/Upload-Post card code paths (not kept as a fallback) -- flag if that is not what you want before merging the PR.
+GOAL_CONDITION: Muxin confirms in review-queue.md or on the PR that one real card rendered correctly on all three platforms via the new Typefully path.
+- STATUS: Backlog
+- DEPENDS ON: Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts
+<!-- card-id: 4c63c6fb-0e63-419c-bc85-26dca0156759 -->
 
 **Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)**
 - Add a "Generate storyboard" button on video-script rows that enqueues `claude -p "/video <folder>"` through the existing job queue (serve.ts:796) — turns the video path into script review → storyboard generation → storyboard approval → render, all inside the GUI. Closes 9e20a616.
