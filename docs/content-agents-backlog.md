@@ -281,18 +281,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
 <!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
 
-**Multi-slot-per-day scheduler: support >1 post/platform/PT-day, starting with X**
-- ORIGIN: split out of ffa6491d's own DECISION (2026-07-07) — Muxin's actual ask for X is multiple posts/day, but the unified scheduler (src/publish/slots.ts + data/publish-schedule.jsonl) enforces ≤1 post/platform/PT-day; ffa6491d explicitly called this 'a separate, bigger follow-up, not bundled into this config bump' and shipped only the X posts_per_week 5→7 config change instead.
-- Bluesky is already at this architecture's ceiling (7/wk, all slot_days) with no headroom left — confirms the limit is structural, not a config number.
-- Scope: extend slots.ts's claim logic so a platform's config can allow N slots/PT-day (default 1, preserving today's behavior for LinkedIn/Bluesky/every other platform); wire a per-platform max into config/platforms.yaml; space claimed slots across the day rather than one fixed time.
-- Muxin still needs to pick X's actual target (ffa6491d cited industry guidance of 3-5 posts/day) and confirm content supply can fill the added slots without violating min_reuse_days — a follow-up decision for whoever picks this up, not a blocker to scoping the mechanism itself.
-- GOAL_CONDITION: src/publish/slots.ts can claim more than one slot per platform per PT-day when that platform's config specifies a max >1; before, claimSlots hard-caps every platform at ≤1/day regardless of config; after, X (once configured with a max >1) can hold multiple claimed slots within one PT-day while LinkedIn/Bluesky/other platforms keep defaulting to 1 and are unaffected.
-- PARENT: ffa6491d-46f9-416f-b521-1fb15e1a391b
-- ORIGIN: proposed by propose-cards 2026-07-07 from epic Evaluate raising per-platform posting caps (X, LinkedIn, Bluesky) for more volume (ffa6491d-46f9-416f-b521-1fb15e1a391b)
-- STATUS: To Do
-- GROOMED: ready — mechanism-only scope (configurable N slots/PT-day, default 1 preserves current behavior), concrete GOAL_CONDITION, X's actual target number explicitly deferred as separate decision, not approval-worthy (no external/cost/security surface) + 2026-07-07
-<!-- card-id: c58fa530-544b-4cde-a04f-2be6b83ed510 -->
-
 **Systematize periodic --no-spin control runs per pillar/platform pair (feeds the routing drift flag's spin/topic-fit isolation)**
 - ORIGIN: 7e550e48's own EXPERIMENTAL RIGOR requirement #2 — 'Systematize the --no-spin control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.' The shipped drift flag (7e550e48, Done) only reports whether a no-spin control exists per pillar/platform pair; it doesn't generate those controls itself, so every pair currently reports 'no control available' with nothing to change that.
 - Without a live no-spin baseline the flag can't separate 'wrong platform for this topic' from 'angle isn't landing' — the exact ambiguity 7e550e48 was designed to resolve for Muxin.
@@ -326,6 +314,27 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: c18c39a9-72d7-4e51-a05e-e13fa57ae601 -->
+
+**queue-view.ts reconcile() cannot detect drift once a platform actually uses max_slots_per_day > 1**
+- - ORIGIN: follow-up auto-filed while building card c58fa530 (multi-slot-per-day scheduler mechanism).
+- src/publish/queue-view.ts's reconcile() keys live posts and ledger claims by a plain `|` Set membership test (present/absent), not a count. Once a platform actually has max_slots_per_day > 1 configured (no platform does yet, this card only built the mechanism), a Set cannot distinguish 2 claims/1 live from 1 claim/1 live on the same day - an orphaned future claim or an extra live post on a multi-slot day would silently evade both the claimedNotLive drift flag and --sync's auto-release (5f039a7e).
+- This needs count-aware matching (compare claim count vs live count per platform/day, not just set membership) - a real redesign of reconcile()'s matching logic, not a one-line fix, and out of scope for the scheduler-mechanism card that found it.
+- GOAL_CONDITION: reconcile() correctly reports claimedNotLive/liveNotClaimed/uncheckable using COUNTS per platform/day (not set presence), verified by a test where a platform has 2 ledger claims and only 1 live post on the same day (today: silently matched as fine; after: the 1 extra claim reports as claimedNotLive).
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: a112f4ac-3505-4765-b7c2-73f34f2c96d1 -->
+
+**Multi-slot-per-day scheduler: support >1 post/platform/PT-day, starting with X**
+- ORIGIN: split out of ffa6491d's own DECISION (2026-07-07) — Muxin's actual ask for X is multiple posts/day, but the unified scheduler (src/publish/slots.ts + data/publish-schedule.jsonl) enforces ≤1 post/platform/PT-day; ffa6491d explicitly called this 'a separate, bigger follow-up, not bundled into this config bump' and shipped only the X posts_per_week 5→7 config change instead.
+- Bluesky is already at this architecture's ceiling (7/wk, all slot_days) with no headroom left — confirms the limit is structural, not a config number.
+- Scope: extend slots.ts's claim logic so a platform's config can allow N slots/PT-day (default 1, preserving today's behavior for LinkedIn/Bluesky/every other platform); wire a per-platform max into config/platforms.yaml; space claimed slots across the day rather than one fixed time.
+- Muxin still needs to pick X's actual target (ffa6491d cited industry guidance of 3-5 posts/day) and confirm content supply can fill the added slots without violating min_reuse_days — a follow-up decision for whoever picks this up, not a blocker to scoping the mechanism itself.
+- GOAL_CONDITION: src/publish/slots.ts can claim more than one slot per platform per PT-day when that platform's config specifies a max >1; before, claimSlots hard-caps every platform at ≤1/day regardless of config; after, X (once configured with a max >1) can hold multiple claimed slots within one PT-day while LinkedIn/Bluesky/other platforms keep defaulting to 1 and are unaffected.
+- PARENT: ffa6491d-46f9-416f-b521-1fb15e1a391b
+- ORIGIN: proposed by propose-cards 2026-07-07 from epic Evaluate raising per-platform posting caps (X, LinkedIn, Bluesky) for more volume (ffa6491d-46f9-416f-b521-1fb15e1a391b)
+- STATUS: Done
+- GROOMED: ready — mechanism-only scope (configurable N slots/PT-day, default 1 preserves current behavior), concrete GOAL_CONDITION, X's actual target number explicitly deferred as separate decision, not approval-worthy (no external/cost/security surface) + 2026-07-07
+<!-- card-id: c58fa530-544b-4cde-a04f-2be6b83ed510 -->
 
 **Codebase-review fix — Phase 5c: split serve.ts into page/jobs/rows/routes**
 - M1: serve.ts is a 1,720-line monolith — the HTTP server (~15 routes, 889-1086), a ~620-line inlined HTML/CSS/JS template (1099-1720, including a hand-rolled markdown renderer whose regexes need double-escaping inside the template literal), fs mutation, and Claude subprocess orchestration all in one file. Everything behind the Phase 1/2 complaint fixes is untestable while it's tangled with I/O.
