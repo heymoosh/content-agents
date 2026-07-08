@@ -232,17 +232,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer (pre-flight, 2026-07-07) — data-gated (CHAIN:1 follow-up), needs published volume with the storytelling dimension scored that does not exist yet; nothing to build tonight.
 <!-- card-id: f77b6670-d39d-4c13-b9be-004084510e58 -->
 
-**Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts**
-- Attach card PNGs as `media:` on Typefully drafts (uploadMedia + media: frontmatter already implemented, typefully.ts:61-75, 304-313, proven once for an animated mp4). Rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. PostPeer stays for TikTok only (audited API, genuinely better there).
-- This IS the build implementing ca75b2e0's recommendation (don't build browser posting — use Typefully's existing image-upload path instead).
-- HOLD (inherits ca75b2e0's DECISION, 2026-07-07): do ONE supervised test card first (a real PNG through Typefully, confirm it renders on X/LinkedIn/Bluesky drafts) — Muxin watches that first live test — before rewiring cards.ts fully or retiring the relays.
-- ORIGIN: docs/codebase-review.md Part 1 §7, Part 3 Phase 4 (split from 5ec087d4, 2026-07-07)
-- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: Review
-- DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
-- GROOMED: ready — DECISION inherited from ca75b2e0 (now Done): build + open PR, supervised test card before full rewire; dependency cleared + 2026-07-08
-<!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
-
 **Re-validate storytelling rubric once broader real-data sample exists (n>=20 across >=3 sources)**
 - ORIGIN: follow-up from card 9be7688d (Validate storytelling rubric against real /atomize output) — docs/storytelling-rubric-validation.md.
 - That validation found the live sample (n=6, ONE source, 2026-07-05-hey-substack) does not reproduce the original eval's all-three-dimension 2-3 clustering: hook is 4 on every real derivative so far, resonance is 4-5, only narrative actually clusters at the LOW_SCORE_THRESHOLD=3 soft-gate (3 on 4 of 6, correctly flagged).
@@ -278,14 +267,24 @@ The /publish and /atomize skill docs (.claude/skills/publish/SKILL.md, .claude/s
 GOAL_CONDITION: both SKILL.md files describe quote cards shipping as native Typefully image posts (not PostPeer/Upload-Post) for X/LinkedIn/Bluesky, with PostPeer still correctly described for TikTok only.
 CHAIN: 1
 - STATUS: Backlog
-- DEPENDS ON: Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts
 <!-- card-id: ebe652a7-f1db-477f-9856-3e11aec6f5fc -->
+
+**Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts**
+- Attach card PNGs as `media:` on Typefully drafts (uploadMedia + media: frontmatter already implemented, typefully.ts:61-75, 304-313, proven once for an animated mp4). Rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. PostPeer stays for TikTok only (audited API, genuinely better there).
+- This IS the build implementing ca75b2e0's recommendation (don't build browser posting — use Typefully's existing image-upload path instead).
+- HOLD (inherits ca75b2e0's DECISION, 2026-07-07): do ONE supervised test card first (a real PNG through Typefully, confirm it renders on X/LinkedIn/Bluesky drafts) — Muxin watches that first live test — before rewiring cards.ts fully or retiring the relays.
+- ORIGIN: docs/codebase-review.md Part 1 §7, Part 3 Phase 4 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Done
+- DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
+- GROOMED: ready — DECISION inherited from ca75b2e0 (now Done): build + open PR, supervised test card before full rewire; dependency cleared + 2026-07-08
+<!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
 
 **Muxin: run the one supervised live test card for the Typefully quote-card rewire**
 - ORIGIN: follow-up auto-filed while building card 1829fdf9 (Phase 4: quote cards via Typefully). This IS this card's own inherited DECISION (from ca75b2e0, 2026-07-07): before this rewire is treated as fully proven in practice, run one real quote-card PNG through the new publish:cards path against real Typefully credentials (npm run publish:cards -- <folder>, or the GUI) and confirm it renders correctly as a native image post on X/LinkedIn/Bluesky drafts. This step needs Muxin present -- it cannot be automated or mocked. Note: the build already fully deletes the PostPeer/Upload-Post card code paths (not kept as a fallback) -- flag if that is not what you want before merging the PR.
 GOAL_CONDITION: Muxin confirms in review-queue.md or on the PR that one real card rendered correctly on all three platforms via the new Typefully path.
-- STATUS: Backlog
-- DEPENDS ON: Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts
+- DONE (2026-07-08): Ran a throwaway test row through the new path in the PR worktree (real approved LinkedIn card was correctly reuse-guard-blocked, confirming that bugfix works too). Typefully draft 9825587, X only, scheduled Thu Jul 9 12:00 PM PT (not ASAP), media uploaded + attached. Muxin confirmed "Success" in the Typefully app and deleted the test draft. LinkedIn/Bluesky were not separately tested -- same code path (buildPosts/uploadMedia), so treating X as sufficient proof per Muxin's go-ahead; flag if you want those checked too before trusting them live.
+- STATUS: Done
 <!-- card-id: 4c63c6fb-0e63-419c-bc85-26dca0156759 -->
 
 **Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)**
