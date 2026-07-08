@@ -279,9 +279,10 @@ async function prepareScenes(
 ): Promise<{ script: string; visuals: string[]; keyframes: string[]; slug: string; videoDir: string } | null> {
   const sbPath = join(folder, "video", "storyboard.md");
   if (!existsSync(sbPath)) throw new Error(`missing ${sbPath} — write the storyboard first (/video).`);
-  if (storyboardRowStatus(folder) !== "approve") {
+  const storyboardStatus = storyboardRowStatus(folder);
+  if (storyboardStatus !== "approve") {
     throw new Error(
-      `storyboard not approved (status="${storyboardRowStatus(folder) ?? "missing"}") — approve it in ` +
+      `storyboard not approved (status="${storyboardStatus ?? "missing"}") — approve it in ` +
         `review-queue.md before rendering. No paid generation runs until then.`
     );
   }

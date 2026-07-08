@@ -359,7 +359,7 @@ function saveDerivative(slug: string, id: string, body: string): void {
   if (!/^[\w.-]+$/.test(id)) throw new Error("bad id");
   const p = join(folder, "derivatives", `${id}.md`);
   if (!existsSync(p)) throw new Error("no such derivative");
-  const { header } = splitFrontmatter(readFileSync(p, "utf8"), { raw: true });
+  const { header } = splitFrontmatter(readFileSync(p, "utf8"));
   writeFileSync(p, header + body.trim() + "\n");
 }
 

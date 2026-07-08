@@ -27,13 +27,20 @@ function parseOrigin(cell: string | undefined): QueueOrigin | undefined {
   return QUEUE_ORIGINS.find((o) => o === value);
 }
 
+// True for a review-queue.md line that's an actual data row — not blank, not the header row,
+// not the `|---|---|` separator row. Shared by every reader/writer below so they can't drift on
+// what counts as a row to parse.
+function isDataRow(line: string): boolean {
+  return line.startsWith("|") && !/^\|\s*-+/.test(line) && !/^\|\s*id\s*\|/i.test(line);
+}
+
 export function readQueue(folder: string): { rows: QueueRow[]; lines: string[] } {
   const path = join(folder, "review-queue.md");
   const lines = readFileSync(path, "utf8").split("\n");
   const rows: QueueRow[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line.startsWith("|") || /^\|\s*-+/.test(line) || /^\|\s*id\s*\|/i.test(line)) continue;
+    if (!isDataRow(line)) continue;
     const cells = line.split("|").map((c) => c.trim());
     // cells[0] is empty (leading |); expect 9 data cells, plus an optional 10th (origin)
     if (cells.length < 10) continue;
@@ -52,17 +59,22 @@ export function readQueue(folder: string): { rows: QueueRow[]; lines: string[] }
 }
 
 export function setStatus(folder: string, row: QueueRow, status: string): void {
-  const path = join(folder, "review-queue.md");
-  const lines = readFileSync(path, "utf8").split("\n");
-  const cells = lines[row.lineIndex].split("|");
-  cells[8] = ` ${status} `;
-  lines[row.lineIndex] = cells.join("|");
-  writeFileSync(path, lines.join("\n"));
+  // Matched by id (via writeCell), not row.lineIndex — callers read `row` before doing async work
+  // (upload retries, provider calls), during which the table can shift; a stale line index would
+  // silently overwrite the wrong row.
+  writeCell(folder, row.id, { status });
 }
 
 export interface QueueCellUpdate {
   status?: string;
   notes?: string;
+}
+
+// A blank cell is a single space ("| |"), matching how every other row in a fresh review-queue.md
+// is written — not the two spaces `` ` ${""} ` `` would produce. Only a non-empty value gets the
+// space-padded form.
+function formatCell(value: string): string {
+  return value === "" ? " " : ` ${value} `;
 }
 
 // Rewrite one row's status and/or notes cell in review-queue.md, matched by id rather than a
@@ -75,12 +87,16 @@ export function writeCell(folder: string, id: string, updates: QueueCellUpdate):
   const lines = readFileSync(path, "utf8").split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line.startsWith("|") || /^\|\s*-+/.test(line) || /^\|\s*id\s*\|/i.test(line)) continue;
+    if (!isDataRow(line)) continue;
     const cells = line.split("|");
-    if (cells.length < 11) continue; // leading "" + 9 data cells + trailing ""
+    // Same minimum readQueue() requires (cells[0] leading "" + 9 data cells) — a row readQueue()
+    // can see should never be silently unwritable here.
+    if (cells.length < 10) continue;
     if (cells[1].trim() !== id) continue;
-    if (updates.status !== undefined) cells[8] = ` ${updates.status} `;
-    if (updates.notes !== undefined) cells[9] = ` ${updates.notes.replace(/[|\n\r]/g, " ").trim()} `;
+    // Both fields come off an untrusted HTTP request body — strip stray pipes/newlines from
+    // either one so neither can shift the row's column boundaries.
+    if (updates.status !== undefined) cells[8] = formatCell(updates.status.replace(/[|\n\r]/g, " ").trim());
+    if (updates.notes !== undefined) cells[9] = formatCell(updates.notes.replace(/[|\n\r]/g, " ").trim());
     lines[i] = cells.join("|");
     writeFileSync(path, lines.join("\n"));
     return true;
@@ -107,7 +123,7 @@ export function stampOrigin(folder: string, origin: QueueOrigin): void {
   const lines = readFileSync(path, "utf8").split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line.startsWith("|") || /^\|\s*-+/.test(line) || /^\|\s*id\s*\|/i.test(line)) continue;
+    if (!isDataRow(line)) continue;
     const cells = line.split("|");
     if (cells.length < 11) continue; // not a data row
     const stamped = ` ${origin} `;

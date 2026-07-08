@@ -156,6 +156,18 @@ test("writeCell updates status and notes together in one pass", () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+test("writeCell writing back an already-empty notes cell is byte-identical, not two spaces", () => {
+  const dir = tmpFolder(
+    `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n` +
+      `|----|----------|--------|-------|-------------|------------|-----|--------|-------|\n` +
+      `| x-1 | x | text | derivatives/x-1.md | 4 | 5 | yes | published | |\n`
+  );
+  const before = readFileSync(join(dir, "review-queue.md"), "utf8");
+  writeCell(dir, "x-1", { status: "published", notes: "" });
+  assert.equal(readFileSync(join(dir, "review-queue.md"), "utf8"), before);
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test("writeCell returns false and leaves the file untouched when the id doesn't exist", () => {
   const dir = tmpFolder(
     `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |\n` +
