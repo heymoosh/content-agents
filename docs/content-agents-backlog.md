@@ -751,15 +751,3 @@ GOAL_CONDITION: Muxin confirms in review-queue.md or on the PR that one real car
 - STATUS: Done
 - DECISION: approved — cloud routine. CODE COMPLETE + MERGED in PR #52 (main 74eaa3a): src/cron/notes-daily.ts + committed dedup ledger data/notes-spread-ledger.jsonl + typefully --no-schedule UNSCHEDULED-draft mode; 27/27 tests, typecheck clean; nothing auto-posts. PARKED awaiting Muxin: do the ~5-min claude.ai setup in docs/setup-cloud-routine.md (connect repo; add secrets SUBSTACK_HANDLE + TYPEFULLY_API_KEY; create daily routine running npm run notes-daily then commit/push ledger). SMOKE-TEST the first real run: confirm drafts land in Typefully DRAFTS (unscheduled), not Scheduled (follow-up card 2972c204). Worktree wt-cron-notes-cloud kept until this is Done. Mark Done once routine is live + first run verified.
 <!-- card-id: f26bf827-2833-43ec-b5dc-3c62da0ab3e5 -->
-
-**Verify quote+image card --with-image against the real paid image provider (OpenRouter)**
-- ORIGIN: auto-filed 2026-07-08 from PR "Create quote and image cards: new --with-image composited quote-card variant" (card 1653734b-8eea-480b-93ea-3c5926159f81) — the sandbox that built and reviewed the PR had no OPENROUTER_API_KEY configured, so `render.ts --still ... --with-image` was only exercised end-to-end with the free local `remotion-svg` stand-in background (pre-seeded at `images/<name>-bg.png` to skip the real generate() call).
-- Run the same command with a real OPENROUTER_API_KEY present so `getImage()` actually calls `openrouter-image` (Riverflow by default, per config/providers.yaml's cost-first policy) and confirm the generated illustration + composite look right end-to-end, including cost logging to data/cost-log.csv.
-- STATUS: Backlog
-<!-- card-id: 261f7270-0b4b-4ea8-b668-b17246f76d04 -->
-
-**Animated HyperFrames companion for the quote+image card variant**
-- ORIGIN: auto-filed 2026-07-08 from PR "Create quote and image cards: new --with-image composited quote-card variant" (card 1653734b-8eea-480b-93ea-3c5926159f81) — the existing typographic-only QuoteCard (`--still`, no flag) always renders a free HyperFrames `.mp4` animation alongside the static PNG; the new `--with-image` composited variant does not yet have an animated companion, and one wasn't scoped as part of that PR.
-- Decide whether the quote+image card should get the same sentence-reveal animation treatment as the approved quote-card animation default, over its generated-illustration background, and scope/build it if so.
-- STATUS: Backlog
-<!-- card-id: e872f4a8-ee3d-419a-943e-2295bcd506b9 -->
