@@ -197,20 +197,40 @@ function possibleSources(platform: string): ("typefully" | "postpeer" | "youtube
   }
 }
 
-function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<string, boolean>): {
+// Count (not just presence) per `${platform}|${day}` key, so a platform with >1 slot/day
+// (max_slots_per_day) reports an orphaned extra claim or extra unclaimed live post instead of both
+// silently reading as "matched, fine".
+function countByKey<T>(items: T[], key: (item: T) => string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const k = key(item);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<string, boolean>): {
   claimedNotLive: Claim[];
   liveNotClaimed: QueueItem[];
   uncheckable: Claim[];
 } {
-  const liveKeys = new Set(live.map((i) => `${i.platform}|${laDay(i.whenIso)}`));
-  const claimKeys = new Set(futureClaims.map((c) => `${c.platform}|${c.day}`));
+  const liveCounts = countByKey(live, (i) => `${i.platform}|${laDay(i.whenIso)}`);
+  const claimCounts = countByKey(futureClaims, (c) => `${c.platform}|${c.day}`);
 
+  // Claims and live posts on the same key are fungible — match the first min(liveCount,
+  // claimCount) of each; whatever's left over on either side is the excess.
+  const claimsMatched = new Map<string, number>();
   const claimedNotLive: Claim[] = [];
   const uncheckable: Claim[] = [];
   for (const c of futureClaims) {
     const srcs = possibleSources(c.platform);
     if (srcs.length === 0) continue; // cadence bucket — skip
-    if (liveKeys.has(`${c.platform}|${c.day}`)) continue; // matched a live post
+    const key = `${c.platform}|${c.day}`;
+    const matchedSoFar = claimsMatched.get(key) ?? 0;
+    if (matchedSoFar < (liveCounts.get(key) ?? 0)) {
+      claimsMatched.set(key, matchedSoFar + 1); // matched a live post
+      continue;
+    }
     if (srcs.every((s) => ok[s])) claimedNotLive.push(c);
     else uncheckable.push(c); // a needed source was unreachable — can't conclude drift
   }
@@ -218,7 +238,19 @@ function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<string, 
   // A live post with no ledger claim. Only meaningful when the ledger actually has claims (it's
   // local + gitignored, so a fresh worktree has none — then every live post would falsely look
   // unclaimed). Skip the per-item list in that case; the caller notes it instead.
-  const liveNotClaimed = claimKeys.size === 0 ? [] : live.filter((i) => !claimKeys.has(`${i.platform}|${laDay(i.whenIso)}`));
+  const livesMatched = new Map<string, number>();
+  const liveNotClaimed =
+    futureClaims.length === 0
+      ? []
+      : live.filter((i) => {
+          const key = `${i.platform}|${laDay(i.whenIso)}`;
+          const matchedSoFar = livesMatched.get(key) ?? 0;
+          if (matchedSoFar < (claimCounts.get(key) ?? 0)) {
+            livesMatched.set(key, matchedSoFar + 1); // matched a claim
+            return false;
+          }
+          return true;
+        });
 
   return { claimedNotLive, liveNotClaimed, uncheckable };
 }
