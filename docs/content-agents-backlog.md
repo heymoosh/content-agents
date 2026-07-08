@@ -281,16 +281,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
 <!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
 
-**Codebase-review fix — Phase 5a: config validation & loaders (zod, memoized loader, slots/cta tests)**
-- R4: zod is a dependency but used nowhere. Configs load as `parse(readFileSync(...)) as T` inside bare `catch {}` blocks that silently return defaults — one YAML typo silently disables behavior: typefully.ts:77-89 (max_chars → Infinity, over-length posts ship), cta.ts:19-33 (CTAs vanish), slots.ts:25-42 (cadence falls back to next-free-slot), reuse-guard.ts:26-40 (reuse limits off). Fix: per-config zod schema validated once at load; ENOENT → defaults, anything else → loud throw naming the file + reason.
-- M3: config/platforms.yaml is independently read + cast in 6 files (thread-check.ts:21, validate.ts:126, spin.ts:15, typefully.ts:79, reuse-guard.ts:28, slots.ts:27), each with its own partial `as {...}` shape that can drift. Fix: one memoized loadPlatforms() returning the R4-validated object; same pattern for other config files.
-- R5 (fold in, same touched files): zero tests on slots.claimSlots (decides every post's send time — DST math, weekly caps, daily uniqueness) and cta.ts. Add table-driven tests for both while hardening their config loading — pure logic, nothing to mock.
-- ORIGIN: docs/codebase-review.md Part 2 R4/M3/R5, Part 3 Phase 5 (split from 5ec087d4, 2026-07-07)
-- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: To Do
-- GROOMED: ready — zod config validation + memoized loader + tests, exact files named, no external/cost/security surface
-<!-- card-id: 5b3a258b-202d-4036-8a6f-f797a4def753 -->
-
 **Codebase-review fix — Phase 5b: unify review-queue.md column parsing**
 - M2: the 10-column review-queue.md table (the approval database) is decoded by hard-coded `cells[N]` offsets in 3 independent places: src/publish/queue.ts:29-52 (canonical), src/review/serve.ts:339-361 (updateRow reimplements the write path), src/video/render.ts:198-211 (a third parser). The 2026-07-04 origin-column addition already required hand-hunting all three. Fix: one typed review-queue module (grow queue.ts) exposing readRows/writeCell; route serve.ts and render.ts through it.
 - M4 (fold in, adjacent code): serve.ts:85-95 (splitRaw) forks src/util/frontmatter.ts to keep the raw header for byte-preserving edits. Fix: extend splitFrontmatter with an option to return the raw header; delete the fork.
@@ -356,6 +346,16 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: c18c39a9-72d7-4e51-a05e-e13fa57ae601 -->
+
+**Codebase-review fix — Phase 5a: config validation & loaders (zod, memoized loader, slots/cta tests)**
+- R4: zod is a dependency but used nowhere. Configs load as `parse(readFileSync(...)) as T` inside bare `catch {}` blocks that silently return defaults — one YAML typo silently disables behavior: typefully.ts:77-89 (max_chars → Infinity, over-length posts ship), cta.ts:19-33 (CTAs vanish), slots.ts:25-42 (cadence falls back to next-free-slot), reuse-guard.ts:26-40 (reuse limits off). Fix: per-config zod schema validated once at load; ENOENT → defaults, anything else → loud throw naming the file + reason.
+- M3: config/platforms.yaml is independently read + cast in 6 files (thread-check.ts:21, validate.ts:126, spin.ts:15, typefully.ts:79, reuse-guard.ts:28, slots.ts:27), each with its own partial `as {...}` shape that can drift. Fix: one memoized loadPlatforms() returning the R4-validated object; same pattern for other config files.
+- R5 (fold in, same touched files): zero tests on slots.claimSlots (decides every post's send time — DST math, weekly caps, daily uniqueness) and cta.ts. Add table-driven tests for both while hardening their config loading — pure logic, nothing to mock.
+- ORIGIN: docs/codebase-review.md Part 2 R4/M3/R5, Part 3 Phase 5 (split from 5ec087d4, 2026-07-07)
+- PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
+- STATUS: Done
+- GROOMED: ready — zod config validation + memoized loader + tests, exact files named, no external/cost/security surface
+<!-- card-id: 5b3a258b-202d-4036-8a6f-f797a4def753 -->
 
 **Codebase-review fix — Phase 3b: provider retry/backoff + orphaned slot cleanup**
 - R2: no retry/backoff on any of the 28 provider fetch sites — a single 429/5xx/network blip aborts the row (the only existing retry is Typefully media transcoding, typefully.ts:324-338), and these transient blips are what turn into Phase 3a's partial-post states. Fix: one small shared fetchWithRetry (exponential backoff on 429/5xx/network) wrapped around publish + provider adapters.
