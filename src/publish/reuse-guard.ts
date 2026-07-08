@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
+import { loadPlatforms } from "../config/platforms.js";
 
 // Reuse-frequency guard: prevents re-publishing the same content slug to the same platform
 // too soon after its last placement. Reads the bets.md Placed log (briefs/bets.md), which is
@@ -24,20 +24,13 @@ export interface ReuseCheckResult {
 // Load per-platform min_reuse_days from config/platforms.yaml.
 // Falls back to the top-level `min_reuse_days:` key, then to FALLBACK_MIN_DAYS.
 function loadMinDays(): { global: number; perPlatform: Record<string, number> } {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
-      min_reuse_days?: number;
-      platforms?: Record<string, { min_reuse_days?: number }>;
-    };
-    const global = cfg.min_reuse_days ?? FALLBACK_MIN_DAYS;
-    const perPlatform: Record<string, number> = {};
-    for (const [k, v] of Object.entries(cfg.platforms ?? {})) {
-      if (typeof v.min_reuse_days === "number") perPlatform[k] = v.min_reuse_days;
-    }
-    return { global, perPlatform };
-  } catch {
-    return { global: FALLBACK_MIN_DAYS, perPlatform: {} };
+  const cfg = loadPlatforms();
+  const global = cfg.min_reuse_days ?? FALLBACK_MIN_DAYS;
+  const perPlatform: Record<string, number> = {};
+  for (const [k, v] of Object.entries(cfg.platforms)) {
+    if (typeof v.min_reuse_days === "number") perPlatform[k] = v.min_reuse_days;
   }
+  return { global, perPlatform };
 }
 
 function escapeRegex(s: string): string {

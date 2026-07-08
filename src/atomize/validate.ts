@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
+import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
 import { summarizeThreadChecks } from "./thread-check.js";
@@ -123,9 +123,7 @@ function main() {
     console.error(`no derivatives folder: ${derivDir}`);
     process.exit(1);
   }
-  const config = parse(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
-    platforms: Record<string, PlatformRule>;
-  };
+  const platforms = loadPlatforms().platforms;
 
   const violations: string[] = [];
   const files = readdirSync(derivDir).filter((f) => f.endsWith(".md"));
@@ -138,7 +136,7 @@ function main() {
   const threadInputs: { file: string; fm: Record<string, unknown> }[] = [];
   for (const file of files) {
     const { fm, body } = splitFrontmatter(readFileSync(join(derivDir, file), "utf8"));
-    violations.push(...checkDerivative(file, fm, body, config.platforms));
+    violations.push(...checkDerivative(file, fm, body, platforms));
     routingFiles.push({ file, platform: String(fm.platform ?? "") });
     threadInputs.push({ file, fm });
   }

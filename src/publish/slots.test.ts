@@ -12,7 +12,16 @@ import assert from "node:assert/strict";
 import { writeFileSync, readFileSync, existsSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readLedger, pruneLedger, releaseClaims, writeLedgerAtomic, type Claim } from "./slots.js";
+import {
+  readLedger,
+  pruneLedger,
+  releaseClaims,
+  writeLedgerAtomic,
+  claimSlots,
+  fmtLa,
+  type Claim,
+  type PlatformSchedule,
+} from "./slots.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const LEDGER = join(repoRoot, "data", "publish-schedule.jsonl");
@@ -145,5 +154,209 @@ describe("slots.ts: writeLedgerAtomic + releaseClaims", () => {
     const result = releaseClaims([present, claim({ asset: "already-gone" })]);
     assert.deepEqual(result, { removed: 1, removedClaims: [present] }, "must not echo back a claim it never actually removed");
     assert.deepEqual(readLedger(), []);
+  });
+});
+
+/**
+ * Unit tests for claimSlots — the DST-aware Pacific-time date math, weekly volume caps, and
+ * daily-uniqueness-per-platform enforcement that decides every post's actual send time.
+ *
+ * claimSlots accepts test-only `now` and `schedule` overrides (added for this test suite) so no
+ * mocking of Date or the real config/platforms.yaml is needed. The ledger is isolated to a fixture
+ * file via CONTENT_AGENTS_TEST_LEDGER, same isolation mechanism as the tests above.
+ */
+describe("slots.ts: claimSlots", () => {
+  const TEST_LEDGER = join(repoRoot, "data", "test-fixture-claim-slots-ledger.jsonl");
+
+  before(() => {
+    process.env.CONTENT_AGENTS_TEST_LEDGER = TEST_LEDGER;
+  });
+
+  after(() => {
+    delete process.env.CONTENT_AGENTS_TEST_LEDGER;
+    if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
+  });
+
+  beforeEach(() => {
+    if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
+  });
+
+  const DAILY: PlatformSchedule = { postsPerWeek: 99, days: [0, 1, 2, 3, 4, 5, 6], timePst: "09:00" };
+
+  // Monday-of-week key in LA time, independently reimplemented from the documented spec (a claim
+  // occupies one Mon-Sun LA week for the postsPerWeek cap) — not a copy of slots.ts's private
+  // weekKey(), so it actually verifies the cap logic rather than restating it.
+  function mondayKeyLA(iso: string): string {
+    const dtf = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "short",
+    });
+    const parts = Object.fromEntries(dtf.formatToParts(new Date(iso)).map((p) => [p.type, p.value]));
+    const WD: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const weekday = WD[parts.weekday];
+    const back = (weekday + 6) % 7; // days since Monday
+    const y = +parts.year;
+    const mo = +parts.month;
+    const d = +parts.day;
+    return new Date(Date.UTC(y, mo - 1, d - back)).toISOString().slice(0, 10);
+  }
+
+  function laDayLA(iso: string): string {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date(iso));
+  }
+
+  test("windowKey with no configured cadence falls back to next-free-slot", () => {
+    const { times, labels } = claimSlots({
+      windowKey: "no-such-platform",
+      conflictPlatforms: ["no-such-platform"],
+      count: 2,
+      asset: "test/asset",
+      by: "test",
+      schedule: {},
+    });
+    assert.deepEqual(times, ["next-free-slot", "next-free-slot"]);
+    assert.deepEqual(labels, ["next-free-slot", "next-free-slot"]);
+  });
+
+  test("only claims days allowed by slot_days (Wed-only cadence)", () => {
+    const schedule: Record<string, PlatformSchedule> = {
+      p: { postsPerWeek: 99, days: [3], timePst: "09:00" }, // Wed only
+    };
+    const { times } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 3,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    assert.equal(times.length, 3);
+    const wdFmt = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "short" });
+    for (const t of times) assert.equal(wdFmt.format(new Date(t)), "Wed", `${t} should land on a Wednesday`);
+  });
+
+  test("claims land at the configured slot_time_pst wall-clock hour in LA", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: { ...DAILY, timePst: "14:45" } };
+    const { times } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 1,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    const hmFmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    assert.equal(hmFmt.format(new Date(times[0])), "14:45");
+  });
+
+  test("DST-aware: the same 09:00 PT wall-clock time lands at different UTC hours in PDT vs PST", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: DAILY };
+    const summer = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 1,
+      asset: "summer",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-01T12:00:00.000Z"), // PDT (UTC-7)
+    });
+    const winter = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 1,
+      asset: "winter",
+      by: "test",
+      schedule,
+      now: new Date("2026-01-01T12:00:00.000Z"), // PST (UTC-8)
+    });
+    assert.equal(new Date(summer.times[0]).getUTCHours(), 16, "09:00 PDT = 16:00 UTC");
+    assert.equal(new Date(winter.times[0]).getUTCHours(), 17, "09:00 PST = 17:00 UTC");
+  });
+
+  test("weekly volume cap: postsPerWeek limits claims to one per Mon-Sun LA week", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: { ...DAILY, postsPerWeek: 1 } };
+    const { times } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 5,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    assert.equal(times.length, 5);
+    const weeks = times.map(mondayKeyLA);
+    assert.equal(new Set(weeks).size, 5, `each claim must land in a distinct week, got weeks: ${weeks.join(", ")}`);
+  });
+
+  test("daily uniqueness: a conflict platform already claimed on a day blocks that day for a different windowKey", () => {
+    const schedule: Record<string, PlatformSchedule> = { a: DAILY, c: DAILY };
+    const now = new Date("2026-07-06T12:00:00.000Z");
+
+    // First claim: windowKey "a", conflicting with "b" too -> records day D1 for both a and b.
+    const first = claimSlots({ windowKey: "a", conflictPlatforms: ["a", "b"], count: 1, asset: "first", by: "test", schedule, now });
+    const d1 = laDayLA(first.times[0]);
+
+    // Second claim: windowKey "c", conflicting with "b" -> day D1 is blocked (taken by "b"),
+    // so it must skip to the very next day (daily cadence, nothing else blocking).
+    const second = claimSlots({ windowKey: "c", conflictPlatforms: ["b"], count: 1, asset: "second", by: "test", schedule, now });
+    const d2 = laDayLA(second.times[0]);
+
+    assert.notEqual(d2, d1, "second claim must not reuse the day already taken by conflict platform b");
+  });
+
+  test("a day already in the past (before now) is never claimed", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: DAILY };
+    const now = new Date("2026-07-06T12:00:00.000Z");
+    const { times } = claimSlots({ windowKey: "p", conflictPlatforms: ["p"], count: 1, asset: "a", by: "test", schedule, now });
+    assert.ok(new Date(times[0]).getTime() > now.getTime(), "claimed time must be strictly after now");
+  });
+
+  test("dryRun computes times without writing to the ledger", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: DAILY };
+    claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 1,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+      dryRun: true,
+    });
+    assert.equal(existsSync(TEST_LEDGER), false, "dryRun must not create/append the ledger");
+  });
+
+  test("claims persist across separate claimSlots calls via the shared ledger", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: { ...DAILY, postsPerWeek: 1 } };
+    const now = new Date("2026-07-06T12:00:00.000Z");
+    const first = claimSlots({ windowKey: "p", conflictPlatforms: ["p"], count: 1, asset: "first", by: "test", schedule, now });
+    const second = claimSlots({ windowKey: "p", conflictPlatforms: ["p"], count: 1, asset: "second", by: "test", schedule, now });
+    assert.notEqual(mondayKeyLA(second.times[0]), mondayKeyLA(first.times[0]), "second run must respect the cap already claimed by the first");
+  });
+
+  test("labels are human-readable PT strings matching the claimed times", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: DAILY };
+    const { times, labels } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 1,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    assert.match(labels[0], /PT$/);
+    assert.equal(labels[0], fmtLa(new Date(times[0])));
   });
 });

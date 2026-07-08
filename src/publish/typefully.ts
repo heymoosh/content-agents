@@ -2,8 +2,8 @@ import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
+import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
@@ -83,16 +83,9 @@ async function uploadMedia(setId: string, filePath: string): Promise<string> {
 }
 
 function loadPlatformMax(): Record<string, number> {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8")) as {
-      platforms?: Record<string, { max_chars?: number }>;
-    };
-    const out: Record<string, number> = {};
-    for (const [k, v] of Object.entries(cfg.platforms ?? {})) out[k] = v.max_chars ?? Infinity;
-    return out;
-  } catch {
-    return {};
-  }
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(loadPlatforms().platforms)) out[k] = v.max_chars ?? Infinity;
+  return out;
 }
 
 // Build the Typefully `posts` array, placing the CTA link per config so the body stays clean.
