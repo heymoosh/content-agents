@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { loadHomeBrand, classifyThread, draftThreadIn, summarizeThreadChecks } from "./thread-check.js";
+import { loadHomeBrand, classifyThread, draftThreadIn, summarizeThreadChecks, threadCheckNote } from "./thread-check.js";
 
 describe("config/platforms.yaml home_brand: the worldview line the thread-check reads (2026-07-04)", () => {
   const homeBrand = loadHomeBrand();
@@ -52,6 +52,20 @@ describe("draftThreadIn: Spin weaves the approved worldview language in on missi
     const once = draftThreadIn("Some post text.", homeBrand);
     const twice = draftThreadIn(once.body, homeBrand);
     assert.equal(twice.body, once.body);
+  });
+});
+
+describe("threadCheckNote: the exact review-queue.md notes-cell suffix Claude appends", () => {
+  test("undefined when the check passed (a passing derivative is not flagged)", () => {
+    assert.equal(threadCheckNote({ thread_check: "pass" }), undefined);
+  });
+
+  test("flags a still-missing check with the exact note text", () => {
+    assert.equal(threadCheckNote({ thread_check: "missing" }), "flag: home-brand thread-check missing");
+  });
+
+  test("an omitted field (fail-safe missing) is flagged too", () => {
+    assert.equal(threadCheckNote({}), "flag: home-brand thread-check missing");
   });
 });
 

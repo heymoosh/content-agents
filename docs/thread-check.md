@@ -44,8 +44,10 @@ deterministic fallback: it appends `worldview_expanded` verbatim as a closing li
 running it twice never duplicates the line) and returns the frontmatter patch
 `{ thread_check: "pass", thread_spin_applied: true }`.
 
-If the redraft genuinely still doesn't connect, leave `thread_check: missing` and say so in the
-review-queue notes.
+If the redraft genuinely still doesn't connect, leave `thread_check: missing`, queue it anyway
+(step 8), and append `threadCheckNote()`'s text to the row's review-queue.md `notes` cell (see
+below) so skimming the raw markdown itself surfaces it too — not just the frontmatter and the GUI
+badge.
 
 ## Never a hard gate
 
@@ -57,6 +59,11 @@ A missing or failing thread-check **never blocks** a piece from being queued or 
 - The review GUI (`src/review/serve.ts`) surfaces a `thread: pass` / `thread: missing` badge next
   to the `spin` badge on each row (reading `thread_check`/`thread_spin_applied` straight from the
   derivative's frontmatter, the same way `spin`/`angle` are already surfaced) — informational only.
+- The raw `review-queue.md` markdown itself carries the same signal: a row still `thread_check:
+  missing` after the redraft attempt gets `threadCheckNote()`'s text
+  (`flag: home-brand thread-check missing`) appended to its `notes` cell (step 8) — same
+  notes-cell pattern the storytelling soft gate already uses (`spinPassNote()`). A passing
+  derivative gets no flag.
 - `/publish` never reads `thread_check`; approval and publishing are gated solely on
   `review-queue.md` row `status`, unchanged by this feature.
 
@@ -67,6 +74,8 @@ A missing or failing thread-check **never blocks** a piece from being queued or 
   `"missing"` for anything other than the literal string `"pass"` (fail-safe: an omitted or
   malformed field always surfaces for review instead of silently passing).
 - `draftThreadIn(body, homeBrand)` — the deterministic Spin fallback described above.
+- `threadCheckNote(fm)` — the review-queue.md notes-cell suffix for a still-missing check;
+  `undefined` when the check passed.
 - `summarizeThreadChecks(files)` — the advisory rollup `validate.ts` prints.
 
 Tests: `src/atomize/thread-check.test.ts` (`node --import tsx --test src/atomize/thread-check.test.ts`).
