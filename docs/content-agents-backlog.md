@@ -56,13 +56,6 @@ scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e0696
 - STATUS: Backlog
 <!-- card-id: c43a8041-60f9-4bea-b365-bc5d684eaca8 -->
 
-**[P0] Use browser automation for image uploads**
-- Instead of relying on the 3rd party, can’t I login to the sites on chrome, have that securely stashed, and we can just upload images that way? We do it for the analytics already.
-- RECOMMENDATION (2026-07-07): don't build browser posting — see docs/codebase-review.md Part 1 §7. Pull is read-with-download-proof; posting is a fragile multi-step composer against platforms that fingerprint automation, with ToS exposure and no scheduling (breaks the scheduled-draft safety posture). The cheaper path is already in the repo: Typefully's v2 API officially supports image upload (verified in their migration-guide feature matrix 2026-07-07), and typefully.ts uploadMedia + media: frontmatter already implements that exact flow — proven live once with the animated-card mp4 (draft 9638763). PNG not yet exercised from this repo: do ONE supervised test card first, then rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. Keep PostPeer only for TikTok (its audited API beats any browser). Bluesky could optionally go direct AT Proto (SDK already a dependency).
-- STATUS: Backlog
-- DECISION: hold (Muxin, 2026-07-07) — confirmed the Typefully-native-image-upload recommendation above is clear as written. Build it and open the PR, but watch the first supervised test card (one PNG through Typefully) before rewiring cards.ts further or retiring PostPeer/Upload-Post for cards. Implementation tracked as its own child card, see Codebase-review fix — Phase 4.
-<!-- card-id: ca75b2e0-aad3-4b2e-a069-660b64938029 -->
-
 **Create quote and image cards**
 - Combine both image gen and quote — an image post that carries BOTH a quote and a generated image, distinct from the existing text-only quote-card pipeline (a3127104, Done).
 - I created an img folder - I’ll be using either ChatGPT or a free app to add images to it
@@ -247,8 +240,9 @@ Examples - use both Primary and a Secondary CTA
 - Make Refresh tab-aware (refresh whichever tab is active, including the brief), label it, show a "last refreshed HH:MM" stamp. Closes 3625b185.
 - ORIGIN: docs/codebase-review.md Part 3, Phase 2 (split from 5ec087d4, 2026-07-07)
 - PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: Backlog
+- STATUS: In Progress
 - DEPENDS ON: Codebase-review fix — Phase 1: job observability (uses the job queue + logs Phase 1 builds)
+- GROOMED: ready — detailed spec (exact files/lines), dependency (Phase 1) Done, closes 9e20a616 + 3625b185, no external/cost/security surface + 2026-07-08
 <!-- card-id: 4e7cb5d3-a032-41db-8c49-474a48779261 -->
 
 **Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts**
@@ -257,9 +251,9 @@ Examples - use both Primary and a Secondary CTA
 - HOLD (inherits ca75b2e0's DECISION, 2026-07-07): do ONE supervised test card first (a real PNG through Typefully, confirm it renders on X/LinkedIn/Bluesky drafts) — Muxin watches that first live test — before rewiring cards.ts fully or retiring the relays.
 - ORIGIN: docs/codebase-review.md Part 1 §7, Part 3 Phase 4 (split from 5ec087d4, 2026-07-07)
 - PARENT: 5ec087d4-fd64-4932-b5cd-4e9edeec5460
-- STATUS: Backlog
-- DEPENDS ON: Use browser automation for image uploads (shares the same recommendation/decision; this card is its implementation)
+- STATUS: To Do
 - DECISION: hold — inherits ca75b2e0's decision (Muxin, 2026-07-07): build it and open the PR, but watch the first supervised test card (one real PNG through Typefully) before rewiring cards.ts fully or retiring PostPeer/Upload-Post for cards.
+- GROOMED: ready — DECISION inherited from ca75b2e0 (now Done): build + open PR, supervised test card before full rewire; dependency cleared + 2026-07-08
 <!-- card-id: 1829fdf9-4b9e-4cad-9744-cb42e094300d -->
 
 **Re-validate storytelling rubric once broader real-data sample exists (n>=20 across >=3 sources)**
@@ -272,6 +266,33 @@ Examples - use both Primary and a Secondary CTA
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
+
+**Unify the 6 duplicated Claude-job error-decoding blocks in src/review/jobs.ts + serve.ts**
+- - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions).
+- Six near-duplicate enoent/timedOut/nonzero-exit error-decoding blocks exist across reviseDerivative, reviseBrief, generateInsights, askInsights, duplicateToPlatform, and runVideoJob/drain(): src/review/jobs.ts:121-135,151-159,417-426,481-491,596-603 plus src/review/serve.ts:256-262,292-297.
+- Not fixed inline because it touches 6+ call sites with slightly different throw-vs-assign semantics -- a real (small) refactor, not a one-line fix.
+- GOAL_CONDITION: the 6 call sites share one extracted error-decoding helper (enoent/timedOut/nonzero-exit), no behavior change, npm test stays green.
+- CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)
+<!-- card-id: 84afb9e3-1394-4f15-945c-00d6ee32c613 -->
+
+**duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
+- - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions), found during the review stage's code-review pass.
+- src/review/jobs.ts duplicateToPlatform() (~591-603) only checks the target derivative path does not already exist AFTER the claude subprocess runs. A stray out-of-band file sitting at that exact computed id could be silently overwritten by the subprocess's write.
+- Judged low-severity/speculative at review time (the id is freshly computed via nextDerivativeId(), so a collision needs an unrelated file to already occupy that exact future id) -- not fixed inline, flagged for a real look later.
+- GOAL_CONDITION: duplicateToPlatform() checks for an existing file at the target path BEFORE invoking the claude subprocess (not just after), and a test proves it refuses to overwrite instead of silently clobbering.
+- CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Codebase-review fix — Phase 2: GUI actions (storyboard button, duplicate-to-platform, unified job queue, tab-aware refresh)
+<!-- card-id: d1ebdd71-ba9f-4fd3-9aa2-f9cbbd4726d3 -->
+
+**[P0] Use browser automation for image uploads**
+- Instead of relying on the 3rd party, can’t I login to the sites on chrome, have that securely stashed, and we can just upload images that way? We do it for the analytics already.
+- RECOMMENDATION (2026-07-07): don't build browser posting — see docs/codebase-review.md Part 1 §7. Pull is read-with-download-proof; posting is a fragile multi-step composer against platforms that fingerprint automation, with ToS exposure and no scheduling (breaks the scheduled-draft safety posture). The cheaper path is already in the repo: Typefully's v2 API officially supports image upload (verified in their migration-guide feature matrix 2026-07-07), and typefully.ts uploadMedia + media: frontmatter already implements that exact flow — proven live once with the animated-card mp4 (draft 9638763). PNG not yet exercised from this repo: do ONE supervised test card first, then rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. Keep PostPeer only for TikTok (its audited API beats any browser). Bluesky could optionally go direct AT Proto (SDK already a dependency).
+- STATUS: Done
+- DECISION: hold (Muxin, 2026-07-07) — confirmed the Typefully-native-image-upload recommendation above is clear as written. Build it and open the PR, but watch the first supervised test card (one PNG through Typefully) before rewiring cards.ts further or retiring PostPeer/Upload-Post for cards. Implementation tracked as its own child card, see Codebase-review fix — Phase 4.
+<!-- card-id: ca75b2e0-aad3-4b2e-a069-660b64938029 -->
 
 **Systematize periodic --no-spin control runs per pillar/platform pair (feeds the routing drift flag's spin/topic-fit isolation)**
 - ORIGIN: 7e550e48's own EXPERIMENTAL RIGOR requirement #2 — 'Systematize the --no-spin control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.' The shipped drift flag (7e550e48, Done) only reports whether a no-spin control exists per pillar/platform pair; it doesn't generate those controls itself, so every pair currently reports 'no control available' with nothing to change that.
