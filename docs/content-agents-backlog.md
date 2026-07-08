@@ -1,12 +1,8 @@
-# ⏸ PUBLISHING FREEZE (Muxin, 2026-07-04)
+# ✅ PUBLISHING FREEZE LIFTED (Muxin confirmed resuming, 2026-07-08)
 
-`/cycle` and `/publish` are PAUSED — no further content goes out (including GUI-Approve
-auto-scheduling on text rows, per `a4a2ce27`) until the measurement scaffolding below ships:
-`7e550e48` (routing drift flag), `92bb2ae6` (exploration budget), `ffa6491d` (posting-cap
-decision). Rationale: don't build out further pipeline features or publish more content on an
-unmeasured setup — get the experiment design in first. All other Backlog/To Do build-out waits
-behind this group; it isn't cancelled, just sequenced after. Lift this banner once all three
-scaffolding cards are Done and Muxin confirms resuming.
+All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag), `92bb2ae6`
+(exploration budget), `ffa6491d` (posting-cap decision) — and Muxin has confirmed resuming.
+`/cycle` and `/publish` are back in normal operation.
 
 ---
 
