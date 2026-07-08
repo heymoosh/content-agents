@@ -6,64 +6,16 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 
 ---
 
-**[P0] Ask Claude buggy on the GUI?**
-- I used Ask Claude to edit a Blue Sky post and turn it into an X post - I wanted it to ALSO create an X post based on the source content. Nothing’s working?
-- Also I had my vault dashboard running at the same time which also uses Claude subscription for responses - I went back to it after submitting a task to it, and I noticed it didn’t finish its original task. I wonder if it’s because I triggered Ask Claude in the content GUI. Am I only able to ask for 1 single Claude task at a time? I’d want to be able to launch both my vault dashboard and content agents GUI and use them whenever I want - so if there’s conflicts, I don’t understand why. Isn’t each ‘request’ just a separate Claude task?
-- I tried getting the GUI to create content from Substack notes that I selected - it’s been stuck on ‘working’ for like 10 mins. I can’t tell if it’s actually doing anything. I’m waiting for it to land on the Review tab.
-- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §1-3. Ask Claude is hard-scoped to editing one existing derivative body in place (its prompt forbids platform changes and new files, serve.ts:373-394), so both requests were impossible by design and the "didn't change anything" error only flashes for 1.4s. No hard one-Claude-task limit exists: only atomize jobs queue; the vault dashboard shares nothing with this GUI except subscription rate limits. The 10-min "working" is a black box because job output is buffered and discarded (no logs, no progress, 15-min timeout). Fix plan: persist+stream job logs, heartbeat in the jobs pill, durable inline errors, a per-row "Duplicate to platform" action, all Claude spawns through the one job queue.
-- STATUS: Backlog
-<!-- card-id: 9304e4a5-38f7-47dc-9b58-75e595b90fa7 -->
-
-**[P2] Video script to Storyboard gap on GUI**
-- If I approve the script, what happens next? Right now on the GUI I can’t even hit ‘approve’ to approve the script. 
-- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §6. Approve is deliberately blocked until video/storyboard.md exists (the phantom-approve guard from card 4bef9a7c, correct as-is), but the GUI has no way to run /video — its job queue only runs /atomize — so the video path dead-ends. Fix: add a "Generate storyboard" button on video-script rows that enqueues /video through the same job queue, making it a two-stage flow: script review → storyboard generation → storyboard approval → render.
-- STATUS: Backlog
-<!-- card-id: 9e20a616-3e13-4194-ab39-863acd5d53be -->
-
-**[P1] Refresh button on GUI - purpose?**
-- What does hitting Refresh on the GUI do?
-- If I hit refresh on each tab - Add/Queue, Review, Analytics - what does it do and does it automatically update everything in the pipeline to sync?
-- ANSWERED (2026-07-07): see docs/codebase-review.md Part 1 §5. One global Refresh (not per-tab): it re-scans every content/*/review-queue.md from disk, live-reconciles Typefully/PostPeer scheduled state when needed, and re-fetches the job list. It does NOT refresh the Analytics tab (brief loads once per page load; raw exports have their own button) and triggers no pipeline work. Fix: make it tab-aware, label it, show a last-refreshed timestamp.
-- STATUS: Backlog
-<!-- card-id: 3625b185-8025-4329-82d4-cb3b35c6ee70 -->
-
-**[P0] GUI error - no content folder created**
-- atomize finished but created no new content folder — check the terminal running the GUI
-- This is all that the terminal said: Last login: Sun Jul  5 11:37:57 on ttys002
-You have mail.
-
-The default interactive shell is now zsh.
-To update your account to use zsh, please run `chsh -s /bin/zsh`.
-For more details, please visit https://support.apple.com/kb/HT208050.
-MacBook-Pro-2:~ Muxin$ create-content
-
-> content-agents@0.1.0 review
-> tsx src/review/serve.ts
-
-
-  Review queue → http://localhost:4600
-
-  Approve / revise / discard / edit every pending derivative in one place.
-  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.
-
-Cadence schedule (PT):
-  bluesky:
-    bluesky-2 → Wed, Jul 15, 6:30 PM PT
-  ↳ note: bluesky-2 cta:source → homepage (no canonical_url in source.md)
-scheduled: bluesky-2 (bluesky) → Wed, Jul 15, 6:30 PM PT → typefully draft 9778798, cta→inline
-scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e06966cb7011183ad79 → x @ 2026-07-21T19:00:00.000Z
-- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §4. "Finished" only means the claude subprocess exited 0 (which it does even when /atomize accomplishes nothing); folder detection requires review-queue.md to exist, so a partially scaffolded folder reads as "no folder"; and the job's stdout is buffered then discarded, never reaching the terminal — the schedule lines seen were from unrelated approve actions. Fix: persist per-job log files, verify success by artifact (new folder + review-queue.md rows, or a machine-readable final line from /atomize), attach the log tail to the job error.
-- STATUS: Backlog
-<!-- card-id: c43a8041-60f9-4bea-b365-bc5d684eaca8 -->
-
 **Create quote and image cards**
 - Combine both image gen and quote — an image post that carries BOTH a quote and a generated image, distinct from the existing text-only quote-card pipeline (a3127104, Done).
 - I created an img folder - I’ll be using either ChatGPT or a free app to add images to it
 - SCOPE CLARIFIED (Muxin, 2026-07-07): NOT the API image pipeline (config/providers.yaml image provider, ~$0.02-0.23/gen) — deliberately cheaper, using tools Muxin already has for free: ChatGPT (his own account, iterate on the image concept there) or a free/open-source local model. Not superseded by a3127104 (contextual per-platform captions) — that's a different feature (caption text), this is quote+image combined in one post.
 - LIKELY PATTERN: Claude suggests an image concept/prompt from the source content; Muxin iterates externally (ChatGPT or his open-source model) until he likes a result; drops the file in; the pipeline assembles it into a quote+image card (verbatim quote + Muxin-provided image, no API image-gen call). May need to generalize into a "non-API image gen" pattern — wait for Muxin to hand off a file he likes, then assemble — rather than a generate-in-pipeline step.
 - PRIORITY (Muxin, 2026-07-07): lower priority — revisit after the current content-stack work.
-- STATUS: Backlog
-- DECISION: defer (pre-flight, 2026-07-07) — Muxin already marked this lower priority, revisit after current content-stack work; hand-off pattern (ChatGPT vs free local model) not yet settled.
+- REPRIORITIZED (Muxin, 2026-07-08): content-stack work (Phase 1-4 GUI/Typefully fixes) is now shipped — no longer deprioritized.
+- HAND-OFF RESOLVED (Muxin, 2026-07-08): superseding the 2026-07-07 "NOT the API image pipeline" note above — just use the image-gen system already in place (the same config/providers.yaml image provider the existing quote-card pipeline uses), no separate ChatGPT/free-local-model hand-off needed. Per-token cost is already governed by the standing model-cost policy card (a1a6f379) — not a separate concern here.
+- STATUS: To Do
+- GROOMED: reprioritized + hand-off pattern resolved (use existing image-gen system), no dependency overlaps + 2026-07-08
 <!-- card-id: 1653734b-8eea-480b-93ea-3c5926159f81 -->
 
 **Explore Draw Things (free local) for short-form video gen as a Kling cost-saver**
@@ -74,16 +26,6 @@ scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e0696
 - STATUS: Backlog
 - DECISION: defer (pre-flight, 2026-07-07) — exploratory, unverified whether Draw Things even does video gen; Muxin marked low priority, not blocking anything.
 <!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
-
-**Voice Notes to Published**
-- Allow me to just drop a voice note (or typed) into Claude, we figure out what it should say at the end, and then it automatically runs /atomize or whatever the skills are to create good content out of
-- Orchestrator level - I stay out of entering commands, Claude handles figuring out which skill to use. Still checks with me on approving content before they go out, but handles all the scheduling and making sure the right content goes on the right platform at the right cadence and publishing times etc..
-- Skills Sanity Check
-- RE-SCOPED (Muxin, 2026-06-30): the review/approval surface is NOT this card — it's the "Unified review + approval GUI" (a4a2ce27), the single approve-before-send surface. This card = the UPSTREAM half only: drop a voice note (or text) → figure out what it should say → auto-run /atomize (Claude picks the skill) → schedule, FEEDING the GUI. Approval + send happen in the GUI.
-- STATUS: Backlog
-- DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle")
-- DECISION: defer — large orchestrator feature; scope the boundaries before building
-<!-- card-id: 664189d9-8b3f-417f-a077-e8cd71d30477 -->
 
 **Smarter routing**
 - No longer going to keep a simple ’subscribe to substack’ CTA - it will depend on the content. See notes:
@@ -125,18 +67,11 @@ Examples - use both Primary and a Secondary CTA
 | Offer-adjacent post        | Work with me / landing page | Read my thinking                 |
 | Personal career reflection | Subscribe/follow            | Maybe: see my job-search project |
 | Case study                 | See projects / work with me | Read the essay behind it         |
-- STATUS: Backlog
-- DEPENDS ON: Landing page
-- DECISION: hold (Muxin, 2026-07-04): agreed to hold pre-flight rec — needs real destination URLs for project/landing-page + work-with-me CTAs, and the tie-breaker rule for ambiguous posts, before this can be built.
+- PARTIAL SCOPE APPROVED (Muxin, 2026-07-08): build everything that does NOT require the landing page now. That's the content-type classification + CTA routing logic for every row above, with any branch whose destination is project/landing-page/work-with-me falling back to the Substack CTA (read full essay / subscribe) until the landing page is live — swap in the real URL then, no reclassification needed. Concretely ships now: essay excerpt, society/capitalism piece, AI agency thesis, personal career reflection (all Substack-only CTAs). "Product/builder insight," "project demo," "offer-adjacent post," and "case study" ship with their primary CTA downgraded to their Substack-reachable secondary until Landing page is live.
+- TIE-BREAKER RESOLVED (Muxin, 2026-07-08): no tie-breaker needed — when a post plausibly fits more than one content type, stack ALL its applicable CTAs as separate lines with a blank line between each (e.g. "Read my newsletter" / blank / "Work with me"), instead of picking one. Common, normal pattern; don't force a single choice.
+- STATUS: To Do
+- GROOMED: partial scope approved (Substack-only CTAs, landing-page branches downgraded to fallback), tie-breaker resolved (stack CTAs), no dependency overlaps + 2026-07-08
 <!-- card-id: 6dcaee98-1a54-4fc8-b170-92611872676f -->
-
-**Add skill run-order quick-reference to the Obsidian Content Agents doc**
-- Add a 'when to run each skill' quick-reference table to the external doc Personal Obsidian/Content Agents.md.
-- Worked OUTSIDE this repo by Muxin. The conductor provides the markdown to paste.
-- Keeps the human-facing run-order guide in sync with the pipeline.
-- STATUS: Backlog
-- DECISION: defer — external; Muxin updates the Obsidian doc outside this repo using the markdown the conductor provides
-<!-- card-id: 5e86bf0e-10c6-4f59-8f3c-538596ee5e31 -->
 
 **Landing page**
 - Landing page for content CTAs (work-with-me / project pages / read-the-essay).
@@ -153,8 +88,9 @@ Examples - use both Primary and a Secondary CTA
 - SCOPE ANSWERED (Muxin, 2026-07-04): NOTES ONLY. Muxin is good at writing his own essays/posts directly on Substack and wants to keep doing that himself — that stays manual. The actual gap is that Substack isn't part of the unified GUI's automated publishing flow yet; this card closes that gap for Notes.
 - Reuses: the saved-session stealth-Chrome agent + diagnostics from the pull build; the unified scheduler (src/publish/slots.ts) for timing.
 - RENEWED INTEREST (Muxin, 2026-07-07): flagged wanting Substack posting automation while discussing posting caps; target cap if/when built = 1 post/day max on Substack. Still deferred per the 2026-07-04 call below — revisit priority explicitly before starting, don't silently pick this up.
-- STATUS: Backlog
-- DECISION: defer — scope answered (Notes only, fold into the unified GUI publishing flow; Muxin keeps writing/scheduling his own essays/posts himself) but deprioritized: a new channel, not part of the content-stack work he wants tackled first. 2026-07-04
+- STATUS: To Do
+- DECISION: approved (Muxin, 2026-07-08) — reprioritized; scope already answered (Notes only, fold into the unified GUI publishing flow), content-stack work that was blocking it is now shipped. Target cap 1 post/day max on Substack per the 2026-07-07 note.
+- GROOMED: reprioritized + scope already answered (Notes only), no dependency overlaps, no open questions + 2026-07-08
 <!-- card-id: 8026f53c-0c52-46a2-aba1-e7e0bd416bdb -->
 
 **Inbound listening + voice-replies (Build 3)**
@@ -162,9 +98,10 @@ Examples - use both Primary and a Secondary CTA
 - Where a platform has no API (e.g. Substack), reuse the constrained browser-agent capability (see analytics-download card) to read/post.
 - Drafts surface in the unified review GUI as suggested replies. SAFETY: draft-only, never auto-send — mirror the notes-daily pattern (unscheduled drafts, human sends).
 - This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
 - DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
+- GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Growth via borrowed audiences (other people's platforms), not just native social**
@@ -249,7 +186,8 @@ Examples - use both Primary and a Secondary CTA
 - Not fixed inline because it touches 6+ call sites with slightly different throw-vs-assign semantics -- a real (small) refactor, not a one-line fix.
 - GOAL_CONDITION: the 6 call sites share one extracted error-decoding helper (enoent/timedOut/nonzero-exit), no behavior change, npm test stays green.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: well-specified refactor, explicit GOAL_CONDITION + file:line refs, no external/cost/security surface + 2026-07-08
 <!-- card-id: 84afb9e3-1394-4f15-945c-00d6ee32c613 -->
 
 **duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
@@ -258,7 +196,8 @@ Examples - use both Primary and a Secondary CTA
 - Judged low-severity/speculative at review time (the id is freshly computed via nextDerivativeId(), so a collision needs an unrelated file to already occupy that exact future id) -- not fixed inline, flagged for a real look later.
 - GOAL_CONDITION: duplicateToPlatform() checks for an existing file at the target path BEFORE invoking the claude subprocess (not just after), and a test proves it refuses to overwrite instead of silently clobbering.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: well-specified bugfix follow-up on the just-shipped duplicateToPlatform(), explicit GOAL_CONDITION + test requirement + 2026-07-08
 <!-- card-id: d1ebdd71-ba9f-4fd3-9aa2-f9cbbd4726d3 -->
 
 **Update .claude/skills/publish + atomize SKILL.md for the Typefully card rewire**
@@ -266,8 +205,78 @@ Examples - use both Primary and a Secondary CTA
 The /publish and /atomize skill docs (.claude/skills/publish/SKILL.md, .claude/skills/atomize/SKILL.md) still describe the retired PostPeer/Upload-Post image_post provider flow for quote cards. The delegated build/review workers could not edit them (writes under .claude/skills/ require interactive permission not available to a headless worker). Update them to describe native Typefully image posts for quote cards on X/LinkedIn/Bluesky, matching the config/cta.yaml, config/providers.yaml, .env.example, and CLAUDE.md rule 3 updates already made in PR for card 1829fdf9.
 GOAL_CONDITION: both SKILL.md files describe quote cards shipping as native Typefully image posts (not PostPeer/Upload-Post) for X/LinkedIn/Bluesky, with PostPeer still correctly described for TikTok only.
 CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: well-specified doc sync, explicit GOAL_CONDITION; note - needs an attended/interactive run since .claude/skills/ writes are permission-gated for headless workers + 2026-07-08
 <!-- card-id: ebe652a7-f1db-477f-9856-3e11aec6f5fc -->
+
+**Smarter routing — full landing-page CTAs (project/work-with-me destinations)**
+- Follow-up to 6dcaee98 (Smarter routing), split off 2026-07-08. That card ships the Substack-only CTA branches now (partial scope, approved). This card is the remainder: once Landing page (87c86b16) is live with real destination URLs, wire the full primary CTAs for "product/builder insight," "project demo," "offer-adjacent post," and "case study" (explore the project / work with me / landing page), replacing the interim Substack-CTA fallback those rows ship with today.
+GOAL_CONDITION: with the Landing page live, the four downgraded content types route to their real project/work-with-me/landing-page destination instead of the Substack fallback; the other four content types (already Substack-only) are unchanged.
+- STATUS: Backlog
+- DEPENDS ON: Landing page
+<!-- card-id: ae602c84-18ed-4532-8f1b-3bd716e1a10e -->
+
+**Add skill run-order quick-reference to the Obsidian Content Agents doc**
+- Add a 'when to run each skill' quick-reference table to the external doc Personal Obsidian/Content Agents.md.
+- Worked OUTSIDE this repo by Muxin. The conductor provides the markdown to paste.
+- Keeps the human-facing run-order guide in sync with the pipeline.
+- DONE (2026-07-08): direct file I/O to Documents/ hit a macOS TCC EPERM block, but AppleScript (Finder/System Events automation) has separate access — wrote the new "## Skill run order (quick reference)" section directly into Personal Obsidian/Content Agents.md via `osascript` file read/write, right after the existing "commands I actually type" table. Verified by reading the file back.
+- STATUS: Done
+<!-- card-id: 5e86bf0e-10c6-4f59-8f3c-538596ee5e31 -->
+
+**[P1] Refresh button on GUI - purpose?**
+- What does hitting Refresh on the GUI do?
+- If I hit refresh on each tab - Add/Queue, Review, Analytics - what does it do and does it automatically update everything in the pipeline to sync?
+- ANSWERED (2026-07-07): see docs/codebase-review.md Part 1 §5. One global Refresh (not per-tab): it re-scans every content/*/review-queue.md from disk, live-reconciles Typefully/PostPeer scheduled state when needed, and re-fetches the job list. It does NOT refresh the Analytics tab (brief loads once per page load; raw exports have their own button) and triggers no pipeline work. Fix: make it tab-aware, label it, show a last-refreshed timestamp.
+- DUPLICATE-CLOSED (2026-07-08, grooming pass): shipped. Refresh is tab-aware (doRefresh() re-reads only the active tab, page.ts:459-496), labeled per-tab via refreshLabelFor() (page.ts:464), and shows a "last refreshed HH:MM" stamp (markRefreshed(), page.ts:477-479, rendered in the header at page.ts:179). Shipped in Phase 2 (4e7cb5d3, PR #127, merged). Verified against current main (af4d062) by a code-reading pass.
+- STATUS: Done
+<!-- card-id: 3625b185-8025-4329-82d4-cb3b35c6ee70 -->
+
+**[P0] GUI error - no content folder created**
+- atomize finished but created no new content folder — check the terminal running the GUI
+- This is all that the terminal said: Last login: Sun Jul  5 11:37:57 on ttys002
+You have mail.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+MacBook-Pro-2:~ Muxin$ create-content
+
+> content-agents@0.1.0 review
+> tsx src/review/serve.ts
+
+
+  Review queue → http://localhost:4600
+
+  Approve / revise / discard / edit every pending derivative in one place.
+  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.
+
+Cadence schedule (PT):
+  bluesky:
+    bluesky-2 → Wed, Jul 15, 6:30 PM PT
+  ↳ note: bluesky-2 cta:source → homepage (no canonical_url in source.md)
+scheduled: bluesky-2 (bluesky) → Wed, Jul 15, 6:30 PM PT → typefully draft 9778798, cta→inline
+scheduled: quote-card-6-x (x) → upload-post upload-post job 090360eb3d464e06966cb7011183ad79 → x @ 2026-07-21T19:00:00.000Z
+- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §4. "Finished" only means the claude subprocess exited 0 (which it does even when /atomize accomplishes nothing); folder detection requires review-queue.md to exist, so a partially scaffolded folder reads as "no folder"; and the job's stdout is buffered then discarded, never reaching the terminal — the schedule lines seen were from unrelated approve actions. Fix: persist per-job log files, verify success by artifact (new folder + review-queue.md rows, or a machine-readable final line from /atomize), attach the log tail to the job error.
+- DUPLICATE-CLOSED (2026-07-08, grooming pass): shipped. Job logs persist per-job to disk instead of being buffered/discarded (jobs.ts:26-29,241-282); success is verified by artifact, not exit code — atomize diffs listSlugs() before/after (jobs.ts:464-469), video checks video/storyboard.md exists (jobs.ts:410-412); any failure attaches the last ~30 log lines via logTailSuffix() (jobs.ts:287-294, wired into every job-error site). Shipped in Phase 1 (efae4554, PR #99, merged). Verified against current main (af4d062) by a code-reading pass.
+- STATUS: Done
+<!-- card-id: c43a8041-60f9-4bea-b365-bc5d684eaca8 -->
+
+**[P2] Video script to Storyboard gap on GUI**
+- If I approve the script, what happens next? Right now on the GUI I can’t even hit ‘approve’ to approve the script. 
+- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §6. Approve is deliberately blocked until video/storyboard.md exists (the phantom-approve guard from card 4bef9a7c, correct as-is), but the GUI has no way to run /video — its job queue only runs /atomize — so the video path dead-ends. Fix: add a "Generate storyboard" button on video-script rows that enqueues /video through the same job queue, making it a two-stage flow: script review → storyboard generation → storyboard approval → render.
+- DUPLICATE-CLOSED (2026-07-08, grooming pass): shipped. "Generate storyboard" button on video-script rows (page.ts:316-319, gated by rows.ts:152) posts to /api/video/generate (serve.ts:535-544) → addVideoJob() (jobs.ts:375-381), enqueued through the same mutexed job queue atomize uses, success verified by artifact (video/storyboard.md exists, jobs.ts:411-412). Shipped in Phase 2 (4e7cb5d3, PR #127, merged). Verified against current main (af4d062) by a code-reading pass.
+- STATUS: Done
+<!-- card-id: 9e20a616-3e13-4194-ab39-863acd5d53be -->
+
+**[P0] Ask Claude buggy on the GUI?**
+- I used Ask Claude to edit a Blue Sky post and turn it into an X post - I wanted it to ALSO create an X post based on the source content. Nothing’s working?
+- Also I had my vault dashboard running at the same time which also uses Claude subscription for responses - I went back to it after submitting a task to it, and I noticed it didn’t finish its original task. I wonder if it’s because I triggered Ask Claude in the content GUI. Am I only able to ask for 1 single Claude task at a time? I’d want to be able to launch both my vault dashboard and content agents GUI and use them whenever I want - so if there’s conflicts, I don’t understand why. Isn’t each ‘request’ just a separate Claude task?
+- I tried getting the GUI to create content from Substack notes that I selected - it’s been stuck on ‘working’ for like 10 mins. I can’t tell if it’s actually doing anything. I’m waiting for it to land on the Review tab.
+- ROOT-CAUSED (2026-07-07): see docs/codebase-review.md Part 1 §1-3. Ask Claude is hard-scoped to editing one existing derivative body in place (its prompt forbids platform changes and new files, serve.ts:373-394), so both requests were impossible by design and the "didn't change anything" error only flashes for 1.4s. No hard one-Claude-task limit exists: only atomize jobs queue; the vault dashboard shares nothing with this GUI except subscription rate limits. The 10-min "working" is a black box because job output is buffered and discarded (no logs, no progress, 15-min timeout). Fix plan: persist+stream job logs, heartbeat in the jobs pill, durable inline errors, a per-row "Duplicate to platform" action, all Claude spawns through the one job queue.
+- DUPLICATE-CLOSED (2026-07-08, grooming pass): entire fix plan already shipped — job logs persist+stream to ~/.content-agents/logs/gui-jobs/<jobId>.log (jobs.ts:26-29,241-282), a running-job heartbeat + elapsed time + view-log link render in the jobs pill (jobs.ts:250-257,314-325; page.ts:640-649), durable inline errors replace the old 1.4s toast (page.ts:411-417), a per-row "Duplicate to platform" action exists (page.ts:324; jobs.ts:571-617; serve.ts:548-557), and all 5 Claude spawn sites (revise, brief-revise, duplicate, insights, ask-insights) route through the one job-queue mutex (jobs.ts:200-227,431-495). Shipped across Phase 1 (efae4554, PR #99) and Phase 2 (4e7cb5d3, PR #127), both merged to main. Verified against current main (af4d062) by a code-reading pass, not just the Phase 2 card's own claim.
+- STATUS: Done
+<!-- card-id: 9304e4a5-38f7-47dc-9b58-75e595b90fa7 -->
 
 **Codebase-review fix — Phase 4: quote cards ship as native Typefully image posts**
 - Attach card PNGs as `media:` on Typefully drafts (uploadMedia + media: frontmatter already implemented, typefully.ts:61-75, 304-313, proven once for an animated mp4). Rewire cards.ts so quote cards ship as native image posts on X/LinkedIn/Bluesky through the existing scheduled+reviewed Typefully path — retiring PostPeer/Upload-Post for cards. PostPeer stays for TikTok only (audited API, genuinely better there).
