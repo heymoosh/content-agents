@@ -359,4 +359,79 @@ describe("slots.ts: claimSlots", () => {
     assert.match(labels[0], /PT$/);
     assert.equal(labels[0], fmtLa(new Date(times[0])));
   });
+
+  test("default behavior unchanged: a platform with no maxSlotsPerDay still caps at 1 claim per PT-day", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: DAILY };
+    const { times } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 2,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    assert.equal(times.length, 2);
+    assert.notEqual(laDayLA(times[0]), laDayLA(times[1]), "with no maxSlotsPerDay set, two claims must land on different PT-days");
+  });
+
+  test("maxSlotsPerDay > 1 lets a platform claim multiple slots on the same PT-day, spaced across the day", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: { ...DAILY, maxSlotsPerDay: 3 } };
+    const { times } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 3,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    assert.equal(times.length, 3);
+    const days = times.map(laDayLA);
+    assert.equal(new Set(days).size, 1, `all 3 claims should land on the same PT-day, got days: ${days.join(", ")}`);
+
+    const hmFmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const hms = times.map((t) => hmFmt.format(new Date(t)));
+    assert.equal(new Set(hms).size, 3, `all 3 claims should land at distinct times, got: ${hms.join(", ")}`);
+  });
+
+  test("maxSlotsPerDay > 1 rolls over to the next PT-day once the day's slots are exhausted", () => {
+    const schedule: Record<string, PlatformSchedule> = { p: { ...DAILY, maxSlotsPerDay: 2 } };
+    const { times } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p"],
+      count: 3,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    assert.equal(times.length, 3);
+    const days = times.map(laDayLA);
+    assert.equal(new Set(days).size, 2, `3 claims at max 2/day should span exactly 2 PT-days, got days: ${days.join(", ")}`);
+  });
+
+  test("maxSlotsPerDay > 1 on the windowKey still respects a conflict platform capped at 1/day", () => {
+    const schedule: Record<string, PlatformSchedule> = {
+      p: { ...DAILY, maxSlotsPerDay: 3 },
+      q: DAILY, // conflict platform, no override -> still capped at 1/day
+    };
+    const { times } = claimSlots({
+      windowKey: "p",
+      conflictPlatforms: ["p", "q"],
+      count: 3,
+      asset: "a",
+      by: "test",
+      schedule,
+      now: new Date("2026-07-06T12:00:00.000Z"),
+    });
+    assert.equal(times.length, 3);
+    const days = times.map(laDayLA);
+    assert.equal(new Set(days).size, 3, "conflict platform q (capped at 1/day) forces each claim onto a distinct day");
+  });
 });
