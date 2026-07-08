@@ -115,6 +115,7 @@ derivative, the video script, and the video title/description. The short version
      cta_label: "Full essay (free to subscribe):"   # short lead-in for the link; omit when cta is none
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
      directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
+     control_run: true      # only on the one derivative drafted for a due spin-control pick (card f444f440); omit otherwise
      ---
      <the post text — nothing else>
      ```
@@ -125,6 +126,14 @@ derivative, the video script, and the video title/description. The short version
      What stays verbatim with no spin frontmatter: the quote-card DEFINITION line (the image quote),
      community variants, and anything with no `spin_angles` entry. On a `--no-spin` run, skip all of
      this and draft every derivative verbatim.
+   - **Spin-control run (card f444f440):** if the latest strategy brief's `[TEST]` recommendations
+     name a pillar + platform pair with a control run still due this month, and this piece's
+     tagged pillar matches, draft ONLY that one platform's derivative verbatim (no `spin: true`,
+     no `angle`) even though every other routed platform for this same piece still gets its normal
+     spin treatment. Stamp that one derivative's frontmatter `control_run: true` so `/publish`
+     records it as a control run (see `src/publish/queue.ts`'s `appendBetPlacement`) and it gets
+     excluded from the pillar/platform resonance figures instead of counted as a normal spin-on or
+     verbatim post.
    - **X and LinkedIn additionally get the storytelling re-hook/re-order pass** (Muxin,
      2026-07-04) — still inside the same never-invent guardrail, not a new license: lead with the
      strongest existing line (drop throat-clearing like "What I described in my essay..."),

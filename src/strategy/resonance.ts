@@ -1,4 +1,5 @@
 import { openDb } from "../db/db.js";
+import { CONTROL_RUN_SOURCE } from "./route.js";
 
 // Topic resonance map: pillar × platform. Requires posts to be tagged first.
 //   tsx src/strategy/resonance.ts
@@ -28,9 +29,9 @@ function main() {
          JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
            ON m.post_id = lm.post_id AND m.captured_at = lm.mc
        ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL`
+       WHERE p.pillar IS NOT NULL AND (p.source IS NULL OR p.source != ?)`
     )
-    .all() as Row[];
+    .all(CONTROL_RUN_SOURCE) as Row[];
   db.close();
 
   if (rows.length === 0) {

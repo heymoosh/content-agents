@@ -70,6 +70,23 @@ makes `/cycle` compound instead of restarting every week.
      windows (not one noisy snapshot). Computed/printed only — never writes to
      `config/routing.yaml` or `config/platforms.yaml`. A flag is a prompt for Muxin to reconsider
      the defaults by hand, not an auto-change.
+   - `npm run spin-control` → spin-control run (card f444f440): picks and records this month's due
+     verbatim control run for whichever already-assigned pillar/platform pair
+     (`config/routing.yaml` defaults) has gone longest without one (idempotent, a control run
+     already picked this calendar month just prints a skip line). When it prints a pick, add a
+     [TEST] recommendation in Step 4 naming the pillar + platform: next time Muxin atomizes a
+     piece for that pillar, draft that ONE platform's derivative verbatim (NOT the whole-piece
+     `/atomize --no-spin` flag — every other routed platform keeps its normal spin treatment) and
+     stamp its frontmatter `control_run: true` before it reaches `review-queue.md` (see
+     `.claude/skills/atomize/SKILL.md` step 4). Without this, the routing drift flag's
+     no-spin-control availability permanently reads false, since Spin's always-on default means a
+     plain verbatim post no longer happens on its own. `/strategy` only surfaces the pick, it
+     never drafts content itself.
+   - `npm run spin-control -- --coverage` → accumulated spin-control engagement (card f444f440):
+     per already-assigned pillar/platform pair with a deliberate control run, tracked separately
+     from the pillar/platform resonance figures and the routing drift flag above — a control run's
+     engagement never feeds either. Prints nothing until a pair reaches n>=3 control runs; a bare
+     "no pair has reached n>=3" needs no brief section.
    - Read `data/community-log.md` (manual observations — treat as qualitative signal)
 
 4. **Write the brief** to `briefs/YYYY-MM-DD-strategy-brief.md`:
@@ -120,6 +137,14 @@ makes `/cycle` compound instead of restarting every week.
     persistent divergences" needs no follow-up. A flag is a suggestion for Muxin's own
     re-approval of the defaults list, same posture as the Angle drift check below — it never
     edits config/routing.yaml itself and never blocks the rest of /strategy.>
+
+   ## Spin-control coverage
+   <only include this section if `npm run spin-control -- --coverage` printed at least one row
+    (some already-assigned pillar/platform pair reached n>=3 control runs) — omit the section
+    entirely otherwise, don't manufacture a placeholder. When present: the coverage table verbatim
+    + 1-2 sentences on whether the control runs show the spin angle is landing or not for that
+    pair (a judgment call for Muxin, never an auto-change here). This bucket is separate from, and
+    never folded into, the Topic resonance map or Routing drift flags above.>
 
    ## Community signals
    <synthesis of community-log.md: what sparked conversation vs silence, per community>

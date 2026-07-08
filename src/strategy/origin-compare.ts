@@ -1,5 +1,6 @@
 import { openDb } from "../db/db.js";
 import { fileURLToPath } from "node:url";
+import { CONTROL_RUN_SOURCE } from "./route.js";
 
 // Atomized-vs-organic traction: per platform, how do machine-distributed posts compare to ones
 // Muxin posted natively (incl. Substack notes)? Reuses the snapshot.ts engagement score + recency
@@ -95,7 +96,11 @@ function main() {
   const byPlatform = platforms.map((pl) => ({
     pl,
     spin: rows.filter((r) => r.platform === pl && r.source === "atomized-spin").length,
-    verbatim: rows.filter((r) => r.platform === pl && r.source === "atomized").length,
+    // Counts both the legacy ad hoc verbatim posts ('atomized') AND the systematic monthly
+    // control runs (CONTROL_RUN_SOURCE, card f444f440's spin-control.ts) — both are verbatim
+    // no-spin baselines. Without the latter, this permanently undercounts once spin-control.ts's
+    // ledger-tracked runs replace ad hoc verbatim posts as the source of control data.
+    verbatim: rows.filter((r) => r.platform === pl && (r.source === "atomized" || r.source === CONTROL_RUN_SOURCE)).length,
   }));
   const totalSpin = byPlatform.reduce((s, x) => s + x.spin, 0);
   const needControl = byPlatform.filter((x) => x.spin >= 3 && x.verbatim < SPIN_CONTROL_N);
@@ -122,8 +127,10 @@ function main() {
   }
 }
 
-// Guarded (not a bare `main()` call) because routing-drift.ts imports NO_SPIN_SOURCE from this
-// module — an unconditional call would re-run the whole report (and hit the DB) on that import.
+// Guarded (not a bare `main()` call), same CLI-entry-point convention as route.ts: nothing
+// currently imports from this module, but a bare call would re-run the whole report (and hit
+// the DB) as a side effect the moment anything — a future test, or a re-added cross-module
+// import of NO_SPIN_SOURCE — imports this file.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
