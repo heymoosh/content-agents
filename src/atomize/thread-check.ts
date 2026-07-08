@@ -49,6 +49,14 @@ export function draftThreadIn(
   return { body: woven, fm: { thread_check: "pass", thread_spin_applied: true } };
 }
 
+// The exact review-queue.md notes-cell suffix Claude appends for a still-missing thread-check
+// after a redraft/draftThreadIn attempt (step 8). Undefined when the check passed — a passing
+// derivative gets no flag. Mirrors storytelling.ts's spinPassNote() — same soft-gate,
+// notes-cell pattern: surfaced for Muxin in the raw markdown itself, never a block.
+export function threadCheckNote(fm: Record<string, unknown>): string | undefined {
+  return classifyThread(fm) === "missing" ? "flag: home-brand thread-check missing" : undefined;
+}
+
 // Advisory-only rollup for `npm run validate` — reported, never a gate (a "missing" piece still
 // queues at step 8 of the atomize skill).
 export function summarizeThreadChecks(

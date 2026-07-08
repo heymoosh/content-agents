@@ -191,7 +191,10 @@ derivative, the video script, and the video title/description. The short version
      `{ thread_check: "pass", thread_spin_applied: true }` — apply that frontmatter patch.
    - **Never a hard gate.** If a piece still doesn't connect after a redraft attempt, leave
      `thread_check: missing` and queue it anyway (step 8) — surface/suggest only, exactly like
-     every other score here.
+     every other score here. Append `threadCheckNote()`'s exact text (`src/atomize/thread-check.ts`,
+     `flag: home-brand thread-check missing`) to its review-queue.md `notes` cell (step 8) so
+     skimming the raw markdown itself surfaces it too, not just the frontmatter and the GUI badge —
+     same notes-cell pattern as the storytelling soft gate above. A passing piece gets no flag.
 
 6. **Validate.** `npm run validate -- <folder>` — must pass before queueing. Fix violations,
    don't relax limits. (Validation enforces char/word limits for every derivative, requires
@@ -241,10 +244,13 @@ derivative, the video script, and the video title/description. The short version
    generated — the routing `include` text platforms, plus ONE `quote-card:<target>` row per routed
    platform for the card (each pointing at the shared `images/quote-card-N.png`, caption from its
    own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending,
-   origin). The table schema itself doesn't grow a storytelling column (`native(1-5)` / `brand(1-5)`
-   / `cta` stay as-is — three separate scripts parse that table by fixed column position, see
-   `src/publish/queue.ts`); instead, a derivative flagged by step 5's soft gate gets
-   `spinPassNote()`'s text appended to its row's `notes` cell.
+   origin). The table schema itself doesn't grow a storytelling or thread-check column
+   (`native(1-5)` / `brand(1-5)` / `cta` stay as-is — three separate scripts parse that table by
+   fixed column position, see `src/publish/queue.ts`); instead, a derivative flagged by step 5's
+   soft gate gets `spinPassNote()`'s text appended to its row's `notes` cell, and one still
+   `thread_check: missing` after step 5.5's redraft attempt gets `threadCheckNote()`'s text
+   appended too (both can appear on the same row, e.g. `flag: spin pass suggested (low: hook);
+   flag: home-brand thread-check missing`).
    - **Origin tag (10th column).** Every row gets an `origin` cell so the review GUI can show
      which pipeline produced it (`src/publish/queue.ts` `QUEUE_ORIGINS`). Check whether this
      invocation set the `ATOMIZE_ORIGIN` environment variable (run `echo $ATOMIZE_ORIGIN`): if it
