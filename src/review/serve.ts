@@ -114,11 +114,11 @@ const schedulingInFlight = new Set<string>();
 // scheduleError is RETURNED (never thrown) so the row stays `approve` and the GUI shows why instead
 // of silently losing the approval or crashing the request.
 //
-// A publisher can also skip a row WITHOUT throwing (the reuse guard, or cards.ts finding no
-// connected account for the row's target) — it just logs a console.warn and returns []. That must
-// still surface as a scheduleError, not fall through silently: `done[0] ?? null` alone can't tell
-// "no scheduler owns this row" (kind === null, a genuine no-op) apart from "a scheduler ran but
-// skipped this row" (kind set, done === []) — and the GUI showed a bare "Approved" for both.
+// A publisher can also skip a row WITHOUT throwing (the reuse guard) — it just logs a console.warn
+// and returns []. That must still surface as a scheduleError, not fall through silently: `done[0]
+// ?? null` alone can't tell "no scheduler owns this row" (kind === null, a genuine no-op) apart
+// from "a scheduler ran but skipped this row" (kind set, done === []) — and the GUI showed a bare
+// "Approved" for both.
 export async function scheduleApproved(
   folder: string,
   row: QueueRow,
@@ -136,7 +136,7 @@ export async function scheduleApproved(
     if (done.length === 0) {
       return {
         scheduled: null,
-        scheduleError: "not scheduled — blocked by the reuse guard or no connected account (check the server log for the reason)",
+        scheduleError: "not scheduled — blocked by the reuse guard (check the server log for the reason)",
       };
     }
     return { scheduled: done[0], scheduleError: null };

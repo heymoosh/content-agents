@@ -11,16 +11,23 @@ import { fmtLa } from "../publish/slots.js";
 // CORRELATION STRATEGY: review-queue.md rows and publish-log.md never store a provider draft/post
 // id (readQueue()'s QueueRow has no such field — see src/publish/queue.ts). The only place a
 // provider ref is persisted at all is the free-text line publish-log.md's appendPublishLog() writes
-// at schedule time, keyed by row id — so BOTH providers are matched the same way: findLoggedRef
+// at schedule time, keyed by row id — so every provider is matched the same way: findLoggedRef
 // parses the most recently logged ref for the row (`typefully draft <id>`, `postpeer post <id>`, or
-// `upload-post job <id>` — see typefully.ts:338, tiktok.ts:197, cards.ts:283), then we check whether
+// `upload-post job <id>` — see typefully.ts, tiktok.ts, and, for quote-cards scheduled before the
+// 2026-07-08 Typefully rewire, cards.ts's old PostPeer/Upload-Post log lines), then we check whether
 // that exact id still shows up in the relevant provider's live list (matched by provider-assigned
 // id, never by the row-derived draft title — row ids like "x-1" repeat across content folders, so
 // title alone can't disambiguate which folder's row a live draft belongs to).
 // A row with no logged ref, or whose logged ref isn't found live, is a mismatch — that's the
 // unscheduled/drifted case this reconciliation exists to flag. A row logged via a provider this
-// module has no live check for (e.g. the Upload-Post card failover) is "unavailable", not a false
-// "mismatch" — it just means this check can't confirm it either way.
+// module has no live check for (e.g. the retired Upload-Post card failover) is "unavailable", not a
+// false "mismatch" — it just means this check can't confirm it either way.
+//
+// Quote-cards (2026-07-08): cards.ts now ships x/linkedin/bluesky cards as native Typefully drafts,
+// same as text — so a card row reconciles via the Typefully branch below UNLESS its most recently
+// logged ref is still a PRE-rewire PostPeer/Upload-Post line (real historical data — e.g.
+// content/2026-06-16-building-an-innovation-nation/publish-log.md), in which case it falls through
+// to the legacy PostPeer branch so old published cards don't misreport a false mismatch.
 
 export type ReconcileState = "scheduled" | "mismatch" | "not-applicable" | "unavailable";
 
@@ -65,9 +72,10 @@ export interface LoggedRef {
 // Parse a folder's publish-log.md text for the MOST RECENT logged provider ref for one row id.
 // Every appendPublishLog() line has the shape `- <ISO> — <rowId> → ...`; the provider ref rides in
 // free text after that (`typefully draft <id>`, `postpeer post <id>`, or `upload-post job <id>`) —
-// see typefully.ts:338, tiktok.ts:197, cards.ts:283. Pure string parsing, no fs here — the caller
-// supplies the log text. A row-matching line whose ref format isn't recognized RESETS `found` to
-// null rather than leaving an earlier ref in place — otherwise a row rescheduled through a provider
+// see typefully.ts (createDraft), tiktok.ts (scheduleToTikTok), cards.ts (publishCards). Pure string
+// parsing, no fs here — the caller supplies the log text. A row-matching line whose ref format isn't
+// recognized RESETS `found` to null rather than leaving an earlier ref in place — otherwise a row
+// rescheduled through a provider
 // this parser doesn't recognize (e.g. postpeer → upload-post) would silently keep reporting its
 // stale, superseded ref instead of reflecting what actually happened most recently.
 export function findLoggedRef(logText: string, rowId: string): LoggedRef | null {
@@ -102,13 +110,21 @@ function safeWhen(iso: string | undefined): string | undefined {
 // call, matched here per row — see src/review/serve.ts). Pure/sync: no network, no fs.
 export function reconcileRow(row: QueueRow, publishLog: PublishLogRead, live: LiveProviderState): ReconciledStatus {
   if (!needsReconciliation(row)) return { provider: null, state: "not-applicable" };
-  const provider = TEXT_PLATFORMS.has(row.platform) ? "typefully" : "postpeer";
+  // Text rows and quote-cards both schedule through Typefully now (cards.ts, 2026-07-08 rewire).
+  // Only TikTok is left on PostPeer.
+  const throughTypefully = TEXT_PLATFORMS.has(row.platform) || isQuoteCardRow(row.platform);
+  const provider = throughTypefully ? "typefully" : "postpeer";
   if (publishLog.error) {
     return { provider, state: "unavailable", reason: publishLog.error };
   }
   const logged = findLoggedRef(publishLog.text, row.id);
 
-  if (TEXT_PLATFORMS.has(row.platform)) {
+  // A quote-card row's MOST RECENT log line is still a pre-rewire PostPeer/Upload-Post entry (old
+  // published data) — reconcile it via the legacy branch below instead of reporting a false
+  // "no logged Typefully draft id" mismatch on a row that was never meant to have one.
+  const legacyCardLog = isQuoteCardRow(row.platform) && logged && logged.provider !== "typefully";
+
+  if (throughTypefully && !legacyCardLog) {
     if (live.typefullyDrafts === null) {
       return { provider: "typefully", state: "unavailable", reason: live.typefullyError ?? "could not reach Typefully" };
     }
@@ -122,9 +138,10 @@ export function reconcileRow(row: QueueRow, publishLog: PublishLogRead, live: Li
     return { provider: "typefully", state: "scheduled", when: safeWhen(match.whenIso) };
   }
 
-  // isQuoteCardRow / isTikTokRow — normally schedule through PostPeer; quote-cards can also fail
-  // over to Upload-Post (config/providers.yaml `image_post`), which this module has no live check
-  // for yet — report "unavailable" for that case instead of a false "mismatch" drift alarm.
+  // isTikTokRow — schedules through PostPeer. Legacy quote-card rows (legacyCardLog above) can also
+  // land here: pre-rewire cards could fail over to Upload-Post (config/providers.yaml `image_post`,
+  // now retired), which this module has no live check for — report "unavailable" for that case
+  // instead of a false "mismatch" drift alarm.
   if (logged?.provider === "upload-post") {
     return { provider: "upload-post", state: "unavailable", reason: "scheduled via the upload-post failover — live reconciliation isn't implemented for that provider yet" };
   }

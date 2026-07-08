@@ -91,8 +91,3 @@ export function resolveCta(
   return { url: rawCta, label, usedFallback: false };
 }
 
-// One line that drops a resolved CTA into a post body. `null` url → body unchanged.
-export function appendCtaLine(body: string, url: string | null, label: string): string {
-  if (!url) return body;
-  return `${body}\n\n${`${label} ${url}`.trim()}`;
-}
