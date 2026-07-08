@@ -1,4 +1,5 @@
 import { openDb } from "../db/db.js";
+import { fileURLToPath } from "node:url";
 
 // Atomized-vs-organic traction: per platform, how do machine-distributed posts compare to ones
 // Muxin posted natively (incl. Substack notes)? Reuses the snapshot.ts engagement score + recency
@@ -8,6 +9,9 @@ import { openDb } from "../db/db.js";
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 const HALF_LIFE_WEEKS = 4; // matches snapshot.ts / resonance.ts
+// The verbatim/no-spin control classification (posts.source), reused by routing-drift.ts's
+// no-spin-control-availability check instead of re-encoding the same string elsewhere.
+export const NO_SPIN_SOURCE = "atomized";
 // Spin is the always-on default (promoted 2026-07-02); `--no-spin` is the opt-out. So almost
 // everything atomized now ships as spin, and the *control* — verbatim `--no-spin` runs — is what
 // gets rare. To measure whether spin actually earns its keep, we need a verbatim baseline to
@@ -118,4 +122,8 @@ function main() {
   }
 }
 
-main();
+// Guarded (not a bare `main()` call) because routing-drift.ts imports NO_SPIN_SOURCE from this
+// module — an unconditional call would re-run the whole report (and hit the DB) on that import.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}
