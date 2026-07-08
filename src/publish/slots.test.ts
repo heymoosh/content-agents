@@ -155,6 +155,15 @@ describe("slots.ts: writeLedgerAtomic + releaseClaims", () => {
     assert.deepEqual(result, { removed: 1, removedClaims: [present] }, "must not echo back a claim it never actually removed");
     assert.deepEqual(readLedger(), []);
   });
+
+  test("releaseClaims removes only as many identical-identity rows as requested, not every matching row", () => {
+    const dup = claim({ asset: "dup/x" });
+    seedLedger([dup, dup]); // two ledger rows sharing identical platform/day/time/asset/by
+
+    const result = releaseClaims([dup]);
+    assert.deepEqual(result, { removed: 1, removedClaims: [dup] });
+    assert.deepEqual(readLedger(), [dup], "one identical row must survive — only one release was requested");
+  });
 });
 
 /**

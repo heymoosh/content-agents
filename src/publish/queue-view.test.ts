@@ -157,6 +157,24 @@ describe("queue-view.ts: reconcile() counts claims per platform/day instead of j
     assert.equal(result.claimedNotLive.length, 0);
     assert.equal(result.liveNotClaimed.length, 0);
   });
+
+  test("2 claims at different times on the same day, one live: the claim with no matching live post is flagged, not whichever comes first in ledger order", () => {
+    const orphan = claim({ asset: "orphan/x", time: "2026-08-01T09:30:00.000Z" });
+    const backed = claim({ asset: "backed/x", time: "2026-08-01T17:00:00.000Z" });
+    const live: QueueItem[] = [
+      { whenIso: backed.time, platform: "x", media: "text", title: "the live post", source: "typefully" },
+    ];
+
+    // Ledger order puts the orphan FIRST — day-count-only matching would greedily "match" it against
+    // the live post and wrongly flag `backed` (which IS live) as the excess claim instead.
+    const result = reconcile(live, [orphan, backed], ALL_OK);
+    assert.equal(result.claimedNotLive.length, 1);
+    assert.equal(
+      result.claimedNotLive[0].asset,
+      "orphan/x",
+      "the claim with no matching live post must be flagged, not the live-backed one"
+    );
+  });
 });
 
 // Regression for card c18c39a9: fetchScheduledDrafts() used to fetch only the first page (limit=50)
