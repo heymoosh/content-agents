@@ -311,7 +311,7 @@ Examples - use both Primary and a Secondary CTA
 - This needs count-aware matching (compare claim count vs live count per platform/day, not just set membership) - a real redesign of reconcile()'s matching logic, not a one-line fix, and out of scope for the scheduler-mechanism card that found it.
 - GOAL_CONDITION: reconcile() correctly reports claimedNotLive/liveNotClaimed/uncheckable using COUNTS per platform/day (not set presence), verified by a test where a platform has 2 ledger claims and only 1 live post on the same day (today: silently matched as fine; after: the 1 extra claim reports as claimedNotLive).
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: Done
 - GROOMED: unambiguously ready — backend-optimizing follow-up (CHAIN:1), concrete GOAL_CONDITION, no UI/product-judgment, dependency (c58fa530) now Done
 <!-- card-id: a112f4ac-3505-4765-b7c2-73f34f2c96d1 -->
 
