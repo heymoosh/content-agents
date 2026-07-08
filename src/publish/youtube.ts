@@ -208,7 +208,7 @@ export async function listScheduledUploads(): Promise<{ publishAt: string; title
   // more pages so a channel with more than one page of uploads doesn't hide scheduled Shorts.
   const ids: string[] = [];
   let pageToken = "";
-  for (let page = 0; ; page++) {
+  for (let page = 0; page < PLAYLIST_MAX_PAGES; page++) {
     const tokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
     const pl = (await get(
       `playlistItems?part=contentDetails&maxResults=${PLAYLIST_PAGE_SIZE}&playlistId=${uploads}${tokenParam}`
@@ -220,22 +220,27 @@ export async function listScheduledUploads(): Promise<{ publishAt: string; title
     pageToken = pl.nextPageToken ?? "";
     if (!pageToken) break;
     if (page + 1 >= PLAYLIST_MAX_PAGES) {
-      console.warn(
-        `listScheduledUploads: hit the ${PLAYLIST_MAX_PAGES}-page cap (${ids.length} uploads fetched) — more uploads may exist and were not fetched`
+      // A truncated live list is more dangerous than an unreachable one: reconcile() (queue-view.ts)
+      // trusts a successful return as complete and will release ledger claims it can't match — the
+      // exact orphan-release misfire this pagination fix is closing. Throwing routes this the same
+      // way a network failure already does (caller marks the source unreachable / uncheckable)
+      // instead of silently handing back a partial list that looks complete.
+      throw new Error(
+        `listScheduledUploads: hit the ${PLAYLIST_MAX_PAGES}-page cap (${ids.length} uploads fetched) — more uploads exist and were not fetched`
       );
-      break;
     }
   }
   if (!ids.length) return [];
 
   // videos.list only accepts up to 50 ids per call — batch so full pagination above doesn't
-  // silently truncate at the video-status lookup step instead.
-  const items: YtVideo[] = [];
-  for (let i = 0; i < ids.length; i += VIDEOS_BATCH_SIZE) {
-    const batch = ids.slice(i, i + VIDEOS_BATCH_SIZE);
-    const vids = (await get(`videos?part=status,snippet&id=${batch.join(",")}`)) as { items?: YtVideo[] };
-    items.push(...(vids.items ?? []));
-  }
+  // silently truncate at the video-status lookup step instead. Batches are independent (no cursor
+  // dependency between them), so fetch them concurrently.
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += VIDEOS_BATCH_SIZE) batches.push(ids.slice(i, i + VIDEOS_BATCH_SIZE));
+  const batchResults = (await Promise.all(
+    batches.map((batch) => get(`videos?part=status,snippet&id=${batch.join(",")}`))
+  )) as { items?: YtVideo[] }[];
+  const items: YtVideo[] = batchResults.flatMap((r) => r.items ?? []);
   const now = Date.now();
   return items
     .filter((v) => v.status?.publishAt && new Date(v.status.publishAt).getTime() > now)

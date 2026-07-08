@@ -130,23 +130,41 @@ describe("typefully fetchScheduledDrafts: pagination", () => {
     assert.equal(calls.length, 3, "should have fetched exactly 3 pages (50 + 50 + 20)");
   });
 
-  test("stops at the page cap and warns instead of looping forever", async () => {
+  test("stops at the page cap and throws instead of looping forever or returning a truncated list", async () => {
     process.env.TYPEFULLY_API_KEY = "test-key";
     process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
     // 600 drafts, always claiming a next page — a pathological account state.
     const allDrafts = Array.from({ length: 600 }, (_, i) => draft(i + 1, i));
     const { calls } = stubPagedFetch(allDrafts);
-    const warnCalls: unknown[][] = [];
-    const originalWarn = console.warn;
-    console.warn = (...args: unknown[]) => warnCalls.push(args);
-    try {
-      const scheduled = await fetchScheduledDrafts();
-      assert.equal(scheduled.length, 500, "must stop at the 10-page cap (10 x 50), not fetch forever");
-      assert.equal(calls.length, 10, "must stop issuing requests once the page cap is hit");
-      assert.equal(warnCalls.length, 1, "must warn once when the cap is hit");
-      assert.match(String(warnCalls[0][0]), /page cap/);
-    } finally {
-      console.warn = originalWarn;
-    }
+
+    await assert.rejects(
+      () => fetchScheduledDrafts(),
+      /page cap/,
+      "a truncated list must surface as a failure (caller treats the source as unreachable), not a silently-partial success"
+    );
+    assert.equal(calls.length, 10, "must stop issuing requests once the page cap is hit");
+  });
+
+  test("a non-final page returning fewer than the limit still advances past it, not just full pages", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    // Page 1 returns a SHORT page (30 items, not the full 50) while still claiming a next page —
+    // offset must advance by what actually came back (30), not by the fixed page limit (50), or
+    // items 31-49 would be silently skipped forever.
+    const allDrafts = Array.from({ length: 80 }, (_, i) => draft(i + 1, i));
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      calls.push(url.toString());
+      const offset = Number(url.searchParams.get("offset") ?? "0");
+      const page = offset === 0 ? allDrafts.slice(0, 30) : allDrafts.slice(offset);
+      const next = offset === 0 ? "https://api.typefully.com/v2/next-page" : null;
+      return new Response(JSON.stringify({ results: page, next }), { status: 200 });
+    }) as typeof fetch;
+
+    const scheduled = await fetchScheduledDrafts();
+
+    assert.equal(scheduled.length, 80, "every draft must be returned, including those after a short non-final page");
+    assert.ok(scheduled.some((d) => d.id === "31"), "item 31 (right after the short page) must not be skipped");
   });
 });

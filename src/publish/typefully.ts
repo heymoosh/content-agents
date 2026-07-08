@@ -156,23 +156,32 @@ export async function fetchScheduledDrafts(): Promise<TypefullyScheduled[]> {
   const setId = await socialSetId();
   const all: TypefullyDraft[] = [];
   let offset = 0;
-  let more = true;
-  for (let page = 0; more; page++) {
+  for (let page = 0; page < DRAFTS_MAX_PAGES; page++) {
     const res = (await api(`/social-sets/${setId}/drafts?limit=${DRAFTS_PAGE_LIMIT}&offset=${offset}`)) as
       | { results?: TypefullyDraft[]; next?: string | null }
       | TypefullyDraft[];
     const list = Array.isArray(res) ? res : res.results ?? [];
     all.push(...list);
-    offset += DRAFTS_PAGE_LIMIT;
-    more = !Array.isArray(res) && !!res.next && list.length > 0;
-    if (more && page + 1 >= DRAFTS_MAX_PAGES) {
-      console.warn(
-        `fetchScheduledDrafts: hit the ${DRAFTS_MAX_PAGES}-page cap (${all.length} drafts fetched) — more scheduled drafts may exist and were not fetched`
-      );
-      more = false;
+    offset += list.length; // advance by what actually came back, not the requested limit
+    if (!Array.isArray(res) && res.next) {
+      if (page + 1 >= DRAFTS_MAX_PAGES) {
+        // A truncated live list is more dangerous than an unreachable one: reconcile() (queue-view.ts)
+        // trusts a successful return as complete and will release ledger claims it can't match — the
+        // exact orphan-release misfire this pagination fix is closing. Throwing routes this the same
+        // way a network failure already does (caller marks the source unreachable / uncheckable)
+        // instead of silently handing back a partial list that looks complete.
+        throw new Error(
+          `fetchScheduledDrafts: hit the ${DRAFTS_MAX_PAGES}-page cap (${all.length} drafts fetched) — more scheduled drafts exist and were not fetched`
+        );
+      }
+      continue;
     }
+    break;
   }
-  return all
+  // Dedup by draft id: offset-based pagination against a live, mutating draft list can return the
+  // same draft twice if one is created/rescheduled between page fetches.
+  const deduped = [...new Map(all.map((d) => [String(d.id), d] as const)).values()];
+  return deduped
     .filter((d) => d.scheduled_date && (d.status === "scheduled" || new Date(d.scheduled_date) > new Date()))
     .sort((a, b) => new Date(a.scheduled_date!).getTime() - new Date(b.scheduled_date!).getTime())
     .map((d) => ({

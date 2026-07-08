@@ -111,22 +111,17 @@ describe("youtube listScheduledUploads: pagination", () => {
     assert.equal(videosCalls.length, 2, "60 ids must be split into two videos.list batches of <=50");
   });
 
-  test("stops at the page cap and warns instead of looping forever", async () => {
+  test("stops at the page cap and throws instead of looping forever or returning a truncated list", async () => {
     setEnv();
     // 300 videos, always claiming another page — a pathological channel.
     const allVideoIds = Array.from({ length: 300 }, (_, i) => `vid-${i + 1}`);
     const { playlistCalls } = stubYouTube(allVideoIds);
-    const warnCalls: unknown[][] = [];
-    const originalWarn = console.warn;
-    console.warn = (...args: unknown[]) => warnCalls.push(args);
-    try {
-      const uploads = await listScheduledUploads();
-      assert.equal(uploads.length, 250, "must stop at the 10-page cap (10 x 25), not fetch forever");
-      assert.equal(playlistCalls.length, 10, "must stop issuing requests once the page cap is hit");
-      assert.equal(warnCalls.length, 1, "must warn once when the cap is hit");
-      assert.match(String(warnCalls[0][0]), /page cap/);
-    } finally {
-      console.warn = originalWarn;
-    }
+
+    await assert.rejects(
+      () => listScheduledUploads(),
+      /page cap/,
+      "a truncated list must surface as a failure (caller treats the source as unreachable), not a silently-partial success"
+    );
+    assert.equal(playlistCalls.length, 10, "must stop issuing requests once the page cap is hit");
   });
 });
