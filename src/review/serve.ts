@@ -44,6 +44,7 @@ import {
 import {
   classifySource,
   addJob,
+  addVideoJob,
   publicJob,
   jobs,
   jobLogPath,
@@ -53,6 +54,10 @@ import {
   revisePrompt,
   reviseDerivative,
   reviseBrief,
+  duplicateToPlatform,
+  runQueued,
+  runClaudeSpawn,
+  logTailSuffix,
 } from "./jobs.js";
 import { renderPage } from "./page.js";
 
@@ -246,21 +251,17 @@ async function generateInsights(): Promise<string> {
     `## Latest strategy brief`,
     briefText,
   ].join("\n");
-  try {
-    const { stdout } = await execFileP("claude", ["-p", prompt, "--permission-mode", "acceptEdits"], {
-      cwd: repoRoot,
-      timeout: STRATEGY_TIMEOUT_MS,
-      maxBuffer: 20_000_000,
-    });
-    return stdout.trim();
-  } catch (e) {
-    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
-    if (err.code === "ENOENT") {
+  // Routed through the ONE job queue (Codebase review Phase 2) — same log/heartbeat + bounded
+  // concurrency every other Claude spawn in this GUI now gets, instead of its own unbounded spawn.
+  return runQueued("insights", "Generate insights", async (job) => {
+    const result = await runClaudeSpawn(job, prompt, { timeoutMs: STRATEGY_TIMEOUT_MS });
+    if (result.enoent) {
       throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
     }
-    if (err.killed) throw new Error(`Claude timed out after ${STRATEGY_TIMEOUT_MS / 1000}s`);
-    throw new Error(`Claude failed: ${(err.stderr || err.message || "unknown").slice(0, 300)}`);
-  }
+    if (result.timedOut) throw new Error(`Claude timed out after ${STRATEGY_TIMEOUT_MS / 1000}s`);
+    if (result.code !== 0) throw new Error(`Claude failed (exit ${result.code})${logTailSuffix(job.id)}`);
+    return result.stdout.trim();
+  });
 }
 
 // Deep-dive follow-up: unlike generateInsights (which we feed pre-fetched data), Claude is allowed
@@ -287,21 +288,16 @@ async function askInsights(question: string, history: { role: string; content: s
     `Answer directly and specifically, citing real numbers you find. Plain markdown, no em dashes,`,
     `no AI-tell filler. Keep it as short as the question allows.`,
   ].join("\n");
-  try {
-    const { stdout } = await execFileP("claude", ["-p", prompt, "--permission-mode", "acceptEdits"], {
-      cwd: repoRoot,
-      timeout: INSIGHTS_ASK_TIMEOUT_MS,
-      maxBuffer: 20_000_000,
-    });
-    return stdout.trim();
-  } catch (e) {
-    const err = e as { code?: string; killed?: boolean; stderr?: string; message?: string };
-    if (err.code === "ENOENT") {
+  // Routed through the ONE job queue (Codebase review Phase 2) — see generateInsights above.
+  return runQueued("ask-insights", `Ask: ${question.trim().slice(0, 60)}`, async (job) => {
+    const result = await runClaudeSpawn(job, prompt, { timeoutMs: INSIGHTS_ASK_TIMEOUT_MS });
+    if (result.enoent) {
       throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
     }
-    if (err.killed) throw new Error(`Claude timed out after ${INSIGHTS_ASK_TIMEOUT_MS / 1000}s`);
-    throw new Error(`Claude failed: ${(err.stderr || err.message || "unknown").slice(0, 300)}`);
-  }
+    if (result.timedOut) throw new Error(`Claude timed out after ${INSIGHTS_ASK_TIMEOUT_MS / 1000}s`);
+    if (result.code !== 0) throw new Error(`Claude failed (exit ${result.code})${logTailSuffix(job.id)}`);
+    return result.stdout.trim();
+  });
 }
 
 // ── Raw downloaded exports (data/inbox = not-yet-ingested, data/processed = archived after
@@ -452,6 +448,10 @@ const server = createServer(async (req, res) => {
         pieces,
         pending: pieces.reduce((n, p) => n + p.pending, 0),
         liveStateAsOf: getLiveStateAsOf(),
+        // The "Duplicate to platform" dropdown's target list — sourced from the same TEXT_PLATFORMS
+        // Typefully scheduling + the spin_angles config both key off, so the client never hardcodes
+        // its own copy of "which platforms are real duplicate targets."
+        textPlatforms: [...TEXT_PLATFORMS],
       });
       return;
     }
@@ -524,6 +524,32 @@ const server = createServer(async (req, res) => {
       try {
         const body = await reviseDerivative(String(b.slug ?? ""), String(b.id ?? ""), String(b.instruction ?? ""));
         json(res, 200, { ok: true, body });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Generate storyboard" (card 9e20a616): enqueue `/video <folder>` through the SAME job queue
+    // atomize runs through. Fire-and-poll, like /api/atomize — the job shows up in /api/jobs and the
+    // row's canGenerateStoryboard/approveBlocked flip once video/storyboard.md lands on disk.
+    if (req.method === "POST" && url.pathname === "/api/video/generate") {
+      const b = await readBody(req);
+      try {
+        const job = addVideoJob(String(b.slug ?? ""));
+        json(res, 200, { ok: true, job: publicJob(job) });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Duplicate to platform" (card 9304e4a5's missing "create a post for another platform"
+    // affordance): copy + re-angle an existing text derivative for a new platform, appending a new
+    // `pending` review-queue.md row. Never approves/schedules anything — CLAUDE.md rule 2 holds.
+    if (req.method === "POST" && url.pathname === "/api/duplicate") {
+      const b = await readBody(req);
+      try {
+        const row = await duplicateToPlatform(String(b.slug ?? ""), String(b.id ?? ""), String(b.platform ?? ""));
+        json(res, 200, { ok: true, row });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
