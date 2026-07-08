@@ -247,17 +247,6 @@ Examples - use both Primary and a Secondary CTA
 - DECISION: defer — deprioritized, lower priority, new media type. Keep in Backlog. 2026-07-04
 <!-- card-id: b0e4ecc5-6120-4b40-a6dd-859c34ca332a -->
 
-**Validate storytelling rubric against real /atomize output**
-- - Run the new storytelling rubric (hook/narrative/resonance) against the next real /atomize
-- output to get real scores and validate the soft-gate against live data, not just the test
-- fixture used to build it.
-- - Depends on: nothing — ready now, just needs an actual /atomize scoring pass on real content.
-- - CHAIN: 1
-- STATUS: To Do
-- DECISION: unparked (Muxin, 2026-07-07) — validate against `content/2026-07-05-what-i-ve-described-in-my-essay-building-an-inno/` (most recent /atomize output at time of decision).
-- GROOMED: ready — bounded validation task (run storytelling rubric against real /atomize output, compare to fixture baseline), CHAIN:1, no blocking dependency
-<!-- card-id: 9be7688d-a41d-4e58-9fce-a9c8df8e4644 -->
-
 **Track a storytelling-improved bucket in bets.md / origin-compare**
 - - Consider whether origin-compare / briefs/bets.md should eventually track a
 - "storytelling-improved" bucket the way spin/verbatim is tracked, so Muxin can measure
@@ -341,6 +330,53 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: To Do
 - GROOMED: ready — mechanical serve.ts split (page/jobs/rows/routes) + request caching for /api/queue, no behavior change intended
 <!-- card-id: c310160b-d296-4219-ab28-4cd50c0a3b40 -->
+
+**Multi-slot-per-day scheduler: support >1 post/platform/PT-day, starting with X**
+- ORIGIN: split out of ffa6491d's own DECISION (2026-07-07) — Muxin's actual ask for X is multiple posts/day, but the unified scheduler (src/publish/slots.ts + data/publish-schedule.jsonl) enforces ≤1 post/platform/PT-day; ffa6491d explicitly called this 'a separate, bigger follow-up, not bundled into this config bump' and shipped only the X posts_per_week 5→7 config change instead.
+- Bluesky is already at this architecture's ceiling (7/wk, all slot_days) with no headroom left — confirms the limit is structural, not a config number.
+- Scope: extend slots.ts's claim logic so a platform's config can allow N slots/PT-day (default 1, preserving today's behavior for LinkedIn/Bluesky/every other platform); wire a per-platform max into config/platforms.yaml; space claimed slots across the day rather than one fixed time.
+- Muxin still needs to pick X's actual target (ffa6491d cited industry guidance of 3-5 posts/day) and confirm content supply can fill the added slots without violating min_reuse_days — a follow-up decision for whoever picks this up, not a blocker to scoping the mechanism itself.
+- GOAL_CONDITION: src/publish/slots.ts can claim more than one slot per platform per PT-day when that platform's config specifies a max >1; before, claimSlots hard-caps every platform at ≤1/day regardless of config; after, X (once configured with a max >1) can hold multiple claimed slots within one PT-day while LinkedIn/Bluesky/other platforms keep defaulting to 1 and are unaffected.
+- PARENT: ffa6491d-46f9-416f-b521-1fb15e1a391b
+- ORIGIN: proposed by propose-cards 2026-07-07 from epic Evaluate raising per-platform posting caps (X, LinkedIn, Bluesky) for more volume (ffa6491d-46f9-416f-b521-1fb15e1a391b)
+- STATUS: To Do
+- GROOMED: ready — mechanism-only scope (configurable N slots/PT-day, default 1 preserves current behavior), concrete GOAL_CONDITION, X's actual target number explicitly deferred as separate decision, not approval-worthy (no external/cost/security surface) + 2026-07-07
+<!-- card-id: c58fa530-544b-4cde-a04f-2be6b83ed510 -->
+
+**Systematize periodic --no-spin control runs per pillar/platform pair (feeds the routing drift flag's spin/topic-fit isolation)**
+- ORIGIN: 7e550e48's own EXPERIMENTAL RIGOR requirement #2 — 'Systematize the --no-spin control runs the retro card (2eb4ea51) already recommended ad hoc — a periodic, deliberate control per pillar/platform pair, not a one-off gut check.' The shipped drift flag (7e550e48, Done) only reports whether a no-spin control exists per pillar/platform pair; it doesn't generate those controls itself, so every pair currently reports 'no control available' with nothing to change that.
+- Without a live no-spin baseline the flag can't separate 'wrong platform for this topic' from 'angle isn't landing' — the exact ambiguity 7e550e48 was designed to resolve for Muxin.
+- Scope: on a periodic cadence (fits the /strategy pass, same rhythm as the angle refresh (8ba83a4c) and exploration budget (92bb2ae6)), pick one pillar/platform pair and draft one derivative with --no-spin, tagged as a control run distinct from normal spin-on posts; queue it through the normal review-queue.md approval like any other derivative.
+- Data handling: track control-run engagement in its own bucket, same posture as 92bb2ae6's exploration-probe bucket — never folded into the pillar/platform's official resonance average.
+- Once ≥1 control run exists for a pair, route.ts --all's divergence flag should report no-spin-control availability as true for that pair instead of permanently false.
+- GOAL_CONDITION: Running the control-run step produces a --no-spin derivative tagged as a control run for one pillar/platform pair on each periodic pass, tracked separately from spin-on engagement data; after at least one control run exists for a pair, route.ts --all's divergence flag reports no-spin-control availability as true for that pair (previously always false, since no mechanism produced these controls).
+- PARENT: 7e550e48-adcf-44d3-83ea-626ee079b9ef
+- ORIGIN: proposed by propose-cards 2026-07-07 from epic Routing drift flag: surface data-vs-brand platform divergence in /strategy (never auto-gate) (7e550e48-adcf-44d3-83ea-626ee079b9ef)
+- STATUS: To Do
+- GROOMED: ready — cadence/selection explicitly inherits sibling card 92bb2ae6's MECHANISM (monthly, longest-since-last-control rule), concrete GOAL_CONDITION, output goes through normal review-queue.md approval (rule 2 still governs) + 2026-07-07
+<!-- card-id: f444f440-7221-4741-a682-254f27f66e29 -->
+
+**Re-validate storytelling rubric once broader real-data sample exists (n>=20 across >=3 sources)**
+- ORIGIN: follow-up from card 9be7688d (Validate storytelling rubric against real /atomize output) — docs/storytelling-rubric-validation.md.
+- That validation found the live sample (n=6, ONE source, 2026-07-05-hey-substack) does not reproduce the original eval's all-three-dimension 2-3 clustering: hook is 4 on every real derivative so far, resonance is 4-5, only narrative actually clusters at the LOW_SCORE_THRESHOLD=3 soft-gate (3 on 4 of 6, correctly flagged).
+- FOLDER NOTE: 9be7688d's own DECISION named content/2026-07-05-what-i-ve-described-in-my-essay-building-an-inno/ as the target ('most recent /atomize output at time of decision'). At execution time (and still true as of this filing) that folder has only source.md + review-queue.md -- no derivatives/, so it has never been through a full /atomize scoring pass and had no storytelling scores to validate. Used content/2026-07-05-hey-substack-i-m-looking-for-others-who-feel-int/ instead, the only folder in the repo with real populated hook/narrative/resonance scores. Worth checking the originally-named folder too once/if it gets atomized.
+- Recommendation was to keep the rubric/threshold as-is (sample too thin to retune) but re-check once storytelling scores exist across a handful of distinct source pieces.
+- Scope: once npm run validate has real hook/narrative/resonance scores across n>=20 derivatives spanning >=3 different source essays/notes (not just more posts from the same source), re-run the same comparison. Specifically check whether hook/resonance keep showing zero variance across multiple sources -- if so, that is worth a real conversation about narrowing the rubric to the dimension that actually discriminates (narrative) vs keeping all three.
+- GOAL_CONDITION: a findings note (extending or superseding docs/storytelling-rubric-validation.md) reports the hook/narrative/resonance distribution across >=20 real scored derivatives spanning >=3 distinct source pieces, states whether hook/resonance still show zero variance, and gives a concrete keep-as-is-or-change recommendation.
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
+
+**Validate storytelling rubric against real /atomize output**
+- - Run the new storytelling rubric (hook/narrative/resonance) against the next real /atomize
+- output to get real scores and validate the soft-gate against live data, not just the test
+- fixture used to build it.
+- - Depends on: nothing — ready now, just needs an actual /atomize scoring pass on real content.
+- - CHAIN: 1
+- STATUS: Done
+- DECISION: unparked (Muxin, 2026-07-07) — validate against `content/2026-07-05-what-i-ve-described-in-my-essay-building-an-inno/` (most recent /atomize output at time of decision).
+- GROOMED: ready — bounded validation task (run storytelling rubric against real /atomize output, compare to fixture baseline), CHAIN:1, no blocking dependency
+<!-- card-id: 9be7688d-a41d-4e58-9fce-a9c8df8e4644 -->
 
 **Codebase-review fix — Phase 1: job observability (persist + stream Claude job logs)**
 - Persist every Claude/atomize job's stdout/stderr to a log file (e.g. ~/.content-agents/logs/gui-jobs/<jobId>.log), streaming as it arrives (spawn with piped streams, not execFile's 40MB in-memory buffer, serve.ts:796-801).
