@@ -59,3 +59,16 @@ test("fetchScheduledPosts throws with the status + body on a non-ok response", a
   stubFetch(401, "unauthorized");
   await assert.rejects(() => fetchScheduledPosts(), /401/);
 });
+
+test("fetchScheduledPosts survives a transient 503 via fetchWithRetry (real call site, not the helper's own unit tests)", async () => {
+  process.env.POSTPEER_API_KEY = "test-key";
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls++;
+    if (calls < 2) return new Response("service unavailable", { status: 503 });
+    return new Response(JSON.stringify([{ id: "999" }]), { status: 200 });
+  }) as typeof fetch;
+  const posts = await fetchScheduledPosts({ sleep: async () => {} });
+  assert.equal(calls, 2, "should have retried once after the transient 503");
+  assert.deepEqual(posts, [{ id: "999", scheduledFor: undefined, status: undefined, content: undefined }]);
+});

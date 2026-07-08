@@ -1,6 +1,7 @@
 import "../../util/env.js";
 import type { ImageProvider } from "../types.js";
 import { writeImageFile } from "./_write.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // One adapter for OpenRouter's whole image catalog — the model is just a param, so every
 // model OpenRouter carries is a one-line contender in config/bakeoff.yaml (no new keys
@@ -34,18 +35,24 @@ export const provider: ImageProvider = {
     // tokens. 8192 comfortably covers a 1K image; bump params.max_tokens for larger sizes.
     const maxTokens = (params?.max_tokens as number) ?? 8192;
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        modalities,
-        max_tokens: maxTokens,
-        image_config: { aspect_ratio: aspect, image_size: imageSize },
-        usage: { include: true },
-      }),
-    });
+    const res = await fetchWithRetry(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          modalities,
+          max_tokens: maxTokens,
+          image_config: { aspect_ratio: aspect, image_size: imageSize },
+          usage: { include: true },
+        }),
+      },
+      // A real billed generation call — a lost-response network error or 5xx must not retry this
+      // and risk a second billed image.
+      { retryOnNetworkError: false }
+    );
     if (!res.ok) {
       throw new Error(`openrouter image request failed: ${res.status} ${await res.text()}`);
     }

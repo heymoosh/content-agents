@@ -1,5 +1,6 @@
 import "../../util/env.js";
 import type { TextPolishProvider } from "../types.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // Grok via OpenRouter chat-completions. Used ONLY for video scripts (atomize step 7a) —
 // the one place AI drafts in Muxin's idea-space rather than extracting verbatim. Text
@@ -14,18 +15,24 @@ export const provider: TextPolishProvider = {
     const key = process.env.OPENROUTER_API_KEY;
     if (!key) throw new Error("OPENROUTER_API_KEY missing in .env (see .env.example)");
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: instructions },
-          { role: "user", content: draft },
-        ],
-        temperature: 0.7,
-      }),
-    });
+    const res = await fetchWithRetry(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: "system", content: instructions },
+            { role: "user", content: draft },
+          ],
+          temperature: 0.7,
+        }),
+      },
+      // A real billed generation call — a lost-response network error or 5xx must not retry this
+      // and risk a second billed polish pass.
+      { retryOnNetworkError: false }
+    );
     if (!res.ok) throw new Error(`openrouter request failed: ${res.status} ${await res.text()}`);
 
     const data = (await res.json()) as {

@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { TTSProvider } from "../types.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // Kokoro-82M run locally — free, no timestamps (render falls back to Whisper alignment).
 // Two invocation modes via KOKORO_MODE:
@@ -28,7 +29,7 @@ export const provider: TTSProvider = {
 
     const url = process.env.KOKORO_URL ?? "http://localhost:8880/v1/audio/speech";
     const voice = voiceId ?? process.env.KOKORO_VOICE ?? "af_heart";
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model: "kokoro", voice, input: text, response_format: "mp3" }),

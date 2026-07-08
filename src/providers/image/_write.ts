@@ -1,5 +1,6 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // Shared by the image adapters: write bytes to disk (creating parent dirs) or download a URL.
 
@@ -10,7 +11,7 @@ export function writeImageFile(outPath: string, buf: Buffer): string {
 }
 
 export async function downloadImage(url: string, outPath: string): Promise<string> {
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
   if (!res.ok) throw new Error(`image download failed: ${res.status} ${url}`);
   return writeImageFile(outPath, Buffer.from(await res.arrayBuffer()));
 }

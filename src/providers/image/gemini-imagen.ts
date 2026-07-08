@@ -1,6 +1,7 @@
 import "../../util/env.js";
 import type { ImageProvider } from "../types.js";
 import { writeImageFile } from "./_write.js";
+import { fetchWithRetry } from "../../util/fetch-retry.js";
 
 // Gemini API → Imagen (direct, not via OpenRouter). Defaults to Imagen 4 Fast (~$0.02/image).
 // The bakeoff can override the model + cost per contender via params; the main pipeline
@@ -16,7 +17,7 @@ export const provider: ImageProvider = {
     const model = (params?.model as string) ?? DEFAULT_MODEL;
     const cost = (params?.cost_usd as number) ?? DEFAULT_COST;
 
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict`,
       {
         method: "POST",
@@ -25,7 +26,10 @@ export const provider: ImageProvider = {
           instances: [{ prompt }],
           parameters: { sampleCount: 1, aspectRatio: aspect },
         }),
-      }
+      },
+      // A real billed generation call — a lost-response network error or 5xx must not retry this
+      // and risk a second billed image.
+      { retryOnNetworkError: false }
     );
     if (!res.ok) {
       throw new Error(`imagen request failed: ${res.status} ${await res.text()}`);

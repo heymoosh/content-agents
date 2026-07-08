@@ -1,5 +1,6 @@
 import "../util/env.js";
 import { POSTPEER_API, extractPostPeerList } from "./queue-view.js";
+import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 
 // Read-only: PostPeer's live post list (GET /v1/posts). PostPeer doesn't publish an official
 // "list scheduled posts" endpoint — src/publish/queue-view.ts already hits this same endpoint for
@@ -15,10 +16,10 @@ export interface PostPeerPost {
   content?: string;
 }
 
-export async function fetchScheduledPosts(): Promise<PostPeerPost[]> {
+export async function fetchScheduledPosts(retryOpts?: FetchRetryOptions): Promise<PostPeerPost[]> {
   const key = process.env.POSTPEER_API_KEY;
   if (!key) throw new Error("POSTPEER_API_KEY missing in .env — see docs/setup-tiktok.md");
-  const res = await fetch(`${POSTPEER_API}/posts`, { headers: { "x-access-key": key } });
+  const res = await fetchWithRetry(`${POSTPEER_API}/posts`, { headers: { "x-access-key": key } }, retryOpts);
   if (!res.ok) throw new Error(`postpeer GET /posts → ${res.status} ${await res.text()}`);
   const json = await res.json();
   return extractPostPeerList(json)
