@@ -27,7 +27,7 @@ platforms:
     max_chars: 280
     derivative_count: [3, 5]
     best_times_pst: "Tue-Thu, 9-11am (primary), 1-2pm (secondary). Weaker on weekends, but posting keeps presence."
-    posts_per_week: 5
+    posts_per_week: 7      # bumped 5->7 (Muxin, 2026-07-07); max the 1-post/PT-day architecture supports
     slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]   # weekends allowed; weekly cap still limits volume
     slot_time_pst: "09:30"
     style: >
@@ -38,8 +38,8 @@ platforms:
     max_chars: 3000
     derivative_count: [1, 2]
     best_times_pst: "Tue-Thu, 8-10am. Business hours only; no evenings or weekends."
-    posts_per_week: 2
-    slot_days: [Tue, Thu]
+    posts_per_week: 5      # bumped 2->5 (Muxin, 2026-07-07); spread across the work week
+    slot_days: [Mon, Tue, Wed, Thu, Fri]
     slot_time_pst: "08:30"
     style: >
       Lesson post, left-aligned narrative, practitioner voice. Insight-driven,
