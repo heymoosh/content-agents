@@ -197,20 +197,67 @@ function possibleSources(platform: string): ("typefully" | "postpeer" | "youtube
   }
 }
 
-function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<string, boolean>): {
+// Count (not just presence) per key, so a platform with >1 slot/day (max_slots_per_day) reports an
+// orphaned extra claim or extra unclaimed live post instead of both silently reading as "matched,
+// fine".
+function countByKey<T>(items: T[], key: (item: T) => string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const k = key(item);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return counts;
+}
+
+// Consume up to min(count) of `items` against `capacity`'s per-key budget, in order; whatever's
+// left over past that budget is the excess for that key. Shared by both matching passes below
+// (exact time, then day) and both directions (claims vs. live, live vs. claims).
+function partitionExcess<T>(items: T[], key: (item: T) => string, capacity: Map<string, number>): T[] {
+  const used = new Map<string, number>();
+  const excess: T[] = [];
+  for (const item of items) {
+    const k = key(item);
+    const usedSoFar = used.get(k) ?? 0;
+    if (usedSoFar < (capacity.get(k) ?? 0)) {
+      used.set(k, usedSoFar + 1);
+    } else {
+      excess.push(item);
+    }
+  }
+  return excess;
+}
+
+const exactKeyOf = (platform: string, iso: string): string => `${platform}|${new Date(iso).getTime()}`;
+const dayKeyOf = (platform: string, day: string): string => `${platform}|${day}`;
+
+export function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<string, boolean>): {
   claimedNotLive: Claim[];
   liveNotClaimed: QueueItem[];
   uncheckable: Claim[];
 } {
-  const liveKeys = new Set(live.map((i) => `${i.platform}|${laDay(i.whenIso)}`));
-  const claimKeys = new Set(futureClaims.map((c) => `${c.platform}|${c.day}`));
+  // A cadence bucket (e.g. "quote-card") is never cross-checked — drop it before any matching so it
+  // can never occupy a real platform's budget.
+  const checkableClaims = futureClaims.filter((c) => possibleSources(c.platform).length > 0);
+
+  // Match in two passes, finest signal first, so a same-day claim that IS backed by a specific live
+  // post is never mistaken for the orphan just because day-level counting alone can't tell which
+  // specific claim/post pair actually corresponds (two same-day claims are otherwise indistinguishable
+  // by count alone, and picking the wrong one to report would release a claim that's actually live):
+  //   1. exact time — unambiguous whenever two same-day claims/posts differ in time-of-day.
+  //   2. day — the coarser grain, a fungible fallback for genuine ties (identical exact time).
+  const liveByExactTime = countByKey(live, (i) => exactKeyOf(i.platform, i.whenIso));
+  const claimsAfterExact = partitionExcess(checkableClaims, (c) => exactKeyOf(c.platform, c.time), liveByExactTime);
+
+  const claimsByExactTime = countByKey(checkableClaims, (c) => exactKeyOf(c.platform, c.time));
+  const liveAfterExact = partitionExcess(live, (i) => exactKeyOf(i.platform, i.whenIso), claimsByExactTime);
+
+  const liveByDay = countByKey(liveAfterExact, (i) => dayKeyOf(i.platform, laDay(i.whenIso)));
+  const excessClaims = partitionExcess(claimsAfterExact, (c) => dayKeyOf(c.platform, c.day), liveByDay);
 
   const claimedNotLive: Claim[] = [];
   const uncheckable: Claim[] = [];
-  for (const c of futureClaims) {
+  for (const c of excessClaims) {
     const srcs = possibleSources(c.platform);
-    if (srcs.length === 0) continue; // cadence bucket — skip
-    if (liveKeys.has(`${c.platform}|${c.day}`)) continue; // matched a live post
     if (srcs.every((s) => ok[s])) claimedNotLive.push(c);
     else uncheckable.push(c); // a needed source was unreachable — can't conclude drift
   }
@@ -218,7 +265,11 @@ function reconcile(live: QueueItem[], futureClaims: Claim[], ok: Record<string, 
   // A live post with no ledger claim. Only meaningful when the ledger actually has claims (it's
   // local + gitignored, so a fresh worktree has none — then every live post would falsely look
   // unclaimed). Skip the per-item list in that case; the caller notes it instead.
-  const liveNotClaimed = claimKeys.size === 0 ? [] : live.filter((i) => !claimKeys.has(`${i.platform}|${laDay(i.whenIso)}`));
+  const claimsByDay = countByKey(claimsAfterExact, (c) => dayKeyOf(c.platform, c.day));
+  const liveNotClaimed =
+    futureClaims.length === 0
+      ? []
+      : partitionExcess(liveAfterExact, (i) => dayKeyOf(i.platform, laDay(i.whenIso)), claimsByDay);
 
   return { claimedNotLive, liveNotClaimed, uncheckable };
 }

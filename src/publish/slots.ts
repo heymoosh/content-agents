@@ -167,15 +167,29 @@ function claimKey(c: Claim): string {
 // Release specific claims from the ledger — e.g. --sync dropping a future claim reconcile() found
 // "claimed but not live" (a run claimed a slot and aborted before the post it was for actually
 // happened, so nothing will ever fill it). Matches by full claim identity; the ledger has no
-// synthetic id. Returns the claims ACTUALLY found + removed (not just `toRelease` echoed back) —
-// the ledger is shared across runs/streams, so by the time this re-reads it, some of `toRelease`
-// may already be gone (or never were there); callers must not assume every requested release landed.
+// synthetic id. Counts occurrences of each identity in `toRelease` rather than using a Set of keys,
+// so two ledger rows that happen to share identical identity (e.g. a claim race) aren't both wiped
+// out when only one of them was actually requested. Returns the claims ACTUALLY found + removed (not
+// just `toRelease` echoed back) — the ledger is shared across runs/streams, so by the time this
+// re-reads it, some of `toRelease` may already be gone (or never were there); callers must not assume
+// every requested release landed.
 export function releaseClaims(toRelease: Claim[]): { removed: number; removedClaims: Claim[] } {
   if (!toRelease.length) return { removed: 0, removedClaims: [] };
   const claims = readLedger();
-  const drop = new Set(toRelease.map(claimKey));
-  const removedClaims = claims.filter((c) => drop.has(claimKey(c)));
-  const remaining = claims.filter((c) => !drop.has(claimKey(c)));
+  const toDrop = new Map<string, number>();
+  for (const c of toRelease) toDrop.set(claimKey(c), (toDrop.get(claimKey(c)) ?? 0) + 1);
+  const removedClaims: Claim[] = [];
+  const remaining: Claim[] = [];
+  for (const c of claims) {
+    const key = claimKey(c);
+    const left = toDrop.get(key) ?? 0;
+    if (left > 0) {
+      toDrop.set(key, left - 1);
+      removedClaims.push(c);
+    } else {
+      remaining.push(c);
+    }
+  }
   if (removedClaims.length > 0) writeLedgerAtomic(remaining);
   return { removed: removedClaims.length, removedClaims };
 }

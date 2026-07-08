@@ -17,7 +17,7 @@ import { writeFileSync, existsSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readLedger, type Claim } from "./slots.js";
-import { syncLedger, type QueueItem } from "./queue-view.js";
+import { syncLedger, reconcile, type QueueItem } from "./queue-view.js";
 import { fetchScheduledDrafts } from "./typefully.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -105,6 +105,75 @@ describe("queue-view.ts: syncLedger", () => {
   test("no-op result on an empty ledger", () => {
     const result = syncLedger([], ALL_OK, NOW);
     assert.deepEqual(result, { prunedPast: 0, keptFuture: 0, releasedOrphans: [] });
+  });
+});
+
+// Regression for card a112f4ac: reconcile() used to key live posts / ledger claims by plain Sets of
+// `${platform}|${day}`, so it could only tell presence from absence, never a count. Once a platform
+// has >1 slot/day (max_slots_per_day, card c58fa530), an orphaned extra claim (or an extra unclaimed
+// live post) on a multi-slot day silently looked "matched, fine" on both sides.
+describe("queue-view.ts: reconcile() counts claims per platform/day instead of just checking presence", () => {
+  test("2 ledger claims + 1 live post on the same platform/day: the 1 excess claim is claimedNotLive", () => {
+    const c1 = claim({ asset: "slot-1/x" });
+    const c2 = claim({ asset: "slot-2/x" });
+    const live: QueueItem[] = [
+      { whenIso: c1.time, platform: "x", media: "text", title: "the one live post", source: "typefully" },
+    ];
+
+    const result = reconcile(live, [c1, c2], ALL_OK);
+    assert.equal(result.claimedNotLive.length, 1, "exactly one of the two same-day claims is unmatched");
+    assert.ok(
+      [c1.asset, c2.asset].includes(result.claimedNotLive[0].asset),
+      "the flagged claim must be one of the two same-day claims"
+    );
+    assert.equal(result.liveNotClaimed.length, 0);
+  });
+
+  test("1 ledger claim + 2 live posts on the same platform/day: the 1 excess live post is liveNotClaimed", () => {
+    const c1 = claim({ asset: "slot-1/x" });
+    const live: QueueItem[] = [
+      { whenIso: c1.time, platform: "x", media: "text", title: "live post A", source: "typefully" },
+      { whenIso: c1.time, platform: "x", media: "text", title: "live post B", source: "typefully" },
+    ];
+
+    const result = reconcile(live, [c1], ALL_OK);
+    assert.equal(result.claimedNotLive.length, 0);
+    assert.equal(result.liveNotClaimed.length, 1, "exactly one of the two same-day live posts is unclaimed");
+    assert.ok(
+      ["live post A", "live post B"].includes(result.liveNotClaimed[0].title),
+      "the flagged live post must be one of the two same-day live posts"
+    );
+  });
+
+  test("2 ledger claims + 2 live posts on the same platform/day: counts match, no drift", () => {
+    const c1 = claim({ asset: "slot-1/x" });
+    const c2 = claim({ asset: "slot-2/x" });
+    const live: QueueItem[] = [
+      { whenIso: c1.time, platform: "x", media: "text", title: "live post A", source: "typefully" },
+      { whenIso: c1.time, platform: "x", media: "text", title: "live post B", source: "typefully" },
+    ];
+
+    const result = reconcile(live, [c1, c2], ALL_OK);
+    assert.equal(result.claimedNotLive.length, 0);
+    assert.equal(result.liveNotClaimed.length, 0);
+  });
+
+  test("2 claims at different times on the same day, one live: the claim with no matching live post is flagged, not whichever comes first in ledger order", () => {
+    const orphan = claim({ asset: "orphan/x", time: "2026-08-01T09:30:00.000Z" });
+    const backed = claim({ asset: "backed/x", time: "2026-08-01T17:00:00.000Z" });
+    const live: QueueItem[] = [
+      { whenIso: backed.time, platform: "x", media: "text", title: "the live post", source: "typefully" },
+    ];
+
+    // Ledger order puts the orphan FIRST — day-count-only matching would greedily "match" it against
+    // the live post and wrongly flag `backed` (which IS live) as the excess claim instead.
+    const result = reconcile(live, [orphan, backed], ALL_OK);
+    assert.equal(result.claimedNotLive.length, 1);
+    assert.equal(
+      result.claimedNotLive[0].asset,
+      "orphan/x",
+      "the claim with no matching live post must be flagged, not the live-backed one"
+    );
   });
 });
 
