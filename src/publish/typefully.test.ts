@@ -10,9 +10,9 @@
  * Typefully /drafts API.
  */
 
-import { test, describe } from "node:test";
+import { test, describe, after } from "node:test";
 import assert from "node:assert/strict";
-import { buildDraftPayload } from "./typefully.js";
+import { buildDraftPayload, fetchScheduledDrafts } from "./typefully.js";
 
 const POSTS = [{ text: "Verbatim note text spread to a text channel." }];
 
@@ -71,5 +71,100 @@ describe("typefully buildDraftPayload: scheduled vs unscheduled contract", () =>
       publishAt: "",
     });
     assert.ok(!("publish_at" in payload), "empty publishAt must not schedule the draft");
+  });
+});
+
+// fetchScheduledDrafts pagination: Typefully v2 caps a single page at limit=50 ({ results, next }
+// shape, next null on the last page). Before this fix, only the first page was ever fetched — a
+// genuinely-scheduled draft sitting beyond item 50 was invisible to reconcile() and could get
+// misreported as an orphaned ledger claim and released by `queue -- --sync`.
+describe("typefully fetchScheduledDrafts: pagination", () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.TYPEFULLY_API_KEY;
+  const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
+
+  after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TYPEFULLY_API_KEY;
+    else process.env.TYPEFULLY_API_KEY = originalKey;
+    if (originalSetId === undefined) delete process.env.TYPEFULLY_SOCIAL_SET_ID;
+    else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
+  });
+
+  function draft(id: number, minutesFromNow: number) {
+    return {
+      id,
+      draft_title: `draft-${id}`,
+      scheduled_date: new Date(Date.now() + minutesFromNow * 60_000).toISOString(),
+      status: "scheduled",
+      x_post_enabled: true,
+    };
+  }
+
+  // Serves fixed-size pages out of `allDrafts`, honoring limit/offset and returning Typefully's
+  // real { results, next } shape (next null on the last page).
+  function stubPagedFetch(allDrafts: ReturnType<typeof draft>[]): { calls: string[] } {
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      calls.push(url.toString());
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      const offset = Number(url.searchParams.get("offset") ?? "0");
+      const page = allDrafts.slice(offset, offset + limit);
+      const next = offset + limit < allDrafts.length ? "https://api.typefully.com/v2/next-page" : null;
+      return new Response(JSON.stringify({ results: page, next }), { status: 200 });
+    }) as typeof fetch;
+    return { calls };
+  }
+
+  test("pages through ALL scheduled drafts, not just the first 50", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    const allDrafts = Array.from({ length: 120 }, (_, i) => draft(i + 1, i));
+    const { calls } = stubPagedFetch(allDrafts);
+
+    const scheduled = await fetchScheduledDrafts();
+
+    assert.equal(scheduled.length, 120, "must return drafts from every page, not just the first 50");
+    assert.ok(scheduled.some((d) => d.id === "119"), "a draft beyond the old 50-item limit must be present");
+    assert.equal(calls.length, 3, "should have fetched exactly 3 pages (50 + 50 + 20)");
+  });
+
+  test("stops at the page cap and throws instead of looping forever or returning a truncated list", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    // 600 drafts, always claiming a next page — a pathological account state.
+    const allDrafts = Array.from({ length: 600 }, (_, i) => draft(i + 1, i));
+    const { calls } = stubPagedFetch(allDrafts);
+
+    await assert.rejects(
+      () => fetchScheduledDrafts(),
+      /page cap/,
+      "a truncated list must surface as a failure (caller treats the source as unreachable), not a silently-partial success"
+    );
+    assert.equal(calls.length, 10, "must stop issuing requests once the page cap is hit");
+  });
+
+  test("a non-final page returning fewer than the limit still advances past it, not just full pages", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    // Page 1 returns a SHORT page (30 items, not the full 50) while still claiming a next page —
+    // offset must advance by what actually came back (30), not by the fixed page limit (50), or
+    // items 31-49 would be silently skipped forever.
+    const allDrafts = Array.from({ length: 80 }, (_, i) => draft(i + 1, i));
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      calls.push(url.toString());
+      const offset = Number(url.searchParams.get("offset") ?? "0");
+      const page = offset === 0 ? allDrafts.slice(0, 30) : allDrafts.slice(offset);
+      const next = offset === 0 ? "https://api.typefully.com/v2/next-page" : null;
+      return new Response(JSON.stringify({ results: page, next }), { status: 200 });
+    }) as typeof fetch;
+
+    const scheduled = await fetchScheduledDrafts();
+
+    assert.equal(scheduled.length, 80, "every draft must be returned, including those after a short non-final page");
+    assert.ok(scheduled.some((d) => d.id === "31"), "item 31 (right after the short page) must not be skipped");
   });
 });

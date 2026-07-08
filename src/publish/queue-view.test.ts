@@ -18,6 +18,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readLedger, type Claim } from "./slots.js";
 import { syncLedger, type QueueItem } from "./queue-view.js";
+import { fetchScheduledDrafts } from "./typefully.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TEST_LEDGER = join(repoRoot, "data", ".test-publish-schedule.queue-view.jsonl");
@@ -104,5 +105,88 @@ describe("queue-view.ts: syncLedger", () => {
   test("no-op result on an empty ledger", () => {
     const result = syncLedger([], ALL_OK, NOW);
     assert.deepEqual(result, { prunedPast: 0, keptFuture: 0, releasedOrphans: [] });
+  });
+});
+
+// Regression for card c18c39a9: fetchScheduledDrafts() used to fetch only the first page (limit=50)
+// of Typefully's scheduled drafts. A real live draft sitting beyond that page was invisible to
+// reconcile(), so a matching ledger claim was misreported as claimedNotLive and `--sync` would
+// release it, letting a later run double-book the same slot. Exercises the full path: a stubbed
+// multi-page Typefully response -> fetchScheduledDrafts() -> reconcile() (via syncLedger).
+describe("queue-view.ts: reconcile() correctly matches a live post beyond the old pagination limit", () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.TYPEFULLY_API_KEY;
+  const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
+
+  before(() => {
+    process.env.CONTENT_AGENTS_TEST_LEDGER = TEST_LEDGER;
+  });
+
+  after(() => {
+    delete process.env.CONTENT_AGENTS_TEST_LEDGER;
+    if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TYPEFULLY_API_KEY;
+    else process.env.TYPEFULLY_API_KEY = originalKey;
+    if (originalSetId === undefined) delete process.env.TYPEFULLY_SOCIAL_SET_ID;
+    else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
+  });
+
+  beforeEach(() => {
+    seedLedger([]);
+  });
+
+  test("the 51st Typefully draft is matched, not wrongly released as an orphan", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+
+    // The claim we expect to survive --sync: a real draft scheduled for 2026-08-01T17:00:00Z on x.
+    const matched = claim({ asset: "51st-draft/x" });
+    seedLedger([matched]);
+
+    // First 50 drafts are unrelated (different day); the 51st (index 50, beyond the OLD limit=50
+    // page) is the one that actually matches the ledger claim.
+    const allDrafts = Array.from({ length: 50 }, (_, i) => ({
+      id: i + 1,
+      draft_title: `filler-${i + 1}`,
+      scheduled_date: "2026-08-02T17:00:00.000Z",
+      status: "scheduled",
+      x_post_enabled: true,
+    }));
+    allDrafts.push({
+      id: 51,
+      draft_title: "the-real-draft",
+      scheduled_date: matched.time,
+      status: "scheduled",
+      x_post_enabled: true,
+    });
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const limit = Number(url.searchParams.get("limit") ?? "50");
+      const offset = Number(url.searchParams.get("offset") ?? "0");
+      const page = allDrafts.slice(offset, offset + limit);
+      const next = offset + limit < allDrafts.length ? "https://api.typefully.com/v2/next-page" : null;
+      return new Response(JSON.stringify({ results: page, next }), { status: 200 });
+    }) as typeof fetch;
+
+    const drafts = await fetchScheduledDrafts();
+    assert.equal(drafts.length, 51, "fetchScheduledDrafts must have paged past the old 50-item limit");
+
+    const live: QueueItem[] = drafts.map((d) => ({
+      whenIso: d.whenIso,
+      platform: d.platforms[0],
+      media: "text",
+      title: d.title,
+      source: "typefully",
+    }));
+
+    const result = syncLedger(live, ALL_OK, NOW);
+    assert.equal(
+      result.releasedOrphans.length,
+      0,
+      "the 51st draft matches the claim, so reconcile() must not report it claimedNotLive"
+    );
+    assert.deepEqual(readLedger(), [matched], "a claim backed by a live post beyond the old page limit must survive --sync");
   });
 });

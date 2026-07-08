@@ -185,6 +185,10 @@ type YtVideo = {
   status?: { publishAt?: string; privacyStatus?: string };
   snippet?: { title?: string };
 };
+const PLAYLIST_PAGE_SIZE = 25;
+const PLAYLIST_MAX_PAGES = 10; // sane upper bound so a pathological channel can't loop forever / hammer the API
+const VIDEOS_BATCH_SIZE = 50; // videos.list accepts at most 50 ids per call
+
 export async function listScheduledUploads(): Promise<{ publishAt: string; title: string; videoId: string }[]> {
   const token = await accessToken();
   const get = async (path: string): Promise<Record<string, unknown>> => {
@@ -199,14 +203,46 @@ export async function listScheduledUploads(): Promise<{ publishAt: string; title
   };
   const uploads = ch.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
   if (!uploads) return [];
-  const pl = (await get(`playlistItems?part=contentDetails&maxResults=25&playlistId=${uploads}`)) as {
-    items?: { contentDetails?: { videoId?: string } }[];
-  };
-  const ids = (pl.items ?? []).map((it) => it.contentDetails?.videoId).filter((v): v is string => !!v);
+
+  // playlistItems pages via nextPageToken (standard YouTube Data API v3 pattern) — loop until no
+  // more pages so a channel with more than one page of uploads doesn't hide scheduled Shorts.
+  const ids: string[] = [];
+  let pageToken = "";
+  for (let page = 0; page < PLAYLIST_MAX_PAGES; page++) {
+    const tokenParam = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "";
+    const pl = (await get(
+      `playlistItems?part=contentDetails&maxResults=${PLAYLIST_PAGE_SIZE}&playlistId=${uploads}${tokenParam}`
+    )) as {
+      items?: { contentDetails?: { videoId?: string } }[];
+      nextPageToken?: string;
+    };
+    ids.push(...(pl.items ?? []).map((it) => it.contentDetails?.videoId).filter((v): v is string => !!v));
+    pageToken = pl.nextPageToken ?? "";
+    if (!pageToken) break;
+    if (page + 1 >= PLAYLIST_MAX_PAGES) {
+      // A truncated live list is more dangerous than an unreachable one: reconcile() (queue-view.ts)
+      // trusts a successful return as complete and will release ledger claims it can't match — the
+      // exact orphan-release misfire this pagination fix is closing. Throwing routes this the same
+      // way a network failure already does (caller marks the source unreachable / uncheckable)
+      // instead of silently handing back a partial list that looks complete.
+      throw new Error(
+        `listScheduledUploads: hit the ${PLAYLIST_MAX_PAGES}-page cap (${ids.length} uploads fetched) — more uploads exist and were not fetched`
+      );
+    }
+  }
   if (!ids.length) return [];
-  const vids = (await get(`videos?part=status,snippet&id=${ids.join(",")}`)) as { items?: YtVideo[] };
+
+  // videos.list only accepts up to 50 ids per call — batch so full pagination above doesn't
+  // silently truncate at the video-status lookup step instead. Batches are independent (no cursor
+  // dependency between them), so fetch them concurrently.
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += VIDEOS_BATCH_SIZE) batches.push(ids.slice(i, i + VIDEOS_BATCH_SIZE));
+  const batchResults = (await Promise.all(
+    batches.map((batch) => get(`videos?part=status,snippet&id=${batch.join(",")}`))
+  )) as { items?: YtVideo[] }[];
+  const items: YtVideo[] = batchResults.flatMap((r) => r.items ?? []);
   const now = Date.now();
-  return (vids.items ?? [])
+  return items
     .filter((v) => v.status?.publishAt && new Date(v.status.publishAt).getTime() > now)
     .map((v) => ({ publishAt: v.status!.publishAt!, title: v.snippet?.title ?? v.id, videoId: v.id }));
 }
