@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openDb, repoRoot } from "./db.js";
-import { CONTROL_RUN_SOURCE } from "../strategy/route.js";
+import { CONTROL_RUN_SOURCE, EXPLORATION_SOURCE } from "../strategy/route.js";
 
 // Classify each post's origin so origin-compare.ts can measure whether atomizing earns traction:
 //   'atomized'          — shipped by /publish from a content folder (verbatim extraction-first)
@@ -13,6 +13,14 @@ import { CONTROL_RUN_SOURCE } from "../strategy/route.js";
 //                          row carries `| control-run`). Takes priority over the spin marker:
 //                          route.ts's loadData() excludes this source from the pillar/platform
 //                          resonance figures; spin-control.ts's loadControlData tracks it separately.
+//   'exploration-probe' — shipped from a content folder as a deliberate off-assignment
+//                          exploration-budget probe (card 92bb2ae6 — Placed-log row carries
+//                          `| exploration`). Takes priority over the spin marker (same as
+//                          control-run above; the two markers are mutually exclusive in practice —
+//                          control-run targets an already-assigned pair, exploration an
+//                          off-assignment one — control-run wins if a row somehow carried both):
+//                          route.ts's loadData() excludes this source from the pillar/platform
+//                          resonance figures; exploration.ts's loadExplorationData tracks it separately.
 //   'organic'            — posted natively / a note Muxin wrote
 // Deterministic; runs during /strategy next to link-bet. The atomized signal is that the post text
 // matches a Placed-log row in briefs/bets.md (what /publish shipped), OR the post already carries a
@@ -45,14 +53,16 @@ interface Placed {
   prefix: string;
   spin: boolean;
   controlRun: boolean;
+  exploration: boolean;
 }
 
-// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | control-run | \"<text-prefix>\"" rows.
+// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | control-run | exploration | \"<text-prefix>\"" rows.
 // The optional ` | spin ` segment (written by appendBetPlacement for spin-experiment derivatives)
 // marks an audience-reframed variant; ` | control-run ` (card f444f440) marks a deliberate
-// --no-spin control run. Markers are scoped to the segment BEFORE the quoted post-text prefix —
-// the quote can itself contain a coincidental "| spin |"/"| control-run |" substring (Muxin's own
-// post text), and testing the full line would false-positive on that.
+// --no-spin control run; ` | exploration ` (card 92bb2ae6) marks a deliberate off-assignment
+// exploration-budget probe. Markers are scoped to the segment BEFORE the quoted post-text prefix —
+// the quote can itself contain a coincidental "| spin |"/"| control-run |"/"| exploration |"
+// substring (Muxin's own post text), and testing the full line would false-positive on that.
 function readPlaced(): Placed[] {
   let text = "";
   try {
@@ -70,15 +80,20 @@ function readPlaced(): Placed[] {
     const markerScope = quote ? line.slice(0, quote.index) : line;
     const spin = /\|\s+spin\s*(\||$)/.test(markerScope);
     const controlRun = /\|\s+control-run\s*(\||$)/.test(markerScope);
-    if (prefix.length >= 12) out.push({ platform: plat[1], prefix, spin, controlRun });
+    const exploration = /\|\s+exploration\s*(\||$)/.test(markerScope);
+    if (prefix.length >= 12) out.push({ platform: plat[1], prefix, spin, controlRun, exploration });
   }
   return out;
 }
 
-// Single source of truth for the controlRun > spin > plain priority: drives both the DB source
-// value and the sanity-check log line so they can't drift apart from independently-edited ternaries.
+// Single source of truth for the controlRun > exploration > spin > plain priority: drives both
+// the DB source value and the sanity-check log line so they can't drift apart from
+// independently-edited ternaries. controlRun and exploration are mutually exclusive in practice
+// (control-run targets an already-assigned pillar/platform pair, exploration an off-assignment
+// one) — controlRun wins if a row somehow carried both markers.
 function classifyHit(hit: Placed | undefined): { value: string; tag: string } {
   if (hit?.controlRun) return { value: CONTROL_RUN_SOURCE, tag: " (control-run)" };
+  if (hit?.exploration) return { value: EXPLORATION_SOURCE, tag: " (exploration)" };
   if (hit?.spin) return { value: "atomized-spin", tag: " (spin)" };
   return { value: "atomized", tag: "" };
 }
@@ -98,6 +113,7 @@ function main() {
   let atomized = 0;
   let spun = 0;
   let controlled = 0;
+  let explored = 0;
   let organic = 0;
   let untouched = 0;
   const matches: string[] = [];
@@ -107,11 +123,12 @@ function main() {
       let value: string;
       if (DISTRIBUTED.has(p.platform)) {
         const content = norm(p.content_text ?? "");
-        // Keep the matched row so its spin/control-run marker can promote the classification.
+        // Keep the matched row so its spin/control-run/exploration marker can promote the classification.
         const hit = placed.find((pl) => pl.platform === p.platform && leadMatch(content, pl.prefix));
         const matched = !!p.bet_id || !!hit;
-        // bet_id-only matches (text edited before posting) lose the spin/control-run signal →
-        // default atomized. control-run takes priority over spin — see CONTROL_RUN_SOURCE.
+        // bet_id-only matches (text edited before posting) lose the spin/control-run/exploration
+        // signal → default atomized. Priority order (controlRun > exploration > spin) lives in
+        // classifyHit, the single source of truth for both the DB value and this log tag.
         const classified = matched ? classifyHit(hit) : { value: "organic", tag: "" };
         value = classified.value;
         if (matched) {
@@ -127,6 +144,7 @@ function main() {
       if (value === "organic") organic++;
       else if (value === "atomized-spin") spun++;
       else if (value === CONTROL_RUN_SOURCE) controlled++;
+      else if (value === EXPLORATION_SOURCE) explored++;
       else atomized++;
     }
   });
@@ -134,7 +152,7 @@ function main() {
   db.close();
 
   console.log(
-    `tag-source: ${atomized} atomized, ${spun} atomized-spin, ${controlled} spin-control-run, ${organic} organic, ${untouched} left untouched (parsed ${placed.length} placed rows)`
+    `tag-source: ${atomized} atomized, ${spun} atomized-spin, ${controlled} spin-control-run, ${explored} exploration-probe, ${organic} organic, ${untouched} left untouched (parsed ${placed.length} placed rows)`
   );
   if (matches.length) {
     console.log(`\natomized (sanity-check these are real):`);

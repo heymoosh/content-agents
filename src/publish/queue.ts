@@ -204,7 +204,12 @@ export function appendBetPlacement(
   // so route.ts's loadData() can exclude it from the pillar/platform resonance figures. Same
   // placement rule as spin — before the quoted prefix.
   const controlRun = fm.control_run ? ` | control-run` : "";
+  // Exploration-probe marker (card 92bb2ae6, exploration budget): tag-source reads this back to
+  // classify the post source = 'exploration-probe' instead of 'atomized'/'atomized-spin', so
+  // route.ts's loadData() can exclude it from the pillar/platform resonance figures. Same
+  // placement rule as spin — before the quoted prefix.
+  const exploration = fm.exploration_probe ? ` | exploration` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${prefix}`;
   writeFileSync(BETS_PATH, existing.replace(/\n*$/, "\n") + line + "\n");
 }

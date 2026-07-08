@@ -20,6 +20,7 @@
     "tag-source": "tsx src/db/tag-source.ts",
     "route": "tsx src/strategy/route.ts",
     "spin-control": "tsx src/strategy/spin-control.ts",
+    "explore": "tsx src/strategy/exploration.ts",
     "angle-refresh": "tsx src/strategy/angle-refresh.ts",
     "new-content": "tsx src/atomize/new-content.ts",
     "new-notes": "tsx src/atomize/new-notes.ts",

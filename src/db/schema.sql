@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS posts (
   media_type TEXT,                     -- 'text' | 'quote-card' | 'video' | 'note' | 'unknown'; populated on ingest, backfilled from format by migration
   pillar TEXT,                         -- 'human-ai' | 'claude-code' | 'civic-tech' | 'career-work' | 'builder' | 'other' | NULL = untagged
   bet_id TEXT,                         -- set by link-bet.ts when /strategy matches a post to a brief's bet (NULL = unattributed)
-  source TEXT,                         -- 'atomized' (verbatim, shipped by /publish from a content folder) | 'atomized-spin' (audience-reframed variant, docs/spin-experiment.md) | 'spin-control-run' (deliberate --no-spin control run, card f444f440, src/strategy/spin-control.ts) | 'organic' (posted natively / a note Muxin wrote) | NULL = unclassified; set by tag-source.ts
+  source TEXT,                         -- 'atomized' (verbatim, shipped by /publish from a content folder) | 'atomized-spin' (audience-reframed variant, docs/spin-experiment.md) | 'spin-control-run' (deliberate --no-spin control run, card f444f440, src/strategy/spin-control.ts) | 'exploration-probe' (off-assignment pillar/platform probe, card 92bb2ae6 -- excluded from route.ts's resonance figures, see src/strategy/exploration.ts) | 'organic' (posted natively / a note Muxin wrote) | NULL = unclassified; set by tag-source.ts
   UNIQUE(platform, platform_post_id)
 );
 

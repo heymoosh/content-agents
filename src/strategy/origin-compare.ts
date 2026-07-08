@@ -1,6 +1,6 @@
 import { openDb } from "../db/db.js";
 import { fileURLToPath } from "node:url";
-import { CONTROL_RUN_SOURCE } from "./route.js";
+import { CONTROL_RUN_SOURCE, EXPLORATION_SOURCE } from "./route.js";
 
 // Atomized-vs-organic traction: per platform, how do machine-distributed posts compare to ones
 // Muxin posted natively (incl. Substack notes)? Reuses the snapshot.ts engagement score + recency
@@ -30,6 +30,9 @@ interface Row {
 
 function main() {
   const db = openDb();
+  // exploration-probe rows are a deliberate off-assignment mechanism (card 92bb2ae6), not part of
+  // the atomized/spin/organic comparison this report measures — exclude them, same as route.ts's
+  // loadData(). Their own coverage bucket lives in exploration.ts's --coverage report.
   const rows = db
     .prepare(
       `SELECT p.platform, p.source, p.posted_at, m.likes, m.replies, m.reposts
@@ -39,9 +42,9 @@ function main() {
          JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
            ON m.post_id = lm.post_id AND m.captured_at = lm.mc
        ) m ON m.post_id = p.id
-       WHERE p.source IS NOT NULL`
+       WHERE p.source IS NOT NULL AND p.source != ?`
     )
-    .all() as Row[];
+    .all(EXPLORATION_SOURCE) as Row[];
   db.close();
 
   if (rows.length === 0) {

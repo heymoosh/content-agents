@@ -87,6 +87,21 @@ makes `/cycle` compound instead of restarting every week.
      from the pillar/platform resonance figures and the routing drift flag above — a control run's
      engagement never feeds either. Prints nothing until a pair reaches n>=3 control runs; a bare
      "no pair has reached n>=3" needs no brief section.
+   - `npm run explore` → exploration budget (card 92bb2ae6): picks and records this month's due
+     off-assignment probe for LinkedIn and for Bluesky (idempotent, a platform already probed
+     this calendar month just prints a skip line). When it prints a pick, add a [TEST]
+     recommendation in Step 4 naming the platform + pillar: next time Muxin atomizes a piece,
+     route ONE derivative for that platform with
+     `tsx src/strategy/route.ts --pillar <pillar> --explore <platform> --folder <folder>` and
+     stamp that derivative's frontmatter `exploration_probe: true` before it reaches
+     `review-queue.md` (see `.claude/skills/atomize/SKILL.md` step 3.5). `/strategy` only
+     surfaces the pick, it never drafts content itself.
+   - `npm run explore -- --coverage` → exploration-budget coverage (card 92bb2ae6): accumulated
+     engagement (n, avg) per off-assignment pillar/platform pair probed by `npm run explore`
+     (LinkedIn/Bluesky's untested pillars, derived live from `config/routing.yaml`'s defaults).
+     This is a SEPARATE bucket from the topic resonance map and routing drift flags above — an
+     exploration probe's engagement never feeds either. Prints nothing until an untested pillar
+     reaches n>=3 probes; a bare "no untested pillar has reached n>=3" needs no brief section.
    - Read `data/community-log.md` (manual observations — treat as qualitative signal)
 
 4. **Write the brief** to `briefs/YYYY-MM-DD-strategy-brief.md`:
@@ -144,6 +159,14 @@ makes `/cycle` compound instead of restarting every week.
     entirely otherwise, don't manufacture a placeholder. When present: the coverage table verbatim
     + 1-2 sentences on whether the control runs show the spin angle is landing or not for that
     pair (a judgment call for Muxin, never an auto-change here). This bucket is separate from, and
+    never folded into, the Topic resonance map or Routing drift flags above.>
+
+   ## Exploration coverage
+   <only include this section if `npm run explore -- --coverage` printed at least one row (some
+    untested pillar reached n>=3 probes) — omit the section entirely otherwise, don't manufacture
+    a placeholder. When present: the coverage table verbatim + 1-2 sentences on whether an
+    off-assignment pillar/platform pair is worth promoting into config/routing.yaml's defaults
+    (a judgment call for Muxin, never an auto-change here). This bucket is separate from, and was
     never folded into, the Topic resonance map or Routing drift flags above.>
 
    ## Community signals
