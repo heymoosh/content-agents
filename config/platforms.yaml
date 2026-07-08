@@ -8,13 +8,14 @@
 # sends it to Typefully (DST-aware, PT) so posts auto-publish on schedule — no manual dragging. Three
 # fields per platform drive it:
 #   posts_per_week  — cap on how many posts land on this platform in any Mon-Sun week
-#   slot_days       — weekdays eligible for a slot (Sun..Sat); scheduler places ~1/day, never same-day
+#   slot_days       — weekdays eligible for a slot (Sun..Sat); scheduler places ~1/day by default
 #   slot_time_pst   — time of day (PST/PDT wall clock) for that day's slot, inside best_times_pst
+#   max_slots_per_day — optional; raises the per-day cap above 1, spacing extra slots across the day
 # Approved posts fill the next free future slots in queue order, spreading across weeks if there are
 # more than posts_per_week. Cross-run + cross-stream spacing IS built: src/publish/slots.ts records
-# every claim in a shared ledger (data/publish-schedule.jsonl), so text and cards never double-book a
-# platform's day across separate runs. A platform without these three fields falls back to
-# Typefully "next-free-slot".
+# every claim in a shared ledger (data/publish-schedule.jsonl), so text and cards never exceed a
+# platform's per-day slot cap across separate runs. A platform without these three fields falls back
+# to Typefully "next-free-slot".
 # Minimum days between re-publishing the same content slug to a platform. The per-platform
 # values below override this for their channel; anything not listed inherits this default.
 # Enforced by the reuse guard in src/publish/reuse-guard.ts (checked by publish:typefully
@@ -27,7 +28,7 @@ platforms:
     max_chars: 280
     derivative_count: [3, 5]
     best_times_pst: "Tue-Thu, 9-11am (primary), 1-2pm (secondary). Weaker on weekends, but posting keeps presence."
-    posts_per_week: 7      # bumped 5->7 (Muxin, 2026-07-07); max the 1-post/PT-day architecture supports
+    posts_per_week: 7      # bumped 5->7 (Muxin, 2026-07-07); max under x's current 1-post/PT-day cadence
     slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]   # weekends allowed; weekly cap still limits volume
     slot_time_pst: "09:30"
     style: >

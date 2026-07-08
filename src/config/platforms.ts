@@ -22,8 +22,10 @@ export const platformRuleSchema = z
     slot_time_pst: z.string().optional(),
     // Max claimed slots per PT-calendar-day for this platform (src/publish/slots.ts). Absent means
     // 1, today's behavior for every platform. >1 opts a platform into multiple same-day slots,
-    // spaced across the day instead of all landing at slot_time_pst.
-    max_slots_per_day: z.number().optional(),
+    // spaced across the day instead of all landing at slot_time_pst. Must be a positive integer —
+    // 0/negative would silently block every future claim, and a fraction would let the day's
+    // uniqueness check round up instead of down.
+    max_slots_per_day: z.number().int().positive().optional(),
     style: z.string().optional(),
   })
   .passthrough();

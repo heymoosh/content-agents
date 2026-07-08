@@ -53,4 +53,10 @@ describe("platformRuleSchema: max_slots_per_day", () => {
   test("rejects a non-number max_slots_per_day instead of silently passing it through", () => {
     assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: "three" }));
   });
+
+  test("rejects zero, negative, and fractional max_slots_per_day (would silently starve or off-by-one the day cap)", () => {
+    assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: 0 }));
+    assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: -1 }));
+    assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: 1.5 }));
+  });
 });

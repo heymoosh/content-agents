@@ -127,7 +127,8 @@ extraction-first.
   `slot_days` / `slot_time_pst` cadence in `config/platforms.yaml` + the shared slot ledger
   `data/publish-schedule.jsonl`), used by ALL scheduled channels — text (Typefully), cards (image
   relays), and TikTok (PostPeer). It claims the next free, PT-anchored slot per platform, ≤1
-  post/platform/PT-day and ≤ `posts_per_week` across runs and streams. Cards (`quote-card` cadence)
+  post/platform/PT-day by default (a platform's `max_slots_per_day` can raise that, spacing extra
+  slots across the day) and ≤ `posts_per_week` across runs and streams. Cards (`quote-card` cadence)
   also de-conflict against each platform they fan out to. Edit `config/platforms.yaml` to change
   cadence — Typefully gets explicit times, not its "next-free-slot"; TikTok still honors
   `TIKTOK_SCHEDULE_AT` as a manual one-off override.

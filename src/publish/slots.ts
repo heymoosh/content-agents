@@ -7,15 +7,17 @@ import { loadPlatforms } from "../config/platforms.js";
 // text (Typefully) and quote cards (image relays). It extends main's per-run cadence (config/
 // platforms.yaml posts_per_week + slot_days + slot_time_pst, DST-aware PT) with a persistent slot
 // ledger (data/publish-schedule.jsonl) so claims survive across /publish runs AND across streams.
-// That closes the "Phase 2" gap main flagged: a platform never gets two posts on the same LA day,
-// whether they come from text, cards, or a separate run.
+// That closes the "Phase 2" gap main flagged: a platform never exceeds its per-day slot cap (default
+// 1, raised via a platform's `max_slots_per_day`) on the same LA day, whether posts come from text,
+// cards, or a separate run.
 //
-// Model: each post occupies one LA calendar day per platform it lands on (daily uniqueness). A
-// `windowKey` (a platforms.yaml entry) supplies the candidate days/time and a weekly volume cap;
-// `conflictPlatforms` are the real platforms the post occupies (deduped against the ledger and
-// recorded so later posts avoid those days). Text: windowKey == platform == the one conflict
-// platform. Cards: windowKey "quote-card" supplies card days/time; conflictPlatforms are the
-// platforms the card fans out to.
+// Model: each post claims one of a platform's per-day slots (default 1; `max_slots_per_day` raises
+// it, spacing extra slots across the day) on the LA calendar day it lands on. A `windowKey` (a
+// platforms.yaml entry) supplies the candidate days/time and a weekly volume cap; `conflictPlatforms`
+// are the real platforms the post occupies (deduped against the ledger and recorded so later posts
+// respect those platforms' own caps). Text: windowKey == platform == the one conflict platform.
+// Cards: windowKey "quote-card" supplies card days/time; conflictPlatforms are the platforms the card
+// fans out to.
 
 const TZ = "America/Los_Angeles";
 const WEEKDAYS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
@@ -185,11 +187,17 @@ function appendLedger(claims: Claim[]): void {
   appendFileSync(ledger, claims.map((c) => JSON.stringify(c)).join("\n") + "\n");
 }
 
+// Increment a platform's tally at `key` in a platform → key → count map.
+function bump(counts: Record<string, Record<string, number>>, platform: string, key: string): void {
+  counts[platform][key] = (counts[platform][key] ?? 0) + 1;
+}
+
 // Claim `count` slots. Candidate days + time + weekly cap come from `windowKey` (a platforms.yaml
-// cadence entry); each claimed day must be free (no existing ledger claim) for EVERY
-// `conflictPlatforms` entry, and is recorded against the windowKey (for the volume cap) and each
-// conflict platform (for daily uniqueness). `dryRun` computes without recording. Returns ISO times
-// (or "next-free-slot" for a windowKey with no cadence — Typefully's fallback).
+// cadence entry); each claimed day must have room (under every relevant platform's max_slots_per_day,
+// default 1) for EVERY `conflictPlatforms` entry, and is recorded against the windowKey (for the
+// volume cap) and each conflict platform (for its own per-day cap). `dryRun` computes without
+// recording. Returns ISO times (or "next-free-slot" for a windowKey with no cadence — Typefully's
+// fallback).
 export function claimSlots(opts: {
   windowKey: string;
   conflictPlatforms: string[];
@@ -227,17 +235,24 @@ export function claimSlots(opts: {
     daySlotCount[p] = {};
     weekCount[p] = {};
   }
+  const weekKeyByDay: Record<string, string> = {}; // memoized so N same-day claims don't redo the DST-aware lookup N times
   for (const c of ledger) {
     if (!relevant.includes(c.platform)) continue;
-    daySlotCount[c.platform][c.day] = (daySlotCount[c.platform][c.day] ?? 0) + 1;
-    const [y, mo, d] = c.day.split("-").map(Number);
-    const wd = laParts(laWallToInstant(y, mo, d, 12, 0)).weekday;
-    const wk = weekKey(y, mo, d, wd);
-    weekCount[c.platform][wk] = (weekCount[c.platform][wk] ?? 0) + 1;
+    bump(daySlotCount, c.platform, c.day);
+    if (!(c.day in weekKeyByDay)) {
+      const [y, mo, d] = c.day.split("-").map(Number);
+      const wd = laParts(laWallToInstant(y, mo, d, 12, 0)).weekday;
+      weekKeyByDay[c.day] = weekKey(y, mo, d, wd);
+    }
+    bump(weekCount, c.platform, weekKeyByDay[c.day]);
   }
 
   const [hh, mm] = sched.timePst.split(":").map(Number);
-  const windowMaxSlotsPerDay = maxPerDay[opts.windowKey];
+  // Every slot claimed this call adds one row to EVERY relevant platform at once, so the group can
+  // never land more slots on one day than its tightest member's own cap — spacing must target that
+  // achievable count, not just windowKey's own (higher) ceiling, or slots cluster near the anchor
+  // instead of spreading across the day.
+  const dayMaxSlots = Math.min(...relevant.map((p) => maxPerDay[p]));
   const now = opts.now ?? new Date();
   const newClaims: Claim[] = [];
   const times: string[] = [];
@@ -259,7 +274,7 @@ export function claimSlots(opts: {
       if (blocked) break;
 
       const slotIndex = daySlotCount[opts.windowKey][dk] ?? 0;
-      const { hh: slotHh, mm: slotMm } = slotTimeForIndex(hh, mm, windowMaxSlotsPerDay, slotIndex);
+      const { hh: slotHh, mm: slotMm } = slotTimeForIndex(hh, mm, dayMaxSlots, slotIndex);
       const instant = laWallToInstant(year, month, day, slotHh, slotMm);
       if (instant.getTime() <= now.getTime()) break;
 
@@ -267,8 +282,8 @@ export function claimSlots(opts: {
       times.push(iso);
       labels.push(fmtLa(instant));
       for (const p of relevant) {
-        weekCount[p][wk] = (weekCount[p][wk] ?? 0) + 1;
-        daySlotCount[p][dk] = (daySlotCount[p][dk] ?? 0) + 1;
+        bump(weekCount, p, wk);
+        bump(daySlotCount, p, dk);
         newClaims.push({ platform: p, day: dk, time: iso, asset: opts.asset, by: opts.by });
       }
     }
