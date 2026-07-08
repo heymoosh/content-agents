@@ -290,7 +290,7 @@ Examples - use both Primary and a Secondary CTA
 - GOAL_CONDITION: Running the control-run step produces a --no-spin derivative tagged as a control run for one pillar/platform pair on each periodic pass, tracked separately from spin-on engagement data; after at least one control run exists for a pair, route.ts --all's divergence flag reports no-spin-control availability as true for that pair (previously always false, since no mechanism produced these controls).
 - PARENT: 7e550e48-adcf-44d3-83ea-626ee079b9ef
 - ORIGIN: proposed by propose-cards 2026-07-07 from epic Routing drift flag: surface data-vs-brand platform divergence in /strategy (never auto-gate) (7e550e48-adcf-44d3-83ea-626ee079b9ef)
-- STATUS: To Do
+- STATUS: Review
 - GROOMED: ready — cadence/selection explicitly inherits sibling card 92bb2ae6's MECHANISM (monthly, longest-since-last-control rule), concrete GOAL_CONDITION, output goes through normal review-queue.md approval (rule 2 still governs) + 2026-07-07
 <!-- card-id: f444f440-7221-4741-a682-254f27f66e29 -->
 
@@ -305,6 +305,16 @@ Examples - use both Primary and a Secondary CTA
 - STATUS: Backlog
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
 
+**queue-view.ts reconcile() cannot detect drift once a platform actually uses max_slots_per_day > 1**
+- - ORIGIN: follow-up auto-filed while building card c58fa530 (multi-slot-per-day scheduler mechanism).
+- src/publish/queue-view.ts's reconcile() keys live posts and ledger claims by a plain `|` Set membership test (present/absent), not a count. Once a platform actually has max_slots_per_day > 1 configured (no platform does yet, this card only built the mechanism), a Set cannot distinguish 2 claims/1 live from 1 claim/1 live on the same day - an orphaned future claim or an extra live post on a multi-slot day would silently evade both the claimedNotLive drift flag and --sync's auto-release (5f039a7e).
+- This needs count-aware matching (compare claim count vs live count per platform/day, not just set membership) - a real redesign of reconcile()'s matching logic, not a one-line fix, and out of scope for the scheduler-mechanism card that found it.
+- GOAL_CONDITION: reconcile() correctly reports claimedNotLive/liveNotClaimed/uncheckable using COUNTS per platform/day (not set presence), verified by a test where a platform has 2 ledger claims and only 1 live post on the same day (today: silently matched as fine; after: the 1 extra claim reports as claimedNotLive).
+- CHAIN: 1
+- STATUS: To Do
+- GROOMED: unambiguously ready — backend-optimizing follow-up (CHAIN:1), concrete GOAL_CONDITION, no UI/product-judgment, dependency (c58fa530) now Done
+<!-- card-id: a112f4ac-3505-4765-b7c2-73f34f2c96d1 -->
+
 **queue --sync orphan-release can misfire past a live-service pagination limit**
 - - ORIGIN: follow-up auto-filed while building card 5f039a7e (Phase 3b: provider retry/backoff + orphaned slot cleanup).
 - syncLedger releases a future ledger claim once reconcile() confirms no live post matches it, but the live-post lists it checks against are paginated at the source (Typefully fetchScheduledDrafts limit=50, YouTube listScheduledUploads maxResults=25). A genuinely-live post sitting beyond that page would misreport as claimedNotLive and get released, letting a later run double-book that slot.
@@ -312,17 +322,9 @@ Examples - use both Primary and a Secondary CTA
 - Fix is a product/design call, not mechanical: options include full pagination on both list calls, a grace period before releasing a claimedNotLive claim (skip release until it has been unmatched across 2+ consecutive --sync runs), or reverting --sync to advisory-only (report, never release).
 - GOAL_CONDITION: pick one of the three mitigations above (or an equivalent), implement it, and add a test proving a live post beyond the current pagination limit is never wrongly released by --sync.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: Done
+- GROOMED: unambiguously ready — backend-optimizing follow-up (CHAIN:1), concrete GOAL_CONDITION, no UI/product-judgment, dependency (5f039a7e) now Done
 <!-- card-id: c18c39a9-72d7-4e51-a05e-e13fa57ae601 -->
-
-**queue-view.ts reconcile() cannot detect drift once a platform actually uses max_slots_per_day > 1**
-- - ORIGIN: follow-up auto-filed while building card c58fa530 (multi-slot-per-day scheduler mechanism).
-- src/publish/queue-view.ts's reconcile() keys live posts and ledger claims by a plain `|` Set membership test (present/absent), not a count. Once a platform actually has max_slots_per_day > 1 configured (no platform does yet, this card only built the mechanism), a Set cannot distinguish 2 claims/1 live from 1 claim/1 live on the same day - an orphaned future claim or an extra live post on a multi-slot day would silently evade both the claimedNotLive drift flag and --sync's auto-release (5f039a7e).
-- This needs count-aware matching (compare claim count vs live count per platform/day, not just set membership) - a real redesign of reconcile()'s matching logic, not a one-line fix, and out of scope for the scheduler-mechanism card that found it.
-- GOAL_CONDITION: reconcile() correctly reports claimedNotLive/liveNotClaimed/uncheckable using COUNTS per platform/day (not set presence), verified by a test where a platform has 2 ledger claims and only 1 live post on the same day (today: silently matched as fine; after: the 1 extra claim reports as claimedNotLive).
-- CHAIN: 1
-- STATUS: Backlog
-<!-- card-id: a112f4ac-3505-4765-b7c2-73f34f2c96d1 -->
 
 **Multi-slot-per-day scheduler: support >1 post/platform/PT-day, starting with X**
 - ORIGIN: split out of ffa6491d's own DECISION (2026-07-07) — Muxin's actual ask for X is multiple posts/day, but the unified scheduler (src/publish/slots.ts + data/publish-schedule.jsonl) enforces ≤1 post/platform/PT-day; ffa6491d explicitly called this 'a separate, bigger follow-up, not bundled into this config bump' and shipped only the X posts_per_week 5→7 config change instead.
