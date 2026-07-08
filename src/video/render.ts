@@ -10,6 +10,7 @@ import {
 import { join, isAbsolute, basename } from "node:path";
 import { execFileSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
+import { storyboardRowStatus } from "../publish/queue.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { logCost } from "../util/cost-log.js";
 import { getImage, getTTS, getBroll, isEnabled, type ImageProfile } from "../providers/registry.js";
@@ -195,21 +196,6 @@ async function renderVideo(folder: string, profile?: ImageProfile): Promise<void
   });
 }
 
-// Read the status of the storyboard row in review-queue.md (the canonical approval gate).
-// Columns: id | platform | format | asset | native | brand | cta | status | notes | origin.
-// Origin is optional and trailing, so the fixed indices below are unaffected either way.
-function storyboardStatus(folder: string): string | null {
-  const queuePath = join(folder, "review-queue.md");
-  if (!existsSync(queuePath)) return null;
-  for (const line of readFileSync(queuePath, "utf8").split("\n")) {
-    if (!line.trim().startsWith("|")) continue;
-    const cells = line.split("|").map((c) => c.trim());
-    // cells[0] is empty (leading |); shift so format=cells[3], status=cells[8].
-    if (cells[3] === "storyboard") return cells[8] ?? "";
-  }
-  return null;
-}
-
 // Derive the low-level render inputs from an APPROVED storyboard, then run --video.
 async function renderVideoFromStoryboard(folder: string, profile?: ImageProfile): Promise<void> {
   const sbPath = join(folder, "video", "storyboard.md");
@@ -217,7 +203,7 @@ async function renderVideoFromStoryboard(folder: string, profile?: ImageProfile)
     throw new Error(`missing ${sbPath} — run /atomize step 7a to write the storyboard first.`);
   }
 
-  const status = storyboardStatus(folder);
+  const status = storyboardRowStatus(folder);
   if (status === null) {
     throw new Error(
       `no storyboard row in ${join(folder, "review-queue.md")} — run /atomize step 7a first.`
@@ -293,9 +279,10 @@ async function prepareScenes(
 ): Promise<{ script: string; visuals: string[]; keyframes: string[]; slug: string; videoDir: string } | null> {
   const sbPath = join(folder, "video", "storyboard.md");
   if (!existsSync(sbPath)) throw new Error(`missing ${sbPath} — write the storyboard first (/video).`);
-  if (storyboardStatus(folder) !== "approve") {
+  const storyboardStatus = storyboardRowStatus(folder);
+  if (storyboardStatus !== "approve") {
     throw new Error(
-      `storyboard not approved (status="${storyboardStatus(folder) ?? "missing"}") — approve it in ` +
+      `storyboard not approved (status="${storyboardStatus ?? "missing"}") — approve it in ` +
         `review-queue.md before rendering. No paid generation runs until then.`
     );
   }
