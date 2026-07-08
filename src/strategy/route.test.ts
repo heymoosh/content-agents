@@ -5,12 +5,14 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { repoRoot } from "../db/db.js";
 import {
+  applyExplorationOverride,
   CONTROL_RUN_SOURCE,
   decideForPillar,
   loadData,
   mergeDecisions,
   type Decision,
   type LoadedData,
+  type MergedDecision,
   type RoutingConfig,
 } from "./route.js";
 
@@ -169,5 +171,41 @@ describe("loadData: excludes deliberate spin-control-run rows from the main reso
     const data = loadData(undefined, db);
     assert.equal(data.cells.get("bluesky|civic-tech")!.n, 1);
     db.close();
+  });
+});
+
+describe("applyExplorationOverride: the exploration-budget's routing hook (card 92bb2ae6)", () => {
+  function md(overrides: Partial<MergedDecision>): MergedDecision {
+    return { platform: "linkedin", decision: "skip", score: null, confidence: "cold-start", rationale: "", pillars: ["human-ai"], ...overrides };
+  }
+
+  test("flips a skipped off-assignment platform to include, tagged confidence 'exploration'", () => {
+    const merged = [md({ platform: "linkedin", decision: "skip" }), md({ platform: "x", decision: "include", confidence: "data" })];
+    const out = applyExplorationOverride(merged, "civic-tech", "linkedin");
+    const li = out.find((m) => m.platform === "linkedin")!;
+    assert.equal(li.decision, "include");
+    assert.equal(li.confidence, "exploration");
+    assert.match(li.rationale, /exploration probe/);
+    assert.match(li.rationale, /exploration_probe: true/);
+    assert.ok(li.pillars.includes("civic-tech"));
+  });
+
+  test("leaves every OTHER platform's decision completely untouched", () => {
+    const merged = [md({ platform: "linkedin", decision: "skip" }), md({ platform: "x", decision: "include", confidence: "data", score: 0.9 })];
+    const out = applyExplorationOverride(merged, "civic-tech", "linkedin");
+    const x = out.find((m) => m.platform === "x")!;
+    assert.deepEqual(x, merged[1], "x is untouched — override targets only the named platform");
+  });
+
+  test("a platform ALREADY included by the normal decision is left as-is (no-op, no confidence downgrade)", () => {
+    const merged = [md({ platform: "linkedin", decision: "include", confidence: "data", score: 0.8 })];
+    const out = applyExplorationOverride(merged, "civic-tech", "linkedin");
+    assert.deepEqual(out, merged, "already-include must not be relabeled 'exploration'");
+  });
+
+  test("a platform absent from the merged decisions entirely is a no-op (nothing to flip)", () => {
+    const merged = [md({ platform: "x", decision: "include", confidence: "data" })];
+    const out = applyExplorationOverride(merged, "civic-tech", "linkedin");
+    assert.deepEqual(out, merged);
   });
 });

@@ -9,11 +9,17 @@ import { runDriftCheck } from "./routing-drift.js";
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
 // cold-start. Routing GATES generation in /atomize; Muxin's review stays the final gate.
 //
-//   tsx src/strategy/route.ts --pillar civic-tech[,human-ai,...] [--folder content/<slug>]
+//   tsx src/strategy/route.ts --pillar civic-tech[,human-ai,...] [--folder content/<slug>] [--explore <platform>]
 //        → prints JSON decisions; writes <folder>/routing.md when --folder is given.
 //          Multiple comma-separated pillars are merged in ONE pass (include if any pillar
 //          includes, unless any pillar's `never` rule vetoes it) instead of overwriting
 //          routing.md per invocation — always route a multi-pillar piece in one call.
+//          `--explore <platform>` (single-pillar calls only) forces that ONE platform's decision
+//          to `include`, confidence "exploration" — the exploration-budget probe (card 92bb2ae6,
+//          src/strategy/exploration.ts) for an off-assignment pillar/platform pair. Muxin's normal
+//          review-queue.md approval still gates publishing; the derivative drafted from this
+//          routing.md should be stamped `exploration_probe: true` in its frontmatter so
+//          tag-source.ts/loadData can exclude its eventual post from the main resonance figures.
 //   tsx src/strategy/route.ts --all
 //        → full pillar × platform routing-map markdown (for the strategy brief)
 //   tsx src/strategy/route.ts --flags
@@ -31,6 +37,13 @@ export const CORE_TEXT = ["x", "linkedin", "bluesky"];
 // these rows from the pillar/platform resonance figures decideForPillar/routing-drift.ts read —
 // see spin-control.ts's loadControlData for the separate bucket these rows DO feed.
 export const CONTROL_RUN_SOURCE = "spin-control-run";
+// posts.source value for an exploration-budget probe post (card 92bb2ae6): a derivative
+// deliberately drafted for an off-assignment pillar/platform pair, tagged `exploration_probe:
+// true` in frontmatter, recorded via the `| exploration` Placed-log marker (queue.ts) and
+// classified back onto the post by tag-source.ts. loadData() below excludes these rows from the
+// pillar/platform resonance figures decideForPillar/routing-drift.ts read — see
+// src/strategy/exploration.ts for the separate coverage bucket these rows DO feed.
+export const EXPLORATION_SOURCE = "exploration-probe";
 const WEEK = 7 * 24 * 3600 * 1000;
 
 export interface RoutingConfig {
@@ -43,7 +56,9 @@ export interface RoutingConfig {
   };
 }
 
-export type Confidence = "data" | "cold-start" | "rule" | "always";
+// "exploration" is stamped only by applyExplorationOverride below — decideForPillar/mergeDecisions
+// never produce it on their own; it marks a one-off exploration-budget probe (card 92bb2ae6).
+export type Confidence = "data" | "cold-start" | "rule" | "always" | "exploration";
 
 export interface Decision {
   platform: string;
@@ -84,8 +99,9 @@ interface EngagementCellRow {
 
 // Shared pillar × platform engagement query (same weighting + latest-metrics CTE used by
 // resonance.ts) behind a `sourceClause`/`sourceParams` the caller supplies — loadData() below
-// uses it to EXCLUDE CONTROL_RUN_SOURCE rows, spin-control.ts's loadControlData uses it to
-// REQUIRE them, over the exact same join/formula so the two buckets can never silently drift
+// uses it to EXCLUDE both CONTROL_RUN_SOURCE and EXPLORATION_SOURCE rows; spin-control.ts's
+// loadControlData REQUIREs CONTROL_RUN_SOURCE and exploration.ts's loadExplorationData REQUIREs
+// EXPLORATION_SOURCE, over the exact same join/formula so the buckets can never silently drift
 // apart on an engagement-weighting change (only one query to update).
 export function queryEngagementCells(
   db: ReturnType<typeof openDb>,
@@ -123,27 +139,28 @@ export function queryEngagementCells(
 // `injectedDb`, when given, is used instead of opening the real analytics.db (and is left open —
 // caller owns its lifecycle). Test-only hook, same pattern as routing-drift.ts's hasNoSpinControl.
 //
-// CONTROL_RUN_SOURCE rows are excluded from BOTH queries below — a deliberate --no-spin control
-// run (card f444f440) must never feed the pillar/platform resonance figures decideForPillar or
-// routing-drift.ts's detectDrift read. Their own separate bucket lives in spin-control.ts's
-// loadControlData, over the SAME posts but scoped to source = CONTROL_RUN_SOURCE only.
+// CONTROL_RUN_SOURCE and EXPLORATION_SOURCE rows are both excluded from BOTH queries below — a
+// deliberate --no-spin control run (card f444f440) or an exploration-budget probe (card 92bb2ae6)
+// must never feed the pillar/platform resonance figures decideForPillar or routing-drift.ts's
+// detectDrift read. Their own separate buckets live in spin-control.ts's loadControlData and
+// exploration.ts's loadExplorationData, over the SAME posts but scoped to one source each.
 export function loadData(range?: WindowRange, injectedDb?: ReturnType<typeof openDb>): LoadedData {
   const db = injectedDb ?? openDb();
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
   const rows = queryEngagementCells(
     db,
-    "AND (p.source IS NULL OR p.source != ?)",
-    [CONTROL_RUN_SOURCE],
+    "AND (p.source IS NULL OR p.source NOT IN (?, ?))",
+    [CONTROL_RUN_SOURCE, EXPLORATION_SOURCE],
     dateClause,
     dateParams
   );
 
   const dates = db
     .prepare(
-      `SELECT platform, posted_at FROM posts p WHERE posted_at IS NOT NULL AND (p.source IS NULL OR p.source != ?) ${dateClause}`
+      `SELECT platform, posted_at FROM posts p WHERE posted_at IS NOT NULL AND (p.source IS NULL OR p.source NOT IN (?, ?)) ${dateClause}`
     )
-    .all(CONTROL_RUN_SOURCE, ...dateParams) as { platform: string; posted_at: string }[];
+    .all(CONTROL_RUN_SOURCE, EXPLORATION_SOURCE, ...dateParams) as { platform: string; posted_at: string }[];
   if (!injectedDb) db.close();
 
   const cells = new Map<string, Cell>();
@@ -324,6 +341,29 @@ export function mergeDecisions(pillars: string[], perPillar: Map<string, Decisio
   return merged;
 }
 
+// The exploration budget's routing hook (card 92bb2ae6, src/strategy/exploration.ts): force ONE
+// platform's decision to `include` for a single-pillar routing pass, even though config/
+// routing.yaml's defaults don't list it there. Pure and additive — a platform already `include`d
+// by the normal defaults-driven decision is left untouched (an exploration probe only matters for
+// an off-assignment pair; overriding an already-included one would be a no-op that muddies the
+// rationale). The distinct "exploration" confidence + rationale is what lets the drafted
+// derivative be stamped `exploration_probe: true` and later excluded from resonance figures
+// (see EXPLORATION_SOURCE / loadData).
+export function applyExplorationOverride(merged: MergedDecision[], pillar: string, platform: string): MergedDecision[] {
+  return merged.map((d) => {
+    if (d.platform !== platform || d.decision === "include") return d;
+    return {
+      ...d,
+      decision: "include",
+      confidence: "exploration",
+      rationale:
+        `exploration probe (card 92bb2ae6): off-assignment probe for "${pillar}" on ${platform} this cycle — ` +
+        `stamp the drafted derivative exploration_probe: true (see src/strategy/exploration.ts)`,
+      pillars: [...new Set([...d.pillars, pillar])],
+    };
+  });
+}
+
 function routingMd(pillars: string[], merged: MergedDecision[]): string {
   const fit = (d: MergedDecision) => (d.score == null ? "—" : d.score.toFixed(2));
   const rows = merged
@@ -388,10 +428,19 @@ function main() {
     process.exit(1);
   }
   const perPillar = new Map(pillars.map((p) => [p, decideForPillar(p, cfg, data)]));
-  const merged: MergedDecision[] =
+  let merged: MergedDecision[] =
     pillars.length === 1
       ? perPillar.get(pillars[0])!.map((d) => ({ ...d, pillars: [pillars[0]] }))
       : mergeDecisions(pillars, perPillar);
+
+  const exploreIdx = args.indexOf("--explore");
+  if (exploreIdx >= 0 && args[exploreIdx + 1]) {
+    if (pillars.length !== 1) {
+      console.error("--explore requires exactly one --pillar (an exploration probe targets one pillar/platform pair)");
+      process.exit(1);
+    }
+    merged = applyExplorationOverride(merged, pillars[0], args[exploreIdx + 1]);
+  }
 
   const fo = args.indexOf("--folder");
   if (fo >= 0 && args[fo + 1]) {
