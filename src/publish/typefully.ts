@@ -49,7 +49,7 @@ async function api(path: string, init?: RequestInit, retryOpts?: FetchRetryOptio
   return res.json();
 }
 
-async function socialSetId(): Promise<string> {
+export async function socialSetId(): Promise<string> {
   if (process.env.TYPEFULLY_SOCIAL_SET_ID) return process.env.TYPEFULLY_SOCIAL_SET_ID;
   const sets = (await api("/social-sets")) as { results?: { id: string | number; name?: string }[] } | { id: string | number }[];
   const list = Array.isArray(sets) ? sets : sets.results ?? [];
@@ -62,8 +62,9 @@ async function socialSetId(): Promise<string> {
 }
 
 // Upload a media file (mp4/mov/png/jpg/gif) to Typefully via its presigned-S3 flow, returning the
-// media_id to attach to a post. Used for native video posts (e.g. animated quote cards).
-async function uploadMedia(setId: string, filePath: string): Promise<string> {
+// media_id to attach to a post. Used for native video posts (e.g. animated quote cards) and, since
+// the 2026-07-08 rewire, native quote-card image posts (src/publish/cards.ts).
+export async function uploadMedia(setId: string, filePath: string): Promise<string> {
   // Creates a real Typefully media object — a lost-response network error or 5xx must not retry
   // this and risk an orphaned duplicate upload consuming Typefully's media quota.
   const { media_id, upload_url } = (await api(
@@ -82,7 +83,7 @@ async function uploadMedia(setId: string, filePath: string): Promise<string> {
   return media_id;
 }
 
-function loadPlatformMax(): Record<string, number> {
+export function loadPlatformMax(): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(loadPlatforms().platforms)) out[k] = v.max_chars ?? Infinity;
   return out;
@@ -90,7 +91,9 @@ function loadPlatformMax(): Record<string, number> {
 
 // Build the Typefully `posts` array, placing the CTA link per config so the body stays clean.
 // Returns a manual-comment string when the platform needs the link added by hand (LinkedIn).
-function buildPosts(
+// Exported so cards.ts (native quote-card image posts) places its CTA link identically to text
+// posts instead of re-deriving reply/comment/inline placement a second time.
+export function buildPosts(
   body: string,
   ctaUrl: string | null,
   ctaLabel: string,
@@ -130,6 +133,35 @@ export function buildDraftPayload(opts: {
   };
   if (opts.publishAt) payload.publish_at = opts.publishAt;
   return payload;
+}
+
+// Create a Typefully draft, retrying on "processing" (an uploaded video/image can still be
+// transcoding for a few seconds after uploadMedia returns). Exported so cards.ts (native
+// quote-card image posts) retries identically instead of drifting from publishText's behavior.
+export async function createDraft(
+  setId: string,
+  payload: Record<string, unknown>
+): Promise<{ id?: string | number; share_url?: string }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return (await api(
+        `/social-sets/${setId}/drafts`,
+        { method: "POST", body: JSON.stringify(payload) },
+        // Creates a real scheduled draft — a lost-response network error OR a 5xx must not
+        // retry this and risk a duplicate scheduled post landing later (a 5xx can arrive after
+        // Typefully already committed the draft). Only 429 still retries (an explicit
+        // rejection, never processed).
+        { retryOnNetworkError: false }
+      )) as { id?: string | number; share_url?: string };
+    } catch (e) {
+      if (attempt < 12 && /processing/i.test((e as Error).message)) {
+        if (attempt === 0) console.log(`  ↳ media still transcoding, waiting…`);
+        await new Promise((r) => setTimeout(r, 5000));
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
 // The draft title publishText gives every row it schedules — the ONE identifier that ties a live
@@ -345,35 +377,10 @@ export async function publishText(
     // so buildDraftPayload omits publish_at and Typefully saves a non-firing draft.
     const publishAt = noSchedule ? null : slotByRow.get(row.id) ?? "next-free-slot";
     const when = noSchedule ? "unscheduled" : whenByRow.get(row.id) ?? "next-free-slot";
-    const draftBody = JSON.stringify(
+    const draft = await createDraft(
+      setId,
       buildDraftPayload({ title: rowDraftTitle(row.id), platformKey, posts, publishAt })
     );
-    // Uploaded video can still be transcoding for a few seconds — retry the draft on "processing".
-    let draft: { id?: string | number; share_url?: string };
-    for (let attempt = 0; ; attempt++) {
-      try {
-        draft = (await api(
-          `/social-sets/${setId}/drafts`,
-          { method: "POST", body: draftBody },
-          // Creates a real scheduled draft — a lost-response network error OR a 5xx must not
-          // retry this and risk a duplicate scheduled post landing later (a 5xx can arrive after
-          // Typefully already committed the draft). Only 429 still retries (an explicit
-          // rejection, never processed).
-          { retryOnNetworkError: false }
-        )) as {
-          id?: string | number;
-          share_url?: string;
-        };
-        break;
-      } catch (e) {
-        if (attempt < 12 && /processing/i.test((e as Error).message)) {
-          if (attempt === 0) console.log(`  ↳ media still transcoding, waiting…`);
-          await new Promise((r) => setTimeout(r, 5000));
-          continue;
-        }
-        throw e;
-      }
-    }
     setStatus(folder, row, "published");
     const placeNote = ctaUrl ? `, cta→${placement}` : "";
     appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${row.platform}, ${when}${placeNote})`);

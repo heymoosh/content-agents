@@ -1,12 +1,12 @@
 /**
- * Unit tests for src/publish/cta.ts resolveCta + appendCtaLine — the shared funnel layer that
- * decides which CTA link (if any) a post gets. Pure functions: a CtaConfig object + frontmatter
- * in, a resolved url/label out. No file IO to mock.
+ * Unit tests for src/publish/cta.ts resolveCta — the shared funnel layer that decides which CTA
+ * link (if any) a post gets. Pure functions: a CtaConfig object + frontmatter in, a resolved
+ * url/label out. No file IO to mock.
  */
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { resolveCta, appendCtaLine, loadCtaConfig, type CtaConfig } from "./cta.js";
+import { resolveCta, loadCtaConfig, type CtaConfig } from "./cta.js";
 
 const CFG: CtaConfig = {
   placement: { x: "reply", linkedin: "inline", bluesky: "inline" },
@@ -113,22 +113,6 @@ describe("resolveCta: table-driven", () => {
   }
 });
 
-describe("appendCtaLine", () => {
-  test("null url leaves the body unchanged", () => {
-    assert.equal(appendCtaLine("body text", null, "label"), "body text");
-  });
-
-  test("url + label appended as one trimmed line", () => {
-    assert.equal(
-      appendCtaLine("body text", "https://example.com", "Read more:"),
-      "body text\n\nRead more: https://example.com"
-    );
-  });
-
-  test("url with no label appends just the url (no leading space)", () => {
-    assert.equal(appendCtaLine("body text", "https://example.com", ""), "body text\n\nhttps://example.com");
-  });
-});
 
 describe("loadCtaConfig: smoke test against the real config/cta.yaml", () => {
   test("loads placement rules and a source fallback from the real config", () => {

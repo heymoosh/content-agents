@@ -167,6 +167,28 @@ describe("reconcileRow — the actual GOAL_CONDITION scenario", () => {
     assert.match(result.reason ?? "", /upload-post failover/);
   });
 
+  // 2026-07-08 rewire (card 1829fdf9): cards.ts ships x/linkedin/bluesky cards as NATIVE Typefully
+  // drafts now, logged exactly like text rows (`typefully draft <id>`) — so a card whose most recent
+  // log line is a Typefully draft must reconcile via the Typefully branch, not PostPeer.
+  test("a published quote-card row logged via the NEW Typefully draft path reconciles like a text row", () => {
+    const log = `- 2026-07-08T00:00:00.000Z — quote-card-1-x → typefully draft 424242 (x, Fri 12:00pm PT)\n`;
+    const live: LiveProviderState = {
+      typefullyDrafts: [{ id: "424242", whenIso: "2026-07-10T20:00:00.000Z", platforms: ["x"], title: "quote-card-1-x (content-agents)" }],
+      postpeerPosts: [],
+    };
+    const result = reconcileRow(row({ id: "quote-card-1-x", platform: "quote-card:x", format: "image", status: "published" }), { text: log }, live);
+    assert.equal(result.provider, "typefully");
+    assert.equal(result.state, "scheduled");
+    assert.ok(result.when && result.when.includes("PT"));
+  });
+
+  test("an approved quote-card row with no logged ref at all reconciles as a Typefully mismatch, not PostPeer", () => {
+    const result = reconcileRow(row({ id: "quote-card-1-x", platform: "quote-card:x", format: "image", status: "approve" }), { text: "" }, NO_LIVE);
+    assert.equal(result.provider, "typefully");
+    assert.equal(result.state, "mismatch");
+    assert.match(result.reason ?? "", /no logged Typefully draft id/);
+  });
+
   test("an approved-but-never-scheduled tiktok row (no publish-log.md entry) is flagged mismatch", () => {
     const result = reconcileRow(row({ id: "tiktok-2", platform: "tiktok", format: "short", status: "approve" }), { text: "" }, NO_LIVE);
     assert.equal(result.provider, "postpeer");

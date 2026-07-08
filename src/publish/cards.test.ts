@@ -1,7 +1,11 @@
-import { test } from "node:test";
+import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { basePlatform, cardTarget, planGroups, alreadyLoggedGroup } from "./cards.js";
-import type { CtaConfig } from "./cta.js";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { join, dirname, basename } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { basePlatform, cardTarget, publishCards } from "./cards.js";
+import { readQueue } from "./queue.js";
 
 // The per-platform card model (Muxin, 2026-07-03): a card row is `quote-card:<target>` — one card
 // image shared across platforms, each with its OWN spun context caption so a quote never ships out
@@ -22,122 +26,143 @@ test("cardTarget returns the destination platform, or null for a legacy fan-out 
   assert.equal(cardTarget("quote-card:"), null); // empty suffix → treat as legacy, not a "" platform
 });
 
-// The caption that flows to the post is the CONTEXT body; the CTA link is placed per cta.yaml —
-// inline on inline platforms, omitted where placement is `reply` (X) since the relay can't reply.
-const cfg = { placement: { bluesky: "inline", x: "reply", linkedin: "comment" } } as unknown as CtaConfig;
+// Card 1829fdf9 (2026-07-08): quote cards now ship as NATIVE Typefully image posts on
+// x/linkedin/bluesky — uploadMedia + media_ids attached to a scheduled draft, the exact path
+// publishText already uses for text posts — instead of the retired PostPeer/Upload-Post relays.
+// Every provider call below is a mocked global.fetch stub (same pattern as typefully.test.ts's
+// pagination tests); no real network call is ever made, and a call to postpeer.dev or
+// upload-post.com is treated as a hard failure.
+describe("publishCards: native Typefully routing (mocked Typefully client)", () => {
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.TYPEFULLY_API_KEY;
+  const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
+  const dirs: string[] = [];
 
-test("planGroups keeps the link inline on inline platforms and omits it on reply platforms", () => {
-  const caption = "We don't need rigged rules to get extreme inequality.";
-  const groups = planGroups(
-    caption,
-    [{ platform: "bluesky" }, { platform: "twitter" }], // twitter normalizes to the x key → reply
-    "https://example.com/essay",
-    "Full essay:",
-    cfg
-  );
-  const withLink = groups.find((g) => g.caption.includes("https://example.com/essay"));
-  const noLink = groups.find((g) => g.caption === caption);
-  assert.ok(withLink, "an inline platform gets the link appended to the context caption");
-  assert.ok(noLink, "a reply platform (X) gets the bare context caption, no link");
-  assert.deepEqual(withLink!.targets.map((t) => t.platform), ["bluesky"]);
-  assert.deepEqual(noLink!.targets.map((t) => t.platform), ["twitter"]);
-});
+  before(() => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+  });
 
-test("planGroups with no CTA is a single group carrying the bare context caption", () => {
-  const caption = "Even in a perfectly fair economy, wealth begets more wealth.";
-  const groups = planGroups(caption, [{ platform: "bluesky" }], null, "", cfg);
-  assert.equal(groups.length, 1);
-  assert.equal(groups[0].caption, caption); // exactly the context — this is the analytics match key
-});
+  // Cleanup is a TARGETED removal (drop only lines carrying one of our own [folder/row] keys), never
+  // a whole-file snapshot restore: briefs/bets.md is a real shared repo file other concurrently-
+  // running test files (e.g. reuse-guard.test.ts) also read/write, and node's test runner runs test
+  // files concurrently — a blind "restore to the pre-test snapshot" would race and could silently
+  // wipe out another file's fixture rows mid-run.
+  after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TYPEFULLY_API_KEY;
+    else process.env.TYPEFULLY_API_KEY = originalKey;
+    if (originalSetId === undefined) delete process.env.TYPEFULLY_SOCIAL_SET_ID;
+    else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
+    if (existsSync(BETS_PATH)) {
+      const lines = readFileSync(BETS_PATH, "utf8").split("\n");
+      const keys = dirs.map((d) => `[${basename(d)}/`);
+      writeFileSync(BETS_PATH, lines.filter((l) => !keys.some((k) => l.includes(k))).join("\n"));
+    }
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
 
-// R1 idempotency (docs/codebase-review.md Part 2): publishCards posts a row's targets in GROUPS
-// (inline-link group + no-link group). If group 1 posts+logs but group 2 then THROWS, the row stays
-// `approve`, so the NEXT /publish re-enters the loop. Without a per-group guard it would RE-POST the
-// already-successful group 1 — a real duplicate public post. alreadyLoggedGroup parses cards.ts's own
-// publish-log line shape and returns the logged ref for an EXACT row+dest match so the loop can skip
-// re-posting while still collecting that ref for refs/appendBetPlacement.
-const SAMPLE_LOG = [
-  "# Publish log",
-  "",
-  "- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [bluesky+linkedin +link] (scheduled 2026-07-08T18:00:00.000Z)",
-  "",
-].join("\n");
+  // Routes calls to a stub Typefully API (media/upload → presigned PUT → drafts), records every
+  // call, and THROWS on any call to a retired card provider — proving PostPeer/Upload-Post are
+  // never touched, not just asserting-after-the-fact on an empty list.
+  function stubTypefully(): { calls: { method: string; url: string; body?: unknown }[] } {
+    const calls: { method: string; url: string; body?: unknown }[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+      calls.push({ method, url, body });
+      if (url.includes("postpeer.dev") || url.includes("upload-post.com")) {
+        throw new Error(`unexpected call to a retired card provider: ${method} ${url}`);
+      }
+      if (url.includes("/media/upload")) {
+        return new Response(JSON.stringify({ media_id: "media-1", upload_url: "https://s3.example.com/upload" }), { status: 200 });
+      }
+      if (url.includes("s3.example.com")) {
+        return new Response(null, { status: 200 });
+      }
+      if (url.endsWith("/drafts")) {
+        return new Response(JSON.stringify({ id: "draft-1", share_url: "https://typefully.com/x/draft-1" }), { status: 200 });
+      }
+      throw new Error(`unexpected fetch in test: ${method} ${url}`);
+    }) as typeof fetch;
+    return { calls };
+  }
 
-test("alreadyLoggedGroup finds the logged ref for the exact row+dest", () => {
-  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "bluesky+linkedin"), "post 12345");
-});
+  function tmpFolder(rowLine: string, captionFrontmatter: string): string {
+    const folder = mkdtempSync(join(tmpdir(), "cards-test-"));
+    dirs.push(folder);
+    mkdirSync(join(folder, "derivatives"), { recursive: true });
+    mkdirSync(join(folder, "images"), { recursive: true });
+    writeFileSync(
+      join(folder, "review-queue.md"),
+      `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
+        `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n` +
+        rowLine
+    );
+    writeFileSync(join(folder, "derivatives", "quote-card-1-x.md"), `${captionFrontmatter}Context caption for the card.\n`);
+    writeFileSync(join(folder, "images", "quote-card-1.png"), "not real png bytes, just a fixture for the mocked upload");
+    return folder;
+  }
 
-test("alreadyLoggedGroup returns null for a different dest on the same row (that group must still post)", () => {
-  // The no-link group (X/twitter) was NOT logged — treating it as posted would silently drop the post.
-  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "twitter"), null);
-});
+  const FUTURE_ISO = "2099-01-01T18:00:00.000Z";
 
-test("alreadyLoggedGroup requires an EXACT platform-set match, not a subset", () => {
-  // A single-platform dest must not match a logged multi-platform group, or we'd wrongly skip and
-  // drop the post for whichever platform the logged group did NOT cover.
-  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "bluesky"), null);
-  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-1", "linkedin"), null);
-});
+  test("schedules a quote-card:x row as a native Typefully draft: uploadMedia → media_ids on the draft, never PostPeer/Upload-Post", async () => {
+    const { calls } = stubTypefully();
+    const folder = tmpFolder(
+      `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
+      `---\nplatform: quote-card:x\ncta: none\n---\n`
+    );
 
-test("alreadyLoggedGroup returns null for a row with no log entries (and for empty log text)", () => {
-  assert.equal(alreadyLoggedGroup(SAMPLE_LOG, "card-2", "bluesky+linkedin"), null);
-  assert.equal(alreadyLoggedGroup("", "card-1", "bluesky+linkedin"), null);
-});
+    const results = await publishCards(folder, { atOverride: FUTURE_ISO });
 
-test("alreadyLoggedGroup handles the no-link bracket (no ` +link`) and multiple logged groups", () => {
-  const log = [
-    "# Publish log",
-    "",
-    "- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [bluesky+linkedin +link] (scheduled 2026-07-08T18:00:00.000Z)",
-    "- 2026-07-06T18:00:01.000Z — card-1 → postpeer post 67890 [twitter] (scheduled 2026-07-08T19:00:00.000Z)",
-    "",
-  ].join("\n");
-  assert.equal(alreadyLoggedGroup(log, "card-1", "bluesky+linkedin"), "post 12345");
-  assert.equal(alreadyLoggedGroup(log, "card-1", "twitter"), "post 67890");
-});
+    assert.equal(results.length, 1);
+    assert.equal(results[0].platform, "x");
+    assert.equal(results[0].ref, "typefully draft draft-1");
 
-test("alreadyLoggedGroup mirrors the loop's partial-failure state: group 1 skip, group 2 post", () => {
-  // Simulate a prior run that posted+logged the inline-link group then threw before the X group.
-  // dest is computed exactly the way publishCards's loop computes it: sorted, so it's stable
-  // regardless of provider.listTargets()'s return order across runs.
-  const withLinkTargets = [{ platform: "bluesky" }, { platform: "linkedin" }];
-  const noLinkTargets = [{ platform: "twitter" }];
-  const destOf = (ts: { platform: string }[]) => ts.map((t) => t.platform).sort().join("+");
-  const priorLog = [
-    "# Publish log",
-    "",
-    `- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [${destOf(withLinkTargets)} +link] (scheduled 2026-07-08T18:00:00.000Z)`,
-    "",
-  ].join("\n");
-  // group 1: already logged → loop reuses this ref, must NOT call the provider again (no duplicate)
-  assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(withLinkTargets)), "post 12345");
-  // group 2: not logged → loop MUST still post it (no silent drop)
-  assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(noLinkTargets)), null);
-});
+    const mediaUploadCall = calls.find((c) => c.url.includes("/media/upload"));
+    assert.ok(mediaUploadCall, "must upload the card PNG via Typefully's media/upload endpoint");
+    const draftCall = calls.find((c) => c.url.endsWith("/drafts"));
+    assert.ok(draftCall, "must create a Typefully draft");
+    const posts = (draftCall!.body as { platforms: Record<string, { posts: { media_ids?: string[] }[] }> }).platforms.x.posts;
+    assert.deepEqual(posts[0].media_ids, ["media-1"], "the draft's post must carry the uploaded card's media_id");
 
-test("alreadyLoggedGroup: dest is order-independent across a retry, even if listTargets() reorders", () => {
-  // The bug this guards against: provider.listTargets() returns connected accounts in whatever
-  // order the provider API gives them, which isn't guaranteed stable between the failed run and the
-  // retry. If dest weren't sorted, "linkedin+bluesky" (retry) wouldn't match a logged
-  // "bluesky+linkedin" (original run), and the guard would silently re-post the already-live group.
-  const destOf = (ts: { platform: string }[]) => ts.map((t) => t.platform).sort().join("+");
-  const originalOrder = [{ platform: "bluesky" }, { platform: "linkedin" }];
-  const retryOrder = [{ platform: "linkedin" }, { platform: "bluesky" }];
-  const priorLog = [
-    "# Publish log",
-    "",
-    `- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [${destOf(originalOrder)} +link] (scheduled 2026-07-08T18:00:00.000Z)`,
-    "",
-  ].join("\n");
-  assert.equal(alreadyLoggedGroup(priorLog, "card-1", destOf(retryOrder)), "post 12345");
-});
+    assert.ok(
+      !calls.some((c) => c.url.includes("postpeer.dev") || c.url.includes("upload-post.com")),
+      "no call to a retired card provider should ever be made"
+    );
 
-test("alreadyLoggedGroup keys on the row id, not another row's identical dest", () => {
-  const log = [
-    "# Publish log",
-    "",
-    "- 2026-07-06T18:00:00.000Z — card-1 → postpeer post 12345 [bluesky+linkedin +link] (scheduled 2026-07-08T18:00:00.000Z)",
-    "",
-  ].join("\n");
-  assert.equal(alreadyLoggedGroup(log, "card-9", "bluesky+linkedin"), null);
+    const { rows } = readQueue(folder);
+    assert.equal(rows[0].status, "published");
+    const log = readFileSync(join(folder, "publish-log.md"), "utf8");
+    assert.match(log, /quote-card-1-x → typefully draft draft-1/);
+  });
+
+  test("a card with a resolvable CTA places the link like a text post (X reply thread), not omitted", async () => {
+    const { calls } = stubTypefully();
+    const folder = tmpFolder(
+      `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
+      `---\nplatform: quote-card:x\ncta: "https://example.com/essay"\ncta_label: "Full essay:"\n---\n`
+    );
+
+    await publishCards(folder, { atOverride: FUTURE_ISO });
+
+    const draftCall = calls.find((c) => c.url.endsWith("/drafts"));
+    assert.ok(draftCall);
+    const xPosts = (draftCall!.body as { platforms: Record<string, { posts: { text: string }[] }> }).platforms.x.posts;
+    // config/cta.yaml places x's link in the first reply (not inline, not omitted) — same as text.
+    assert.equal(xPosts.length, 2, "X CTA goes in a second (reply) post, matching publishText's buildPosts");
+    assert.match(xPosts[1].text, /https:\/\/example\.com\/essay/);
+  });
+
+  test("a legacy fan-out quote-card row (no :<platform> target) throws instead of silently misrouting", async () => {
+    stubTypefully();
+    const folder = tmpFolder(
+      `| quote-card-1 | quote-card | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
+      `---\nplatform: quote-card\ncta: none\n---\n`
+    );
+    await assert.rejects(() => publishCards(folder, { atOverride: FUTURE_ISO }), /legacy fan-out/);
+  });
 });

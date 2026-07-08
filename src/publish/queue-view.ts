@@ -187,7 +187,10 @@ function possibleSources(platform: string): ("typefully" | "postpeer" | "youtube
     case "x":
     case "linkedin":
     case "bluesky":
-      return ["typefully", "postpeer"]; // text via Typefully, or a card fan-out via PostPeer
+      // Text AND quote-cards (2026-07-08 rewire) both ship through Typefully now — PostPeer is no
+      // longer a possible source for these platforms, so its reachability no longer gates drift
+      // detection here (only TikTok still needs PostPeer live).
+      return ["typefully"];
     case "tiktok":
       return ["postpeer"];
     case "youtube":

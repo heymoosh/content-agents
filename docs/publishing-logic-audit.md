@@ -131,15 +131,18 @@ Three test suites: atomize skill split structure (9 tests), new-notes media_type
 
 #### publish:cards (`src/publish/cards.ts`)
 
-- Reads `review-queue.md`, filters `status=approve`, `platform=quote-card`.
-- Reuse guard check on `"quote-card"`.
-- Loads image-post provider from `config/providers.yaml` (`postpeer` primary, `upload-post` failover).
-- Discovers image targets from provider (fan-out to all connected image-capable accounts, excluding TikTok/YouTube).
-- Splits targets by CTA placement (inline vs. omit) so X gets no in-body link.
-- Calls `claimSlots` with `windowKey "quote-card"` and `conflictPlatforms` = all target platforms.
-- Calls `provider.scheduleImagePost` per group (one call per placement group).
+- Reads `review-queue.md`, filters `status=approve`, `platform=quote-card:<x|linkedin|bluesky>`
+  (a legacy fan-out `quote-card` row with no target throws — no longer generated).
+- Reuse guard check per target platform (`checkReuse(slug, target)`, same as text).
+- 2026-07-08 rewire: no more swappable image-post provider. Ships as a NATIVE Typefully image post
+  — `uploadMedia` (presigned S3 upload) + `media_ids` attached to a scheduled draft, reusing
+  `typefully.ts`'s `buildPosts`/`createDraft`/`buildDraftPayload`. PostPeer/Upload-Post are retired
+  for cards (PostPeer remains for TikTok only, a separate path).
+- CTA placement is identical to text posts (shared `buildPosts`): inline on inline platforms,
+  first-reply on X, manual first-comment note on a `comment`-placement config.
+- Calls `claimSlots` with `windowKey "quote-card"` and `conflictPlatforms` = the row's one target.
 - Marks rows `published`, appends logs, appends bet placement.
-- `--check` is a read-only preflight (rows + next slot + CTA plan + accounts).
+- `--check` is a read-only preflight (rows + next slot + CTA plan + Typefully auth).
 - `--at <ISO>` overrides the time (bypasses ledger).
 - **Status: COMPLETE AND WIRED.**
 

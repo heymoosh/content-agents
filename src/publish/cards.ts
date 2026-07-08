@@ -2,114 +2,57 @@ import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta, appendCtaLine, type CtaConfig } from "./cta.js";
+import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
+import {
+  TEXT_PLATFORMS,
+  socialSetId,
+  uploadMedia,
+  createDraft,
+  buildDraftPayload,
+  buildPosts,
+  loadPlatformMax,
+  rowDraftTitle,
+} from "./typefully.js";
 
-// Schedule approved `quote-card` (image) rows from a content folder's review queue to the social
-// platforms, via the swappable image-post provider chosen in config/providers.yaml (`image_post:
-// postpeer` primary, `upload-post` failover on quota). Cards are SCHEDULED, never instant — the
-// provider dashboard is the second safety net (cancel there before a card fires to test).
+// Schedule approved `quote-card` (image) rows from a content folder's review queue to
+// X/LinkedIn/Bluesky, NATIVELY through Typefully (2026-07-08 rewire — src/publish/typefully.ts's
+// uploadMedia + media_ids attach, the same scheduled-draft path text posts already use, proven once
+// for an animated mp4). The card PNG is uploaded and attached to the draft; the caption is the row's
+// per-platform context derivative. Retires PostPeer/Upload-Post FOR CARDS — PostPeer stays wired for
+// TikTok only (src/publish/tiktok.ts, untouched; a genuinely different, video-only relay).
 //   tsx src/publish/cards.ts <content-folder>              schedule approved cards
 //   tsx src/publish/cards.ts <content-folder> --check      dry run: rows + next slot + CTA plan
 //   tsx src/publish/cards.ts <content-folder> --at <ISO>   override the time (one-off / test)
-//   tsx src/publish/cards.ts --check                       provider auth/account preflight only
+//   tsx src/publish/cards.ts --check                       Typefully auth preflight only
+// Needs TYPEFULLY_API_KEY (and optionally TYPEFULLY_SOCIAL_SET_ID) in .env — same as publish:typefully.
 //
 // Timing comes from the UNIFIED scheduler (src/publish/slots.ts, windowKey `quote-card` in
 // config/platforms.yaml) + the shared ledger, so a card never exceeds a platform's per-day slot cap
 // (default 1) already claimed by a text post (or another card) that day. The quote line is the verbatim body of
 // derivatives/<id>.md (CLAUDE.md rule 1). The article CTA follows config/cta.yaml exactly like text
-// (shared cta.ts): link INLINE on inline platforms (Bluesky/LinkedIn), OMITTED where placement is
-// `reply` (X) — the relays can't post a reply, so omitting dodges X's penalty. PNG is images/<id>.png
-// (rendered by `npm run render -- --still <folder>`, gitignored).
+// (shared cta.ts + buildPosts): inline on inline platforms (Bluesky/LinkedIn), in the first reply on X,
+// manual first-comment note on LinkedIn-comment-placement configs — identical to text posts, since a
+// card is now just a Typefully draft with an image attached.
 
-interface ImageTarget {
-  platform: string;
-  accountId?: string;
-}
-
-interface ImagePostProvider {
-  providerName: string;
-  listTargets(): Promise<ImageTarget[]>;
-  scheduleImagePost(a: {
-    imagePath: string;
-    caption: string;
-    scheduledFor: string;
-    targets: ImageTarget[];
-  }): Promise<string>;
-  check(): Promise<void>;
-}
-
-const PROVIDERS: Record<string, () => Promise<ImagePostProvider>> = {
-  postpeer: () => import("./image-post/postpeer.js").then((m) => m as unknown as ImagePostProvider),
-  "upload-post": () => import("./image-post/upload-post.js").then((m) => m as unknown as ImagePostProvider),
-};
-
-function imagePostName(): string {
-  try {
-    const cfg = parseYaml(readFileSync(join(repoRoot, "config", "providers.yaml"), "utf8")) as {
-      image_post?: string;
-    };
-    return (cfg.image_post ?? "postpeer").trim();
-  } catch {
-    return "postpeer";
-  }
-}
-
-async function loadProvider(): Promise<ImagePostProvider> {
-  const name = imagePostName();
-  const factory = PROVIDERS[name];
-  if (!factory) {
-    throw new Error(
-      `config/providers.yaml image_post: "${name}" is not a known image-post provider (postpeer | upload-post)`
-    );
-  }
-  return factory();
-}
-
-// config/cta.yaml + the scheduler key X as "x"; PostPeer reports it as "twitter". Map a provider
-// platform → the shared platform key used for CTA placement and slot de-confliction.
-function platformKey(platform: string): string {
-  return platform.toLowerCase() === "twitter" ? "x" : platform.toLowerCase();
-}
-
-// The real platforms a card occupies (deduped, mapped to shared keys) — what the scheduler
-// de-conflicts against so a card never exceeds a platform's per-day slot cap (default 1) already
-// claimed by a text post that day.
-function conflictPlatforms(targets: ImageTarget[]): string[] {
-  return [...new Set(targets.map((t) => platformKey(t.platform)))];
-}
-
-// Split targets by cta.yaml placement: `inline` platforms get the link in the caption; everything
-// else (e.g. X's `reply`) gets no link, since the relays can't post a reply/first-comment and an
-// in-body link on X eats a 30-50% reach penalty.
-function splitByPlacement(targets: ImageTarget[], cfg: CtaConfig): { withLink: ImageTarget[]; noLink: ImageTarget[] } {
-  const withLink: ImageTarget[] = [];
-  const noLink: ImageTarget[] = [];
-  for (const t of targets) {
-    const placement = cfg.placement[platformKey(t.platform)] ?? "inline";
-    (placement === "inline" ? withLink : noLink).push(t);
-  }
-  return { withLink, noLink };
-}
-
-// A card row's platform is either legacy `quote-card` (one card fanned out to every connected
-// account) or per-platform `quote-card:<target>` (the current model: a card whose CAPTION is a
-// spun, context-only text post written for that one platform, so a quote never ships out of
-// context). basePlatform strips the suffix; cardTarget returns the destination (null when legacy).
+// A card row's platform is either legacy `quote-card` (one card image fanned out to every platform in
+// a single post — retired, no longer generated; see .claude/skills/atomize/SKILL.md step 7) or the
+// current per-platform `quote-card:<target>` (a card whose CAPTION is a spun, context-only text post
+// written for that one platform, so a quote never ships out of context). basePlatform strips the
+// suffix; cardTarget returns the destination (null when legacy).
 export const basePlatform = (p: string): string => p.split(":")[0];
 export function cardTarget(rowPlatform: string): string | null {
   const parts = rowPlatform.split(":");
   return parts.length > 1 && parts[1] ? parts[1] : null;
 }
 
-// The post BODY for a card = the body of derivatives/<row.id>.md. For a `quote-card:<target>` row
-// that's the per-platform CONTEXT caption (the quote itself lives on the image, rendered from the
-// separate quote-card-N.md definition derivative); for a legacy `quote-card` row it's the quote.
+// The post BODY (caption) for a card = the body of derivatives/<row.id>.md — the per-platform CONTEXT
+// caption (the quote itself lives on the image, rendered from the separate quote-card-N.md definition
+// derivative).
 function cardCopy(folder: string, rowId: string): { text: string; fm: Record<string, unknown> } {
   const path = join(folder, "derivatives", `${rowId}.md`);
   if (!existsSync(path)) {
@@ -130,71 +73,36 @@ function approvedCards(folder: string) {
   return rows.filter((r) => r.status === "approve" && isQuoteCardRow(r.platform));
 }
 
-// The destinations + caption for one card: inline-link group and/or no-link group per cta.yaml.
-export function planGroups(
-  quote: string,
-  targets: ImageTarget[],
-  ctaUrl: string | null,
-  ctaLabel: string,
-  cfg: CtaConfig
-): { caption: string; targets: ImageTarget[] }[] {
-  if (!ctaUrl) return [{ caption: quote, targets }];
-  const { withLink, noLink } = splitByPlacement(targets, cfg);
-  const groups: { caption: string; targets: ImageTarget[] }[] = [];
-  if (withLink.length) groups.push({ caption: appendCtaLine(quote, ctaUrl, ctaLabel), targets: withLink });
-  if (noLink.length) groups.push({ caption: quote, targets: noLink });
-  return groups;
-}
-
-// Escape a string for literal use inside a RegExp — dest joins platforms with "+", a regex metachar.
-function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// Idempotency for the multi-group posting loop below. A card row posts its targets in GROUPS
-// (inline-link group + no-link group). If group 1 posts+logs but group 2 then THROWS, the row stays
-// `approve`, so the next /publish re-enters the loop — without this guard it would RE-POST the
-// already-successful group 1 (a real duplicate public post to Bluesky/LinkedIn). Given the current
-// publish-log.md text, this returns the logged provider ref for THIS row's group identified by its
-// exact `dest` platform-set, so the loop can reuse that ref instead of calling the provider again.
-//
-// Parses cards.ts's OWN log-line shape only: `- <ISO> — <rowId> → <provider> <ref> [<dest>[ +link]]
-// (scheduled ...)` (written by appendPublishLog above). The `[dest]` bracket is unique to this file —
-// typefully.ts/tiktok.ts use a bracket-less shape, and findLoggedRef (reconcile.ts) keys only on
-// rowId with no dest concept, so it can't tell one group's ref from another's here. Pure string in,
-// no fs — the caller supplies the log text. Match is EXACT: a partial or superset dest returns null
-// (only the identical platform set counts as "already posted"), so a group that was NOT actually
-// posted is never wrongly skipped. Returns null when the row+dest has no logged line.
-export function alreadyLoggedGroup(logText: string, rowId: string, dest: string): string | null {
-  const re = new RegExp(
-    `^-\\s+\\S+\\s+—\\s+${escapeRe(rowId)}\\s+→\\s+\\S+\\s+(.+?)\\s+\\[${escapeRe(dest)}(?: \\+link)?\\]`
-  );
+// Idempotency for a row that already has a live Typefully draft from a prior run. Unlike the old
+// PostPeer/Upload-Post path (which posted a row's targets in separate GROUPS and needed
+// alreadyLoggedGroup to guard against re-posting a group that already succeeded), a card is now
+// ONE draft per row — so the only gap left is a crash between createDraft succeeding and this row's
+// status/log write landing. Without this guard, re-running publishCards on a still-`approve` row
+// would re-upload the media and create a SECOND live scheduled draft for the same card.
+function alreadyLoggedDraft(folder: string, rowId: string): string | null {
+  let text: string;
+  try {
+    text = readFileSync(join(folder, "publish-log.md"), "utf8");
+  } catch {
+    return null;
+  }
+  const escaped = rowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`—\\s+${escaped}\\s+→\\s+typefully draft (\\S+)`);
   let found: string | null = null;
-  for (const line of logText.split("\n")) {
+  for (const line of text.split("\n")) {
     const m = line.match(re);
-    if (m) found = m[1]; // last logged wins, mirroring findLoggedRef
+    if (m) found = m[1]; // last logged wins
   }
   return found;
 }
 
-// The row's publish-log.md text (for the idempotency check), or "" when the file doesn't exist yet
-// (first run — nothing has been posted). Same folder/filename convention as appendPublishLog.
-function readPublishLog(folder: string): string {
-  try {
-    return readFileSync(join(folder, "publish-log.md"), "utf8");
-  } catch {
-    return "";
-  }
-}
-
 async function runCheck(folder: string | null): Promise<void> {
-  const name = imagePostName();
-  console.log(`image_post provider (config/providers.yaml): ${name}`);
+  console.log("image posts: native Typefully drafts (uploadMedia + media_ids) — x/linkedin/bluesky");
 
   const cfg = loadCtaConfig();
   const inline = Object.entries(cfg.placement).filter(([, v]) => v === "inline").map(([k]) => k);
   const other = Object.entries(cfg.placement).filter(([, v]) => v !== "inline").map(([k, v]) => `${k}(${v})`);
-  console.log(`CTA (config/cta.yaml): link inline on [${inline.join(", ")}]; omitted on [${other.join(", ")}] (relays can't reply/comment).`);
+  console.log(`CTA (config/cta.yaml): inline on [${inline.join(", ")}]; ${other.join(", ") || "none"} placed like text posts (reply/first-comment).`);
 
   if (folder) {
     const cards = approvedCards(folder);
@@ -209,7 +117,7 @@ async function runCheck(folder: string | null): Promise<void> {
         const rendered = existsSync(imagePath) ? "rendered" : "NOT RENDERED — run `npm run render -- --still`";
         const { text, fm } = cardCopy(folder, c.id);
         const { url } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
-        const target = cardTarget(c.platform) ?? "all platforms";
+        const target = cardTarget(c.platform) ?? "UNSUPPORTED (legacy fan-out — split into quote-card:<x|linkedin|bluesky>)";
         console.log(`  • ${c.id} → ${target}  ${c.asset} (${rendered})  ${url ? `link → ${url}` : "no link"}`);
         console.log(`      caption: ${text.replace(/\s+/g, " ").slice(0, 100)}${text.length > 100 ? "…" : ""}`);
       }
@@ -217,25 +125,25 @@ async function runCheck(folder: string | null): Promise<void> {
     console.log("");
   }
 
-  const provider = await loadProvider();
   try {
-    await provider.check();
+    await socialSetId();
+    console.log("✓ Typefully auth OK — social set resolved.");
   } catch (e) {
-    console.error(`✗ ${name} preflight failed: ${e instanceof Error ? e.message : e}`);
+    console.error(`✗ Typefully preflight failed: ${e instanceof Error ? e.message : e}`);
     process.exit(1);
   }
 }
 
 export interface ScheduledCard {
   id: string;
-  platform: string; // destination platform (single target) or "quote-card" for legacy fan-out
+  platform: string; // destination platform (x | linkedin | bluesky)
   when: string; // human PT label (matches publishText/publishShorts, not a raw ISO string)
-  ref: string; // provider post ref(s)
+  ref: string; // "typefully draft <id>"
 }
 
-// Schedule approved quote-card rows from a folder to the image relays. Extracted from the CLI (like
-// publishText) so the review GUI can schedule ONE row on approve via opts.onlyIds. With no opts it
-// behaves exactly as the CLI did — every approved card in the folder — so /publish is unchanged.
+// Schedule approved quote-card rows from a folder natively through Typefully. Extracted from the
+// CLI (like publishText) so the review GUI can schedule ONE row on approve via opts.onlyIds. With no
+// opts it behaves exactly as the CLI did — every approved card in the folder — so /publish is unchanged.
 export async function publishCards(
   folder: string,
   opts: { onlyIds?: string[]; atOverride?: string; forceReuse?: boolean } = {}
@@ -247,24 +155,21 @@ export async function publishCards(
     return [];
   }
 
-  // Reuse guard: check if this slug was already published as a quote-card recently.
+  // Reuse guard: per TARGET platform (like publishText's checkReuse(slug, r.platform)), not a
+  // shared "quote-card" bucket — bets.md Placed rows are keyed by the row's real destination
+  // platform (appendBetPlacement below), so a bucket-wide check would never match and never block
+  // anything. Cached per target since several rows in one folder can share a platform.
   // Pass forceReuse to bypass the window and proceed anyway.
   const slug = basename(folder);
-  if (opts.forceReuse) {
-    console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
-  } else {
-    const reuseResult = checkReuse(slug, "quote-card");
-    if (!reuseResult.allowed) {
-      console.warn(`reuse guard: ${reuseResult.reason} — skipping cards`);
-      return [];
-    }
-  }
+  const forceReuse = opts.forceReuse ?? false;
+  if (forceReuse) console.log("reuse guard bypassed via --force-reuse, proceeding with publish");
+  const reuseByTarget = new Map<string, ReturnType<typeof checkReuse>>();
 
-  const provider = await loadProvider();
-  const allTargets = await provider.listTargets();
+  const setId = await socialSetId();
   const cfg = loadCtaConfig();
   const canonicalUrl = loadCanonicalUrl(folder);
   const sourceKind = loadSourceKind(folder);
+  const maxMap = loadPlatformMax();
 
   // Validate a `--at` override once (one-off/test; bypasses the scheduler + ledger).
   let atIso: string | null = null;
@@ -275,75 +180,106 @@ export async function publishCards(
     atIso = at.toISOString();
   }
 
+  // One bad row must not strand every OTHER approved card in this folder (mirrors the "keep going
+  // past a failing channel" principle already applied one layer up, across channels, in
+  // src/publish/all.ts): failures are collected and only raised after every row's been attempted,
+  // so valid rows still get scheduled this run.
   const results: ScheduledCard[] = [];
-  for (let i = 0; i < cards.length; i++) {
-    const row = cards[i];
-    const target = cardTarget(row.platform); // "x" | "linkedin" | "bluesky" | null (legacy fan-out)
-    const imagePath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
-    if (!existsSync(imagePath)) {
-      throw new Error(`missing ${imagePath} — render the card first: npm run render -- --still ${folder}`);
-    }
-
-    // Where this row posts: the single target's connected account(s), or every account (legacy).
-    const rowTargets = target ? allTargets.filter((t) => platformKey(t.platform) === target) : allTargets;
-    if (rowTargets.length === 0) {
-      console.warn(`  ⚠ ${row.id}: no connected ${target} account on ${provider.providerName} — skipping`);
-      continue;
-    }
-
-    // One card slot for this row, de-conflicting against the platform(s) it occupies so it never
-    // shares a day with a text post there. `--at` overrides the scheduler for a one-off.
-    let scheduledFor: string;
-    if (atIso) {
-      scheduledFor = atIso;
-    } else {
-      scheduledFor = claimSlots({
-        windowKey: "quote-card",
-        conflictPlatforms: conflictPlatforms(rowTargets),
-        count: 1,
-        asset: `${basename(folder)}/${row.id}`,
-        by: "cards",
-      }).times[0];
-      if (!scheduledFor || scheduledFor === "next-free-slot") {
-        throw new Error("no card slot available — give config/platforms.yaml a `quote-card` cadence (posts_per_week + slot_days + slot_time_pst)");
+  const failures: string[] = [];
+  for (const row of cards) {
+    try {
+      const target = cardTarget(row.platform); // "x" | "linkedin" | "bluesky" | null (legacy fan-out)
+      if (!target) {
+        throw new Error(
+          `${row.id}: legacy fan-out quote-card row (no ":<platform>" target) can't ship through Typefully, ` +
+            `which needs one platform per draft — split it into quote-card:<x|linkedin|bluesky> rows ` +
+            `(see .claude/skills/atomize/SKILL.md step 7).`
+        );
       }
-    }
+      if (!TEXT_PLATFORMS.has(target)) {
+        throw new Error(`${row.id}: quote-card target "${target}" isn't a Typefully platform (x | linkedin | bluesky)`);
+      }
 
-    const { text: caption, fm } = cardCopy(folder, row.id);
-    const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
-    if (usedFallback) {
-      console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
-    }
+      if (!forceReuse) {
+        if (!reuseByTarget.has(target)) reuseByTarget.set(target, checkReuse(slug, target));
+        const reuseResult = reuseByTarget.get(target)!;
+        if (!reuseResult.allowed) {
+          console.warn(`reuse guard: ${reuseResult.reason} — skipping ${row.id}`);
+          continue;
+        }
+      }
 
-    const groups = planGroups(caption, rowTargets, ctaUrl, ctaLabel, cfg);
-    const priorLog = readPublishLog(folder); // prior runs' log lines, for the per-group idempotency check
-    const refs: string[] = [];
-    for (const g of groups) {
-      // Sorted so `dest` is stable regardless of provider.listTargets()'s return order — a retry run
-      // whose provider lists connected accounts in a different order must still produce the SAME
-      // dest string as the original run, or the idempotency check below misses the match and re-posts.
-      const dest = g.targets.map((t) => t.platform).sort().join("+");
-      // If a prior run already posted+logged THIS exact group but then threw on a later group, the
-      // row is still `approve` and we're re-entering this loop — reuse the logged ref, don't re-post.
-      const priorRef = alreadyLoggedGroup(priorLog, row.id, dest);
+      const imagePath = isAbsolute(row.asset) ? row.asset : join(folder, row.asset);
+      if (!existsSync(imagePath)) {
+        throw new Error(`missing ${imagePath} — render the card first: npm run render -- --still ${folder}`);
+      }
+
+      // Already scheduled on a prior run (createDraft succeeded but this row's status/log write
+      // never landed, e.g. a crash mid-run) — reuse that ref instead of creating a duplicate draft.
+      const priorRef = alreadyLoggedDraft(folder, row.id);
       if (priorRef) {
-        console.log(`  ↳ ${row.id} [${dest}] already scheduled on a prior run (${priorRef}) — skipping re-post`);
-        refs.push(priorRef);
+        console.log(`  ↳ ${row.id} already scheduled on a prior run (typefully draft ${priorRef}) — skipping re-post`);
+        setStatus(folder, row, "published");
+        results.push({ id: row.id, platform: target, when: "(scheduled on a prior run)", ref: `typefully draft ${priorRef}` });
         continue;
       }
-      const link = g.caption.includes("\n") ? " +link" : "";
-      const ref = await provider.scheduleImagePost({ imagePath, caption: g.caption, scheduledFor, targets: g.targets });
-      refs.push(ref);
-      appendPublishLog(folder, `${row.id} → ${provider.providerName} ${ref} [${dest}${link}] (scheduled ${scheduledFor})`);
+
+      // One card slot for this row, de-conflicting against the platform it occupies so it never
+      // shares a day with a text post there. `--at` overrides the scheduler for a one-off.
+      let scheduledFor: string;
+      if (atIso) {
+        scheduledFor = atIso;
+      } else {
+        scheduledFor = claimSlots({
+          windowKey: "quote-card",
+          conflictPlatforms: [target],
+          count: 1,
+          asset: `${basename(folder)}/${row.id}`,
+          by: "cards",
+        }).times[0];
+        if (!scheduledFor || scheduledFor === "next-free-slot") {
+          throw new Error("no card slot available — give config/platforms.yaml a `quote-card` cadence (posts_per_week + slot_days + slot_time_pst)");
+        }
+      }
+
+      const { text: caption, fm } = cardCopy(folder, row.id);
+      const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+      if (usedFallback) {
+        console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
+      }
+      const placement = cfg.placement[target] ?? "inline";
+      const { posts, manualComment } = buildPosts(caption, ctaUrl, ctaLabel, placement, maxMap[target] ?? Infinity);
+
+      const mediaId = await uploadMedia(setId, imagePath);
+      (posts[0] as { text: string; media_ids?: string[] }).media_ids = [mediaId];
+      console.log(`  ↳ uploaded ${basename(imagePath)} → media attached to ${row.id}`);
+
+      const draft = await createDraft(
+        setId,
+        buildDraftPayload({ title: rowDraftTitle(row.id), platformKey: target, posts, publishAt: scheduledFor })
+      );
+
+      setStatus(folder, row, "published");
+      const placeNote = ctaUrl ? `, cta→${placement}` : "";
+      const when = fmtLa(new Date(scheduledFor));
+      appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${target}, ${when}${placeNote})`);
+      if (manualComment) {
+        appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
+      }
+      appendBetPlacement(folder, row.id, target, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, caption);
+      console.log(
+        `scheduled: ${row.id} (${target}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
+          (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
+      );
+      results.push({ id: row.id, platform: target, when, ref: `typefully draft ${draft.id ?? "?"}` });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`  ✗ ${row.id}: ${msg}`);
+      failures.push(msg);
     }
-    setStatus(folder, row, "published");
-    // Record the placement under the ACTUAL destination platform, with the CAPTION as the match key,
-    // so tag-source attributes the card post per platform (and fm.spin → the `| spin` marker →
-    // classified atomized-spin). Legacy fan-out rows keep the shared "quote-card" key.
-    const betPlatform = target ?? "quote-card";
-    appendBetPlacement(folder, row.id, betPlatform, `${refs.join(" | ")} @ ${scheduledFor}`, fm, caption);
-    console.log(`scheduled: ${row.id} (${target ?? "all platforms"}) → ${provider.providerName} ${refs.join(" | ")} @ ${scheduledFor}`);
-    results.push({ id: row.id, platform: betPlatform, when: fmtLa(new Date(scheduledFor)), ref: refs.join(" | ") });
+  }
+  if (failures.length > 0) {
+    throw new Error(`publishCards: ${failures.length} row(s) failed to schedule:\n${failures.join("\n")}`);
   }
   return results;
 }

@@ -23,11 +23,11 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
 3. **Browser automation for posting is allowed only with Muxin's explicit approval.** Prefer
-   official APIs and sanctioned API relays (Typefully, YouTube, AT Protocol, PostPeer for TikTok +
-   quote cards, Upload-Post as the card failover) or ready-to-paste files — they're more reliable.
-   Where no usable API exists (e.g. Substack), a constrained browser agent MAY post, but only on
-   content Muxin has approved — rule 2 still governs, nothing posts unreviewed. Never auto-post via
-   browser without that approval.
+   official APIs and sanctioned API relays (Typefully — text posts and, since 2026-07-08, quote
+   cards as native image posts too — YouTube, AT Protocol, PostPeer for TikTok) or ready-to-paste
+   files — they're more reliable. Where no usable API exists (e.g. Substack), a constrained browser
+   agent MAY post, but only on content Muxin has approved — rule 2 still governs, nothing posts
+   unreviewed. Never auto-post via browser without that approval.
 4. **Discrete verifiable outputs.** Every pipeline step writes a file or DB rows that can be
    inspected. Scripts do deterministic work; Claude does judgment (tagging, synthesis,
    extraction, scoring) inline while running skills.
