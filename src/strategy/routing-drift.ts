@@ -1,6 +1,5 @@
 import { openDb } from "../db/db.js";
-import { NO_SPIN_SOURCE } from "./origin-compare.js";
-import { CORE_TEXT, computeFit, loadData, type LoadedData, type RoutingConfig, type WindowRange } from "./route.js";
+import { CONTROL_RUN_SOURCE, CORE_TEXT, computeFit, loadData, type LoadedData, type RoutingConfig, type WindowRange } from "./route.js";
 
 // Routing drift flags: does a pillar/platform pair's fit score PERSISTENTLY diverge from
 // config/routing.yaml's defaults list? decideForPillar (route.ts) is now always defaults-driven
@@ -33,7 +32,7 @@ export interface DriftFlag {
   direction: DriftDirection;
   n: number; // combined sample count across the windows that both independently cleared the floor
   windowsChecked: number; // independent windows that agreed on the direction (currently always 2)
-  noSpinControlAvailable: boolean; // a verbatim (source='atomized') post exists for this pair in the lookback
+  noSpinControlAvailable: boolean; // a deliberate control run (source=CONTROL_RUN_SOURCE) exists for this pair in the lookback
 }
 
 // Pure divergence check — no I/O. `windowData` must already be loaded per-window (loadData's
@@ -77,9 +76,11 @@ export function detectDrift(
   return flags;
 }
 
-// Reuses origin-compare.ts's source classification (~lines 88-118 there): source='atomized' IS
-// the verbatim/no-spin control. A pillar/platform pair with at least one such post in the
-// lookback window already has a no-spin control to read the flag against.
+// Checks for a DELIBERATE, current control run (source=CONTROL_RUN_SOURCE, card f444f440's
+// spin-control.ts) — not source='atomized' (origin-compare.ts's NO_SPIN_SOURCE). Spin is now the
+// always-on default, so a stray old 'atomized' post is a pre-Spin artifact, not evidence of a
+// live baseline; only the periodic --no-spin control run counts. Scoped to `range` like any other
+// lookback here, so an ancient control run ages out and stops counting too.
 export function hasNoSpinControl(
   db: ReturnType<typeof openDb>,
   pillar: string,
@@ -92,7 +93,7 @@ export function hasNoSpinControl(
        WHERE platform = ? AND pillar = ? AND source = ?
          AND posted_at >= ? AND posted_at < ?`
     )
-    .get(platform, pillar, NO_SPIN_SOURCE, new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()) as {
+    .get(platform, pillar, CONTROL_RUN_SOURCE, new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()) as {
     c: number;
   };
   return row.c > 0;

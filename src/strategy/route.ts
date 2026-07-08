@@ -24,6 +24,13 @@ export const PILLARS = ["human-ai", "claude-code", "civic-tech", "career-work", 
 // Derivative target platforms routing chooses among. Substack is the source channel,
 // not a target. Community targets come from config (defaults / rules), not the DB.
 export const CORE_TEXT = ["x", "linkedin", "bluesky"];
+// posts.source value for a deliberate --no-spin control run (card f444f440, src/strategy/spin-
+// control.ts): a periodic verbatim derivative drafted for an ALREADY-ASSIGNED pillar/platform
+// pair so routing-drift.ts's no-spin-control check has a live baseline (Spin is the always-on
+// default now, so a plain verbatim post no longer happens on its own). loadData() below excludes
+// these rows from the pillar/platform resonance figures decideForPillar/routing-drift.ts read —
+// see spin-control.ts's loadControlData for the separate bucket these rows DO feed.
+export const CONTROL_RUN_SOURCE = "spin-control-run";
 const WEEK = 7 * 24 * 3600 * 1000;
 
 export interface RoutingConfig {
@@ -64,7 +71,7 @@ export interface LoadedData {
   baselines: Map<string, number>; // key: platform → avg engagement per post on that platform
 }
 
-function loadConfig(): RoutingConfig {
+export function loadConfig(): RoutingConfig {
   return parse(readFileSync(join(repoRoot, "config", "routing.yaml"), "utf8")) as RoutingConfig;
 }
 
@@ -77,8 +84,15 @@ function loadConfig(): RoutingConfig {
 // `range`, when given, scopes every query to posts with posted_at in [range.startMs, range.endMs)
 // — used by routing-drift.ts to load two independent windows of history separately, through this
 // SAME function, rather than duplicating the score math.
-export function loadData(range?: WindowRange): LoadedData {
-  const db = openDb();
+// `injectedDb`, when given, is used instead of opening the real analytics.db (and is left open —
+// caller owns its lifecycle). Test-only hook, same pattern as routing-drift.ts's hasNoSpinControl.
+//
+// CONTROL_RUN_SOURCE rows are excluded from BOTH queries below — a deliberate --no-spin control
+// run (card f444f440) must never feed the pillar/platform resonance figures decideForPillar or
+// routing-drift.ts's detectDrift read. Their own separate bucket lives in spin-control.ts's
+// loadControlData, over the SAME posts but scoped to source = CONTROL_RUN_SOURCE only.
+export function loadData(range?: WindowRange, injectedDb?: ReturnType<typeof openDb>): LoadedData {
+  const db = injectedDb ?? openDb();
   const dateClause = range ? `AND p.posted_at >= ? AND p.posted_at < ?` : "";
   const dateParams = range ? [new Date(range.startMs).toISOString(), new Date(range.endMs).toISOString()] : [];
   const rows = db
@@ -92,17 +106,17 @@ export function loadData(range?: WindowRange): LoadedData {
          JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
            ON m.post_id = lm.post_id AND m.captured_at = lm.mc
        ) m ON m.post_id = p.id
-       WHERE p.pillar IS NOT NULL ${dateClause}
+       WHERE p.pillar IS NOT NULL AND (p.source IS NULL OR p.source != ?) ${dateClause}
        GROUP BY p.platform, p.pillar`
     )
-    .all(...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
+    .all(CONTROL_RUN_SOURCE, ...dateParams) as { platform: string; pillar: string; n: number; avg_eng: number }[];
 
   const dates = db
     .prepare(
-      `SELECT platform, posted_at FROM posts p WHERE posted_at IS NOT NULL ${dateClause}`
+      `SELECT platform, posted_at FROM posts p WHERE posted_at IS NOT NULL AND (p.source IS NULL OR p.source != ?) ${dateClause}`
     )
-    .all(...dateParams) as { platform: string; posted_at: string }[];
-  db.close();
+    .all(CONTROL_RUN_SOURCE, ...dateParams) as { platform: string; posted_at: string }[];
+  if (!injectedDb) db.close();
 
   const cells = new Map<string, Cell>();
   for (const r of rows) cells.set(`${r.platform}|${r.pillar}`, { n: r.n, avg_eng: r.avg_eng });

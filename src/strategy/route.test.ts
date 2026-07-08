@@ -1,6 +1,18 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { decideForPillar, mergeDecisions, type Decision, type LoadedData, type RoutingConfig } from "./route.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import Database from "better-sqlite3";
+import { repoRoot } from "../db/db.js";
+import {
+  CONTROL_RUN_SOURCE,
+  decideForPillar,
+  loadData,
+  mergeDecisions,
+  type Decision,
+  type LoadedData,
+  type RoutingConfig,
+} from "./route.js";
 
 function d(overrides: Partial<Decision>): Decision {
   return { platform: "x", decision: "include", score: null, confidence: "cold-start", rationale: "", ...overrides };
@@ -109,5 +121,53 @@ describe("mergeDecisions: platform-fit gate across multiple pillars", () => {
     const merged = mergeDecisions(["civic-tech", "human-ai"], perPillar);
     const community = merged.find((m) => m.platform === "community:democratic-resilience")!;
     assert.equal(community.decision, "include");
+  });
+});
+
+describe("loadData: excludes deliberate spin-control-run rows from the main resonance figures (card f444f440)", () => {
+  function freshDb(): Database.Database {
+    const schema = readFileSync(join(repoRoot, "src", "db", "schema.sql"), "utf8");
+    const db = new Database(":memory:");
+    db.exec(schema);
+    return db;
+  }
+
+  function insertPost(
+    db: Database.Database,
+    platform: string,
+    pillar: string,
+    source: string | null,
+    postedAt: string,
+    likes: number
+  ): void {
+    const info = db
+      .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, pillar, source) VALUES (?, ?, ?, ?, ?)`)
+      .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, pillar, source);
+    db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+      info.lastInsertRowid,
+      postedAt,
+      likes
+    );
+  }
+
+  test("a spin-control-run post is excluded from the pillar/platform cell's n and avg_eng", () => {
+    const db = freshDb();
+    insertPost(db, "x", "human-ai", "organic", "2026-06-01T00:00:00.000Z", 10);
+    insertPost(db, "x", "human-ai", "organic", "2026-06-08T00:00:00.000Z", 12);
+    insertPost(db, "x", "human-ai", CONTROL_RUN_SOURCE, "2026-06-15T00:00:00.000Z", 1000);
+
+    const data = loadData(undefined, db);
+    const cell = data.cells.get("x|human-ai")!;
+    assert.equal(cell.n, 2, "the spin-control-run row must not be counted in n");
+    assert.equal(cell.avg_eng, 11, "avg must be computed from only the two organic posts (10, 12) -> 11");
+    db.close();
+  });
+
+  test("a post with NULL source is treated as a normal (non-control) post", () => {
+    const db = freshDb();
+    insertPost(db, "bluesky", "civic-tech", null, "2026-06-01T00:00:00.000Z", 5);
+    const data = loadData(undefined, db);
+    assert.equal(data.cells.get("bluesky|civic-tech")!.n, 1);
+    db.close();
   });
 });

@@ -199,7 +199,12 @@ export function appendBetPlacement(
   // to classify the post 'atomized-spin' instead of 'atomized'. Placed BEFORE the quoted prefix
   // so tag-source's end-anchored quote regex still finds the text at the line's tail.
   const spin = fm.spin ? ` | spin` : "";
+  // Spin-control-run marker (card f444f440, src/strategy/spin-control.ts): tag-source reads this
+  // back to classify the post source = 'spin-control-run' instead of 'atomized'/'atomized-spin',
+  // so route.ts's loadData() can exclude it from the pillar/platform resonance figures. Same
+  // placement rule as spin — before the quoted prefix.
+  const controlRun = fm.control_run ? ` | control-run` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${prefix}`;
   writeFileSync(BETS_PATH, existing.replace(/\n*$/, "\n") + line + "\n");
 }

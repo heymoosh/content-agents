@@ -1,12 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openDb, repoRoot } from "./db.js";
+import { CONTROL_RUN_SOURCE } from "../strategy/route.js";
 
 // Classify each post's origin so origin-compare.ts can measure whether atomizing earns traction:
-//   'atomized'      — shipped by /publish from a content folder (verbatim extraction-first)
-//   'atomized-spin' — shipped from a content folder, but reframed for audience fit (the opt-in
-//                     spin experiment, docs/spin-experiment.md — Placed-log row carries `| spin`)
-//   'organic'       — posted natively / a note Muxin wrote
+//   'atomized'          — shipped by /publish from a content folder (verbatim extraction-first)
+//   'atomized-spin'      — shipped from a content folder, but reframed for audience fit (the
+//                          opt-in spin experiment, docs/spin-experiment.md — Placed-log row
+//                          carries `| spin`)
+//   'spin-control-run'  — shipped from a content folder as a deliberate --no-spin control run on
+//                          an already-assigned pillar/platform pair (card f444f440 — Placed-log
+//                          row carries `| control-run`). Takes priority over the spin marker:
+//                          route.ts's loadData() excludes this source from the pillar/platform
+//                          resonance figures; spin-control.ts's loadControlData tracks it separately.
+//   'organic'            — posted natively / a note Muxin wrote
 // Deterministic; runs during /strategy next to link-bet. The atomized signal is that the post text
 // matches a Placed-log row in briefs/bets.md (what /publish shipped), OR the post already carries a
 // bet_id (in case the text was edited before posting). Everything else on a native channel is organic.
@@ -37,11 +44,15 @@ interface Placed {
   platform: string;
   prefix: string;
   spin: boolean;
+  controlRun: boolean;
 }
 
-// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | \"<text-prefix>\"" rows.
+// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | control-run | \"<text-prefix>\"" rows.
 // The optional ` | spin ` segment (written by appendBetPlacement for spin-experiment derivatives)
-// marks an audience-reframed variant; it sits before the end-anchored quote so both still parse.
+// marks an audience-reframed variant; ` | control-run ` (card f444f440) marks a deliberate
+// --no-spin control run. Markers are scoped to the segment BEFORE the quoted post-text prefix —
+// the quote can itself contain a coincidental "| spin |"/"| control-run |" substring (Muxin's own
+// post text), and testing the full line would false-positive on that.
 function readPlaced(): Placed[] {
   let text = "";
   try {
@@ -56,8 +67,10 @@ function readPlaced(): Placed[] {
     const quote = line.match(/\|\s+"([^"]*)"\s*$/);
     if (!plat) continue;
     const prefix = quote ? norm(quote[1]) : "";
-    const spin = /\|\s+spin\s*(\||$)/.test(line);
-    if (prefix.length >= 12) out.push({ platform: plat[1], prefix, spin });
+    const markerScope = quote ? line.slice(0, quote.index) : line;
+    const spin = /\|\s+spin\s*(\||$)/.test(markerScope);
+    const controlRun = /\|\s+control-run\s*(\||$)/.test(markerScope);
+    if (prefix.length >= 12) out.push({ platform: plat[1], prefix, spin, controlRun });
   }
   return out;
 }
@@ -76,6 +89,7 @@ function main() {
   const update = db.prepare("UPDATE posts SET source = ? WHERE id = ?");
   let atomized = 0;
   let spun = 0;
+  let controlled = 0;
   let organic = 0;
   let untouched = 0;
   const matches: string[] = [];
@@ -85,12 +99,16 @@ function main() {
       let value: string;
       if (DISTRIBUTED.has(p.platform)) {
         const content = norm(p.content_text ?? "");
-        // Keep the matched row so its spin marker can promote 'atomized' → 'atomized-spin'.
+        // Keep the matched row so its spin/control-run marker can promote the classification.
         const hit = placed.find((pl) => pl.platform === p.platform && leadMatch(content, pl.prefix));
         const matched = !!p.bet_id || !!hit;
-        // bet_id-only matches (text edited before posting) lose the spin signal → default atomized.
-        value = matched ? (hit?.spin ? "atomized-spin" : "atomized") : "organic";
-        if (matched) matches.push(`  #${p.id} ${p.platform}${hit?.spin ? " (spin)" : ""}: ${(p.content_text ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
+        // bet_id-only matches (text edited before posting) lose the spin/control-run signal →
+        // default atomized. control-run takes priority over spin — see CONTROL_RUN_SOURCE.
+        value = matched ? (hit?.controlRun ? CONTROL_RUN_SOURCE : hit?.spin ? "atomized-spin" : "atomized") : "organic";
+        if (matched) {
+          const tag = hit?.controlRun ? " (control-run)" : hit?.spin ? " (spin)" : "";
+          matches.push(`  #${p.id} ${p.platform}${tag}: ${(p.content_text ?? "").replace(/\s+/g, " ").slice(0, 60)}`);
+        }
       } else if (NATIVE_ONLY.has(p.platform)) {
         value = "organic";
       } else {
@@ -100,6 +118,7 @@ function main() {
       if (value !== p.source) update.run(value, p.id);
       if (value === "organic") organic++;
       else if (value === "atomized-spin") spun++;
+      else if (value === CONTROL_RUN_SOURCE) controlled++;
       else atomized++;
     }
   });
@@ -107,7 +126,7 @@ function main() {
   db.close();
 
   console.log(
-    `tag-source: ${atomized} atomized, ${spun} atomized-spin, ${organic} organic, ${untouched} left untouched (parsed ${placed.length} placed rows)`
+    `tag-source: ${atomized} atomized, ${spun} atomized-spin, ${controlled} spin-control-run, ${organic} organic, ${untouched} left untouched (parsed ${placed.length} placed rows)`
   );
   if (matches.length) {
     console.log(`\natomized (sanity-check these are real):`);

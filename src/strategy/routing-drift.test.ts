@@ -91,7 +91,7 @@ describe("formatDriftFlags: markdown rendering", () => {
   });
 });
 
-describe("hasNoSpinControl: reuses origin-compare.ts's source='atomized' classification", () => {
+describe("hasNoSpinControl: requires a DELIBERATE control run (source='spin-control-run'), not just any old verbatim post (card f444f440)", () => {
   function freshDb(): Database.Database {
     const schema = readFileSync(join(repoRoot, "src", "db", "schema.sql"), "utf8");
     const db = new Database(":memory:");
@@ -105,15 +105,23 @@ describe("hasNoSpinControl: reuses origin-compare.ts's source='atomized' classif
     ).run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, pillar, source);
   }
 
-  test("true when a verbatim ('atomized') post exists for the pillar/platform pair in range", () => {
+  test("true when a deliberate control-run ('spin-control-run') post exists for the pillar/platform pair in range", () => {
     const db = freshDb();
-    insertPost(db, "x", "human-ai", "atomized", "2026-06-15T00:00:00.000Z");
+    insertPost(db, "x", "human-ai", "spin-control-run", "2026-06-15T00:00:00.000Z");
     const range = { startMs: new Date("2026-06-01").getTime(), endMs: new Date("2026-07-01").getTime() };
     assert.equal(hasNoSpinControl(db, "human-ai", "x", range), true);
     db.close();
   });
 
-  test("false when only 'atomized-spin' or 'organic' posts exist (no verbatim control)", () => {
+  test("false when only a stray old verbatim ('atomized') post exists — that predates Spin going always-on, not a deliberate current control", () => {
+    const db = freshDb();
+    insertPost(db, "x", "human-ai", "atomized", "2026-06-15T00:00:00.000Z");
+    const range = { startMs: new Date("2026-06-01").getTime(), endMs: new Date("2026-07-01").getTime() };
+    assert.equal(hasNoSpinControl(db, "human-ai", "x", range), false);
+    db.close();
+  });
+
+  test("false when only 'atomized-spin' or 'organic' posts exist (no control run)", () => {
     const db = freshDb();
     insertPost(db, "x", "human-ai", "atomized-spin", "2026-06-15T00:00:00.000Z");
     insertPost(db, "x", "human-ai", "organic", "2026-06-16T00:00:00.000Z");
@@ -122,9 +130,9 @@ describe("hasNoSpinControl: reuses origin-compare.ts's source='atomized' classif
     db.close();
   });
 
-  test("false when the only verbatim post falls outside the given range", () => {
+  test("false when the only control-run post falls outside the given range", () => {
     const db = freshDb();
-    insertPost(db, "x", "human-ai", "atomized", "2026-01-01T00:00:00.000Z");
+    insertPost(db, "x", "human-ai", "spin-control-run", "2026-01-01T00:00:00.000Z");
     const range = { startMs: new Date("2026-06-01").getTime(), endMs: new Date("2026-07-01").getTime() };
     assert.equal(hasNoSpinControl(db, "human-ai", "x", range), false);
     db.close();
