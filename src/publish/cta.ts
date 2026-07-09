@@ -38,6 +38,154 @@ export function loadCtaConfig(): CtaConfig {
   };
 }
 
+// --- Content-type CTA routing (Smarter routing, card 6dcaee98) -------------------------------
+// A derivative is classified by CONTENT TYPE (frontmatter `content_type`, an array — possibly
+// more than one type applies), not pillar. config/content-types.yaml carries each type's
+// documented primary + (optional) secondary CTA text. This lives in code (not just skill
+// judgment, like the old pillar `targets:` block) so the routing table is one source of truth.
+//
+// Three destinations: `source` (the essay/Substack link), `project` (a PER-POST url read from the
+// derivative's OWN `project_url` frontmatter — only ever set when genuinely relevant to that post,
+// never just because the content type matched), and `work_with_me` (a fixed config-level url —
+// Muxin's LinkedIn profile, standing in for the not-yet-built "work with me" landing-page
+// destination). See config/content-types.yaml's header comment.
+
+export type CtaDestination = "source" | "project" | "work_with_me";
+
+export interface ContentTypeCtaEntry {
+  text: string;
+  destination: CtaDestination;
+}
+
+export interface ContentTypeDef {
+  primary: ContentTypeCtaEntry;
+  secondary?: ContentTypeCtaEntry;
+}
+
+export interface ContentTypesConfig {
+  types: Record<string, ContentTypeDef>;
+  workWithMeUrl: string | null;
+}
+
+const ctaEntrySchema = z.object({
+  text: z.string(),
+  destination: z.enum(["source", "project", "work_with_me"]),
+});
+
+const contentTypeDefSchema = z.object({ primary: ctaEntrySchema, secondary: ctaEntrySchema.optional() });
+
+const contentTypesYamlSchema = z
+  .object({
+    types: z.record(z.string(), contentTypeDefSchema).optional(),
+    work_with_me_url: z.string().optional(),
+  })
+  .passthrough();
+
+export function loadContentTypesConfig(): ContentTypesConfig {
+  const cfg = loadYamlConfig(join(repoRoot, "config", "content-types.yaml"), contentTypesYamlSchema, {});
+  return { types: cfg.types ?? {}, workWithMeUrl: cfg.work_with_me_url ?? null };
+}
+
+export interface ResolvedCta {
+  url: string;
+  label: string;
+}
+
+// A `source` destination resolves exactly like resolveCta's `source` case (the essay's own
+// canonical_url, else the configured homepage/fallback). A `project` destination resolves ONLY to
+// this derivative's own `project_url` frontmatter value; a missing project_url means "omit this
+// CTA," never a fallback to the essay link (that would mislabel the essay as "the project," and
+// wouldn't serve a work-with-me ask anyway even when the essay IS on-topic). A `work_with_me`
+// destination resolves to the fixed `workWithMeUrl` from config/content-types.yaml — always
+// available, never a fallback.
+function resolveEntryUrl(
+  entry: ContentTypeCtaEntry,
+  projectUrl: string | null,
+  canonicalUrl: string | null,
+  cfg: CtaConfig,
+  workWithMeUrl: string | null
+): { url: string | null; usedFallback: boolean } {
+  if (entry.destination === "project") {
+    return { url: projectUrl && projectUrl.trim() ? projectUrl.trim() : null, usedFallback: false };
+  }
+  if (entry.destination === "work_with_me") {
+    return { url: workWithMeUrl, usedFallback: false };
+  }
+  return { url: canonicalUrl ?? cfg.fallbackUrl, usedFallback: canonicalUrl == null };
+}
+
+function resolveOneContentType(
+  typeKey: string,
+  ctCfg: ContentTypesConfig,
+  cfg: CtaConfig,
+  canonicalUrl: string | null,
+  projectUrl: string | null
+): { ctas: ResolvedCta[]; usedFallback: boolean } {
+  const def = ctCfg.types[typeKey];
+  if (!def) {
+    console.warn(`  ↳ warning: content_type "${typeKey}" not found in config/content-types.yaml — no CTA for it`);
+    return { ctas: [], usedFallback: false };
+  }
+  const entries = def.secondary ? [def.primary, def.secondary] : [def.primary];
+  const resolved: ResolvedCta[] = [];
+  let usedFallback = false;
+  for (const e of entries) {
+    const { url, usedFallback: uf } = resolveEntryUrl(e, projectUrl, canonicalUrl, cfg, ctCfg.workWithMeUrl);
+    if (url) {
+      resolved.push({ url, label: e.text });
+      if (uf) usedFallback = true;
+    }
+  }
+  return { ctas: resolved, usedFallback };
+}
+
+// Resolve every content type a derivative was classified as (frontmatter `content_type`, a string
+// or array of strings) into its CTA lines, stacking ALL matched types' CTAs — never picking one
+// winner when a piece plausibly fits more than one type. Empty/missing `content_type` resolves to
+// no CTAs (the caller's job to fall back to the plain `cta` path). `project` entries resolve from
+// this derivative's own `project_url` frontmatter (per-post, not shared config).
+export function resolveContentTypeCtas(
+  fm: Record<string, unknown>,
+  canonicalUrl: string | null,
+  cfg: CtaConfig,
+  ctCfg: ContentTypesConfig
+): { ctas: ResolvedCta[]; usedFallback: boolean } {
+  const raw = fm.content_type;
+  const types = Array.isArray(raw)
+    ? raw.filter((t): t is string => typeof t === "string")
+    : typeof raw === "string" && raw.trim()
+      ? [raw.trim()]
+      : [];
+  const projectUrl = typeof fm.project_url === "string" ? fm.project_url.trim() || null : null;
+  const results = types.map((t) => resolveOneContentType(t, ctCfg, cfg, canonicalUrl, projectUrl));
+  return {
+    ctas: results.flatMap((r) => r.ctas),
+    usedFallback: results.some((r) => r.usedFallback),
+  };
+}
+
+// The top-level entry point publishers call: an explicit frontmatter `cta` (source | literal url |
+// none) still wins, exactly as before (backward compatible with notes/civic-tech/etc. overrides).
+// Only when there's no explicit `cta` does a `content_type` classification drive the CTA(s) — and
+// then it can resolve to 0, 1, or several stacked lines instead of exactly one. `usedFallback`
+// mirrors resolveCta's diagnostic flag either way, so callers can log the same "no canonical_url"
+// note regardless of which path resolved the link.
+export function resolveCtaLines(
+  fm: Record<string, unknown>,
+  canonicalUrl: string | null,
+  cfg: CtaConfig,
+  sourceKind: string,
+  ctCfg: ContentTypesConfig
+): { ctas: ResolvedCta[]; usedFallback: boolean } {
+  const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
+  if (!rawCta) {
+    const viaContentType = resolveContentTypeCtas(fm, canonicalUrl, cfg, ctCfg);
+    if (viaContentType.ctas.length > 0) return viaContentType;
+  }
+  const { url, label, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+  return { ctas: url ? [{ url, label }] : [], usedFallback };
+}
+
 // The source essay's own URL — what `cta: source` derivatives point at. Pasted into source.md
 // `canonical_url` (auto-filled when atomized from a live URL). Null until it's a real http(s) url.
 export function loadCanonicalUrl(folder: string): string | null {

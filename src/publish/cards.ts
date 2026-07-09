@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, resolveCta } from "./cta.js";
+import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, loadContentTypesConfig, resolveCtaLines } from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import {
@@ -110,15 +110,17 @@ async function runCheck(folder: string | null): Promise<void> {
     if (cards.length > 0) {
       const canonicalUrl = loadCanonicalUrl(folder);
       const sourceKind = loadSourceKind(folder);
+      const ctCfg = loadContentTypesConfig();
       const { labels } = claimSlots({ windowKey: "quote-card", conflictPlatforms: [], count: 1, asset: "(preview)", by: "cards", dryRun: true });
       console.log(`  next free card slot (config/platforms.yaml quote-card cadence): ${labels[0] ?? "next-free-slot"}`);
       for (const c of cards) {
         const imagePath = isAbsolute(c.asset) ? c.asset : join(folder, c.asset);
         const rendered = existsSync(imagePath) ? "rendered" : "NOT RENDERED — run `npm run render -- --still`";
         const { text, fm } = cardCopy(folder, c.id);
-        const { url } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+        const { ctas } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
         const target = cardTarget(c.platform) ?? "UNSUPPORTED (legacy fan-out — split into quote-card:<x|linkedin|bluesky>)";
-        console.log(`  • ${c.id} → ${target}  ${c.asset} (${rendered})  ${url ? `link → ${url}` : "no link"}`);
+        const linkNote = ctas.length > 0 ? `link → ${ctas.map((cta) => cta.url).join(", ")}` : "no link";
+        console.log(`  • ${c.id} → ${target}  ${c.asset} (${rendered})  ${linkNote}`);
         console.log(`      caption: ${text.replace(/\s+/g, " ").slice(0, 100)}${text.length > 100 ? "…" : ""}`);
       }
     }
@@ -167,6 +169,7 @@ export async function publishCards(
 
   const setId = await socialSetId();
   const cfg = loadCtaConfig();
+  const ctCfg = loadContentTypesConfig();
   const canonicalUrl = loadCanonicalUrl(folder);
   const sourceKind = loadSourceKind(folder);
   const maxMap = loadPlatformMax();
@@ -243,12 +246,12 @@ export async function publishCards(
       }
 
       const { text: caption, fm } = cardCopy(folder, row.id);
-      const { url: ctaUrl, label: ctaLabel, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+      const { ctas, usedFallback } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
       if (usedFallback) {
-        console.log(`  ↳ note: ${row.id} cta:source → homepage (no canonical_url in source.md)`);
+        console.log(`  ↳ note: ${row.id} cta → homepage (no canonical_url in source.md)`);
       }
       const placement = cfg.placement[target] ?? "inline";
-      const { posts, manualComment } = buildPosts(caption, ctaUrl, ctaLabel, placement, maxMap[target] ?? Infinity);
+      const { posts, manualComment } = buildPosts(caption, ctas, placement, maxMap[target] ?? Infinity);
 
       const mediaId = await uploadMedia(setId, imagePath);
       (posts[0] as { text: string; media_ids?: string[] }).media_ids = [mediaId];
@@ -260,7 +263,7 @@ export async function publishCards(
       );
 
       setStatus(folder, row, "published");
-      const placeNote = ctaUrl ? `, cta→${placement}` : "";
+      const placeNote = ctas.length > 0 ? `, cta→${placement}` : "";
       const when = fmtLa(new Date(scheduledFor));
       appendPublishLog(folder, `${row.id} → typefully draft ${draft.id ?? "?"} (${target}, ${when}${placeNote})`);
       if (manualComment) {

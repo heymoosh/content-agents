@@ -1,0 +1,90 @@
+# Content-type -> CTA routing (Smarter routing, card 6dcaee98). No more one CTA per pillar --
+# /atomize classifies each derivative by CONTENT TYPE (which of the 8 types below fit, possibly
+# more than one) instead of by pillar, and src/publish/cta.ts resolves the CTA(s) at PUBLISH time.
+#
+# Each type has a documented `primary` (the main ask) and, for most types, a `secondary` (the
+# follow-up) -- verbatim from the card's table. `secondary` is optional: offer_adjacent_post
+# carries only one entry.
+#
+# Three destinations:
+#   - `source`  -- the essay/Substack link. Resolves like any other CTA (the essay's own
+#     canonical_url, falling back to source_fallback in cta.yaml).
+#   - `project` -- a PER-POST url, supplied at atomize time as that derivative's own `project_url`
+#     frontmatter field (see .claude/skills/atomize/SKILL.md step 4.5) -- and ONLY when it's
+#     genuinely relevant to that specific post's content, never attached just because the content
+#     type matched (Muxin, 2026-07-08). There is no config-level project url and no "live" flag --
+#     a project link varies per post, so it can't live here. If a derivative has no project_url,
+#     that CTA entry is simply dropped from the resolved output, never substituted with the essay
+#     link instead (an essay link doesn't serve a "see the project" ask, and the essay may not even
+#     be on-topic with the builder/project content -- Muxin, 2026-07-08).
+#   - `work_with_me` -- a fixed, config-level url (below): Muxin's LinkedIn profile, standing in for
+#     the not-yet-built "work with me" landing-page destination (Muxin, 2026-07-08). The 4
+#     "work"-flavored types (product_builder_insight, project_demo, offer_adjacent_post, case_study)
+#     use this instead of a `source` fallback, because their intent is "connect for work," which an
+#     essay/subscribe link doesn't serve regardless of topical relevance. Swap `work_with_me_url` for
+#     the real landing-page URL once card 87c86b16 ships -- a pure config change, no reclassification.
+
+work_with_me_url: "https://www.linkedin.com/in/muxinli"
+
+types:
+  essay_excerpt:
+    primary:
+      text: "Read full essay on Substack"
+      destination: source
+    secondary:
+      text: "See related project"
+      destination: project
+
+  society_capitalism_piece:
+    primary:
+      text: "Subscribe/read more"
+      destination: source
+    secondary:
+      text: "Optional: explore projects"
+      destination: project
+
+  ai_agency_thesis:
+    primary:
+      text: "Read full essay"
+      destination: source
+    secondary:
+      text: "See what I'm building"
+      destination: project
+
+  personal_career_reflection:
+    primary:
+      text: "Subscribe/follow"
+      destination: source
+    secondary:
+      text: "Maybe: see my job-search project"
+      destination: project
+
+  product_builder_insight:
+    primary:
+      text: "See how I think/work"
+      destination: project
+    secondary:
+      text: "Connect on LinkedIn"
+      destination: work_with_me
+
+  project_demo:
+    primary:
+      text: "Explore the project"
+      destination: project
+    secondary:
+      text: "Connect on LinkedIn"
+      destination: work_with_me
+
+  offer_adjacent_post:
+    primary:
+      text: "Connect on LinkedIn"
+      destination: work_with_me
+    # no secondary -- this type has no inherent project to fall back to
+
+  case_study:
+    primary:
+      text: "See projects"
+      destination: project
+    secondary:
+      text: "Connect on LinkedIn"
+      destination: work_with_me

@@ -119,8 +119,10 @@ derivative, the video script, and the video title/description. The short version
      scores: { native: 4, brand: 5, hook: 4, narrative: 3, resonance: 3, cta: true }
      thread_check: pass     # pass | missing — stamped in step 5.5, after scoring
      thread_spin_applied: true   # only present once the step 5.5 fallback redraft ran
-     cta: source            # source | <literal-url> | none — stamped from config/cta.yaml (step 4.5)
-     cta_label: "Full essay (free to subscribe):"   # short lead-in for the link; omit when cta is none
+     content_type: [essay_excerpt]   # 1+ of the 8 keys in config/content-types.yaml — classifies what job this post does; drives its CTA(s) at publish time (step 4.5). Omit ONLY when setting an explicit cta override below.
+     project_url: https://example.com/my-project   # OPTIONAL, per-post: only set when Muxin confirmed a SPECIFIC project genuinely relevant to THIS post's content (step 4.5 — ask her, never guess/reuse a project just because the content type matched). Omit when she has none or none applies — that CTA line is simply dropped, never defaulted to the essay link or an unrelated project.
+     cta: source            # OPTIONAL override: source | <literal-url> | none — wins over content_type when set (e.g. civic-tech's voting-tool link, or a deliberate none). Omit to let content_type drive the CTA.
+     cta_label: "Full essay (free to subscribe):"   # only needed alongside an explicit cta override; content_type-driven CTAs carry their own label from config/content-types.yaml
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
      directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
      control_run: true      # only on the one derivative drafted for a due spin-control pick (card f444f440); omit otherwise
@@ -155,24 +157,63 @@ derivative, the video script, and the video title/description. The short version
      through `text-polish` — that provider (Grok) is reserved for video scripts, which now live
      in the `/video` skill.
 
-4.5. **Stamp the CTA** (`config/cta.yaml`). The funnel: convert rented attention into owned
-   audience. For each text derivative set `cta` + `cta_label` from the target for THAT
-   derivative's pillar — human-ai / claude-code / other → `cta: source` (a "read more" link to
-   the essay itself; `/publish` resolves it from source.md `canonical_url`, falling back to the
-   Substack home when there's no essay URL); civic-tech (and community rooms posting civic
-   content) → the voting tool URL. A piece that spans pillars: choose per derivative (e.g. a
-   civic-leaning Bluesky take on a human-ai essay may point at the voting tool). If a derivative
-   isn't a "go read the essay" invite, you may set its `cta` to a literal url or `none` instead.
-   **Never write the link into the post body** — `/publish` places it per platform from
-   `cta.yaml` `placement` (X → first reply, LinkedIn → first comment, Bluesky/community →
-   inline), so the body stays clean and dodges the in-post link penalty. Each per-platform card
-   caption takes the pillar CTA too (default `cta: source`); `publish:cards` places it INLINE on
-   inline platforms (Bluesky/LinkedIn) and OMITS it where placement is `reply` (X), since the image
-   relays can't post a reply. Set a caption's `cta` to `none` only to deliberately ship it link-free.
-   Donations are never the headline ask; the default CTA is "come read / subscribe."
+4.5. **Classify the content type(s) and let the CTA follow** (`config/content-types.yaml`, card
+   6dcaee98 "Smarter routing"). The funnel: convert rented attention into owned audience — but the
+   CTA text now depends on WHAT the post is about, not which pillar it's tagged. For each text
+   derivative, judge which of these 8 content types it plausibly is (one, or more than one — don't
+   force a single choice when it genuinely fits several):
+   - `essay_excerpt` — expands/quotes a Substack essay's argument.
+   - `society_capitalism_piece` — a broader society/capitalism worldview post.
+   - `ai_agency_thesis` — the AI-agency thesis specifically.
+   - `personal_career_reflection` — personal reflection not tied to a project.
+   - `product_builder_insight` — diagnoses a builder/product problem, or shares how you think/work.
+   - `project_demo` — shows off a specific project/tool/system/build process.
+   - `offer_adjacent_post` — reads like an implicit "work with me" pitch.
+   - `case_study` — a concrete before/after or project case study.
+
+   Stamp every type that plausibly applies as `content_type: [<key>, ...]` (a single-item array is
+   fine and the common case). `src/publish/cta.ts`'s `resolveContentTypeCtas()` resolves the
+   actual CTA text at PUBLISH time from `config/content-types.yaml` — you never hand-pick CTA copy
+   here. It stacks every matched type's CTA(s) as separate lines (a post matching 2 types gets
+   both, never one winner).
+   - **`project`-destination CTAs need a `project_url` you supply — and it must be genuinely
+     RELEVANT, never just any project Muxin has built.** `product_builder_insight`, `project_demo`,
+     and `case_study` (plus the optional secondary on the other four types) resolve to a `project`
+     link. That link is only correct when THIS SPECIFIC derivative's content actually discusses,
+     demonstrates, or is about that particular project — the content-type bucket alone (e.g. "this
+     reads like builder insight") does NOT tell you which project, or whether one applies at all.
+     Never invent that connection yourself (the same never-invent guardrail as extraction-first
+     text) — if the source material doesn't make the relevant project obvious, ASK MUXIN DIRECTLY:
+     "This looks like it could link to a specific project — is there one that's actually relevant
+     here, and if so what's the URL?" Stamp `project_url` only with what she gives you. If she has
+     none, or none is genuinely relevant to this post, omit `project_url` entirely — that CTA line
+     is simply dropped, never filled with an unrelated project just to have a link.
+   - **The 4 work-flavored types always carry a "Connect on LinkedIn" CTA — nothing for you to
+     set.** `product_builder_insight`, `project_demo`, `offer_adjacent_post`, and `case_study` are
+     fundamentally "connect for work" asks, so their non-project entry resolves to Muxin's LinkedIn
+     profile (a fixed config value), never the essay/Substack link — an essay pointer doesn't serve
+     a work-with-me intent even when the essay happens to be on-topic. This is fully automatic at
+     publish time; you only ever need to decide `content_type` and, separately, whether a genuinely
+     relevant `project_url` applies.
+   - **The literal-URL override still exists, and still wins.** Civic-tech pieces (and community
+     rooms posting civic content) keep pointing at the voting tool exactly as before: set
+     `cta: <voting-tool-url>` (+ `cta_label`) directly and skip `content_type` — an explicit `cta`
+     always wins over a `content_type` classification. Same for a derivative that shouldn't carry
+     a "go read" invite at all (`cta: none`), or any other literal-url case.
+   - **Never write the link into the post body** — `/publish` places it per platform from
+     `cta.yaml` `placement` (X → first reply, LinkedIn → first comment, Bluesky/community →
+     inline), so the body stays clean and dodges the in-post link penalty. Stacked CTA lines
+     render as one block (blank line between each) wherever a single CTA would have gone. Each
+     per-platform card caption gets the same treatment (classify its `content_type` same as the
+     parent derivative, or set an explicit `cta` override); `publish:cards` places it INLINE on
+     inline platforms (Bluesky/LinkedIn) and OMITS it where placement is `reply` (X), since the
+     image relays can't post a reply. Set a caption's `cta` to `none` only to deliberately ship it
+     link-free. Donations are never the headline ask; the default CTA is "come read / subscribe"
+     (or whatever the classified content type's own text says).
    - **Check `canonical_url`.** If source.md has no `canonical_url` (a local draft, not yet
      published), tell Muxin to paste the published essay URL into source.md before `/publish` —
-     otherwise every `cta: source` link falls back to the Substack home instead of the essay.
+     otherwise any `source`-destination CTA link falls back to the Substack home instead of the
+     essay.
 
 5. **Score honestly** (the frontmatter `scores`):
    - `native`: does this read like a real human post on that platform? (1–5)
