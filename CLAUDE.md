@@ -121,6 +121,27 @@ extraction-first.
 | Lock | `/story lock` (after approve) | `npm run story:lock` | continuity entry, character-state updates | `canon.md`, `ready-to-paste/chapter-NN.txt` |
 | Illustrate | `/illustrate <series>` | `npm run story:illustrate` | fan-art styles / scene prompts; cost-first model | `illustrations/` |
 
+## Conductor: reaching into job-search-agent (JSA)
+
+The outreach engine (`docs/outreach-engine-plan.md`) treats JSA as a sibling repo it sometimes
+needs to build or run in directly, not just read from. Normal outreach-engine reads go through
+`JSA_DB_PATH` (`manual_research.db`, read-only — see the plan's §2a handoff format). Some work
+needs more than a read: running JSA's own `scripts/auto_analyze.py` on demand (e.g. a "find
+companies" request beyond what's already scored), or a content-agents card whose `DECISION` names
+job-search-agent outright.
+
+For that, this repo's conductor lane launches with `--add-dir` reach into JSA already granted —
+the `content-agents` entry in `~/.claude/orchestrator-repos*.json` carries `add_dirs` for
+`job-search-agent` and `job-search-agent-worktrees`, the same way simple-kanban's lane reaches into
+claude-config. A card whose `DECISION` names job-search-agent builds there instead of here:
+worktree under `job-search-agent-worktrees/wt-<slug>`, base branch `master` (JSA's own
+`.orchestrator.json`), JSA's own self-vet/merge rules apply there, not this repo's.
+
+JSA keeps its own backlog (`docs/operations/backlog.md`) and its own independent conductor lane —
+this add_dir grant does not fold JSA's card queue into content-agents' loop. It only gives
+content-agents-originated work (backlog cards or runtime skill calls, e.g. the outreach engine's
+"find companies" step) somewhere to actually run JSA code when it needs to.
+
 ## Conventions
 
 - TypeScript ESM, run with `tsx`. No build step.
