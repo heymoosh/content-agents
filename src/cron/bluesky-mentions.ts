@@ -55,7 +55,10 @@ export interface DetectedMention {
 }
 
 function toDetectedMention(n: RawNotification): DetectedMention {
-  const rkey = n.uri.split("/").pop() ?? n.uri;
+  // `?? n.uri` only guards null/undefined, not "" — a URI with a trailing slash would otherwise
+  // produce an empty rkey (a broken postUrl) instead of falling back to the full URI.
+  const lastSegment = n.uri.split("/").pop();
+  const rkey = lastSegment ? lastSegment : n.uri;
   return {
     uri: n.uri,
     reason: n.reason as MentionReason,
@@ -75,7 +78,7 @@ export function detectNewMentions(
   seenUris: Set<string>
 ): DetectedMention[] {
   return notifications
-    .filter((n) => (n.reason === "mention" || n.reason === "reply") && !seenUris.has(n.uri))
+    .filter((n) => (REASONS as readonly string[]).includes(n.reason) && !seenUris.has(n.uri))
     .map(toDetectedMention);
 }
 
@@ -131,7 +134,11 @@ async function main() {
   const args = process.argv.slice(2);
   const isDryRun = args.includes("--dry-run");
   const limitIdx = args.indexOf("--limit");
-  const fetchLimit = limitIdx >= 0 ? Math.max(1, parseInt(args[limitIdx + 1] ?? "30", 10) || 30) : 30;
+  // `|| 30` would treat an explicit `--limit 0` as falsy and silently substitute the default —
+  // check NaN specifically so 0 (Math.max floors it to 1 anyway) round-trips as the caller's own
+  // value instead of being swapped for 30.
+  const parsedLimit = limitIdx >= 0 ? parseInt(args[limitIdx + 1] ?? "30", 10) : 30;
+  const fetchLimit = Math.max(1, Number.isNaN(parsedLimit) ? 30 : parsedLimit);
 
   console.log(`\nbluesky-mentions${isDryRun ? " [DRY RUN — no network, no writes]" : ""}`);
   console.log("=".repeat(50));
@@ -173,6 +180,9 @@ async function main() {
   for (const m of newMentions) {
     console.log(`  [${m.reason}] @${m.authorHandle}: "${m.postText.slice(0, 100)}"`);
     console.log(`    ${m.postUrl}`);
+    // reply-draft.ts's --uri flag needs the AT URI (m.uri), not the bsky.app link above — print a
+    // ready-to-paste command so the handoff to the next step doesn't require opening the ledger.
+    console.log(`    tsx src/atomize/reply-draft.ts --uri "${m.uri}"`);
   }
 
   if (isDryRun) {

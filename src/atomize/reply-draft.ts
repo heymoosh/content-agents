@@ -106,6 +106,8 @@ export function buildReplyPrompt(input: {
 export interface ClaudeRunResult {
   stdout: string;
   code: number | null;
+  timedOut?: boolean;
+  stderr?: string;
 }
 
 // Injected so draftMentionReply is unit-testable without ever spawning a real `claude` process.
@@ -116,16 +118,29 @@ export type SpawnClaude = (prompt: string) => Promise<ClaudeRunResult>;
 
 const REPLY_TIMEOUT_MS = 120_000;
 
+// `--tools ""` disables ALL tool access for this call, not just file edits. Drafting a reply only
+// ever needs Claude to read the prompt and print text — it never legitimately needs Bash/Edit/Write
+// — and the prompt embeds a stranger's public post text (mention.postText, thread context), so
+// unlike every other `claude -p` call site in this repo (which only ever embeds Muxin's own trusted
+// input), this one is attacker-reachable. `--tools ""` closes that off regardless of what an
+// injected instruction in the mention text asks for.
 export function realSpawnClaude(prompt: string): Promise<ClaudeRunResult> {
   return new Promise((resolve, reject) => {
     let stdout = "";
-    const child = spawn("claude", ["-p", prompt, "--permission-mode", "acceptEdits"], {
+    // Drained (not just ignored) so stderr output can never fill the OS pipe buffer and block the
+    // child from exiting — mirrors runClaudeSpawn's same guard in src/review/jobs.ts.
+    let stderr = "";
+    const child = spawn("claude", ["-p", prompt, "--tools", ""], {
       cwd: repoRoot,
       timeout: REPLY_TIMEOUT_MS,
+      killSignal: "SIGTERM",
     });
     child.on("error", reject);
     child.stdout?.on("data", (c) => (stdout += c.toString("utf8")));
-    child.on("close", (code) => resolve({ stdout, code }));
+    child.stderr?.on("data", (c) => (stderr += c.toString("utf8")));
+    // Node's `timeout` option sends killSignal (SIGTERM) once REPLY_TIMEOUT_MS elapses — seeing
+    // that signal back means this was a timeout, not a crash (mirrors runClaudeSpawn's own check).
+    child.on("close", (code, signal) => resolve({ stdout, code, timedOut: signal === "SIGTERM", stderr }));
   });
 }
 
@@ -143,6 +158,29 @@ export interface DraftedReply {
   id: string;
   path: string;
   body: string;
+}
+
+// scaffoldContentFolder's slug is date + slugify(title), with no per-mention disambiguator — a
+// SECOND mention/reply from the same author on the same day would collide with the first reply's
+// folder and throw "already exists" (src/atomize/new-content.ts). Retry with a numbered suffix
+// instead of crashing the whole CLI run over a plausible same-day-same-author case.
+function scaffoldReplyFolder(mention: MentionForReply): string {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const title =
+      attempt === 1 ? `Reply to @${mention.authorHandle}` : `Reply to @${mention.authorHandle} (${attempt})`;
+    try {
+      return scaffoldContentFolder({
+        title,
+        origin: mention.postUrl,
+        publishedAt: mention.indexedAt,
+        text: mention.postText,
+        sourceKind: "bluesky-mention",
+      });
+    } catch (e) {
+      if (attempt === 5 || !(e instanceof Error) || !e.message.startsWith("already exists")) throw e;
+    }
+  }
+  throw new Error("unreachable");
 }
 
 // Draft ONE reply for `mention` and queue it for review. Writes:
@@ -168,18 +206,19 @@ export async function draftMentionReply(
     maxChars,
   });
 
-  const { stdout, code } = await spawnClaude(prompt);
-  if (code !== 0) throw new Error(`claude -p failed drafting a reply (exit ${code})`);
+  const { stdout, code, timedOut, stderr } = await spawnClaude(prompt);
+  if (code !== 0) {
+    const reason = timedOut ? `timed out after ${REPLY_TIMEOUT_MS / 1000}s` : `exit ${code}`;
+    const tail = stderr?.trim() ? `\n${stderr.trim().slice(-500)}` : "";
+    throw new Error(`claude -p failed drafting a reply (${reason})${tail}`);
+  }
   const body = stdout.trim();
   if (!body) throw new Error("claude -p produced no reply text");
+  if (body.length > maxChars) {
+    throw new Error(`claude -p produced a reply over the ${maxChars}-char limit (${body.length} chars) — try again`);
+  }
 
-  const folder = scaffoldContentFolder({
-    title: `Reply to @${mention.authorHandle}`,
-    origin: mention.postUrl,
-    publishedAt: mention.indexedAt,
-    text: mention.postText,
-    sourceKind: "bluesky-mention",
-  });
+  const folder = scaffoldReplyFolder(mention);
 
   const id = "bluesky-1";
   const path = join(folder, "derivatives", `${id}.md`);
@@ -203,7 +242,10 @@ export async function draftMentionReply(
     format: "text",
     asset: `derivatives/${id}.md`,
     status: "pending", // NEVER "approve" on creation — CLAUDE.md rule 2, proven by the gate test
-    notes: `reply to @${mention.authorHandle}`,
+    // No `notes` here — the review GUI reuses this same cell as the "Revise" box's seed text, so
+    // filling it with "reply to @handle" would show up as a stray pre-filled revise instruction.
+    // The reply-to-@handle context is already visible via the piece's own "Reply to @handle"
+    // heading (firstHeading) and the reply-context line (replyContextHtml/rowEl).
     origin: "reply to mention",
   });
 

@@ -142,11 +142,17 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
   else if (row.format === "video") kind = "video";
   else if (row.format === "storyboard") kind = "storyboard";
 
+  // "Ask Claude" (revisable) and "Duplicate to platform" (duplicatable, below) both run jobs.ts
+  // prompts that tell Claude the body must "stay traceable to Muxin's source at
+  // content/<slug>/source.md" — true for every normal atomized row, but NOT for a "reply to
+  // mention" row, whose source.md is the mention author's own post, not Muxin's writing. Gate both
+  // off for that origin so neither prompt runs against a false premise.
+  const isReply = row.origin === "reply to mention";
   const out: EnrichedRow = {
     ...row,
     kind,
     editable: false,
-    revisable: existsSync(join(folder, "derivatives", `${row.id}.md`)),
+    revisable: !isReply && existsSync(join(folder, "derivatives", `${row.id}.md`)),
     hasAsset: false,
     approveBlocked: approveBlockReason(folder, row),
     reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live) : undefined,
@@ -198,8 +204,9 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     }
   }
   // "Duplicate to platform" only makes sense on a real text post — not an empty draft, and not an
-  // asset row (image/video/storyboard) that has no body of its own to re-angle.
-  out.duplicatable = kind === "text" && out.hasAsset;
+  // asset row (image/video/storyboard) that has no body of its own to re-angle. Also excluded for
+  // "reply to mention" rows — see isReply above.
+  out.duplicatable = !isReply && kind === "text" && out.hasAsset;
   return out;
 }
 
