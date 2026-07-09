@@ -376,10 +376,19 @@ after 4 nothing falls through the cracks, after 5 the top of the funnel fills it
 2. §2b tracker ownership (content-agents owns all four buckets; JSA hands off Level-1 only).
    Has JSA roadmap implications — her call; Phases 1–3 proceed regardless. **RATIFIED 2026-07-08.**
 3. The Phase 0 seed list (3–5 clients + 3–5 platforms from her own head/JSA TARGETs).
-   **STILL PENDING — the only remaining input.** Muxin supplies names, or Phase 0 pulls
-   TARGET-verdict companies from `manual_research.db` via the ratified `--from-jsa` path.
-   Anchor seeds for §9 count too (first two on file from Muxin, 2026-07-08: Audrey Tang, the
-   Collective Intelligence Project).
+   **PARTIALLY SUPPLIED (Muxin, 2026-07-09).** Platforms: 2 of 3–5 on file — The School for
+   Moral Ambition (moralambition.org, Rutger Bregman's mission-driven career-impact community/
+   foundation, 25k+ members across Circles + Fellowships) and the UN ITU's AI for Good Neural
+   Network (neuralnetwork.aiforgood.itu.int, an AI-matched community/content platform tied to the
+   AI for Good summit — session video, virtual exhibits, AI-powered connection matching). Both fit
+   her steer below (non-LinkedIn, mission-aligned). Still need 1–3 more to hit the 3–5 test-set
+   minimum. Clients: **still no concrete names** — genuinely nothing in mind yet. Directional
+   criteria given instead: smaller, mission-aligned tech companies, judged by the kind of
+   role/engagement on offer, not brand size. Treat that as input to the Phase 1 client fit profile
+   (`config/outreach/clients.md`), not a name list — the actual seed still needs either 1–3+ Muxin
+   names or the `--from-jsa` TARGET-verdict pull to hit the 3–5 minimum. Anchor seeds for §9 count
+   too (first two on file from Muxin, 2026-07-08: Audrey Tang, the Collective Intelligence
+   Project).
 4. This plan's phase ordering (specifically: discovery last). **RATIFIED 2026-07-08.**
 
 ---
