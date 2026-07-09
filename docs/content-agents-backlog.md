@@ -6,19 +6,6 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 
 ---
 
-**Create quote and image cards**
-- Combine both image gen and quote — an image post that carries BOTH a quote and a generated image, distinct from the existing text-only quote-card pipeline (a3127104, Done).
-- I created an img folder - I’ll be using either ChatGPT or a free app to add images to it
-- SCOPE CLARIFIED (Muxin, 2026-07-07): NOT the API image pipeline (config/providers.yaml image provider, ~$0.02-0.23/gen) — deliberately cheaper, using tools Muxin already has for free: ChatGPT (his own account, iterate on the image concept there) or a free/open-source local model. Not superseded by a3127104 (contextual per-platform captions) — that's a different feature (caption text), this is quote+image combined in one post.
-- LIKELY PATTERN: Claude suggests an image concept/prompt from the source content; Muxin iterates externally (ChatGPT or his open-source model) until he likes a result; drops the file in; the pipeline assembles it into a quote+image card (verbatim quote + Muxin-provided image, no API image-gen call). May need to generalize into a "non-API image gen" pattern — wait for Muxin to hand off a file he likes, then assemble — rather than a generate-in-pipeline step.
-- PRIORITY (Muxin, 2026-07-07): lower priority — revisit after the current content-stack work.
-- REPRIORITIZED (Muxin, 2026-07-08): content-stack work (Phase 1-4 GUI/Typefully fixes) is now shipped — no longer deprioritized.
-- HAND-OFF RESOLVED (Muxin, 2026-07-08): superseding the 2026-07-07 "NOT the API image pipeline" note above — just use the image-gen system already in place (the same config/providers.yaml image provider the existing quote-card pipeline uses), no separate ChatGPT/free-local-model hand-off needed. Per-token cost is already governed by the standing model-cost policy card (a1a6f379) — not a separate concern here.
-- SUPERVISED TEST PASSED (Muxin, 2026-07-08): real quote+image card (real Riverflow illustration, $0.02) scheduled as a real Typefully draft (9826674) on X — Muxin confirmed it looked correct. PR #135 still held/draft per standing content-generation review policy; merge whenever ready.
-- STATUS: Review
-- GROOMED: reprioritized + hand-off pattern resolved (use existing image-gen system), no dependency overlaps + 2026-07-08
-<!-- card-id: 1653734b-8eea-480b-93ea-3c5926159f81 -->
-
 **Explore Draw Things (free local) for short-form video gen as a Kling cost-saver**
 - ORIGIN: raised by Muxin 2026-07-07 alongside the quote+image card discussion — a tangent, not scoped yet.
 - Draw Things is a free, local (on-device) image/video-gen app. Worth a bakeoff-style eval against Kling (currently ~$0.08/s via OpenRouter, used for video-broll first+last-frame animation) to see if it can do first+last-frame or general short-clip animation at comparable quality for $0.
@@ -27,56 +14,6 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - STATUS: Backlog
 - DECISION: defer (pre-flight, 2026-07-07) — exploratory, unverified whether Draw Things even does video gen; Muxin marked low priority, not blocking anything.
 <!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
-
-**Smarter routing**
-- No longer going to keep a simple ’subscribe to substack’ CTA - it will depend on the content. See notes:
-If the post is derived from a Substack essay and the main value is the argument, CTA = read the full essay / subscribe.
-
-If the post is about a project, tool, system, case study, or build process, CTA = explore the project or landing page.
-
-If the post diagnoses a builder/product problem, CTA = work with me or landing page.
-
-If the post is broad worldview but mentions a concrete artifact, CTA = read essay + see project.
-
-If the post is personal reflection, CTA = follow/subscribe, unless it connects directly to a project.
-
-Mermaid of Job of Each Piece for CTA
-flowchart TD
-    A[New social/content piece] --> B{Main job of the piece?}
-
-    B -->|Expand an essay idea| C[Send to Substack]
-    B -->|Show what you built| D[Send to project page]
-    B -->|Diagnose a builder/product problem| E[Send to work-with-me page]
-    B -->|Personal reflection or point of view| F[Send to follow/subscribe]
-    B -->|Mix of essay + artifact| G[Dual CTA:\nRead essay + see project]
-
-    C --> H[Deepen audience]
-    D --> I[Build proof]
-    E --> J[Create income opportunity]
-    F --> K[Build relationship]
-    G --> L[Connect worldview to practice]
-
-Examples - use both Primary and a Secondary CTA
-
-| Content type               | Primary CTA                 | Secondary CTA                    |
-| -------------------------- | --------------------------- | -------------------------------- |
-| Essay excerpt              | Read full essay on Substack | See related project              |
-| Society/capitalism piece   | Subscribe/read more         | Optional: explore projects       |
-| AI agency thesis           | Read full essay             | See what I'm building            |
-| Product/builder insight    | See how I think/work        | Read related essay               |
-| Project demo               | Explore the project         | Work with me                     |
-| Offer-adjacent post        | Work with me / landing page | Read my thinking                 |
-| Personal career reflection | Subscribe/follow            | Maybe: see my job-search project |
-| Case study                 | See projects / work with me | Read the essay behind it         |
-- PARTIAL SCOPE APPROVED (Muxin, 2026-07-08): build everything that does NOT require the landing page now. That's the content-type classification + CTA routing logic for every row above, with any branch whose destination is project/landing-page/work-with-me falling back to the Substack CTA (read full essay / subscribe) until the landing page is live — swap in the real URL then, no reclassification needed. Concretely ships now: essay excerpt, society/capitalism piece, AI agency thesis, personal career reflection (all Substack-only CTAs). "Product/builder insight," "project demo," "offer-adjacent post," and "case study" ship with their primary CTA downgraded to their Substack-reachable secondary until Landing page is live.
-- TIE-BREAKER RESOLVED (Muxin, 2026-07-08): no tie-breaker needed — when a post plausibly fits more than one content type, stack ALL its applicable CTAs as separate lines with a blank line between each (e.g. "Read my newsletter" / blank / "Work with me"), instead of picking one. Common, normal pattern; don't force a single choice.
-- PR #140 open (held/draft) per standing content-generation review policy — content-type classification engine built and tested. One follow-up filed (e889e512, code dedup, depends on this card).
-- PR #140 REVISED (Muxin, 2026-07-08): per her feedback, "work with me" fully removed from this release (deferred to ae602c84, updated to match), and project links are now a per-post `project_url` frontmatter field rather than a shared landing-page URL — `/atomize` asks her directly when a content type could use one. Muxin reviewed the exact resolved text directly (no live Typefully draft — TYPEFULLY_API_KEY not configured in this session). 402/402 tests passing, typecheck clean. Awaiting her PR approval.
-- PR #140 FIXED (Muxin, 2026-07-08): Muxin correctly flagged the supervised-test example — it linked an arbitrary project (this repo) that wasn't actually relevant to that post's content, just because the content type matched. The resolver was fine; `.claude/skills/atomize/SKILL.md` step 4.5 was the gap — it never told `/atomize` to confirm relevance before setting `project_url`, and still referenced the deleted `landing_page_live` flag. Fixed: step 4.5 now says explicitly a project link is only correct when the specific post's content discusses/demonstrates that project, never attached just because the content type matched — same never-invent guardrail as extraction-first text. 402/402 tests still passing.
-- PR #140 FIXED AGAIN (Muxin, 2026-07-08): falling back to the essay link for the 4 work-flavored types (product/builder insight, project demo, offer-adjacent, case study) doesn't make sense unless the essay is genuinely on-topic, and even then doesn't serve a "work with me" intent. Fixed: those 4 types now resolve their non-project entry to a new `work_with_me` destination (a fixed config value — Muxin's LinkedIn profile, https://www.linkedin.com/in/muxinli) instead of `source`, standing in for the not-yet-built landing page. None of them ever fall back to the essay link or resolve to zero CTAs anymore. This updates the premise of follow-up card ae602c84 (see below) — 404/404 tests passing, typecheck clean.
-- STATUS: Review
-- GROOMED: partial scope approved (Substack-only CTAs, landing-page branches downgraded to fallback), tie-breaker resolved (stack CTAs), no dependency overlaps + 2026-07-08
-<!-- card-id: 6dcaee98-1a54-4fc8-b170-92611872676f -->
 
 **Landing page**
 - Landing page for content CTAs (work-with-me / project pages / read-the-essay).
@@ -192,9 +129,9 @@ Examples - use both Primary and a Secondary CTA
 - IMPLEMENTATION-SCOPED (2026-07-08, stronger-model pass): the scoping pass Muxin asked for is done — docs/outreach-engine-plan.md maps all 10 approved stages to concrete modules (src/outreach/, /outreach skill, config/outreach/), defines the lead-folder + message + tracker.jsonl data model, adds what the design left open (dedup memory, per-lead research checkpointing for the rate-limit failure mode, a mechanical two-sided-message guard: message frontmatter must cite ≥1 lead.md evidence item), and sequences the build (Phases 0–5; this card's core is Phase 2: gate → draft → lock → /atomize reuse). Both remaining open questions carry recommendations (handoff §2a above; Level-2 ownership below).
 - RATIFIED (Muxin, 2026-07-08): all plan recommendations agreed — both open questions on this card are now RESOLVED (see the two arrows above). No open questions remain.
 - PLAN ADDENDUM (Muxin approved, 2026-07-08): docs/outreach-engine-plan.md gained §9 (discovery methodology: worldview-map query generation, anchor-graph expansion, people-not-companies client sourcing, mid-tail caps, quote-required match + disconfirmation pass) and §10 (research anti-churn guards: pull ≠ research, closed-checklist prompt with per-signal search budget, hard timeout, batch cap + backoff, run log). The quote-required match and disconfirmation pass harden this card's stage 4 (QUALIFY + PITCH); the anti-churn guards harden stage 3 (RESEARCH).
+- OPEN QUESTION — JSA Level 2 Networking ownership: JSA's own PRD (`product/prd/level-2-networking.md`, status "Early Concept/Brainstorming", unbuilt) specs almost exactly this engine's shape (profile → source people → footprint aggregation → matchmaking → outreach package → message composition → 3B7 tracking → relationship memory) for job-search networking, AND JSA's own docs (`product/technical/productization.md`) frame it as a sellable feature for JSA's other users (pricing tiers, "42,000+ users helped" goal) — not just Muxin's personal tool. Two ways this could go: (a) JSA builds its own Level 2 as a product feature, and content-agents' Follow-ups tab just pulls its state read-only once it exists; or (b) content-agents' shared engine (being built for client/platform outreach anyway) becomes the single place ALL FOUR reason-buckets' outreach/tracking lives, JSA hands off only Level-1 verdicts, and JSA never builds its own Level 2 — avoiding the twin-engine problem already avoided for sourcing. This has real product/roadmap consequences for JSA that aren't visible from content-agents alone; flag for Muxin's call (or the tougher-model scoping pass) rather than deciding silently. → RESOLVED (Muxin ratified, 2026-07-08): option (b), built pluggable — content-agents' Follow-ups tab tracks the jobsearch bucket natively; JSA hands off Level-1 verdicts only and does not build its own Level 2 for Muxin's use (its product-feature path for other users stays open: the bucket can swap to a read-only JSA pull later with no change to the others). Full reasoning: docs/outreach-engine-plan.md §2b. Cross-repo note: flag this to whoever next touches JSA so its roadmap reflects it.
 - STATUS: To Do
 - DECISION: approved (Muxin, 2026-07-08) — two-sided messaging required (name their problem, not just shared values); the problem-fit read is confirmed new research work in content-agents, not reused from JSA. Depth of JSA's own values-matching gets a timeboxed Phase 0 check (plan §2c) that doesn't block the build. INTEGRATED DESIGN APPROVED + IMPLEMENTATION SCOPED + RATIFIED — build per docs/outreach-engine-plan.md, this card's core is Phase 2 (gate → draft → lock → /atomize reuse), after Phase 1 lands. Drafting-logic PRs hold for Muxin's review per rule 7.
-- OPEN QUESTION — JSA Level 2 Networking ownership: JSA's own PRD (`product/prd/level-2-networking.md`, status "Early Concept/Brainstorming", unbuilt) specs almost exactly this engine's shape (profile → source people → footprint aggregation → matchmaking → outreach package → message composition → 3B7 tracking → relationship memory) for job-search networking, AND JSA's own docs (`product/technical/productization.md`) frame it as a sellable feature for JSA's other users (pricing tiers, "42,000+ users helped" goal) — not just Muxin's personal tool. Two ways this could go: (a) JSA builds its own Level 2 as a product feature, and content-agents' Follow-ups tab just pulls its state read-only once it exists; or (b) content-agents' shared engine (being built for client/platform outreach anyway) becomes the single place ALL FOUR reason-buckets' outreach/tracking lives, JSA hands off only Level-1 verdicts, and JSA never builds its own Level 2 — avoiding the twin-engine problem already avoided for sourcing. This has real product/roadmap consequences for JSA that aren't visible from content-agents alone; flag for Muxin's call (or the tougher-model scoping pass) rather than deciding silently. → RESOLVED (Muxin ratified, 2026-07-08): option (b), built pluggable — content-agents' Follow-ups tab tracks the jobsearch bucket natively; JSA hands off Level-1 verdicts only and does not build its own Level 2 for Muxin's use (its product-feature path for other users stays open: the bucket can swap to a read-only JSA pull later with no change to the others). Full reasoning: docs/outreach-engine-plan.md §2b. Cross-repo note: flag this to whoever next touches JSA so its roadmap reflects it.
 <!-- card-id: c308a8cf-944b-4518-b019-f82675af3ab2 -->
 
 **Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach**
@@ -207,8 +144,8 @@ Examples - use both Primary and a Secondary CTA
 - IMPLEMENTATION-SCOPED (2026-07-08, stronger-model pass): see docs/outreach-engine-plan.md — data model is `data/outreach/tracker.jsonl` (committed append-only event log, same pattern as publish-schedule.jsonl; events = the 3B7 shape + re_researched; state derived by folding; per-bucket follow-up windows in config/outreach.yaml), surfaced as the Follow-ups tab in page.ts/serve.ts with the row shape + anti-patterns already specced on this card. Builds as Phase 4, after the draft/lock loop (Phase 2) exists to feed it. Jobsearch bucket is pluggable per the c308a8cf Level-2 recommendation (native events, or read-only JSA pull if Muxin picks option (a)); inbound bucket is schema-ready from day one but stays empty until db22283f lands.
 - RATIFIED (Muxin, 2026-07-08): plan recommendations agreed, including Level-2 ownership option (b) — the jobsearch bucket is tracked natively here (JSA hands off Level-1 verdicts only), built pluggable per c308a8cf's resolved open question.
 - STATUS: To Do
-- DECISION: approved (Muxin, 2026-07-08) — architecture approved (extend the unified review GUI; don't build separately; don't route through JSA's product UI); data-interchange direction set (local SQLite read, not Sheets, not markdown); scoped + ratified per docs/outreach-engine-plan.md §3–§4. Builds as Phase 4, after Phases 1–2 exist to feed it. Phase 4 is GUI/state plumbing, so its PR auto-merges on green CI per rule 7 (no generation logic).
 - DEPENDS ON: Unified review + approval GUI (a4a2ce27, Done) as the base to extend; Draft tailored outreach messages (c308a8cf) for the locked-core-message data this tab surfaces; Inbound listening + voice-replies (db22283f) for the client-inbound bucket.
+- DECISION: approved (Muxin, 2026-07-08) — architecture approved (extend the unified review GUI; don't build separately; don't route through JSA's product UI); data-interchange direction set (local SQLite read, not Sheets, not markdown); scoped + ratified per docs/outreach-engine-plan.md §3–§4. Builds as Phase 4, after Phases 1–2 exist to feed it. Phase 4 is GUI/state plumbing, so its PR auto-merges on green CI per rule 7 (no generation logic).
 <!-- card-id: 659b50f0-6bc7-473b-8673-b901e9c93d11 -->
 
 **Minimize model API cost — prefer subscription / free routes over per-token API (retro review + standing policy)**
@@ -336,6 +273,71 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - STATUS: Backlog
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 <!-- card-id: 81808fa0-7e30-4fd1-9b61-03951b0041bc -->
+
+**Create quote and image cards**
+- Combine both image gen and quote — an image post that carries BOTH a quote and a generated image, distinct from the existing text-only quote-card pipeline (a3127104, Done).
+- I created an img folder - I’ll be using either ChatGPT or a free app to add images to it
+- SCOPE CLARIFIED (Muxin, 2026-07-07): NOT the API image pipeline (config/providers.yaml image provider, ~$0.02-0.23/gen) — deliberately cheaper, using tools Muxin already has for free: ChatGPT (his own account, iterate on the image concept there) or a free/open-source local model. Not superseded by a3127104 (contextual per-platform captions) — that's a different feature (caption text), this is quote+image combined in one post.
+- LIKELY PATTERN: Claude suggests an image concept/prompt from the source content; Muxin iterates externally (ChatGPT or his open-source model) until he likes a result; drops the file in; the pipeline assembles it into a quote+image card (verbatim quote + Muxin-provided image, no API image-gen call). May need to generalize into a "non-API image gen" pattern — wait for Muxin to hand off a file he likes, then assemble — rather than a generate-in-pipeline step.
+- PRIORITY (Muxin, 2026-07-07): lower priority — revisit after the current content-stack work.
+- REPRIORITIZED (Muxin, 2026-07-08): content-stack work (Phase 1-4 GUI/Typefully fixes) is now shipped — no longer deprioritized.
+- HAND-OFF RESOLVED (Muxin, 2026-07-08): superseding the 2026-07-07 "NOT the API image pipeline" note above — just use the image-gen system already in place (the same config/providers.yaml image provider the existing quote-card pipeline uses), no separate ChatGPT/free-local-model hand-off needed. Per-token cost is already governed by the standing model-cost policy card (a1a6f379) — not a separate concern here.
+- SUPERVISED TEST PASSED (Muxin, 2026-07-08): real quote+image card (real Riverflow illustration, $0.02) scheduled as a real Typefully draft (9826674) on X — Muxin confirmed it looked correct. PR #135 still held/draft per standing content-generation review policy; merge whenever ready.
+- DONE (2026-07-08): Muxin approved and merged PR #135.
+- STATUS: Done
+- GROOMED: reprioritized + hand-off pattern resolved (use existing image-gen system), no dependency overlaps + 2026-07-08
+<!-- card-id: 1653734b-8eea-480b-93ea-3c5926159f81 -->
+
+**Smarter routing**
+- No longer going to keep a simple ’subscribe to substack’ CTA - it will depend on the content. See notes:
+If the post is derived from a Substack essay and the main value is the argument, CTA = read the full essay / subscribe.
+
+If the post is about a project, tool, system, case study, or build process, CTA = explore the project or landing page.
+
+If the post diagnoses a builder/product problem, CTA = work with me or landing page.
+
+If the post is broad worldview but mentions a concrete artifact, CTA = read essay + see project.
+
+If the post is personal reflection, CTA = follow/subscribe, unless it connects directly to a project.
+
+Mermaid of Job of Each Piece for CTA
+flowchart TD
+    A[New social/content piece] --> B{Main job of the piece?}
+
+    B -->|Expand an essay idea| C[Send to Substack]
+    B -->|Show what you built| D[Send to project page]
+    B -->|Diagnose a builder/product problem| E[Send to work-with-me page]
+    B -->|Personal reflection or point of view| F[Send to follow/subscribe]
+    B -->|Mix of essay + artifact| G[Dual CTA:\nRead essay + see project]
+
+    C --> H[Deepen audience]
+    D --> I[Build proof]
+    E --> J[Create income opportunity]
+    F --> K[Build relationship]
+    G --> L[Connect worldview to practice]
+
+Examples - use both Primary and a Secondary CTA
+
+| Content type               | Primary CTA                 | Secondary CTA                    |
+| -------------------------- | --------------------------- | -------------------------------- |
+| Essay excerpt              | Read full essay on Substack | See related project              |
+| Society/capitalism piece   | Subscribe/read more         | Optional: explore projects       |
+| AI agency thesis           | Read full essay             | See what I'm building            |
+| Product/builder insight    | See how I think/work        | Read related essay               |
+| Project demo               | Explore the project         | Work with me                     |
+| Offer-adjacent post        | Work with me / landing page | Read my thinking                 |
+| Personal career reflection | Subscribe/follow            | Maybe: see my job-search project |
+| Case study                 | See projects / work with me | Read the essay behind it         |
+- PARTIAL SCOPE APPROVED (Muxin, 2026-07-08): build everything that does NOT require the landing page now. That's the content-type classification + CTA routing logic for every row above, with any branch whose destination is project/landing-page/work-with-me falling back to the Substack CTA (read full essay / subscribe) until the landing page is live — swap in the real URL then, no reclassification needed. Concretely ships now: essay excerpt, society/capitalism piece, AI agency thesis, personal career reflection (all Substack-only CTAs). "Product/builder insight," "project demo," "offer-adjacent post," and "case study" ship with their primary CTA downgraded to their Substack-reachable secondary until Landing page is live.
+- TIE-BREAKER RESOLVED (Muxin, 2026-07-08): no tie-breaker needed — when a post plausibly fits more than one content type, stack ALL its applicable CTAs as separate lines with a blank line between each (e.g. "Read my newsletter" / blank / "Work with me"), instead of picking one. Common, normal pattern; don't force a single choice.
+- PR #140 open (held/draft) per standing content-generation review policy — content-type classification engine built and tested. One follow-up filed (e889e512, code dedup, depends on this card).
+- PR #140 REVISED (Muxin, 2026-07-08): per her feedback, "work with me" fully removed from this release (deferred to ae602c84, updated to match), and project links are now a per-post `project_url` frontmatter field rather than a shared landing-page URL — `/atomize` asks her directly when a content type could use one. Muxin reviewed the exact resolved text directly (no live Typefully draft — TYPEFULLY_API_KEY not configured in this session). 402/402 tests passing, typecheck clean. Awaiting her PR approval.
+- PR #140 FIXED (Muxin, 2026-07-08): Muxin correctly flagged the supervised-test example — it linked an arbitrary project (this repo) that wasn't actually relevant to that post's content, just because the content type matched. The resolver was fine; `.claude/skills/atomize/SKILL.md` step 4.5 was the gap — it never told `/atomize` to confirm relevance before setting `project_url`, and still referenced the deleted `landing_page_live` flag. Fixed: step 4.5 now says explicitly a project link is only correct when the specific post's content discusses/demonstrates that project, never attached just because the content type matched — same never-invent guardrail as extraction-first text. 402/402 tests still passing.
+- PR #140 FIXED AGAIN (Muxin, 2026-07-08): falling back to the essay link for the 4 work-flavored types (product/builder insight, project demo, offer-adjacent, case study) doesn't make sense unless the essay is genuinely on-topic, and even then doesn't serve a "work with me" intent. Fixed: those 4 types now resolve their non-project entry to a new `work_with_me` destination (a fixed config value — Muxin's LinkedIn profile, https://www.linkedin.com/in/muxinli) instead of `source`, standing in for the not-yet-built landing page. None of them ever fall back to the essay link or resolve to zero CTAs anymore. This updates the premise of follow-up card ae602c84 (see below) — 404/404 tests passing, typecheck clean.
+- DONE (2026-07-08): PR #140 merged.
+- STATUS: Done
+- GROOMED: partial scope approved (Substack-only CTAs, landing-page branches downgraded to fallback), tie-breaker resolved (stack CTAs), no dependency overlaps + 2026-07-08
+<!-- card-id: 6dcaee98-1a54-4fc8-b170-92611872676f -->
 
 **Verify quote+image card --with-image against the real paid image provider (OpenRouter)**
 - ORIGIN: follow-up auto-filed while building card 1653734b (Create quote and image cards).
