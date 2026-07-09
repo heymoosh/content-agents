@@ -2,6 +2,23 @@
 // client-side <script> (the client script keeps its own DECIDED constant, shadowing the server-side
 // one in rows.ts — that's a different runtime, left exactly as-is, no logic changes here).
 //
+// Pure, DOM-free mirror of the inline "replying to" context line the client <script> below renders
+// for a "reply to mention" row (backend origin — carries reply_to_url/reply_to_text frontmatter
+// alongside the normal kind:"text" shape; row-enrichment may surface either the camelCased
+// replyToText, matching this file's sourceLines/threadSpinApplied convention, or the raw
+// reply_to_text key — checked in that order). The client script can't import this (it's plain text
+// rendered into the page, evaluated in the browser, not this module), so it keeps its own inline
+// copy — same intentional cross-runtime duplication already called out for DECIDED above. Exists
+// here purely so the row-context tweak has something a Node test can call directly, no browser DOM.
+export function replyContextHtml(row: { origin?: string; replyToText?: string; reply_to_text?: string }): string {
+  const text = row.replyToText ?? row.reply_to_text;
+  if (row.origin !== "reply to mention" || !text) return "";
+  const esc = (s: string) =>
+    s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+  const snippet = text.replace(/\s+/g, " ").slice(0, 220);
+  return `<div class="reply-context">↳ replying to: ${esc(snippet)}</div>`;
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -72,6 +89,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .recon-ok { font-size:12.5px; color:var(--green); font-weight:600; margin:4px 0 0; }
   .recon-mismatch { font-size:12.5px; color:var(--red); font-weight:600; margin:4px 0 0; }
   .recon-unknown { font-size:12.5px; color:var(--muted); margin:4px 0 0; }
+  .reply-context { font-size:12.5px; color:var(--muted); margin:4px 0 0; }
   .actions { display:flex; gap:7px; margin-top:11px; flex-wrap:wrap; align-items:center; }
   .actions .spacer { flex:1; }
   button.approve{border-color:var(--green);color:var(--green)}
@@ -284,6 +302,14 @@ function rowEl(piece, row){
   // Origin source-tag (Muxin, 2026-07-04): which pipeline created this row. Omitted (not guessed)
   // for a row written before this field existed — see src/publish/queue.ts QUEUE_ORIGINS.
   const origin = row.origin ? '<span class="origin">'+esc(row.origin)+'</span>' : "";
+  // "reply to mention" rows (card db22283f) carry reply_to_url/reply_to_text alongside the normal
+  // kind:"text" shape — show what's being replied to inline so Muxin has context without opening
+  // the file. Checks camelCase first (this file's own sourceLines/threadSpinApplied convention),
+  // then the raw frontmatter key, in case row-enrichment surfaces it un-cased.
+  const replyText = row.replyToText ?? row.reply_to_text;
+  const replyContext = (row.origin === "reply to mention" && replyText)
+    ? '<div class="reply-context">↳ replying to: '+esc(replyText.replace(/\s+/g," ").slice(0,220))+'</div>'
+    : "";
   let preview = "";
   if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
   else if (row.assetUrl && row.kind === "video") preview = '<video class="preview" src="'+row.assetUrl+'" controls muted></video>';
@@ -339,7 +365,7 @@ function rowEl(piece, row){
       '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + thread + origin + src +
       '<span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>'+
     '</div>'+
-    preview + notes + sched + reconHtml + manual + blockedNote +
+    replyContext + preview + notes + sched + reconHtml + manual + blockedNote +
     '<div class="actions">'+
       '<button class="approve'+(row.status==="approve"?" on":"")+'" data-act="approve"'+
         (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>'+approveLabel+'</button>'+

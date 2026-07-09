@@ -35,6 +35,7 @@ interface EnrichedRow extends QueueRow {
   sourceLines?: unknown;
   threadCheck?: string; // "pass" | "missing" — config/platforms.yaml home_brand thread-check
   threadSpinApplied?: boolean; // Spin already drafted the worldview thread in on a "missing" verdict
+  replyToText?: string; // "reply to mention" rows (card db22283f) — what the mention/reply said
   assetUrl?: string; // image/video preview URL
   editable: boolean; // can the body be edited-and-saved here?
   revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
@@ -164,6 +165,7 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     out.sourceLines = fm.source_lines;
     out.threadCheck = classifyThread(fm);
     out.threadSpinApplied = fm.thread_spin_applied === true;
+    out.replyToText = typeof fm.reply_to_text === "string" ? fm.reply_to_text : undefined;
     return true;
   };
 
