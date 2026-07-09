@@ -58,6 +58,15 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    `review-queue.md`) and is not a logic change, so it never needs a held PR. If in doubt whether a
    diff is "logic" or "content," ask: does this diff change what future runs will generate, or is
    it just this run's output/state? Only the former holds.
+   - **Conductor mechanics for a held content-generation-logic PR.** Open it as a **draft PR**,
+     never auto-merge, and put an **old-vs-new content sample side by side** in the PR
+     description (run the changed logic on a real or representative input before/after so Muxin
+     can see the actual output delta, not just the diff). This applies to every content-generation
+     LOGIC change with no exceptions — there is no self-vet carve-out for these, even when the
+     diff also touches a UI surface (e.g. review-GUI tooling bundled with a logic change still
+     holds on the logic half). The narrower self-vet exception for review-GUI/tooling-only PRs
+     (no logic change) still stands — see the diagnostic above: only "is it a logic change"
+     decides, UI-surface-or-not is irrelevant to that decision.
 
 ## Pipeline map
 
