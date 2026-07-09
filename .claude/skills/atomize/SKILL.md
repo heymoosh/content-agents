@@ -264,7 +264,8 @@ derivative, the video script, and the video title/description. The short version
 
 7. **Generate the quote-card asset(s)** (cheap, extraction-first). A card is a bare-quote IMAGE
    shared across platforms, each with its OWN per-platform CONTEXT caption — so the quote never
-   ships alone, out of context (Muxin, 2026-07-03). Three parts per card N:
+   ships alone, out of context (Muxin, 2026-07-03). Three parts per card N (plus an optional
+   quote+image variant, part d):
 
    a. **Definition derivative** `derivatives/quote-card-N.md` — the verbatim quote line that goes
       ON the image. `platform: quote-card`, `source_lines: [<the quote's line>]`, no spin, body =
@@ -280,6 +281,20 @@ derivative, the video script, and the video title/description. The short version
       guardrails as any text post (reframe through the channel angle, never invent a claim). On a
       `--no-spin` run, write the caption verbatim (no `spin`/`angle`, `source_lines` hard-required)
       — still context-only. Char limit is the TARGET platform's (X 280, etc.), enforced by validate.
+   d. **Optional quote+image variant.** Distinct from the typographic-only card above (which stays
+      the default and is unaffected) — the SAME verbatim quote composited over a generated
+      illustration, for when the piece has a strong visual concept worth the extra render. Write
+      `derivatives/quote-card-N-image-prompt.txt` — ONE line, an image concept prompt drawn from
+      the source content (Claude's judgment, same spirit as how video B-roll visual prompts are
+      drafted from storyboard scenes in `/video` — a visual concept, not new text in Muxin's
+      voice, so it doesn't touch the extraction-first rule for the quote itself). Then render with
+      the same command plus one flag: `npm run render -- --still <folder> --quote quote-card-N
+      --with-image` → writes `images/quote-card-N-image.png` (the composited card) alongside the
+      raw generated illustration `images/quote-card-N-bg.png`, without touching
+      `images/quote-card-N.png`/`.mp4` from part b. Skip this part entirely unless the piece calls
+      for it; when you do use it, add its own review-queue row (step 8) pointing at
+      `images/quote-card-N-image.png` instead of the typographic PNG — same image model policy
+      (below) applies.
 
    Then add one review-queue row per caption (step 8): `quote-card-N-<target> | quote-card:<target>
    | image | images/quote-card-N.png | …`. `publish:cards` posts the shared image to that one

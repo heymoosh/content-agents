@@ -2,6 +2,7 @@ import React from "react";
 import { Composition, Still } from "remotion";
 import { Short, shortSchema, calculateShortMetadata } from "./Short";
 import { QuoteCard, quoteCardSchema } from "./QuoteCard";
+import { QuoteImageCard, quoteImageCardSchema } from "./QuoteImageCard";
 import {
   Illustration,
   illustrationSchema,
@@ -58,6 +59,18 @@ export const Root: React.FC = () => {
         defaultProps={{
           quote: "Quote goes here",
           attribution: "Muxin Li",
+        }}
+      />
+      <Still
+        id="QuoteImageCard"
+        component={QuoteImageCard}
+        schema={quoteImageCardSchema}
+        width={1080}
+        height={1080}
+        defaultProps={{
+          quote: "Quote goes here",
+          attribution: "Muxin Li",
+          image: "",
         }}
       />
       <Composition
