@@ -3,10 +3,12 @@
  * A derivative is classified by CONTENT TYPE (frontmatter `content_type`, an array), not pillar;
  * these functions resolve the documented primary/(optional) secondary CTA(s) for each type from
  * config/content-types.yaml — `source` resolves to the essay link, `project` resolves ONLY to
- * this derivative's own `project_url` frontmatter (dropped if absent) — and stack CTAs from 2+
- * matched types instead of picking one winner. Pure functions: a ContentTypesConfig object +
- * frontmatter in, resolved CTA lines out. No file IO to mock (except the smoke test against the
- * real config).
+ * this derivative's own `project_url` frontmatter (dropped if absent, and only ever set when
+ * genuinely relevant to that post — never just because the content type matched), and
+ * `work_with_me` resolves to a fixed config-level url (Muxin's LinkedIn profile, standing in for
+ * the not-yet-built work-with-me landing page) — and stack CTAs from 2+ matched types instead of
+ * picking one winner. Pure functions: a ContentTypesConfig object + frontmatter in, resolved CTA
+ * lines out. No file IO to mock (except the smoke test against the real config).
  */
 
 import { test, describe } from "node:test";
@@ -22,6 +24,7 @@ const CFG: CtaConfig = {
 
 const CANONICAL = "https://example.com/essay";
 const PROJECT = "https://example.com/my-project";
+const LINKEDIN = "https://www.linkedin.com/in/muxinli";
 
 const ALL_TYPE_KEYS = [
   "essay_excerpt",
@@ -35,11 +38,12 @@ const ALL_TYPE_KEYS = [
 ];
 
 describe("loadContentTypesConfig: smoke test against the real config/content-types.yaml", () => {
-  test("loads all 8 documented content types", () => {
+  test("loads all 8 documented content types + the work_with_me_url", () => {
     const ctCfg = loadContentTypesConfig();
     for (const key of ALL_TYPE_KEYS) {
       assert.ok(ctCfg.types[key], `missing content type: ${key}`);
     }
+    assert.equal(ctCfg.workWithMeUrl, LINKEDIN);
   });
 });
 
@@ -51,9 +55,9 @@ describe("resolveContentTypeCtas: a project-destination entry resolves to the de
     { type: "society_capitalism_piece", labels: ["Subscribe/read more", "Optional: explore projects"] },
     { type: "ai_agency_thesis", labels: ["Read full essay", "See what I'm building"] },
     { type: "personal_career_reflection", labels: ["Subscribe/follow", "Maybe: see my job-search project"] },
-    { type: "product_builder_insight", labels: ["See how I think/work", "Read related essay"] },
-    { type: "project_demo", labels: ["Explore the project"] },
-    { type: "case_study", labels: ["See projects", "Read the essay behind it"] },
+    { type: "product_builder_insight", labels: ["See how I think/work", "Connect on LinkedIn"] },
+    { type: "project_demo", labels: ["Explore the project", "Connect on LinkedIn"] },
+    { type: "case_study", labels: ["See projects", "Connect on LinkedIn"] },
   ];
 
   for (const c of cases) {
@@ -78,48 +82,61 @@ describe("resolveContentTypeCtas: a project-destination entry is DROPPED (not de
   const ctCfg = loadContentTypesConfig();
 
   const cases = [
-    { type: "essay_excerpt", remaining: ["Read full essay on Substack"] },
-    { type: "society_capitalism_piece", remaining: ["Subscribe/read more"] },
-    { type: "ai_agency_thesis", remaining: ["Read full essay"] },
-    { type: "personal_career_reflection", remaining: ["Subscribe/follow"] },
-    { type: "product_builder_insight", remaining: ["Read related essay"] },
-    { type: "case_study", remaining: ["Read the essay behind it"] },
+    { type: "essay_excerpt", remaining: [{ label: "Read full essay on Substack", url: CANONICAL }] },
+    { type: "society_capitalism_piece", remaining: [{ label: "Subscribe/read more", url: CANONICAL }] },
+    { type: "ai_agency_thesis", remaining: [{ label: "Read full essay", url: CANONICAL }] },
+    { type: "personal_career_reflection", remaining: [{ label: "Subscribe/follow", url: CANONICAL }] },
+    { type: "product_builder_insight", remaining: [{ label: "Connect on LinkedIn", url: LINKEDIN }] },
+    { type: "project_demo", remaining: [{ label: "Connect on LinkedIn", url: LINKEDIN }] },
+    { type: "case_study", remaining: [{ label: "Connect on LinkedIn", url: LINKEDIN }] },
   ];
 
   for (const c of cases) {
-    test(`${c.type}: drops its project entry, keeps only the source entry, when no project_url is set`, () => {
+    test(`${c.type}: drops its project entry, keeps only the non-project entry, when no project_url is set`, () => {
       const { ctas } = resolveContentTypeCtas({ content_type: [c.type] }, CANONICAL, CFG, ctCfg);
-      assert.deepEqual(ctas, [{ url: CANONICAL, label: c.remaining[0] }]);
+      assert.deepEqual(ctas, c.remaining);
     });
   }
-
-  test("project_demo (project-only, no secondary) resolves to ZERO CTAs with no project_url", () => {
-    const { ctas } = resolveContentTypeCtas({ content_type: ["project_demo"] }, CANONICAL, CFG, ctCfg);
-    assert.deepEqual(ctas, []);
-  });
 });
 
-describe("resolveContentTypeCtas: project_demo and offer_adjacent_post's new single-entry shapes", () => {
+describe("resolveContentTypeCtas: the 4 work-flavored types stand in with LinkedIn, never an essay-link fallback", () => {
   const ctCfg = loadContentTypesConfig();
 
-  test("project_demo: exactly one CTA (the project link) when project_url is given", () => {
-    const { ctas } = resolveContentTypeCtas(
+  test("product_builder_insight: project + LinkedIn when project_url is given; LinkedIn alone when it's not", () => {
+    const withProject = resolveContentTypeCtas(
+      { content_type: ["product_builder_insight"], project_url: PROJECT },
+      CANONICAL,
+      CFG,
+      ctCfg
+    );
+    assert.deepEqual(withProject.ctas, [
+      { url: PROJECT, label: "See how I think/work" },
+      { url: LINKEDIN, label: "Connect on LinkedIn" },
+    ]);
+
+    const withoutProject = resolveContentTypeCtas({ content_type: ["product_builder_insight"] }, CANONICAL, CFG, ctCfg);
+    assert.deepEqual(withoutProject.ctas, [{ url: LINKEDIN, label: "Connect on LinkedIn" }]);
+  });
+
+  test("project_demo: project + LinkedIn when project_url is given; LinkedIn alone when it's not (never zero CTAs)", () => {
+    const withProject = resolveContentTypeCtas(
       { content_type: ["project_demo"], project_url: PROJECT },
       CANONICAL,
       CFG,
       ctCfg
     );
-    assert.deepEqual(ctas, [{ url: PROJECT, label: "Explore the project" }]);
+    assert.deepEqual(withProject.ctas, [
+      { url: PROJECT, label: "Explore the project" },
+      { url: LINKEDIN, label: "Connect on LinkedIn" },
+    ]);
+
+    const withoutProject = resolveContentTypeCtas({ content_type: ["project_demo"] }, CANONICAL, CFG, ctCfg);
+    assert.deepEqual(withoutProject.ctas, [{ url: LINKEDIN, label: "Connect on LinkedIn" }]);
   });
 
-  test("project_demo: zero CTAs when project_url is absent", () => {
-    const { ctas } = resolveContentTypeCtas({ content_type: ["project_demo"] }, CANONICAL, CFG, ctCfg);
-    assert.deepEqual(ctas, []);
-  });
-
-  test("offer_adjacent_post: always exactly one CTA (the source link), unconditionally", () => {
+  test("offer_adjacent_post: always exactly one CTA (Connect on LinkedIn), unconditionally", () => {
     const withoutProject = resolveContentTypeCtas({ content_type: ["offer_adjacent_post"] }, CANONICAL, CFG, ctCfg);
-    assert.deepEqual(withoutProject.ctas, [{ url: CANONICAL, label: "Read my thinking" }]);
+    assert.deepEqual(withoutProject.ctas, [{ url: LINKEDIN, label: "Connect on LinkedIn" }]);
 
     const withProject = resolveContentTypeCtas(
       { content_type: ["offer_adjacent_post"], project_url: PROJECT },
@@ -129,9 +146,25 @@ describe("resolveContentTypeCtas: project_demo and offer_adjacent_post's new sin
     );
     assert.deepEqual(
       withProject.ctas,
-      [{ url: CANONICAL, label: "Read my thinking" }],
+      [{ url: LINKEDIN, label: "Connect on LinkedIn" }],
       "offer_adjacent_post has no project-destination entry at all, so project_url must have no effect"
     );
+  });
+
+  test("case_study: project + LinkedIn when project_url is given; LinkedIn alone when it's not", () => {
+    const withProject = resolveContentTypeCtas(
+      { content_type: ["case_study"], project_url: PROJECT },
+      CANONICAL,
+      CFG,
+      ctCfg
+    );
+    assert.deepEqual(withProject.ctas, [
+      { url: PROJECT, label: "See projects" },
+      { url: LINKEDIN, label: "Connect on LinkedIn" },
+    ]);
+
+    const withoutProject = resolveContentTypeCtas({ content_type: ["case_study"] }, CANONICAL, CFG, ctCfg);
+    assert.deepEqual(withoutProject.ctas, [{ url: LINKEDIN, label: "Connect on LinkedIn" }]);
   });
 });
 
@@ -147,11 +180,11 @@ describe("resolveContentTypeCtas: multi-type stacking never picks one winner, wi
     );
     assert.deepEqual(
       ctas.map((r) => r.label),
-      ["Subscribe/follow", "Maybe: see my job-search project", "See how I think/work", "Read related essay"]
+      ["Subscribe/follow", "Maybe: see my job-search project", "See how I think/work", "Connect on LinkedIn"]
     );
   });
 
-  test("a post matching 2+ content types drops every project entry, keeps every source entry, with no project_url", () => {
+  test("a post matching 2+ content types drops every project entry, never an essay fallback for the work-flavored type", () => {
     const { ctas } = resolveContentTypeCtas(
       { content_type: ["personal_career_reflection", "product_builder_insight"] },
       CANONICAL,
@@ -160,7 +193,7 @@ describe("resolveContentTypeCtas: multi-type stacking never picks one winner, wi
     );
     assert.deepEqual(
       ctas.map((r) => r.label),
-      ["Subscribe/follow", "Read related essay"]
+      ["Subscribe/follow", "Connect on LinkedIn"]
     );
   });
 });
@@ -216,6 +249,11 @@ describe("resolveCtaLines: the top-level entry point publishers call", () => {
       ctas.map((r) => r.label),
       ["Read full essay on Substack", "See related project"]
     );
+  });
+
+  test("no explicit cta, work-flavored content_type set: resolves to LinkedIn, never the essay link", () => {
+    const { ctas } = resolveCtaLines({ content_type: ["offer_adjacent_post"] }, CANONICAL, CFG, "", ctCfg);
+    assert.deepEqual(ctas, [{ url: LINKEDIN, label: "Connect on LinkedIn" }]);
   });
 
   test("no explicit cta, no content_type: no link (legacy empty-cta behavior unchanged)", () => {

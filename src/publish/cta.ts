@@ -44,12 +44,13 @@ export function loadCtaConfig(): CtaConfig {
 // documented primary + (optional) secondary CTA text. This lives in code (not just skill
 // judgment, like the old pillar `targets:` block) so the routing table is one source of truth.
 //
-// Two destinations only: `source` (the essay/Substack link) and `project` (a PER-POST url read
-// from the derivative's OWN `project_url` frontmatter — no config-level url, no shared landing
-// page). "Work with me" is out of scope for this release (deferred to card ae602c84) — see
-// config/content-types.yaml's header comment.
+// Three destinations: `source` (the essay/Substack link), `project` (a PER-POST url read from the
+// derivative's OWN `project_url` frontmatter — only ever set when genuinely relevant to that post,
+// never just because the content type matched), and `work_with_me` (a fixed config-level url —
+// Muxin's LinkedIn profile, standing in for the not-yet-built "work with me" landing-page
+// destination). See config/content-types.yaml's header comment.
 
-export type CtaDestination = "source" | "project";
+export type CtaDestination = "source" | "project" | "work_with_me";
 
 export interface ContentTypeCtaEntry {
   text: string;
@@ -63,11 +64,12 @@ export interface ContentTypeDef {
 
 export interface ContentTypesConfig {
   types: Record<string, ContentTypeDef>;
+  workWithMeUrl: string | null;
 }
 
 const ctaEntrySchema = z.object({
   text: z.string(),
-  destination: z.enum(["source", "project"]),
+  destination: z.enum(["source", "project", "work_with_me"]),
 });
 
 const contentTypeDefSchema = z.object({ primary: ctaEntrySchema, secondary: ctaEntrySchema.optional() });
@@ -75,12 +77,13 @@ const contentTypeDefSchema = z.object({ primary: ctaEntrySchema, secondary: ctaE
 const contentTypesYamlSchema = z
   .object({
     types: z.record(z.string(), contentTypeDefSchema).optional(),
+    work_with_me_url: z.string().optional(),
   })
   .passthrough();
 
 export function loadContentTypesConfig(): ContentTypesConfig {
   const cfg = loadYamlConfig(join(repoRoot, "config", "content-types.yaml"), contentTypesYamlSchema, {});
-  return { types: cfg.types ?? {} };
+  return { types: cfg.types ?? {}, workWithMeUrl: cfg.work_with_me_url ?? null };
 }
 
 export interface ResolvedCta {
@@ -91,15 +94,22 @@ export interface ResolvedCta {
 // A `source` destination resolves exactly like resolveCta's `source` case (the essay's own
 // canonical_url, else the configured homepage/fallback). A `project` destination resolves ONLY to
 // this derivative's own `project_url` frontmatter value; a missing project_url means "omit this
-// CTA," never a fallback to the essay link (that would mislabel the essay as "the project").
+// CTA," never a fallback to the essay link (that would mislabel the essay as "the project," and
+// wouldn't serve a work-with-me ask anyway even when the essay IS on-topic). A `work_with_me`
+// destination resolves to the fixed `workWithMeUrl` from config/content-types.yaml — always
+// available, never a fallback.
 function resolveEntryUrl(
   entry: ContentTypeCtaEntry,
   projectUrl: string | null,
   canonicalUrl: string | null,
-  cfg: CtaConfig
+  cfg: CtaConfig,
+  workWithMeUrl: string | null
 ): { url: string | null; usedFallback: boolean } {
   if (entry.destination === "project") {
     return { url: projectUrl && projectUrl.trim() ? projectUrl.trim() : null, usedFallback: false };
+  }
+  if (entry.destination === "work_with_me") {
+    return { url: workWithMeUrl, usedFallback: false };
   }
   return { url: canonicalUrl ?? cfg.fallbackUrl, usedFallback: canonicalUrl == null };
 }
@@ -120,7 +130,7 @@ function resolveOneContentType(
   const resolved: ResolvedCta[] = [];
   let usedFallback = false;
   for (const e of entries) {
-    const { url, usedFallback: uf } = resolveEntryUrl(e, projectUrl, canonicalUrl, cfg);
+    const { url, usedFallback: uf } = resolveEntryUrl(e, projectUrl, canonicalUrl, cfg, ctCfg.workWithMeUrl);
     if (url) {
       resolved.push({ url, label: e.text });
       if (uf) usedFallback = true;

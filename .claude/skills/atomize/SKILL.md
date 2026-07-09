@@ -188,6 +188,13 @@ derivative, the video script, and the video title/description. The short version
      here, and if so what's the URL?" Stamp `project_url` only with what she gives you. If she has
      none, or none is genuinely relevant to this post, omit `project_url` entirely — that CTA line
      is simply dropped, never filled with an unrelated project just to have a link.
+   - **The 4 work-flavored types always carry a "Connect on LinkedIn" CTA — nothing for you to
+     set.** `product_builder_insight`, `project_demo`, `offer_adjacent_post`, and `case_study` are
+     fundamentally "connect for work" asks, so their non-project entry resolves to Muxin's LinkedIn
+     profile (a fixed config value), never the essay/Substack link — an essay pointer doesn't serve
+     a work-with-me intent even when the essay happens to be on-topic. This is fully automatic at
+     publish time; you only ever need to decide `content_type` and, separately, whether a genuinely
+     relevant `project_url` applies.
    - **The literal-URL override still exists, and still wins.** Civic-tech pieces (and community
      rooms posting civic content) keep pointing at the voting tool exactly as before: set
      `cta: <voting-tool-url>` (+ `cta_label`) directly and skip `content_type` — an explicit `cta`
