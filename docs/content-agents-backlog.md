@@ -6,12 +6,23 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 
 ---
 
+**Extend Substack URL to atomize to any URL**
+- You know how I can give you a substack essay URL and you can run it through atomize? I wanted to be able to do that with any link. Does it work that way?
+
+SCOPE (Muxin confirmed, 2026-07-09): today /atomize's URL path (src/atomize/new-content.ts -> fetchSubstackPost in src/atomize/fetch-substack.ts) is Substack-only -- it fetches <origin>/feed, parses it as RSS, and matches the item by URL; content:encoded/description supplies the HTML. Any URL is assumed to be Substack; there is no fallback.
+Add a generic fallback: when the feed fetch fails, has no matching item, or the URL's host isn't a feed at all, fetch the page HTML directly and extract the main article text via a readability-style extractor (no such library exists in this repo yet -- add @mozilla/readability + a lightweight DOM shim, e.g. linkedom; no native deps). Pull title/author/date from <title>/OpenGraph/meta tags or JSON-LD instead of RSS tags. Keep the existing Substack RSS path as the first attempt (it already handles Substack's paywall/markup correctly) -- this is a fallback, not a replacement.
+Known limits to surface, not solve: heavy JS-rendered pages and hard paywalls still won't extract cleanly -- those still go through /atomize <file> or --text same as today.
+GOAL_CONDITION: a non-Substack article URL (e.g. a normal blog/news post with no matching /feed item) run through `npm run new-content -- <url>` produces a content/<date>-<slug>/source.md with a correctly extracted title and body text, AND an existing Substack post URL still resolves via the RSS path exactly as before (no regression).
+- STATUS: To Do
+- GROOMED: scope + GOAL_CONDITION added (generic-URL fallback via readability extraction), no dependency overlaps + 2026-07-09
+<!-- card-id: fe83c8f7-0c1c-45ab-b80a-73bbf07cba3a -->
+
 **Explore Draw Things (free local) for short-form video gen as a Kling cost-saver**
 - ORIGIN: raised by Muxin 2026-07-07 alongside the quote+image card discussion — a tangent, not scoped yet.
 - Draw Things is a free, local (on-device) image/video-gen app. Worth a bakeoff-style eval against Kling (currently ~$0.08/s via OpenRouter, used for video-broll first+last-frame animation) to see if it can do first+last-frame or general short-clip animation at comparable quality for $0.
 - Unverified: whether Draw Things actually supports video generation (vs. image-only) — confirm this before scoping further.
 - PRIORITY (Muxin, 2026-07-07): low — exploratory, not blocking anything.
-- STATUS: Backlog
+- STATUS: To Do
 - DECISION: defer (pre-flight, 2026-07-07) — exploratory, unverified whether Draw Things even does video gen; Muxin marked low priority, not blocking anything.
 - GROOMED: bounded eval task (confirm Draw Things video capability, bakeoff vs Kling if yes); low-priority exploratory, no blocking unknown + 2026-07-08
 <!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
@@ -77,9 +88,9 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - SEED LIST (Muxin, 2026-07-09): no client candidates supplied — genuinely blank, nothing in mind yet. Directional criteria given instead: smaller, mission-aligned tech companies, judged by the kind of role/engagement on offer rather than brand size. That's fit-profile guidance, not a name list — feeds the Phase 1 `config/outreach/clients.md` fit criteria. The actual Phase 0 seed (§8 item 3, docs/outreach-engine-plan.md) still needs 3–5 real names, either directly from Muxin or the `--from-jsa` TARGET-verdict pull.
 - CROSS-REPO NOTE — JSA sourcing model should flip to people-first too (Muxin, 2026-07-09): JSA's job-search sourcing is company-first today (source candidate companies, then `founder-deep-dive` as one research dimension within that). Muxin's call, reasoning from this card's own §9d logic: values are a durable property of the PERSON, while any single company is a moving target — so JSA should source people first via the same reflective/worldview-fit-writing signal and anchor-graph mechanism this engine uses for clients/platforms (not a separate build, same technique), and let base-requirements company filters (comp, location, stage, culture fit) work as a ranking/scoring layer applied AFTER a person is sourced, not as the primary discovery seam. Not a content-agents action item — JSA is a separate repo — but flag this to whoever next scopes JSA's sourcing pipeline; it sharpens the already-open UNVERIFIED JSA-values-depth question (c308a8cf, plan §2c) into a concrete architecture recommendation.
 CARD TYPE: EPIC
-- STATUS: To Do
+- STATUS: Backlog
 - DECISION: approved (Muxin, 2026-07-08) — build Phase 1 per docs/outreach-engine-plan.md (engine core + client config, seeded leads; discovery waits for Phase 5; Phase 1 inherits the §9f quote-required match + disconfirmation pass and the §10 anti-churn guards, and lands the worldview-map + anchors config files). Remaining input: the Phase 0 seed list (Muxin names 3–5 clients, or Phase 0 pulls JSA TARGET verdicts via --from-jsa) — still pending, see 2026-07-09 note above. The PR holds for review (rule 7, content-generation logic).
-- PARKED: CARD TYPE: EPIC / parent only. Not a buildable unit -- split into Outreach engine Phase 1-5 per docs/outreach-engine-plan.md §6 + 2026-07-09
+- PARKED: superseded as work items by the Outreach engine Phase 1-5 cards (2026-07-09) — kept as reference epics; specs/decisions on these bodies remain canonical
 <!-- card-id: ba9769af-f171-4f73-a373-2ca2cef5004c -->
 
 **Content agent: find platforms to appear on (podcasts, channels, newsletters)**
@@ -97,10 +108,10 @@ CARD TYPE: EPIC
 - DISCOVERY METHODOLOGY APPROVED (Muxin, 2026-07-08): plan §9 details the platform-sourcing approach — podcast search at the EPISODE level, not the show level (ListenNotes/Podchaser full-text episode descriptions: "which shows did an episode about untested assumptions" finds mid-tail shows that already care about her themes, not the saturated top-20 list); anchor-graph expansion generalized beyond the Substack recommendation graph to every public graph an anchor sits in (worked example in §9c from Muxin's own seeds, Audrey Tang + the Collective Intelligence Project: shows that hosted Tang are themselves platform candidates, their other guests enter the pool, CIP's collaborator/partner-org cluster and who they publicly recommend expand from there; every locked lead becomes a new anchor so the frontier compounds); mid-tail size bands (podcasts ≳50k listeners / newsletters ≳50k subs downgraded — the engine exists for niches Muxin couldn't have found herself, she can hand-add big names); lens rotation + dedup ledger + pass-reason anti-examples prevent surfacing the same list twice.
 - SEED LIST (Muxin, 2026-07-09): first 2 of the Phase 0 platform seed (§8 item 3, docs/outreach-engine-plan.md) — The School for Moral Ambition (moralambition.org, Rutger Bregman's mission-driven career-impact community/foundation, 25k+ members across Circles + Fellowships) and the UN ITU's AI for Good Neural Network (neuralnetwork.aiforgood.itu.int, an AI-matched community/content platform tied to the AI for Good summit — session video, virtual exhibits, AI-powered connection matching). Both satisfy her steer to look beyond LinkedIn toward mission-aligned communities. Still need 1–3 more to hit the 3–5 test-set minimum before Phase 1/3 has a seeded platform set to run against.
 CARD TYPE: EPIC
-- STATUS: To Do
+- STATUS: Backlog
 - DEPENDS ON: Per-channel positioning: one clear angle per platform ("Swizzle") — NOTE (2026-07-08): this dependency (d23bfc5d) is now Done. Sequencing dependency: Phases 1–2 of docs/outreach-engine-plan.md (engine core + draft/lock loop) land first.
 - DECISION: approved (Muxin, 2026-07-08) — build as Phase 3 per docs/outreach-engine-plan.md (platform fit profile, pitch angle aligned to spin_angles, target-list summary feeding 30772ba1); discovery per plan §9 lands with Phase 5. PR holds for review (rule 7, content-generation logic).
-- PARKED: CARD TYPE: EPIC / parent only. Not a buildable unit -- split into Outreach engine Phase 1-5 per docs/outreach-engine-plan.md §6 + 2026-07-09
+- PARKED: superseded as work items by the Outreach engine Phase 1-5 cards (2026-07-09) — kept as reference epics; specs/decisions on these bodies remain canonical
 <!-- card-id: b7dcb608-4089-4f19-ba5c-df5dc1c75b7c -->
 
 **Draft tailored outreach messages for companies worth connecting with on shared values**
@@ -138,9 +149,9 @@ CARD TYPE: EPIC
 - PLAN ADDENDUM (Muxin approved, 2026-07-08): docs/outreach-engine-plan.md gained §9 (discovery methodology: worldview-map query generation, anchor-graph expansion, people-not-companies client sourcing, mid-tail caps, quote-required match + disconfirmation pass) and §10 (research anti-churn guards: pull ≠ research, closed-checklist prompt with per-signal search budget, hard timeout, batch cap + backoff, run log). The quote-required match and disconfirmation pass harden this card's stage 4 (QUALIFY + PITCH); the anti-churn guards harden stage 3 (RESEARCH).
 - OPEN QUESTION — JSA Level 2 Networking ownership: JSA's own PRD (`product/prd/level-2-networking.md`, status "Early Concept/Brainstorming", unbuilt) specs almost exactly this engine's shape (profile → source people → footprint aggregation → matchmaking → outreach package → message composition → 3B7 tracking → relationship memory) for job-search networking, AND JSA's own docs (`product/technical/productization.md`) frame it as a sellable feature for JSA's other users (pricing tiers, "42,000+ users helped" goal) — not just Muxin's personal tool. Two ways this could go: (a) JSA builds its own Level 2 as a product feature, and content-agents' Follow-ups tab just pulls its state read-only once it exists; or (b) content-agents' shared engine (being built for client/platform outreach anyway) becomes the single place ALL FOUR reason-buckets' outreach/tracking lives, JSA hands off only Level-1 verdicts, and JSA never builds its own Level 2 — avoiding the twin-engine problem already avoided for sourcing. This has real product/roadmap consequences for JSA that aren't visible from content-agents alone; flag for Muxin's call (or the tougher-model scoping pass) rather than deciding silently. → RESOLVED (Muxin ratified, 2026-07-08): option (b), built pluggable — content-agents' Follow-ups tab tracks the jobsearch bucket natively; JSA hands off Level-1 verdicts only and does not build its own Level 2 for Muxin's use (its product-feature path for other users stays open: the bucket can swap to a read-only JSA pull later with no change to the others). Full reasoning: docs/outreach-engine-plan.md §2b. Cross-repo note: flag this to whoever next touches JSA so its roadmap reflects it.
 CARD TYPE: EPIC
-- STATUS: To Do
+- STATUS: Backlog
 - DECISION: approved (Muxin, 2026-07-08) — two-sided messaging required (name their problem, not just shared values); the problem-fit read is confirmed new research work in content-agents, not reused from JSA. Depth of JSA's own values-matching gets a timeboxed Phase 0 check (plan §2c) that doesn't block the build. INTEGRATED DESIGN APPROVED + IMPLEMENTATION SCOPED + RATIFIED — build per docs/outreach-engine-plan.md, this card's core is Phase 2 (gate → draft → lock → /atomize reuse), after Phase 1 lands. Drafting-logic PRs hold for Muxin's review per rule 7.
-- PARKED: CARD TYPE: EPIC / parent only. Not a buildable unit -- split into Outreach engine Phase 1-5 per docs/outreach-engine-plan.md §6 + 2026-07-09
+- PARKED: superseded as work items by the Outreach engine Phase 1-5 cards (2026-07-09) — kept as reference epics; specs/decisions on these bodies remain canonical
 <!-- card-id: c308a8cf-944b-4518-b019-f82675af3ab2 -->
 
 **Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach**
@@ -153,10 +164,10 @@ CARD TYPE: EPIC
 - IMPLEMENTATION-SCOPED (2026-07-08, stronger-model pass): see docs/outreach-engine-plan.md — data model is `data/outreach/tracker.jsonl` (committed append-only event log, same pattern as publish-schedule.jsonl; events = the 3B7 shape + re_researched; state derived by folding; per-bucket follow-up windows in config/outreach.yaml), surfaced as the Follow-ups tab in page.ts/serve.ts with the row shape + anti-patterns already specced on this card. Builds as Phase 4, after the draft/lock loop (Phase 2) exists to feed it. Jobsearch bucket is pluggable per the c308a8cf Level-2 recommendation (native events, or read-only JSA pull if Muxin picks option (a)); inbound bucket is schema-ready from day one but stays empty until db22283f lands.
 - RATIFIED (Muxin, 2026-07-08): plan recommendations agreed, including Level-2 ownership option (b) — the jobsearch bucket is tracked natively here (JSA hands off Level-1 verdicts only), built pluggable per c308a8cf's resolved open question.
 CARD TYPE: EPIC
-- STATUS: To Do
+- STATUS: Backlog
 - DEPENDS ON: Unified review + approval GUI (a4a2ce27, Done) as the base to extend; Draft tailored outreach messages (c308a8cf) for the locked-core-message data this tab surfaces; Inbound listening + voice-replies (db22283f) for the client-inbound bucket.
 - DECISION: approved (Muxin, 2026-07-08) — architecture approved (extend the unified review GUI; don't build separately; don't route through JSA's product UI); data-interchange direction set (local SQLite read, not Sheets, not markdown); scoped + ratified per docs/outreach-engine-plan.md §3–§4. Builds as Phase 4, after Phases 1–2 exist to feed it. Phase 4 is GUI/state plumbing, so its PR auto-merges on green CI per rule 7 (no generation logic).
-- PARKED: CARD TYPE: EPIC / parent only. Not a buildable unit -- split into Outreach engine Phase 1-5 per docs/outreach-engine-plan.md §6 + 2026-07-09
+- PARKED: superseded as work items by the Outreach engine Phase 1-5 cards (2026-07-09) — kept as reference epics; specs/decisions on these bodies remain canonical
 <!-- card-id: 659b50f0-6bc7-473b-8673-b901e9c93d11 -->
 
 **Minimize model API cost — prefer subscription / free routes over per-token API (retro review + standing policy)**
@@ -166,7 +177,7 @@ CARD TYPE: EPIC
 - HONEST CONSTRAINT: there is NO clean "subscription API" for Grok or GPT — their APIs bill per token and the app subscriptions aren't programmatic. The real lever is "default to Claude (subscription via the harness)"; treat Grok/GPT/paid-image as opt-in only where they add value Claude can't (e.g. Grok's fiction voice). Don't promise subscription-Grok we can't deliver.
 - Biggest concrete wins to evaluate: (a) video scripts on claude-native instead of grok-openrouter; (b) keep images free/cost-first, escalate only on request (already the policy); (c) confirm all Claude work routes through the harness subscription, not an Anthropic API key.
 - Applies to simple-kanban builds too ("all builds") — same policy belongs in the conductor config via the claude-config lane (handoff; that conductor is live).
-- STATUS: Backlog
+- STATUS: To Do
 - DECISION: defer — deprioritized, not high priority right now. Keep in Backlog. Flag when picked up: part of its scope touches the shared ~/.claude conductor config (cross-repo blast radius). 2026-07-04
 - GROOMED: two-part scope clear (retro review of config/providers.yaml + codify CLAUDE.md rule 6), honest constraint already resolves the Grok/GPT subscription question + 2026-07-08
 <!-- card-id: a1a6f379-556f-4e46-83a8-5e70fbd3c2b4 -->
@@ -201,7 +212,7 @@ CARD TYPE: EPIC
 - Scope: once npm run validate has real hook/narrative/resonance scores across n>=20 derivatives spanning >=3 different source essays/notes (not just more posts from the same source), re-run the same comparison. Specifically check whether hook/resonance keep showing zero variance across multiple sources -- if so, that is worth a real conversation about narrowing the rubric to the dimension that actually discriminates (narrative) vs keeping all three.
 - GOAL_CONDITION: a findings note (extending or superseding docs/storytelling-rubric-validation.md) reports the hook/narrative/resonance distribution across >=20 real scored derivatives spanning >=3 distinct source pieces, states whether hook/resonance still show zero variance, and gives a concrete keep-as-is-or-change recommendation.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
 - GROOMED: explicit GOAL_CONDITION already on card; data-gate (n>=20, >=3 sources) is a natural precondition the task itself checks, not a readiness gap + 2026-07-08
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
 
@@ -239,7 +250,7 @@ CHAIN: 1
 - Follow-up to 6dcaee98 (Smarter routing), UPDATED 2026-07-08 (again) per Muxin's PR #140 feedback: "work with me" now HAS a real (if provisional) destination — Muxin's LinkedIn profile (`https://www.linkedin.com/in/muxinli`), wired as a `work_with_me` destination in `config/content-types.yaml` (`work_with_me_url`). `product_builder_insight`, `project_demo`, `offer_adjacent_post`, and `case_study` (the 4 work-flavored types) all resolve to "Connect on LinkedIn" today, unconditionally — none of them fall back to the essay link or resolve to zero CTAs. This SUPERSEDES the card's original premise (it previously assumed no real destination existed at all).
 - Remaining scope, once Landing page (87c86b16) ships with a real work-with-me page: flip `work_with_me_url` in `config/content-types.yaml` from the LinkedIn profile to the real landing-page URL — a pure config change, no code/reclassification needed (same pattern as project links). Whether the CTA TEXT should also change at that point (e.g. "Work with me" instead of "Connect on LinkedIn") is Muxin's call when the time comes — flag it, don't decide silently.
 GOAL_CONDITION: with the Landing page live and a real work-with-me URL configured, `work_with_me_url` in `config/content-types.yaml` points at the real URL instead of LinkedIn; the 4 work-flavored types' CTA text is confirmed with Muxin (unchanged or updated, her call); every other content type is unchanged.
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Landing page
 - GROOMED: explicit GOAL_CONDITION already on card; pure config swap once Landing page ships; DEPENDS ON already correctly set + 2026-07-08
 <!-- card-id: ae602c84-18ed-4532-8f1b-3bd716e1a10e -->
@@ -302,6 +313,10 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - SEED CANDIDATES: Muxin's own client seed list is still blank (0 of 3-5, plan §8 item 3) -- use --from-jsa --verdict TARGET --limit N to pull real seeded candidates from JSA's manual_research.db instead of waiting on manual names.
 - GOAL_CONDITION (plan §6 Phase 1 definition of done): Muxin runs /outreach add on a seeded company and gets a cited, classified pitch report she can judge cold; 'unclear' demonstrably surfaces as unclear on at least one thin-evidence lead.
 - RULE 7: research/qualify prompts are content-generation logic -> this PR HOLDS for Muxin's review (plan §6, §7).
+
+JSA VALUES-DEPTH FINDING (closes the SS2c UNVERIFIED flag, verified in code 2026-07-09): JSA's verdict (auto_analyze.py compute_verdict) is logistics-weighted. Remote/Parental/Salary/Job Protection carry weight 2.0; Human Enablement, the ONLY mission/values dimension, carries the floor weight 1.0, is never a hard gate, and acts only as a salary-conditioned compensator. The older graph/ pipeline has zero values dimensions. Therefore a JSA TARGET means strong logistics, NOT values alignment: --from-jsa --verdict TARGET is a logistics-fit seed source only, and every JSA-sourced lead MUST still pass this engine's quote-required worldview qualify (SS2c's posture, now confirmed necessary, not just prudent). Treat JSA's Human Enablement search output (mission-language quotes) as useful qualify evidence; ignore its score. Muxin is separately considering removing HE from JSA's scoring entirely since the anchor-graph network design covers similar-to-aligned discovery; that is a JSA-repo call, out of scope here, and this engine's qualify never depended on it either way. The real values instrument already built is the Cowork founder-deep-dive skill (Philosophical Depth Probe tiers + Layer-7 Introduction Test); port its rubric prose into config/outreach/ as the person-level qualify reference (its Apollo/MCP tool steps do not port; use web search).
+
+TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach pursue without BOTH (a) company-level worldview qualification (quote-required per SS9f) AND (b) a named, evidenced like-minded person there (founder-deep-dive-style, extended beyond founders; Muxin's last job proves person-fit and company-fit diverge). Person-high/company-low still has value: record that person as an anchor in config/outreach/anchors.md (networking + future-referral node) even when the company is passed. Client<->employer conversion is expected: a lead's kind/bucket may change without losing its evidence and decision history. Rationale is strategic, not just preference: aligned people/orgs refer into more aligned work; misaligned ones refer into their own network.
 - STATUS: To Do
 - GROOMED: split from ba9769af per docs/outreach-engine-plan.md §6 Phase 1; explicit GOAL_CONDITION, seed-blocker resolved via --from-jsa pull, plan RATIFIED 2026-07-08 + 2026-07-09
 <!-- card-id: 8e8b616e-ba97-4421-8fed-978128e0b94b -->
@@ -315,7 +330,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - RULE 2 ANALOG: no send path exists anywhere in this codebase. Approve means lock, never transmit.
 - RULE 7: draft prompt is content-generation logic -> this PR HOLDS for Muxin's review.
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
 <!-- card-id: d5b34590-4354-49f1-952f-3faaf1ce7d4a -->
@@ -351,11 +366,30 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - GOAL_CONDITION (plan §6 Phase 5 definition of done): a real discovery run (client and platform) surfaces NEW candidates not already in any lead folder, respects batch cap + backoff, and logs to data/outreach/run-log.jsonl; a calibration loop compares discovery output against Muxin's pursue/pass record on the grade-bets rhythm.
 - WHY LAST: seeded leads validate the qualify/draft pipeline first; discovery quality is the least verifiable stage and benefits from months of Muxin's pursue/pass decisions as a calibration record. Pull it earlier only if Phase 1-3 throughput runs dry of seeded candidates.
 - RULE 7: discovery/qualify prompts are content-generation logic -> this PR HOLDS for Muxin's review.
-- STATUS: Backlog
+
+DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor expansion begins from the ingested corpus (see the "Ingest existing research corpus" card) — roughly 30 anchors from the Obsidian vault + 140 JSA-scored companies — not just the 2 seed anchors. (2) The two-key jobsearch gate on the Phase 1 card applies at surfacing time for jobsearch-bucket candidates: discovery that finds an aligned person at a misaligned company surfaces the PERSON as an anchor candidate, not the company as a lead. (3) The anchor graph is the "similar to this kind of company/person" mechanism; the worldview map stays the thesis test — do not reintroduce JSA's Human Enablement score as a discovery signal (see the values-depth finding on the Phase 1 card).
+- STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 3: platform config + borrowed-audience target list
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- confirmed defer; no direct epic approval for this specific phase, and deliberately last per plan anyway.
 - GROOMED: split from ba9769af/b7dcb608 per plan §6 Phase 5; explicit GOAL_CONDITION, deliberately-last rationale pinned, DEPENDS ON Phase 3 + 2026-07-09
 <!-- card-id: 96216ecc-86b5-47ba-8a99-4051c17e5423 -->
+
+**Outreach engine — Ingest existing research corpus (Obsidian vault + JSA DB) into anchors + leads**
+- Warm-start the anchor graph from data Muxin already has instead of cold-starting from 2 seed anchors. Sources (all read-only): the Obsidian vault at "/Users/Muxin/Documents/Personal Obsidian/Job Hunt/" — Research/Company Research/ (5 deep-researched companies: Anthropic, Notion, Superhuman, Mem, Fireflies — interview notes with verbatim quotes, deep person profiles, Muxin's Thoughts reactions), Research/Chats with People/ (~17 real-contact conversation notes), Contacts/ (SEED_CONTACTS.md 66-person roster, Interest Cross-Reference.md, Anthropic Deep Profiles/) — plus JSA's manual_research.db (~140 scored companies; 10 TARGET / 42 CONSIDER) via JSA_DB_PATH.
+- Output: (a) config/outreach/anchors.md entries for the people/orgs the vault already evidences as aligned (Boris Cherny, Cat Wu, Thariq, Kevin Moody, Ivan Zhao, etc.), each with a why-this-anchor line quoting Muxin's own notes + a source path; (b) pre-created outreach/leads/ folders (source: ingested) for already-vetted companies worth pursuing, carrying the vault/JSA evidence snapshotted in lead.md.
+- Constraints: NO graph database — ~250 total nodes fits the plan's existing file formats (anchors.md + lead folders); a graph DB is speculative infra. Vault analysis notes parse cleanly (H1 + bold fields + blockquotes); transcripts and thought-dumps need Claude judgment, so ingest is Claude-in-skill, not a deterministic parser. JSA's Human Enablement score is ingested as evidence text only, never as a fit signal (see the values-depth finding on the Phase 1 card). Nothing here contacts anyone; it only seeds config + lead state.
+- GOAL_CONDITION: config/outreach/anchors.md contains >=20 anchor entries, each with a why-this-anchor evidence line and a source path into the vault or JSA DB; lead folders exist for at least the 5 deep-researched vault companies with source: ingested and populated ## Evidence sections; the run touches the vault and manual_research.db read-only (no writes outside this repo).
+- STATUS: To Do
+- DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
+- GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
+<!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
+
+**Outreach engine — Phase 0: discovery spike (JSA_DB_PATH + seed list)**
+- The plan's Phase 0 (docs/outreach-engine-plan.md SS6) had no card, so it could silently never happen — yet it holds the one blocking input for Phase 1. Two of its three items are now DONE: the JSA values-depth check (SS2c) closed 2026-07-09, finding recorded on the Phase 1 card; the read path is designed (jsa.ts, better-sqlite3 readonly).
+- Remaining: (1) add JSA_DB_PATH to .env pointing at manual_research.db and verify a read-only better-sqlite3 query works; (2) MUXIN INPUT REQUIRED — the seed list is still short: platforms have 2 of 3-5 (School for Moral Ambition, AI for Good Neural Network), clients have zero concrete names (only directional criteria: smaller mission-aligned tech companies). Client seeds can come from Muxin's head, the --from-jsa TARGET pull (logistics-fit only — must still pass worldview qualify), or the vault's deep-researched companies via the ingest card.
+- GOAL_CONDITION: .env carries JSA_DB_PATH and a read-only query against manual_research.db succeeds from this repo; the plan doc SS8 item 3 records >=3 client seeds and >=3 platform seeds.
+- STATUS: Backlog
+<!-- card-id: be1e4dcd-36dc-41bf-8c1a-66925d7f4658 -->
 
 **Create quote and image cards**
 - Combine both image gen and quote — an image post that carries BOTH a quote and a generated image, distinct from the existing text-only quote-card pipeline (a3127104, Done).
