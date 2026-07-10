@@ -1,5 +1,9 @@
 // Fetch a Substack post (or the latest from a feed) and extract title + plain text.
 // Public posts only — Substack has no API; the RSS feed and post HTML are the interfaces.
+// Any URL whose feed doesn't resolve the post (not Substack, no matching item, feed down) falls
+// back to fetchGenericArticle, a Readability-based extractor for plain article HTML.
+
+import { fetchGenericArticle } from "./fetch-generic.js";
 
 export interface FetchedPost {
   title: string;
@@ -30,7 +34,7 @@ function tag(xml: string, name: string): string | null {
   return m[1].replace(/^<!\[CDATA\[([\s\S]*)\]\]>$/, "$1").trim();
 }
 
-export async function fetchSubstackPost(url: string): Promise<FetchedPost> {
+async function fetchFromFeed(url: string): Promise<FetchedPost> {
   // Resolve via the publication's RSS feed — it carries full content for public posts
   // and avoids scraping paywalled markup.
   const u = new URL(url);
@@ -59,4 +63,20 @@ export async function fetchSubstackPost(url: string): Promise<FetchedPost> {
     publishedAt: tag(item, "pubDate") ? new Date(tag(item, "pubDate")!).toISOString() : null,
     text: htmlToText(html),
   };
+}
+
+export async function fetchSubstackPost(url: string): Promise<FetchedPost> {
+  try {
+    return await fetchFromFeed(url);
+  } catch (feedErr) {
+    try {
+      return await fetchGenericArticle(url);
+    } catch (genericErr) {
+      throw new Error(
+        `could not extract post via RSS feed or generic article extraction.\n` +
+          `- feed attempt: ${(feedErr as Error).message}\n` +
+          `- generic fallback attempt: ${(genericErr as Error).message}`
+      );
+    }
+  }
 }
