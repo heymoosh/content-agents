@@ -93,7 +93,7 @@ function writeLeadFile(dir: string, opts: {
     `---\n` +
     `kind: ${opts.kind}\n` +
     `name: "${opts.name.replace(/"/g, '\\"')}"\n` +
-    `url: ${opts.url}\n` +
+    `url: "${opts.url.replace(/"/g, '\\"')}"\n` +
     `source: ${opts.source}${jsaLine}\n` +
     `status: intake   # intake | researched | qualified | pursue | passed | drafted | locked\n` +
     `${fitField}\n` +
