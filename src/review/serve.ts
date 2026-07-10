@@ -358,6 +358,14 @@ export function isSafeRawPath(relPath: string): boolean {
   return RAW_ROOTS.some((root) => relPath === root || relPath.startsWith(`${root}/`));
 }
 
+// Follow-ups tab's draft-follow-up route: only a real single-segment outreach/leads/<dir> name is
+// legal. Requiring the leading char to be alphanumeric blocks a bare "." or ".." segment (which
+// `[\w.-]+` alone would let through, e.g. "outreach/leads/.." resolving one level up) -- same
+// posture as rows.ts's safeFolder() explicitly rejecting "..".
+export function isValidLeadDir(dir: string): boolean {
+  return /^outreach\/leads\/[A-Za-z0-9][\w.-]*$/.test(dir);
+}
+
 function serveRawFile(res: ServerResponse, relPath: string): void {
   if (!isSafeRawPath(relPath)) {
     res.writeHead(400).end("bad path");
@@ -771,7 +779,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/followups/draft-follow-up") {
       const b = await readBody(req);
       const dir = String(b.dir ?? "");
-      if (!/^outreach\/leads\/[\w.-]+$/.test(dir)) {
+      if (!isValidLeadDir(dir)) {
         json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
         return;
       }
