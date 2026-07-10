@@ -13,6 +13,24 @@ This is not a "would this be nice exposure" filter. It answers one question: **i
 audience Muxin can genuinely borrow — real people who'd care what she has to say — and is there
 an actual path for her to reach them as a guest or contributor, not just a wishlist name?**
 
+**"Platform" is not limited to organizations.** An individual creator with a real audience (a
+podcast host, a newsletter writer, an influencer, a community/channel organizer) is an equally
+valid target, not a fallback when no org-run show or publication is found. Do not default the
+search toward institutions; a solo host with a real audience and an open door often has a shorter,
+realer pitch path than an org with a formal review process.
+
+**Muxin's own 3-part test, the core gate every platform-kind lead must clear:**
+
+1. **Has a real audience.** People who'd actually care what she has to say, not a follower count.
+2. **Has an open invitation to host someone as a guest or have a chat.** Passive content
+   consumption (an article you could quote, a directory you could get listed in) does not count:
+   there has to be an actual hosting/interview/conversation mechanism, and it has to be genuinely
+   open to outside people, not just a live website.
+3. **The topics it covers are ones Muxin is a good fit to talk about.**
+
+The five fit dimensions below operationalize this test with evidence signals; the three-part test
+is the gate, the dimensions are how you check it.
+
 ## Fit dimensions
 
 A platform-kind lead is evaluated across five dimensions. All five feed the `fit` verdict; none
@@ -21,7 +39,8 @@ which behaves like one.
 
 ### 1. Topic overlap
 
-Does the platform's actual content sit close to Muxin's essay themes — AI & society, fairness,
+This is part 3 of Muxin's 3-part test: the topics it covers are ones she's a good fit to talk
+about. Does the platform's actual content sit close to Muxin's essay themes — AI & society, fairness,
 product/build work (the untested-assumption pattern, greenfield vs. turnaround judgment)? Judge
 by recent episodes/issues/posts, not an "about" page description. A platform whose stated mission
 sounds aligned but whose last 10 episodes are all something else (e.g. pure market news, pure
@@ -29,7 +48,7 @@ celebrity interviews) does not have real topic overlap no matter what the taglin
 
 ### 2. Audience reality check
 
-Real audience, not vanity metrics. A platform can look big (follower count, subscriber count)
+This is part 1 of Muxin's 3-part test: a real audience, not vanity metrics. A platform can look big (follower count, subscriber count)
 while its actual engaged audience is thin (low listen-through, low comment/reply activity, a
 newsletter that's mostly unopened). Evidence should distinguish claimed size from evidence of an
 actually-engaged audience: comments, replies, discussion threads, guest testimonials about
@@ -45,7 +64,8 @@ statements. No quote means the values leg is unmet, not assumed, same rule as cl
 
 ### 4. Guest-friendliness / pitch-path
 
-Do they actually take outside guests or contributors, and is there a real, visible path in
+This is part 2 of Muxin's 3-part test: an **open invitation to host someone as a guest or have a
+chat**. Do they actually take outside guests or contributors, and is there a real, visible path in
 (a pitch page, a "be on the show" link, a public call for contributors, a history of hosting
 non-celebrity outside guests)? This behaves like clients.md's HARD qualifier: a platform that is
 purely a solo-voice format with zero outside-guest history, or one whose "contact" surface is
@@ -53,6 +73,13 @@ dead (no response mechanism at all, a form that visibly goes nowhere), cannot be
 matter how strong the topic/audience/values read is. That does not automatically mean
 `disqualified` — a platform can be `weak` on this dimension pending more research — but it caps
 the fit verdict at `partial` at best until a real pitch path is found.
+
+**A directory or network is not, on its own, a platform under this test.** A "directory of people
+interested in caring about stuff" (a member list, a badge, a community you can join and be
+listed in) is passive membership, not an invitation to be hosted. It only clears this dimension
+if it has an actual interview/guest/conversation series with a real path in; joining a network
+without ever being invited to talk does not count, no matter how large or well-regarded the
+network is.
 
 ### 5. Recency
 
