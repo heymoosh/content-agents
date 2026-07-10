@@ -52,25 +52,28 @@ Publish ONLY rows Muxin set to `approve` in `<folder>/review-queue.md`. Never pu
      `npm run publish:tiktok -- --check`. The API can't set TikTok's "made with AI" label (it's an
      in-app per-post toggle) — disclose in the caption for AI-heavy shorts.
 
-5. **Quote cards** (`quote-card` rows): `npm run publish:cards -- <folder>`
-   - Schedules each approved card's `images/<id>.png` via the image-post provider in
-     `config/providers.yaml` (`image_post: postpeer` primary, `upload-post` failover on quota). A
-     card fans out to EVERY connected image-capable account (Bluesky / X / LinkedIn / …, auto-
-     discovered from the provider dashboard; video-only TikTok/YouTube excluded).
-   - **CTA follows `config/cta.yaml` (shared with text):** the article link goes INLINE on inline
-     platforms (Bluesky/LinkedIn) and is OMITTED where placement is `reply` (X) — the relays can't
-     post a reply, so omitting dodges X's in-body link penalty. The fan-out splits into one call per
-     placement group (X gets the bare quote; Bluesky/LinkedIn get quote + link).
+5. **Quote cards** (`quote-card:<target>` rows): `npm run publish:cards -- <folder>`
+   - Ships as a NATIVE Typefully image post (2026-07-08 rewire) — same scheduled-draft path text
+     posts use, with the card PNG uploaded and attached via `uploadMedia` + `media_ids`
+     (`src/publish/typefully.ts`, reused by `src/publish/cards.ts`). Retires PostPeer/Upload-Post
+     and the `image_post` provider toggle for cards entirely — PostPeer stays wired for TikTok
+     only (step 4, a genuinely different video-only relay).
+   - Each row targets ONE platform (`quote-card:x` / `quote-card:linkedin` / `quote-card:bluesky`)
+     with that platform's own context caption as the draft body — there is no more fan-out to
+     every connected account. A legacy bare `quote-card` row (no `:<target>`) errors out; split it
+     into per-platform rows first (see `.claude/skills/atomize/SKILL.md` step 7).
+   - **CTA follows `config/cta.yaml` (shared with text):** inline on inline platforms
+     (Bluesky/LinkedIn), placed like a text post (reply/first-comment) elsewhere (X).
    - **Timing is unified with text** (same scheduler + ledger): a card claims the next `quote-card`
-     slot (`config/platforms.yaml`) and de-conflicts against EACH target platform's cap — so a card
+     slot (`config/platforms.yaml`) and de-conflicts against its target platform's cap — so a card
      series respects e.g. LinkedIn's 2/wk and never shares a platform's day with a text post.
-     `--at <ISO>` overrides for a one-off/test. SCHEDULED, never instant; cancel in the provider
-     dashboard before it fires.
-   - Prereqs: render the PNGs first (`npm run render -- --still <folder>` — gitignored), and connect
-     image accounts in the provider dashboard. Verify with `npm run publish:cards -- <folder> --check`
-     (read-only: rows + next slot + CTA plan + the accounts a card fans out to).
-   - On a 402/429: the provider's free quota is exhausted — surface it; swap `image_post` to the
-     other provider or top up. Do not work around it.
+     `--at <ISO>` overrides for a one-off/test. SCHEDULED, never instant; cancel in Typefully's
+     queue before it fires.
+   - Prereqs: render the PNGs first (`npm run render -- --still <folder>` — gitignored). Needs
+     `TYPEFULLY_API_KEY` same as `publish:typefully`, nothing card-specific to configure. Verify
+     with `npm run publish:cards -- <folder> --check` (read-only: rows + next slot + CTA plan).
+   - On a 402 error: Typefully needs a paid plan — same Postiz fallback as step 2. Do not work
+     around it.
 
 6. **No-API platforms** (community / substack rows): `npm run publish:paste -- <folder>`
    - Emits `ready-to-paste/<id>.txt` files; Muxin copy-pastes when convenient.
