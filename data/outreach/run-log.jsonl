@@ -1,0 +1,2 @@
+{"timestamp":"2026-07-10T14:46:30.746Z","dir":"outreach/leads/client-posthog","name":"PostHog","kind":"client","search_budget_per_signal":2,"timeout_min":6,"evidence_found":8,"classification":"greenfield","disconfirmation_checked":true,"model":"sonnet"}
+{"timestamp":"2026-07-10T14:52:42.506Z","dir":"outreach/leads/client-axelerant","name":"Axelerant","kind":"client","search_budget_per_signal":2,"timeout_min":6,"evidence_found":4,"classification":"unclear","disconfirmation_checked":true,"model":"sonnet"}

@@ -30,3 +30,4 @@ worldview-aligned anchor worth keeping on file.
 <!-- qualify.ts appends entries below this line, one per anchor, in the same
      "- **Name**, role @ company. Why this anchor: <one line, cites the lead file>." shape
      as the seeded anchors above. Do not hand-edit the machine-appended section format. -->
+- **Ankur Gupta (Founder/CEO)** @ Axelerant. Why this anchor: Reflective, uncertainty-holding statement about the company's own direction (paired with "I wish I could say that we always knew what we wanted Axelerant's culture to be like. But that wasn't the case."); rates Developing on the Philosophical Depth Probe, real instinct toward openness-to-change (worldview statement 4) but scoped to internal culture, not a broader articulated worldview.
