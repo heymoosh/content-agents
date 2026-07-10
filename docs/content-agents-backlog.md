@@ -241,7 +241,10 @@ SHIP: held
 - SEED CANDIDATES: 2 of 3-5 platform seeds on file (plan §8 item 3) -- The School for Moral Ambition, UN ITU AI for Good Neural Network. 1-3 more still needed to hit the test-set minimum; not blocking the build itself.
 - RULE 7: platform qualify/pitch-angle prompts are content-generation logic -> this PR HOLDS for Muxin's review.
 - DEPENDENCY NOTE (2026-07-09, Muxin): Phase 3 only needs Phase 1's qualify.ts + lead.md schema, not Phase 2's draft/lock; was over-conservatively pointed at Phase 2. Unblocks Phase 2 (message quality) and Phase 3 (platform-list quality) to build/review independently once Phase 1 lands.
-- STATUS: In Progress
+PR: https://github.com/heymoosh/content-agents/pull/177
+SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
+- STATUS: Review
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (platform qualify/pitch-angle prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from b7dcb608 per plan §6 Phase 3; explicit GOAL_CONDITION (also satisfies 30772ba1), DEPENDS ON Phase 2 + 2026-07-09
@@ -308,11 +311,12 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
 
-**Update .claude/skills/atomize + outreach SKILL.md for Phase 2 (draft/lock)**
+**Update .claude/skills/atomize + outreach SKILL.md for Phase 2 (draft/lock) + Phase 3 (platform-kind)**
 - ORIGIN: follow-up auto-filed while building card d5b34590 (Outreach engine Phase 2: decision gate, draft, lock, /atomize reuse).
 - .claude/skills/atomize/SKILL.md step-4 frontmatter example should document `outreach_message: true` so a live /atomize run actually stamps the marker src/db/tag-source.ts now knows how to read. .claude/skills/outreach/SKILL.md non-negotiable-rule-1 and its subcommand list need draft/lock added, replacing any "Phase 2 not built yet" language.
 - Could not be done inside the Phase 2 build itself -- writes under .claude/ are not grantable to a headless worker in that session (same constraint card ebe652a7 hit; needs an attended/interactive run).
-- GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), and atomize/SKILL.md documents the outreach_message: true frontmatter marker.
+- EXTENDED (2026-07-10, while building Phase 3 card 6590efec): outreach/SKILL.md also needs a platform-kind walkthrough (mirroring the client-kind flow) and documentation of `outreach:status --targets` -- same headless .claude/ write-permission wall, same attended session can fix both at once.
+- GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: cccfc43a-6547-4f08-aeb4-3e76e7e27c49 -->
@@ -333,6 +337,15 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
+
+**Fix qualify.ts illegal fit:unclear downgrade for platform-kind leads**
+- ORIGIN: follow-up auto-filed while building card 6590efec (Outreach engine Phase 3), found by /code-review --fix.
+- qualify.ts evaluateQualify() hardcodes "unclear" as the downgrade value regardless of kind, but "unclear" is not a legal fit value (validate.ts VALID_FITS is strong|partial|weak|disqualified -- unclear is only legal for client-kind classification). intake.ts has the same latent issue (seeds fit: unclear at intake time). If a platform lead is ever qualified from a claimed strong/partial with zero evidence or no worldview-match quote, it would get downgraded to the illegal value fit: unclear and fail shape validation.
+- Not exercised by either of Phase 3s 2 real seeded proof leads (both classified weak directly, never hit this downgrade path) -- pre-existing bug, not introduced by Phase 3.
+- GOAL_CONDITION: evaluateQualify() downgrades a platform-kind lead to a legal fit value (e.g. weak, not unclear) when evidence is insufficient; a test exercises this path directly.
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: 19b348f4-7f8a-4790-9393-8e42739ac1a0 -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
 - A content/research agent that finds and qualifies potential clients who are a genuine fit to work with Muxin — not just anyone with a budget.
