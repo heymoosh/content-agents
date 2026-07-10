@@ -34,11 +34,11 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - GOAL_CONDITION: src/atomize/reply-draft.test.ts, src/cron/bluesky-mentions.test.ts, src/cron/bluesky-mentions-ledger.ts, src/publish/reply-approval-gate.test.ts, and src/review/page.test.ts all pass in the "check" CI job (npm test); a drafted reply never lands with queue-row status "approve" (reply-approval-gate.test.ts's gate case); `tsx src/atomize/reply-draft.ts --dry-run` produces a voice.yaml-compliant reply for a fixture mention with zero network calls and zero writes.
 - RULE 7: src/atomize/reply-draft.ts drafts what a Bluesky reply says in Muxin's voice -> content-generation logic (same class as the rule's named video-script-drafting example) -> this PR HOLDS for Muxin's review: draft PR, old-vs-new reply-draft sample in the PR body, no auto-merge even though CI is green and the review-GUI touch (src/review/page.ts, rows.ts) is otherwise low-risk.
 - SHIP: held (PR #155, https://github.com/heymoosh/content-agents/pull/155 -- draft, no auto-merge, RULE 7 content-generation-logic hold)
-- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 - STATUS: Review
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
 - DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
 - GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
+- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
@@ -197,17 +197,8 @@ CARD TYPE: EPIC
 - CHAIN: 1
 - STATUS: To Do
 - GROOMED: explicit GOAL_CONDITION already on card; data-gate (n>=20, >=3 sources) is a natural precondition the task itself checks, not a readiness gap + 2026-07-08
+- PARKED: data not ready: card needs n>=20 scored derivatives across >=3 distinct source pieces; repo currently has only 6, all from one source (2026-07-05-hey-substack) - same state as the original validation. Building now would just reproduce that finding. Re-check once more /atomize runs across different essays accumulate scored derivatives.
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
-
-**Unify the 6 duplicated Claude-job error-decoding blocks in src/review/jobs.ts + serve.ts**
-- - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions).
-- Six near-duplicate enoent/timedOut/nonzero-exit error-decoding blocks exist across reviseDerivative, reviseBrief, generateInsights, askInsights, duplicateToPlatform, and runVideoJob/drain(): src/review/jobs.ts:121-135,151-159,417-426,481-491,596-603 plus src/review/serve.ts:256-262,292-297.
-- Not fixed inline because it touches 6+ call sites with slightly different throw-vs-assign semantics -- a real (small) refactor, not a one-line fix.
-- GOAL_CONDITION: the 6 call sites share one extracted error-decoding helper (enoent/timedOut/nonzero-exit), no behavior change, npm test stays green.
-- CHAIN: 1
-- STATUS: To Do
-- GROOMED: well-specified refactor, explicit GOAL_CONDITION + file:line refs, no external/cost/security surface + 2026-07-08
-<!-- card-id: 84afb9e3-1394-4f15-945c-00d6ee32c613 -->
 
 **duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
 - - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions), found during the review stage's code-review pass.
@@ -236,6 +227,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - STATUS: To Do
 - DEPENDS ON: Landing page
 - GROOMED: explicit GOAL_CONDITION already on card; pure config swap once Landing page ships; DEPENDS ON already correctly set + 2026-07-08
+- PARKED: needs Muxin call: CTA text for the 4 work-flavored types (keep as-is or update) before this config swap runs - card says her call, flag not decide silently
 <!-- card-id: ae602c84-18ed-4532-8f1b-3bd716e1a10e -->
 
 **Animated HyperFrames companion for the quote+image card variant**
@@ -365,13 +357,16 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
+- PARKED: needs Muxin call: this populates a committed config file with judgment calls characterizing real named people from her private notes, and unlike its sibling outreach cards it has no Rule-7 PR-hold, so it would merge unreviewed - want a human look first
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Outreach engine — Phase 0: discovery spike (JSA_DB_PATH + seed list)**
 - The plan's Phase 0 (docs/outreach-engine-plan.md SS6) had no card, so it could silently never happen — yet it holds the one blocking input for Phase 1. Two of its three items are now DONE: the JSA values-depth check (SS2c) closed 2026-07-09, finding recorded on the Phase 1 card; the read path is designed (jsa.ts, better-sqlite3 readonly).
 - Remaining: (1) add JSA_DB_PATH to .env pointing at manual_research.db and verify a read-only better-sqlite3 query works; (2) MUXIN INPUT REQUIRED — the seed list is still short: platforms have 2 of 3-5 (School for Moral Ambition, AI for Good Neural Network), clients have zero concrete names (only directional criteria: smaller mission-aligned tech companies). Client seeds can come from Muxin's head, the --from-jsa TARGET pull (logistics-fit only — must still pass worldview qualify), or the vault's deep-researched companies via the ingest card.
 - GOAL_CONDITION: .env carries JSA_DB_PATH and a read-only query against manual_research.db succeeds from this repo; the plan doc SS8 item 3 records >=3 client seeds and >=3 platform seeds.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clear GOAL_CONDITION; seed gaps have self-resolution paths (--from-jsa / vault ingest) + 2026-07-10
+- PARKED: needs Muxin call: card says MUXIN INPUT REQUIRED for the client seed list before this outreach spike builds
 <!-- card-id: be1e4dcd-36dc-41bf-8c1a-66925d7f4658 -->
 
 **Resume Substack publishing automation build (salvage worktree from ceiling-killed session)**
@@ -380,22 +375,37 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Original card 8026f53c is PARKED (ceiling hit) — see its DECISION/SCOPE lines for the already-answered scope (Notes only, 1 post/day cap) before restarting.
 - STATUS: To Do
 - DECISION: approved — carries forward the same approval already on 8026f53c (Muxin, 2026-07-08); scope already answered, no new judgment call needed to start.
+- GROOMED: salvage worktree + DECISION already approved, points to exact files + 2026-07-10
 <!-- card-id: 83f60f12-ab69-43a8-a38c-ff73c88ed0ed -->
 
 **Port cost-minimization policy to claude-config/simple-kanban conductor lane**
 - Card a1a6f379 (content-agents) codified CLAUDE.md rule 6 (prefer subscription/free model routes, minimize per-token API cost) and fixed a scaffold-default drift bug. That card noted the same policy applies to simple-kanban builds via the claude-config lane, out of scope for the content-agents worktree. ORIGIN: follow-up from a1a6f379.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clear pointer to a1a6f379's fix to port to claude-config lane + 2026-07-10
+- PARKED: needs Muxin call: targets the separate claude-config conductor lane with an under-specified port-the-fix scope - confirm exact change before building in that repo
 <!-- card-id: 3ddcc3c3-8226-4778-824e-21dd199bde75 -->
 
 **Fix test pollution of briefs/bets.md (npm test writes to real file, not a tmp fixture)**
 - Found while reviewing card a1a6f379: running npm test in a content-agents worktree can pollute briefs/bets.md with real test-run rows due to a pre-existing test-isolation bug (some test under src/publish/cards.ts writes to the actual file instead of a tmp fixture). ORIGIN: follow-up from a1a6f379.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clear scoped bug: src/publish/cards.ts test writes to real bets.md + 2026-07-10
 <!-- card-id: aab1eec7-b913-46d9-8475-e3cc81533109 -->
 
 **Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
 - config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clear bakeoff scope: whisper.cpp vs Gemini, headless-executable + 2026-07-10
 <!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
+
+**Unify the 6 duplicated Claude-job error-decoding blocks in src/review/jobs.ts + serve.ts**
+- - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions).
+- Six near-duplicate enoent/timedOut/nonzero-exit error-decoding blocks exist across reviseDerivative, reviseBrief, generateInsights, askInsights, duplicateToPlatform, and runVideoJob/drain(): src/review/jobs.ts:121-135,151-159,417-426,481-491,596-603 plus src/review/serve.ts:256-262,292-297.
+- Not fixed inline because it touches 6+ call sites with slightly different throw-vs-assign semantics -- a real (small) refactor, not a one-line fix.
+- GOAL_CONDITION: the 6 call sites share one extracted error-decoding helper (enoent/timedOut/nonzero-exit), no behavior change, npm test stays green.
+- CHAIN: 1
+- STATUS: Done
+- GROOMED: well-specified refactor, explicit GOAL_CONDITION + file:line refs, no external/cost/security surface + 2026-07-08
+<!-- card-id: 84afb9e3-1394-4f15-945c-00d6ee32c613 -->
 
 **Minimize model API cost — prefer subscription / free routes over per-token API (retro review + standing policy)**
 - Requirement (Muxin, 2026-06-30): for ALL builds, default model usage to subscription / flat-rate / free routes and minimize per-token API spend. We lean on OpenRouter (per-token) more than needed.
