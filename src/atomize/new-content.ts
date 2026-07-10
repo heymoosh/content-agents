@@ -37,6 +37,15 @@ export function resolveFileSource(arg: string, raw: string): {
   const { fm, body } = splitFrontmatter(raw);
   const isOutreachMessage =
     typeof fm.lead === "string" && typeof fm.channel === "string" && Array.isArray(fm.evidence);
+  // Rule 1's scoped exception for draft.ts's composed prose is legal ONLY because Muxin reviews
+  // every message before lock.ts ever fires (docs/outreach-engine-plan.md §6/§7) -- so only a
+  // LOCKED message (her review already happened) is a legal /atomize source. A draft/approved
+  // message atomized here would let unreviewed composed prose into the extraction-first pipeline.
+  if (isOutreachMessage && fm.status !== "locked") {
+    throw new Error(
+      `refusing to atomize ${arg}: outreach message status is "${String(fm.status ?? "")}", not locked -- only a LOCKED message (Muxin has approved it) is a legal /atomize source`,
+    );
+  }
   const firstHeading = body.match(/^#\s+(.+)$/m)?.[1];
   const title =
     firstHeading ??

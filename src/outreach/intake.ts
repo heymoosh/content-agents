@@ -110,8 +110,8 @@ function writeLeadFile(dir: string, opts: {
   writeFileSync(
     join(dir, "review-queue.md"),
     `# Outreach review queue -- ${opts.name}\n\n` +
-      `Populated by \`/outreach draft\` (message drafting, Phase 2 -- not built yet). Empty until\n` +
-      `a message exists for this lead.\n`,
+      `Populated by \`npm run outreach:draft\`. Rows below surface in the review GUI; Approve calls\n` +
+      `\`outreach:lock\`, never a scheduler -- nothing here sends or publishes anything.\n`,
   );
 }
 

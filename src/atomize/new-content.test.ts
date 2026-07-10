@@ -63,3 +63,21 @@ describe("resolveFileSource: a locked outreach message is recognized and strippe
     assert.equal(out.origin, "file:message-01.md");
   });
 });
+
+describe("resolveFileSource: only a LOCKED outreach message is a legal /atomize source", () => {
+  test("refuses a draft (not-yet-reviewed) outreach message", () => {
+    const raw =
+      "---\nlead: client-posthog\nchannel: email\nevidence: [E1]\nclassification: greenfield\nstatus: draft\n---\n\nHi there.\n";
+    assert.throws(
+      () => resolveFileSource("outreach/leads/client-posthog/messages/message-01.md", raw),
+      /not locked|status is "draft"/,
+    );
+  });
+
+  test("accepts a locked outreach message", () => {
+    const raw =
+      "---\nlead: client-posthog\nchannel: email\nevidence: [E1]\nclassification: greenfield\nstatus: locked\nlocked_at: 2026-07-10\n---\n\nHi there.\n";
+    const out = resolveFileSource("outreach/leads/client-posthog/messages/message-01.md", raw);
+    assert.equal(out.sourceKind, "outreach-message");
+  });
+});
