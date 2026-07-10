@@ -188,13 +188,17 @@ test("scheduleKind routes each row type to the publisher that owns its filter", 
   assert.equal(scheduleKind(row({ platform: "substack", format: "text" })), "substack");
   // a row no scheduler owns just gets the plain approve status (e.g. the storyboard row)
   assert.equal(scheduleKind(row({ platform: "video-script", format: "storyboard" })), null);
+  // Outreach Phase 2: Approve on an outreach-message row means LOCK, never a real scheduler —
+  // routed by format (fixed), not platform (the channel: email|linkedin-dm|contact-form|podcast-pitch).
+  assert.equal(scheduleKind(row({ platform: "email", format: "outreach-message" })), "outreach-lock");
+  assert.equal(scheduleKind(row({ platform: "podcast-pitch", format: "outreach-message" })), "outreach-lock");
 });
 
 // Stub deps: record which publisher fired + return a marker so we can assert the row's scheduled
 // info came back. Any dep NOT overridden throws if called, proving routing hit exactly one path.
 function stubDeps(): { deps: SchedulerDeps; calls: Record<string, { folder: string; onlyIds?: string[] }[]> } {
   const calls: Record<string, { folder: string; onlyIds?: string[] }[]> = {
-    publishText: [], publishCards: [], publishTikTok: [], publishShorts: [], publishSubstack: [],
+    publishText: [], publishCards: [], publishTikTok: [], publishShorts: [], publishSubstack: [], lockOutreachMessage: [],
   };
   const rec = (name: string) => async (folder: string, opts?: { onlyIds?: string[] }) => {
     calls[name].push({ folder, onlyIds: opts?.onlyIds });
@@ -208,6 +212,7 @@ function stubDeps(): { deps: SchedulerDeps; calls: Record<string, { folder: stri
       publishTikTok: rec("publishTikTok"),
       publishShorts: rec("publishShorts"),
       publishSubstack: rec("publishSubstack"),
+      lockOutreachMessage: rec("lockOutreachMessage"),
     },
   };
 }
@@ -286,9 +291,42 @@ test("scheduleApproved does nothing for a row no scheduler owns", async () => {
       calls.publishCards.length +
       calls.publishTikTok.length +
       calls.publishShorts.length +
-      calls.publishSubstack.length,
+      calls.publishSubstack.length +
+      calls.lockOutreachMessage.length,
     0,
   );
+});
+
+// Outreach Phase 2, GUI approve-equals-lock semantics: approving an outreach-message row must
+// call lock.ts (via deps.lockOutreachMessage) and NEVER any real scheduler/publisher — CLAUDE.md
+// rule 2 analog, there is no send path. Same dispatch/injection pattern as every publisher above.
+test("scheduleApproved locks an OUTREACH-MESSAGE row via lockOutreachMessage only, never a real publisher", async () => {
+  const { deps, calls } = stubDeps();
+  const out = await scheduleApproved(
+    "/outreach/leads/client-acme-co",
+    row({ id: "message-01", platform: "email", format: "outreach-message" }),
+    deps,
+  );
+  assert.deepEqual(out, { scheduled: { scheduledBy: "lockOutreachMessage" }, scheduleError: null });
+  assert.deepEqual(calls.lockOutreachMessage, [{ folder: "/outreach/leads/client-acme-co", onlyIds: ["message-01"] }]);
+  assert.equal(
+    calls.publishText.length + calls.publishCards.length + calls.publishTikTok.length + calls.publishShorts.length + calls.publishSubstack.length,
+    0,
+  );
+});
+
+test("scheduleApproved surfaces a scheduleError (row stays approve) when locking fails validation", async () => {
+  const { deps } = stubDeps();
+  deps.lockOutreachMessage = async () => {
+    throw new Error("refusing to lock message-01.md, fails the two-sided guard");
+  };
+  const out = await scheduleApproved(
+    "/outreach/leads/client-acme-co",
+    row({ id: "message-01", platform: "email", format: "outreach-message" }),
+    deps,
+  );
+  assert.equal(out.scheduled, null);
+  assert.match(out.scheduleError ?? "", /two-sided guard/);
 });
 
 // A publisher can skip a row WITHOUT throwing (the reuse guard, or cards.ts finding no connected

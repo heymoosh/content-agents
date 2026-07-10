@@ -32,6 +32,7 @@ import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import { listLeads } from "../outreach/status.js";
+import { lockOutreachMessageRow } from "../outreach/lock.js";
 import {
   enrich,
   listPieces,
@@ -88,15 +89,20 @@ const IS_DEV_WORKTREE = repoRoot.includes("/.claude/worktrees/");
 //   tiktok                                               → tiktok.ts  (publishTikTok → scheduleToTikTok)
 //   YouTube Short (platform youtube OR format short)     → youtube.ts (publishShorts)
 //   substack                                             → substack.ts (publishSubstack)
+//   outreach-message (any channel)                       → outreach/lock.ts (lockOutreachMessageRow)
+//     -- NOT a scheduler at all (CLAUDE.md rule 2 analog): Approve on this row kind means LOCK,
+//     never send/schedule anything. Routed by FORMAT (fixed), not platform, since platform here is
+//     the outreach channel (email/linkedin-dm/contact-form/podcast-pitch), not a real destination.
 // Returns null for a row no scheduler owns — it just gets the plain approve status (CLAUDE.md rule 2
 // is preserved: the row was already set to approve; scheduling only mirrors what /publish would do).
-export type ScheduleKind = "text" | "card" | "tiktok" | "video" | "substack";
+export type ScheduleKind = "text" | "card" | "tiktok" | "video" | "substack" | "outreach-lock";
 export function scheduleKind(row: QueueRow): ScheduleKind | null {
   if (TEXT_PLATFORMS.has(row.platform)) return "text";
   if (isQuoteCardRow(row.platform)) return "card";
   if (isTikTokRow(row.platform)) return "tiktok"; // checked before "video" — a tiktok row is also a short
   if (isShortRow(row.platform, row.format)) return "video";
   if (isSubstackRow(row.platform)) return "substack";
+  if (row.format === "outreach-message") return "outreach-lock";
   return null;
 }
 
@@ -108,6 +114,7 @@ export interface SchedulerDeps {
   publishTikTok: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
   publishShorts: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
   publishSubstack: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+  lockOutreachMessage: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
 }
 const DEFAULT_SCHEDULER_DEPS: SchedulerDeps = {
   publishText,
@@ -115,6 +122,7 @@ const DEFAULT_SCHEDULER_DEPS: SchedulerDeps = {
   publishTikTok,
   publishShorts,
   publishSubstack,
+  lockOutreachMessage: lockOutreachMessageRow,
 };
 
 // Rows (keyed `${slug}/${id}`) currently mid-schedule — see the in-flight guard in the /api/status
@@ -143,6 +151,7 @@ export async function scheduleApproved(
     : kind === "card" ? deps.publishCards
     : kind === "tiktok" ? deps.publishTikTok
     : kind === "substack" ? deps.publishSubstack
+    : kind === "outreach-lock" ? deps.lockOutreachMessage
     : deps.publishShorts;
   try {
     const done = await fn(folder, { onlyIds: [row.id] });

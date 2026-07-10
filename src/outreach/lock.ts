@@ -5,6 +5,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { setFrontmatterField, parseEvidence } from "./qualify.js";
 import { checkMessageShape } from "./validate.js";
+import { writeCell } from "../publish/queue.js";
 
 // outreach:lock: stage 8 LOCK (docs/outreach-engine-plan.md §5/§6 Phase 2). Approved -> locked --
 // Muxin approving an outreach-message row in the review GUI calls this (src/review/serve.ts's
@@ -87,7 +88,10 @@ export function runLock(messageFileArg: string): LockResult {
 // outreach/leads/client-acme-co); onlyIds is the one message id being approved (e.g.
 // ["message-01"]), mirroring how every other publisher in that dispatch is scoped to one row per
 // approve-click. Returns [] (the same "nothing to do" shape other publishers use) when no id is
-// given, rather than throwing.
+// given, rather than throwing. Also flips the review-queue.md row's own status to "locked" --
+// the same "the publisher writes back its own terminal status" convention typefully.ts's
+// publishText follows (setStatus(folder, row, "published")) -- so the row never reads as a
+// stale "approve" once it's actually locked.
 export async function lockOutreachMessageRow(
   folder: string,
   opts: { onlyIds?: string[] } = {},
@@ -95,7 +99,9 @@ export async function lockOutreachMessageRow(
   const id = opts.onlyIds?.[0];
   if (!id) return [];
   const messageFile = join(folder, "messages", `${id}.md`);
-  return [runLock(messageFile)];
+  const result = runLock(messageFile);
+  writeCell(folder, id, { status: "locked" });
+  return [result];
 }
 
 function main() {

@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync, existsSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { readQueue } from "../publish/queue.js";
 import { runLock, lockOutreachMessageRow } from "./lock.js";
 
 const LEAD_BODY = [
@@ -49,7 +50,9 @@ function makeLeadWithMessage(messageFmOverrides: Record<string, string> = {}): {
   writeFileSync(join(leadDir, "lead.md"), `${LEAD_HEADER}\n\n${LEAD_BODY}\n`);
   writeFileSync(
     join(leadDir, "review-queue.md"),
-    "# Outreach review queue -- Acme Co\n\n| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|----|----|----|----|----|----|----|----|----|----|\n",
+    "# Outreach review queue -- Acme Co\n\n| id | platform | format | asset | native | brand | cta | status | notes | origin |\n" +
+      "|----|----|----|----|----|----|----|----|----|----|\n" +
+      "| message-01 | email | outreach-message | messages/message-01.md | — | — | — | approve |  | from /outreach draft |\n",
   );
   mkdirSync(join(leadDir, "messages"), { recursive: true });
   const fm: Record<string, string> = {
@@ -175,6 +178,17 @@ describe("lockOutreachMessageRow: GUI approve-equals-lock adapter", () => {
     try {
       const results = await lockOutreachMessageRow(leadDir, {});
       assert.deepEqual(results, []);
+    } finally {
+      rmSync(leadDir, { recursive: true, force: true });
+    }
+  });
+
+  test("flips the review-queue.md row's own status to locked, mirroring how every other publisher writes back its terminal status", async () => {
+    const { leadDir } = makeLeadWithMessage();
+    try {
+      await lockOutreachMessageRow(leadDir, { onlyIds: ["message-01"] });
+      const { rows } = readQueue(leadDir);
+      assert.equal(rows.find((r) => r.id === "message-01")?.status, "locked");
     } finally {
       rmSync(leadDir, { recursive: true, force: true });
     }

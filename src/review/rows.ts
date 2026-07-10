@@ -19,13 +19,18 @@ import {
 } from "./reconcile.js";
 
 export const CONTENT = join(repoRoot, "content");
+// Outreach Phase 2 (docs/outreach-engine-plan.md §6): a lead's review-queue.md row surfaces in
+// this SAME Review tab, not a second one — a second discovery root, not a second parser.
+export const OUTREACH_LEADS = join(repoRoot, "outreach", "leads");
 
 // A row is "decided" once it's out of the review inbox. Everything else needs Muxin's eyes.
-const DECIDED = new Set(["published", "discard"]);
+// "locked" (an outreach-message row's terminal state — see lock.ts) counts as decided too: it's
+// not still awaiting Muxin, just like "published"/"discard".
+const DECIDED = new Set(["published", "discard", "locked"]);
 export const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 export const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
 
-type Kind = "text" | "image" | "video" | "storyboard" | "unknown";
+type Kind = "text" | "image" | "video" | "storyboard" | "outreach-message" | "unknown";
 
 interface EnrichedRow extends QueueRow {
   kind: Kind;
@@ -58,19 +63,23 @@ export interface Piece {
   pending: number;
 }
 
-// Resolve a slug to its content folder, refusing anything that isn't a real review-queue folder
-// (defends the write/asset endpoints against path traversal on a slug from the client).
+// Resolve a slug to its folder, refusing anything that isn't a real review-queue folder (defends
+// the write/asset endpoints against path traversal on a slug from the client). Checks CONTENT
+// first (the common case), then OUTREACH_LEADS — collision is a non-issue in practice (content
+// slugs are date-prefixed, outreach lead slugs are kind-prefixed, e.g. "client-acme-co").
 export function safeFolder(slug: string): string {
   if (!slug || slug.includes("/") || slug.includes("..")) throw new Error("bad slug");
-  const folder = join(CONTENT, slug);
-  if (!existsSync(join(folder, "review-queue.md"))) throw new Error("no such queue");
-  return folder;
+  const contentFolder = join(CONTENT, slug);
+  if (existsSync(join(contentFolder, "review-queue.md"))) return contentFolder;
+  const outreachFolder = join(OUTREACH_LEADS, slug);
+  if (existsSync(join(outreachFolder, "review-queue.md"))) return outreachFolder;
+  throw new Error("no such queue");
 }
 
 function firstHeading(folder: string): string {
   try {
     const m = readFileSync(join(folder, "review-queue.md"), "utf8").match(/^#\s+(.+)$/m);
-    if (m) return m[1].replace(/^Review queue\s*[—-]\s*/i, "").trim();
+    if (m) return m[1].replace(/^(?:Outreach review queue|Review queue)\s*[—-]\s*/i, "").trim();
   } catch {
     /* fall through to slug */
   }
@@ -157,6 +166,7 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
   else if (row.format === "image") kind = "image";
   else if (row.format === "video") kind = "video";
   else if (row.format === "storyboard") kind = "storyboard";
+  else if (row.format === "outreach-message") kind = "outreach-message";
 
   // "Ask Claude" (revisable) and "Duplicate to platform" (duplicatable, below) both run jobs.ts
   // prompts that tell Claude the body must "stay traceable to Muxin's source at
@@ -191,7 +201,7 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     return true;
   };
 
-  if ((kind === "text" || kind === "video") && asset.endsWith(".md")) {
+  if ((kind === "text" || kind === "video" || kind === "outreach-message") && asset.endsWith(".md")) {
     if (loadMd(asset)) {
       out.hasAsset = true;
       out.editable = kind === "text"; // text derivatives are safe to edit-in-place
@@ -278,19 +288,27 @@ export function getLiveStateAsOf(): number | null {
   return liveStateAsOf;
 }
 
-export async function listPieces(): Promise<Piece[]> {
-  let dirs: string[] = [];
+// Every folder directly under `root` that carries its own review-queue.md — the one discovery
+// rule shared by CONTENT (content/<slug>/) and OUTREACH_LEADS (outreach/leads/<kind>-<slug>/), so
+// picking up outreach leads is a second root scanned the same way, not a second parser.
+function listRootFolders(root: string): string[] {
   try {
-    dirs = readdirSync(CONTENT, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && existsSync(join(CONTENT, d.name, "review-queue.md")))
+    return readdirSync(root, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && existsSync(join(root, d.name, "review-queue.md")))
       .map((d) => d.name);
   } catch {
-    dirs = [];
+    return [];
   }
+}
+
+export async function listPieces(): Promise<Piece[]> {
+  const dirs = [
+    ...listRootFolders(CONTENT).map((slug) => ({ slug, folder: join(CONTENT, slug) })),
+    ...listRootFolders(OUTREACH_LEADS).map((slug) => ({ slug, folder: join(OUTREACH_LEADS, slug) })),
+  ];
   // Read every folder's rows up front (sync, no network) so a live Typefully/PostPeer fetch only
   // happens when there's actually an approved row somewhere to reconcile.
-  const folderRows = dirs.map((slug) => {
-    const folder = join(CONTENT, slug);
+  const folderRows = dirs.map(({ slug, folder }) => {
     return { slug, folder, rows: readQueueCached(folder) };
   });
   const anyNeedsReconcile = folderRows.some(({ rows }) => rows.some(needsReconciliation));
