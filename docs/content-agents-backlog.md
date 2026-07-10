@@ -216,6 +216,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer, access-path (paid API vs DM/notification scraping) not chosen, not worth building unattended tonight.
 - GROOMED: clear scope (X mentions/replies/DMs), no blocking unknown + 2026-07-10
+- PARKED: Muxin deferred (2026-07-09 pre-flight): X access-path (paid API vs browser scraping) not chosen
 <!-- card-id: ec217518-9bc8-4ccd-ab37-3eecb78a0406 -->
 
 **Inbound listening: LinkedIn (mentions/comments/DMs)**
@@ -237,6 +238,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer; also still blocked, db22283f (the pattern this mirrors) is In Progress, not Done.
 - GROOMED: clear scope (Substack comment replies), no blocking unknown + 2026-07-10
+- PARKED: Muxin deferred (2026-07-09 pre-flight): agreed defer on Substack comment-reply listening
 <!-- card-id: 81808fa0-7e30-4fd1-9b61-03951b0041bc -->
 
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
@@ -307,6 +309,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
+- PARKED: SAFETY HOLD (conductor, 2026-07-10): heymoosh/content-agents is a PUBLIC repo. This card ingests Muxin private Obsidian vault notes (named-individual interview notes/deep profiles, e.g. Boris Cherny, Cat Wu, Ivan Zhao, plus a 66-person contact roster) + JSA manual_research.db into committed anchors.md entries + lead.md folders. The DECISION: hold on this card gates MERGE for review, but pushing a build branch to origin already makes that content publicly visible via the draft PR diff, before any review happens -- rule 7s hold-for-review posture does not cover this. Needs an explicit call from Muxin: ok to push named-individual notes to a public repo (even as a held draft), or should this build redact/anonymize, target a private repo, or route around git entirely (e.g. a local-only anchors file)? Not building until she answers.
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Port cost-minimization policy to claude-config/simple-kanban conductor lane**
@@ -314,16 +317,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: To Do
 - DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): mirror the a1a6f379 cost-minimization fix into the claude-config/simple-kanban conductor lane, low-risk mirrored change.
 - GROOMED: clear pointer to a1a6f379's fix to port to claude-config lane + 2026-07-10
+- PARKED: INFRA PREREQUISITE (conductor, 2026-07-10): this card DECISION names claude-config/~/.claude as the actual build target (per ~/.claude/CLAUDE.md Conductor rules for claude-config), which needs a session launched with --add-dir ~/.claude --add-dir ~/.claude-worktrees. This content-agents session was not launched that way -- confirmed no write access to ~/.claude (touch: Operation not permitted). Needs a session launched into the claude-config lane specifically to build this, not this content-agents conductor run.
 <!-- card-id: 3ddcc3c3-8226-4778-824e-21dd199bde75 -->
-
-**Clarify which flow produces platform:substack rows in review-queue.md**
-- Follow-up from Substack publishing automation (card 83f60f12, PR #164). config/routing.yaml and config/platforms.yaml comments state Substack is a source channel (analytics pull), not an atomize routing target, but src/publish/substack.ts now consumes review-queue.md rows with platform: substack.
-- Look at the /atomize notes flow to find (or build) the actual path that queues those rows, so the new publish automation has real input to act on.
-- CHAIN: depth 1 (follow-up of 83f60f12)
-- STATUS: To Do
-- DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): Substack IS an atomize routing target now via the Notes flow. Update config/routing.yaml + config/platforms.yaml comments to reflect Substack as both a source AND a target.
-- GROOMED: clear diagnostic task, no blocking unknown + 2026-07-10
-<!-- card-id: a52927cd-5d00-41d8-82a6-9febf59e5394 -->
 
 **Bakeoff whisper.cpp vs Gemini on a real Muxin voice memo**
 - CHAIN: depth 1 (follow-up to b1327a9c-3ffc-41df-a822-0c1e85458a1e, whisper.cpp adapter + bakeoff script). Run npm run bakeoff:transcription -- data/inbox/<memo-file> once a real voice memo exists, read both transcripts against what was actually said, and decide whether to flip config/providers.yaml transcription: from gemini to whispercpp. See docs/bakeoffs/whispercpp-vs-gemini-transcription.md OPEN section. PARKED: needs Muxin to physically drop a real voice memo in data/inbox/ (gitignored) before this can run; no synthetic clip can answer the real question. Surface via morning summary, not a live ask.
@@ -354,6 +349,25 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: dc47457f-a6b7-49fe-b48d-838b41fc7657 -->
+
+**Build the actual Substack Notes repost path (route.ts target + skill-doc fix)**
+- ORIGIN: follow-up auto-filed while building card a52927cd (Clarify which flow produces platform:substack rows), found while tracing the routing comment fix.
+- Real gap, not just stale comments: no code path today actually produces a platform: substack review-queue row. src/strategy/route.ts CORE_TEXT (the pillar routers target list) never includes 'substack'. Two project skill docs explicitly say the OPPOSITE of Muxins 2026-07-10 decision: .claude/skills/atomize/references/notes-mode.md step 3 tells Claude 'Substack is already excluded as a routing target, so a note is never reposted back to where it came from'; .claude/skills/atomize/references/spin-mode.md (lines ~12-13) repeats the same stale reserved-not-a-target claim.
+- src/publish/substack.ts (PR #164, already merged) is fully wired and works once a row exists -- this card is the missing producer side, plus fixing the two stale skill docs (writes under .claude/skills/ need an attended/interactive session, same constraint cards ebe652a7 and cccfc43a hit).
+- GOAL_CONDITION: running /atomize notes on a real Substack Note produces a review-queue.md row with platform: substack when appropriate (conditioned on source_kind: substack-note, per the plan), and .claude/skills/atomize/references/notes-mode.md + spin-mode.md no longer say Substack is excluded as a target.
+- RULE 7: this is src/strategy/route.ts routing-decision logic (which platforms a piece is atomized to) -- content-generation-adjacent logic per CLAUDE.md rule 7. This PR should HOLD for Muxins review.
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
+
+**Clarify which flow produces platform:substack rows in review-queue.md**
+- Follow-up from Substack publishing automation (card 83f60f12, PR #164). config/routing.yaml and config/platforms.yaml comments state Substack is a source channel (analytics pull), not an atomize routing target, but src/publish/substack.ts now consumes review-queue.md rows with platform: substack.
+- Look at the /atomize notes flow to find (or build) the actual path that queues those rows, so the new publish automation has real input to act on.
+- CHAIN: depth 1 (follow-up of 83f60f12)
+- STATUS: Done
+- DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): Substack IS an atomize routing target now via the Notes flow. Update config/routing.yaml + config/platforms.yaml comments to reflect Substack as both a source AND a target.
+- GROOMED: clear diagnostic task, no blocking unknown + 2026-07-10
+<!-- card-id: a52927cd-5d00-41d8-82a6-9febf59e5394 -->
 
 **Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
 - config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
