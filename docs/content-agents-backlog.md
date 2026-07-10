@@ -32,10 +32,11 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - Treat native social (X/LinkedIn/Bluesky) as inbound funnels; Substack is home. Borrowed audiences drive new people toward Substack.
 - Action seed: maintain a target list of podcasts / newsletters / platforms + a pitch angle aligned to the per-channel positioning card.
 - PLAN POINTER (2026-07-08): the target list this card wants is produced by the fit-finder engine's Phase 3 (platform config + `outreach:status --targets` summary surfaced in the weekly brief) — see docs/outreach-engine-plan.md §6. This card stays a strategy note; it needs no build of its own.
-- STATUS: To Do
+- STATUS: Backlog
 - DEPENDS ON: Outreach engine — Phase 3: platform config + borrowed-audience target list
 - DECISION: defer — stays in Backlog, not now (Muxin, 2026-07-04). Target-list mechanics now covered by docs/outreach-engine-plan.md Phase 3 (2026-07-08).
 - GROOMED: clear outcome, points at surface area, no blocking unknown + 2026-07-10
+- PARKED: conductor mis-claimed 2026-07-10: card carries DECISION defer + own text says no build needed (Phase 3 dependency already Done satisfies the strategy note); reverted to Backlog, not a real build task
 <!-- card-id: 30772ba1-3c4a-4823-85ad-3a79788ed867 -->
 
 **Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach**
@@ -161,10 +162,11 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - THIS IS THE 'FINDING JOBS/COMPANIES' TOUCHPOINT IN THIS REPO: this repo does NOT build a jobs/companies finder -- Muxin's separate Job Search Agent (JSA, external repo) already sources/scores candidate companies. The only jobs/companies-related build here is this tab's jobsearch bucket, tracking JSA's leads read-only.
 - GOAL_CONDITION (plan §6 Phase 4 definition of done): Follow-ups tab renders all 4 buckets (client/platform/inbound/jobsearch) from tracker.jsonl with correct due-date/next-action per row; jobsearch bucket populated from a read-only pull of JSA's manual_research.db. Inbound bucket ships schema-ready but empty until db22283f (Inbound listening, currently In Progress) lands -- not a blocking dependency.
 - RULE 7: this is GUI/state plumbing, NOT content-generation logic -> auto-merges on green CI (plan §6).
-- STATUS: To Do
+- STATUS: In Progress
 - DEPENDS ON: Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse
 - DECISION: approved — card body itself states this is GUI/state plumbing, not content-generation logic; auto-merges on green CI per plan doc
 - GROOMED: split from 659b50f0 per plan §6 Phase 4; explicit GOAL_CONDITION, GUI/state plumbing (auto-merge lane), DEPENDS ON Phase 2 + 2026-07-09
+- LANE: b
 <!-- card-id: 21a5eb84-d78c-4aca-9672-6500875a3e88 -->
 
 **Outreach engine — Phase 5: discovery + batch hardening (client + platform)**
@@ -250,6 +252,23 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: Backlog
 <!-- card-id: 4e2e83f3-cd4f-438a-a5a1-15912c1f4f6f -->
 
+**Update per-channel spin angles: LinkedIn to case-study/client-conversion format, X to technical-but-still-outside-the-bubble**
+- ORIGIN: 2026-07-10 conversation with Muxin reviewing per-platform positioning (`config/platforms.yaml` `spin_angles`).
+- WHY: LinkedIn's diagnosis-of-world register reads as "interesting worldview," not "hire me for this." Muxin confirmed the ick she'd flagged about consulting-flavored content is about the FORMAT (essay-as-thesis), not consulting itself — without a concrete conversion hook there is no path to sales.
+- LINKEDIN SCOPE: rewrite `spin_angles.linkedin`'s angle text (and the spin-mode.md guidance it drives) toward a case-first structure: (1) open on a real anonymized situation, not a category ("A team building an onboarding flow was convinced churn was a UX problem"); (2) name the assumption found, in the team's own words, not Muxin's; (3) say what happened when it got tested and what it cost to have missed it; (4) the one-line zoom-out to the broader pattern comes LAST, as the closer, not the headline; (5) end with a soft signal of availability (what she'd look for scoping this kind of engagement) instead of a hard ask — a proof-of-work sample, not a thesis. Reader-reaction target: "I have that exact blind spot," not "interesting way to see the world."
+  - Two source paths, resolved at build time by checking what material exists: (a) if an essay already contains a real concrete example, spin's existing rehook latitude (lead with strongest line, reorder for arc — spin-mode.md) restructures it without inventing anything; (b) if the case isn't written up anywhere, it needs a short case note as new atomize source material. Either path lands in the existing `case_study`/`product_builder_insight` content types (`config/content-types.yaml`), which already carry "Connect on LinkedIn" CTA scaffolding — no new plumbing needed there.
+- X SCOPE: sharpen `spin_angles.x`'s angle text to read as more technically grounded (real technical specifics, not surface-level), while explicitly preserving the outsider framing — Muxin does NOT want X to read as belonging only inside the tech-circle bubble. A wording tightening of the existing angle, not a flip to an insider/builder voice.
+- RULE 7: both are content-generation logic (per-channel angle/spin config driving what future runs generate) — build holds as a draft PR with an old-vs-new sample post per platform so Muxin sees the actual delta before merge, per CLAUDE.md rule 7's conductor mechanics.
+- GOAL_CONDITION: `spin_angles.linkedin` reflects the case-first structure above (verified against a real or representative essay run, before/after sample in the PR); `spin_angles.x` reads technically sharper without reading insider-exclusive (verified against a real or representative sample); spin-mode.md guidance updated to match both.
+PR: https://github.com/heymoosh/content-agents/pull/185
+SHIP: held
+- STATUS: Review
+- DECISION: approved (Muxin, 2026-07-10) — LinkedIn case-study reframe confirmed; X clarified as technical-but-still-outside-the-bubble, not a flip to insider voice.
+- GROOMED: explicit structural spec for LinkedIn, explicit direction for X, both map onto existing scaffolding (spin_angles, case_study/product_builder_insight CTA types, existing rehook latitude) — no blocking unknown; PR will hold for review per rule 7 since this is content-generation logic + 2026-07-10
+- CI NOTE: CI: pending (as of 2026-07-10T21:29Z)
+- LANE: a
+<!-- card-id: c42769b1-fdf4-4a78-a888-d21ea9a8ef2d -->
+
 **Content agent: find platforms to appear on (podcasts, channels, newsletters)**
 - A content/research agent that finds OTHER people's platforms that are a strong fit for Muxin to talk about her work — podcasts, channels, newsletters, anyone with an audience and a real overlap, whether the hook is her essays (AI & society / fairness) or her product/build work.
 - The agent: build a fit profile (topic overlap + audience + values), then source + qualify candidate platforms/hosts and surface them with a suggested pitch angle for her review.
@@ -319,11 +338,11 @@ CARD TYPE: EPIC
 EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased why-this-anchor basis + source paths are OK to commit, now that the repo is private. Build as originally scoped.
 PR: https://github.com/heymoosh/content-agents/pull/181
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Outreach engine — Phase 3: platform config + borrowed-audience target list**
@@ -336,11 +355,11 @@ SHIP: held
 - DEPENDENCY NOTE (2026-07-09, Muxin): Phase 3 only needs Phase 1's qualify.ts + lead.md schema, not Phase 2's draft/lock; was over-conservatively pointed at Phase 2. Unblocks Phase 2 (message quality) and Phase 3 (platform-list quality) to build/review independently once Phase 1 lands.
 PR: https://github.com/heymoosh/content-agents/pull/177
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (platform qualify/pitch-angle prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from b7dcb608 per plan §6 Phase 3; explicit GOAL_CONDITION (also satisfies 30772ba1), DEPENDS ON Phase 2 + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 <!-- card-id: 6590efec-54ca-4288-9cf7-5e69e034477d -->
 
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
@@ -354,11 +373,11 @@ SHIP: held
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
 PR: https://github.com/heymoosh/content-agents/pull/171
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 <!-- card-id: d5b34590-4354-49f1-952f-3faaf1ce7d4a -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
