@@ -200,16 +200,6 @@ CARD TYPE: EPIC
 - PARKED: data not ready: card needs n>=20 scored derivatives across >=3 distinct source pieces; repo currently has only 6, all from one source (2026-07-05-hey-substack) - same state as the original validation. Building now would just reproduce that finding. Re-check once more /atomize runs across different essays accumulate scored derivatives.
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
 
-**duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
-- - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions), found during the review stage's code-review pass.
-- src/review/jobs.ts duplicateToPlatform() (~591-603) only checks the target derivative path does not already exist AFTER the claude subprocess runs. A stray out-of-band file sitting at that exact computed id could be silently overwritten by the subprocess's write.
-- Judged low-severity/speculative at review time (the id is freshly computed via nextDerivativeId(), so a collision needs an unrelated file to already occupy that exact future id) -- not fixed inline, flagged for a real look later.
-- GOAL_CONDITION: duplicateToPlatform() checks for an existing file at the target path BEFORE invoking the claude subprocess (not just after), and a test proves it refuses to overwrite instead of silently clobbering.
-- CHAIN: 1
-- STATUS: To Do
-- GROOMED: well-specified bugfix follow-up on the just-shipped duplicateToPlatform(), explicit GOAL_CONDITION + test requirement + 2026-07-08
-<!-- card-id: d1ebdd71-ba9f-4fd3-9aa2-f9cbbd4726d3 -->
-
 **Update .claude/skills/publish + atomize SKILL.md for the Typefully card rewire**
 - ORIGIN: follow-up auto-filed while building card 1829fdf9 (Phase 4: quote cards via Typefully).
 The /publish and /atomize skill docs (.claude/skills/publish/SKILL.md, .claude/skills/atomize/SKILL.md) still describe the retired PostPeer/Upload-Post image_post provider flow for quote cards. The delegated build/review workers could not edit them (writes under .claude/skills/ require interactive permission not available to a headless worker). Update them to describe native Typefully image posts for quote cards on X/LinkedIn/Bluesky, matching the config/cta.yaml, config/providers.yaml, .env.example, and CLAUDE.md rule 3 updates already made in PR for card 1829fdf9.
@@ -247,6 +237,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - CHAIN: 1
 - STATUS: To Do
 - DEPENDS ON: Smarter routing
+- DECISION: approved — pure refactor unifying duplicated fallback logic, existing tests must still pass unmodified
 - GROOMED: explicit GOAL_CONDITION + exact files/tests named; backend dedup, CHAIN:1, dependency (Smarter routing) now Done + 2026-07-08
 <!-- card-id: e889e512-92fb-40dd-9669-fdcb51c6be11 -->
 
@@ -293,6 +284,7 @@ JSA VALUES-DEPTH FINDING (closes the SS2c UNVERIFIED flag, verified in code 2026
 
 TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach pursue without BOTH (a) company-level worldview qualification (quote-required per SS9f) AND (b) a named, evidenced like-minded person there (founder-deep-dive-style, extended beyond founders; Muxin's last job proves person-fit and company-fit diverge). Person-high/company-low still has value: record that person as an anchor in config/outreach/anchors.md (networking + future-referral node) even when the company is passed. Client<->employer conversion is expected: a lead's kind/bucket may change without losing its evidence and decision history. Rationale is strategic, not just preference: aligned people/orgs refer into more aligned work; misaligned ones refer into their own network.
 - STATUS: To Do
+- DECISION: hold — card body itself states Rule 7 applies (research/qualify prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from ba9769af per docs/outreach-engine-plan.md §6 Phase 1; explicit GOAL_CONDITION, seed-blocker resolved via --from-jsa pull, plan RATIFIED 2026-07-08 + 2026-07-09
 <!-- card-id: 8e8b616e-ba97-4421-8fed-978128e0b94b -->
 
@@ -307,6 +299,7 @@ TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
 - STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
+- DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
 <!-- card-id: d5b34590-4354-49f1-952f-3faaf1ce7d4a -->
 
@@ -319,6 +312,7 @@ TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach
 - RULE 7: platform qualify/pitch-angle prompts are content-generation logic -> this PR HOLDS for Muxin's review.
 - STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads) -- corrected 2026-07-09 (Muxin): Phase 3 only needs Phase 1s qualify.ts + lead.md schema, not Phase 2s draft/lock; was over-conservatively pointed at Phase 2. Unblocks Phase 2 (message quality) and Phase 3 (platform-list quality) to build/review independently once Phase 1 lands.
+- DECISION: hold — card body itself states Rule 7 applies (platform qualify/pitch-angle prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from b7dcb608 per plan §6 Phase 3; explicit GOAL_CONDITION (also satisfies 30772ba1), DEPENDS ON Phase 2 + 2026-07-09
 <!-- card-id: 6590efec-54ca-4288-9cf7-5e69e034477d -->
 
@@ -331,6 +325,7 @@ TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach
 - RULE 7: this is GUI/state plumbing, NOT content-generation logic -> auto-merges on green CI (plan §6).
 - STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse
+- DECISION: approved — card body itself states this is GUI/state plumbing, not content-generation logic; auto-merges on green CI per plan doc
 - GROOMED: split from 659b50f0 per plan §6 Phase 4; explicit GOAL_CONDITION, GUI/state plumbing (auto-merge lane), DEPENDS ON Phase 2 + 2026-07-09
 <!-- card-id: 21a5eb84-d78c-4aca-9672-6500875a3e88 -->
 
@@ -356,8 +351,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - GOAL_CONDITION: config/outreach/anchors.md contains >=20 anchor entries, each with a why-this-anchor evidence line and a source path into the vault or JSA DB; lead folders exist for at least the 5 deep-researched vault companies with source: ingested and populated ## Evidence sections; the run touches the vault and manual_research.db read-only (no writes outside this repo).
 - STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
+- DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
-- PARKED: needs Muxin call: this populates a committed config file with judgment calls characterizing real named people from her private notes, and unlike its sibling outreach cards it has no Rule-7 PR-hold, so it would merge unreviewed - want a human look first
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Outreach engine — Phase 0: discovery spike (JSA_DB_PATH + seed list)**
@@ -388,14 +383,27 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 **Fix test pollution of briefs/bets.md (npm test writes to real file, not a tmp fixture)**
 - Found while reviewing card a1a6f379: running npm test in a content-agents worktree can pollute briefs/bets.md with real test-run rows due to a pre-existing test-isolation bug (some test under src/publish/cards.ts writes to the actual file instead of a tmp fixture). ORIGIN: follow-up from a1a6f379.
 - STATUS: To Do
+- DECISION: approved — pure test-isolation bugfix, no prod mutation, no judgment call
 - GROOMED: clear scoped bug: src/publish/cards.ts test writes to real bets.md + 2026-07-10
 <!-- card-id: aab1eec7-b913-46d9-8475-e3cc81533109 -->
 
 **Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
 - config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
 - STATUS: To Do
+- DECISION: approved — self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it
 - GROOMED: clear bakeoff scope: whisper.cpp vs Gemini, headless-executable + 2026-07-10
 <!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
+
+**duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
+- - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions), found during the review stage's code-review pass.
+- src/review/jobs.ts duplicateToPlatform() (~591-603) only checks the target derivative path does not already exist AFTER the claude subprocess runs. A stray out-of-band file sitting at that exact computed id could be silently overwritten by the subprocess's write.
+- Judged low-severity/speculative at review time (the id is freshly computed via nextDerivativeId(), so a collision needs an unrelated file to already occupy that exact future id) -- not fixed inline, flagged for a real look later.
+- GOAL_CONDITION: duplicateToPlatform() checks for an existing file at the target path BEFORE invoking the claude subprocess (not just after), and a test proves it refuses to overwrite instead of silently clobbering.
+- CHAIN: 1
+- STATUS: Done
+- DECISION: approved — pure code fix (path-existence check before subprocess write), no judgment call, low risk
+- GROOMED: well-specified bugfix follow-up on the just-shipped duplicateToPlatform(), explicit GOAL_CONDITION + test requirement + 2026-07-08
+<!-- card-id: d1ebdd71-ba9f-4fd3-9aa2-f9cbbd4726d3 -->
 
 **Unify the 6 duplicated Claude-job error-decoding blocks in src/review/jobs.ts + serve.ts**
 - - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions).
