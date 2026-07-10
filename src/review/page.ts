@@ -194,6 +194,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <button class="tab" data-tab="review">Review <span class="count" id="count">0</span></button>
     <button class="tab" data-tab="strategy">Analytics</button>
     <button class="tab" data-tab="outreach">Outreach</button>
+    <button class="tab" data-tab="followups">Follow-ups</button>
   </nav>
   <span class="grow"></span>
   <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
@@ -272,6 +273,15 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <span class="hint">Read-only (Phase 1 has no send path, nothing here contacts anyone). Add/research/qualify leads from the terminal: <code>/outreach add</code>, then <code>npm run outreach:research -- outreach/leads/&lt;dir&gt;</code>, then <code>npm run outreach:qualify -- outreach/leads/&lt;dir&gt;</code>.</span>
       </div>
       <div id="outreachList"><div class="empty">Loading…</div></div>
+    </div>
+  </section>
+  <section class="view" id="followupsView" hidden>
+    <div class="strategy">
+      <div class="strategy-actions">
+        <span class="hint">Tracks state AFTER a message is sent by hand — nothing here contacts anyone. Mark responded, draft a follow-up touch (reframes the locked message; still lands pending review), or move on.</span>
+      </div>
+      <div id="followupsNote"></div>
+      <div id="followupsList"><div class="empty">Loading…</div></div>
     </div>
   </section>
 </main>
@@ -504,7 +514,7 @@ function render(){
 // Refresh even do?"). It's now tab-aware: doRefresh() below only re-reads whatever the CURRENT tab
 // shows, labeled per tab, with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "ingest";
-function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Refresh leads" : "Refresh queue"; }
+function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Refresh leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
 function setTab(t){
   currentTab = t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
@@ -512,10 +522,12 @@ function setTab(t){
   $("#reviewView").hidden = t!=="review";
   $("#strategyView").hidden = t!=="strategy";
   $("#outreachView").hidden = t!=="outreach";
+  $("#followupsView").hidden = t!=="followups";
   $("#decidedWrap").style.display = t==="review" ? "" : "none";
   $("#refresh").textContent = refreshLabelFor(t);
   if (t==="strategy" && !briefLoaded){ loadBrief(); loadRaw(); }
   if (t==="outreach"){ loadOutreach(); }
+  if (t==="followups"){ loadFollowups(); }
 }
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>setTab(b.dataset.tab)));
 
@@ -533,6 +545,7 @@ async function doRefresh(){
     if (currentTab === "review") { await load(); await loadJobs(); }
     else if (currentTab === "strategy") { await loadBrief(); await loadRaw(); }
     else if (currentTab === "outreach") { await loadOutreach(); }
+    else if (currentTab === "followups") { await loadFollowups(); }
     else { await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
@@ -702,6 +715,56 @@ async function loadOutreach(){
     sec.innerHTML = '<div class="notes-head"><h3>'+esc(key.toUpperCase())+' ('+group.length+')</h3></div><div class="notelist">'+rows+'</div>';
     box.appendChild(sec);
   }
+}
+
+// ── Follow-ups (Phase 4) ──
+// Fixed bucket order (not data-driven) so the 4 reason-buckets always render in the same place,
+// including an empty "Inbound" section before db22283f lands (schema-ready, never omitted).
+const FOLLOWUP_BUCKETS = [["client","Client"],["platform","Platform"],["jobsearch","Job search"],["inbound","Inbound"]];
+function followupTouchLabel(iso){ return iso ? iso.slice(0,10) : "never"; }
+function followupRowHtml(row){
+  const why = row.why ? '<div class="src">'+esc(row.why)+'</div>' : "";
+  const disabled = row.status==="done" || row.status==="abandoned";
+  const draftBtn = row.dir ? '<button class="fu-draft" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'" data-dir="'+esc(row.dir)+'"'+(disabled?" disabled":"")+'>Draft follow-up</button>' : "";
+  return '<div class="notepick">'+
+      '<div class="ntext"><div class="nmeta">last touch '+followupTouchLabel(row.lastTouch)+' · '+esc(row.nextAction)+'</div>'+
+      '<b>'+esc(row.who)+'</b>'+why+'</div>'+
+      '<div class="actions">'+
+        '<button class="fu-responded" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark responded</button>'+
+        draftBtn+
+        '<button class="fu-moveon" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Move on</button>'+
+      '</div>'+
+    '</div>';
+}
+async function loadFollowups(){
+  const box = $("#followupsList");
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/followups");
+  const d = await r.json();
+  if(!d.ok){ box.innerHTML = '<div class="empty">'+esc(d.error||"failed to load")+'</div>'; return; }
+  $("#followupsNote").innerHTML = d.jobsearchNote ? '<div class="hint">Job search bucket: '+esc(d.jobsearchNote)+'</div>' : "";
+  box.innerHTML = "";
+  for(const [bucket,label] of FOLLOWUP_BUCKETS){
+    const rows = (d.buckets && d.buckets[bucket]) || [];
+    const sec = document.createElement("div"); sec.className = "notes-panel";
+    const inner = rows.length ? rows.map(followupRowHtml).join("") : '<div class="empty">Nothing here yet.</div>';
+    sec.innerHTML = '<div class="notes-head"><h3>'+esc(label)+' ('+rows.length+')</h3></div><div class="notelist">'+inner+'</div>';
+    box.appendChild(sec);
+  }
+  box.querySelectorAll("button.fu-responded").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-responded", b.dataset.bucket, b.dataset.lead)));
+  box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", b.dataset.bucket, b.dataset.lead)));
+  box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>followupDraft(b.dataset.dir)));
+}
+async function followupAction(action, bucket, lead){
+  const r = await post("/api/followups/"+action, {bucket, lead});
+  if(r.ok){ flash(action==="mark-responded" ? "Marked responded" : "Moved on"); loadFollowups(); }
+  else flash(r.error || "Failed");
+}
+async function followupDraft(dir){
+  flash("Drafting follow-up… (your subscription, ~30-60s)");
+  const r = await post("/api/followups/draft-follow-up", {dir});
+  if(r.ok){ flash("Follow-up drafted — review it on the Outreach tab"); loadFollowups(); }
+  else flash(r.error || "Failed to draft");
 }
 
 // ── ingest + job queue ──

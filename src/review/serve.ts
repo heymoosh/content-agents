@@ -33,6 +33,7 @@ import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import { listLeads } from "../outreach/status.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
+import { buildFollowups, markResponded, moveOn, isBucket } from "../outreach/tracker.js";
 import {
   enrich,
   listPieces,
@@ -62,6 +63,7 @@ import {
   runQueued,
   runClaudeSpawn,
   decodeSpawnFailure,
+  enqueueFollowUpDraft,
 } from "./jobs.js";
 import { renderPage } from "./page.js";
 
@@ -727,6 +729,58 @@ const server = createServer(async (req, res) => {
     // instead of re-implementing the outreach/leads/*/lead.md read here.
     if (req.method === "GET" && url.pathname === "/api/outreach/leads") {
       json(res, 200, { ok: true, leads: listLeads() });
+      return;
+    }
+    // Follow-ups tab (docs/outreach-engine-plan.md §6 Phase 4, backlog card 21a5eb84): folds
+    // data/outreach/tracker.jsonl into all 4 reason-buckets (client/platform/inbound/jobsearch).
+    // GUI/state plumbing only -- no content-generation logic here (CLAUDE.md rule 7).
+    if (req.method === "GET" && url.pathname === "/api/followups") {
+      json(res, 200, { ok: true, ...buildFollowups() });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/followups/mark-responded") {
+      const b = await readBody(req);
+      const bucket = String(b.bucket ?? "");
+      const lead = String(b.lead ?? "");
+      if (!lead || !isBucket(bucket)) {
+        json(res, 400, { ok: false, error: "bucket and lead are required" });
+        return;
+      }
+      const event = markResponded(bucket, lead, b.note ? String(b.note) : undefined);
+      json(res, 200, { ok: true, event });
+      return;
+    }
+    // "Move on" -- reads as closing a chapter, never failure (659b50f0's explicit anti-pattern:
+    // no CRM aesthetics, no guilt-styling on overdue rows).
+    if (req.method === "POST" && url.pathname === "/api/followups/move-on") {
+      const b = await readBody(req);
+      const bucket = String(b.bucket ?? "");
+      const lead = String(b.lead ?? "");
+      if (!lead || !isBucket(bucket)) {
+        json(res, 400, { ok: false, error: "bucket and lead are required" });
+        return;
+      }
+      const event = moveOn(bucket, lead, b.note ? String(b.note) : undefined);
+      json(res, 200, { ok: true, event });
+      return;
+    }
+    // A follow-up touch is a Spin reframe of the already-locked message (plan §5 stage 9) --
+    // reuses the existing /outreach draft path via the GUI job queue, never a new compose path.
+    // Only client/platform rows carry a `dir` (a real outreach/leads/<dir> folder); jobsearch/
+    // inbound rows have nowhere to draft into yet, so this refuses anything outside that tree.
+    if (req.method === "POST" && url.pathname === "/api/followups/draft-follow-up") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      if (!/^outreach\/leads\/[\w.-]+$/.test(dir)) {
+        json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
+        return;
+      }
+      try {
+        const result = await enqueueFollowUpDraft(dir, b.channel ? String(b.channel) : undefined);
+        json(res, 200, { ok: true, result });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
       return;
     }
     res.writeHead(404).end("not found");
