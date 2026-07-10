@@ -3,7 +3,7 @@ import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { parseEvidence } from "./qualify.js";
+import { parseEvidence, LEAD_SOURCES } from "./qualify.js";
 
 // outreach:validate -- two halves, dispatched by what kind of path is given:
 //   tsx src/outreach/validate.ts outreach/leads/client-acme-co                       (lead shape)
@@ -23,7 +23,11 @@ import { parseEvidence } from "./qualify.js";
 // /atomize source through the GUI's approve button.
 
 const VALID_KINDS = new Set(["client", "platform"]);
-const VALID_SOURCES = new Set(["manual", "jsa", "discovered"]);
+// Sourced from qualify.ts's LEAD_SOURCES so the two files can't drift on what a valid
+// `source:` value is -- "ingested": pre-existing research (e.g. Muxin's Obsidian vault)
+// snapshotted into a lead.md directly, distinct from "manual" (hand-typed intake), "jsa",
+// and "discovered".
+const VALID_SOURCES: Set<string> = new Set(LEAD_SOURCES);
 const VALID_STATUSES = new Set([
   "intake",
   "researched",
@@ -56,7 +60,7 @@ export function checkLeadShape(file: string, fm: Record<string, unknown>, body: 
 
   const source = String(fm.source ?? "");
   if (!VALID_SOURCES.has(source)) {
-    violations.push(`${file}: source must be one of manual|jsa|discovered (got "${source}")`);
+    violations.push(`${file}: source must be one of ${LEAD_SOURCES.join("|")} (got "${source}")`);
   }
   if (source === "jsa" && (!fm.jsa_verdict || typeof fm.jsa_verdict !== "string" || !fm.jsa_verdict.trim())) {
     violations.push(`${file}: source: jsa but missing "jsa_verdict" frontmatter (snapshot at intake requires it)`);

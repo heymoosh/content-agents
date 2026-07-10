@@ -25,7 +25,8 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 // being discarded.
 
 export type LeadKind = "client" | "platform";
-export type LeadSource = "manual" | "jsa" | "discovered";
+export type LeadSource = "manual" | "jsa" | "discovered" | "ingested";
+export const LEAD_SOURCES: readonly LeadSource[] = ["manual", "jsa", "discovered", "ingested"];
 
 const CLIENT_POSITIVE = new Set(["turnaround", "greenfield"]);
 const PLATFORM_POSITIVE = new Set(["strong", "partial"]);
@@ -212,7 +213,7 @@ export function runQualify(dirArg: string): QualifyRunResult {
 
   const kind: LeadKind = fm.kind === "platform" ? "platform" : "client";
   const rawSource = String(fm.source ?? "manual");
-  const source: LeadSource = rawSource === "jsa" ? "jsa" : rawSource === "discovered" ? "discovered" : "manual";
+  const source: LeadSource = (LEAD_SOURCES as string[]).includes(rawSource) ? (rawSource as LeadSource) : "manual";
   const relLeadFile = leadPath.startsWith(repoRoot) ? leadPath.slice(repoRoot.length + 1) : leadPath;
 
   const evidence = parseEvidence(body);
