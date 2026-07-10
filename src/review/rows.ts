@@ -100,6 +100,22 @@ export function approveBlockReason(
   return null;
 }
 
+// Server-side enforcement mirror of the `isReply` UI hint inside enrich() below (which only
+// drives the revisable/duplicatable button flags — a hint the GUI can choose to render, not a
+// gate). serve.ts's /api/revise and /api/duplicate handlers call this BEFORE ever running
+// reviseDerivative/duplicateToPlatform, sourced from the row's actual persisted origin (read
+// server-side via readQueue), never a client-supplied flag: both of those jobs.ts prompts tell
+// Claude the body must "stay traceable to Muxin's source at content/<slug>/source.md", but for a
+// "reply to mention" row that file holds the mention author's own untrusted post text, not
+// Muxin's writing — and runClaudeSpawn's default permission mode (acceptEdits, full tool access)
+// is the opposite of reply-draft.ts's locked-down `--tools ""` spawn for that same untrusted text.
+export function replyToMentionBlockReason(row: QueueRow | undefined): string | null {
+  if (row?.origin === "reply to mention") {
+    return "not available for a reply-to-mention row (its source is the mention author's own post, not Muxin's writing)";
+  }
+  return null;
+}
+
 // Read-only publish-log.md text for a folder — the only place a provider draft/post id is
 // persisted (see src/review/reconcile.ts). A missing file (ENOENT — no log yet) just has no
 // entries to find; any OTHER read failure (permissions, fd exhaustion, ...) is carried as `error`
