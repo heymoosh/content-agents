@@ -6,6 +6,7 @@ import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
 import { claimSlots, readLedger, releaseClaims, fmtLa, type Claim } from "./slots.js";
+import { checkReuse } from "./reuse-guard.js";
 import { launchPlatform } from "../pull/browser.js";
 import { captureDiagnostics, looksLikeAuthWall } from "../pull/diagnose.js";
 import { PullError, classifyUnknown, CULPRIT, type PullFailureKind } from "../pull/errors.js";
@@ -172,6 +173,16 @@ export async function publishSubstack(
   if (opts.onlyIds) approved = approved.filter((r) => opts.onlyIds!.includes(r.id));
   if (approved.length === 0) {
     console.log("no approved substack rows in the review queue");
+    return [];
+  }
+
+  // Reuse guard: skip if this slug was published to Substack too recently (config/platforms.yaml
+  // substack.min_reuse_days). Checked even on a dry run, so --dry-run honestly reports a block.
+  const slug = basename(folder);
+  const reuseCheck = checkReuse(slug, "substack");
+  if (!reuseCheck.allowed) {
+    console.warn(`reuse guard: ${reuseCheck.reason} — skipping`);
+    console.log("no rows to publish: substack blocked by the reuse guard");
     return [];
   }
 
