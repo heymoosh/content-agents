@@ -284,7 +284,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
-- PARKED: SAFETY HOLD (conductor, 2026-07-10): heymoosh/content-agents is a PUBLIC repo. This card ingests Muxin private Obsidian vault notes (named-individual interview notes/deep profiles, e.g. Boris Cherny, Cat Wu, Ivan Zhao, plus a 66-person contact roster) + JSA manual_research.db into committed anchors.md entries + lead.md folders. The DECISION: hold on this card gates MERGE for review, but pushing a build branch to origin already makes that content publicly visible via the draft PR diff, before any review happens -- rule 7s hold-for-review posture does not cover this. Needs an explicit call from Muxin: ok to push named-individual notes to a public repo (even as a held draft), or should this build redact/anonymize, target a private repo, or route around git entirely (e.g. a local-only anchors file)? Not building until she answers.
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Port cost-minimization policy to claude-config/simple-kanban conductor lane**
