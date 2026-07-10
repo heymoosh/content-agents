@@ -283,11 +283,11 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Output: (a) config/outreach/anchors.md entries for the people/orgs the vault already evidences as aligned (Boris Cherny, Cat Wu, Thariq, Kevin Moody, Ivan Zhao, etc.), each with a why-this-anchor line quoting Muxin's own notes + a source path; (b) pre-created outreach/leads/ folders (source: ingested) for already-vetted companies worth pursuing, carrying the vault/JSA evidence snapshotted in lead.md.
 - Constraints: NO graph database — ~250 total nodes fits the plan's existing file formats (anchors.md + lead folders); a graph DB is speculative infra. Vault analysis notes parse cleanly (H1 + bold fields + blockquotes); transcripts and thought-dumps need Claude judgment, so ingest is Claude-in-skill, not a deterministic parser. JSA's Human Enablement score is ingested as evidence text only, never as a fit signal (see the values-depth finding on the Phase 1 card). Nothing here contacts anyone; it only seeds config + lead state.
 - GOAL_CONDITION: config/outreach/anchors.md contains >=20 anchor entries, each with a why-this-anchor evidence line and a source path into the vault or JSA DB; lead folders exist for at least the 5 deep-researched vault companies with source: ingested and populated ## Evidence sections; the run touches the vault and manual_research.db read-only (no writes outside this repo).
-- STATUS: To Do
+EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased why-this-anchor basis + source paths are OK to commit, now that the repo is private. Build as originally scoped.
+- STATUS: In Progress
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
-- PARKED: SAFETY HOLD (conductor, 2026-07-10, re-raised): repo is now private, which resolves the public-internet-exposure half of the original concern. But this card still ingests named-individual private research notes (interview notes, a 66-person contact roster) into committed repo files. Muxin has not yet given an explicit go-ahead for THIS specific flow -- her prior "I changed it to private" reply answered the visibility question, not "yes, ingest the notes." Waiting for an explicit yes/no/how before building.
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Port cost-minimization policy to claude-config/simple-kanban conductor lane**
