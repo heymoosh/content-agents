@@ -27,19 +27,6 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - PARKED: external work per its own DECISION: defer -- landing page is built outside this repo; conductor should never claim/build this card, only mark Done by hand once the real landing page is live.
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
-**Substack publishing automation (constrained browser agent, approved content only)**
-- We auto-publish to X/LinkedIn/Bluesky (Typefully), YouTube, TikTok (PostPeer), and quote cards, but there is NO automation for publishing to Substack. Substack has no usable publishing API (CLAUDE.md rule 3).
-- Build the POST side of the constrained browser agent we already use for analytics pull (src/pull/): drive the saved Substack session to publish or schedule an approved piece, and nothing else.
-- SAFETY (non-negotiable): only acts on content Muxin set to `approve` in review-queue.md (rule 2), and browser posting needs Muxin's explicit go-ahead (rule 3). Never auto-post unreviewed.
-- SCOPE ANSWERED (Muxin, 2026-07-04): NOTES ONLY. Muxin is good at writing his own essays/posts directly on Substack and wants to keep doing that himself — that stays manual. The actual gap is that Substack isn't part of the unified GUI's automated publishing flow yet; this card closes that gap for Notes.
-- Reuses: the saved-session stealth-Chrome agent + diagnostics from the pull build; the unified scheduler (src/publish/slots.ts) for timing.
-- RENEWED INTEREST (Muxin, 2026-07-07): flagged wanting Substack posting automation while discussing posting caps; target cap if/when built = 1 post/day max on Substack. Still deferred per the 2026-07-04 call below — revisit priority explicitly before starting, don't silently pick this up.
-- STATUS: In Progress
-- DECISION: approved (Muxin, 2026-07-08) — reprioritized; scope already answered (Notes only, fold into the unified GUI publishing flow), content-stack work that was blocking it is now shipped. Target cap 1 post/day max on Substack per the 2026-07-07 note.
-- GROOMED: reprioritized + scope already answered (Notes only), no dependency overlaps, no open questions + 2026-07-08
-- PARKED: hard context/turn ceiling exceeded (turns=256 tokens=81162) — session killed mid-card by the watchdog safety valve, never resumed — 2026-07-10
-<!-- card-id: 8026f53c-0c52-46a2-aba1-e7e0bd416bdb -->
-
 **Growth via borrowed audiences (other people's platforms), not just native social**
 - Strategy note to fold into the weekly strategy brief: prioritize getting in front of OTHER people's existing audiences — podcast guest spots, guest essays / features in other newsletters, collabs, interviews, cross-posts — over grinding native social. Typically far more effective for reach and trust. NOT podcast-specific; any borrowed-audience channel counts.
 - Treat native social (X/LinkedIn/Bluesky) as inbound funnels; Substack is home. Borrowed audiences drive new people toward Substack.
@@ -326,14 +313,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - GROOMED: clear pointer to a1a6f379's fix to port to claude-config lane + 2026-07-10
 <!-- card-id: 3ddcc3c3-8226-4778-824e-21dd199bde75 -->
 
-**Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
-- config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
-- STATUS: In Progress
-- DECISION: approved — self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it
-- GROOMED: clear bakeoff scope: whisper.cpp vs Gemini, headless-executable + 2026-07-10
-- PARKED: hard context/turn ceiling exceeded (turns=251 tokens=94607) — session killed mid-card by the watchdog safety valve, never resumed
-<!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
-
 **Clarify which flow produces platform:substack rows in review-queue.md**
 - Follow-up from Substack publishing automation (card 83f60f12, PR #164). config/routing.yaml and config/platforms.yaml comments state Substack is a source channel (analytics pull), not an atomize routing target, but src/publish/substack.ts now consumes review-queue.md rows with platform: substack.
 - Look at the /atomize notes flow to find (or build) the actual path that queues those rows, so the new publish automation has real input to act on.
@@ -356,6 +335,25 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: Backlog
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
+
+**Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
+- config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
+- STATUS: Done
+- DECISION: approved — self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it
+- GROOMED: clear bakeoff scope: whisper.cpp vs Gemini, headless-executable + 2026-07-10
+<!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
+
+**Substack publishing automation (constrained browser agent, approved content only)**
+- We auto-publish to X/LinkedIn/Bluesky (Typefully), YouTube, TikTok (PostPeer), and quote cards, but there is NO automation for publishing to Substack. Substack has no usable publishing API (CLAUDE.md rule 3).
+- Build the POST side of the constrained browser agent we already use for analytics pull (src/pull/): drive the saved Substack session to publish or schedule an approved piece, and nothing else.
+- SAFETY (non-negotiable): only acts on content Muxin set to `approve` in review-queue.md (rule 2), and browser posting needs Muxin's explicit go-ahead (rule 3). Never auto-post unreviewed.
+- SCOPE ANSWERED (Muxin, 2026-07-04): NOTES ONLY. Muxin is good at writing his own essays/posts directly on Substack and wants to keep doing that himself — that stays manual. The actual gap is that Substack isn't part of the unified GUI's automated publishing flow yet; this card closes that gap for Notes.
+- Reuses: the saved-session stealth-Chrome agent + diagnostics from the pull build; the unified scheduler (src/publish/slots.ts) for timing.
+- RENEWED INTEREST (Muxin, 2026-07-07): flagged wanting Substack posting automation while discussing posting caps; target cap if/when built = 1 post/day max on Substack. Still deferred per the 2026-07-04 call below — revisit priority explicitly before starting, don't silently pick this up.
+- STATUS: Done
+- DECISION: approved (Muxin, 2026-07-08) — reprioritized; scope already answered (Notes only, fold into the unified GUI publishing flow), content-stack work that was blocking it is now shipped. Target cap 1 post/day max on Substack per the 2026-07-07 note.
+- GROOMED: reprioritized + scope already answered (Notes only), no dependency overlaps, no open questions + 2026-07-08
+<!-- card-id: 8026f53c-0c52-46a2-aba1-e7e0bd416bdb -->
 
 **Outreach engine — Phase 0: discovery spike (JSA_DB_PATH + seed list)**
 - The plan's Phase 0 (docs/outreach-engine-plan.md SS6) had no card, so it could silently never happen — yet it holds the one blocking input for Phase 1. Two of its three items are now DONE: the JSA values-depth check (SS2c) closed 2026-07-09, finding recorded on the Phase 1 card; the read path is designed (jsa.ts, better-sqlite3 readonly).
@@ -395,7 +393,6 @@ TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach
 - RULE 7: src/atomize/reply-draft.ts drafts what a Bluesky reply says in Muxin's voice -> content-generation logic (same class as the rule's named video-script-drafting example) -> this PR HOLDS for Muxin's review: draft PR, old-vs-new reply-draft sample in the PR body, no auto-merge even though CI is green and the review-GUI touch (src/review/page.ts, rows.ts) is otherwise low-risk.
 - SHIP: merged (PR #155, https://github.com/heymoosh/content-agents/pull/155 -- Muxin reviewed + merged 2026-07-10)
 - STATUS: Done
-- DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
 - DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
 - GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
