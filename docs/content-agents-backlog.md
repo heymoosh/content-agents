@@ -34,11 +34,11 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - GOAL_CONDITION: src/atomize/reply-draft.test.ts, src/cron/bluesky-mentions.test.ts, src/cron/bluesky-mentions-ledger.ts, src/publish/reply-approval-gate.test.ts, and src/review/page.test.ts all pass in the "check" CI job (npm test); a drafted reply never lands with queue-row status "approve" (reply-approval-gate.test.ts's gate case); `tsx src/atomize/reply-draft.ts --dry-run` produces a voice.yaml-compliant reply for a fixture mention with zero network calls and zero writes.
 - RULE 7: src/atomize/reply-draft.ts drafts what a Bluesky reply says in Muxin's voice -> content-generation logic (same class as the rule's named video-script-drafting example) -> this PR HOLDS for Muxin's review: draft PR, old-vs-new reply-draft sample in the PR body, no auto-merge even though CI is green and the review-GUI touch (src/review/page.ts, rows.ts) is otherwise low-risk.
 - SHIP: held (PR #155, https://github.com/heymoosh/content-agents/pull/155 -- draft, no auto-merge, RULE 7 content-generation-logic hold)
-- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 - STATUS: Review
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
 - DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
 - GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
+- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
@@ -48,9 +48,10 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - SCOPE ANSWERED (Muxin, 2026-07-04): NOTES ONLY. Muxin is good at writing his own essays/posts directly on Substack and wants to keep doing that himself — that stays manual. The actual gap is that Substack isn't part of the unified GUI's automated publishing flow yet; this card closes that gap for Notes.
 - Reuses: the saved-session stealth-Chrome agent + diagnostics from the pull build; the unified scheduler (src/publish/slots.ts) for timing.
 - RENEWED INTEREST (Muxin, 2026-07-07): flagged wanting Substack posting automation while discussing posting caps; target cap if/when built = 1 post/day max on Substack. Still deferred per the 2026-07-04 call below — revisit priority explicitly before starting, don't silently pick this up.
-- STATUS: To Do
+- STATUS: In Progress
 - DECISION: approved (Muxin, 2026-07-08) — reprioritized; scope already answered (Notes only, fold into the unified GUI publishing flow), content-stack work that was blocking it is now shipped. Target cap 1 post/day max on Substack per the 2026-07-07 note.
 - GROOMED: reprioritized + scope already answered (Notes only), no dependency overlaps, no open questions + 2026-07-08
+- PARKED: hard context/turn ceiling exceeded (turns=256 tokens=81162) — session killed mid-card by the watchdog safety valve, never resumed — 2026-07-10
 <!-- card-id: 8026f53c-0c52-46a2-aba1-e7e0bd416bdb -->
 
 **Growth via borrowed audiences (other people's platforms), not just native social**
@@ -384,6 +385,14 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - GOAL_CONDITION: .env carries JSA_DB_PATH and a read-only query against manual_research.db succeeds from this repo; the plan doc SS8 item 3 records >=3 client seeds and >=3 platform seeds.
 - STATUS: Backlog
 <!-- card-id: be1e4dcd-36dc-41bf-8c1a-66925d7f4658 -->
+
+**Resume Substack publishing automation build (salvage worktree from ceiling-killed session)**
+- Resume the Substack publishing automation build (Notes-only browser-agent posting, folded into the unified GUI publish flow) — previous attempt (card 8026f53c) was killed mid-build by the watchdog turn/token ceiling before committing anything.
+- Uncommitted work-in-progress already sits in the worktree at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-substack-publishing-automation-8026f53c on branch wt/substack-publishing-automation-8026f53c: new src/publish/substack.ts + docs/setup-substack-publish.md, plus edits to src/publish/all.ts, src/publish/paste-files.ts, src/review/serve.ts (+serve.test.ts), config/platforms.yaml, package.json. Worktree left in place, not cleaned up — inspect and salvage before rebuilding from scratch.
+- Original card 8026f53c is PARKED (ceiling hit) — see its DECISION/SCOPE lines for the already-answered scope (Notes only, 1 post/day cap) before restarting.
+- STATUS: To Do
+- DECISION: approved — carries forward the same approval already on 8026f53c (Muxin, 2026-07-08); scope already answered, no new judgment call needed to start.
+<!-- card-id: 83f60f12-ab69-43a8-a38c-ff73c88ed0ed -->
 
 **Extend Substack URL to atomize to any URL**
 - You know how I can give you a substack essay URL and you can run it through atomize? I wanted to be able to do that with any link. Does it work that way?
