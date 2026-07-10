@@ -243,6 +243,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - DEPENDS ON: Smarter routing
 - DECISION: approved — pure refactor unifying duplicated fallback logic, existing tests must still pass unmodified
 - GROOMED: explicit GOAL_CONDITION + exact files/tests named; backend dedup, CHAIN:1, dependency (Smarter routing) now Done + 2026-07-08
+- PARKED: dangling DEPENDS ON: the original Smarter routing card (6dcaee98) it names is already Done but no longer exists on the board under that title, so the fuzzy dependency matcher cannot resolve it to a Done card and treats it as blocked (dangling ref = blocked, by design). Board bookkeeping only -- needs Muxin (or a groomer pass) to either clear DEPENDS ON or repoint it at a real title; conductor left the link untouched rather than editing a dependency link without approval.
 <!-- card-id: e889e512-92fb-40dd-9669-fdcb51c6be11 -->
 
 **Inbound listening: X (mentions/replies/DMs)**
@@ -389,7 +390,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 **Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)**
 - Resume the Outreach engine Phase 1 build (engine core + client config, seeded leads) — previous attempt (card 8e8b616e) was killed mid-card by the watchdog turn/token ceiling before Step 2 (create_worktree) ever completed. No worktree exists and no commits were made — this is a clean restart, nothing to salvage from disk.
 Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREMENTS/GOAL_CONDITION/RULE 7 lines for the full, already-groomed spec before restarting; nothing about the spec itself needs re-deriving.
-- STATUS: To Do
+RELAUNCH: 1
+- STATUS: In Progress
 - DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
 - GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
 <!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
@@ -403,12 +405,19 @@ Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREME
 - PARKED: needs Muxin call: config/routing.yaml says Substack is a source channel, not an atomize routing target, but substack.ts now consumes platform:substack review-queue rows -- is Substack meant to be an atomize target (contradicts the config comment) or is there a different intended path? Flagged in Pre-flight decisions batch, 2026-07-10.
 <!-- card-id: a52927cd-5d00-41d8-82a6-9febf59e5394 -->
 
+**Bakeoff whisper.cpp vs Gemini on a real Muxin voice memo**
+- CHAIN: depth 1 (follow-up to b1327a9c-3ffc-41df-a822-0c1e85458a1e, whisper.cpp adapter + bakeoff script). Run npm run bakeoff:transcription -- data/inbox/<memo-file> once a real voice memo exists, read both transcripts against what was actually said, and decide whether to flip config/providers.yaml transcription: from gemini to whispercpp. See docs/bakeoffs/whispercpp-vs-gemini-transcription.md OPEN section. PARKED: needs Muxin to physically drop a real voice memo in data/inbox/ (gitignored) before this can run; no synthetic clip can answer the real question. Surface via morning summary, not a live ask.
+- STATUS: Backlog
+- PARKED: needs Muxin to physically drop a real voice memo in data/inbox/ before this can run (2026-07-10) — surfaced via morning summary, not a live ask
+<!-- card-id: ae96b8e1-4102-4bd6-af10-8df51d21704d -->
+
 **Resume whisper.cpp vs Gemini transcription bakeoff (salvage worktree from ceiling-killed session)**
 - Resume the whisper.cpp vs Gemini transcription bakeoff (card de591b28) — previous attempt was killed mid-card by the watchdog turn/token ceiling before finishing.
 - One commit already sits on the worktree branch at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-whispercpp-vs-gemini-transcription-de591b28 (branch wt/whispercpp-vs-gemini-transcription-de591b28, commit 6264f38, "Add whisper.cpp transcription adapter + bakeoff comparison script"). Working tree is clean (no uncommitted changes), no PR opened yet. Worktree left in place, not cleaned up — inspect and continue from that commit rather than rebuilding from scratch.
 - Original card de591b28 is PARKED (ceiling hit) — see its DECISION/GROOMED lines for the already-answered scope (whisper.cpp vs Gemini, headless-executable) before restarting.
-- STATUS: To Do
-- DECISION: approved — carries forward the same approval already on de591b28 (self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it).
+- STATUS: Done
+- DECISION: approved — carries forward the same approval already on de591b28 (self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it). review-stage self-vet 2026-07-10 (lane b): no GOAL_CONDITION carried onto this resume card, so self-authored one on HEAD 6264f38 (tsc --noEmit clean; npm test 434/434 green; whispercpp.ts exports a valid TranscriptionProvider; config/providers.yaml transcription: default unchanged=gemini) -> /goal met. /verify verified via the committed smoke-test artifact (whispercpp end-to-end transcript, $0 cost; gemini guard-clause correctly fired on missing key). /security-review PASS (execFileSync array-args only, fixed-list dynamic import, no secrets, scoped rmSync). Non-visual, not content-generation-logic (CLAUDE.md rule 7) -> ships on green, no PR-review hold.
+- LANE: b
 <!-- card-id: b1327a9c-3ffc-41df-a822-0c1e85458a1e -->
 
 **Fix cards.test.ts leaking a row into real briefs/bets.md**
