@@ -1,0 +1,68 @@
+# Outreach engine (docs/outreach-engine-plan.md) config. Read by src/outreach/*.ts scripts and
+# by Claude inline judgment during the /outreach skill (research/qualify/draft stages) — same
+# "scripts do deterministic work, Claude does judgment" split as config/pillars.yaml.
+# Anti-churn guard numbers below map to plan §10; JSA handoff maps to plan §2a.
+
+# Name of the env var (in .env) that src/outreach/jsa.ts reads for the read-only path to JSA's
+# manual_research.db. jsa.ts opens it with better-sqlite3 `{ readonly: true }` and only ever
+# snapshots fields into a new lead.md at intake — never a live link, never a write.
+jsa_db_path_env: JSA_DB_PATH
+
+# Hard cap on any single research/discovery batch per run: `--from-jsa --verdict TARGET --limit N`,
+# a bulk `outreach:research` invocation, or a discover.ts (Phase 5) surfacing pass.
+# §10 guard #4 — the real currency at risk is Muxin's Claude Max 5-hour rolling window, not
+# dollars; exhausting it locks her out of every other Claude use, not just this one.
+batch_cap: 5
+
+# Hard subprocess timeout per lead's research pass, in minutes (§10 guard #3 — same posture as
+# the text-polish provider's 180s cap). A run that hits the wall keeps whatever it already
+# checkpointed into lead.md (the ## Profile / ## Evidence sections are written incrementally)
+# and stops cleanly; it does not silently retry inside the same run.
+research_timeout_min: 6
+
+# Per-signal search budget during the closed-checklist research pass (§10 guard #2). The pass
+# walks the finite signal taxonomy in config/outreach/clients.md / platforms.md — never an
+# open-ended "research this company" prompt. A signal still unfound after this many searches is
+# recorded as "no evidence found" and the pass moves on; "unclear" stays a legal terminal verdict
+# so the model is never incentivized to keep digging just to force a classification.
+search_budget_per_signal: 2
+
+# Outbound channels a drafted message can target (messages/message-NN.md `channel` field, plan §3).
+channels:
+  - email
+  - linkedin-dm
+  - contact-form
+  - podcast-pitch
+
+# Follow-up tracker (data/outreach/tracker.jsonl) timing windows, per reason-bucket (plan §3,
+# Phase 4 / card 659b50f0). `follow_up_after_days`: no response by then means a follow-up touch
+# is due. `abandon_after_days`: no response by then means "move on" is a legal, non-punitive
+# outcome — never guilt-styled in the Follow-ups tab (659b50f0's explicit anti-pattern).
+follow_up:
+  client:
+    follow_up_after_days: 7
+    abandon_after_days: 30
+  platform:
+    follow_up_after_days: 10
+    abandon_after_days: 45
+  jobsearch:
+    follow_up_after_days: 7
+    abandon_after_days: 30
+  inbound:
+    follow_up_after_days: 3
+    abandon_after_days: 14
+
+# Mid-tail size bands (plan §9e guard #3): candidates at or past these thresholds are
+# downgraded/excluded from discovery — everyone is already vying for them and Muxin can
+# hand-add a big name herself. The engine exists to surface the mid-tail she'd never have time
+# to scan on her own. `company_funding_stage_exclude` lists stages (and past) that disqualify a
+# client-kind lead by size alone, independent of the fit taxonomy in clients.md.
+mid_tail_caps:
+  podcast_listeners_max: 50000
+  newsletter_subscribers_max: 50000
+  company_funding_stage_exclude:
+    - series-b
+    - series-c
+    - series-d-plus
+    - growth
+    - public
