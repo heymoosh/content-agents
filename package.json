@@ -35,6 +35,7 @@
     "story:lock": "tsx src/fiction/canon.ts",
     "story:illustrate": "tsx src/fiction/illustrate.ts",
     "bakeoff": "tsx src/bakeoff/run.ts",
+    "bakeoff:transcription": "tsx src/bakeoff/transcription.ts",
     "publish:typefully": "tsx src/publish/typefully.ts",
     "publish:youtube": "tsx src/publish/youtube.ts",
     "publish:tiktok": "tsx src/publish/tiktok.ts",

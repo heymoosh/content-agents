@@ -16,9 +16,15 @@ transcription: gemini   # DELIBERATE PAID OPT-IN (per-token, ~$0.004/MB ≈ a fe
 # free-local because verbatim transcription accuracy on Muxin's real voice memos hasn't been evaluated
 # against a local model — a genuine quality tradeoff, not ours to guess (CLAUDE.md rule 6). Note: this repo
 # already runs whisper.cpp locally and free for a DIFFERENT job — TTS caption forced-alignment
-# (src/video/align.ts, see docs/setup-kokoro.md) — so a `src/providers/transcription/whispercpp.ts` adapter
-# reusing that binary is a small lift IF a bakeoff on real memos shows acceptable quality. Do that eval
-# before flipping this default.
+# (src/video/align.ts, see docs/setup-kokoro.md).
+# UPDATE 2026-07-10: the free-local adapter now EXISTS — src/providers/transcription/whispercpp.ts
+# reuses that same binary/model. Engineering-verified on a synthetic clip (adapter correctness,
+# interface contract, cost tracking); NOT yet bake-off'd against Gemini on a real Muxin voice memo,
+# which is the only test that actually answers the quality question. To run that eval once a real
+# memo exists (drop a file in data/inbox/, gitignored):
+#   npm run bakeoff:transcription -- data/inbox/<memo-file>
+# See docs/bakeoffs/whispercpp-vs-gemini-transcription.md. Flip this line to `transcription:
+# whispercpp` only after that real-memo comparison clears whisper.cpp's accuracy.
 text-polish: claude-cli   # VIDEO SCRIPTS ONLY (/video step 3). Claude Code on Muxin's subscription — $0 marginal, no API key (CLAUDE.md rule 6). Model = CLAUDE_POLISH_MODEL alias (default "sonnet"; "haiku" for the cheapest short-script run). Swap to "grok-openrouter" to draft on Grok instead (needs OPENROUTER_API_KEY, bills per token). Text posts stay extraction-first — see CLAUDE.md rule 1.
 prose: grok-openrouter         # BUILD 2 — FICTION ONLY, OPT-IN EXTERNAL ADAPTER (paid, per-token). NOT the
 # per-series default — every series scaffolded by `story:new` sets `prose: claude-native` in its own
