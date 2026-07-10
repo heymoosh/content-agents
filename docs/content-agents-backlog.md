@@ -205,9 +205,10 @@ CARD TYPE: EPIC
 The /publish and /atomize skill docs (.claude/skills/publish/SKILL.md, .claude/skills/atomize/SKILL.md) still describe the retired PostPeer/Upload-Post image_post provider flow for quote cards. The delegated build/review workers could not edit them (writes under .claude/skills/ require interactive permission not available to a headless worker). Update them to describe native Typefully image posts for quote cards on X/LinkedIn/Bluesky, matching the config/cta.yaml, config/providers.yaml, .env.example, and CLAUDE.md rule 3 updates already made in PR for card 1829fdf9.
 GOAL_CONDITION: both SKILL.md files describe quote cards shipping as native Typefully image posts (not PostPeer/Upload-Post) for X/LinkedIn/Bluesky, with PostPeer still correctly described for TikTok only.
 CHAIN: 1
-- STATUS: To Do
+- STATUS: In Progress
 - DECISION: approved (Muxin, 2026-07-09, pre-flight) -- Muxin granted permission for the .claude/skills/ write; worker may request/accept the one-off sandbox override needed to edit publish/atomize SKILL.md.
 - GROOMED: well-specified doc sync, explicit GOAL_CONDITION; note - needs an attended/interactive run since .claude/skills/ writes are permission-gated for headless workers + 2026-07-08
+- PARKED: Claude Code auto-mode classifier repeatedly blocks create_worktree on this card citing a PID 28225 collision that direct process-ancestry tracing (this session IS pid 28225, confirmed via $$ ancestry + ps aux showing exactly one orchestrate-pipeline claude process) disproves. Classifier does not appear to re-evaluate on corrected context within-session. Needs Muxin either to confirm no collision and re-run attended, or to add a Bash permission rule per the denial message.
 <!-- card-id: ebe652a7-f1db-477f-9856-3e11aec6f5fc -->
 
 **Smarter routing — swap the LinkedIn work-with-me stand-in for the real landing page**
@@ -283,9 +284,10 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 JSA VALUES-DEPTH FINDING (closes the SS2c UNVERIFIED flag, verified in code 2026-07-09): JSA's verdict (auto_analyze.py compute_verdict) is logistics-weighted. Remote/Parental/Salary/Job Protection carry weight 2.0; Human Enablement, the ONLY mission/values dimension, carries the floor weight 1.0, is never a hard gate, and acts only as a salary-conditioned compensator. The older graph/ pipeline has zero values dimensions. Therefore a JSA TARGET means strong logistics, NOT values alignment: --from-jsa --verdict TARGET is a logistics-fit seed source only, and every JSA-sourced lead MUST still pass this engine's quote-required worldview qualify (SS2c's posture, now confirmed necessary, not just prudent). Treat JSA's Human Enablement search output (mission-language quotes) as useful qualify evidence; ignore its score. Muxin is separately considering removing HE from JSA's scoring entirely since the anchor-graph network design covers similar-to-aligned discovery; that is a JSA-repo call, out of scope here, and this engine's qualify never depended on it either way. The real values instrument already built is the Cowork founder-deep-dive skill (Philosophical Depth Probe tiers + Layer-7 Introduction Test); port its rubric prose into config/outreach/ as the person-level qualify reference (its Apollo/MCP tool steps do not port; use web search).
 
 TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach pursue without BOTH (a) company-level worldview qualification (quote-required per SS9f) AND (b) a named, evidenced like-minded person there (founder-deep-dive-style, extended beyond founders; Muxin's last job proves person-fit and company-fit diverge). Person-high/company-low still has value: record that person as an anchor in config/outreach/anchors.md (networking + future-referral node) even when the company is passed. Client<->employer conversion is expected: a lead's kind/bucket may change without losing its evidence and decision history. Rationale is strategic, not just preference: aligned people/orgs refer into more aligned work; misaligned ones refer into their own network.
-- STATUS: To Do
+- STATUS: In Progress
 - DECISION: hold — card body itself states Rule 7 applies (research/qualify prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from ba9769af per docs/outreach-engine-plan.md §6 Phase 1; explicit GOAL_CONDITION, seed-blocker resolved via --from-jsa pull, plan RATIFIED 2026-07-08 + 2026-07-09
+- PARKED: hard context/turn ceiling exceeded (turns=255 tokens=100544) — session killed mid-card by the watchdog safety valve, never resumed — 2026-07-10
 <!-- card-id: 8e8b616e-ba97-4421-8fed-978128e0b94b -->
 
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
@@ -393,6 +395,14 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - DECISION: approved — self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it
 - GROOMED: clear bakeoff scope: whisper.cpp vs Gemini, headless-executable + 2026-07-10
 <!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
+
+**Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)**
+- Resume the Outreach engine Phase 1 build (engine core + client config, seeded leads) — previous attempt (card 8e8b616e) was killed mid-card by the watchdog turn/token ceiling before Step 2 (create_worktree) ever completed. No worktree exists and no commits were made — this is a clean restart, nothing to salvage from disk.
+Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREMENTS/GOAL_CONDITION/RULE 7 lines for the full, already-groomed spec before restarting; nothing about the spec itself needs re-deriving.
+- STATUS: To Do
+- DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
+- GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
+<!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
 
 **duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
 - - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions), found during the review stage's code-review pass.
