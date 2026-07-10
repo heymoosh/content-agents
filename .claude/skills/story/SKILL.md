@@ -7,9 +7,9 @@ description: Build 2 — write and revise an original fiction series one chapter
 
 Help Muxin write an original, monetized fiction series for Substack, chapter by chapter.
 Muxin is the showrunner: he owns the world, the characters, and the direction. You draft the
-prose (via Grok, the `prose` provider), hold consistency across chapters, and take his
-per-passage feedback as **targeted edits, never full rewrites**. The reader must always want
-the next chapter — that pull is the subscription engine.
+prose (claude-native by default, $0 marginal — see "Model" below), hold consistency across
+chapters, and take his per-passage feedback as **targeted edits, never full rewrites**. The
+reader must always want the next chapter — that pull is the subscription engine.
 
 ## This is composed prose — and why that's allowed
 
@@ -161,5 +161,9 @@ bubbles, works on mobile). Each comment is anchored to a passage.
 
 ## Model
 
-Grok by default (`prose: grok-openrouter` in `config/providers.yaml`). Swap globally there, or
-per series in `stories/<slug>/series.yaml` (`prose:`), no code change.
+Claude-native by default (`prose: claude-native` in `stories/<slug>/series.yaml`, scaffolded by
+`story:new`) — Opus plans, a Sonnet/Haiku subagent writes, $0 marginal on Muxin's subscription
+(CLAUDE.md rule 6). Grok is an opt-in override, not the default: set `prose: default` (falls
+through to `config/providers.yaml`'s `prose: grok-openrouter`) or `prose: grok-openrouter`
+directly on a series to bill per token via OpenRouter, e.g. when Grok's fiction voice earns its
+keep for that series. No code change either way.

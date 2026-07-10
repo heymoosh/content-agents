@@ -15,7 +15,9 @@ import {
 import { buildContext } from "./context.js";
 import { oneSentencePerLine } from "./_format.js";
 
-// Draft one chapter with the configured prose model (Grok by default). Builds the context
+// Draft one chapter with an external, paid prose adapter (this script is a no-op for the
+// claude-native default — see the guard below; the /story skill drafts claude-native chapters
+// itself, without this script). Builds the context
 // pack, loads the craft + style system prompt, sends the chapter instructions, writes
 // chapters/chapter-NN.md (one sentence per line), logs cost. The /story skill supplies the
 // per-chapter beat sheet via --beats / --beats-file (Claude's judgment); without it the model
