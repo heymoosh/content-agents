@@ -134,10 +134,19 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
     );
   }
 
-  test("refuses a kind: platform lead (no message schema yet)", async () => {
-    const dir = makeLeadDir(leadFixture({ kind: "platform", classification: "strong" }));
+  test("refuses a kind: platform lead when fit is weak", async () => {
+    const dir = makeLeadDir(leadFixture({ kind: "platform", classification: "weak" }));
     try {
-      await assert.rejects(runDraft(dir), /platform/);
+      await assert.rejects(runDraft(dir), /non-fit|weak/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses a kind: platform lead when fit is disqualified", async () => {
+    const dir = makeLeadDir(leadFixture({ kind: "platform", classification: "disqualified" }));
+    try {
+      await assert.rejects(runDraft(dir), /non-fit|disqualified/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

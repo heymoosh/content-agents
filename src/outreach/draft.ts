@@ -20,9 +20,9 @@ import { parseEvidence, type EvidenceItem } from "./qualify.js";
 //
 //   tsx src/outreach/draft.ts outreach/leads/client-acme-co [--channel email|linkedin-dm|contact-form|podcast-pitch]
 //
-// Phase 2 supports kind: client only, same reasoning as research.ts refusing kind: platform:
-// the plan's message schema (docs/outreach-engine-plan.md §3) only documents a
-// classification-based frontmatter, no fit-based variant yet (that's Phase 3, platform config).
+// kind: platform uses `fit` (strong|partial) in place of kind: client's `classification`
+// (turnaround|greenfield) -- same two-sided-guard posture, parallel field per validate.ts's own
+// kind-specific lead-shape rules.
 
 const execFileP = promisify(execFile);
 
@@ -32,6 +32,7 @@ export type Channel = (typeof CHANNELS)[number];
 const DRAFT_TIMEOUT_MS = 120_000; // same order of magnitude as reply-draft.ts's REPLY_TIMEOUT_MS
 
 const POSITIVE_CLASSIFICATIONS = new Set(["turnaround", "greenfield"]);
+const POSITIVE_FITS = new Set(["strong", "partial"]);
 
 // Deterministic evidence selection for the two-sided guard: the classification-supporting
 // signal plus any worldview-match item(s), so the message frontmatter's `evidence` list -- and
@@ -51,6 +52,7 @@ export function buildDraftPrompt(opts: {
   leadName: string;
   channel: Channel;
   classification: string;
+  classificationLabel?: string;
   pitchAngle: string;
   evidence: EvidenceItem[];
 }): string {
@@ -64,7 +66,7 @@ export function buildDraftPrompt(opts: {
     `You are drafting ONE outreach message for Muxin Li to send BY HAND to ${opts.leadName} (docs/outreach-engine-plan.md stage 6, DRAFT). Print ONLY the message body to stdout: no subject line, no preamble, no quote marks around it, no explanation, nothing else.`,
     ``,
     `Channel: ${opts.channel}`,
-    `Classification: ${opts.classification}`,
+    `${opts.classificationLabel ?? "Classification"}: ${opts.classification}`,
     `Approved pitch angle: ${opts.pitchAngle || "(none recorded, find the honest angle from the evidence below)"}`,
     ``,
     `Cite THESE SPECIFIC facts about ${opts.leadName} (the two-sided rule: name their real situation, not just shared values):`,
@@ -134,17 +136,25 @@ export async function runDraft(dirArg: string, opts: { channel?: string } = {}):
   const { fm, body } = splitFrontmatter(raw);
 
   const kind = fm.kind === "platform" ? "platform" : "client";
-  if (kind === "platform") {
-    throw new Error(
-      "kind: platform has no message schema yet (docs/outreach-engine-plan.md §3 only documents a classification-based message frontmatter, platform config is Phase 3 scope) -- draft.ts only supports kind: client for now.",
-    );
-  }
 
-  const classification = String(fm.classification ?? "unclear");
-  if (!POSITIVE_CLASSIFICATIONS.has(classification)) {
-    throw new Error(
-      `refusing to draft: classification is "${classification}" (must be turnaround or greenfield) -- you don't draft outreach off a non-fit`,
-    );
+  let classification: string;
+  let classificationLabel: string | undefined;
+  if (kind === "platform") {
+    const fit = String(fm.fit ?? "unclear");
+    if (!POSITIVE_FITS.has(fit)) {
+      throw new Error(
+        `refusing to draft: fit is "${fit}" (must be strong or partial) -- you don't draft outreach off a non-fit`,
+      );
+    }
+    classification = fit;
+    classificationLabel = "Fit";
+  } else {
+    classification = String(fm.classification ?? "unclear");
+    if (!POSITIVE_CLASSIFICATIONS.has(classification)) {
+      throw new Error(
+        `refusing to draft: classification is "${classification}" (must be turnaround or greenfield) -- you don't draft outreach off a non-fit`,
+      );
+    }
   }
 
   const evidence = parseEvidence(body);
@@ -162,7 +172,7 @@ export async function runDraft(dirArg: string, opts: { channel?: string } = {}):
   const pitchAngle = String(fm.pitch_angle ?? "");
   const selected = selectEvidenceForDraft(evidence, classification);
 
-  const prompt = buildDraftPrompt({ leadName, channel, classification, pitchAngle, evidence: selected });
+  const prompt = buildDraftPrompt({ leadName, channel, classification, classificationLabel, pitchAngle, evidence: selected });
   const messageBody = await callClaudeDraft(prompt);
 
   const messagesDir = join(absDir, "messages");
@@ -173,12 +183,13 @@ export async function runDraft(dirArg: string, opts: { channel?: string } = {}):
 
   const leadSlug = basename(absDir);
   const evidenceIds = selected.map((e) => e.id);
+  const classificationField = kind === "platform" ? `fit: ${classification}\n` : `classification: ${classification}\n`;
   const frontmatter =
     `---\n` +
     `lead: ${leadSlug}\n` +
     `channel: ${channel}\n` +
     `evidence: [${evidenceIds.join(", ")}]\n` +
-    `classification: ${classification}\n` +
+    classificationField +
     `status: draft   # draft | approved | locked\n` +
     `---\n`;
 
