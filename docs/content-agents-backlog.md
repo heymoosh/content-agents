@@ -34,11 +34,11 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - GOAL_CONDITION: src/atomize/reply-draft.test.ts, src/cron/bluesky-mentions.test.ts, src/cron/bluesky-mentions-ledger.ts, src/publish/reply-approval-gate.test.ts, and src/review/page.test.ts all pass in the "check" CI job (npm test); a drafted reply never lands with queue-row status "approve" (reply-approval-gate.test.ts's gate case); `tsx src/atomize/reply-draft.ts --dry-run` produces a voice.yaml-compliant reply for a fixture mention with zero network calls and zero writes.
 - RULE 7: src/atomize/reply-draft.ts drafts what a Bluesky reply says in Muxin's voice -> content-generation logic (same class as the rule's named video-script-drafting example) -> this PR HOLDS for Muxin's review: draft PR, old-vs-new reply-draft sample in the PR body, no auto-merge even though CI is green and the review-GUI touch (src/review/page.ts, rows.ts) is otherwise low-risk.
 - SHIP: held (PR #155, https://github.com/heymoosh/content-agents/pull/155 -- draft, no auto-merge, RULE 7 content-generation-logic hold)
+- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 - STATUS: Review
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
 - DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
 - GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
-- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
