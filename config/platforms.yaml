@@ -149,14 +149,18 @@ spin_angles:
   x:
     audience: tech
     angle: >-
-      Voice of the non-engineer OUTSIDE the SV tech bubble — what these AI tools are actually like
-      for the 96% of non-tech workers, and how the hidden assumptions baked in by that bubble
-      misfire for and harm them.
+      Voice of the non-engineer OUTSIDE the SV tech bubble, grounded in real technical
+      specifics — name the actual tool or mechanism and where it actually breaks, never a
+      surface-level "AI is like X." Still written for the 96% of non-tech workers the bubble's
+      hidden assumptions misfire for and harm, never for or like an engineer building the tools.
   linkedin:
     audience: business/career
     angle: >-
-      Critiques business innovation broadly (NOT just product craft) — how corporate / business
-      norms quietly strangle the creative innovation they claim to want.
+      Case-first: open on one real, anonymized situation, never a category or a thesis, and name
+      the assumption behind it in the subject's own words. Show what happened when that
+      assumption got tested and what it cost to have missed it. The zoom-out to the broader
+      pattern is the closing line, not the opener. End on a soft signal of availability, what
+      Muxin would look for in scoping this kind of engagement, not a hard sales ask.
   substack:
     audience: society
     angle: >-

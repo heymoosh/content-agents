@@ -15,6 +15,16 @@ angles are internal generation config only. Never publish an angle statement ver
 copy; it shapes the framing, the words still come from Muxin. `src/atomize/spin.ts`
 (`resolveAngle`) is the code's view of the same mapping.
 
+**LinkedIn and X updated 2026-07-10 (Muxin, per-channel positioning review).** LinkedIn's angle is
+now case-first, not thesis-first: open on one real anonymized situation (never a category), name
+the assumption in the subject's own words, show what it cost to have missed it, and put the
+zoom-out-to-the-broader-pattern line last, as the closer — ending on a soft signal of availability
+(what Muxin would look for in scoping this kind of work), not a hard sales ask. The old
+essay-as-thesis register read as "interesting worldview," not "hire me for this"; this fixes that
+without turning the post into a pitch. X's angle keeps the non-engineer-outsider voice (Muxin does
+NOT want X reading as insider/tech-circle content) but now requires real technical specifics — the
+actual tool or mechanism and where it actually breaks — instead of a surface-level "AI is like X."
+
 **What changes vs. a verbatim run:** run steps 1–8 (in SKILL.md) exactly as usual, with three differences.
 
 1. **You may reframe and flavor, through the channel's approved angle, within hard guardrails.**
