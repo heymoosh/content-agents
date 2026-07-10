@@ -93,9 +93,13 @@ function main() {
     join(dir, "series.yaml"),
     `slug: ${slug}\n` +
       `title: "${title.replace(/"/g, '\\"')}"\n\n` +
-      `# Prose model for this series. "default" = use config/providers.yaml \`prose\`.\n` +
-      `# Set to any adapter in src/providers/prose/ to override per series.\n` +
-      `prose: default\n\n` +
+      `# Drafting mode for this series (CLAUDE.md rule 6: cheapest acceptable route by default).\n` +
+      `#   prose: claude-native -> the /story skill composes the chapter with Claude itself (no API\n` +
+      `#                           key, $0 marginal, on Muxin's subscription). Default for new series.\n` +
+      `#   prose: default        -> use config/providers.yaml \`prose\` (currently grok-openrouter,\n` +
+      `#                           paid per-token). Opt in deliberately if Grok's voice earns its keep.\n` +
+      `#   prose: <adapter>      -> any other adapter in src/providers/prose/, per series.\n` +
+      `prose: claude-native\n\n` +
       `narrative:\n` +
       `  pov: third person limited   # overrides config/fiction/style.yaml for this series\n` +
       `  tense: past\n` +

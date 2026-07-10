@@ -11,9 +11,20 @@ image: openrouter-image   # default image ADAPTER. COST-FIRST: Riverflow by defa
 image_params: { model: sourceful/riverflow-v2-fast, modalities: ["image"] }               # Riverflow v2 fast ~$0.02/img
 image_pro:   { provider: gemini-nano-banana, model: gemini-3-pro-image-preview }          # Nano Banana Pro ~$0.13/img (direct Google)
 image_hero:  { provider: openrouter-image, model: openai/gpt-5.4-image-2 }                # best look ~$0.23/img, slow
-transcription: gemini
+transcription: gemini   # DELIBERATE PAID OPT-IN (per-token, ~$0.004/MB ≈ a few cents/voice-memo — cheap in
+# absolute terms, not $0). Used by /atomize's audio-memo path (src/atomize/new-content.ts). Not swapped to
+# free-local because verbatim transcription accuracy on Muxin's real voice memos hasn't been evaluated
+# against a local model — a genuine quality tradeoff, not ours to guess (CLAUDE.md rule 6). Note: this repo
+# already runs whisper.cpp locally and free for a DIFFERENT job — TTS caption forced-alignment
+# (src/video/align.ts, see docs/setup-kokoro.md) — so a `src/providers/transcription/whispercpp.ts` adapter
+# reusing that binary is a small lift IF a bakeoff on real memos shows acceptable quality. Do that eval
+# before flipping this default.
 text-polish: claude-cli   # VIDEO SCRIPTS ONLY (/video step 3). Claude Code on Muxin's subscription — $0 marginal, no API key (CLAUDE.md rule 6). Model = CLAUDE_POLISH_MODEL alias (default "sonnet"; "haiku" for the cheapest short-script run). Swap to "grok-openrouter" to draft on Grok instead (needs OPENROUTER_API_KEY, bills per token). Text posts stay extraction-first — see CLAUDE.md rule 1.
-prose: grok-openrouter         # BUILD 2 — FICTION ONLY. Composes original chapters (the /story skill). Swap to another model here, or per-series in stories/<slug>/series.yaml. Never used by Build 0/1.
+prose: grok-openrouter         # BUILD 2 — FICTION ONLY, OPT-IN EXTERNAL ADAPTER (paid, per-token). NOT the
+# per-series default — every series scaffolded by `story:new` sets `prose: claude-native` in its own
+# series.yaml ($0, no API key, CLAUDE.md rule 6) and never reads this line. This global value only
+# fires for a series that explicitly opts into an external adapter via `prose: default` or
+# `prose: grok-openrouter` in its own series.yaml (e.g. Grok's fiction voice earning its keep).
 # Kept on OpenRouter on purpose: it lets us bake off prose across models behind one key. Once
 # the model is locked, moving to the direct xAI API (to skip OpenRouter's ~5% fee) is one new
 # file, src/providers/prose/grok-xai.ts, plus changing this line to `prose: grok-xai`.
