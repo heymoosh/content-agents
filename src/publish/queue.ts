@@ -8,7 +8,7 @@ import { repoRoot } from "../db/db.js";
 
 // Which pipeline created this row. Exactly one of these three, or undefined for a row written
 // before this field existed (or one carrying a value we don't recognize) — never guessed.
-export const QUEUE_ORIGINS = ["from /cycle", "reply to mention", "from GUI queue"] as const;
+export const QUEUE_ORIGINS = ["from /cycle", "reply to mention", "from GUI queue", "from /outreach draft"] as const;
 export type QueueOrigin = (typeof QUEUE_ORIGINS)[number];
 
 export interface QueueRow {
@@ -243,7 +243,13 @@ export function appendBetPlacement(
   // route.ts's loadData() can exclude it from the pillar/platform resonance figures. Same
   // placement rule as spin — before the quoted prefix.
   const exploration = fm.exploration_probe ? ` | exploration` : "";
+  // Outreach-message marker (docs/outreach-engine-plan.md §6 Phase 2): set on a derivative the
+  // /atomize skill drafted from a LOCKED outreach message (new-content.ts's resolveFileSource
+  // tags source.md `source_kind: outreach-message`). tag-source.ts reads this back to classify
+  // the post source = 'atomized-outreach' instead of 'atomized'/'atomized-spin'. Same placement
+  // rule as spin — before the quoted prefix.
+  const outreachMessage = fm.outreach_message ? ` | outreach-message` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${prefix}`;
   writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
 }

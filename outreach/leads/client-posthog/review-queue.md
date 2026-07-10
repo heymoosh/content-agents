@@ -1,4 +1,5 @@
 # Outreach review queue -- PostHog
 
-Populated by `/outreach draft` (message drafting, Phase 2 -- not built yet). Empty until
-a message exists for this lead.
+Populated by `npm run outreach:draft`. Rows below surface in the review GUI; Approve calls
+`outreach:lock`, never a scheduler -- nothing here sends or publishes anything.
+| message-01 | email | outreach-message | messages/message-01.md | — | — | — | pending | | from /outreach draft |

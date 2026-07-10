@@ -148,6 +148,35 @@ test("duplicatable is false for a text row whose derivative file doesn't exist y
   }
 });
 
+// Outreach Phase 2 (docs/outreach-engine-plan.md §6): a lead's review-queue.md row for a
+// drafted message reuses the SAME enrich() the Review tab uses for every other row — no second
+// parser. kind classification + body loading off messages/<id>.md, never derivatives/<id>.md.
+test("enrich() classifies an outreach-message row and loads its body from messages/<id>.md", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-outreach-test-"));
+  try {
+    mkdirSync(join(folder, "messages"), { recursive: true });
+    writeFileSync(
+      join(folder, "messages", "message-01.md"),
+      "---\nlead: client-acme-co\nchannel: email\nevidence: [E1]\nclassification: greenfield\nstatus: draft\n---\n\nHi there.\n",
+    );
+    const row: QueueRow = {
+      id: "message-01", platform: "email", format: "outreach-message", asset: "messages/message-01.md",
+      status: "pending", notes: "", lineIndex: 0,
+    };
+    const out = enrich(folder, "client-acme-co", row, { text: "" }, NO_LIVE);
+    assert.equal(out.kind, "outreach-message");
+    assert.equal(out.hasAsset, true);
+    assert.equal(out.body, "Hi there.");
+    // never editable/revisable/duplicatable in this phase (no in-place edit, no "Ask Claude",
+    // no re-angling flow defined for outreach messages) — Approve/Discard are the only actions.
+    assert.equal(out.editable, false);
+    assert.equal(out.revisable, false);
+    assert.equal(out.duplicatable, false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test("duplicatable is false for an image (quote-card) row, even with an asset on disk", () => {
   const folder = mkdtempSync(join(tmpdir(), "rows-duplicate-test-"));
   try {

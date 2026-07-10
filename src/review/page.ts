@@ -70,6 +70,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .pill.revise{background:var(--amber-bg);color:var(--amber)}
   .pill.discard{background:#eee;color:var(--muted)}
   .pill.published{background:var(--blue-bg);color:var(--blue)}
+  .pill.locked{background:var(--blue-bg);color:var(--blue)}
   .pill.blocked{background:var(--red-bg);color:var(--red)}
   .pill.needs{background:#efe9db;color:#8a6d1e}
   .spin { font-size:11px; background:#efeafd; color:#5b46b8; padding:2px 8px; border-radius:5px; font-weight:600; }
@@ -279,7 +280,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 const $ = (s, r=document) => r.querySelector(s);
 let DATA = { pieces: [], pending: 0 };
 let showDecided = false;
-const DECIDED = new Set(["published","discard"]);
+const DECIDED = new Set(["published","discard","locked"]);
 
 function flash(msg){ const f=$("#flash"); f.textContent=msg; f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1400); }
 function esc(s){ return (s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -294,7 +295,7 @@ async function post(path, body){
 }
 
 function statusLabel(s){ return s ? s : "needs"; }
-function pillClass(s){ return s && ["approve","revise","discard","published","blocked"].includes(s) ? s : "needs"; }
+function pillClass(s){ return s && ["approve","revise","discard","published","blocked","locked"].includes(s) ? s : "needs"; }
 
 function rowEl(piece, row){
   const el = document.createElement("div");
@@ -408,6 +409,12 @@ async function onAction(e, piece, row, el){
     const r = await post("/api/status",{slug:piece.slug,id:row.id,status:act});
     if (act === "approve"){
       if (r.ok === false){ flash(r.error || "Approve blocked"); }
+      else if (row.kind === "outreach-message" && r.scheduled){
+        // Outreach Phase 2: Approve here calls lock.ts, not a real scheduler — nothing sends,
+        // nothing schedules (CLAUDE.md rule 2 analog). Never say "Scheduled" for this row kind.
+        row.status="locked";
+        flash("Locked");
+      }
       else if (r.scheduled){
         row.status="published"; row.scheduledWhen=r.scheduled.when; row.manualComment=r.scheduled.manualComment||"";
         // A YouTube Short with no "youtube" cadence configured uploads PRIVATE instead of on a real
