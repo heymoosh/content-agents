@@ -193,6 +193,7 @@ CARD TYPE: EPIC
 GOAL_CONDITION: with the Landing page live and a real work-with-me URL configured, `work_with_me_url` in `config/content-types.yaml` points at the real URL instead of LinkedIn; the 4 work-flavored types' CTA text is confirmed with Muxin (unchanged or updated, her call); every other content type is unchanged.
 - STATUS: To Do
 - DEPENDS ON: Landing page
+- DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): when the real landing page ships, change the CTA TEXT too (e.g. "Work with me" instead of "Connect on LinkedIn") for the 4 work-flavored types, not just the destination URL.
 - GROOMED: explicit GOAL_CONDITION already on card; pure config swap once Landing page ships; DEPENDS ON already correctly set + 2026-07-08
 - PARKED: needs Muxin call: CTA text for the 4 work-flavored types (keep as-is or update) before this config swap runs - card says her call, flag not decide silently
 <!-- card-id: ae602c84-18ed-4532-8f1b-3bd716e1a10e -->
@@ -318,20 +319,11 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
-**Outreach engine — Phase 0: discovery spike (JSA_DB_PATH + seed list)**
-- The plan's Phase 0 (docs/outreach-engine-plan.md SS6) had no card, so it could silently never happen — yet it holds the one blocking input for Phase 1. Two of its three items are now DONE: the JSA values-depth check (SS2c) closed 2026-07-09, finding recorded on the Phase 1 card; the read path is designed (jsa.ts, better-sqlite3 readonly).
-- Remaining: (1) add JSA_DB_PATH to .env pointing at manual_research.db and verify a read-only better-sqlite3 query works; (2) MUXIN INPUT REQUIRED — the seed list is still short: platforms have 2 of 3-5 (School for Moral Ambition, AI for Good Neural Network), clients have zero concrete names (only directional criteria: smaller mission-aligned tech companies). Client seeds can come from Muxin's head, the --from-jsa TARGET pull (logistics-fit only — must still pass worldview qualify), or the vault's deep-researched companies via the ingest card.
-- GOAL_CONDITION: .env carries JSA_DB_PATH and a read-only query against manual_research.db succeeds from this repo; the plan doc SS8 item 3 records >=3 client seeds and >=3 platform seeds.
-- STATUS: To Do
-- GROOMED: clear GOAL_CONDITION; seed gaps have self-resolution paths (--from-jsa / vault ingest) + 2026-07-10
-- PARKED: needs Muxin call: card says MUXIN INPUT REQUIRED for the client seed list before this outreach spike builds
-<!-- card-id: be1e4dcd-36dc-41bf-8c1a-66925d7f4658 -->
-
 **Port cost-minimization policy to claude-config/simple-kanban conductor lane**
 - Card a1a6f379 (content-agents) codified CLAUDE.md rule 6 (prefer subscription/free model routes, minimize per-token API cost) and fixed a scaffold-default drift bug. That card noted the same policy applies to simple-kanban builds via the claude-config lane, out of scope for the content-agents worktree. ORIGIN: follow-up from a1a6f379.
 - STATUS: To Do
+- DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): mirror the a1a6f379 cost-minimization fix into the claude-config/simple-kanban conductor lane, low-risk mirrored change.
 - GROOMED: clear pointer to a1a6f379's fix to port to claude-config lane + 2026-07-10
-- PARKED: needs Muxin call: targets the separate claude-config conductor lane with an under-specified port-the-fix scope - confirm exact change before building in that repo
 <!-- card-id: 3ddcc3c3-8226-4778-824e-21dd199bde75 -->
 
 **Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
@@ -347,8 +339,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Look at the /atomize notes flow to find (or build) the actual path that queues those rows, so the new publish automation has real input to act on.
 - CHAIN: depth 1 (follow-up of 83f60f12)
 - STATUS: To Do
+- DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): Substack IS an atomize routing target now via the Notes flow. Update config/routing.yaml + config/platforms.yaml comments to reflect Substack as both a source AND a target.
 - GROOMED: clear diagnostic task, no blocking unknown + 2026-07-10
-- PARKED: needs Muxin call: config/routing.yaml says Substack is a source channel, not an atomize routing target, but substack.ts now consumes platform:substack review-queue rows -- is Substack meant to be an atomize target (contradicts the config comment) or is there a different intended path? Flagged in Pre-flight decisions batch, 2026-07-10.
 <!-- card-id: a52927cd-5d00-41d8-82a6-9febf59e5394 -->
 
 **Bakeoff whisper.cpp vs Gemini on a real Muxin voice memo**
@@ -364,6 +356,15 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: Backlog
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
+
+**Outreach engine — Phase 0: discovery spike (JSA_DB_PATH + seed list)**
+- The plan's Phase 0 (docs/outreach-engine-plan.md SS6) had no card, so it could silently never happen — yet it holds the one blocking input for Phase 1. Two of its three items are now DONE: the JSA values-depth check (SS2c) closed 2026-07-09, finding recorded on the Phase 1 card; the read path is designed (jsa.ts, better-sqlite3 readonly).
+- Remaining: (1) add JSA_DB_PATH to .env pointing at manual_research.db and verify a read-only better-sqlite3 query works; (2) MUXIN INPUT REQUIRED — the seed list is still short: platforms have 2 of 3-5 (School for Moral Ambition, AI for Good Neural Network), clients have zero concrete names (only directional criteria: smaller mission-aligned tech companies). Client seeds can come from Muxin's head, the --from-jsa TARGET pull (logistics-fit only — must still pass worldview qualify), or the vault's deep-researched companies via the ingest card.
+- GOAL_CONDITION: .env carries JSA_DB_PATH and a read-only query against manual_research.db succeeds from this repo; the plan doc SS8 item 3 records >=3 client seeds and >=3 platform seeds.
+- STATUS: Done
+- DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): Phase 1 build (PR #167) already satisfies this card -- JSA_DB_PATH read path proven working, 2 real seeds pulled via --from-jsa TARGET/WAIT verdicts (client-posthog, client-axelerant). No separate build needed, marking Done.
+- GROOMED: clear GOAL_CONDITION; seed gaps have self-resolution paths (--from-jsa / vault ingest) + 2026-07-10
+<!-- card-id: be1e4dcd-36dc-41bf-8c1a-66925d7f4658 -->
 
 **Outreach engine — Phase 1: engine core + client config (seeded leads)**
 - PARENT: ba9769af
