@@ -272,10 +272,11 @@ SHIP: held
 - RULE 7: discovery/qualify prompts are content-generation logic -> this PR HOLDS for Muxin's review.
 
 DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor expansion begins from the ingested corpus (see the "Ingest existing research corpus" card) — roughly 30 anchors from the Obsidian vault + 140 JSA-scored companies — not just the 2 seed anchors. (2) The two-key jobsearch gate on the Phase 1 card applies at surfacing time for jobsearch-bucket candidates: discovery that finds an aligned person at a misaligned company surfaces the PERSON as an anchor candidate, not the company as a lead. (3) The anchor graph is the "similar to this kind of company/person" mechanism; the worldview map stays the thesis test — do not reintroduce JSA's Human Enablement score as a discovery signal (see the values-depth finding on the Phase 1 card).
-- STATUS: To Do
+- STATUS: Backlog
 - DEPENDS ON: Outreach engine — Phase 3: platform config + borrowed-audience target list
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- confirmed defer; no direct epic approval for this specific phase, and deliberately last per plan anyway.
 - GROOMED: split from ba9769af/b7dcb608 per plan §6 Phase 5; explicit GOAL_CONDITION, deliberately-last rationale pinned, DEPENDS ON Phase 3 + 2026-07-09
+- PARKED: Muxin deferred (2026-07-09 pre-flight): deliberately last per plan, no direct epic approval yet
 <!-- card-id: 96216ecc-86b5-47ba-8a99-4051c17e5423 -->
 
 **Outreach engine — Ingest existing research corpus (Obsidian vault + JSA DB) into anchors + leads**
@@ -284,7 +285,10 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Constraints: NO graph database — ~250 total nodes fits the plan's existing file formats (anchors.md + lead folders); a graph DB is speculative infra. Vault analysis notes parse cleanly (H1 + bold fields + blockquotes); transcripts and thought-dumps need Claude judgment, so ingest is Claude-in-skill, not a deterministic parser. JSA's Human Enablement score is ingested as evidence text only, never as a fit signal (see the values-depth finding on the Phase 1 card). Nothing here contacts anyone; it only seeds config + lead state.
 - GOAL_CONDITION: config/outreach/anchors.md contains >=20 anchor entries, each with a why-this-anchor evidence line and a source path into the vault or JSA DB; lead folders exist for at least the 5 deep-researched vault companies with source: ingested and populated ## Evidence sections; the run touches the vault and manual_research.db read-only (no writes outside this repo).
 EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased why-this-anchor basis + source paths are OK to commit, now that the repo is private. Build as originally scoped.
-- STATUS: In Progress
+PR: https://github.com/heymoosh/content-agents/pull/181
+SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
+- STATUS: Review
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
@@ -347,6 +351,15 @@ EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased
 - CHAIN: 1
 - STATUS: Backlog
 <!-- card-id: 19b348f4-7f8a-4790-9393-8e42739ac1a0 -->
+
+**Decide: should qualify.ts accept vault: evidence sources (not just https://)?**
+- ORIGIN: follow-up auto-filed while building card d4524bd0 (Outreach engine -- Ingest existing research corpus), found by /code-review --fix.
+- client-mem/lead.md is classified turnaround, but its only worldview-match evidence item cites a vault: path (Muxin's own Obsidian notes), not a live https:// URL. qualify.ts isValidSourceUrl only accepts https:// -- the moment outreach:qualify runs on this lead (per its own normal contract), it will silently downgrade Mem from turnaround to unclear, losing a real, cited signal purely because of its source format.
+- Policy call, not a mechanical bug: should vault:-sourced evidence (ingested research, source: ingested leads) count as legitimate for qualify's URL-validity check across the whole outreach engine, or should ingested leads get re-verified against a live URL before they can qualify? Affects any future ingested lead, not just Mem.
+- GOAL_CONDITION: qualify.ts either (a) accepts vault: as a legal evidence source alongside https://, with a test proving it does not downgrade client-mem, or (b) Muxin decides ingested evidence must be re-verified against a live source before qualify -- whichever she picks, client-mem/lead.md ends up with a fit verdict that reflects a deliberate decision, not a silent format-driven downgrade.
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: 4e2e83f3-cd4f-438a-a5a1-15912c1f4f6f -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
 - A content/research agent that finds and qualifies potential clients who are a genuine fit to work with Muxin — not just anyone with a budget.
