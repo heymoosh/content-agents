@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { checkLeadShape } from "./validate.js";
+import { checkLeadShape, checkMessageShape } from "./validate.js";
 
 const REQUIRED_BODY = [
   "## Profile",
@@ -134,5 +134,74 @@ describe("checkLeadShape: pitch_angle and required body sections", () => {
     assert.ok(violations.some((v) => v.includes("## Classification")));
     assert.ok(violations.some((v) => v.includes("## Pitch")));
     assert.ok(violations.some((v) => v.includes("## Decision log")));
+  });
+});
+
+describe("checkMessageShape: the message-half guard (docs/outreach-engine-plan.md §3/§6 Phase 2)", () => {
+  const LEAD_EVIDENCE_IDS = new Set(["E1", "E6"]);
+
+  function baseMessageFm(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      lead: "client-acme-co",
+      channel: "email",
+      evidence: ["E1", "E6"],
+      classification: "greenfield",
+      status: "draft",
+      ...overrides,
+    };
+  }
+
+  test("a well-formed message passes with zero violations", () => {
+    assert.deepEqual(checkMessageShape("message-01.md", baseMessageFm(), LEAD_EVIDENCE_IDS), []);
+  });
+
+  test("flags a missing lead field", () => {
+    const fm = baseMessageFm({ lead: "" });
+    const violations = checkMessageShape("message-01.md", fm, LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes('"lead"')));
+  });
+
+  test("flags an invalid channel", () => {
+    const violations = checkMessageShape("message-01.md", baseMessageFm({ channel: "carrier-pigeon" }), LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes("channel must be")));
+  });
+
+  test("flags an invalid status", () => {
+    const violations = checkMessageShape("message-01.md", baseMessageFm({ status: "sent" }), LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes("status must be")));
+  });
+
+  test("the two-sided guard: refuses an empty evidence list", () => {
+    const violations = checkMessageShape("message-01.md", baseMessageFm({ evidence: [] }), LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes("evidence") && v.includes("non-empty")));
+  });
+
+  test("the two-sided guard: refuses a missing evidence field entirely", () => {
+    const fm = baseMessageFm();
+    delete fm.evidence;
+    const violations = checkMessageShape("message-01.md", fm, LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes("evidence") && v.includes("non-empty")));
+  });
+
+  test("the two-sided guard: refuses an evidence id that does not exist in the lead's own Evidence section", () => {
+    const violations = checkMessageShape("message-01.md", baseMessageFm({ evidence: ["E1", "E99"] }), LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes('"E99"') && v.includes("does not exist")));
+  });
+
+  test("refuses classification: unclear (you don't draft outreach off a non-fit)", () => {
+    const violations = checkMessageShape("message-01.md", baseMessageFm({ classification: "unclear" }), LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes("non-fit")));
+  });
+
+  test("refuses classification: disqualified", () => {
+    const violations = checkMessageShape("message-01.md", baseMessageFm({ classification: "disqualified" }), LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes("non-fit")));
+  });
+
+  test("flags a missing classification field", () => {
+    const fm = baseMessageFm();
+    delete fm.classification;
+    const violations = checkMessageShape("message-01.md", fm, LEAD_EVIDENCE_IDS);
+    assert.ok(violations.some((v) => v.includes('"classification"')));
   });
 });

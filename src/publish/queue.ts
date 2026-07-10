@@ -8,7 +8,7 @@ import { repoRoot } from "../db/db.js";
 
 // Which pipeline created this row. Exactly one of these three, or undefined for a row written
 // before this field existed (or one carrying a value we don't recognize) — never guessed.
-export const QUEUE_ORIGINS = ["from /cycle", "reply to mention", "from GUI queue"] as const;
+export const QUEUE_ORIGINS = ["from /cycle", "reply to mention", "from GUI queue", "from /outreach draft"] as const;
 export type QueueOrigin = (typeof QUEUE_ORIGINS)[number];
 
 export interface QueueRow {

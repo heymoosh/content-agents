@@ -1,15 +1,26 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, existsSync, statSync } from "node:fs";
+import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { parseEvidence } from "./qualify.js";
 
-// outreach:validate -- the lead-SHAPE half only: is lead.md's frontmatter/structure well-formed.
-//   tsx src/outreach/validate.ts outreach/leads/client-acme-co
-// This is deliberately NOT a full pipeline validator -- it does not check evidence quality,
-// quote-required worldview matches, or classification legality (that's qualify.ts's job, run
-// separately, against the research/qualify output). This module only answers: "is this lead.md
-// shaped the way docs/outreach-engine-plan.md §3 says a lead.md must be shaped."
+// outreach:validate -- two halves, dispatched by what kind of path is given:
+//   tsx src/outreach/validate.ts outreach/leads/client-acme-co                       (lead shape)
+//   tsx src/outreach/validate.ts outreach/leads/client-acme-co/messages/message-01.md (message shape)
+//
+// LEAD half: is lead.md's frontmatter/structure well-formed. Deliberately NOT a full pipeline
+// validator -- it does not check evidence quality, quote-required worldview matches, or
+// classification legality (that's qualify.ts's job, run separately, against the research/qualify
+// output). This half only answers: "is this lead.md shaped the way
+// docs/outreach-engine-plan.md §3 says a lead.md must be shaped."
+//
+// MESSAGE half (Phase 2, docs/outreach-engine-plan.md §3/§6): the mechanical two-sided guard.
+// Refuses a drafted message whose `evidence` list is empty, whose evidence ids don't resolve to
+// real E-ids in the lead's own `## Evidence` section, or whose `classification` is
+// unclear/disqualified (you don't draft outreach off a non-fit). lock.ts re-runs this same check
+// before ever locking a message, so a hand-edited/corrupted file can never become a legal
+// /atomize source through the GUI's approve button.
 
 const VALID_KINDS = new Set(["client", "platform"]);
 const VALID_SOURCES = new Set(["manual", "jsa", "discovered"]);
@@ -91,12 +102,57 @@ export function checkLeadShape(file: string, fm: Record<string, unknown>, body: 
   return violations;
 }
 
-function main() {
-  const dir = process.argv[2];
-  if (!dir) {
-    console.error("usage: tsx src/outreach/validate.ts <lead-folder>");
-    process.exit(1);
+const VALID_CHANNELS = new Set(["email", "linkedin-dm", "contact-form", "podcast-pitch"]);
+const VALID_MESSAGE_STATUSES = new Set(["draft", "approved", "locked"]);
+const ILLEGAL_MESSAGE_CLASSIFICATIONS = new Set(["unclear", "disqualified"]);
+
+// Pure per-file check, exported so it can be unit-tested without a lead folder on disk. Mirrors
+// checkLeadShape's shape (a violations array of strings), plus the two-sided evidence-reference
+// guard against `leadEvidenceIds` (the calling lead's own real E-ids, from its ## Evidence section).
+export function checkMessageShape(file: string, fm: Record<string, unknown>, leadEvidenceIds: Set<string>): string[] {
+  const violations: string[] = [];
+
+  if (!fm.lead || typeof fm.lead !== "string" || !fm.lead.trim()) {
+    violations.push(`${file}: missing "lead" frontmatter`);
   }
+
+  const channel = String(fm.channel ?? "");
+  if (!VALID_CHANNELS.has(channel)) {
+    violations.push(`${file}: channel must be one of ${[...VALID_CHANNELS].join("|")} (got "${channel}")`);
+  }
+
+  const status = String(fm.status ?? "");
+  if (!VALID_MESSAGE_STATUSES.has(status)) {
+    violations.push(`${file}: status must be one of draft|approved|locked (got "${status}")`);
+  }
+
+  if (fm.classification === undefined) {
+    violations.push(`${file}: missing "classification" frontmatter`);
+  } else {
+    const classification = String(fm.classification);
+    if (ILLEGAL_MESSAGE_CLASSIFICATIONS.has(classification)) {
+      violations.push(
+        `${file}: classification is "${classification}" -- you don't draft outreach off a non-fit (turnaround|greenfield only)`,
+      );
+    }
+  }
+
+  const evidence = fm.evidence;
+  const evidenceIds = Array.isArray(evidence) ? evidence.map((e) => String(e)) : [];
+  if (evidenceIds.length === 0) {
+    violations.push(`${file}: "evidence" must be a non-empty array of evidence ids (the two-sided guard)`);
+  } else {
+    for (const id of evidenceIds) {
+      if (!leadEvidenceIds.has(id)) {
+        violations.push(`${file}: evidence id "${id}" does not exist in the lead's own ## Evidence section`);
+      }
+    }
+  }
+
+  return violations;
+}
+
+function validateLead(dir: string): void {
   const absDir = dir.startsWith("/") ? dir : join(repoRoot, dir);
   const leadPath = join(absDir, "lead.md");
   if (!existsSync(leadPath)) {
@@ -111,6 +167,55 @@ function main() {
     process.exit(1);
   }
   console.log(`ok: ${dir} lead.md is well-formed`);
+}
+
+// Message mode resolves its lead folder structurally (messages/<file>.md's grandparent
+// directory) rather than off the message's own `lead:` frontmatter string -- the same
+// "navigate by directory join, not by embedded path" convention research.ts/qualify.ts/lock.ts
+// use to find a lead's lead.md.
+function validateMessage(file: string): void {
+  const absFile = file.startsWith("/") ? file : join(repoRoot, file);
+  if (!existsSync(absFile)) {
+    console.error(`no such message file: ${absFile}`);
+    process.exit(1);
+  }
+  const leadDir = dirname(dirname(absFile));
+  const leadPath = join(leadDir, "lead.md");
+  if (!existsSync(leadPath)) {
+    console.error(`no lead.md found at ${leadPath} (expected messages/<file>.md under a lead folder)`);
+    process.exit(1);
+  }
+  const { fm } = splitFrontmatter(readFileSync(absFile, "utf8"));
+  const { body: leadBody } = splitFrontmatter(readFileSync(leadPath, "utf8"));
+  const leadEvidenceIds = new Set(parseEvidence(leadBody).map((e) => e.id));
+  const violations = checkMessageShape(basename(absFile), fm, leadEvidenceIds);
+  if (violations.length) {
+    console.error(`VALIDATION FAILED (${violations.length}):`);
+    for (const v of violations) console.error(`  - ${v}`);
+    process.exit(1);
+  }
+  console.log(`ok: ${file} message is well-formed and its evidence resolves against ${leadDir}`);
+}
+
+function main() {
+  const arg = process.argv[2];
+  if (!arg) {
+    console.error(
+      "usage: tsx src/outreach/validate.ts <lead-folder>\n" +
+        "   or: tsx src/outreach/validate.ts <lead-folder>/messages/message-NN.md",
+    );
+    process.exit(1);
+  }
+  const absArg = arg.startsWith("/") ? arg : join(repoRoot, arg);
+  if (!existsSync(absArg)) {
+    console.error(`no such path: ${absArg}`);
+    process.exit(1);
+  }
+  if (statSync(absArg).isDirectory()) {
+    validateLead(arg);
+  } else {
+    validateMessage(arg);
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
