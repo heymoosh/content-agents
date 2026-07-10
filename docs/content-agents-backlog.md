@@ -212,7 +212,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - X has ZERO read access today: the existing browser agent (src/pull/platforms/x.ts) only drives X's own Analytics "Download CSV" export button. There is no code path anywhere that reads mentions, replies, or DMs for X. Building this means either a paid X API tier (mentions/DM read access is not on X's free tier) or new browser-agent scraping of the notifications page -- both substantial, separate undertakings, not a small extension of what exists.
 - GOAL_CONDITION: X inbound listening (mentions/replies, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for which access path (paid API vs. browser-agent scraping) was chosen and why, given CLAUDE.md rule 6 (prefer subscription/free routes, minimize per-token/per-service cost).
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: Backlog
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer, access-path (paid API vs DM/notification scraping) not chosen, not worth building unattended tonight.
 - GROOMED: clear scope (X mentions/replies/DMs), no blocking unknown + 2026-07-10
@@ -233,7 +233,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - Substack's browser-agent auth/session plumbing (src/pull/browser.ts, login.ts) is reusable, but it currently only reads two analytics JSON endpoints (post_management/published, publish-dashboard/summary-v2) -- it never opens a post's comment thread or reads comment/reply text, and never touches any DM/chat surface. Reading actual comment-reply text is genuinely new browser-agent code (different pages/selectors, not yet built). Whether Substack DMs are even a real product surface is unconfirmed -- worth checking before scoping this card further.
 - GOAL_CONDITION: Substack inbound listening (new comment replies on Muxin's posts, at minimum) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, reusing src/pull/browser.ts's session/auth plumbing extended to a comments-reading page.
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: Backlog
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer; also still blocked, db22283f (the pattern this mirrors) is In Progress, not Done.
 - GROOMED: clear scope (Substack comment replies), no blocking unknown + 2026-07-10
@@ -248,7 +248,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - RULE 2 ANALOG: no send path exists anywhere in this codebase. Approve means lock, never transmit.
 - RULE 7: draft prompt is content-generation logic -> this PR HOLDS for Muxin's review.
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
-- STATUS: To Do
+- STATUS: In Progress
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
