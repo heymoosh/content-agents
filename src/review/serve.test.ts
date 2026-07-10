@@ -7,6 +7,7 @@ import {
   revisePrompt,
   classifySource,
   isSafeRawPath,
+  isValidLeadDir,
   approveBlockReason,
   replyToMentionBlockReason,
   scheduleKind,
@@ -161,6 +162,16 @@ test("isSafeRawPath only allows paths under data/inbox or data/processed", () =>
   assert.ok(!isSafeRawPath("/etc/passwd"));
   assert.ok(!isSafeRawPath("config/voice.yaml")); // outside the two allowed roots
   assert.ok(!isSafeRawPath(""));
+});
+
+test("isValidLeadDir only allows a single real segment under outreach/leads/", () => {
+  assert.ok(isValidLeadDir("outreach/leads/client-acme-co"));
+  assert.ok(isValidLeadDir("outreach/leads/platform-foo.bar"));
+  assert.ok(!isValidLeadDir("outreach/leads/..")); // single-segment ".." would resolve one level up
+  assert.ok(!isValidLeadDir("outreach/leads/."));
+  assert.ok(!isValidLeadDir("outreach/leads/../../../etc/passwd"));
+  assert.ok(!isValidLeadDir("/etc/passwd"));
+  assert.ok(!isValidLeadDir(""));
 });
 
 // Approve → auto-schedule for cards / tiktok / video / substack (Muxin, 2026-07-04): approving one

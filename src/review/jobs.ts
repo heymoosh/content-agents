@@ -19,6 +19,7 @@ import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { CONTENT, safeFolder } from "./rows.js";
 import { briefRevisePrompt, latestBriefPath } from "./serve.js";
+import { runDraft, type DraftResult } from "../outreach/draft.js";
 
 // Per-job stdout/stderr logs for the atomize job queue (see the Job interface below) — persisted
 // to disk so a job's real output survives past the 40MB in-memory buffer execFile used to impose,
@@ -172,12 +173,13 @@ const ATOMIZE_PERMISSION_MODE = process.env.ATOMIZE_PERMISSION_MODE ?? "acceptEd
 type JobStatus = "queued" | "running" | "done" | "failed";
 // "url" | "file" | "text" | "notes" | "continue" | "video" are the atomize-family kinds (dispatch
 // a slash-command against a folder/source, verified by artifact check — see drain() below).
-// "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" are generic task jobs (run
-// an arbitrary async task via runQueued) — the four call sites complaint 2 flagged as spawning
-// unbounded, plus "Duplicate to platform". Both families share the same queue/mutex/log/heartbeat.
+// "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" are
+// generic task jobs (run an arbitrary async task via runQueued) — the four call sites complaint 2
+// flagged as spawning unbounded, plus "Duplicate to platform" and the Follow-ups tab's
+// "Draft follow-up". Both families share the same queue/mutex/log/heartbeat.
 export type JobKind =
   | "url" | "file" | "text" | "notes" | "continue" | "video"
-  | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate";
+  | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up";
 interface Job {
   id: string;
   kind: JobKind;
@@ -643,4 +645,15 @@ export async function duplicateToPlatform(
     });
     return { id: targetId, platform: targetPlatform, body: newBody };
   });
+}
+
+// ── Follow-ups tab: "Draft follow-up" ────────────────────────────────────────────────────────
+// A follow-up touch is a Spin reframe of the already-locked message, extraction-first (plan §5
+// stage 9) — this reuses outreach/draft.ts's runDraft() (the ONE place composed prose is allowed,
+// c308a8cf/CLAUDE.md rule 1's scoped exception) verbatim, never a bespoke compose path. Routed
+// through the SAME job queue every other GUI Claude spawn uses, so it's bounded by the one
+// `draining` mutex. Writes a new messages/message-NN.md + a `pending` review-queue.md row — same
+// as any other draft — nothing here sends or locks anything (CLAUDE.md rule 2 analog).
+export async function enqueueFollowUpDraft(dir: string, channel?: string): Promise<DraftResult> {
+  return runQueued("draft-follow-up", `Draft follow-up: ${dir}`, () => runDraft(dir, { channel }));
 }

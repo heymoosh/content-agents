@@ -9,13 +9,25 @@ import { repoRoot } from "../db/db.js";
 // config/outreach.yaml so a missing/partial file still yields sane, documented values instead of
 // throwing mid-run.
 
+// Follow-up tracker buckets (plan §3 / card 659b50f0 / Phase 4 card 21a5eb84) -- the same four
+// reason-buckets data/outreach/tracker.jsonl events carry.
+export type FollowUpBucket = "client" | "platform" | "jobsearch" | "inbound";
+
+export interface FollowUpWindow {
+  followUpAfterDays: number;
+  abandonAfterDays: number;
+}
+
 export interface OutreachConfig {
   jsaDbPathEnv: string;
   batchCap: number;
   researchTimeoutMin: number;
   searchBudgetPerSignal: number;
   channels: string[];
+  followUp: Record<FollowUpBucket, FollowUpWindow>;
 }
+
+const FOLLOW_UP_BUCKETS: readonly FollowUpBucket[] = ["client", "platform", "jobsearch", "inbound"];
 
 const DEFAULTS: OutreachConfig = {
   jsaDbPathEnv: "JSA_DB_PATH",
@@ -23,7 +35,20 @@ const DEFAULTS: OutreachConfig = {
   researchTimeoutMin: 6,
   searchBudgetPerSignal: 2,
   channels: ["email", "linkedin-dm", "contact-form", "podcast-pitch"],
+  // Matches the checked-in config/outreach.yaml `follow_up:` section exactly, so a missing/partial
+  // file (or a file missing one bucket) still yields the same sane windows documented there.
+  followUp: {
+    client: { followUpAfterDays: 7, abandonAfterDays: 30 },
+    platform: { followUpAfterDays: 10, abandonAfterDays: 45 },
+    jobsearch: { followUpAfterDays: 7, abandonAfterDays: 30 },
+    inbound: { followUpAfterDays: 3, abandonAfterDays: 14 },
+  },
 };
+
+interface RawFollowUpWindow {
+  follow_up_after_days?: number;
+  abandon_after_days?: number;
+}
 
 interface RawConfig {
   jsa_db_path_env?: string;
@@ -31,16 +56,30 @@ interface RawConfig {
   research_timeout_min?: number;
   search_budget_per_signal?: number;
   channels?: string[];
+  follow_up?: Partial<Record<FollowUpBucket, RawFollowUpWindow>>;
+}
+
+function parseFollowUp(raw: RawConfig["follow_up"]): OutreachConfig["followUp"] {
+  const result = {} as OutreachConfig["followUp"];
+  for (const bucket of FOLLOW_UP_BUCKETS) {
+    const rawWindow = raw?.[bucket];
+    const fallback = DEFAULTS.followUp[bucket];
+    result[bucket] = {
+      followUpAfterDays: rawWindow?.follow_up_after_days ?? fallback.followUpAfterDays,
+      abandonAfterDays: rawWindow?.abandon_after_days ?? fallback.abandonAfterDays,
+    };
+  }
+  return result;
 }
 
 export function loadOutreachConfig(): OutreachConfig {
   const configPath = join(repoRoot, "config", "outreach.yaml");
-  if (!existsSync(configPath)) return { ...DEFAULTS };
+  if (!existsSync(configPath)) return { ...DEFAULTS, followUp: parseFollowUp(undefined) };
   let raw: RawConfig = {};
   try {
     raw = (parse(readFileSync(configPath, "utf8")) as RawConfig) ?? {};
   } catch {
-    return { ...DEFAULTS };
+    return { ...DEFAULTS, followUp: parseFollowUp(undefined) };
   }
   return {
     jsaDbPathEnv: raw.jsa_db_path_env ?? DEFAULTS.jsaDbPathEnv,
@@ -48,5 +87,6 @@ export function loadOutreachConfig(): OutreachConfig {
     researchTimeoutMin: raw.research_timeout_min ?? DEFAULTS.researchTimeoutMin,
     searchBudgetPerSignal: raw.search_budget_per_signal ?? DEFAULTS.searchBudgetPerSignal,
     channels: raw.channels ?? DEFAULTS.channels,
+    followUp: parseFollowUp(raw.follow_up),
   };
 }
