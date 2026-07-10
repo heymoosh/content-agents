@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "./db.js";
 import { CONTROL_RUN_SOURCE, EXPLORATION_SOURCE } from "../strategy/route.js";
 
@@ -59,7 +60,7 @@ function leadMatch(content: string, prefix: string): boolean {
   return shorter.length >= 20 && longer.startsWith(shorter);
 }
 
-interface Placed {
+export interface Placed {
   platform: string;
   prefix: string;
   spin: boolean;
@@ -77,10 +78,10 @@ interface Placed {
 // BEFORE the quoted post-text prefix — the quote can itself contain a coincidental
 // "| spin |"/"| control-run |"/"| exploration |"/"| outreach-message |" substring (Muxin's own
 // post text), and testing the full line would false-positive on that.
-function readPlaced(): Placed[] {
+export function readPlaced(path: string = BETS_PATH): Placed[] {
   let text = "";
   try {
-    text = readFileSync(BETS_PATH, "utf8");
+    text = readFileSync(path, "utf8");
   } catch {
     return [];
   }
@@ -109,7 +110,7 @@ function readPlaced(): Placed[] {
 // likewise expected never to co-occur with either (a locked-message derivative isn't a spin-control
 // or exploration pick), but sits below both defensively, above spin (an outreach-sourced
 // derivative reframed for audience fit is still, first and foremost, outreach-sourced).
-function classifyHit(hit: Placed | undefined): { value: string; tag: string } {
+export function classifyHit(hit: Placed | undefined): { value: string; tag: string } {
   if (hit?.controlRun) return { value: CONTROL_RUN_SOURCE, tag: " (control-run)" };
   if (hit?.exploration) return { value: EXPLORATION_SOURCE, tag: " (exploration)" };
   if (hit?.outreachMessage) return { value: OUTREACH_MESSAGE_SOURCE, tag: " (outreach-message)" };
@@ -181,4 +182,8 @@ function main() {
   }
 }
 
-main();
+// Run only as a CLI entry point — importing classifyHit/readPlaced for tests must not execute
+// main() (which opens the db and mutates posts.source).
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}

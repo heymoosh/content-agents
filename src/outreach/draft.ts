@@ -181,8 +181,11 @@ export async function runDraft(dirArg: string, opts: { channel?: string } = {}):
     `classification: ${classification}\n` +
     `status: draft   # draft | approved | locked\n` +
     `---\n`;
-  writeFileSync(messageFile, `${frontmatter}\n${messageBody}\n`);
 
+  // Append the queue row BEFORE writing the message body: if the process dies between these two
+  // writes, a "pending" row pointing at a not-yet-written asset is a visible, diagnosable gap
+  // (the GUI / outreach:status shows the row; opening it surfaces the missing file). The reverse
+  // order risks an orphaned message file with no queue trail at all -- invisible to both.
   appendRow(absDir, {
     id: messageId,
     platform: channel,
@@ -191,6 +194,8 @@ export async function runDraft(dirArg: string, opts: { channel?: string } = {}):
     status: "pending", // NEVER "approve" on creation -- CLAUDE.md rule 2 analog, Muxin reviews first
     origin: "from /outreach draft",
   });
+
+  writeFileSync(messageFile, `${frontmatter}\n${messageBody}\n`);
 
   logCost({ step: "outreach:draft", detail: leadName, costUsd: 0 });
 
