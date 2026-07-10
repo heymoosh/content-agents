@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -97,6 +97,27 @@ test("duplicatePrompt scopes to ONE new file, carries the target platform's angl
 test("duplicatePrompt omits the char-limit line when no max_chars is known", () => {
   const p = duplicatePrompt("2026-06-16-foo", "x-1", "x", "bluesky", "bluesky-1", "body", undefined);
   assert.ok(!/character limit/.test(p));
+});
+
+test("assertNoExistingDerivative throws when a stray file already occupies the target path", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jobs-duplicate-guard-test-"));
+  const targetPath = join(dir, "x-1.md");
+  writeFileSync(targetPath, "stray out-of-band file");
+  try {
+    assert.throws(() => assertNoExistingDerivative(targetPath, "x-1"), /refus.*overwrite/i);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("assertNoExistingDerivative does not throw when the target path is free", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jobs-duplicate-guard-test-"));
+  const targetPath = join(dir, "x-1.md");
+  try {
+    assert.doesNotThrow(() => assertNoExistingDerivative(targetPath, "x-1"));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // ── runQueued: the ONE job queue (Codebase review Phase 2, part 3) ──────────────────────────────
