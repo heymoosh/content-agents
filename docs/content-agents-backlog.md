@@ -21,8 +21,10 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - Landing page for content CTAs (work-with-me / project pages / read-the-essay).
 - Worked on OUTSIDE this repo. Smarter routing depends on this being live.
 - When the landing page is live, mark this Done so Smarter routing unblocks.
-- STATUS: Backlog
+- STATUS: To Do
 - DECISION: defer — external; built outside this repo. Mark Done when the landing page is live to unblock Smarter routing
+- GROOMED: clear scoped card, no blocking unknown + 2026-07-10
+- PARKED: external work per its own DECISION: defer -- landing page is built outside this repo; conductor should never claim/build this card, only mark Done by hand once the real landing page is live.
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
 **Inbound listening + voice-replies (Build 3)**
@@ -59,9 +61,10 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - Treat native social (X/LinkedIn/Bluesky) as inbound funnels; Substack is home. Borrowed audiences drive new people toward Substack.
 - Action seed: maintain a target list of podcasts / newsletters / platforms + a pitch angle aligned to the per-channel positioning card.
 - PLAN POINTER (2026-07-08): the target list this card wants is produced by the fit-finder engine's Phase 3 (platform config + `outreach:status --targets` summary surfaced in the weekly brief) — see docs/outreach-engine-plan.md §6. This card stays a strategy note; it needs no build of its own.
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 3: platform config + borrowed-audience target list
 - DECISION: defer — stays in Backlog, not now (Muxin, 2026-07-04). Target-list mechanics now covered by docs/outreach-engine-plan.md Phase 3 (2026-07-08).
+- GROOMED: clear outcome, points at surface area, no blocking unknown + 2026-07-10
 <!-- card-id: 30772ba1-3c4a-4823-85ad-3a79788ed867 -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
@@ -247,9 +250,10 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - X has ZERO read access today: the existing browser agent (src/pull/platforms/x.ts) only drives X's own Analytics "Download CSV" export button. There is no code path anywhere that reads mentions, replies, or DMs for X. Building this means either a paid X API tier (mentions/DM read access is not on X's free tier) or new browser-agent scraping of the notifications page -- both substantial, separate undertakings, not a small extension of what exists.
 - GOAL_CONDITION: X inbound listening (mentions/replies, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for which access path (paid API vs. browser-agent scraping) was chosen and why, given CLAUDE.md rule 6 (prefer subscription/free routes, minimize per-token/per-service cost).
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer, access-path (paid API vs DM/notification scraping) not chosen, not worth building unattended tonight.
+- GROOMED: clear scope (X mentions/replies/DMs), no blocking unknown + 2026-07-10
 <!-- card-id: ec217518-9bc8-4ccd-ab37-3eecb78a0406 -->
 
 **Inbound listening: LinkedIn (mentions/comments/DMs)**
@@ -267,9 +271,10 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - Substack's browser-agent auth/session plumbing (src/pull/browser.ts, login.ts) is reusable, but it currently only reads two analytics JSON endpoints (post_management/published, publish-dashboard/summary-v2) -- it never opens a post's comment thread or reads comment/reply text, and never touches any DM/chat surface. Reading actual comment-reply text is genuinely new browser-agent code (different pages/selectors, not yet built). Whether Substack DMs are even a real product surface is unconfirmed -- worth checking before scoping this card further.
 - GOAL_CONDITION: Substack inbound listening (new comment replies on Muxin's posts, at minimum) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, reusing src/pull/browser.ts's session/auth plumbing extended to a comments-reading page.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer; also still blocked, db22283f (the pattern this mirrors) is In Progress, not Done.
+- GROOMED: clear scope (Substack comment replies), no blocking unknown + 2026-07-10
 <!-- card-id: 81808fa0-7e30-4fd1-9b61-03951b0041bc -->
 
 **Outreach engine — Phase 1: engine core + client config (seeded leads)**
@@ -375,9 +380,10 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 
 **Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
 - config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
-- STATUS: To Do
+- STATUS: In Progress
 - DECISION: approved — self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it
 - GROOMED: clear bakeoff scope: whisper.cpp vs Gemini, headless-executable + 2026-07-10
+- PARKED: hard context/turn ceiling exceeded (turns=251 tokens=94607) — session killed mid-card by the watchdog safety valve, never resumed
 <!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
 
 **Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)**
@@ -392,14 +398,25 @@ Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREME
 - Follow-up from Substack publishing automation (card 83f60f12, PR #164). config/routing.yaml and config/platforms.yaml comments state Substack is a source channel (analytics pull), not an atomize routing target, but src/publish/substack.ts now consumes review-queue.md rows with platform: substack.
 - Look at the /atomize notes flow to find (or build) the actual path that queues those rows, so the new publish automation has real input to act on.
 - CHAIN: depth 1 (follow-up of 83f60f12)
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clear diagnostic task, no blocking unknown + 2026-07-10
+- PARKED: needs Muxin call: config/routing.yaml says Substack is a source channel, not an atomize routing target, but substack.ts now consumes platform:substack review-queue rows -- is Substack meant to be an atomize target (contradicts the config comment) or is there a different intended path? Flagged in Pre-flight decisions batch, 2026-07-10.
 <!-- card-id: a52927cd-5d00-41d8-82a6-9febf59e5394 -->
+
+**Resume whisper.cpp vs Gemini transcription bakeoff (salvage worktree from ceiling-killed session)**
+- Resume the whisper.cpp vs Gemini transcription bakeoff (card de591b28) — previous attempt was killed mid-card by the watchdog turn/token ceiling before finishing.
+- One commit already sits on the worktree branch at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-whispercpp-vs-gemini-transcription-de591b28 (branch wt/whispercpp-vs-gemini-transcription-de591b28, commit 6264f38, "Add whisper.cpp transcription adapter + bakeoff comparison script"). Working tree is clean (no uncommitted changes), no PR opened yet. Worktree left in place, not cleaned up — inspect and continue from that commit rather than rebuilding from scratch.
+- Original card de591b28 is PARKED (ceiling hit) — see its DECISION/GROOMED lines for the already-answered scope (whisper.cpp vs Gemini, headless-executable) before restarting.
+- STATUS: To Do
+- DECISION: approved — carries forward the same approval already on de591b28 (self-contained provider bakeoff/investigation, cost already logged per CLAUDE.md rule 6, no judgment call blocking it).
+<!-- card-id: b1327a9c-3ffc-41df-a822-0c1e85458a1e -->
 
 **Fix cards.test.ts leaking a row into real briefs/bets.md**
 - Follow-up from Substack publishing automation (card 83f60f12, PR #164) code-review pass. cards.test.ts writes a test row directly into the real briefs/bets.md instead of saving/restoring it like substack.test.ts and reuse-guard.test.ts already do.
 - Pre-existing test-isolation bug, consistent with and confirming the already-tracked backlog card aab1eec7 — give cards.test.ts the same save/restore pattern.
 - CHAIN: depth 1 (follow-up of 83f60f12)
-- STATUS: Backlog
+RESOLVED: already shipped in PR #165 (commit 96fb68e, "Fix cards.test.ts pollution of real briefs/bets.md") — betsPath() now honors CONTENT_AGENTS_TEST_BETS_PATH, cards.test.ts points it at a tmp fixture. Marking Done, no new work needed.
+- STATUS: Done
 <!-- card-id: 8d89becf-79bf-4c59-a6b8-2f4622bb8b97 -->
 
 **Fix test pollution of briefs/bets.md (npm test writes to real file, not a tmp fixture)**
