@@ -395,6 +395,8 @@ RELAUNCH: 1
 - STATUS: Review
 - DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
 - GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
+- PR: https://github.com/heymoosh/content-agents/pull/167 (draft, held for review per RULE 7)
+- SHIP: held
 <!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
 
 **Clarify which flow produces platform:substack rows in review-queue.md**
