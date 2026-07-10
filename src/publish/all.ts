@@ -4,12 +4,13 @@ import { existsSync } from "node:fs";
 import { repoRoot } from "../db/db.js";
 
 // One entry point that schedules a content folder across EVERY channel in a single pass — text
-// (Typefully), quote cards (image relays), TikTok (PostPeer), YouTube, and ready-to-paste files — all
-// drawing from the one shared slot ledger (src/publish/slots.ts) so nothing double-books a platform's
-// day. The per-channel scripts (publish:typefully / :cards / :tiktok / :youtube / :paste) stay
-// independently callable; this just runs them in order. Each acts ONLY on rows Muxin set to `approve`
-// in review-queue.md, so a channel with nothing approved is a harmless no-op. Nothing here publishes
-// instantly — every channel schedules a draft.
+// (Typefully), quote cards (image relays), TikTok (PostPeer), YouTube, Substack Notes (constrained
+// browser agent), and ready-to-paste files — all drawing from the one shared slot ledger
+// (src/publish/slots.ts) so nothing double-books a platform's day. The per-channel scripts
+// (publish:typefully / :cards / :tiktok / :youtube / :substack / :paste) stay independently callable;
+// this just runs them in order. Each acts ONLY on rows Muxin set to `approve` in review-queue.md, so a
+// channel with nothing approved is a harmless no-op. Nothing here publishes instantly — every channel
+// schedules a draft.
 //   npm run publish:all <content-folder>
 
 const CHANNELS = [
@@ -17,6 +18,7 @@ const CHANNELS = [
   { name: "cards", script: "src/publish/cards.ts" },
   { name: "tiktok", script: "src/publish/tiktok.ts" },
   { name: "youtube", script: "src/publish/youtube.ts" },
+  { name: "substack", script: "src/publish/substack.ts" },
   { name: "paste", script: "src/publish/paste-files.ts" },
 ];
 
