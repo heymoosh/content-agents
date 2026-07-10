@@ -542,6 +542,14 @@ export function nextDerivativeId(folder: string, platform: string): string {
   return `${platform}-${max + 1}`;
 }
 
+// Guards duplicateToPlatform's write: refuse instead of letting the claude subprocess silently
+// clobber a stray file that happens to already occupy the freshly-computed target id.
+export function assertNoExistingDerivative(targetPath: string, targetId: string): void {
+  if (existsSync(targetPath)) {
+    throw new Error(`refusing to overwrite existing derivative at ${targetId}.md`);
+  }
+}
+
 // Build the instruction for a new, re-angled derivative. Exported so the prompt's guardrails
 // (extraction-first, voice.yaml, the target platform's angle + max_chars) are unit-testable.
 export function duplicatePrompt(
@@ -611,6 +619,7 @@ export async function duplicateToPlatform(
     // with another duplicate/atomize job that lands in between and claims the same id.
     const targetId = nextDerivativeId(folder, targetPlatform);
     const targetPath = join(folder, "derivatives", `${targetId}.md`);
+    assertNoExistingDerivative(targetPath, targetId);
     const prompt = duplicatePrompt(slug, id, sourcePlatform, targetPlatform, targetId, body, maxChars);
 
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
