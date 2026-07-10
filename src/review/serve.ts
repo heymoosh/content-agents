@@ -31,6 +31,7 @@ import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
+import { listLeads } from "../outreach/status.js";
 import {
   enrich,
   listPieces,
@@ -708,6 +709,15 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "GET" && url.pathname === "/api/strategy/raw-file") {
       serveRawFile(res, url.searchParams.get("path") ?? "");
+      return;
+    }
+    // Read-only outreach lead surfacing (Phase 1 definition of done: "GUI reads lead
+    // review-queues"). No write path here on purpose -- add/research/qualify stay CLI-only
+    // (`/outreach` skill, `npm run outreach:*`) for Phase 1; this endpoint just lets Muxin see
+    // where every seeded lead stands without a terminal. Reuses status.ts's own scan (listLeads)
+    // instead of re-implementing the outreach/leads/*/lead.md read here.
+    if (req.method === "GET" && url.pathname === "/api/outreach/leads") {
+      json(res, 200, { ok: true, leads: listLeads() });
       return;
     }
     res.writeHead(404).end("not found");

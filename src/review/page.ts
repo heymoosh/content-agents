@@ -192,6 +192,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <button class="tab on" data-tab="ingest">Add / Queue</button>
     <button class="tab" data-tab="review">Review <span class="count" id="count">0</span></button>
     <button class="tab" data-tab="strategy">Analytics</button>
+    <button class="tab" data-tab="outreach">Outreach</button>
   </nav>
   <span class="grow"></span>
   <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
@@ -262,6 +263,14 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       </div>
       <div id="rawList"><div class="empty">Loading…</div></div>
       <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest) — open one yourself if you want to read the raw numbers rather than a computed report.</span>
+    </div>
+  </section>
+  <section class="view" id="outreachView" hidden>
+    <div class="strategy">
+      <div class="strategy-actions">
+        <span class="hint">Read-only (Phase 1 has no send path, nothing here contacts anyone). Add/research/qualify leads from the terminal: <code>/outreach add</code>, then <code>npm run outreach:research -- outreach/leads/&lt;dir&gt;</code>, then <code>npm run outreach:qualify -- outreach/leads/&lt;dir&gt;</code>.</span>
+      </div>
+      <div id="outreachList"><div class="empty">Loading…</div></div>
     </div>
   </section>
 </main>
@@ -488,16 +497,18 @@ function render(){
 // Refresh even do?"). It's now tab-aware: doRefresh() below only re-reads whatever the CURRENT tab
 // shows, labeled per tab, with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "ingest";
-function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="strategy" ? "Refresh brief + exports" : "Refresh queue"; }
+function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Refresh leads" : "Refresh queue"; }
 function setTab(t){
   currentTab = t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
   $("#ingestView").hidden = t!=="ingest";
   $("#reviewView").hidden = t!=="review";
   $("#strategyView").hidden = t!=="strategy";
+  $("#outreachView").hidden = t!=="outreach";
   $("#decidedWrap").style.display = t==="review" ? "" : "none";
   $("#refresh").textContent = refreshLabelFor(t);
   if (t==="strategy" && !briefLoaded){ loadBrief(); loadRaw(); }
+  if (t==="outreach"){ loadOutreach(); }
 }
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>setTab(b.dataset.tab)));
 
@@ -514,6 +525,7 @@ async function doRefresh(){
   try {
     if (currentTab === "review") { await load(); await loadJobs(); }
     else if (currentTab === "strategy") { await loadBrief(); await loadRaw(); }
+    else if (currentTab === "outreach") { await loadOutreach(); }
     else { await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
@@ -646,6 +658,44 @@ async function loadRaw(){
   }
 }
 $("#rawRefreshBtn").addEventListener("click", loadRaw);
+
+// ── Outreach (Phase 1, read-only) ──
+// Same grouping order as status.ts's own STATUS_ORDER (pursue-ready leads first, cold/terminal
+// statuses last) so this view and npm run outreach:status never disagree about ordering.
+const OUTREACH_STATUS_ORDER = ["pursue","qualified","researched","intake","drafted","locked","passed"];
+async function loadOutreach(){
+  const box = $("#outreachList");
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/outreach/leads");
+  const d = await r.json();
+  const leads = (d.leads || []);
+  if(!leads.length){
+    box.innerHTML = '<div class="empty">No outreach leads yet. Run <code>/outreach add</code> (or npm run outreach:add) from the terminal to seed one.</div>';
+    return;
+  }
+  const groups = new Map();
+  for(const l of leads){
+    const key = l.status || "(no status)";
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(l);
+  }
+  const keys = [...OUTREACH_STATUS_ORDER.filter(k=>groups.has(k)), ...[...groups.keys()].filter(k=>!OUTREACH_STATUS_ORDER.includes(k))];
+  box.innerHTML = "";
+  for(const key of keys){
+    const group = groups.get(key);
+    const sec = document.createElement("div"); sec.className = "notes-panel";
+    let rows = "";
+    for(const l of group){
+      const field = l.kind === "platform" ? "fit" : "classification";
+      const value = l.classificationOrFit || "unclear";
+      const angle = l.pitchAngle ? '<div class="src">pitch: '+esc(l.pitchAngle)+'</div>' : "";
+      rows += '<div class="notepick"><div class="ntext"><div class="nmeta">'+esc(l.kind)+' · '+esc(l.source)+' · '+esc(field)+'='+esc(value)+'</div>'+
+        '<b>'+esc(l.name)+'</b>'+angle+'<div class="src">'+esc(l.dir)+'</div></div></div>';
+    }
+    sec.innerHTML = '<div class="notes-head"><h3>'+esc(key.toUpperCase())+' ('+group.length+')</h3></div><div class="notelist">'+rows+'</div>';
+    box.appendChild(sec);
+  }
+}
 
 // ── ingest + job queue ──
 let JOBS = [];
