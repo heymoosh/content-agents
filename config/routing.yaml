@@ -3,10 +3,13 @@
 # this file fills cold-start gaps and encodes rules the data can't see yet.
 #
 # Routing targets are derivative platforms only: x, linkedin, bluesky, and
-# community:<id> (see config/platforms.yaml communities). Substack is the SOURCE
-# channel, not a target. quote-card is a format asset — see thresholds.always_consider;
-# it is never platform-gated. (Video scripts moved to the /video skill — atomize no
-# longer generates them, so video-script is not routed here.)
+# community:<id> (see config/platforms.yaml communities), for full essays/posts. Substack
+# is both a SOURCE channel (analytics pull) and, for Substack Notes specifically, an
+# atomize routing TARGET (via the /atomize notes flow -> src/publish/substack.ts) — full
+# essays/posts are still never routed to Substack; Muxin writes and publishes those
+# directly. quote-card is a format asset — see thresholds.always_consider; it is never
+# platform-gated. (Video scripts moved to the /video skill — atomize no longer generates
+# them, so video-script is not routed here.)
 
 defaults:                 # platforms to include per pillar while data is INSUFFICIENT (cold start)
   human-ai:    [x, linkedin, bluesky]

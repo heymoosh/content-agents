@@ -142,8 +142,9 @@ home_brand:
 # docs/spin-experiment.md and .claude/skills/atomize/references/spin-mode.md). Internal generation
 # config ONLY: these guide how /atomize reframes a platform derivative from the source essay. They
 # are never published verbatim as post copy — the post text must still trace back to something
-# Muxin actually wrote. `substack` is reserved: Substack is the source channel, not an atomize
-# output target (config/routing.yaml), so its angle isn't applied to any derivative today.
+# Muxin actually wrote. `substack` is both a SOURCE channel (analytics pull) and an atomize
+# routing TARGET for Substack Notes specifically (via /atomize notes -> src/publish/substack.ts;
+# see config/routing.yaml) — full essays/posts are still never routed there.
 spin_angles:
   x:
     audience: tech
