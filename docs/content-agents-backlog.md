@@ -11,9 +11,10 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - Draw Things is a free, local (on-device) image/video-gen app. Worth a bakeoff-style eval against Kling (currently ~$0.08/s via OpenRouter, used for video-broll first+last-frame animation) to see if it can do first+last-frame or general short-clip animation at comparable quality for $0.
 - Unverified: whether Draw Things actually supports video generation (vs. image-only) — confirm this before scoping further.
 - PRIORITY (Muxin, 2026-07-07): low — exploratory, not blocking anything.
-- STATUS: To Do
-- DECISION: defer (pre-flight, 2026-07-07) — exploratory, unverified whether Draw Things even does video gen; Muxin marked low priority, not blocking anything.
-- GROOMED: bounded eval task (confirm Draw Things video capability, bakeoff vs Kling if yes); low-priority exploratory, no blocking unknown + 2026-07-08
+- RESEARCH FINDING (2026-07-10): CONFIRMED — Draw Things supports local I2V video generation (Wan 2.1/Wan Video I2V up to 720p/81 frames, Hunyuan Video, SkyReels I2V, Stable Video Diffusion I2V, LTX-2.3), Apple Silicon, ~2-4s clips on consumer Macs, longer render times than cloud. Sources: wiki.drawthings.ai/wiki/Video_Generation_Basics, wiki.drawthings.ai/wiki/Image_to_Image_and_Image_to_Video. Capability question is resolved; the bakeoff itself needs hands-on GUI use of the native macOS app + local model downloads, which a headless coding agent cannot execute in this environment.
+- STATUS: Backlog
+- DECISION: defer — capability CONFIRMED via research 2026-07-10 (Draw Things does support local I2V video gen), but the bakeoff itself requires hands-on GUI use of a native macOS app + local model downloads, which this headless conductor cannot execute. Needs Muxin to run manually if/when she wants the comparison.
+- PARKED: unbuildable headlessly — Draw Things is a native GUI macOS app requiring local GPU + manual model download/run; video-gen capability now confirmed via research, but the actual bakeoff needs Muxin's hands-on session, not a coding agent
 <!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
 
 **Landing page**
