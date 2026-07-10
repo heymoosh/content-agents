@@ -373,13 +373,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - PARKED: needs Muxin call: targets the separate claude-config conductor lane with an under-specified port-the-fix scope - confirm exact change before building in that repo
 <!-- card-id: 3ddcc3c3-8226-4778-824e-21dd199bde75 -->
 
-**Fix test pollution of briefs/bets.md (npm test writes to real file, not a tmp fixture)**
-- Found while reviewing card a1a6f379: running npm test in a content-agents worktree can pollute briefs/bets.md with real test-run rows due to a pre-existing test-isolation bug (some test under src/publish/cards.ts writes to the actual file instead of a tmp fixture). ORIGIN: follow-up from a1a6f379.
-- STATUS: To Do
-- DECISION: approved — pure test-isolation bugfix, no prod mutation, no judgment call
-- GROOMED: clear scoped bug: src/publish/cards.ts test writes to real bets.md + 2026-07-10
-<!-- card-id: aab1eec7-b913-46d9-8475-e3cc81533109 -->
-
 **Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
 - config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
 - STATUS: To Do
@@ -408,6 +401,13 @@ Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREME
 - CHAIN: depth 1 (follow-up of 83f60f12)
 - STATUS: Backlog
 <!-- card-id: 8d89becf-79bf-4c59-a6b8-2f4622bb8b97 -->
+
+**Fix test pollution of briefs/bets.md (npm test writes to real file, not a tmp fixture)**
+- Found while reviewing card a1a6f379: running npm test in a content-agents worktree can pollute briefs/bets.md with real test-run rows due to a pre-existing test-isolation bug (some test under src/publish/cards.ts writes to the actual file instead of a tmp fixture). ORIGIN: follow-up from a1a6f379.
+- STATUS: Done
+- DECISION: approved — pure test-isolation bugfix, no prod mutation, no judgment call
+- GROOMED: clear scoped bug: src/publish/cards.ts test writes to real bets.md + 2026-07-10
+<!-- card-id: aab1eec7-b913-46d9-8475-e3cc81533109 -->
 
 **Resume Substack publishing automation build (salvage worktree from ceiling-killed session)**
 - Resume the Substack publishing automation build (Notes-only browser-agent posting, folded into the unified GUI publish flow) — previous attempt (card 8026f53c) was killed mid-build by the watchdog turn/token ceiling before committing anything.
