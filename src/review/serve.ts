@@ -57,7 +57,7 @@ import {
   duplicateToPlatform,
   runQueued,
   runClaudeSpawn,
-  logTailSuffix,
+  decodeSpawnFailure,
 } from "./jobs.js";
 import { renderPage } from "./page.js";
 
@@ -255,11 +255,10 @@ async function generateInsights(): Promise<string> {
   // concurrency every other Claude spawn in this GUI now gets, instead of its own unbounded spawn.
   return runQueued("insights", "Generate insights", async (job) => {
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: STRATEGY_TIMEOUT_MS });
-    if (result.enoent) {
-      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
-    }
-    if (result.timedOut) throw new Error(`Claude timed out after ${STRATEGY_TIMEOUT_MS / 1000}s`);
-    if (result.code !== 0) throw new Error(`Claude failed (exit ${result.code})${logTailSuffix(job.id)}`);
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "Claude", timeoutLabel: `${STRATEGY_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
+    });
+    if (failure) throw new Error(failure);
     return result.stdout.trim();
   });
 }
@@ -291,11 +290,10 @@ async function askInsights(question: string, history: { role: string; content: s
   // Routed through the ONE job queue (Codebase review Phase 2) — see generateInsights above.
   return runQueued("ask-insights", `Ask: ${question.trim().slice(0, 60)}`, async (job) => {
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: INSIGHTS_ASK_TIMEOUT_MS });
-    if (result.enoent) {
-      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
-    }
-    if (result.timedOut) throw new Error(`Claude timed out after ${INSIGHTS_ASK_TIMEOUT_MS / 1000}s`);
-    if (result.code !== 0) throw new Error(`Claude failed (exit ${result.code})${logTailSuffix(job.id)}`);
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "Claude", timeoutLabel: `${INSIGHTS_ASK_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
+    });
+    if (failure) throw new Error(failure);
     return result.stdout.trim();
   });
 }
