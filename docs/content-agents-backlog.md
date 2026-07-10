@@ -27,22 +27,6 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - PARKED: external work per its own DECISION: defer -- landing page is built outside this repo; conductor should never claim/build this card, only mark Done by hand once the real landing page is live.
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
-**Inbound listening + voice-replies (Build 3)**
-- New capability: listen for mentions/replies/DMs on the channels, and draft replies in Muxin's voice (config/voice.yaml) for her to approve.
-- Where a platform has no API (e.g. Substack), reuse the constrained browser-agent capability (see analytics-download card) to read/post.
-- Drafts surface in the unified review GUI as suggested replies. SAFETY: draft-only, never auto-send — mirror the notes-daily pattern (unscheduled drafts, human sends).
-- This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
-- PRIORITIZED (Muxin, 2026-07-08): moved ahead of Substack publishing automation — content-generation-affecting work goes first next session.
-- GOAL_CONDITION: src/atomize/reply-draft.test.ts, src/cron/bluesky-mentions.test.ts, src/cron/bluesky-mentions-ledger.ts, src/publish/reply-approval-gate.test.ts, and src/review/page.test.ts all pass in the "check" CI job (npm test); a drafted reply never lands with queue-row status "approve" (reply-approval-gate.test.ts's gate case); `tsx src/atomize/reply-draft.ts --dry-run` produces a voice.yaml-compliant reply for a fixture mention with zero network calls and zero writes.
-- RULE 7: src/atomize/reply-draft.ts drafts what a Bluesky reply says in Muxin's voice -> content-generation logic (same class as the rule's named video-script-drafting example) -> this PR HOLDS for Muxin's review: draft PR, old-vs-new reply-draft sample in the PR body, no auto-merge even though CI is green and the review-GUI touch (src/review/page.ts, rows.ts) is otherwise low-risk.
-- SHIP: held (PR #155, https://github.com/heymoosh/content-agents/pull/155 -- draft, no auto-merge, RULE 7 content-generation-logic hold)
-- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
-- STATUS: Review
-- DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
-- DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
-- GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
-<!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
-
 **Substack publishing automation (constrained browser agent, approved content only)**
 - We auto-publish to X/LinkedIn/Bluesky (Typefully), YouTube, TikTok (PostPeer), and quote cards, but there is NO automation for publishing to Substack. Substack has no usable publishing API (CLAUDE.md rule 3).
 - Build the POST side of the constrained browser agent we already use for analytics pull (src/pull/): drive the saved Substack session to publish or schedule an approved piece, and nothing else.
@@ -267,24 +251,6 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - GROOMED: clear scope (Substack comment replies), no blocking unknown + 2026-07-10
 <!-- card-id: 81808fa0-7e30-4fd1-9b61-03951b0041bc -->
 
-**Outreach engine — Phase 1: engine core + client config (seeded leads)**
-- PARENT: ba9769af
-- ORIGIN: split out of ba9769af (Content agent: find fit clients) per docs/outreach-engine-plan.md §6 Phase 1 -- each phase is one backlog card -> one PR; the epic's accumulated scoping stays on ba9769af (now CARD TYPE: EPIC / parked), this card is the buildable slice.
-- SCOPE: intake.ts, jsa.ts (read-only manual_research.db reader, JSA_DB_PATH), research.ts (checkpointed evidence pass via claude-cli web search), qualify.ts (deterministic evidence/classification-legality checks), validate.ts (lead-shape half), config/outreach.yaml + config/outreach/clients.md, /outreach skill (add/research/qualify/status), GUI reads lead review-queues. No discovery, no drafting yet.
-- BUILD REQUIREMENTS (plan §9-§10): quote-required worldview match (a values claim must quote the candidate's own words with a link, else classify unclear) + disconfirmation pass; closed-checklist research prompt with per-signal search budget (default 2/signal) + hard subprocess timeout (5-8 min); --from-jsa refuses to bulk-import with no argument; per-run research log line to data/outreach/run-log.jsonl.
-- SEED CANDIDATES: Muxin's own client seed list is still blank (0 of 3-5, plan §8 item 3) -- use --from-jsa --verdict TARGET --limit N to pull real seeded candidates from JSA's manual_research.db instead of waiting on manual names.
-- GOAL_CONDITION (plan §6 Phase 1 definition of done): Muxin runs /outreach add on a seeded company and gets a cited, classified pitch report she can judge cold; 'unclear' demonstrably surfaces as unclear on at least one thin-evidence lead.
-- RULE 7: research/qualify prompts are content-generation logic -> this PR HOLDS for Muxin's review (plan §6, §7).
-
-JSA VALUES-DEPTH FINDING (closes the SS2c UNVERIFIED flag, verified in code 2026-07-09): JSA's verdict (auto_analyze.py compute_verdict) is logistics-weighted. Remote/Parental/Salary/Job Protection carry weight 2.0; Human Enablement, the ONLY mission/values dimension, carries the floor weight 1.0, is never a hard gate, and acts only as a salary-conditioned compensator. The older graph/ pipeline has zero values dimensions. Therefore a JSA TARGET means strong logistics, NOT values alignment: --from-jsa --verdict TARGET is a logistics-fit seed source only, and every JSA-sourced lead MUST still pass this engine's quote-required worldview qualify (SS2c's posture, now confirmed necessary, not just prudent). Treat JSA's Human Enablement search output (mission-language quotes) as useful qualify evidence; ignore its score. Muxin is separately considering removing HE from JSA's scoring entirely since the anchor-graph network design covers similar-to-aligned discovery; that is a JSA-repo call, out of scope here, and this engine's qualify never depended on it either way. The real values instrument already built is the Cowork founder-deep-dive skill (Philosophical Depth Probe tiers + Layer-7 Introduction Test); port its rubric prose into config/outreach/ as the person-level qualify reference (its Apollo/MCP tool steps do not port; use web search).
-
-TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach pursue without BOTH (a) company-level worldview qualification (quote-required per SS9f) AND (b) a named, evidenced like-minded person there (founder-deep-dive-style, extended beyond founders; Muxin's last job proves person-fit and company-fit diverge). Person-high/company-low still has value: record that person as an anchor in config/outreach/anchors.md (networking + future-referral node) even when the company is passed. Client<->employer conversion is expected: a lead's kind/bucket may change without losing its evidence and decision history. Rationale is strategic, not just preference: aligned people/orgs refer into more aligned work; misaligned ones refer into their own network.
-- STATUS: In Progress
-- DECISION: hold — card body itself states Rule 7 applies (research/qualify prompts are content-generation logic); build + draft PR, hold for review
-- GROOMED: split from ba9769af per docs/outreach-engine-plan.md §6 Phase 1; explicit GOAL_CONDITION, seed-blocker resolved via --from-jsa pull, plan RATIFIED 2026-07-08 + 2026-07-09
-- PARKED: hard context/turn ceiling exceeded (turns=255 tokens=100544) — session killed mid-card by the watchdog safety valve, never resumed — 2026-07-10
-<!-- card-id: 8e8b616e-ba97-4421-8fed-978128e0b94b -->
-
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
 - PARENT: c308a8cf
 - ORIGIN: split out of c308a8cf (Draft tailored outreach messages) per docs/outreach-engine-plan.md §6 Phase 2.
@@ -376,18 +342,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - PARKED: hard context/turn ceiling exceeded (turns=251 tokens=94607) — session killed mid-card by the watchdog safety valve, never resumed
 <!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
 
-**Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)**
-- Resume the Outreach engine Phase 1 build (engine core + client config, seeded leads) — previous attempt (card 8e8b616e) was killed mid-card by the watchdog turn/token ceiling before Step 2 (create_worktree) ever completed. No worktree exists and no commits were made — this is a clean restart, nothing to salvage from disk.
-Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREMENTS/GOAL_CONDITION/RULE 7 lines for the full, already-groomed spec before restarting; nothing about the spec itself needs re-deriving.
-RELAUNCH: 1
-- Cold-start note (2026-07-10): worktree's uncommitted layer was found mid-revert (src/outreach/*, leads, npm scripts, GUI wiring deleted; unrelated already-merged whisper.cpp files stranded here as stray untracked copies) — restored to the last real commit (nothing lost, it was all committed), stray files removed, rebased clean onto origin/main (2 commits, no conflicts). Re-verified: tsc --noEmit clean, npm test 511/511 green, GOAL_CONDITION evidence confirmed on disk (client-posthog -> classification: greenfield, cited pitch_angle; client-axelerant -> classification: unclear, thin evidence correctly non-pitchable; data/outreach/run-log.jsonl has both real run entries). RULE 7 hold stands -> opening draft PR.
-- PR: https://github.com/heymoosh/content-agents/pull/167 (draft, held for review per RULE 7)
-- SHIP: held
-- STATUS: Review
-- DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
-- GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
-<!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
-
 **Clarify which flow produces platform:substack rows in review-queue.md**
 - Follow-up from Substack publishing automation (card 83f60f12, PR #164). config/routing.yaml and config/platforms.yaml comments state Substack is a source channel (analytics pull), not an atomize routing target, but src/publish/substack.ts now consumes review-queue.md rows with platform: substack.
 - Look at the /atomize notes flow to find (or build) the actual path that queues those rows, so the new publish automation has real input to act on.
@@ -410,6 +364,52 @@ RELAUNCH: 1
 - STATUS: Backlog
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
+
+**Outreach engine — Phase 1: engine core + client config (seeded leads)**
+- PARENT: ba9769af
+- ORIGIN: split out of ba9769af (Content agent: find fit clients) per docs/outreach-engine-plan.md §6 Phase 1 -- each phase is one backlog card -> one PR; the epic's accumulated scoping stays on ba9769af (now CARD TYPE: EPIC / parked), this card is the buildable slice.
+- SCOPE: intake.ts, jsa.ts (read-only manual_research.db reader, JSA_DB_PATH), research.ts (checkpointed evidence pass via claude-cli web search), qualify.ts (deterministic evidence/classification-legality checks), validate.ts (lead-shape half), config/outreach.yaml + config/outreach/clients.md, /outreach skill (add/research/qualify/status), GUI reads lead review-queues. No discovery, no drafting yet.
+- BUILD REQUIREMENTS (plan §9-§10): quote-required worldview match (a values claim must quote the candidate's own words with a link, else classify unclear) + disconfirmation pass; closed-checklist research prompt with per-signal search budget (default 2/signal) + hard subprocess timeout (5-8 min); --from-jsa refuses to bulk-import with no argument; per-run research log line to data/outreach/run-log.jsonl.
+- SEED CANDIDATES: Muxin's own client seed list is still blank (0 of 3-5, plan §8 item 3) -- use --from-jsa --verdict TARGET --limit N to pull real seeded candidates from JSA's manual_research.db instead of waiting on manual names.
+- GOAL_CONDITION (plan §6 Phase 1 definition of done): Muxin runs /outreach add on a seeded company and gets a cited, classified pitch report she can judge cold; 'unclear' demonstrably surfaces as unclear on at least one thin-evidence lead.
+- RULE 7: research/qualify prompts are content-generation logic -> this PR HOLDS for Muxin's review (plan §6, §7).
+
+JSA VALUES-DEPTH FINDING (closes the SS2c UNVERIFIED flag, verified in code 2026-07-09): JSA's verdict (auto_analyze.py compute_verdict) is logistics-weighted. Remote/Parental/Salary/Job Protection carry weight 2.0; Human Enablement, the ONLY mission/values dimension, carries the floor weight 1.0, is never a hard gate, and acts only as a salary-conditioned compensator. The older graph/ pipeline has zero values dimensions. Therefore a JSA TARGET means strong logistics, NOT values alignment: --from-jsa --verdict TARGET is a logistics-fit seed source only, and every JSA-sourced lead MUST still pass this engine's quote-required worldview qualify (SS2c's posture, now confirmed necessary, not just prudent). Treat JSA's Human Enablement search output (mission-language quotes) as useful qualify evidence; ignore its score. Muxin is separately considering removing HE from JSA's scoring entirely since the anchor-graph network design covers similar-to-aligned discovery; that is a JSA-repo call, out of scope here, and this engine's qualify never depended on it either way. The real values instrument already built is the Cowork founder-deep-dive skill (Philosophical Depth Probe tiers + Layer-7 Introduction Test); port its rubric prose into config/outreach/ as the person-level qualify reference (its Apollo/MCP tool steps do not port; use web search).
+
+TWO-KEY JOBSEARCH GATE (Muxin, 2026-07-09): a jobsearch-bucket lead cannot reach pursue without BOTH (a) company-level worldview qualification (quote-required per SS9f) AND (b) a named, evidenced like-minded person there (founder-deep-dive-style, extended beyond founders; Muxin's last job proves person-fit and company-fit diverge). Person-high/company-low still has value: record that person as an anchor in config/outreach/anchors.md (networking + future-referral node) even when the company is passed. Client<->employer conversion is expected: a lead's kind/bucket may change without losing its evidence and decision history. Rationale is strategic, not just preference: aligned people/orgs refer into more aligned work; misaligned ones refer into their own network.
+- Superseded 2026-07-10: this session was ceiling-killed before ever creating a worktree (see PARKED note below); the relaunch card fb4d6b28 built and shipped this exact scope (PR #167, merged 2026-07-10, GOAL_CONDITION verified). Marking Done here too so cards that DEPEND ON this card's exact title (Phase 2 d5b34590, Phase 3 6590efec, Phase 5 96216ecc, Ingest-corpus d4524bd0) resolve correctly instead of staying blocked on a dead card forever.
+- STATUS: Done
+- DECISION: hold — card body itself states Rule 7 applies (research/qualify prompts are content-generation logic); build + draft PR, hold for review
+- GROOMED: split from ba9769af per docs/outreach-engine-plan.md §6 Phase 1; explicit GOAL_CONDITION, seed-blocker resolved via --from-jsa pull, plan RATIFIED 2026-07-08 + 2026-07-09
+- PARKED: hard context/turn ceiling exceeded (turns=255 tokens=100544) — session killed mid-card by the watchdog safety valve, never resumed — 2026-07-10
+<!-- card-id: 8e8b616e-ba97-4421-8fed-978128e0b94b -->
+
+**Inbound listening + voice-replies (Build 3)**
+- New capability: listen for mentions/replies/DMs on the channels, and draft replies in Muxin's voice (config/voice.yaml) for her to approve.
+- Where a platform has no API (e.g. Substack), reuse the constrained browser-agent capability (see analytics-download card) to read/post.
+- Drafts surface in the unified review GUI as suggested replies. SAFETY: draft-only, never auto-send — mirror the notes-daily pattern (unscheduled drafts, human sends).
+- This is the "AI answers in my voice" idea — scope and test carefully before any send path exists.
+- PRIORITIZED (Muxin, 2026-07-08): moved ahead of Substack publishing automation — content-generation-affecting work goes first next session.
+- GOAL_CONDITION: src/atomize/reply-draft.test.ts, src/cron/bluesky-mentions.test.ts, src/cron/bluesky-mentions-ledger.ts, src/publish/reply-approval-gate.test.ts, and src/review/page.test.ts all pass in the "check" CI job (npm test); a drafted reply never lands with queue-row status "approve" (reply-approval-gate.test.ts's gate case); `tsx src/atomize/reply-draft.ts --dry-run` produces a voice.yaml-compliant reply for a fixture mention with zero network calls and zero writes.
+- RULE 7: src/atomize/reply-draft.ts drafts what a Bluesky reply says in Muxin's voice -> content-generation logic (same class as the rule's named video-script-drafting example) -> this PR HOLDS for Muxin's review: draft PR, old-vs-new reply-draft sample in the PR body, no auto-merge even though CI is green and the review-GUI touch (src/review/page.ts, rows.ts) is otherwise low-risk.
+- SHIP: merged (PR #155, https://github.com/heymoosh/content-agents/pull/155 -- Muxin reviewed + merged 2026-07-10)
+- STATUS: Done
+- DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
+- DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
+- GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
+<!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
+
+**Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)**
+- Resume the Outreach engine Phase 1 build (engine core + client config, seeded leads) — previous attempt (card 8e8b616e) was killed mid-card by the watchdog turn/token ceiling before Step 2 (create_worktree) ever completed. No worktree exists and no commits were made — this is a clean restart, nothing to salvage from disk.
+Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREMENTS/GOAL_CONDITION/RULE 7 lines for the full, already-groomed spec before restarting; nothing about the spec itself needs re-deriving.
+RELAUNCH: 1
+- Cold-start note (2026-07-10): worktree's uncommitted layer was found mid-revert (src/outreach/*, leads, npm scripts, GUI wiring deleted; unrelated already-merged whisper.cpp files stranded here as stray untracked copies) — restored to the last real commit (nothing lost, it was all committed), stray files removed, rebased clean onto origin/main (2 commits, no conflicts). Re-verified: tsc --noEmit clean, npm test 511/511 green, GOAL_CONDITION evidence confirmed on disk (client-posthog -> classification: greenfield, cited pitch_angle; client-axelerant -> classification: unclear, thin evidence correctly non-pitchable; data/outreach/run-log.jsonl has both real run entries). RULE 7 hold stands -> opening draft PR.
+- PR: https://github.com/heymoosh/content-agents/pull/167 (Muxin reviewed + merged 2026-07-10; rebased through a package.json conflict against PR #155 first)
+- SHIP: merged
+- STATUS: Done
+- DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
+- GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
+<!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
 
 **Update .claude/skills/publish + atomize SKILL.md for the Typefully card rewire**
 - ORIGIN: follow-up auto-filed while building card 1829fdf9 (Phase 4: quote cards via Typefully).
