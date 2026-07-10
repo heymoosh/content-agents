@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildResearchPrompt,
+  buildPlatformResearchPrompt,
   parseResearchResponse,
   mergeResearchIntoLead,
   runResearch,
@@ -55,6 +56,66 @@ describe("buildResearchPrompt", () => {
   test("bans em dashes in the output instructions", () => {
     const prompt = buildResearchPrompt(baseOpts);
     assert.ok(prompt.includes("No em dashes anywhere in your output"));
+  });
+});
+
+describe("buildPlatformResearchPrompt", () => {
+  const basePlatformOpts = {
+    name: "Some Podcast",
+    url: "https://pod.example.com",
+    existingProfile: "",
+    searchBudgetPerSignal: 2,
+    platformsRubric: "PLATFORM RUBRIC TEXT",
+    worldviewMap: "WORLDVIEW TEXT",
+    spinAngles: "x (audience: tech): some angle text",
+  };
+
+  test("embeds the platform name, url, and search budget", () => {
+    const prompt = buildPlatformResearchPrompt(basePlatformOpts);
+    assert.ok(prompt.includes("Some Podcast"));
+    assert.ok(prompt.includes("https://pod.example.com"));
+    assert.ok(prompt.includes("at most 2 times"));
+  });
+
+  test("embeds the platforms rubric, worldview map, and spin_angles text verbatim", () => {
+    const prompt = buildPlatformResearchPrompt(basePlatformOpts);
+    assert.ok(prompt.includes("PLATFORM RUBRIC TEXT"));
+    assert.ok(prompt.includes("WORLDVIEW TEXT"));
+    assert.ok(prompt.includes("x (audience: tech): some angle text"));
+  });
+
+  test("instructs the model to classify into strong/partial/weak/disqualified, not client values", () => {
+    const prompt = buildPlatformResearchPrompt(basePlatformOpts);
+    assert.ok(prompt.includes("CLASSIFICATION: <strong|partial|weak|disqualified>"));
+    assert.ok(!prompt.includes("turnaround|greenfield"));
+  });
+
+  test("instructs the pitch angle to be grounded in the closest spin_angles match", () => {
+    const prompt = buildPlatformResearchPrompt(basePlatformOpts);
+    assert.ok(/spin_angles/i.test(prompt));
+    assert.ok(/closest/i.test(prompt));
+  });
+
+  test("instructs a quote-required worldview match and a disconfirmation pass", () => {
+    const prompt = buildPlatformResearchPrompt(basePlatformOpts);
+    assert.ok(/REQUIRED to be a real quote/.test(prompt));
+    assert.ok(/Disconfirmation pass/.test(prompt));
+  });
+
+  test("instructs mid-tail size to downgrade, not disqualify", () => {
+    const prompt = buildPlatformResearchPrompt(basePlatformOpts);
+    assert.ok(/50k/.test(prompt));
+    assert.ok(/DOWNGRADE/.test(prompt));
+  });
+
+  test("bans em dashes in the output instructions", () => {
+    const prompt = buildPlatformResearchPrompt(basePlatformOpts);
+    assert.ok(prompt.includes("No em dashes anywhere in your output"));
+  });
+
+  test("omits the existing-profile block when there is none yet", () => {
+    const prompt = buildPlatformResearchPrompt({ ...basePlatformOpts, existingProfile: "(not yet researched)" });
+    assert.ok(!prompt.includes("Existing profile notes already on file"));
   });
 });
 
@@ -227,6 +288,103 @@ describe("mergeResearchIntoLead", () => {
   });
 });
 
+describe("mergeResearchIntoLead: kind: platform sets fit, not classification", () => {
+  const PLATFORM_HEADER = [
+    "---",
+    "kind: platform",
+    'name: "Some Podcast"',
+    "url: https://pod.example.com",
+    "source: manual",
+    "status: intake   # intake | researched | qualified | pursue | passed | drafted | locked",
+    "fit: unclear   # strong | partial | weak | disqualified",
+    "pitch_angle: ",
+    "---",
+  ].join("\n");
+
+  const PLATFORM_BODY = [
+    "## Profile",
+    "",
+    "(not yet researched)",
+    "",
+    "## Evidence",
+    "",
+    "(none yet)",
+    "",
+    "## Classification",
+    "",
+    "(not yet classified)",
+    "",
+    "## Pitch",
+    "",
+    "(not yet drafted)",
+    "",
+    "## Decision log",
+    "",
+    "- 2026-07-01: intake (manual)",
+  ].join("\n");
+
+  const CLIENT_HEADER = [
+    "---",
+    "kind: client",
+    'name: "Acme Co"',
+    "url: https://acme.co",
+    "source: manual",
+    "status: intake   # intake | researched | qualified | pursue | passed | drafted | locked",
+    "classification: unclear   # turnaround | greenfield | unclear | disqualified",
+    "pitch_angle: ",
+    "---",
+  ].join("\n");
+
+  const PLATFORM_PARSED = {
+    profile: "Some Podcast covers AI and society for a general audience.",
+    evidenceBlock: "",
+    evidence: [
+      {
+        id: "E1",
+        signal: "worldview-match",
+        person: "",
+        source: "https://pod.example.com/about",
+        quote: "we think the real risk is the systems we build without checking them",
+        description: "host mission statement",
+      },
+    ],
+    disconfirmation: "Searched for closed-to-outside-guests language, found none.",
+    classification: "strong",
+    classificationNote: "Per E1 the host's own words match worldview-map statement 1.",
+    pitchAngle: "the civic-tech audience angle, applied to this podcast's own listeners",
+  };
+
+  test("sets fit (not classification) in the frontmatter for a platform-kind lead", () => {
+    const { header } = mergeResearchIntoLead({
+      header: PLATFORM_HEADER,
+      body: PLATFORM_BODY,
+      parsed: PLATFORM_PARSED,
+      kind: "platform",
+    });
+    assert.ok(header.includes("fit: strong"));
+    assert.ok(!/^classification:/m.test(header));
+  });
+
+  test("defaults to weak (not unclear) when the model returns no classification for a platform lead", () => {
+    const { header } = mergeResearchIntoLead({
+      header: PLATFORM_HEADER,
+      body: PLATFORM_BODY,
+      parsed: { ...PLATFORM_PARSED, classification: "" },
+      kind: "platform",
+    });
+    assert.ok(header.includes("fit: weak"));
+  });
+
+  test("still defaults to unclear for a client-kind lead (kind omitted preserves prior behavior)", () => {
+    const { header } = mergeResearchIntoLead({
+      header: CLIENT_HEADER,
+      body: PLATFORM_BODY,
+      parsed: { ...PLATFORM_PARSED, classification: "" },
+    });
+    assert.ok(header.includes("classification: unclear"));
+  });
+});
+
 describe("runResearch guard clauses (no subprocess reached)", () => {
   function makeLeadDir(fixtureBody: string): string {
     const dir = mkdtempSync(join(tmpdir(), "outreach-research-test-"));
@@ -234,17 +392,6 @@ describe("runResearch guard clauses (no subprocess reached)", () => {
     writeFileSync(join(dir, "lead.md"), fixtureBody);
     return dir;
   }
-
-  test("refuses a kind: platform lead with a Phase 3 scope message, before ever shelling out", async () => {
-    const dir = makeLeadDir(
-      ['---', "kind: platform", 'name: "Some Podcast"', "fit: unclear", "---", "", "## Profile", "", "x"].join("\n"),
-    );
-    try {
-      await assert.rejects(runResearch(dir), /Phase 3 scope/);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
 
   test("throws a clear error when lead.md does not exist", async () => {
     const dir = mkdtempSync(join(tmpdir(), "outreach-research-test-"));

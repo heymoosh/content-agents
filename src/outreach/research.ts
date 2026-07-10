@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { logCost } from "../util/cost-log.js";
@@ -13,6 +14,7 @@ import {
   extractSection,
   setFrontmatterField,
   type EvidenceItem,
+  type LeadKind,
 } from "./qualify.js";
 
 // outreach:research: checkpointed evidence-gathering pass on an intake lead
@@ -28,9 +30,12 @@ import {
 //
 //   tsx src/outreach/research.ts outreach/leads/client-acme-co
 //
-// Phase 1 supports kind: client only. kind: platform needs config/outreach/platforms.md, which is
-// explicit Phase 3 scope (docs/outreach-engine-plan.md) and does not exist yet -- research.ts
-// refuses a platform lead with a clear message rather than inventing an unreviewed rubric.
+// kind: client walks config/outreach/clients.md + person-fit.md (buildResearchPrompt).
+// kind: platform (Phase 3, docs/outreach-engine-plan.md §6) walks config/outreach/platforms.md
+// instead (buildPlatformResearchPrompt), classifies into the `fit` frontmatter field
+// (strong|partial|weak|disqualified) rather than `classification`, and feeds config/platforms.yaml
+// `spin_angles` in as raw material so the pitch angle names a specific, already-approved audience
+// match rather than inventing a new worldview framing per lead.
 
 const execFileP = promisify(execFile);
 
@@ -100,6 +105,73 @@ export function buildResearchPrompt(opts: {
     `<1-2 short paragraphs of rationale citing the evidence item ids above, e.g. "per E2, E4". Must not assert a worldview match without citing a worldview-match evidence item that carries a real quote.>`,
     ``,
     `PITCH_ANGLE: <one sentence: the specific, honest angle a pitch to this company would use, naming the real match found, or "insufficient evidence for a pitch angle yet" if classification is unclear or disqualified>`,
+  ].join("\n");
+}
+
+// Platform-kind sibling of buildResearchPrompt above (docs/outreach-engine-plan.md §6 Phase 3).
+// Separate function rather than a kind-branching version of buildResearchPrompt: the signal
+// taxonomy, classification values, and pitch-angle instructions all differ enough from the
+// client-kind prompt that threading a shared function with two rubric shapes would be harder to
+// read than two straight-line prompts, and it keeps the well-tested client-kind prompt untouched.
+export function buildPlatformResearchPrompt(opts: {
+  name: string;
+  url: string;
+  existingProfile: string;
+  searchBudgetPerSignal: number;
+  platformsRubric: string;
+  worldviewMap: string;
+  spinAngles: string;
+}): string {
+  const profileBlock =
+    opts.existingProfile.trim() && !isPlaceholderSection(opts.existingProfile)
+      ? `Existing profile notes already on file (do not repeat verbatim, build on them):\n"""\n${opts.existingProfile.trim()}\n"""\n`
+      : "";
+  return [
+    `You are running the RESEARCH stage of a platform-fit outreach engine for Muxin Li (docs/outreach-engine-plan.md).`,
+    `Target platform: ${opts.name}`,
+    `URL: ${opts.url || "(none given)"}`,
+    ``,
+    profileBlock,
+    `--- PLATFORM FIT RUBRIC (config/outreach/platforms.md) ---`,
+    opts.platformsRubric.trim(),
+    ``,
+    `--- WORLDVIEW MAP (config/outreach/worldview-map.md) ---`,
+    opts.worldviewMap.trim(),
+    ``,
+    `--- MUXIN'S EXISTING PER-CHANNEL POSITIONING (config/platforms.yaml spin_angles, raw material for the pitch angle) ---`,
+    opts.spinAngles.trim(),
+    ``,
+    `--- YOUR TASK ---`,
+    `Gather citable, specific evidence for this platform, closed-checklist style:`,
+    `1. Walk the topic-overlap, audience-reality, guest-friendliness/pitch-path, and recency signals, and disqualifying signals from the platform fit rubric above, one at a time. For each signal, search at most ${opts.searchBudgetPerSignal} times. If nothing turns up within that budget, record "no evidence found" for that signal and move on. Do not exceed the budget chasing one signal.`,
+    `2. Separately, look for a worldview-match: a direct quote (with a working source link) from the platform itself (host, editor, mission page, an episode or issue) that echoes one of the worldview-map statements above, in the platform's own words, not Muxin's phrasing. This is REQUIRED to be a real quote. If none exists, say so plainly, do not paraphrase or infer one.`,
+    `3. Disconfirmation pass: separately search for evidence AGAINST the worldview match you just made (or against a worldview match existing at all if you found none). Look for signals the platform does not share this belief, or does not actually take outside guests or contributors despite appearances. Record what you searched for and what, if anything, you found, even if the honest answer is nothing found either way.`,
+    `4. Classify the platform as exactly one of: strong, partial, weak, disqualified, per the rubric above. If evidence is thin or mixed, use weak, a real and expected outcome (the platform-kind analog of "unclear"). Never round up to look more decisive.`,
+    `5. Pitch angle: pick whichever of the per-channel positioning entries above (spin_angles) has the closest audience match to this platform's actual audience, and use its "angle" text as the core material for a one-sentence pitch angle naming the specific overlap between that positioning and this platform's own audience/content. Do not invent a new worldview framing from scratch when an already-approved one fits.`,
+    ``,
+    `RULES:`,
+    `- Every evidence item must have a real, working-looking source URL, and worldview-match items must carry a real direct quote. No quote means no worldview-match claim, full stop.`,
+    `- Cite Glassdoor/Blind-style or comment-section commentary as commentary, never as verified fact.`,
+    `- No em dashes anywhere in your output. Use periods, commas, colons, or parentheses instead.`,
+    `- Do not invent evidence. "No evidence found" is a legitimate, expected result for most signals.`,
+    `- Mid-tail sizing: if audience size is at or past roughly 50k (listeners or subscribers), record it explicitly in an audience-reality evidence item and DOWNGRADE the fit rather than disqualify. Muxin can hand-add a big name herself; this engine exists to find the mid-tail niches she would not otherwise find.`,
+    ``,
+    `--- OUTPUT FORMAT (exact section markers, nothing before the first marker or after the last) ---`,
+    `PROFILE:`,
+    `<2-4 sentence plain-prose summary of what this platform is and does, for someone who has never heard of it>`,
+    ``,
+    `EVIDENCE:`,
+    `<one line per evidence item found, in exactly this shape, one item per line>`,
+    `- E1 | signal: <topic-overlap|audience-reality|guest-friendliness|recency|worldview-match|disqualifying> | person: <name, or blank for platform-level signals> | source: <full https URL> | quote: <exact quote in double quotes, or (none) for non-quote signals> | <one-line description>`,
+    ``,
+    `DISCONFIRMATION:`,
+    `<1-3 sentences: what you searched for as evidence against the worldview match or guest-friendliness read, and what you found or did not find>`,
+    ``,
+    `CLASSIFICATION: <strong|partial|weak|disqualified>`,
+    `CLASSIFICATION_NOTE:`,
+    `<1-2 short paragraphs of rationale citing the evidence item ids above, e.g. "per E2, E4". Must not assert a worldview match without citing a worldview-match evidence item that carries a real quote.>`,
+    ``,
+    `PITCH_ANGLE: <one sentence: the specific, honest angle a pitch to this platform would use, grounded in the closest spin_angles match and naming the real overlap found, or "insufficient evidence for a pitch angle yet" if classification is weak or disqualified>`,
   ].join("\n");
 }
 
@@ -177,17 +249,24 @@ function replaceSection(body: string, heading: string, transform: (old: string) 
 
 // Pure merge of a parsed research response into an existing lead.md's header/body, exported so
 // the merge logic (append vs replace, evidence renumbering, placeholder handling) can be unit
-// tested without touching disk or a subprocess. kind is always "client" in Phase 1 (see the
-// module comment above on why kind: platform is refused before this ever runs).
+// tested without touching disk or a subprocess. `kind` defaults to "client" (Phase 1's only kind,
+// preserved for callers that predate Phase 3) -- kind: "platform" writes the `fit` frontmatter
+// field instead of `classification`, defaulting an empty model response to "weak" (the platform
+// analog of "unclear") rather than "unclear", since "unclear" is not a legal `fit` value
+// (config/outreach/platforms.md, validate.ts's VALID_FITS).
 export function mergeResearchIntoLead(opts: {
   header: string;
   body: string;
   parsed: ParsedResearch;
+  kind?: LeadKind;
 }): { header: string; body: string } {
   const { parsed } = opts;
-  const classification = parsed.classification || "unclear";
+  const kind = opts.kind ?? "client";
+  const fieldName = kind === "platform" ? "fit" : "classification";
+  const defaultValue = kind === "platform" ? "weak" : "unclear";
+  const classification = parsed.classification || defaultValue;
 
-  let header = setFrontmatterField(opts.header, "classification", classification);
+  let header = setFrontmatterField(opts.header, fieldName, classification);
   header = setFrontmatterField(header, "status", "researched");
   header = setFrontmatterField(header, "pitch_angle", yamlQuote(parsed.pitchAngle || "(not yet drafted)"));
 
@@ -252,6 +331,17 @@ async function callClaudeResearch(prompt: string, timeoutMs: number): Promise<st
   return text;
 }
 
+// spin_angles is checked-in, hand-edited config (config/platforms.yaml), read fresh each run so a
+// Muxin edit to an angle takes effect on the next research pass without a code change.
+function loadSpinAnglesText(): string {
+  const raw = readFileSync(join(repoRoot, "config", "platforms.yaml"), "utf8");
+  const doc = parseYaml(raw) as { spin_angles?: Record<string, { audience?: string; angle?: string }> };
+  const spinAngles = doc.spin_angles ?? {};
+  return Object.entries(spinAngles)
+    .map(([channel, v]) => `${channel} (audience: ${v.audience ?? "?"}): ${(v.angle ?? "").trim()}`)
+    .join("\n\n");
+}
+
 export async function runResearch(dirArg: string): Promise<RunResearchResult> {
   const config = loadOutreachConfig();
   const absDir = dirArg.startsWith("/") ? dirArg : join(repoRoot, dirArg);
@@ -260,38 +350,47 @@ export async function runResearch(dirArg: string): Promise<RunResearchResult> {
   const raw = readFileSync(leadPath, "utf8");
   const { fm, body, header } = splitFrontmatter(raw);
 
-  const kind = fm.kind === "platform" ? "platform" : "client";
-  if (kind === "platform") {
-    throw new Error(
-      "kind: platform has no fit profile yet (config/outreach/platforms.md is Phase 3 scope, not built in Phase 1). research.ts only supports kind: client for now.",
-    );
-  }
-
+  const kind: LeadKind = fm.kind === "platform" ? "platform" : "client";
   const name = String(fm.name ?? dirArg);
   const url = String(fm.url ?? "");
   const existingProfile = extractSection(body, "## Profile");
-
-  const clientsRubric = readFileSync(join(repoRoot, "config", "outreach", "clients.md"), "utf8");
   const worldviewMap = readFileSync(join(repoRoot, "config", "outreach", "worldview-map.md"), "utf8");
-  const personFitRubric = readFileSync(join(repoRoot, "config", "outreach", "person-fit.md"), "utf8");
 
-  const prompt = buildResearchPrompt({
-    name,
-    url,
-    existingProfile,
-    searchBudgetPerSignal: config.searchBudgetPerSignal,
-    clientsRubric,
-    worldviewMap,
-    personFitRubric,
-  });
+  let prompt: string;
+  if (kind === "platform") {
+    const platformsRubric = readFileSync(join(repoRoot, "config", "outreach", "platforms.md"), "utf8");
+    const spinAngles = loadSpinAnglesText();
+    prompt = buildPlatformResearchPrompt({
+      name,
+      url,
+      existingProfile,
+      searchBudgetPerSignal: config.searchBudgetPerSignal,
+      platformsRubric,
+      worldviewMap,
+      spinAngles,
+    });
+  } else {
+    const clientsRubric = readFileSync(join(repoRoot, "config", "outreach", "clients.md"), "utf8");
+    const personFitRubric = readFileSync(join(repoRoot, "config", "outreach", "person-fit.md"), "utf8");
+    prompt = buildResearchPrompt({
+      name,
+      url,
+      existingProfile,
+      searchBudgetPerSignal: config.searchBudgetPerSignal,
+      clientsRubric,
+      worldviewMap,
+      personFitRubric,
+    });
+  }
 
   const timeoutMs = config.researchTimeoutMin * 60_000;
   const text = await callClaudeResearch(prompt, timeoutMs);
   const parsed = parseResearchResponse(text);
+  const defaultClassification = kind === "platform" ? "weak" : "unclear";
 
-  const merged = mergeResearchIntoLead({ header, body, parsed });
+  const merged = mergeResearchIntoLead({ header, body, parsed, kind });
   const date = new Date().toISOString().slice(0, 10);
-  const logLine = `- ${date}: research pass (search_budget_per_signal=${config.searchBudgetPerSignal}, evidence_found=${parsed.evidence.length}, classification=${parsed.classification || "unclear"})`;
+  const logLine = `- ${date}: research pass (search_budget_per_signal=${config.searchBudgetPerSignal}, evidence_found=${parsed.evidence.length}, classification=${parsed.classification || defaultClassification})`;
   const finalBody = `${merged.body.replace(/\n+$/, "")}\n${logLine}\n`;
 
   writeFileSync(leadPath, `${merged.header}\n${finalBody}`);
@@ -305,7 +404,7 @@ export async function runResearch(dirArg: string): Promise<RunResearchResult> {
     search_budget_per_signal: config.searchBudgetPerSignal,
     timeout_min: config.researchTimeoutMin,
     evidence_found: parsed.evidence.length,
-    classification: parsed.classification || "unclear",
+    classification: parsed.classification || defaultClassification,
     disconfirmation_checked: Boolean(parsed.disconfirmation.trim()),
     model: (process.env.CLAUDE_POLISH_MODEL ?? "sonnet").trim(),
   };
@@ -316,7 +415,7 @@ export async function runResearch(dirArg: string): Promise<RunResearchResult> {
   return {
     dir: dirArg,
     name,
-    classification: parsed.classification || "unclear",
+    classification: parsed.classification || defaultClassification,
     evidenceCount: parsed.evidence.length,
   };
 }
