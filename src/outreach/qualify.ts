@@ -47,7 +47,10 @@ export interface EvidenceItem {
   description: string;
 }
 
-function extractSection(body: string, heading: string): string {
+// Exported so research.ts (the LLM evidence-gathering pass) can reuse the exact same section
+// slicing and frontmatter-field rewrite logic when it merges its findings into lead.md, instead
+// of maintaining a second, possibly-drifting copy of this parsing.
+export function extractSection(body: string, heading: string): string {
   const lines = body.split("\n");
   const start = lines.findIndex((l) => l.trim() === heading);
   if (start === -1) return "";
@@ -172,7 +175,7 @@ export function evaluateQualify(input: QualifyInput, evidence: EvidenceItem[]): 
   return { fieldName, claimed, finalValue, status, downgraded, reasons, anchorEntry };
 }
 
-function setFrontmatterField(header: string, field: string, value: string): string {
+export function setFrontmatterField(header: string, field: string, value: string): string {
   const lines = header.split("\n");
   const idx = lines.findIndex((l) => l.startsWith(`${field}:`));
   if (idx === -1) return header;
