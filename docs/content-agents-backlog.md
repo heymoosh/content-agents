@@ -248,7 +248,10 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - RULE 2 ANALOG: no send path exists anywhere in this codebase. Approve means lock, never transmit.
 - RULE 7: draft prompt is content-generation logic -> this PR HOLDS for Muxin's review.
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
-- STATUS: In Progress
+PR: https://github.com/heymoosh/content-agents/pull/171
+SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
+- STATUS: Review
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
@@ -335,6 +338,22 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: Backlog
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
+
+**Update .claude/skills/atomize + outreach SKILL.md for Phase 2 (draft/lock)**
+- ORIGIN: follow-up auto-filed while building card d5b34590 (Outreach engine Phase 2: decision gate, draft, lock, /atomize reuse).
+- .claude/skills/atomize/SKILL.md step-4 frontmatter example should document `outreach_message: true` so a live /atomize run actually stamps the marker src/db/tag-source.ts now knows how to read. .claude/skills/outreach/SKILL.md non-negotiable-rule-1 and its subcommand list need draft/lock added, replacing any "Phase 2 not built yet" language.
+- Could not be done inside the Phase 2 build itself -- writes under .claude/ are not grantable to a headless worker in that session (same constraint card ebe652a7 hit; needs an attended/interactive run).
+- GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), and atomize/SKILL.md documents the outreach_message: true frontmatter marker.
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: cccfc43a-6547-4f08-aeb4-3e76e7e27c49 -->
+
+**Decide: should atomized-outreach content be excluded from pillar/platform resonance figures?**
+- ORIGIN: follow-up auto-filed while building card d5b34590 (Outreach engine Phase 2). route.ts loadData() already excludes CONTROL_RUN_SOURCE/EXPLORATION_SOURCE from strategy resonance math. Phase 2 deliberately did NOT add the new outreach-message tag-source value to that exclusion list (kept the change local to tag-source.ts per its own scope) since that is a strategy-analytics judgment call, not a Phase 2 build decision.
+- Worth a deliberate call before Phase 4/5 strategy work leans on resonance figures that might now include outreach-sourced follow-up posts (spin reframes of locked outreach messages, run through /atomize like any other content).
+- CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: dc47457f-a6b7-49fe-b48d-838b41fc7657 -->
 
 **Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
 - config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
