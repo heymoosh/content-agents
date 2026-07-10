@@ -391,7 +391,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Resume the Outreach engine Phase 1 build (engine core + client config, seeded leads) — previous attempt (card 8e8b616e) was killed mid-card by the watchdog turn/token ceiling before Step 2 (create_worktree) ever completed. No worktree exists and no commits were made — this is a clean restart, nothing to salvage from disk.
 Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREMENTS/GOAL_CONDITION/RULE 7 lines for the full, already-groomed spec before restarting; nothing about the spec itself needs re-deriving.
 RELAUNCH: 1
-- STATUS: In Progress
+- Cold-start note (2026-07-10): worktree's uncommitted layer was found mid-revert (src/outreach/*, leads, npm scripts, GUI wiring deleted; unrelated already-merged whisper.cpp files stranded here as stray untracked copies) — restored to the last real commit (nothing lost, it was all committed), stray files removed, rebased clean onto origin/main (2 commits, no conflicts). Re-verified: tsc --noEmit clean, npm test 511/511 green, GOAL_CONDITION evidence confirmed on disk (client-posthog -> classification: greenfield, cited pitch_angle; client-axelerant -> classification: unclear, thin evidence correctly non-pitchable; data/outreach/run-log.jsonl has both real run entries). RULE 7 hold stands -> opening draft PR.
+- STATUS: Review
 - DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
 - GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
 <!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
@@ -410,6 +411,14 @@ RELAUNCH: 1
 - STATUS: Backlog
 - PARKED: needs Muxin to physically drop a real voice memo in data/inbox/ before this can run (2026-07-10) — surfaced via morning summary, not a live ask
 <!-- card-id: ae96b8e1-4102-4bd6-af10-8df51d21704d -->
+
+**Code-enforce research.ts per-signal search budget (currently prompt-text-only)**
+- Discovered during fb4d6b28's Step 3.5 code-review: research.ts search_budget_per_signal (config/outreach.yaml, default 2/signal) is enforced only as prompt text ("search at most N times") passed to the claude-cli subprocess, not as code-level call interception. The hard subprocess timeout (5-8 min) IS genuinely enforced via Node timeout option -- only the per-signal count lacks a code-level backstop.
+- Not a blocker: the timeout already bounds worst-case wall-clock/cost even if the LLM ignores the budget hint. This is a tightening, not a bug.
+- CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
+<!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
 
 **Resume whisper.cpp vs Gemini transcription bakeoff (salvage worktree from ceiling-killed session)**
 - Resume the whisper.cpp vs Gemini transcription bakeoff (card de591b28) — previous attempt was killed mid-card by the watchdog turn/token ceiling before finishing.
