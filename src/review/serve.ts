@@ -29,6 +29,7 @@ import { publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
 import { publishCards, isQuoteCardRow } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
+import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import {
   enrich,
@@ -84,26 +85,35 @@ const IS_DEV_WORKTREE = repoRoot.includes("/.claude/worktrees/");
 //   quote-card / quote-card:<target>                     → cards.ts   (publishCards)
 //   tiktok                                               → tiktok.ts  (publishTikTok → scheduleToTikTok)
 //   YouTube Short (platform youtube OR format short)     → youtube.ts (publishShorts)
+//   substack                                             → substack.ts (publishSubstack)
 // Returns null for a row no scheduler owns — it just gets the plain approve status (CLAUDE.md rule 2
 // is preserved: the row was already set to approve; scheduling only mirrors what /publish would do).
-export type ScheduleKind = "text" | "card" | "tiktok" | "video";
+export type ScheduleKind = "text" | "card" | "tiktok" | "video" | "substack";
 export function scheduleKind(row: QueueRow): ScheduleKind | null {
   if (TEXT_PLATFORMS.has(row.platform)) return "text";
   if (isQuoteCardRow(row.platform)) return "card";
   if (isTikTokRow(row.platform)) return "tiktok"; // checked before "video" — a tiktok row is also a short
   if (isShortRow(row.platform, row.format)) return "video";
+  if (isSubstackRow(row.platform)) return "substack";
   return null;
 }
 
-// The four folder-level publish functions the dispatch routes to. Injected (default = the real ones)
-// so scheduleApproved is unit-testable WITHOUT any real PostPeer / Upload-Post / YouTube network call.
+// The five folder-level publish functions the dispatch routes to. Injected (default = the real ones)
+// so scheduleApproved is unit-testable WITHOUT any real PostPeer / Upload-Post / YouTube / browser call.
 export interface SchedulerDeps {
   publishText: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
   publishCards: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
   publishTikTok: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
   publishShorts: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+  publishSubstack: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
 }
-const DEFAULT_SCHEDULER_DEPS: SchedulerDeps = { publishText, publishCards, publishTikTok, publishShorts };
+const DEFAULT_SCHEDULER_DEPS: SchedulerDeps = {
+  publishText,
+  publishCards,
+  publishTikTok,
+  publishShorts,
+  publishSubstack,
+};
 
 // Rows (keyed `${slug}/${id}`) currently mid-schedule — see the in-flight guard in the /api/status
 // handler below, which prevents a double-click/retry from firing a duplicate real provider call.
@@ -130,6 +140,7 @@ export async function scheduleApproved(
     kind === "text" ? deps.publishText
     : kind === "card" ? deps.publishCards
     : kind === "tiktok" ? deps.publishTikTok
+    : kind === "substack" ? deps.publishSubstack
     : deps.publishShorts;
   try {
     const done = await fn(folder, { onlyIds: [row.id] });

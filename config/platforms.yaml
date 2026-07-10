@@ -96,6 +96,15 @@ platforms:
     posts_per_week: 3
     slot_days: [Tue, Wed, Thu, Fri]
     slot_time_pst: "16:00"
+  substack:
+    min_reuse_days: 7       # Notes only (essays are published directly by Muxin, not this pipeline); short-form, faster reuse window allows topical updates
+    # Substack NOTES cadence for the unified scheduler (publish:substack). Posts Tuesday through
+    # Friday at 9am PST, giving organic readership momentum day-to-day without overwhelming subscribers.
+    # Scope: Substack Notes only, posted via the constrained browser agent in src/publish/substack.ts.
+    # Full essays/posts are written and published by Muxin directly on Substack, never through this repo.
+    posts_per_week: 4
+    slot_days: [Tue, Wed, Thu, Fri]
+    slot_time_pst: "09:00"
 
 communities:
   moral-ambition:

@@ -17,6 +17,7 @@ const CHANNELS = [
   { name: "cards", script: "src/publish/cards.ts" },
   { name: "tiktok", script: "src/publish/tiktok.ts" },
   { name: "youtube", script: "src/publish/youtube.ts" },
+  { name: "substack", script: "src/publish/substack.ts" },
   { name: "paste", script: "src/publish/paste-files.ts" },
 ];
 

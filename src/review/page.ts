@@ -46,6 +46,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .badge.x{background:#e9edf2;color:#2c3e50}.badge.linkedin{background:#e4ecf5;color:#1c4e8a}
   .badge.bluesky{background:#e3eefb;color:#1f6fd6}.badge.tiktok{background:#f0e9f2;color:#5a2c66}
   .badge.quote-card{background:#f3ecdf;color:#7a5a1c}.badge.video-script,.badge.youtube{background:#f6e3e1;color:#9a2f2f}
+  .badge.substack{background:#fbe7dd;color:#a3441c}
   .fmt { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
   .pill { font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; margin-left:auto; }
   .pill.approve{background:var(--green-bg);color:var(--green)}
