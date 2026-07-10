@@ -48,6 +48,7 @@
     "notes-daily": "tsx src/cron/notes-daily.ts",
     "bluesky-mentions": "tsx src/cron/bluesky-mentions.ts",
     "reply-draft": "tsx src/atomize/reply-draft.ts",
+    "outreach:jsa": "tsx src/outreach/jsa.ts",
     "outreach:add": "tsx src/outreach/intake.ts",
     "outreach:research": "tsx src/outreach/research.ts",
     "outreach:qualify": "tsx src/outreach/qualify.ts",

@@ -23,7 +23,9 @@ import { parseEvidence } from "./qualify.js";
 // /atomize source through the GUI's approve button.
 
 const VALID_KINDS = new Set(["client", "platform"]);
-const VALID_SOURCES = new Set(["manual", "jsa", "discovered"]);
+// "ingested": pre-existing research (e.g. Muxin's Obsidian vault) snapshotted into a lead.md
+// directly, distinct from "manual" (hand-typed intake), "jsa", and "discovered".
+const VALID_SOURCES = new Set(["manual", "jsa", "discovered", "ingested"]);
 const VALID_STATUSES = new Set([
   "intake",
   "researched",
