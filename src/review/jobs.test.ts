@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, runQueued, publicJob, jobs, addVideoJob } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -148,6 +148,48 @@ test("runQueued's job bookkeeping (status/error) tracks a failing task, and publ
   assert.equal(job.error, "boom");
   const pub = publicJob(job);
   assert.ok(!("task" in pub), "publicJob() must never expose the internal task closure");
+});
+
+// ── decodeSpawnFailure (card 84afb9e3) — the one enoent/timedOut/non-zero-exit classification ────
+// Previously six near-duplicated if/else-if chains, one per Claude-spawning call site. Pure and
+// deterministic, so every branch (including the two sites disagree on: verb wording, and whether
+// the log tail is appended to a timeout message) is unit-tested directly, no subprocess needed.
+
+test("decodeSpawnFailure returns null for a clean, zero-exit run", () => {
+  const result = decodeSpawnFailure({ code: 0, timedOut: false, enoent: false }, "job-x", {
+    timeoutVerb: "Claude", timeoutLabel: "180s", exitVerb: "Claude",
+  });
+  assert.equal(result, null);
+});
+
+test("decodeSpawnFailure reports enoent the same way regardless of verb options", () => {
+  const result = decodeSpawnFailure({ code: null, timedOut: false, enoent: true }, "job-x", {
+    timeoutVerb: "atomize", timeoutLabel: "15 min", exitVerb: "atomize",
+  });
+  assert.equal(result, "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
+});
+
+test("decodeSpawnFailure uses timeoutVerb + timeoutLabel, and omits the log tail by default", () => {
+  const result = decodeSpawnFailure({ code: null, timedOut: true, enoent: false }, "job-x", {
+    timeoutVerb: "Claude", timeoutLabel: "180s", exitVerb: "Claude revise",
+  });
+  assert.equal(result, "Claude timed out after 180s");
+});
+
+test("decodeSpawnFailure appends the log tail to the timeout message when includeTailOnTimeout is set", () => {
+  const result = decodeSpawnFailure({ code: null, timedOut: true, enoent: false }, "no-such-job-log", {
+    timeoutVerb: "atomize", timeoutLabel: "15 min", exitVerb: "atomize", includeTailOnTimeout: true,
+  });
+  // No log file exists for "no-such-job-log", so logTailSuffix resolves to "" — proves the tail
+  // path is wired up (not appending garbage) without needing a real persisted log.
+  assert.equal(result, "atomize timed out after 15 min");
+});
+
+test("decodeSpawnFailure uses exitVerb (which may differ from timeoutVerb) for a non-zero exit", () => {
+  const result = decodeSpawnFailure({ code: 1, timedOut: false, enoent: false }, "no-such-job-log", {
+    timeoutVerb: "Claude", timeoutLabel: "180s", exitVerb: "Claude revise",
+  });
+  assert.equal(result, "Claude revise failed (exit 1)");
 });
 
 // ── addVideoJob (card 9e20a616) — validation-only path, no real /video spawn ────────────────────

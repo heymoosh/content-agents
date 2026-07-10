@@ -118,11 +118,10 @@ export async function reviseDerivative(slug: string, id: string, instruction: st
 
   return runQueued("revise", `Ask Claude: ${slug}/${id}`, async (job) => {
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
-    if (result.enoent) {
-      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
-    }
-    if (result.timedOut) throw new Error(`Claude timed out after ${REVISE_TIMEOUT_MS / 1000}s`);
-    if (result.code !== 0) throw new Error(`Claude revise failed (exit ${result.code})${logTailSuffix(job.id)}`);
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude revise",
+    });
+    if (failure) throw new Error(failure);
 
     const refusal = parseReviseRefusal(result.stdout);
     if (refusal) throw new Error(`Ask Claude can't do that: ${refusal}`);
@@ -148,11 +147,10 @@ export async function reviseBrief(instruction: string): Promise<{ path: string; 
 
   return runQueued("brief-revise", `Revise brief: ${relPath}`, async (job) => {
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
-    if (result.enoent) {
-      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
-    }
-    if (result.timedOut) throw new Error(`Claude timed out after ${REVISE_TIMEOUT_MS / 1000}s`);
-    if (result.code !== 0) throw new Error(`Claude revise failed (exit ${result.code})${logTailSuffix(job.id)}`);
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude revise",
+    });
+    if (failure) throw new Error(failure);
     const after = readFileSync(abs, "utf8");
     if (after === before) throw new Error("Claude ran but didn't change anything — try a more specific instruction");
     return { path: relPath, content: after };
@@ -293,6 +291,40 @@ export function logTailSuffix(jobId: string): string {
   }
 }
 
+// The ONE enoent/timedOut/non-zero-exit classification for a runClaudeSpawn() result, shared by
+// every Claude-spawning call site in the GUI (reviseDerivative, reviseBrief, duplicateToPlatform,
+// generateInsights/askInsights in serve.ts, runVideoJob, and drain()'s atomize branch — previously
+// six near-duplicated if/else-if chains, one per call site). Returns the failure message the caller
+// should throw or assign, or null when the run was clean (exit 0, no timeout/enoent) so the caller
+// proceeds to its own success-path work.
+//
+// Call sites disagree on wording, not on the underlying decoding, so the differences are captured
+// as options rather than papered over:
+// - `timeoutVerb`/`exitVerb` let a site's timeout and exit-code messages use different verbs (e.g.
+//   reviseDerivative says "Claude timed out" but "Claude revise failed").
+// - `timeoutLabel` is the pre-formatted duration ("180s" vs "15 min") since sites disagree on unit.
+// - `includeTailOnTimeout` preserves an existing quirk: the assign-style sites (runVideoJob, the
+//   atomize branch of drain()) append the log tail to the timeout message too, while the throw-style
+//   sites (revise/insights/duplicate) don't. Preserved as-is — this is a pure extraction, not a
+//   behavior change.
+export function decodeSpawnFailure(
+  result: { code: number | null; timedOut: boolean; enoent: boolean },
+  jobId: string,
+  opts: { timeoutVerb: string; timeoutLabel: string; exitVerb: string; includeTailOnTimeout?: boolean }
+): string | null {
+  if (result.enoent) {
+    return "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs";
+  }
+  if (result.timedOut) {
+    const tail = opts.includeTailOnTimeout ? logTailSuffix(jobId) : "";
+    return `${opts.timeoutVerb} timed out after ${opts.timeoutLabel}${tail}`;
+  }
+  if (result.code !== 0) {
+    return `${opts.exitVerb} failed (exit ${result.code})${logTailSuffix(jobId)}`;
+  }
+  return null;
+}
+
 // How a raw source string should reach /atomize. Exported + `exists` injected so it's unit-testable
 // without touching the filesystem.
 export function classifySource(
@@ -407,23 +439,17 @@ async function runVideoJob(job: Job): Promise<void> {
     timeoutMs: ATOMIZE_TIMEOUT_MS,
     permissionMode: ATOMIZE_PERMISSION_MODE,
   });
-  const ran = result.code === 0 && !result.timedOut && !result.enoent;
+  const failure = decodeSpawnFailure(result, job.id, {
+    timeoutVerb: "video generation", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
+    exitVerb: "video generation", includeTailOnTimeout: true,
+  });
   const storyboardReady = existsSync(join(folderAbs, "video", "storyboard.md"));
-  job.status = ran && storyboardReady ? "done" : "failed";
+  job.status = !failure && storyboardReady ? "done" : "failed";
   if (job.status === "done") {
     job.slugs = [basename(job.arg)]; // enables the jobs pill's "→ review" jump link
     return;
   }
-  const tail = logTailSuffix(job.id);
-  if (result.enoent) {
-    job.error = "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs";
-  } else if (result.timedOut) {
-    job.error = `video generation timed out after ${ATOMIZE_TIMEOUT_MS / 60000} min${tail}`;
-  } else if (result.code !== 0) {
-    job.error = `video generation failed (exit ${result.code})${tail}`;
-  } else {
-    job.error = `/video ran but produced no video/storyboard.md — check the view-log link${tail}`;
-  }
+  job.error = failure ?? `/video ran but produced no video/storyboard.md — check the view-log link${logTailSuffix(job.id)}`;
 }
 
 // Process the queue one job at a time — every kind (atomize-family AND task jobs) shares this one
@@ -464,7 +490,11 @@ async function drain(): Promise<void> {
   const before = new Set(listSlugs());
   const result = await runAtomizeJob(job);
   job.slugs = listSlugs().filter((s) => !before.has(s)); // artifact check — real folders, not exit code
-  const ran = result.code === 0 && !result.timedOut && !result.enoent;
+  const failure = decodeSpawnFailure(result, job.id, {
+    timeoutVerb: "atomize", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
+    exitVerb: "atomize", includeTailOnTimeout: true,
+  });
+  const ran = !failure;
   job.status = ran ? "done" : "failed";
   if (ran && job.slugs.length) {
     // Belt-and-suspenders: force the origin tag on every row of every folder this job created,
@@ -478,16 +508,7 @@ async function drain(): Promise<void> {
       }
     }
   } else {
-    const tail = logTailSuffix(job.id);
-    if (result.enoent) {
-      job.error = "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs";
-    } else if (result.timedOut) {
-      job.error = `atomize timed out after ${ATOMIZE_TIMEOUT_MS / 60000} min${tail}`;
-    } else if (result.code !== 0) {
-      job.error = `atomize failed (exit ${result.code})${tail}`;
-    } else if (!job.slugs.length) {
-      job.error = `atomize finished but created no new content folder — check the view-log link${tail}`;
-    }
+    job.error = failure ?? `atomize finished but created no new content folder — check the view-log link${logTailSuffix(job.id)}`;
   }
   job.finishedAt = Date.now();
   draining = false;
@@ -593,11 +614,10 @@ export async function duplicateToPlatform(
     const prompt = duplicatePrompt(slug, id, sourcePlatform, targetPlatform, targetId, body, maxChars);
 
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
-    if (result.enoent) {
-      throw new Error("the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
-    }
-    if (result.timedOut) throw new Error(`Claude timed out after ${REVISE_TIMEOUT_MS / 1000}s`);
-    if (result.code !== 0) throw new Error(`Claude failed (exit ${result.code})${logTailSuffix(job.id)}`);
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
+    });
+    if (failure) throw new Error(failure);
     if (!existsSync(targetPath)) {
       throw new Error(`Claude ran but didn't write ${targetId}.md — check the view-log link${logTailSuffix(job.id)}`);
     }
