@@ -34,11 +34,11 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - GOAL_CONDITION: src/atomize/reply-draft.test.ts, src/cron/bluesky-mentions.test.ts, src/cron/bluesky-mentions-ledger.ts, src/publish/reply-approval-gate.test.ts, and src/review/page.test.ts all pass in the "check" CI job (npm test); a drafted reply never lands with queue-row status "approve" (reply-approval-gate.test.ts's gate case); `tsx src/atomize/reply-draft.ts --dry-run` produces a voice.yaml-compliant reply for a fixture mention with zero network calls and zero writes.
 - RULE 7: src/atomize/reply-draft.ts drafts what a Bluesky reply says in Muxin's voice -> content-generation logic (same class as the rule's named video-script-drafting example) -> this PR HOLDS for Muxin's review: draft PR, old-vs-new reply-draft sample in the PR body, no auto-merge even though CI is green and the review-GUI touch (src/review/page.ts, rows.ts) is otherwise low-risk.
 - SHIP: held (PR #155, https://github.com/heymoosh/content-agents/pull/155 -- draft, no auto-merge, RULE 7 content-generation-logic hold)
+- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 - STATUS: Review
 - DEPENDS ON: Automate the analytics download for /cycle (constrained browser agent)
 - DECISION: approved — green-lit to start (draft-only replies, dependency already Done). Sequencing note UPDATED (2026-07-05): 87cb6d93 and 8b00ab2e — the two cards this was queued behind — are both now Done. This card is no longer blocked by sequencing; ready to pick up whenever prioritized.
 - GROOMED: DECISION: approved already on file; dependency 0026b615 confirmed Done + 2026-07-08
-- CI NOTE: CI: pass (PR #155, refreshed at cold-start)
 <!-- card-id: db22283f-2e26-4f21-89a0-fcfe8f8fd4e9 -->
 
 **Substack publishing automation (constrained browser agent, approved content only)**
@@ -164,18 +164,6 @@ CARD TYPE: EPIC
 - DECISION: approved (Muxin, 2026-07-08) — architecture approved (extend the unified review GUI; don't build separately; don't route through JSA's product UI); data-interchange direction set (local SQLite read, not Sheets, not markdown); scoped + ratified per docs/outreach-engine-plan.md §3–§4. Builds as Phase 4, after Phases 1–2 exist to feed it. Phase 4 is GUI/state plumbing, so its PR auto-merges on green CI per rule 7 (no generation logic).
 - PARKED: superseded as work items by the Outreach engine Phase 1-5 cards (2026-07-09) — kept as reference epics; specs/decisions on these bodies remain canonical
 <!-- card-id: 659b50f0-6bc7-473b-8673-b901e9c93d11 -->
-
-**Minimize model API cost — prefer subscription / free routes over per-token API (retro review + standing policy)**
-- Requirement (Muxin, 2026-06-30): for ALL builds, default model usage to subscription / flat-rate / free routes and minimize per-token API spend. We lean on OpenRouter (per-token) more than needed.
-- Part 1 — RETRO REVIEW the current setup (config/providers.yaml + skills). Today's paid/per-token routes: text-polish = grok-openrouter (VIDEO SCRIPTS); prose = grok-openrouter (FICTION, opt-in — default is already claude-native = $0); image = openrouter Riverflow ~$0.02 cost-first + paid step-ups (Nano ~$0.13, gpt-5.4-image ~$0.23); video-broll = Kling ~$0.08/s; transcription = gemini. For each: move to Claude-via-harness-subscription where quality allows, free-local where acceptable, or keep as a logged opt-in.
-- Part 2 — CODIFY as a standing requirement so all unbuilt cards inherit it: policy added to CLAUDE.md (rule 6) + reflect in config/providers.yaml defaults; verify savings via the existing data/cost-log.csv.
-- HONEST CONSTRAINT: there is NO clean "subscription API" for Grok or GPT — their APIs bill per token and the app subscriptions aren't programmatic. The real lever is "default to Claude (subscription via the harness)"; treat Grok/GPT/paid-image as opt-in only where they add value Claude can't (e.g. Grok's fiction voice). Don't promise subscription-Grok we can't deliver.
-- Biggest concrete wins to evaluate: (a) video scripts on claude-native instead of grok-openrouter; (b) keep images free/cost-first, escalate only on request (already the policy); (c) confirm all Claude work routes through the harness subscription, not an Anthropic API key.
-- Applies to simple-kanban builds too ("all builds") — same policy belongs in the conductor config via the claude-config lane (handoff; that conductor is live).
-- STATUS: To Do
-- DECISION: defer — deprioritized, not high priority right now. Keep in Backlog. Flag when picked up: part of its scope touches the shared ~/.claude conductor config (cross-repo blast radius). 2026-07-04
-- GROOMED: two-part scope clear (retro review of config/providers.yaml + codify CLAUDE.md rule 6), honest constraint already resolves the Grok/GPT subscription question + 2026-07-08
-<!-- card-id: a1a6f379-556f-4e46-83a8-5e70fbd3c2b4 -->
 
 **"Hit record" on-camera video as a first-class media type (auto-topic, auto-route, delete source)**
 - New input: Muxin records a raw talking-head / selfie video ("hit record", say a thing, stop) and drops it in. No script, no storyboard — this is the fast, human, face-to-camera lane, DISTINCT from /video (essay → scripted short) and from Voice Notes to Published (664189d9, audio → text).
@@ -393,6 +381,33 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: To Do
 - DECISION: approved — carries forward the same approval already on 8026f53c (Muxin, 2026-07-08); scope already answered, no new judgment call needed to start.
 <!-- card-id: 83f60f12-ab69-43a8-a38c-ff73c88ed0ed -->
+
+**Port cost-minimization policy to claude-config/simple-kanban conductor lane**
+- Card a1a6f379 (content-agents) codified CLAUDE.md rule 6 (prefer subscription/free model routes, minimize per-token API cost) and fixed a scaffold-default drift bug. That card noted the same policy applies to simple-kanban builds via the claude-config lane, out of scope for the content-agents worktree. ORIGIN: follow-up from a1a6f379.
+- STATUS: Backlog
+<!-- card-id: 3ddcc3c3-8226-4778-824e-21dd199bde75 -->
+
+**Fix test pollution of briefs/bets.md (npm test writes to real file, not a tmp fixture)**
+- Found while reviewing card a1a6f379: running npm test in a content-agents worktree can pollute briefs/bets.md with real test-run rows due to a pre-existing test-isolation bug (some test under src/publish/cards.ts writes to the actual file instead of a tmp fixture). ORIGIN: follow-up from a1a6f379.
+- STATUS: Backlog
+<!-- card-id: aab1eec7-b913-46d9-8475-e3cc81533109 -->
+
+**Bakeoff: whisper.cpp vs Gemini for voice-memo transcription**
+- config/providers.yaml transcription: gemini is a deliberate paid opt-in (CLAUDE.md rule 6) pending a whisper.cpp bakeoff to see if a free-local route is quality-acceptable. ORIGIN: follow-up from a1a6f379.
+- STATUS: Backlog
+<!-- card-id: de591b28-9f79-47b6-94e7-c96162d6fe5c -->
+
+**Minimize model API cost — prefer subscription / free routes over per-token API (retro review + standing policy)**
+- Requirement (Muxin, 2026-06-30): for ALL builds, default model usage to subscription / flat-rate / free routes and minimize per-token API spend. We lean on OpenRouter (per-token) more than needed.
+- Part 1 — RETRO REVIEW the current setup (config/providers.yaml + skills). Today's paid/per-token routes: text-polish = grok-openrouter (VIDEO SCRIPTS); prose = grok-openrouter (FICTION, opt-in — default is already claude-native = $0); image = openrouter Riverflow ~$0.02 cost-first + paid step-ups (Nano ~$0.13, gpt-5.4-image ~$0.23); video-broll = Kling ~$0.08/s; transcription = gemini. For each: move to Claude-via-harness-subscription where quality allows, free-local where acceptable, or keep as a logged opt-in.
+- Part 2 — CODIFY as a standing requirement so all unbuilt cards inherit it: policy added to CLAUDE.md (rule 6) + reflect in config/providers.yaml defaults; verify savings via the existing data/cost-log.csv.
+- HONEST CONSTRAINT: there is NO clean "subscription API" for Grok or GPT — their APIs bill per token and the app subscriptions aren't programmatic. The real lever is "default to Claude (subscription via the harness)"; treat Grok/GPT/paid-image as opt-in only where they add value Claude can't (e.g. Grok's fiction voice). Don't promise subscription-Grok we can't deliver.
+- Biggest concrete wins to evaluate: (a) video scripts on claude-native instead of grok-openrouter; (b) keep images free/cost-first, escalate only on request (already the policy); (c) confirm all Claude work routes through the harness subscription, not an Anthropic API key.
+- Applies to simple-kanban builds too ("all builds") — same policy belongs in the conductor config via the claude-config lane (handoff; that conductor is live).
+- STATUS: Done
+- DECISION: defer — deprioritized, not high priority right now. Keep in Backlog. Flag when picked up: part of its scope touches the shared ~/.claude conductor config (cross-repo blast radius). 2026-07-04
+- GROOMED: two-part scope clear (retro review of config/providers.yaml + codify CLAUDE.md rule 6), honest constraint already resolves the Grok/GPT subscription question + 2026-07-08
+<!-- card-id: a1a6f379-556f-4e46-83a8-5e70fbd3c2b4 -->
 
 **Extend Substack URL to atomize to any URL**
 - You know how I can give you a substack essay URL and you can run it through atomize? I wanted to be able to do that with any link. Does it work that way?
