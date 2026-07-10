@@ -366,15 +366,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - PARKED: needs Muxin call: card says MUXIN INPUT REQUIRED for the client seed list before this outreach spike builds
 <!-- card-id: be1e4dcd-36dc-41bf-8c1a-66925d7f4658 -->
 
-**Resume Substack publishing automation build (salvage worktree from ceiling-killed session)**
-- Resume the Substack publishing automation build (Notes-only browser-agent posting, folded into the unified GUI publish flow) — previous attempt (card 8026f53c) was killed mid-build by the watchdog turn/token ceiling before committing anything.
-- Uncommitted work-in-progress already sits in the worktree at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-substack-publishing-automation-8026f53c on branch wt/substack-publishing-automation-8026f53c: new src/publish/substack.ts + docs/setup-substack-publish.md, plus edits to src/publish/all.ts, src/publish/paste-files.ts, src/review/serve.ts (+serve.test.ts), config/platforms.yaml, package.json. Worktree left in place, not cleaned up — inspect and salvage before rebuilding from scratch.
-- Original card 8026f53c is PARKED (ceiling hit) — see its DECISION/SCOPE lines for the already-answered scope (Notes only, 1 post/day cap) before restarting.
-- STATUS: To Do
-- DECISION: approved — carries forward the same approval already on 8026f53c (Muxin, 2026-07-08); scope already answered, no new judgment call needed to start.
-- GROOMED: salvage worktree + DECISION already approved, points to exact files + 2026-07-10
-<!-- card-id: 83f60f12-ab69-43a8-a38c-ff73c88ed0ed -->
-
 **Port cost-minimization policy to claude-config/simple-kanban conductor lane**
 - Card a1a6f379 (content-agents) codified CLAUDE.md rule 6 (prefer subscription/free model routes, minimize per-token API cost) and fixed a scaffold-default drift bug. That card noted the same policy applies to simple-kanban builds via the claude-config lane, out of scope for the content-agents worktree. ORIGIN: follow-up from a1a6f379.
 - STATUS: To Do
@@ -403,6 +394,32 @@ Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREME
 - DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
 - GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
 <!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
+
+**Clarify which flow produces platform:substack rows in review-queue.md**
+- Follow-up from Substack publishing automation (card 83f60f12, PR #164). config/routing.yaml and config/platforms.yaml comments state Substack is a source channel (analytics pull), not an atomize routing target, but src/publish/substack.ts now consumes review-queue.md rows with platform: substack.
+- Look at the /atomize notes flow to find (or build) the actual path that queues those rows, so the new publish automation has real input to act on.
+- CHAIN: depth 1 (follow-up of 83f60f12)
+- STATUS: Backlog
+<!-- card-id: a52927cd-5d00-41d8-82a6-9febf59e5394 -->
+
+**Fix cards.test.ts leaking a row into real briefs/bets.md**
+- Follow-up from Substack publishing automation (card 83f60f12, PR #164) code-review pass. cards.test.ts writes a test row directly into the real briefs/bets.md instead of saving/restoring it like substack.test.ts and reuse-guard.test.ts already do.
+- Pre-existing test-isolation bug, consistent with and confirming the already-tracked backlog card aab1eec7 — give cards.test.ts the same save/restore pattern.
+- CHAIN: depth 1 (follow-up of 83f60f12)
+- STATUS: Backlog
+<!-- card-id: 8d89becf-79bf-4c59-a6b8-2f4622bb8b97 -->
+
+**Resume Substack publishing automation build (salvage worktree from ceiling-killed session)**
+- Resume the Substack publishing automation build (Notes-only browser-agent posting, folded into the unified GUI publish flow) — previous attempt (card 8026f53c) was killed mid-build by the watchdog turn/token ceiling before committing anything.
+- Uncommitted work-in-progress already sits in the worktree at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-substack-publishing-automation-8026f53c on branch wt/substack-publishing-automation-8026f53c: new src/publish/substack.ts + docs/setup-substack-publish.md, plus edits to src/publish/all.ts, src/publish/paste-files.ts, src/review/serve.ts (+serve.test.ts), config/platforms.yaml, package.json. Worktree left in place, not cleaned up — inspect and salvage before rebuilding from scratch.
+- Original card 8026f53c is PARKED (ceiling hit) — see its DECISION/SCOPE lines for the already-answered scope (Notes only, 1 post/day cap) before restarting.
+RETRY: 1
+RELAUNCH: 1
+GOAL_CONDITION: npm test (src/publish/substack.test.ts 6 cases: approve-only gate, no-approved-rows no-op, phase-1 claim, wait-not-due, phase-2 fire, dry-run-zero-mutations, 1/day cap) + src/review/serve.test.ts substack-routing cases all pass; npx tsc --noEmit clean.
+- STATUS: Done
+- DECISION: approved — carries forward the same approval already on 8026f53c (Muxin, 2026-07-08); scope already answered, no new judgment call needed to start.
+- GROOMED: salvage worktree + DECISION already approved, points to exact files + 2026-07-10
+<!-- card-id: 83f60f12-ab69-43a8-a38c-ff73c88ed0ed -->
 
 **duplicateToPlatform: check target derivative path does not already exist BEFORE spawning claude, not just after**
 - - ORIGIN: follow-up auto-filed while building card 4e7cb5d3 (Phase 2: GUI actions), found during the review stage's code-review pass.
