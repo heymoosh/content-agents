@@ -176,7 +176,13 @@ export function appendPublishLog(folder: string, entry: string): void {
 // from each brief's recommendations; /publish appends an append-only "placed" row here every time
 // an asset ships, so next cycle /strategy can match the published post back to its analytics
 // outcome (then `npm run link-bet` stamps posts.bet_id and `npm run grade-bets` scores the bet).
-const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+// Resolved lazily (not a top-level const) so tests can point it at an isolated file via
+// CONTENT_AGENTS_TEST_BETS_PATH before exercising appendBetPlacement, instead of writing into the
+// real, shared briefs/bets.md — same isolation mechanism as slots.ts's ledgerPath()/
+// CONTENT_AGENTS_TEST_LEDGER.
+function betsPath(): string {
+  return process.env.CONTENT_AGENTS_TEST_BETS_PATH ?? join(repoRoot, "briefs", "bets.md");
+}
 
 const BETS_HEADER = `# Bets ledger
 
@@ -208,10 +214,11 @@ export function appendBetPlacement(
   fm: Record<string, unknown> = {},
   body = ""
 ): void {
-  mkdirSync(dirname(BETS_PATH), { recursive: true });
+  const path = betsPath();
+  mkdirSync(dirname(path), { recursive: true });
   let existing = "";
   try {
-    existing = readFileSync(BETS_PATH, "utf8");
+    existing = readFileSync(path, "utf8");
   } catch {
     existing = BETS_HEADER;
   }
@@ -238,5 +245,5 @@ export function appendBetPlacement(
   const exploration = fm.exploration_probe ? ` | exploration` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
   const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${prefix}`;
-  writeFileSync(BETS_PATH, existing.replace(/\n*$/, "\n") + line + "\n");
+  writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
 }

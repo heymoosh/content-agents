@@ -1,7 +1,7 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
+import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { basePlatform, cardTarget, publishCards } from "./cards.js";
@@ -34,33 +34,33 @@ test("cardTarget returns the destination platform, or null for a legacy fan-out 
 // upload-post.com is treated as a hard failure.
 describe("publishCards: native Typefully routing (mocked Typefully client)", () => {
   const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-  const BETS_PATH = join(repoRoot, "briefs", "bets.md");
+  // appendBetPlacement (src/publish/queue.ts) writes to briefs/bets.md — a real, shared repo file
+  // other concurrently-running test files (e.g. reuse-guard.test.ts) also read/write, since node's
+  // test runner runs test files concurrently. Point it at an isolated fixture file via
+  // CONTENT_AGENTS_TEST_BETS_PATH (same isolation mechanism as slots.test.ts's
+  // CONTENT_AGENTS_TEST_LEDGER) instead of touching the real ledger at all.
+  const TEST_BETS_PATH = join(repoRoot, "briefs", "test-fixture-cards-bets.md");
   const originalFetch = globalThis.fetch;
   const originalKey = process.env.TYPEFULLY_API_KEY;
   const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
+  const originalBetsPath = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
   const dirs: string[] = [];
 
   before(() => {
     process.env.TYPEFULLY_API_KEY = "test-key";
     process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = TEST_BETS_PATH;
   });
 
-  // Cleanup is a TARGETED removal (drop only lines carrying one of our own [folder/row] keys), never
-  // a whole-file snapshot restore: briefs/bets.md is a real shared repo file other concurrently-
-  // running test files (e.g. reuse-guard.test.ts) also read/write, and node's test runner runs test
-  // files concurrently — a blind "restore to the pre-test snapshot" would race and could silently
-  // wipe out another file's fixture rows mid-run.
   after(() => {
     globalThis.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.TYPEFULLY_API_KEY;
     else process.env.TYPEFULLY_API_KEY = originalKey;
     if (originalSetId === undefined) delete process.env.TYPEFULLY_SOCIAL_SET_ID;
     else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
-    if (existsSync(BETS_PATH)) {
-      const lines = readFileSync(BETS_PATH, "utf8").split("\n");
-      const keys = dirs.map((d) => `[${basename(d)}/`);
-      writeFileSync(BETS_PATH, lines.filter((l) => !keys.some((k) => l.includes(k))).join("\n"));
-    }
+    if (originalBetsPath === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+    else process.env.CONTENT_AGENTS_TEST_BETS_PATH = originalBetsPath;
+    if (existsSync(TEST_BETS_PATH)) rmSync(TEST_BETS_PATH, { force: true });
     for (const d of dirs) rmSync(d, { recursive: true, force: true });
   });
 
