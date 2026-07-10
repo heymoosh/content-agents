@@ -89,8 +89,41 @@ export function renderStatusTable(leads: LeadSummary[]): string {
   return lines.join("\n").trim();
 }
 
+// Fit-positive-first ordering for the target list, same "what can I act on" priority as
+// STATUS_ORDER above but keyed on fit instead of status, since a target list is read for "which
+// platforms are worth pitching," not "where is this lead in the pipeline."
+const FIT_ORDER = ["strong", "partial", "weak", "disqualified"];
+
+// outreach:status --targets -- a rendered target-list summary of platform-kind leads only
+// (docs/outreach-engine-plan.md §6 Phase 3: the "maintain a target list" action seed for card
+// 30772ba1, Growth via borrowed audiences, which /strategy folds into the weekly brief). Reuses
+// listLeads()'s scan; adds no new filesystem or LLM surface.
+export function renderTargetsList(leads: LeadSummary[]): string {
+  const platforms = leads.filter((l) => l.kind === "platform");
+  if (platforms.length === 0) {
+    return "no platform-kind leads yet -- run `tsx src/outreach/intake.ts --kind platform ...` (or `/outreach add --kind platform`) to add one.";
+  }
+  const sorted = [...platforms].sort((a, b) => {
+    const aRank = FIT_ORDER.indexOf(a.classificationOrFit);
+    const bRank = FIT_ORDER.indexOf(b.classificationOrFit);
+    const aKey = aRank === -1 ? FIT_ORDER.length : aRank;
+    const bKey = bRank === -1 ? FIT_ORDER.length : bRank;
+    return aKey !== bKey ? aKey - bKey : a.name.localeCompare(b.name);
+  });
+  const lines: string[] = [`BORROWED-AUDIENCE TARGET LIST (${sorted.length})`];
+  for (const lead of sorted) {
+    const angle = lead.pitchAngle.trim() || "(no pitch angle yet)";
+    lines.push(`  ${lead.name} [fit: ${lead.classificationOrFit || "unclear"}] -- ${angle} -- ${lead.dir}`);
+  }
+  return lines.join("\n");
+}
+
 function main() {
   const leads = listLeads();
+  if (process.argv.includes("--targets")) {
+    console.log(renderTargetsList(leads));
+    return;
+  }
   console.log(renderStatusTable(leads));
   console.log(`\n${leads.length} lead${leads.length === 1 ? "" : "s"} total.`);
 }

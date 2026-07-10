@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeLead, groupByStatus, renderStatusTable, type LeadSummary } from "./status.js";
+import { summarizeLead, groupByStatus, renderStatusTable, renderTargetsList, type LeadSummary } from "./status.js";
 
 function makeLeadMd(overrides: Record<string, string> = {}): string {
   const fields: Record<string, string> = {
@@ -121,5 +121,57 @@ describe("renderStatusTable", () => {
     };
     const text = renderStatusTable([lead]);
     assert.ok(text.includes("fit=strong"));
+  });
+});
+
+describe("renderTargetsList", () => {
+  const strongPlatform: LeadSummary = {
+    dir: "outreach/leads/platform-strong-show", kind: "platform", name: "Strong Show", source: "manual",
+    status: "pursue", classificationOrFit: "strong", pitchAngle: "the civic-tech angle applies here",
+  };
+  const partialPlatform: LeadSummary = {
+    dir: "outreach/leads/platform-partial-show", kind: "platform", name: "Partial Show", source: "discovered",
+    status: "qualified", classificationOrFit: "partial", pitchAngle: "a thinner but real overlap",
+  };
+  const weakPlatform: LeadSummary = {
+    dir: "outreach/leads/platform-weak-show", kind: "platform", name: "Weak Show", source: "manual",
+    status: "qualified", classificationOrFit: "weak", pitchAngle: "",
+  };
+  const clientLead: LeadSummary = {
+    dir: "outreach/leads/client-acme", kind: "client", name: "Acme Co", source: "manual",
+    status: "pursue", classificationOrFit: "turnaround", pitchAngle: "a client pitch angle",
+  };
+
+  test("returns a friendly empty-state message when there are no platform-kind leads", () => {
+    const text = renderTargetsList([clientLead]);
+    assert.ok(text.includes("no platform-kind leads yet"));
+  });
+
+  test("includes only platform-kind leads, excluding client-kind leads entirely", () => {
+    const text = renderTargetsList([clientLead, strongPlatform]);
+    assert.ok(!text.includes("Acme Co"));
+    assert.ok(text.includes("Strong Show"));
+  });
+
+  test("renders name, fit verdict, pitch angle, and source dir for each platform lead", () => {
+    const text = renderTargetsList([strongPlatform]);
+    assert.ok(text.includes("Strong Show"));
+    assert.ok(text.includes("strong"));
+    assert.ok(text.includes("the civic-tech angle applies here"));
+    assert.ok(text.includes("outreach/leads/platform-strong-show"));
+  });
+
+  test("orders strong/partial fit ahead of weak fit", () => {
+    const text = renderTargetsList([weakPlatform, strongPlatform, partialPlatform]);
+    const strongIdx = text.indexOf("Strong Show");
+    const partialIdx = text.indexOf("Partial Show");
+    const weakIdx = text.indexOf("Weak Show");
+    assert.ok(strongIdx < partialIdx);
+    assert.ok(partialIdx < weakIdx);
+  });
+
+  test("shows a placeholder when a lead has no pitch angle yet", () => {
+    const text = renderTargetsList([weakPlatform]);
+    assert.ok(text.includes("no pitch angle yet"));
   });
 });
