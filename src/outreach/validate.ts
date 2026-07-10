@@ -109,6 +109,7 @@ export function checkLeadShape(file: string, fm: Record<string, unknown>, body: 
 const VALID_CHANNELS = new Set(["email", "linkedin-dm", "contact-form", "podcast-pitch"]);
 const VALID_MESSAGE_STATUSES = new Set(["draft", "approved", "locked"]);
 const ILLEGAL_MESSAGE_CLASSIFICATIONS = new Set(["unclear", "disqualified"]);
+const ILLEGAL_MESSAGE_FITS = new Set(["weak", "disqualified"]);
 
 // Pure per-file check, exported so it can be unit-tested without a lead folder on disk. Mirrors
 // checkLeadShape's shape (a violations array of strings), plus the two-sided evidence-reference
@@ -130,14 +131,21 @@ export function checkMessageShape(file: string, fm: Record<string, unknown>, lea
     violations.push(`${file}: status must be one of draft|approved|locked (got "${status}")`);
   }
 
-  if (fm.classification === undefined) {
-    violations.push(`${file}: missing "classification" frontmatter`);
-  } else {
+  if (fm.classification === undefined && fm.fit === undefined) {
+    violations.push(`${file}: missing "classification" (kind: client) or "fit" (kind: platform) frontmatter`);
+  } else if (fm.classification !== undefined && fm.fit !== undefined) {
+    violations.push(`${file}: message must carry "classification" OR "fit", not both`);
+  } else if (fm.classification !== undefined) {
     const classification = String(fm.classification);
     if (ILLEGAL_MESSAGE_CLASSIFICATIONS.has(classification)) {
       violations.push(
         `${file}: classification is "${classification}" -- you don't draft outreach off a non-fit (turnaround|greenfield only)`,
       );
+    }
+  } else {
+    const fit = String(fm.fit);
+    if (ILLEGAL_MESSAGE_FITS.has(fit)) {
+      violations.push(`${file}: fit is "${fit}" -- you don't draft outreach off a non-fit (strong|partial only)`);
     }
   }
 
