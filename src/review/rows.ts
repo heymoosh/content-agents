@@ -35,6 +35,7 @@ interface EnrichedRow extends QueueRow {
   sourceLines?: unknown;
   threadCheck?: string; // "pass" | "missing" — config/platforms.yaml home_brand thread-check
   threadSpinApplied?: boolean; // Spin already drafted the worldview thread in on a "missing" verdict
+  replyToText?: string; // "reply to mention" rows (card db22283f) — what the mention/reply said
   assetUrl?: string; // image/video preview URL
   editable: boolean; // can the body be edited-and-saved here?
   revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
@@ -99,6 +100,22 @@ export function approveBlockReason(
   return null;
 }
 
+// Server-side enforcement mirror of the `isReply` UI hint inside enrich() below (which only
+// drives the revisable/duplicatable button flags — a hint the GUI can choose to render, not a
+// gate). serve.ts's /api/revise and /api/duplicate handlers call this BEFORE ever running
+// reviseDerivative/duplicateToPlatform, sourced from the row's actual persisted origin (read
+// server-side via readQueue), never a client-supplied flag: both of those jobs.ts prompts tell
+// Claude the body must "stay traceable to Muxin's source at content/<slug>/source.md", but for a
+// "reply to mention" row that file holds the mention author's own untrusted post text, not
+// Muxin's writing — and runClaudeSpawn's default permission mode (acceptEdits, full tool access)
+// is the opposite of reply-draft.ts's locked-down `--tools ""` spawn for that same untrusted text.
+export function replyToMentionBlockReason(row: QueueRow | undefined): string | null {
+  if (row?.origin === "reply to mention") {
+    return "not available for a reply-to-mention row (its source is the mention author's own post, not Muxin's writing)";
+  }
+  return null;
+}
+
 // Read-only publish-log.md text for a folder — the only place a provider draft/post id is
 // persisted (see src/review/reconcile.ts). A missing file (ENOENT — no log yet) just has no
 // entries to find; any OTHER read failure (permissions, fd exhaustion, ...) is carried as `error`
@@ -141,11 +158,17 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
   else if (row.format === "video") kind = "video";
   else if (row.format === "storyboard") kind = "storyboard";
 
+  // "Ask Claude" (revisable) and "Duplicate to platform" (duplicatable, below) both run jobs.ts
+  // prompts that tell Claude the body must "stay traceable to Muxin's source at
+  // content/<slug>/source.md" — true for every normal atomized row, but NOT for a "reply to
+  // mention" row, whose source.md is the mention author's own post, not Muxin's writing. Gate both
+  // off for that origin so neither prompt runs against a false premise.
+  const isReply = row.origin === "reply to mention";
   const out: EnrichedRow = {
     ...row,
     kind,
     editable: false,
-    revisable: existsSync(join(folder, "derivatives", `${row.id}.md`)),
+    revisable: !isReply && existsSync(join(folder, "derivatives", `${row.id}.md`)),
     hasAsset: false,
     approveBlocked: approveBlockReason(folder, row),
     reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live) : undefined,
@@ -164,6 +187,7 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     out.sourceLines = fm.source_lines;
     out.threadCheck = classifyThread(fm);
     out.threadSpinApplied = fm.thread_spin_applied === true;
+    out.replyToText = typeof fm.reply_to_text === "string" ? fm.reply_to_text : undefined;
     return true;
   };
 
@@ -196,8 +220,9 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     }
   }
   // "Duplicate to platform" only makes sense on a real text post — not an empty draft, and not an
-  // asset row (image/video/storyboard) that has no body of its own to re-angle.
-  out.duplicatable = kind === "text" && out.hasAsset;
+  // asset row (image/video/storyboard) that has no body of its own to re-angle. Also excluded for
+  // "reply to mention" rows — see isReply above.
+  out.duplicatable = !isReply && kind === "text" && out.hasAsset;
   return out;
 }
 

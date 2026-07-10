@@ -8,6 +8,7 @@ import {
   classifySource,
   isSafeRawPath,
   approveBlockReason,
+  replyToMentionBlockReason,
   scheduleKind,
   scheduleApproved,
   enrich,
@@ -119,6 +120,38 @@ test("approveBlockReason allows a video/short row once its asset exists", () => 
 test("approveBlockReason doesn't block a video/short row with no asset cell yet (nothing to check)", () => {
   const noAssetRow: QueueRow = { id: "tiktok-1", platform: "tiktok", format: "short", asset: "—", status: "pending", notes: "", lineIndex: 5 };
   assert.equal(approveBlockReason("/content/2026-06-16-foo", noAssetRow, () => false), null);
+});
+
+// Security fix (card db22283f follow-up): rows.ts's `isReply` gate inside enrich() only ever
+// drove the revisable/duplicatable BUTTON flags in the GUI — a client-side hint, not a server-side
+// gate. A request straight at /api/revise or /api/duplicate for a "reply to mention" row's id could
+// still reach reviseDerivative/duplicateToPlatform, both of which run a `claude -p` prompt over
+// content/<slug>/source.md — for that origin, the mention author's own untrusted post text, not
+// Muxin's — through runClaudeSpawn's DEFAULT permission mode (acceptEdits, full tool access),
+// unlike reply-draft.ts's locked-down `--tools ""` spawn for that same untrusted text.
+// replyToMentionBlockReason is what those two route handlers in serve.ts (~/api/revise, ~/api/duplicate)
+// now call FIRST, sourced from the row's real persisted origin via readQueue — never a
+// client-supplied flag — returning early with a 400 before reviseDerivative/duplicateToPlatform
+// (and therefore any `claude -p` spawn) is ever reached.
+test('replyToMentionBlockReason blocks a row whose persisted origin is "reply to mention"', () => {
+  const row: QueueRow = {
+    id: "bluesky-1", platform: "bluesky", format: "text", asset: "derivatives/bluesky-1.md",
+    status: "pending", notes: "reply to @alice.bsky.social", origin: "reply to mention", lineIndex: 1,
+  };
+  const reason = replyToMentionBlockReason(row);
+  assert.match(reason ?? "", /reply-to-mention row/);
+  assert.match(reason ?? "", /not Muxin's writing/);
+});
+
+test("replyToMentionBlockReason allows every other origin, a row with no origin column, and an unknown id", () => {
+  const base = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 1 };
+  assert.equal(replyToMentionBlockReason({ ...base, origin: "from /cycle" }), null);
+  assert.equal(replyToMentionBlockReason({ ...base, origin: "from GUI queue" }), null);
+  assert.equal(replyToMentionBlockReason({ ...base }), null); // pre-2026-07-04 row, no origin cell
+  // An id that doesn't match any row (readQueue's .find() returns undefined) isn't blocked here —
+  // it falls through to reviseDerivative/duplicateToPlatform's own "no such row" error, same as
+  // before this fix, so a bad id still gets a real error instead of a misleading reply-gate message.
+  assert.equal(replyToMentionBlockReason(undefined), null);
 });
 
 test("isSafeRawPath only allows paths under data/inbox or data/processed", () => {

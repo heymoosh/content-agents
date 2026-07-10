@@ -37,6 +37,7 @@ import {
   updateRow,
   saveDerivative,
   approveBlockReason,
+  replyToMentionBlockReason,
   safeFolder,
   IMAGE_EXT,
   VIDEO_EXT,
@@ -67,7 +68,7 @@ import { renderPage } from "./page.js";
 // revisePrompt, jobLogPath, lastNonEmptyLine, tailLines, jobElapsedMs). scheduleKind,
 // scheduleApproved, isSafeRawPath, and SchedulerDeps are still defined natively below — this
 // module deliberately keeps scheduling + the whole Strategy/Analytics tab (see comments below).
-export { approveBlockReason, enrich, classifySource, revisePrompt, jobLogPath, lastNonEmptyLine, tailLines, jobElapsedMs };
+export { approveBlockReason, replyToMentionBlockReason, enrich, classifySource, revisePrompt, jobLogPath, lastNonEmptyLine, tailLines, jobElapsedMs };
 
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
 
@@ -530,8 +531,20 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/revise") {
       const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const id = String(b.id ?? "");
       try {
-        const body = await reviseDerivative(String(b.slug ?? ""), String(b.id ?? ""), String(b.instruction ?? ""));
+        // Server-side origin check, sourced from the row's actual persisted state — never a
+        // client-supplied flag — BEFORE this can spawn `claude -p` against a "reply to mention"
+        // row's untrusted source text (see replyToMentionBlockReason's comment in rows.ts).
+        const folder = safeFolder(slug);
+        const row = readQueue(folder).rows.find((r) => r.id === id);
+        const blocked = replyToMentionBlockReason(row);
+        if (blocked) {
+          json(res, 400, { ok: false, error: `Ask Claude is ${blocked}` });
+          return;
+        }
+        const body = await reviseDerivative(slug, id, String(b.instruction ?? ""));
         json(res, 200, { ok: true, body });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -556,9 +569,20 @@ const server = createServer(async (req, res) => {
     // `pending` review-queue.md row. Never approves/schedules anything — CLAUDE.md rule 2 holds.
     if (req.method === "POST" && url.pathname === "/api/duplicate") {
       const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const id = String(b.id ?? "");
       try {
-        const row = await duplicateToPlatform(String(b.slug ?? ""), String(b.id ?? ""), String(b.platform ?? ""));
-        json(res, 200, { ok: true, row });
+        // Same server-side origin check as /api/revise above — a "reply to mention" row must
+        // never reach duplicateToPlatform's claude -p spawn either.
+        const folder = safeFolder(slug);
+        const existingRow = readQueue(folder).rows.find((r) => r.id === id);
+        const blocked = replyToMentionBlockReason(existingRow);
+        if (blocked) {
+          json(res, 400, { ok: false, error: `Duplicate to platform is ${blocked}` });
+          return;
+        }
+        const newRow = await duplicateToPlatform(slug, id, String(b.platform ?? ""));
+        json(res, 200, { ok: true, row: newRow });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
