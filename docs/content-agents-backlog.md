@@ -287,6 +287,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
+- PARKED: SAFETY HOLD (conductor, 2026-07-10, re-raised): repo is now private, which resolves the public-internet-exposure half of the original concern. But this card still ingests named-individual private research notes (interview notes, a 66-person contact roster) into committed repo files. Muxin has not yet given an explicit go-ahead for THIS specific flow -- her prior "I changed it to private" reply answered the visibility question, not "yes, ingest the notes." Waiting for an explicit yes/no/how before building.
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Port cost-minimization policy to claude-config/simple-kanban conductor lane**
