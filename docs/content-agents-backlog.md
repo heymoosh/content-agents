@@ -203,17 +203,6 @@ CARD TYPE: EPIC
 - PARKED: data not ready: card needs n>=20 scored derivatives across >=3 distinct source pieces; repo currently has only 6, all from one source (2026-07-05-hey-substack) - same state as the original validation. Building now would just reproduce that finding. Re-check once more /atomize runs across different essays accumulate scored derivatives.
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
 
-**Update .claude/skills/publish + atomize SKILL.md for the Typefully card rewire**
-- ORIGIN: follow-up auto-filed while building card 1829fdf9 (Phase 4: quote cards via Typefully).
-The /publish and /atomize skill docs (.claude/skills/publish/SKILL.md, .claude/skills/atomize/SKILL.md) still describe the retired PostPeer/Upload-Post image_post provider flow for quote cards. The delegated build/review workers could not edit them (writes under .claude/skills/ require interactive permission not available to a headless worker). Update them to describe native Typefully image posts for quote cards on X/LinkedIn/Bluesky, matching the config/cta.yaml, config/providers.yaml, .env.example, and CLAUDE.md rule 3 updates already made in PR for card 1829fdf9.
-GOAL_CONDITION: both SKILL.md files describe quote cards shipping as native Typefully image posts (not PostPeer/Upload-Post) for X/LinkedIn/Bluesky, with PostPeer still correctly described for TikTok only.
-CHAIN: 1
-- STATUS: In Progress
-- DECISION: approved (Muxin, 2026-07-09, pre-flight) -- Muxin granted permission for the .claude/skills/ write; worker may request/accept the one-off sandbox override needed to edit publish/atomize SKILL.md.
-- GROOMED: well-specified doc sync, explicit GOAL_CONDITION; note - needs an attended/interactive run since .claude/skills/ writes are permission-gated for headless workers + 2026-07-08
-- PARKED: Claude Code auto-mode classifier repeatedly blocks create_worktree on this card citing a PID 28225 collision that direct process-ancestry tracing (this session IS pid 28225, confirmed via $$ ancestry + ps aux showing exactly one orchestrate-pipeline claude process) disproves. Classifier does not appear to re-evaluate on corrected context within-session. Needs Muxin either to confirm no collision and re-run attended, or to add a Bash permission rule per the denial message.
-<!-- card-id: ebe652a7-f1db-477f-9856-3e11aec6f5fc -->
-
 **Smarter routing — swap the LinkedIn work-with-me stand-in for the real landing page**
 - Follow-up to 6dcaee98 (Smarter routing), UPDATED 2026-07-08 (again) per Muxin's PR #140 feedback: "work with me" now HAS a real (if provisional) destination — Muxin's LinkedIn profile (`https://www.linkedin.com/in/muxinli`), wired as a `work_with_me` destination in `config/content-types.yaml` (`work_with_me_url`). `product_builder_insight`, `project_demo`, `offer_adjacent_post`, and `case_study` (the 4 work-flavored types) all resolve to "Connect on LinkedIn" today, unconditionally — none of them fall back to the essay link or resolve to zero CTAs. This SUPERSEDES the card's original premise (it previously assumed no real destination existed at all).
 - Remaining scope, once Landing page (87c86b16) ships with a real work-with-me page: flip `work_with_me_url` in `config/content-types.yaml` from the LinkedIn profile to the real landing-page URL — a pure config change, no code/reclassification needed (same pattern as project links). Whether the CTA TEXT should also change at that point (e.g. "Work with me" instead of "Connect on LinkedIn") is Muxin's call when the time comes — flag it, don't decide silently.
@@ -392,11 +381,11 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 Original card 8e8b616e is PARKED (ceiling hit) — see its SCOPE/BUILD REQUIREMENTS/GOAL_CONDITION/RULE 7 lines for the full, already-groomed spec before restarting; nothing about the spec itself needs re-deriving.
 RELAUNCH: 1
 - Cold-start note (2026-07-10): worktree's uncommitted layer was found mid-revert (src/outreach/*, leads, npm scripts, GUI wiring deleted; unrelated already-merged whisper.cpp files stranded here as stray untracked copies) — restored to the last real commit (nothing lost, it was all committed), stray files removed, rebased clean onto origin/main (2 commits, no conflicts). Re-verified: tsc --noEmit clean, npm test 511/511 green, GOAL_CONDITION evidence confirmed on disk (client-posthog -> classification: greenfield, cited pitch_angle; client-axelerant -> classification: unclear, thin evidence correctly non-pitchable; data/outreach/run-log.jsonl has both real run entries). RULE 7 hold stands -> opening draft PR.
+- PR: https://github.com/heymoosh/content-agents/pull/167 (draft, held for review per RULE 7)
+- SHIP: held
 - STATUS: Review
 - DECISION: hold — carries forward the same DECISION already on 8e8b616e (RULE 7 applies: research/qualify prompts are content-generation logic; build + draft PR, hold for review). No new judgment call needed to restart.
 - GROOMED: restart of ceiling-killed 8e8b616e; spec already fully groomed on the original card, no worktree/commits to salvage + 2026-07-10
-- PR: https://github.com/heymoosh/content-agents/pull/167 (draft, held for review per RULE 7)
-- SHIP: held
 <!-- card-id: fb4d6b28-a509-4297-adc6-ff98540eedb2 -->
 
 **Clarify which flow produces platform:substack rows in review-queue.md**
@@ -421,6 +410,17 @@ RELAUNCH: 1
 - STATUS: Backlog
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
+
+**Update .claude/skills/publish + atomize SKILL.md for the Typefully card rewire**
+- ORIGIN: follow-up auto-filed while building card 1829fdf9 (Phase 4: quote cards via Typefully).
+The /publish and /atomize skill docs (.claude/skills/publish/SKILL.md, .claude/skills/atomize/SKILL.md) still describe the retired PostPeer/Upload-Post image_post provider flow for quote cards. The delegated build/review workers could not edit them (writes under .claude/skills/ require interactive permission not available to a headless worker). Update them to describe native Typefully image posts for quote cards on X/LinkedIn/Bluesky, matching the config/cta.yaml, config/providers.yaml, .env.example, and CLAUDE.md rule 3 updates already made in PR for card 1829fdf9.
+GOAL_CONDITION: both SKILL.md files describe quote cards shipping as native Typefully image posts (not PostPeer/Upload-Post) for X/LinkedIn/Bluesky, with PostPeer still correctly described for TikTok only.
+CHAIN: 1
+- Resumed attended 2026-07-10: no real PID collision (verified via ps aux, one orchestrate-pipeline process). publish/SKILL.md step 5 was the only stale section (atomize/SKILL.md step 7 already described the current per-platform quote-card:<target> flow correctly). Shipped as PR #168 (merged, green CI, docs-only -> no RULE 7 hold).
+- STATUS: Done
+- DECISION: approved (Muxin, 2026-07-09, pre-flight) -- Muxin granted permission for the .claude/skills/ write; worker may request/accept the one-off sandbox override needed to edit publish/atomize SKILL.md.
+- GROOMED: well-specified doc sync, explicit GOAL_CONDITION; note - needs an attended/interactive run since .claude/skills/ writes are permission-gated for headless workers + 2026-07-08
+<!-- card-id: ebe652a7-f1db-477f-9856-3e11aec6f5fc -->
 
 **Resume whisper.cpp vs Gemini transcription bakeoff (salvage worktree from ceiling-killed session)**
 - Resume the whisper.cpp vs Gemini transcription bakeoff (card de591b28) — previous attempt was killed mid-card by the watchdog turn/token ceiling before finishing.
