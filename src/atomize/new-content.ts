@@ -6,21 +6,56 @@ import { repoRoot } from "../db/db.js";
 import { slugify } from "../util/slug.js";
 import { logCost } from "../util/cost-log.js";
 import { fetchSubstackPost } from "./fetch-substack.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
 
 // Scaffold a content folder from a source:
 //   tsx src/atomize/new-content.ts https://muxin.substack.com/p/some-post
 //   tsx src/atomize/new-content.ts notes/build-log.md
 //   tsx src/atomize/new-content.ts memos/idea.m4a        (transcribes via provider)
 //   tsx src/atomize/new-content.ts --text                (reads the body from stdin)
+//   tsx src/atomize/new-content.ts outreach/leads/client-acme-co/messages/message-01.md
+//                                                         (a LOCKED outreach message; see
+//                                                          resolveFileSource below)
 // Output: content/<YYYY-MM-DD>-<slug>/source.md + subfolders. Prints the folder path.
 
 const AUDIO_EXTS = new Set([".m4a", ".mp3", ".wav", ".ogg", ".flac"]);
+
+// Outreach Phase 2 (docs/outreach-engine-plan.md §6): a locked outreach message
+// (outreach/leads/<lead>/messages/message-NN.md) is a legal /atomize file source -- its
+// frontmatter (lead/channel/evidence/classification/status/locked_at) must be stripped before
+// becoming source.md's body (raw YAML in the body would break source_lines line-number tracing),
+// and it's flagged via sourceKind so tag-source.ts can later tell atomized-from-outreach content
+// apart from an atomized essay (see src/db/tag-source.ts).
+export function resolveFileSource(arg: string, raw: string): {
+  title: string;
+  origin: string;
+  publishedAt: string | null;
+  text: string;
+  sourceKind?: string;
+} {
+  const ext = extname(arg).toLowerCase();
+  const { fm, body } = splitFrontmatter(raw);
+  const isOutreachMessage =
+    typeof fm.lead === "string" && typeof fm.channel === "string" && Array.isArray(fm.evidence);
+  const firstHeading = body.match(/^#\s+(.+)$/m)?.[1];
+  const title =
+    firstHeading ??
+    (isOutreachMessage ? `Outreach message: ${fm.lead}` : basename(arg, ext).replace(/[-_]/g, " "));
+  return {
+    title,
+    origin: `file:${basename(arg)}`,
+    publishedAt: null,
+    text: body,
+    sourceKind: isOutreachMessage ? "outreach-message" : undefined,
+  };
+}
 
 async function resolveSource(arg: string): Promise<{
   title: string;
   origin: string;
   publishedAt: string | null;
   text: string;
+  sourceKind?: string;
 }> {
   if (/^https?:\/\//.test(arg)) {
     const post = await fetchSubstackPost(arg);
@@ -40,14 +75,7 @@ async function resolveSource(arg: string): Promise<{
       text,
     };
   }
-  const text = readFileSync(arg, "utf8");
-  const firstHeading = text.match(/^#\s+(.+)$/m)?.[1];
-  return {
-    title: firstHeading ?? basename(arg, ext).replace(/[-_]/g, " "),
-    origin: `file:${basename(arg)}`,
-    publishedAt: null,
-    text,
-  };
+  return resolveFileSource(arg, readFileSync(arg, "utf8"));
 }
 
 // Raw text pasted on stdin (`--text`): derive the title from the first heading or first

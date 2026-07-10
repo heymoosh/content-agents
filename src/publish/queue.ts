@@ -243,7 +243,13 @@ export function appendBetPlacement(
   // route.ts's loadData() can exclude it from the pillar/platform resonance figures. Same
   // placement rule as spin — before the quoted prefix.
   const exploration = fm.exploration_probe ? ` | exploration` : "";
+  // Outreach-message marker (docs/outreach-engine-plan.md §6 Phase 2): set on a derivative the
+  // /atomize skill drafted from a LOCKED outreach message (new-content.ts's resolveFileSource
+  // tags source.md `source_kind: outreach-message`). tag-source.ts reads this back to classify
+  // the post source = 'atomized-outreach' instead of 'atomized'/'atomized-spin'. Same placement
+  // rule as spin — before the quoted prefix.
+  const outreachMessage = fm.outreach_message ? ` | outreach-message` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${prefix}`;
   writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
 }
