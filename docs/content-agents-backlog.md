@@ -367,7 +367,11 @@ ROOT CAUSE (confirmed by reading code + data, not guessed): the design is actual
 THIS SPECIFIC ROW'S actual state (verified via briefs/bets.md Placed log): the same slug already had a LinkedIn placement (`qvid-linkedin`, 2026-06-24) 17 days before the quote-card-6-linkedin approve attempt. LinkedIn's `min_reuse_days` is 60 (config/platforms.yaml). The reuse guard correctly blocked scheduling. This row is NOT stuck forever -- it becomes eligible again ~2026-08-23 -- but nothing in the GUI says that; it just looks broken.
 GAP TO CLOSE (not yet scoped/decided -- for grooming): persist the real scheduleError reason somewhere durable when an approve-time schedule attempt fails (e.g. the row's notes column in review-queue.md), and/or have the reconcile pass itself detect a reuse-guard block specifically and report "blocked by reuse guard, eligible again in N days" instead of the generic, alarming "no logged draft" message. Muxin confirmed (2026-07-11) the intended semantics: "when I say approve I do mean that it should go into scheduling" -- so a silent/invisible scheduling failure is a real gap, not a documentation issue.
 GOAL_CONDITION: not yet defined -- scope once Muxin decides which half of the gap to close (persist-the-reason vs. smarter-reconcile-message vs. both).
-- STATUS: Backlog
+
+SCOPE DECIDED (Muxin, 2026-07-11): (c) build BOTH halves of the gap. (a) Persist the real scheduleError reason durably when an approve-time schedule attempt fails -- write it to the row's notes column in review-queue.md so it survives past the ephemeral flash-toast (page.ts:435), not just flashed once. (b) Have the reconcile pass (src/review/reconcile.ts) detect a reuse-guard block specifically and report "blocked by reuse guard, eligible again in N days" instead of the generic, alarming "no logged draft" message.
+GOAL_CONDITION: an approve-time schedule failure leaves a durable, human-readable reason persisted on the row (not just a toast); AND the reconcile pass, for a row blocked by the reuse guard, reports "blocked by reuse guard, eligible again in N days" -- e.g. the innovation-nation quote-card-6-linkedin row reads as blocked until ~2026-08-23, not "no logged Typefully draft".
+- STATUS: To Do
+- GROOMED: decision c (persist reason + reuse-guard-aware reconcile) recorded; GOAL_CONDITION stated + 2026-07-11
 <!-- card-id: 174f70bd-1dd3-456f-9d66-6945ac88872a -->
 
 **GUI job logs mix content from unrelated old runs due to append-mode, non-truncated, ID-reused log files**
@@ -378,7 +382,8 @@ REPRO: 1) Ensure the GUI server has been restarted at least once since a prior j
 OBSERVED: Submitted plain text "Just some random plain text idea about productivity habits...". The job (job-1) correctly identified the source as too thin to atomize and declined - but the displayed error/log text ALSO contained an entire unrelated previous run about a video storyboard fixture ("content/zz-e2e-storyboard-test-4e7cb5d3", "disposable fixture (origin: e2e-test)") and, mixed in after that, a third unrelated block about a totally different job discussing an /atomize skill text-corruption issue ("Want me to atomize a genuine piece instead? Point me at one.") - none of which belongs to this job. Confirmed via GET /api/jobs that this job's own id/kind/label (job-1, kind text) does not match the storyboard or skill-corruption content embedded in its error field.
 EXPECTED: A job's status/error and log view should only ever show that job's own output. Old unrelated runs should never bleed into a new job's displayed result.
 ROOT CAUSE: src/review/jobs.ts:201 - module-scoped "let jobSeq = 0" resets to 0 on every server process restart, so job IDs like "job-1" are reused across separate server lifetimes (not unique long-term). jobs.ts:27-30 jobLogPath() keys the on-disk log file purely by that reused ID under a shared, non-project-scoped directory (~/.content-agents/logs/gui-jobs/<id>.log). jobs.ts:247 opens that path with flags "a" (append) and never truncates it before a new job writes to it. Read path: src/review/serve.ts:669-684 (readFileSync(jobLogPath(jobId))) returns the full accumulated multi-run file, and that same content also gets surfaced directly into the job's error field shown inline in the queue UI. Fix should truncate/create-fresh the log file per new job (e.g. flags "w" or delete-before-open), and/or use a globally-unique job id (e.g. include a timestamp or uuid) instead of a process-local reset-to-0 counter.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clear outcome + precise root cause (append-mode/reused-id log files, jobs.ts:201/247); stateable predicate + 2026-07-11
 <!-- card-id: 89f7dea5-3a74-4732-80cf-d4b98f49f2fe -->
 
 **Nonexistent file path silently treated as plain text, burns minutes of LLM time instead of failing fast**
@@ -389,7 +394,8 @@ REPRO: Paste an absolute path to a file that does not exist, e.g. /Users/Muxin/D
 OBSERVED: The job was queued with kind "TEXT" (not "FILE"), even though the pasted string is clearly a file path. It ran for 2m59s with the UI showing only the same static generic startup line ("Warning: no stdin data received in 3s...") the entire time - no incremental progress, no "file not found" message - before finally completing with a (correct, well-reasoned) refusal to atomize a non-content string. Comparable jobs in the same session (plain text, bad URL) completed in 18-76s. There was no way for the user to distinguish this from a hang while it ran.
 EXPECTED: A pasted string that looks like an absolute/relative file path but does not resolve via existsSync() should fail fast with a clear "file not found" error, without spending an LLM turn (multiple minutes) to discover that.
 ROOT CAUSE: classifySource() in src/review/jobs.ts around line 332-345 only returns kind "file" when existsSync(asPath) is true; when the path does not exist it silently falls through to kind "text" (line 343-344) using the raw path string as the label/content instead of surfacing a classification error. addJob() then materializes that raw path string as the literal content of a new .inbox/<id>.md file (jobs.ts ~386) and dispatches it to the claude atomize subprocess, which has no fast local check for "does this look like a path that doesn't exist" and instead spends a full reasoning turn (multiple minutes, several tool calls) concluding the input isn't real content. Fix: when the input matches a path-like pattern (contains / and no spaces, or starts with ~ or a drive letter) but existsSync() fails, return a distinct classification (e.g. kind "file-not-found") and surface an immediate client-side or server-side error instead of dispatching an LLM job.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clear fail-fast outcome; classifySource() surface + path-like heuristic pinned + 2026-07-11
 <!-- card-id: 4450fd23-5a8e-4673-b0d5-b94e013f1fe7 -->
 
 **Analytics tab: insights follow-up ETA text badly undersells actual wait (~10-60s shown, took ~190s)**
@@ -400,7 +406,8 @@ REPRO: 1) Analytics tab -> Generate insights (returns quickly if data/analytics.
 OBSERVED: Static ETA text says ~10-60s; actual completion took ~180-200s (close to the server-side 180s hard timeout in src/review/serve.ts:185 INSIGHTS_ASK_TIMEOUT_MS). No intermediate feedback distinguishes "still working, this is normal" from "about to time out." A user watching the literal estimate would reasonably conclude the UI is frozen/broken well before it resolves.
 EXPECTED: Either a more honest ETA (e.g. "~1-3 min"), a progress indicator that doesn't imply a hard ceiling at 60s, or a live elapsed-time counter so users can tell it's still working rather than stuck.
 ROOT CAUSE: ETA string hardcoded in src/review/page.ts:655 (askInsights()): "Claude is looking into it... (~10-60s, may re-run a report)". Actual bound is the 180s server-side spawn timeout (src/review/serve.ts:185, jobs.ts:259-264) with no client-side abort/progress wiring (page.ts post() at line ~302 is a plain fetch with no AbortController). The feature itself works correctly (real synthesis returned, and on true timeout the server returns a clear "Claude timed out after 180s" error) -- this is a UX/messaging accuracy issue, not a functional failure.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: UX-messaging fix; hardcoded ETA string pinned (page.ts:655), 180s real bound; author-granted latitude + 2026-07-11
 <!-- card-id: a14693da-75c7-495b-acc2-baadc6973589 -->
 
 **Review tab: video-script/storyboard body clips most content behind an easy-to-miss scroll**
@@ -411,7 +418,8 @@ REPRO: 1) Open Review tab. 2) Scroll to a VIDEO-SCRIPT/STORYBOARD row. 3) Observ
 OBSERVED: Script text truncated at a fixed 260px height with only a faint overlay scrollbar as the sole discoverability cue; a reviewer skimming the queue could easily approve/discard a video script without ever seeing most of its content.
 EXPECTED: Either a visible scroll affordance (persistent thin scrollbar or fade-out gradient at the clipped edge), or a taller default height / expand-to-read control for the video-script kind specifically, since these bodies are read in full before approval (unlike short social post excerpts).
 ROOT CAUSE: src/review/page.ts, CSS rule `.body.story` (~line 83): `max-height:260px; overflow:auto;` with no companion visual affordance signaling clipped content.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clip-affordance outcome clear; .body.story CSS surface pinned + 2026-07-11
 <!-- card-id: dcb91654-efd0-4992-8820-a9d97c40ac2e -->
 
 **Review tab: quote-card rows with body text but no rendered image look identical to a normal card**
@@ -422,7 +430,8 @@ REPRO: 1) Open Review tab. 2) Find a QUOTE-CARD:* row whose note includes "image
 OBSERVED: Row typed IMAGE shows text only, with the missing-image fact mentioned only in small buried note text.
 EXPECTED: A row typed IMAGE should visually flag when its image is absent, consistently with the existing no-body-no-image case which already shows an explicit placeholder (— no asset generated yet —). At minimum, this should be as visually prominent, not a note fragment appended after unrelated flags.
 ROOT CAUSE: src/review/rows.ts ~line 209-216 (assetUrl only set if existsSync(...) true) and src/review/page.ts ~line 334-341 (image tag only rendered when assetUrl is set; the no-asset placeholder branch only fires when body is ALSO empty, so a body-with-no-image row falls through to plain text rendering with no placeholder).
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: mirror existing no-asset placeholder branch for IMAGE rows; rows.ts/page.ts surface pinned + 2026-07-11
 <!-- card-id: 4c3dd6fc-43e5-41a5-b5bd-387139b6296f -->
 
 **Review GUI: in-progress action state (storyboard/duplicate/ask-Claude) reverts to idle before the real job finishes**
@@ -437,7 +446,8 @@ REPRO:
 OBSERVED: The button/indicator reverts to idle almost immediately, well before the real async operation completes, with no visible "still working" state in between.
 EXPECTED: The in-progress indicator (storyboardQueued hint, thinking spinner) should persist until the specific operation actually resolves, regardless of unrelated queue/job activity elsewhere on the page.
 ROOT CAUSE: src/review/page.ts client script - the periodic background poll (setInterval(loadJobs, 3000), gated on any job being queued/running) calls loadJobs(), whose own "a job moved -> refresh review rows" logic (if(before !== JSON.stringify(...)) load();) unconditionally replaces the entire client-side DATA object with a fresh /api/queue response and calls render(), rebuilding every row's DOM from scratch. This clobbers (a) the client-only row.storyboardQueued flag (set by the gen-storyboard handler, never persisted server-side) and (b) any row whose action box was manually set to a "thinking..." innerHTML (ai-send, dup-send handlers in the same file), since render() replaces that DOM node outright. This fires any time ANY job anywhere in the system changes status - not just the job the user just started - so it reproduces easily whenever other queue activity is happening concurrently with a long-running row-level action.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: persist in-progress indicator outcome clear; poll-render clobber root cause pinned + 2026-07-11
 <!-- card-id: fbfea28b-e730-4234-afaf-9ef25d43b7d9 -->
 
 **Review GUI: Approve is not gated for quote-card rows whose image was never rendered (unlike video/storyboard)**
@@ -451,7 +461,8 @@ REPRO:
 OBSERVED: Approve button offers no warning and is fully clickable for a quote-card row with no rendered image; video/storyboard rows get a proactive block, image rows do not.
 EXPECTED: approveBlockReason() should also check row.format === "image" (or equivalently kind === "image") and block Approve with a message like "image not rendered yet - run npm run render -- --still <folder>" when the asset file is missing, mirroring the existing video/storyboard treatment.
 ROOT CAUSE: src/review/rows.ts approveBlockReason() (~line 96-110) has no branch for the image/quote-card format, unlike its storyboard and video/short branches.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: add image branch to approveBlockReason() (rows.ts ~96-110), fully specified, mirrors video/storyboard + 2026-07-11
 <!-- card-id: a8cb13a4-4bf5-4e29-aaa7-04acc39abd99 -->
 
 **Follow-ups: Draft follow-up failure is invisible to the user**
@@ -467,7 +478,8 @@ REPRO:
 OBSERVED: If the user is not staring at the screen during the ~1.4s window the toast is visible, they have no way to tell whether the draft is still running, succeeded, or failed -- no entry in the Jobs pill (Add/Queue tab), no persisted log, nothing in the Follow-ups list itself. The "Draft follow-up" button also has no disabled/in-flight state, so a user unsure whether their click registered can click again, queuing a second real `claude -p` subprocess call (confirmed via network tab: two concurrent POST /api/followups/draft-follow-up fired from two clicks) that burns another up-to-120s of subscription usage for the same lead.
 EXPECTED: Draft follow-up should behave like every other Claude-spawning action in this app (atomize, revise, insights): show up in the Jobs pill with live status and a real log link, per the code's own stated intent. The comment at src/review/jobs.ts:651-656 explicitly claims this "reuses the same job queue" and "shows up in the jobs pill with a real log + heartbeat" -- but enqueueFollowUpDraft (src/review/jobs.ts:657-659) calls outreach/draft.ts's runDraft(), which spawns its subprocess via execFile directly (src/outreach/draft.ts:93, imported at line 3) rather than through runClaudeSpawn() (src/review/jobs.ts:241), so it never gets a log file or heartbeat. At minimum the button should disable while its own request is in flight, and the failure/success toast should persist long enough (or land somewhere durable) for the user to actually see it.
 ROOT CAUSE: src/outreach/draft.ts's runDraft() bypasses the shared runClaudeSpawn() logging/heartbeat path (src/review/jobs.ts:241-256) that every other Claude-spawning GUI action uses, contradicting the intent stated in the comment at src/review/jobs.ts:651-656. Separately, src/review/page.ts:763-768 followupDraft() has no in-flight guard (no button disable, no queued-toast persistence) and src/review/page.ts:295 flash() is hardcoded to 1400ms regardless of message importance.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: route runDraft() through shared runClaudeSpawn() + button in-flight guard; intent clear, minimum floor stated + 2026-07-11
 <!-- card-id: d39258ab-37ff-4b4c-b317-a3eb744059c2 -->
 
 **Outreach tab: long status groups clip cards with no scroll affordance**
@@ -481,7 +493,8 @@ REPRO:
 OBSERVED: A correctly-fetched, correctly-rendered card (Notion) and an entire correctly-rendered card (Superhuman) are invisible with no affordance telling the user there's more to scroll to. This took direct DOM/network inspection to distinguish from a real data-loss bug -- a normal user has no way to tell the difference and would reasonably conclude the app lost or failed to render their data.
 EXPECTED: Either remove the fixed max-height (let the group grow with the page, since the outer page already scrolls), or add a visible scroll cue (a bottom fade gradient, a persistent thin scrollbar via `scrollbar-gutter`/webkit-scrollbar styling, or a "N more" indicator) so a clipped list is visually distinguishable from a complete one.
 ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:auto; }`. Shared by the Outreach tab's per-status groups and the Follow-ups tab's per-bucket lists (same class), so any bucket with enough rows/text is subject to the same silent clipping.
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: clip-affordance outcome clear; .notelist max-height:420px pinned (page.ts:140) + 2026-07-11
 <!-- card-id: 218cb426-115b-4eda-90bd-70fe34408e60 -->
 
 **Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example**
