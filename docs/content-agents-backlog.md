@@ -394,10 +394,10 @@ SHIP: held
 - GOAL_CONDITION: `spin_angles.linkedin` reflects the case-first structure above (verified against a real or representative essay run, before/after sample in the PR); `spin_angles.x` reads technically sharper without reading insider-exclusive (verified against a real or representative sample); spin-mode.md guidance updated to match both.
 PR: https://github.com/heymoosh/content-agents/pull/185
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
 - STATUS: Done
 - DECISION: approved (Muxin, 2026-07-10) — LinkedIn case-study reframe confirmed; X clarified as technical-but-still-outside-the-bubble, not a flip to insider voice.
 - GROOMED: explicit structural spec for LinkedIn, explicit direction for X, both map onto existing scaffolding (spin_angles, case_study/product_builder_insight CTA types, existing rehook latitude) — no blocking unknown; PR will hold for review per rule 7 since this is content-generation logic + 2026-07-10
-- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
 - LANE: a
 <!-- card-id: c42769b1-fdf4-4a78-a888-d21ea9a8ef2d -->
 
@@ -484,11 +484,11 @@ CARD TYPE: EPIC
 EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased why-this-anchor basis + source paths are OK to commit, now that the repo is private. Build as originally scoped.
 PR: https://github.com/heymoosh/content-agents/pull/181
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
-- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Outreach engine — Phase 3: platform config + borrowed-audience target list**
@@ -501,11 +501,11 @@ SHIP: held
 - DEPENDENCY NOTE (2026-07-09, Muxin): Phase 3 only needs Phase 1's qualify.ts + lead.md schema, not Phase 2's draft/lock; was over-conservatively pointed at Phase 2. Unblocks Phase 2 (message quality) and Phase 3 (platform-list quality) to build/review independently once Phase 1 lands.
 PR: https://github.com/heymoosh/content-agents/pull/177
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (platform qualify/pitch-angle prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from b7dcb608 per plan §6 Phase 3; explicit GOAL_CONDITION (also satisfies 30772ba1), DEPENDS ON Phase 2 + 2026-07-09
-- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 <!-- card-id: 6590efec-54ca-4288-9cf7-5e69e034477d -->
 
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
@@ -519,11 +519,11 @@ SHIP: held
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
 PR: https://github.com/heymoosh/content-agents/pull/171
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
-- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 <!-- card-id: d5b34590-4354-49f1-952f-3faaf1ce7d4a -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
