@@ -15,10 +15,10 @@ describe("config/platforms.yaml spin_angles: the four Muxin-approved angles (202
     assert.match(angles.x.angle, /96% of non-tech workers/);
   });
 
-  test("linkedin: business innovation broadly, not just product craft", () => {
+  test("linkedin: case-first, anonymized situation before the pattern zoom-out, business/career audience", () => {
     assert.equal(angles.linkedin.audience, "business/career");
-    assert.match(angles.linkedin.angle, /NOT just product craft/);
-    assert.match(angles.linkedin.angle, /corporate \/ business norms quietly strangle/);
+    assert.match(angles.linkedin.angle, /Case-first/);
+    assert.match(angles.linkedin.angle, /zoom-out to the broader pattern is the closing line/);
   });
 
   test("substack: builder-philosopher, society", () => {
