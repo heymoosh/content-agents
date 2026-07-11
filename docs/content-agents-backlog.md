@@ -155,20 +155,6 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - PARKED: Muxin deferred (2026-07-09 pre-flight): agreed defer on Substack comment-reply listening
 <!-- card-id: 81808fa0-7e30-4fd1-9b61-03951b0041bc -->
 
-**Outreach engine — Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)**
-- PARENT: 659b50f0
-- ORIGIN: split out of 659b50f0 (Unified follow-up tracking) per docs/outreach-engine-plan.md §6 Phase 4.
-- SCOPE: tracker.ts (append/fold data/outreach/tracker.jsonl, due-date/overdue computation, summary for /strategy), new 'Follow-ups' tab in src/review/page.ts + serve.ts (row shape: who/bucket/why -- surfaces the locked core-message angle/last touch/next action+due; actions: mark-responded, draft-follow-up via existing job queue, move-on -- no CRM aesthetics, no guilt-styling on overdue), follow-up windows per bucket in config/outreach.yaml, jobsearch bucket wired per the §2b RATIFIED decision (content-agents tracks it natively; JSA hands off Level-1 verdicts only, read-only from manual_research.db).
-- THIS IS THE 'FINDING JOBS/COMPANIES' TOUCHPOINT IN THIS REPO: this repo does NOT build a jobs/companies finder -- Muxin's separate Job Search Agent (JSA, external repo) already sources/scores candidate companies. The only jobs/companies-related build here is this tab's jobsearch bucket, tracking JSA's leads read-only.
-- GOAL_CONDITION (plan §6 Phase 4 definition of done): Follow-ups tab renders all 4 buckets (client/platform/inbound/jobsearch) from tracker.jsonl with correct due-date/next-action per row; jobsearch bucket populated from a read-only pull of JSA's manual_research.db. Inbound bucket ships schema-ready but empty until db22283f (Inbound listening, currently In Progress) lands -- not a blocking dependency.
-- RULE 7: this is GUI/state plumbing, NOT content-generation logic -> auto-merges on green CI (plan §6).
-- STATUS: In Progress
-- DEPENDS ON: Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse
-- DECISION: approved — card body itself states this is GUI/state plumbing, not content-generation logic; auto-merges on green CI per plan doc
-- GROOMED: split from 659b50f0 per plan §6 Phase 4; explicit GOAL_CONDITION, GUI/state plumbing (auto-merge lane), DEPENDS ON Phase 2 + 2026-07-09
-- LANE: b
-<!-- card-id: 21a5eb84-d78c-4aca-9672-6500875a3e88 -->
-
 **Outreach engine — Phase 5: discovery + batch hardening (client + platform)**
 - PARENT: ba9769af (completes b7dcb608 too -- shared discovery engine serves both client and platform configs).
 - ORIGIN: split out of ba9769af/b7dcb608 per docs/outreach-engine-plan.md §6 Phase 5 -- deliberately LAST.
@@ -262,12 +248,50 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - GOAL_CONDITION: `spin_angles.linkedin` reflects the case-first structure above (verified against a real or representative essay run, before/after sample in the PR); `spin_angles.x` reads technically sharper without reading insider-exclusive (verified against a real or representative sample); spin-mode.md guidance updated to match both.
 PR: https://github.com/heymoosh/content-agents/pull/185
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
 - STATUS: Review
 - DECISION: approved (Muxin, 2026-07-10) — LinkedIn case-study reframe confirmed; X clarified as technical-but-still-outside-the-bubble, not a flip to insider voice.
 - GROOMED: explicit structural spec for LinkedIn, explicit direction for X, both map onto existing scaffolding (spin_angles, case_study/product_builder_insight CTA types, existing rehook latitude) — no blocking unknown; PR will hold for review per rule 7 since this is content-generation logic + 2026-07-10
-- CI NOTE: CI: pending (as of 2026-07-10T21:29Z)
 - LANE: a
 <!-- card-id: c42769b1-fdf4-4a78-a888-d21ea9a8ef2d -->
+
+**Write/source an anonymized case note for the LinkedIn case-first spin angle to work from**
+- ORIGIN: follow-up auto-filed while building card c42769b1 (Update per-channel spin angles), PR #185.
+The new LinkedIn case-first spin angle needs a real anonymized third-party case (a team/client situation, not Muxin's own story) to work from. No such material exists yet in the corpus -- PR #185's old-vs-new sample had to use Muxin's own personal-branding essay as the case study, since it was the only source available, which is honest but not the intended target material (a client/team case, per the card's own LINKEDIN SCOPE). Same reasoning applies more mildly to the X angle's technical-sharpening sample.
+Scope: write or source a short anonymized case note (a real turnaround/greenfield situation Muxin has worked on or observed) as new atomize source material, so the case-first LinkedIn angle has genuine third-party material instead of only self-referential examples. Once it exists, re-run spin on it to confirm the new angle reads as intended against real case material.
+CHAIN: 1
+- STATUS: Backlog
+<!-- card-id: f7b186c2-0fe8-40b2-bc6d-0351b630bbda -->
+
+**Follow-ups tab: add a manual mark-as-sent/contacted action**
+- Once Muxin actually sends a client/platform/jobsearch follow-up message by hand, nothing today appends a "contacted"/"followup_sent" tracker event for it -- the Follow-ups tab only offers mark-responded/draft-follow-up/move-on per card 21a5eb84's scope. Need a 4th action (or a CLI command) to log a manual send.
+ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
+CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
+<!-- card-id: bf88258a-5d0f-457a-a403-53a9bbad1648 -->
+
+**Wire tracker.ts summarizeFollowups() into the /strategy weekly brief**
+- src/outreach/tracker.ts exports summarizeFollowups() (counts per bucket, due/overdue counts) per card 21a5eb84's scope ("summary for /strategy"), but it is not wired into src/strategy/*'s weekly brief synthesis yet -- that wiring was explicitly out of scope for Phase 4. A future card should decide where/how the weekly brief surfaces follow-up due/overdue counts.
+ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
+CHAIN: 1
+- STATUS: Backlog
+- DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
+<!-- card-id: 2a751683-d3a5-46cc-9de2-dd0b25d7edcc -->
+
+**Outreach engine — Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)**
+- PARENT: 659b50f0
+- ORIGIN: split out of 659b50f0 (Unified follow-up tracking) per docs/outreach-engine-plan.md §6 Phase 4.
+- SCOPE: tracker.ts (append/fold data/outreach/tracker.jsonl, due-date/overdue computation, summary for /strategy), new 'Follow-ups' tab in src/review/page.ts + serve.ts (row shape: who/bucket/why -- surfaces the locked core-message angle/last touch/next action+due; actions: mark-responded, draft-follow-up via existing job queue, move-on -- no CRM aesthetics, no guilt-styling on overdue), follow-up windows per bucket in config/outreach.yaml, jobsearch bucket wired per the §2b RATIFIED decision (content-agents tracks it natively; JSA hands off Level-1 verdicts only, read-only from manual_research.db).
+- THIS IS THE 'FINDING JOBS/COMPANIES' TOUCHPOINT IN THIS REPO: this repo does NOT build a jobs/companies finder -- Muxin's separate Job Search Agent (JSA, external repo) already sources/scores candidate companies. The only jobs/companies-related build here is this tab's jobsearch bucket, tracking JSA's leads read-only.
+- GOAL_CONDITION (plan §6 Phase 4 definition of done): Follow-ups tab renders all 4 buckets (client/platform/inbound/jobsearch) from tracker.jsonl with correct due-date/next-action per row; jobsearch bucket populated from a read-only pull of JSA's manual_research.db. Inbound bucket ships schema-ready but empty until db22283f (Inbound listening, currently In Progress) lands -- not a blocking dependency.
+- RULE 7: this is GUI/state plumbing, NOT content-generation logic -> auto-merges on green CI (plan §6).
+- STATUS: Done
+- DEPENDS ON: Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse
+- DECISION: approved — card body itself states this is GUI/state plumbing, not content-generation logic; auto-merges on green CI per plan doc
+- GROOMED: split from 659b50f0 per plan §6 Phase 4; explicit GOAL_CONDITION, GUI/state plumbing (auto-merge lane), DEPENDS ON Phase 2 + 2026-07-09
+- LANE: b
+<!-- card-id: 21a5eb84-d78c-4aca-9672-6500875a3e88 -->
 
 **Content agent: find platforms to appear on (podcasts, channels, newsletters)**
 - A content/research agent that finds OTHER people's platforms that are a strong fit for Muxin to talk about her work — podcasts, channels, newsletters, anyone with an audience and a real overlap, whether the hook is her essays (AI & society / fairness) or her product/build work.
@@ -338,11 +362,11 @@ CARD TYPE: EPIC
 EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased why-this-anchor basis + source paths are OK to commit, now that the repo is private. Build as originally scoped.
 PR: https://github.com/heymoosh/content-agents/pull/181
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
-- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Outreach engine — Phase 3: platform config + borrowed-audience target list**
@@ -355,11 +379,11 @@ SHIP: held
 - DEPENDENCY NOTE (2026-07-09, Muxin): Phase 3 only needs Phase 1's qualify.ts + lead.md schema, not Phase 2's draft/lock; was over-conservatively pointed at Phase 2. Unblocks Phase 2 (message quality) and Phase 3 (platform-list quality) to build/review independently once Phase 1 lands.
 PR: https://github.com/heymoosh/content-agents/pull/177
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (platform qualify/pitch-angle prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from b7dcb608 per plan §6 Phase 3; explicit GOAL_CONDITION (also satisfies 30772ba1), DEPENDS ON Phase 2 + 2026-07-09
-- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 <!-- card-id: 6590efec-54ca-4288-9cf7-5e69e034477d -->
 
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
@@ -373,11 +397,11 @@ SHIP: held
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
 PR: https://github.com/heymoosh/content-agents/pull/171
 SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
-- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 <!-- card-id: d5b34590-4354-49f1-952f-3faaf1ce7d4a -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
