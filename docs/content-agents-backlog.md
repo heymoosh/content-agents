@@ -32,7 +32,7 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - Treat native social (X/LinkedIn/Bluesky) as inbound funnels; Substack is home. Borrowed audiences drive new people toward Substack.
 - Action seed: maintain a target list of podcasts / newsletters / platforms + a pitch angle aligned to the per-channel positioning card.
 - PLAN POINTER (2026-07-08): the target list this card wants is produced by the fit-finder engine's Phase 3 (platform config + `outreach:status --targets` summary surfaced in the weekly brief) — see docs/outreach-engine-plan.md §6. This card stays a strategy note; it needs no build of its own.
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 3: platform config + borrowed-audience target list
 - DECISION: defer — stays in Backlog, not now (Muxin, 2026-07-04). Target-list mechanics now covered by docs/outreach-engine-plan.md Phase 3 (2026-07-08).
 - GROOMED: clear outcome, points at surface area, no blocking unknown + 2026-07-10
@@ -164,7 +164,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - RULE 7: discovery/qualify prompts are content-generation logic -> this PR HOLDS for Muxin's review.
 
 DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor expansion begins from the ingested corpus (see the "Ingest existing research corpus" card) — roughly 30 anchors from the Obsidian vault + 140 JSA-scored companies — not just the 2 seed anchors. (2) The two-key jobsearch gate on the Phase 1 card applies at surfacing time for jobsearch-bucket candidates: discovery that finds an aligned person at a misaligned company surfaces the PERSON as an anchor candidate, not the company as a lead. (3) The anchor graph is the "similar to this kind of company/person" mechanism; the worldview map stays the thesis test — do not reintroduce JSA's Human Enablement score as a discovery signal (see the values-depth finding on the Phase 1 card).
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Outreach engine — Phase 3: platform config + borrowed-audience target list
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- confirmed defer; no direct epic approval for this specific phase, and deliberately last per plan anyway.
 - GROOMED: split from ba9769af/b7dcb608 per plan §6 Phase 5; explicit GOAL_CONDITION, deliberately-last rationale pinned, DEPENDS ON Phase 3 + 2026-07-09
@@ -260,6 +260,8 @@ SHIP: held
 The new LinkedIn case-first spin angle needs a real anonymized third-party case (a team/client situation, not Muxin's own story) to work from. No such material exists yet in the corpus -- PR #185's old-vs-new sample had to use Muxin's own personal-branding essay as the case study, since it was the only source available, which is honest but not the intended target material (a client/team case, per the card's own LINKEDIN SCOPE). Same reasoning applies more mildly to the X angle's technical-sharpening sample.
 Scope: write or source a short anonymized case note (a real turnaround/greenfield situation Muxin has worked on or observed) as new atomize source material, so the case-first LinkedIn angle has genuine third-party material instead of only self-referential examples. Once it exists, re-run spin on it to confirm the new angle reads as intended against real case material.
 CHAIN: 1
+
+SCOPE EXTENSION (Muxin approved, 2026-07-10): shape the case-note capture as an INTERVIEW TEMPLATE -- five questions mapping one-to-one onto the skeleton beats: (1) what was the situation (with a number/decision), (2) what did the team believe, in their own words, (3) what tested it, (4) what did the miss cost, (5) what's the pattern. Muxin answers in voice or text; Claude transcribes into a case note. She is the author of the answers, so it stays clean under extraction-first (same principle as the voice-notes flow). Target: ~10 minutes of Muxin's time per case.
 - STATUS: Backlog
 <!-- card-id: f7b186c2-0fe8-40b2-bc6d-0351b630bbda -->
 
@@ -278,6 +280,116 @@ CHAIN: 1
 - STATUS: Backlog
 - DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
 <!-- card-id: 2a751683-d3a5-46cc-9de2-dd0b25d7edcc -->
+
+**Remove AI smells from writing: add an independent sweep/review-and-edit pass after drafting?**
+- ORIGIN: Muxin, 2026-07-10 -- raised while discussing whether /atomize reliably keeps AI writing
+tells out of generated copy.
+QUESTION: should we add an independent sweep/review-and-edit pass AFTER drafting, instead of (or
+in addition to) relying on the drafting prompt alone to avoid AI smells?
+CURRENT STATE (verified 2026-07-10): enforcement of config/voice.yaml (no em dashes, no "here's
+the thing"/"delve"/etc., the banned list) is PROMPT-ONLY everywhere it's used -- every generation
+site (atomize derivatives, video scripts, outreach drafts/research, GUI revise/duplicate jobs)
+tells the Claude subprocess "follow config/voice.yaml" as an instruction, and voice.yaml's own
+check_before_queue section tells the model to self-check ("count the em dashes, target is zero").
+src/atomize/validate.ts is the one deterministic gate that runs before something reaches
+review-queue.md, and it does NOT scan for em dashes or banned phrases at all -- it only checks
+source_lines traceability, char/word limits, spin-angle match, and the routing skip-gate. So if a
+drafting pass slips a tell through, nothing mechanically catches it; it relies entirely on the
+model remembering plus Muxin catching it in review.
+OPTIONS TO WEIGH (not yet decided):
+(a) a cheap deterministic lint added to validate.ts -- regex-scan for em dashes + the banned-phrase
+    list from voice.yaml, fail the derivative like a char-limit violation does today. Catches the
+    mechanical stuff (em dashes, banned phrases/words) for ~free, but can't judge cadence/tone.
+(b) an independent LLM review-and-edit pass after drafting -- a fresh Claude call (not the same
+    context that drafted) reads the draft against voice.yaml's is/is_not + rewrites anything that
+    reads like a brand instead of Muxin talking. Catches tone/cadence a regex can't, costs an extra
+    subprocess call per derivative.
+(c) both -- deterministic lint as a hard mechanical gate, independent pass for the judgment layer.
+GOAL_CONDITION: not yet defined -- depends on which option(s) Muxin wants; scope this once she
+decides the approach.
+- STATUS: Backlog
+<!-- card-id: e26f6e12-73d6-4378-8be8-f43265e2f139 -->
+
+**Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
+- ORIGIN: Muxin, 2026-07-10 -- "if a topic doesn't work on that platform then we shouldn't bother
+creating a draft for it using atomize." Muxin wasn't sure whether this was already asked for /
+already built, or whether it conflicts with an existing experiment -- flagging both her memory gap
+and the current state below so a strategy session doesn't start from scratch.
+CURRENT STATE (verified 2026-07-10): there IS an existing gate, but it's coarser than what Muxin is
+describing. config/routing.yaml gates which platforms a piece gets atomized to, but at the PILLAR
+level (6 broad categories: human-ai, claude-code, civic-tech, career-work, builder, other), not per
+specific topic/essay. Once a pillar has >= min_posts_for_data (3) real posts on a platform, resonance
+data decides inclusion (skip_below_score: 0.4); below that, it cold-starts to config's per-pillar
+defaults. Separately, docs/spin-experiment.md ran a real experiment (approved 2026-06-24, promoted
+to always-on 2026-07-02) showing the SAME human-ai content scored very differently by platform
+(13.1 as a Substack note, 5.5 on LinkedIn, 1.45 on X as verbatim) -- but that experiment is about HOW
+to reframe/word a post once it's already been routed to a platform (spin_angles), not WHETHER to
+draft for that platform at all. So today's logic is: pillar-level routing decides platform inclusion,
+spin decides framing within it -- neither operates at the finer "this specific source doesn't fit
+this platform even though its pillar generally does" level Muxin is describing.
+RISK FACTORS Muxin flagged, to carry into the strategy session: (1) topics need time to take root on
+a platform -- changing what gets posted where based on thin/early signal is risky; (2) changing an
+established platform's topic mix at all carries reputational/algorithmic risk, separate from whether
+the individual gating call is correct.
+NEXT STEP (Muxin's explicit ask): this needs a dedicated strategy session with a stronger/advanced
+model to define the actual approach (what granularity of gating, how much data before acting on it,
+how to avoid thrashing an established platform's topic mix) BEFORE any build. Do not scope
+implementation from this card alone.
+
+DECISION (Muxin, 2026-07-10 strategy session): RESOLVED BY DESIGN -- no per-topic resonance gating (thin/early signal + algorithmic risk, per the card's own risk flags). Instead gate on register/frame-fit: the new source-triage card (b288d0da) classifies each source as frame-native / reflective / fiction-promo, which drives frame on/off + platform subset. Existing pillar routing + spin stand unchanged. Superseded by b288d0da.
+- STATUS: Backlog
+<!-- card-id: 9a7656d9-5b53-4e2a-88c7-96abcc5c6b2e -->
+
+**Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some) -- check overlap with PR #185 first**
+- ORIGIN: Muxin, 2026-07-10 -- wants the content agent to help surface an angle that ties her
+source topic/insight to a real CTA connecting her brand and work to product-team value, especially
+on platforms likely to attract clients/customers (LinkedIn especially, X to a lesser degree). Basing
+this on "vibes" about what tends to work per platform becoming what people expect there.
+LIKELY OVERLAP -- CHECK THIS FIRST: card c42769b1 (Update per-channel spin angles), built earlier
+today, is currently sitting in an open PR (#185, draft, CI green, held for review per rule 7) that
+already rewrote spin_angles.linkedin to a case-first/client-conversion structure (real anonymized
+situation -> named assumption -> cost of having missed it -> pattern zoom-out LAST -> soft
+availability signal instead of a hard ask) and sharpened spin_angles.x to be more technically
+grounded while keeping the non-engineer-outsider voice. Muxin should review PR #185 before treating
+this as new/unscoped work -- it may already deliver most or all of what this card is asking for.
+Known gap even after PR #185 merges: its own PR body flags that no anonymized third-party case
+existed yet in the corpus, so the LinkedIn sample had to use Muxin's own personal-branding essay as
+the stand-in case (follow-up card f7b186c2 already filed to write/source a real one).
+NEXT STEP (Muxin's explicit ask): wants an AI strategy session (stronger/advanced model) to help
+define the approach for tying source topic to a real CTA per platform, before deciding what (if
+anything) is still needed beyond PR #185 + its follow-up. Do not scope new implementation from this
+card alone -- start by reviewing PR #185's actual result.
+
+DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 (case-first LinkedIn / technical X spin angles) + the new beat-template card (1eeb82a4) + f7b186c2 (real anonymized case note). No separate CTA build. The CTA is the natural last beat of the case skeleton (soft availability signal), not a bolt-on.
+- STATUS: Backlog
+<!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
+
+**Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example**
+- ORIGIN: Muxin-approved strategy session 2026-07-10 (branding frame discussion; follows PR #185 / card c42769b1).
+- WHY: PR #185's sample drifted thesis-first because spin_angles describes INTENT in prose; runtime Sonnet follows STRUCTURE far more reliably. Encode the brand skeleton ('everyone treats X as fixed; it's actually a belief; here's what testing it revealed') as named beats with per-beat pass/fail tests, not a description.
+- SCOPE: rewrite spin_angles.linkedin and spin_angles.x in config/platforms.yaml + the spin-mode.md guidance they drive as fill-in beat templates: (1) specific situation with a number/decision (test: could a stranger picture the scene?); (2) the assumption QUOTED as a belief statement in the holder's own words (test: is there literally a quoted belief sentence? if the source can't produce one, the piece doesn't fit the skeleton -- fall back to normal extraction, never fake it); (3) what testing it revealed + what the miss cost; (4) one-line zoom-out LAST (final two sentences only); (5) LinkedIn only: soft availability signal, no hard ask.
+- EXEMPLARS: include Muxin's Oncor case draft ('Personal Obsidian/Branding/Content/Ideas/LinkedIn -- Case Format (Diagnosis Post).md', Draft v1, approved-for-reuse material) verbatim in spin-mode.md as the gold positive example, and PR #185's personal-branding sample as the labeled counter-example ('wrong: thesis-first, subject is me').
+- DIALECT PRESERVATION: per-platform sections stay separate config entries -- X keeps its sharper/more-technical compressed register, LinkedIn keeps the case format; voice (Muxin's cadence, config/voice.yaml) is constant across platforms; dialect = compression + example register only.
+- RULE 7: content-generation logic -- PR HOLDS for Muxin's review with old-vs-new samples in the description.
+- GOAL_CONDITION: spin_angles.linkedin/.x + spin-mode.md contain the beat template (per-beat tests), the Oncor gold exemplar, the counter-example, and the fits/doesn't-fit fallback rule; a before/after spin sample on a real source is in the PR body; npm test green.
+PR: https://github.com/heymoosh/content-agents/pull/189 (stacked on PR #185 -- review #185 first)
+SHIP: held
+- STATUS: Review
+- GROOMED: Muxin-approved scope from 2026-07-10 strategy session; explicit GOAL_CONDITION, exemplar named, rule-7 hold flagged + 2026-07-10
+<!-- card-id: 1eeb82a4-712b-4b0c-9427-29fc8ef5bef9 -->
+
+**Source triage step at /atomize time: frame-native / reflective / fiction-promo drives frame on/off + platform subset**
+- ORIGIN: Muxin-approved strategy session 2026-07-10 -- 'a system to help me stay consistent with posting what where, and what should have a frame and shouldn't, without me needing to think about it.'
+- SCOPE: a classification step when a piece enters /atomize (she writes in Obsidian, runs /atomize on the file): classify the SOURCE once as frame-native / reflective / fiction-promo, record it as a fact in the content folder (e.g. routing.md or source frontmatter), and have every downstream step read it instead of re-deciding.
+- BUCKET RULES (Muxin approved): frame-native (carries a testable belief / the move) -> full fan-out, skeleton beats applied per platform dialect. Reflective/personal (e.g. 'What AI Cannot Reach', 'More than Bread') -> NO skeleton ever; skips conversion-facing treatment (LinkedIn case format, X); native to Substack + Bluesky (personal register performs there per platform-pillar data); home = Human Inference landing page + newsletter once live (card 87c86b16), Substack interim. Fiction -> series on Substack; teasers fan out UNFRAMED via the existing extraction-first cliffhanger style.
+- UX: triage shows the classification + resulting platform subset ('frame-native -> LinkedIn/X/Bluesky' or 'reflective -> Substack/newsletter, no frame') for Muxin to confirm -- one judgment call per piece, surfaced in the review flow she already uses. Side effect: flags 'no beat-2 belief statement found' so she learns which essays lack the move.
+- SUPERSEDES 9a7656d9's ask: gate on register/frame-fit (a judgment classification), not on thin per-topic resonance data.
+- RULE 7: routing/content-generation logic -- PR HOLDS for Muxin's review.
+- GOAL_CONDITION: running /atomize on a reflective source produces a recorded 'reflective' classification, no skeleton-framed derivatives, and a platform subset excluding LinkedIn-case/X treatment; a frame-native source gets the full framed fan-out; a fiction teaser is never framed; the classification is stored in the content folder and read (not re-derived) by downstream steps.
+- STATUS: To Do
+- DEPENDS ON: Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example
+- GROOMED: Muxin-approved scope from 2026-07-10 strategy session; bucket rules + GOAL_CONDITION explicit, depends on beat-template card + 2026-07-10
+<!-- card-id: b288d0da-c003-4617-93e4-809e865b7a80 -->
 
 **Outreach engine — Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)**
 - PARENT: 659b50f0
