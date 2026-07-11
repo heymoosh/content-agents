@@ -22,7 +22,7 @@ gets its full framing on Bluesky and X instead, per format_notes.
 | x-1 | x | text | derivatives/x-1.md | 5 | 4 | no | pending | flag: spin pass suggested (low: narrative) | from /cycle |
 | x-2 | x | text | derivatives/x-2.md | 5 | 5 | no | pending | flag: spin pass suggested (low: narrative) | from /cycle |
 | x-3 | x | text | derivatives/x-3.md | 4 | 5 | no | pending | flag: spin pass suggested (low: narrative) | from /cycle |
-| x-4 | x | text | derivatives/x-4.md | 5 | 4 | no | pending | flag: spin pass suggested (low: narrative) | from /cycle |
+| x-4 | x | text | derivatives/x-4.md | 5 | 4 | no | published | flag: spin pass suggested (low: narrative) | from /cycle |
 | x-5 | x | text | derivatives/x-5.md | 4 | 4 | yes | pending | flag: spin pass suggested (low: hook, narrative) | from /cycle |
 | linkedin-1 | linkedin | text | derivatives/linkedin-1.md | 4 | 4 | yes | pending | cut to career-work angle per brief DO_LESS on human-ai→LinkedIn | from /cycle |
 | bluesky-1 | bluesky | text | derivatives/bluesky-1.md | 4 | 5 | no | pending | flag: spin pass suggested (low: narrative) | from /cycle |
