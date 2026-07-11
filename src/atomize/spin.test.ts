@@ -15,10 +15,11 @@ describe("config/platforms.yaml spin_angles: the four Muxin-approved angles (202
     assert.match(angles.x.angle, /96% of non-tech workers/);
   });
 
-  test("linkedin: case-first, anonymized situation before the pattern zoom-out, business/career audience", () => {
+  test("linkedin: case-first beat template, zoom-out beat placed last, business/career audience", () => {
     assert.equal(angles.linkedin.audience, "business/career");
-    assert.match(angles.linkedin.angle, /Case-first/);
-    assert.match(angles.linkedin.angle, /zoom-out to the broader pattern is the closing line/);
+    assert.match(angles.linkedin.angle, /Case-first beat template/);
+    assert.match(angles.linkedin.angle, /Beat 4 — Zoom-out/);
+    assert.match(angles.linkedin.angle, /QUOTED as a belief statement/);
   });
 
   test("substack: builder-philosopher, society", () => {
