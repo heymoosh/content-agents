@@ -347,20 +347,6 @@ DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 
 - STATUS: Backlog
 <!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
 
-**Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example**
-- ORIGIN: Muxin-approved strategy session 2026-07-10 (branding frame discussion; follows PR #185 / card c42769b1).
-- WHY: PR #185's sample drifted thesis-first because spin_angles describes INTENT in prose; runtime Sonnet follows STRUCTURE far more reliably. Encode the brand skeleton ('everyone treats X as fixed; it's actually a belief; here's what testing it revealed') as named beats with per-beat pass/fail tests, not a description.
-- SCOPE: rewrite spin_angles.linkedin and spin_angles.x in config/platforms.yaml + the spin-mode.md guidance they drive as fill-in beat templates: (1) specific situation with a number/decision (test: could a stranger picture the scene?); (2) the assumption QUOTED as a belief statement in the holder's own words (test: is there literally a quoted belief sentence? if the source can't produce one, the piece doesn't fit the skeleton -- fall back to normal extraction, never fake it); (3) what testing it revealed + what the miss cost; (4) one-line zoom-out LAST (final two sentences only); (5) LinkedIn only: soft availability signal, no hard ask.
-- EXEMPLARS: include Muxin's Oncor case draft ('Personal Obsidian/Branding/Content/Ideas/LinkedIn -- Case Format (Diagnosis Post).md', Draft v1, approved-for-reuse material) verbatim in spin-mode.md as the gold positive example, and PR #185's personal-branding sample as the labeled counter-example ('wrong: thesis-first, subject is me').
-- DIALECT PRESERVATION: per-platform sections stay separate config entries -- X keeps its sharper/more-technical compressed register, LinkedIn keeps the case format; voice (Muxin's cadence, config/voice.yaml) is constant across platforms; dialect = compression + example register only.
-- RULE 7: content-generation logic -- PR HOLDS for Muxin's review with old-vs-new samples in the description.
-- GOAL_CONDITION: spin_angles.linkedin/.x + spin-mode.md contain the beat template (per-beat tests), the Oncor gold exemplar, the counter-example, and the fits/doesn't-fit fallback rule; a before/after spin sample on a real source is in the PR body; npm test green.
-PR: https://github.com/heymoosh/content-agents/pull/189 (stacked on PR #185 -- review #185 first)
-SHIP: held
-- STATUS: Review
-- GROOMED: Muxin-approved scope from 2026-07-10 strategy session; explicit GOAL_CONDITION, exemplar named, rule-7 hold flagged + 2026-07-10
-<!-- card-id: 1eeb82a4-712b-4b0c-9427-29fc8ef5bef9 -->
-
 **Source triage step at /atomize time: frame-native / reflective / fiction-promo drives frame on/off + platform subset**
 - ORIGIN: Muxin-approved strategy session 2026-07-10 -- 'a system to help me stay consistent with posting what where, and what should have a frame and shouldn't, without me needing to think about it.'
 - SCOPE: a classification step when a piece enters /atomize (she writes in Obsidian, runs /atomize on the file): classify the SOURCE once as frame-native / reflective / fiction-promo, record it as a fact in the content folder (e.g. routing.md or source frontmatter), and have every downstream step read it instead of re-deciding.
@@ -374,6 +360,30 @@ SHIP: held
 - GROOMED: Muxin-approved scope from 2026-07-10 strategy session; bucket rules + GOAL_CONDITION explicit, depends on beat-template card + 2026-07-10
 <!-- card-id: b288d0da-c003-4617-93e4-809e865b7a80 -->
 
+**GUI approve-time scheduling failure is invisible after the fact (silent 'blocked by reuse guard' state)**
+- ORIGIN: Muxin, 2026-07-11 -- "I had a bad experience with the GUI earlier this week and haven't wanted to reopen it since." Reproduced live by opening the Review tab against real queue data.
+CONCRETE REPRO FOUND: row `quote-card-6-linkedin` (content/2026-06-16-building-an-innovation-nation/) shows STATUS: approve but has NO entry in that folder's publish-log.md. The Review tab's reconcile pass (src/review/reconcile.ts) flags it with a red warning: "not found at typefully -- no logged Typefully draft id found for this row."
+ROOT CAUSE (confirmed by reading code + data, not guessed): the design is actually correct in principle -- src/review/serve.ts's approve handler (~L518-522) deliberately keeps a row at STATUS: approve (never "published") when scheduleApproved() reports a scheduling failure, specifically so the failure reason can be shown. But src/review/page.ts:435 only surfaces that reason as an EPHEMERAL flash-toast: `flash("Approved -- schedule failed: "+r.scheduleError)`. It is never written anywhere persistent (not to the row's notes column, not logged). So if the flash is missed in the moment, the ONLY signal left is the generic reconcile "mismatch" state days later, which does not explain WHY -- it just reads as broken/lost.
+THIS SPECIFIC ROW'S actual state (verified via briefs/bets.md Placed log): the same slug already had a LinkedIn placement (`qvid-linkedin`, 2026-06-24) 17 days before the quote-card-6-linkedin approve attempt. LinkedIn's `min_reuse_days` is 60 (config/platforms.yaml). The reuse guard correctly blocked scheduling. This row is NOT stuck forever -- it becomes eligible again ~2026-08-23 -- but nothing in the GUI says that; it just looks broken.
+GAP TO CLOSE (not yet scoped/decided -- for grooming): persist the real scheduleError reason somewhere durable when an approve-time schedule attempt fails (e.g. the row's notes column in review-queue.md), and/or have the reconcile pass itself detect a reuse-guard block specifically and report "blocked by reuse guard, eligible again in N days" instead of the generic, alarming "no logged draft" message. Muxin confirmed (2026-07-11) the intended semantics: "when I say approve I do mean that it should go into scheduling" -- so a silent/invisible scheduling failure is a real gap, not a documentation issue.
+GOAL_CONDITION: not yet defined -- scope once Muxin decides which half of the gap to close (persist-the-reason vs. smarter-reconcile-message vs. both).
+- STATUS: Backlog
+<!-- card-id: 174f70bd-1dd3-456f-9d66-6945ac88872a -->
+
+**Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example**
+- ORIGIN: Muxin-approved strategy session 2026-07-10 (branding frame discussion; follows PR #185 / card c42769b1).
+- WHY: PR #185's sample drifted thesis-first because spin_angles describes INTENT in prose; runtime Sonnet follows STRUCTURE far more reliably. Encode the brand skeleton ('everyone treats X as fixed; it's actually a belief; here's what testing it revealed') as named beats with per-beat pass/fail tests, not a description.
+- SCOPE: rewrite spin_angles.linkedin and spin_angles.x in config/platforms.yaml + the spin-mode.md guidance they drive as fill-in beat templates: (1) specific situation with a number/decision (test: could a stranger picture the scene?); (2) the assumption QUOTED as a belief statement in the holder's own words (test: is there literally a quoted belief sentence? if the source can't produce one, the piece doesn't fit the skeleton -- fall back to normal extraction, never fake it); (3) what testing it revealed + what the miss cost; (4) one-line zoom-out LAST (final two sentences only); (5) LinkedIn only: soft availability signal, no hard ask.
+- EXEMPLARS: include Muxin's Oncor case draft ('Personal Obsidian/Branding/Content/Ideas/LinkedIn -- Case Format (Diagnosis Post).md', Draft v1, approved-for-reuse material) verbatim in spin-mode.md as the gold positive example, and PR #185's personal-branding sample as the labeled counter-example ('wrong: thesis-first, subject is me').
+- DIALECT PRESERVATION: per-platform sections stay separate config entries -- X keeps its sharper/more-technical compressed register, LinkedIn keeps the case format; voice (Muxin's cadence, config/voice.yaml) is constant across platforms; dialect = compression + example register only.
+- RULE 7: content-generation logic -- PR HOLDS for Muxin's review with old-vs-new samples in the description.
+- GOAL_CONDITION: spin_angles.linkedin/.x + spin-mode.md contain the beat template (per-beat tests), the Oncor gold exemplar, the counter-example, and the fits/doesn't-fit fallback rule; a before/after spin sample on a real source is in the PR body; npm test green.
+PR: https://github.com/heymoosh/content-agents/pull/189 (stacked on PR #185 -- review #185 first)
+SHIP: held
+- STATUS: Done
+- GROOMED: Muxin-approved scope from 2026-07-10 strategy session; explicit GOAL_CONDITION, exemplar named, rule-7 hold flagged + 2026-07-10
+<!-- card-id: 1eeb82a4-712b-4b0c-9427-29fc8ef5bef9 -->
+
 **Update per-channel spin angles: LinkedIn to case-study/client-conversion format, X to technical-but-still-outside-the-bubble**
 - ORIGIN: 2026-07-10 conversation with Muxin reviewing per-platform positioning (`config/platforms.yaml` `spin_angles`).
 - WHY: LinkedIn's diagnosis-of-world register reads as "interesting worldview," not "hire me for this." Muxin confirmed the ick she'd flagged about consulting-flavored content is about the FORMAT (essay-as-thesis), not consulting itself — without a concrete conversion hook there is no path to sales.
@@ -384,10 +394,10 @@ SHIP: held
 - GOAL_CONDITION: `spin_angles.linkedin` reflects the case-first structure above (verified against a real or representative essay run, before/after sample in the PR); `spin_angles.x` reads technically sharper without reading insider-exclusive (verified against a real or representative sample); spin-mode.md guidance updated to match both.
 PR: https://github.com/heymoosh/content-agents/pull/185
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
 - STATUS: Done
 - DECISION: approved (Muxin, 2026-07-10) — LinkedIn case-study reframe confirmed; X clarified as technical-but-still-outside-the-bubble, not a flip to insider voice.
 - GROOMED: explicit structural spec for LinkedIn, explicit direction for X, both map onto existing scaffolding (spin_angles, case_study/product_builder_insight CTA types, existing rehook latitude) — no blocking unknown; PR will hold for review per rule 7 since this is content-generation logic + 2026-07-10
+- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
 - LANE: a
 <!-- card-id: c42769b1-fdf4-4a78-a888-d21ea9a8ef2d -->
 
@@ -474,11 +484,11 @@ CARD TYPE: EPIC
 EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased why-this-anchor basis + source paths are OK to commit, now that the repo is private. Build as originally scoped.
 PR: https://github.com/heymoosh/content-agents/pull/181
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Outreach engine — Phase 3: platform config + borrowed-audience target list**
@@ -491,11 +501,11 @@ SHIP: held
 - DEPENDENCY NOTE (2026-07-09, Muxin): Phase 3 only needs Phase 1's qualify.ts + lead.md schema, not Phase 2's draft/lock; was over-conservatively pointed at Phase 2. Unblocks Phase 2 (message quality) and Phase 3 (platform-list quality) to build/review independently once Phase 1 lands.
 PR: https://github.com/heymoosh/content-agents/pull/177
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (platform qualify/pitch-angle prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from b7dcb608 per plan §6 Phase 3; explicit GOAL_CONDITION (also satisfies 30772ba1), DEPENDS ON Phase 2 + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 <!-- card-id: 6590efec-54ca-4288-9cf7-5e69e034477d -->
 
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
@@ -509,11 +519,11 @@ SHIP: held
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
 PR: https://github.com/heymoosh/content-agents/pull/171
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 <!-- card-id: d5b34590-4354-49f1-952f-3faaf1ce7d4a -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
