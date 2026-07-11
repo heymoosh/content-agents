@@ -24,6 +24,9 @@ essay-as-thesis register read as "interesting worldview," not "hire me for this"
 without turning the post into a pitch. X's angle keeps the non-engineer-outsider voice (Muxin does
 NOT want X reading as insider/tech-circle content) but now requires real technical specifics — the
 actual tool or mechanism and where it actually breaks — instead of a surface-level "AI is like X."
+This prose intent was rewritten into an explicit beat template later the same day — see "Beat-
+template rewrite" below for the current spec; the YAML in `config/platforms.yaml` reflects the
+beat template, not this paragraph.
 
 **What changes vs. a verbatim run:** run steps 1–8 (in SKILL.md) exactly as usual, with three differences.
 
@@ -106,3 +109,106 @@ invented.
 (`needsSpinPass()` in `src/atomize/storytelling.ts`) gets `spinPassNote()`'s text appended to its
 review-queue.md `notes` cell — a suggestion to run this pass, never a block. Muxin's `approve` in
 review-queue.md is still the only real gate.
+
+## Beat-template rewrite: LinkedIn + X (Muxin, 2026-07-10)
+
+PR #185's LinkedIn/X angles (2026-07-10, section above) described the case-first structure in
+**prose** — what the output should feel like. That was too weak a steering signal: even PR #185's
+own verification sample drifted thesis-first, subject-is-me, despite being drafted under the new
+angle. Runtime models follow explicit **structure** — named beats with pass/fail tests — far more
+reliably than a paragraph describing intent. `config/platforms.yaml`'s `spin_angles.linkedin` and
+`spin_angles.x` now encode the case shape as numbered beats, each with an embedded test. Read the
+current YAML there for the authoritative beat list; this section explains it with a worked example.
+
+**The fallback rule (load-bearing):** beat 2 (LinkedIn) / beat 1's assumption half (X) requires a
+literal quoted-or-near-quoted belief statement in the source material. If the source can't produce
+one, the piece does NOT fit the case skeleton — fall back to normal (non-case) extraction/spin.
+Never fabricate a quote or a scene to force the fit. This rule exists because the case format only
+works on real third-party material; forcing it onto material that has no real assumption-to-quote
+produces exactly the drift PR #185 hit (see counter-example below).
+
+**Exemplar, mapped to LinkedIn's 5 beats.** Source: Muxin's own draft, "LinkedIn — Case Format
+(Diagnosis Post).md" (Draft v1, approved for reuse):
+
+> A demand response program for smart thermostats was stuck under 50 professional installs across
+> two full campaigns. First they dropped the install fee from $100 to $30. The next move on the
+> table was $0.
+>
+> The team's read was consistent: "It's a pricing problem. Get the fee low enough and installs
+> follow."
+>
+> Nobody had asked why someone would choose paid professional installation when DIY was already
+> free. Price was never the gap. There was no reason to pick the paid option over the free one, at
+> any price point.
+>
+> The fix wasn't a lower price. It was a bill credit tied specifically to choosing professional
+> install, something that made the paid option worth choosing instead of just cheaper. Installs
+> went from under 50 to over 1,500. It was later cited by a Texas PUC contractor as the most cost
+> effective demand response program in the state.
+>
+> Two campaigns and two price drops happened before anyone tested that assumption. Not for lack of
+> attention. "It's a pricing problem" just felt too obviously true to write down as a guess.
+>
+> When I get pulled into something like this, I'm not looking for "we don't know what to do." I'm
+> looking for "we've already tried a few things and the number hasn't moved." That's usually a sign
+> the team is optimizing a variable that was never the real constraint.
+
+- **Beat 1 (situation):** under-50-installs across two campaigns, fee dropped $100 → $30, $0 next
+  on the table. A stranger can picture the scene from this alone.
+- **Beat 2 (assumption, quoted):** "It's a pricing problem. Get the fee low enough and installs
+  follow." — a literal quoted belief sentence.
+- **Beat 3 (cost):** the bill-credit fix, installs from under-50 to 1,500+, the Texas PUC citation
+  — concrete numbers and a named outcome, not "it got better."
+- **Beat 4 (zoom-out, last):** "That's usually a sign the team is optimizing a variable that was
+  never the real constraint" — one line, the close of the piece, not the opener.
+- **Beat 5 (soft availability close):** the final paragraph — what Muxin looks for when pulled into
+  something like this ("we've already tried a few things and the number hasn't moved") — a
+  diagnostic signal, not "book a call" or "DM me."
+
+**Counter-example — labeled "wrong: thesis-first, subject is me."** This is PR #185's own hand-
+drafted "NEW" sample, and PR #185's own PR body already admitted it drifted thesis-first despite
+being drafted under the case-first prose angle. It is a real, documented failure case, not a
+strawman:
+
+> Earlier this year I was convinced my LinkedIn problem was a positioning problem: pick the right
+> lane, repeat it, and the brand follows. That's the standard advice, so I ran it as an experiment
+> on myself.
+>
+> My actual career doesn't fit one lane: journalism, education, anthropology, product, tech, an
+> MBA. Every framing I tried for a "brand" asked me to pick one of those and treat the rest as noise
+> to cut.
+>
+> I spent most of this year testing that assumption instead of accepting it. Every time I cut a
+> piece to fit the lane, the post got easier to write and said less. The parts I was told to
+> amputate were exactly the parts doing the real work.
+>
+> The pattern underneath: "pick a lane and repeat it" is advice built for people whose value already
+> sits inside one category. It punishes range right as AI is about to make range more valuable, not
+> less.
+>
+> If your own experience doesn't reduce to one lane either, I'd be glad to compare notes on what
+> you've tried and what actually held up.
+
+**Why it's wrong under the beat template:** beat 1's "situation" here is a category/reflection ("my
+LinkedIn problem was a positioning problem"), not a scene with a number or a decision a stranger
+could picture — it fails beat 1's test outright. And the subject of the whole case is Muxin
+herself, not a third-party/client situation, which defeats the case format's actual purpose: a
+client-conversion register (a stranger recognizing "this could be my team"), not personal
+reflection. This happened because no real third-party case existed in the corpus yet when PR #185
+was drafted (card f7b186c2 tracks sourcing one). Until a real third-party case exists in the
+corpus, apply the beat template to whatever source material most resembles a case — even
+autobiographical material — but flag that output to Muxin as a stand-in, not the target end-state
+for this angle.
+
+**Dialect preservation (X vs. LinkedIn).** `spin_angles.linkedin` and `spin_angles.x` stay separate
+config entries — never merged. Voice (`config/voice.yaml`, Muxin's cadence) is constant across both;
+what differs is compression and register only. X compresses the same underlying beats into 2-3
+visible beats (situation + assumption folded together, cost, zoom-out folded into the closing
+line), keeps its own non-engineer-outsider register with real named tools/mechanisms, and drops
+beat 5 (the soft-availability close) entirely — that beat is LinkedIn-only, X has no engagement-
+scoping subtext.
+
+**Follow-up not done here:** X's beat count/shape is provisional until real technical-mechanism
+source material (a genuine tool/mechanism failure case, not an essay excerpt) exists to test it
+against — worth revisiting once card f7b186c2's sourcing work lands a first real case either
+platform can draw on.
