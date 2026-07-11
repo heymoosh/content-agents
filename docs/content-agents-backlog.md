@@ -238,23 +238,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: Backlog
 <!-- card-id: 4e2e83f3-cd4f-438a-a5a1-15912c1f4f6f -->
 
-**Update per-channel spin angles: LinkedIn to case-study/client-conversion format, X to technical-but-still-outside-the-bubble**
-- ORIGIN: 2026-07-10 conversation with Muxin reviewing per-platform positioning (`config/platforms.yaml` `spin_angles`).
-- WHY: LinkedIn's diagnosis-of-world register reads as "interesting worldview," not "hire me for this." Muxin confirmed the ick she'd flagged about consulting-flavored content is about the FORMAT (essay-as-thesis), not consulting itself — without a concrete conversion hook there is no path to sales.
-- LINKEDIN SCOPE: rewrite `spin_angles.linkedin`'s angle text (and the spin-mode.md guidance it drives) toward a case-first structure: (1) open on a real anonymized situation, not a category ("A team building an onboarding flow was convinced churn was a UX problem"); (2) name the assumption found, in the team's own words, not Muxin's; (3) say what happened when it got tested and what it cost to have missed it; (4) the one-line zoom-out to the broader pattern comes LAST, as the closer, not the headline; (5) end with a soft signal of availability (what she'd look for scoping this kind of engagement) instead of a hard ask — a proof-of-work sample, not a thesis. Reader-reaction target: "I have that exact blind spot," not "interesting way to see the world."
-  - Two source paths, resolved at build time by checking what material exists: (a) if an essay already contains a real concrete example, spin's existing rehook latitude (lead with strongest line, reorder for arc — spin-mode.md) restructures it without inventing anything; (b) if the case isn't written up anywhere, it needs a short case note as new atomize source material. Either path lands in the existing `case_study`/`product_builder_insight` content types (`config/content-types.yaml`), which already carry "Connect on LinkedIn" CTA scaffolding — no new plumbing needed there.
-- X SCOPE: sharpen `spin_angles.x`'s angle text to read as more technically grounded (real technical specifics, not surface-level), while explicitly preserving the outsider framing — Muxin does NOT want X to read as belonging only inside the tech-circle bubble. A wording tightening of the existing angle, not a flip to an insider/builder voice.
-- RULE 7: both are content-generation logic (per-channel angle/spin config driving what future runs generate) — build holds as a draft PR with an old-vs-new sample post per platform so Muxin sees the actual delta before merge, per CLAUDE.md rule 7's conductor mechanics.
-- GOAL_CONDITION: `spin_angles.linkedin` reflects the case-first structure above (verified against a real or representative essay run, before/after sample in the PR); `spin_angles.x` reads technically sharper without reading insider-exclusive (verified against a real or representative sample); spin-mode.md guidance updated to match both.
-PR: https://github.com/heymoosh/content-agents/pull/185
-SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
-- STATUS: Review
-- DECISION: approved (Muxin, 2026-07-10) — LinkedIn case-study reframe confirmed; X clarified as technical-but-still-outside-the-bubble, not a flip to insider voice.
-- GROOMED: explicit structural spec for LinkedIn, explicit direction for X, both map onto existing scaffolding (spin_angles, case_study/product_builder_insight CTA types, existing rehook latitude) — no blocking unknown; PR will hold for review per rule 7 since this is content-generation logic + 2026-07-10
-- LANE: a
-<!-- card-id: c42769b1-fdf4-4a78-a888-d21ea9a8ef2d -->
-
 **Write/source an anonymized case note for the LinkedIn case-first spin angle to work from**
 - ORIGIN: follow-up auto-filed while building card c42769b1 (Update per-channel spin angles), PR #185.
 The new LinkedIn case-first spin angle needs a real anonymized third-party case (a team/client situation, not Muxin's own story) to work from. No such material exists yet in the corpus -- PR #185's old-vs-new sample had to use Muxin's own personal-branding essay as the case study, since it was the only source available, which is honest but not the intended target material (a client/team case, per the card's own LINKEDIN SCOPE). Same reasoning applies more mildly to the X angle's technical-sharpening sample.
@@ -390,6 +373,23 @@ SHIP: held
 - DEPENDS ON: Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example
 - GROOMED: Muxin-approved scope from 2026-07-10 strategy session; bucket rules + GOAL_CONDITION explicit, depends on beat-template card + 2026-07-10
 <!-- card-id: b288d0da-c003-4617-93e4-809e865b7a80 -->
+
+**Update per-channel spin angles: LinkedIn to case-study/client-conversion format, X to technical-but-still-outside-the-bubble**
+- ORIGIN: 2026-07-10 conversation with Muxin reviewing per-platform positioning (`config/platforms.yaml` `spin_angles`).
+- WHY: LinkedIn's diagnosis-of-world register reads as "interesting worldview," not "hire me for this." Muxin confirmed the ick she'd flagged about consulting-flavored content is about the FORMAT (essay-as-thesis), not consulting itself — without a concrete conversion hook there is no path to sales.
+- LINKEDIN SCOPE: rewrite `spin_angles.linkedin`'s angle text (and the spin-mode.md guidance it drives) toward a case-first structure: (1) open on a real anonymized situation, not a category ("A team building an onboarding flow was convinced churn was a UX problem"); (2) name the assumption found, in the team's own words, not Muxin's; (3) say what happened when it got tested and what it cost to have missed it; (4) the one-line zoom-out to the broader pattern comes LAST, as the closer, not the headline; (5) end with a soft signal of availability (what she'd look for scoping this kind of engagement) instead of a hard ask — a proof-of-work sample, not a thesis. Reader-reaction target: "I have that exact blind spot," not "interesting way to see the world."
+  - Two source paths, resolved at build time by checking what material exists: (a) if an essay already contains a real concrete example, spin's existing rehook latitude (lead with strongest line, reorder for arc — spin-mode.md) restructures it without inventing anything; (b) if the case isn't written up anywhere, it needs a short case note as new atomize source material. Either path lands in the existing `case_study`/`product_builder_insight` content types (`config/content-types.yaml`), which already carry "Connect on LinkedIn" CTA scaffolding — no new plumbing needed there.
+- X SCOPE: sharpen `spin_angles.x`'s angle text to read as more technically grounded (real technical specifics, not surface-level), while explicitly preserving the outsider framing — Muxin does NOT want X to read as belonging only inside the tech-circle bubble. A wording tightening of the existing angle, not a flip to an insider/builder voice.
+- RULE 7: both are content-generation logic (per-channel angle/spin config driving what future runs generate) — build holds as a draft PR with an old-vs-new sample post per platform so Muxin sees the actual delta before merge, per CLAUDE.md rule 7's conductor mechanics.
+- GOAL_CONDITION: `spin_angles.linkedin` reflects the case-first structure above (verified against a real or representative essay run, before/after sample in the PR); `spin_angles.x` reads technically sharper without reading insider-exclusive (verified against a real or representative sample); spin-mode.md guidance updated to match both.
+PR: https://github.com/heymoosh/content-agents/pull/185
+SHIP: held
+- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
+- STATUS: Done
+- DECISION: approved (Muxin, 2026-07-10) — LinkedIn case-study reframe confirmed; X clarified as technical-but-still-outside-the-bubble, not a flip to insider voice.
+- GROOMED: explicit structural spec for LinkedIn, explicit direction for X, both map onto existing scaffolding (spin_angles, case_study/product_builder_insight CTA types, existing rehook latitude) — no blocking unknown; PR will hold for review per rule 7 since this is content-generation logic + 2026-07-10
+- LANE: a
+<!-- card-id: c42769b1-fdf4-4a78-a888-d21ea9a8ef2d -->
 
 **Outreach engine — Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)**
 - PARENT: 659b50f0
