@@ -552,7 +552,25 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: /publish reads per-platform posts_per_week + slot_time_pst from strategy output; posting cadence + timing adapt per platform to engagement trends; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: To Do
+- SCOPE RECONCILED (Muxin, 2026-07-15): unlike Levers A/B, Muxin's call here was NOT recommend-only
+  -- "auto-write a config I approve." src/strategy/cadence-fit.ts -- write proposes per-platform
+  posts_per_week + slot_time_pst into config/schedule-overrides.yaml (seeded/shipped inert,
+  approved: false); src/publish/slots.ts's loadSchedule() only applies it once Muxin sets
+  approved: true herself. Over-posting/rate-limit risk (flagged in the original DECISION) is
+  guarded four ways: approved:false default, a conservative single-step posts_per_week nudge
+  (never a jump), a hard max_posts_per_week ceiling, and review-queue.md still gating every actual
+  publish. Separately: X and LinkedIn's analytics capture only the posting DATE, not the hour --
+  every post lands on a synthetic timestamp with no real time-of-day signal (X: 1 distinct PT hour
+  across 225 posts; LinkedIn: 1 distinct PT hour across 73). Peak-hour reads for both are correctly
+  suppressed as insufficient-data via a distinct-hours-seen guard; only Bluesky has real
+  timestamps today. Filed a follow-up card (below) to capture real X/LinkedIn post times in
+  ingest. A thin trend window (n<3) always reads insufficient-data, same overfitting posture as
+  Levers A/B.
+- SHIP: held (draft PR #224 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic
+  AND a live-scheduler seam, needs Muxin's review; before/after sample + the four over-posting
+  guards + the X/LinkedIn timestamp gap all called out in PR body; builds on merged Levers
+  A/#220 and B/#222)
+- STATUS: Review
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). This lever changes live posting cadence/timing, so extra scrutiny is warranted at review -- but building and opening a draft PR carries no live-posting risk by itself (nothing merges/deploys without Muxin's review per rule 7 and the epic's 'None auto-merges' statement). Flag the over-posting/rate-limit risk prominently in the PR description for her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: ed23f712-b34d-442c-9d5d-c07b10924924 -->
@@ -584,6 +602,34 @@ CARD TYPE: EPIC
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). CTA-effectiveness methodology (metrics/weighting/significance threshold) is underspecified; build worker should choose a reasonable default (e.g. click-through rate, minimum sample size) and flag the choice explicitly in the PR for Muxin to adjust at review. PR opens as a HELD draft per rule 7. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: d80411bc-5884-4cfe-a471-a2f887fc36dc -->
+
+**Capture real X/LinkedIn post times in ingest (unblocks lever C time-of-day for X/LinkedIn)**
+- Found building Strategy lever C (card ed23f712, PR #224): src/strategy/cadence-fit.ts's
+  peak-posting-hour read correctly suppresses X and LinkedIn as insufficient-data, because their
+  analytics exports only carry the posting DATE, not the hour -- src/ingest/parse-x.ts and
+  src/ingest/parse-linkedin.ts parse a bare `YYYY-MM-DD` into a synthetic local-midnight
+  timestamp (`new Date(date).toISOString()` / `safeIso`), so every post lands on one or two
+  distinct UTC hours regardless of when it actually went out (X: 1 distinct PT hour across 225
+  posts; LinkedIn: 1 distinct PT hour across 73). Only Bluesky (fetch-bluesky.ts pulls the API's
+  real `record.createdAt`) and Substack Notes carry true per-post timestamps today.
+- Investigate whether X's/LinkedIn's own analytics export (or their APIs) actually expose a
+  real per-post timestamp anywhere Muxin can pull from, and if so wire it into
+  src/ingest/parse-x.ts / parse-linkedin.ts so posts.posted_at carries a real hour instead of a
+  parsing artifact.
+- GOAL_CONDITION: newly ingested X/LinkedIn posts carry a real (non-synthetic) posted_at
+  timestamp where the source data supports it; src/strategy/cadence-fit.ts's peak-hour read for
+  X/LinkedIn stops reading insufficient-data once enough real-timestamped posts accumulate (no
+  code change needed there -- the existing distinct-hours-seen guard already unlocks once the
+  data does); npm test green.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: filed by the ed23f712 (lever C) build worker, 2026-07-15, as a data-gap follow-up --
+  not part of the original epic decomposition.
+- STATUS: To Do
+- DECISION: hold -- this is a data/ingest investigation (does the export or API even expose a
+  real timestamp?), not a decided build; needs a quick research pass before scoping the actual
+  change. Not itself content-generation logic (rule 7 doesn't apply), but the eventual parser
+  change should be reviewed since it changes what posts.posted_at means downstream.
+<!-- card-id: 6f1a2e9c-8b4a-4c37-9e5f-2b7d4c9a3e61 -->
 
 **Add Threads as a supported publishing platform (official Graph API)**
 - Meta opened the Threads API to broader third-party publishing in 2026 -- richer post types, search/profile discovery, reply management, and real-time publish/delete notifications for third-party apps.
