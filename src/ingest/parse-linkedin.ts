@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { sha256Text } from "../util/hash.js";
 import { ImportRow, AudienceRow, ParseError } from "./types.js";
 import { toInt, toFloat } from "../util/csv.js";
+import { linkedinPostTimeIso } from "./snowflake.js";
 
 // LinkedIn creator/content analytics XLSX export. The per-post data lives on the "TOP POSTS"
 // sheet, which LinkedIn lays out as TWO side-by-side blocks separated by a blank column:
@@ -103,7 +104,11 @@ export async function parseLinkedIn(fileName: string, buffer: Buffer): Promise<I
     out.push({
       platform: "linkedin",
       platformPostId: String(id),
-      postedAt: safeIso(rec.date),
+      // Prefer the real time decoded from the LinkedIn post/activity id; the export's Publish
+      // Date column has no time-of-day, so fall back to a synthetic local-midnight instant when
+      // the id isn't a real LinkedIn id (e.g. the sha256 fallback used when no numeric id was
+      // found in the URL).
+      postedAt: linkedinPostTimeIso(String(id)) ?? safeIso(rec.date),
       url: rec.url,
       contentText: textFromUrl(rec.url), // no post text in the export — recover the opening line from the URL slug
       format: "text",
