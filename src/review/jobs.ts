@@ -19,7 +19,7 @@ import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { CONTENT, safeFolder } from "./rows.js";
 import { briefRevisePrompt, latestBriefPath } from "./serve.js";
-import { runDraft, type DraftResult } from "../outreach/draft.js";
+import { runDraft, draftModel, type DraftResult } from "../outreach/draft.js";
 
 // Per-job stdout/stderr logs for the atomize job queue (see the Job interface below) — persisted
 // to disk so a job's real output survives past the 40MB in-memory buffer execFile used to impose,
@@ -258,10 +258,26 @@ interface ClaudeSpawnResult {
   enoent: boolean;
   stdout: string;
 }
+// Pure argv builder for runClaudeSpawn, split out so a caller's exact invocation is unit-testable
+// without spawning a real subprocess. `permissionMode: null` omits the --permission-mode flag
+// entirely (draft.ts's callClaudeDraft never passes one, using --model/--tools instead — see
+// enqueueFollowUpDraft below); omitting the option (undefined) keeps the original "acceptEdits"
+// default so every pre-existing caller is unaffected.
+export function buildClaudeSpawnArgs(
+  prompt: string,
+  opts: { permissionMode?: string | null; model?: string; tools?: string }
+): string[] {
+  const args = ["-p", prompt];
+  if (opts.permissionMode !== null) args.push("--permission-mode", opts.permissionMode ?? "acceptEdits");
+  if (opts.model !== undefined) args.push("--model", opts.model);
+  if (opts.tools !== undefined) args.push("--tools", opts.tools);
+  return args;
+}
+
 export function runClaudeSpawn(
   job: Job,
   prompt: string,
-  opts: { timeoutMs: number; permissionMode?: string; env?: NodeJS.ProcessEnv }
+  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
 ): Promise<ClaudeSpawnResult> {
   mkdirSync(JOB_LOG_DIR, { recursive: true });
   const log = createWriteStream(jobLogPath(job.id), { flags: "a" });
@@ -276,7 +292,7 @@ export function runClaudeSpawn(
     if (line) job.lastStdoutLine = line;
   };
   return new Promise((resolve) => {
-    const child = spawn("claude", ["-p", prompt, "--permission-mode", opts.permissionMode ?? "acceptEdits"], {
+    const child = spawn("claude", buildClaudeSpawnArgs(prompt, opts), {
       cwd: repoRoot,
       timeout: opts.timeoutMs,
       killSignal: "SIGTERM",
@@ -699,6 +715,37 @@ export async function duplicateToPlatform(
 // through the SAME job queue every other GUI Claude spawn uses, so it's bounded by the one
 // `draining` mutex. Writes a new messages/message-NN.md + a `pending` review-queue.md row — same
 // as any other draft — nothing here sends or locks anything (CLAUDE.md rule 2 analog).
+//
+// Card d39258ab: runDraft's default callClaudeDraft spawns via execFile, so this job used to get
+// no persisted log or heartbeat despite being routed through the shared queue — unlike every other
+// Claude-spawning GUI action. Fix: inject a callClaude backed by the shared runClaudeSpawn/
+// decodeSpawnFailure so it gets a real log + heartbeat too, WITHOUT changing what gets generated —
+// same model (draftModel(), the same resolver draft.ts's own callClaudeDraft uses), same --tools ""
+// lockdown, same prompt, same timeout as draft.ts's own execFile call. Only transport + error
+// wording differ.
+const DRAFT_TIMEOUT_MS = 120_000; // mirrors outreach/draft.ts's own (private) DRAFT_TIMEOUT_MS
 export async function enqueueFollowUpDraft(dir: string, channel?: string): Promise<DraftResult> {
-  return runQueued("draft-follow-up", `Draft follow-up: ${dir}`, () => runDraft(dir, { channel }));
+  return runQueued("draft-follow-up", `Draft follow-up: ${dir}`, (job) =>
+    runDraft(dir, {
+      channel,
+      callClaude: async (prompt) => {
+        const result = await runClaudeSpawn(job, prompt, {
+          timeoutMs: DRAFT_TIMEOUT_MS,
+          model: draftModel(),
+          tools: "",
+          permissionMode: null,
+        });
+        const failure = decodeSpawnFailure(result, job.id, {
+          timeoutVerb: "claude -p",
+          timeoutLabel: "120s",
+          exitVerb: "claude -p",
+          includeTailOnTimeout: true,
+        });
+        if (failure) throw new Error(failure);
+        const text = result.stdout.trim();
+        if (!text) throw new Error("claude -p returned no text during draft");
+        return text;
+      },
+    }),
+  );
 }

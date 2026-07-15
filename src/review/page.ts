@@ -326,6 +326,12 @@ const DECIDED = new Set(["published","discard","locked"]);
 const aiPending = new Set();       // row ids with an in-flight Ask-Claude revise
 const dupPending = new Map();      // row id -> target platform, for an in-flight Duplicate
 const storyboardSlugs = new Set(); // piece slugs with an in-flight storyboard (video) job
+// Follow-ups tab (card d39258ab): fuPending mirrors dupPending's in-flight guard (dedupe + disabled
+// button), fuError mirrors row.dupError's durable failure — the Follow-ups list is rebuilt wholesale
+// by loadFollowups() rather than per-row rerender(), so both live here keyed by lead dir, not on a
+// row object that gets replaced every load.
+const fuPending = new Set();       // lead dirs with an in-flight Draft follow-up
+const fuError = new Map();         // lead dir -> last draft-follow-up error
 
 function flash(msg){ const f=$("#flash"); f.textContent=msg; f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1400); }
 function esc(s){ return (s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -794,10 +800,18 @@ function followupTouchLabel(iso){ return iso ? iso.slice(0,10) : "never"; }
 function followupRowHtml(row){
   const why = row.why ? '<div class="src">'+esc(row.why)+'</div>' : "";
   const disabled = row.status==="done" || row.status==="abandoned";
-  const draftBtn = row.dir ? '<button class="fu-draft" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'" data-dir="'+esc(row.dir)+'"'+(disabled?" disabled":"")+'>Draft follow-up</button>' : "";
+  const pending = row.dir ? fuPending.has(row.dir) : false;
+  const err = row.dir ? fuError.get(row.dir) : null;
+  const draftBtn = row.dir ? '<button class="fu-draft" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'" data-dir="'+esc(row.dir)+'"'+((disabled||pending)?" disabled":"")+'>'+(pending?"Drafting…":"Draft follow-up")+'</button>' : "";
+  // Durable inline status (card d39258ab) instead of only a 1.4s auto-hiding flash() toast — the
+  // toast alone made a real ~30-120s-long failure vanish before anyone not staring at the screen
+  // could see it (same anti-pattern the ai-send/dup-send toast was already fixed for, card fbfea28b).
+  const status = pending
+    ? '<div class="hint">drafting… (your subscription, ~30-60s — Add / Queue tab has progress + log)</div>'
+    : err ? '<div class="src">'+esc(err)+' — see Add / Queue tab for the job log</div>' : "";
   return '<div class="notepick">'+
       '<div class="ntext"><div class="nmeta">last touch '+followupTouchLabel(row.lastTouch)+' · '+esc(row.nextAction)+'</div>'+
-      '<b>'+esc(row.who)+'</b>'+why+'</div>'+
+      '<b>'+esc(row.who)+'</b>'+why+status+'</div>'+
       '<div class="actions">'+
         '<button class="fu-contacted" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark sent</button>'+
         '<button class="fu-responded" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark responded</button>'+
@@ -806,12 +820,13 @@ function followupRowHtml(row){
       '</div>'+
     '</div>';
 }
-async function loadFollowups(){
+// Last fetched /api/followups payload, cached so an in-flight/error change (fuPending/fuError) can
+// rerender the list without a network refetch — mirrors DATA's role for the review queue.
+let FOLLOWUPS_DATA = null;
+function renderFollowupsBox(){
+  if(!FOLLOWUPS_DATA) return;
+  const d = FOLLOWUPS_DATA;
   const box = $("#followupsList");
-  box.innerHTML = '<div class="empty">Loading…</div>';
-  const r = await fetch("/api/followups");
-  const d = await r.json();
-  if(!d.ok){ box.innerHTML = '<div class="empty">'+esc(d.error||"failed to load")+'</div>'; return; }
   $("#followupsNote").innerHTML = d.jobsearchNote ? '<div class="hint">Job search bucket: '+esc(d.jobsearchNote)+'</div>' : "";
   box.innerHTML = "";
   for(const [bucket,label] of FOLLOWUP_BUCKETS){
@@ -826,16 +841,35 @@ async function loadFollowups(){
   box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", b.dataset.bucket, b.dataset.lead)));
   box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>followupDraft(b.dataset.dir)));
 }
+async function loadFollowups(){
+  const box = $("#followupsList");
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/followups");
+  const d = await r.json();
+  if(!d.ok){ box.innerHTML = '<div class="empty">'+esc(d.error||"failed to load")+'</div>'; return; }
+  FOLLOWUPS_DATA = d;
+  renderFollowupsBox();
+}
 async function followupAction(action, bucket, lead){
   const r = await post("/api/followups/"+action, {bucket, lead});
   if(r.ok){ flash(action==="mark-responded" ? "Marked responded" : action==="mark-contacted" ? "Marked sent" : "Moved on"); loadFollowups(); }
   else flash(r.error || "Failed");
 }
 async function followupDraft(dir){
-  flash("Drafting follow-up… (your subscription, ~30-60s)");
-  const r = await post("/api/followups/draft-follow-up", {dir});
-  if(r.ok){ flash("Follow-up drafted — review it on the Outreach tab"); loadFollowups(); }
-  else flash(r.error || "Failed to draft");
+  if(fuPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn (card fbfea28b precedent)
+  fuError.delete(dir);
+  fuPending.add(dir); renderFollowupsBox(); // button disables immediately, survives any background rerender
+  try {
+    const r = await post("/api/followups/draft-follow-up", {dir});
+    if(r.ok){ flash("Follow-up drafted — review it on the Outreach tab"); await loadFollowups(); }
+    else { fuError.set(dir, r.error || "Failed to draft"); }
+  } catch (e) {
+    // The awaited fetch itself can reject (dropped connection, proxy timeout on a ~30-120s request)
+    // — previously unhandled, so NOTHING was shown at all. Now it lands as the same durable error.
+    fuError.set(dir, e instanceof Error ? e.message : String(e));
+  } finally {
+    fuPending.delete(dir); renderFollowupsBox();
+  }
 }
 
 // ── ingest + job queue ──

@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildDraftPrompt, selectEvidenceForDraft, runDraft } from "./draft.js";
@@ -197,6 +197,34 @@ describe("runDraft guard clauses (no subprocess reached)", () => {
     const dir = mkdtempSync(join(tmpdir(), "outreach-draft-test-"));
     try {
       await assert.rejects(runDraft(dir), /no lead\.md found/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // Card d39258ab: the GUI (src/review/jobs.ts) injects a callClaude backed by the shared logged
+  // spawn instead of this file's own execFile call, so a draft job gets a real log + heartbeat.
+  // Proves the seam is honored (and stays opt-in — no real subprocess needed for this test).
+  test("runDraft uses an injected opts.callClaude instead of spawning claude via execFile", async () => {
+    const dir = makeLeadDir(leadFixture());
+    // runDraft appends a review-queue.md row (appendRow) after drafting, which requires the file to
+    // already exist with a header — every other guard-clause test above throws before reaching that
+    // point, so this is the first test here that needs it.
+    writeFileSync(
+      join(dir, "review-queue.md"),
+      `| id | platform | format | asset | native | brand | cta | status | notes |\n|---|---|---|---|---|---|---|---|---|\n`,
+    );
+    let promptSeen = "";
+    try {
+      const result = await runDraft(dir, {
+        callClaude: async (prompt) => {
+          promptSeen = prompt;
+          return "the injected draft body";
+        },
+      });
+      assert.ok(promptSeen.includes("Acme Co"), "the real prompt reached the injected callClaude");
+      const written = readFileSync(result.messageFile, "utf8");
+      assert.match(written, /the injected draft body/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

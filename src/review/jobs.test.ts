@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -211,6 +211,32 @@ test("decodeSpawnFailure uses exitVerb (which may differ from timeoutVerb) for a
     timeoutVerb: "Claude", timeoutLabel: "180s", exitVerb: "Claude revise",
   });
   assert.equal(result, "Claude revise failed (exit 1)");
+});
+
+// ── buildClaudeSpawnArgs (card d39258ab) — pure argv builder for runClaudeSpawn ─────────────────
+// Split out so a caller's exact `claude` invocation is asserted directly, without spawning a real
+// subprocess. The draft-follow-up wiring (enqueueFollowUpDraft) depends on this producing the SAME
+// argv shape as outreach/draft.ts's own execFile call (--model/--tools, no --permission-mode) —
+// tested here since that invocation equivalence is the whole self-vet argument for card d39258ab
+// not being a content-generation-logic change.
+
+test("buildClaudeSpawnArgs: every pre-existing caller (no model/tools/permissionMode override) is unaffected", () => {
+  assert.deepEqual(buildClaudeSpawnArgs("do the thing", {}), ["-p", "do the thing", "--permission-mode", "acceptEdits"]);
+});
+
+test("buildClaudeSpawnArgs: an explicit permissionMode overrides the acceptEdits default", () => {
+  assert.deepEqual(buildClaudeSpawnArgs("p", { permissionMode: "plan" }), ["-p", "p", "--permission-mode", "plan"]);
+});
+
+test("buildClaudeSpawnArgs: permissionMode: null omits --permission-mode entirely, matching draft.ts's own callClaudeDraft invocation", () => {
+  assert.deepEqual(
+    buildClaudeSpawnArgs("p", { permissionMode: null, model: "sonnet", tools: "" }),
+    ["-p", "p", "--model", "sonnet", "--tools", ""],
+  );
+});
+
+test("buildClaudeSpawnArgs: model/tools are appended only when explicitly set", () => {
+  assert.deepEqual(buildClaudeSpawnArgs("p", { model: "sonnet" }), ["-p", "p", "--permission-mode", "acceptEdits", "--model", "sonnet"]);
 });
 
 // ── addVideoJob (card 9e20a616) — validation-only path, no real /video spawn ────────────────────
