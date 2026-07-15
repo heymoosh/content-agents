@@ -29,7 +29,8 @@ export type TrackerEventType =
   | "scheduled"
   | "done"
   | "abandoned"
-  | "re_researched";
+  | "re_researched"
+  | "inbound_received";
 
 export interface TrackerEvent {
   ts: string; // ISO timestamp
@@ -101,7 +102,12 @@ const TERMINAL_STATUS: Partial<Record<TrackerEventType, LeadStatus>> = {
 // clock from that event's own date (an event-supplied `due` overrides the computed date, so a
 // human-authored event can set its own). re_researched legally resets the lead to
 // "not_contacted" (plan §3: "an unclear lead can re-enter the pipeline when new evidence
-// appears"). Everything else in TERMINAL_STATUS has no due-date pressure at all.
+// appears"). inbound_received is the mirror case for the inbound bucket: someone else spoke
+// first, so there's no due-date clock on MUXIN yet -- the ball is in her court, same
+// "not_contacted"-shaped state (nextActionLabel gives it inbound-specific copy), until she
+// actually replies with a normal contacted/followup_sent event and the shared clock takes over.
+// A later inbound_received after she's replied correctly flips the row back (latest-event-wins).
+// Everything else in TERMINAL_STATUS has no due-date pressure at all.
 export function foldLeadEvents(
   leadKey: string,
   bucket: Bucket,
@@ -114,10 +120,10 @@ export function foldLeadEvents(
   }
   const latest = [...events].sort((a, b) => a.ts.localeCompare(b.ts))[events.length - 1];
 
-  if (latest.event === "re_researched") {
+  if (latest.event === "re_researched" || latest.event === "inbound_received") {
     return {
       lead: leadKey, bucket, lastEvent: latest.event, lastTouch: latest.ts, lastNote: latest.note,
-      status: "not_contacted", dueDate: null, abandonDate: null,
+      channel: latest.channel, status: "not_contacted", dueDate: null, abandonDate: null,
     };
   }
 
@@ -148,7 +154,10 @@ export function foldLeadEvents(
 export function nextActionLabel(state: LeadState): string {
   switch (state.status) {
     case "not_contacted":
-      return "not yet contacted";
+      // Inbound v. outbound share every other state's mechanics -- this is the one place they
+      // diverge: an inbound lead in "not_contacted" means someone else spoke first and Muxin
+      // owes a reply, not that nobody's reached out yet.
+      return state.bucket === "inbound" ? "draft reply" : "not yet contacted";
     case "waiting":
       return `waiting${state.dueDate ? ` (check back ${state.dueDate})` : ""}`;
     case "due":
@@ -262,9 +271,12 @@ export function buildClientPlatformRows(
   return rows;
 }
 
-// inbound bucket: schema-ready from day one, but nothing produces bucket:"inbound" events until
-// db22283f (Inbound listening) lands -- there is no lead-folder source to fold against, so this
-// just folds whatever tracker events already exist per unique lead key. Today that's always [].
+// inbound bucket: schema-ready from day one; populated by src/cron/inbound-to-tracker.ts, which
+// folds each platform's listening ledger (e.g. data/bluesky-mentions-ledger.jsonl) into
+// bucket:"inbound" `inbound_received` events keyed by author handle. There is no lead-folder
+// source to join against (unlike client/platform), so this just folds whatever tracker events
+// already exist per unique lead key -- `who` is the handle, `why` is the mention text carried on
+// the event's `note`.
 export function buildInboundRows(
   events: TrackerEvent[],
   config: OutreachConfig,
@@ -275,7 +287,7 @@ export function buildInboundRows(
   return leadKeys.map((leadKey) => {
     const leadEvents = inboundEvents.filter((e) => e.lead === leadKey);
     const state = foldLeadEvents(leadKey, "inbound", leadEvents, config, nowIso);
-    return rowFromState(state, leadKey, "(inbound listening not built yet — db22283f)");
+    return rowFromState(state, leadKey, state.lastNote ?? "(mention)");
   });
 }
 

@@ -19,6 +19,7 @@ import "../util/env.js";
 import { pathToFileURL } from "node:url";
 import { AtpAgent } from "@atproto/api";
 import { readLedger, appendLedger } from "./bluesky-mentions-ledger.js";
+import { foldLedgerIntoTracker } from "./inbound-to-tracker.js";
 
 const REASONS = ["mention", "reply"] as const;
 type MentionReason = (typeof REASONS)[number];
@@ -205,6 +206,12 @@ async function main() {
   }
   console.log(`\nLedger: marked ${newMentions.length} notification(s) as seen.`);
   console.log("Nothing drafted or published — draft a reply for one of these with src/atomize/reply-draft.ts.");
+
+  // 5. Fold newly-seen mentions into the shared Follow-ups tracker so they surface in the
+  //    Follow-ups tab's inbound bucket (src/outreach/tracker.ts). Read-modify-append only — no
+  //    network calls, no drafting.
+  const folded = foldLedgerIntoTracker();
+  console.log(`Tracker: folded ${folded.appended} new mention(s) into the Follow-ups tab's inbound bucket.`);
 }
 
 // Run the CLI only when executed directly, so the module can be imported (detectNewMentions,

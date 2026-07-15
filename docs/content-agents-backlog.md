@@ -620,7 +620,25 @@ CARD TYPE: EPIC
   semantics (e.g. treat the mention itself as the clock-start, "responded" only once Muxin actually
   replies) or an explicit documented reverse-mapping decision. Surface this to Muxin before
   scoping the build, don't guess.
-- STATUS: To Do
+- DECISION (Muxin, 2026-07-15): follow-up MECHANICS stay identical across inbound and outbound --
+  same due-date clock, same nudge/overdue/responded/done vocabulary. The only thing inbound adds
+  is one leading state before a lead rejoins that shared flow: a fresh mention has no clock yet
+  (ball is in Muxin's court), rendered with an inbound-specific "draft reply" label; once she
+  replies with a normal contacted/followup_sent event, it's a plain outbound-shaped row from then
+  on. No parallel semantics universe.
+- SHIP: added `inbound_received` to TrackerEventType (src/outreach/tracker.ts); foldLeadEvents
+  treats it like the existing re_researched branch (not_contacted, no due-date pressure);
+  nextActionLabel branches on bucket for the not_contacted case only ("draft reply" for inbound,
+  unchanged "not yet contacted" elsewhere); buildInboundRows renders the mention author + mention
+  text instead of the old placeholder. New src/cron/inbound-to-tracker.ts (foldLedgerIntoTracker)
+  folds data/bluesky-mentions-ledger.jsonl into bucket:"inbound" events, deduped by AT URI so
+  re-runs never double-append; wired into bluesky-mentions.ts's main() so it runs automatically
+  after each live listening pass (skipped in --dry-run, matching the poller's own no-writes rule).
+  Plumbing + a label, no message text generated -- not content-generation logic per rule 7. Tests:
+  src/cron/inbound-to-tracker.test.ts (dedupe idempotency, shared-clock takeover once Muxin
+  replies, ping-pong back to "draft reply" on a later mention, outbound copy unaffected). (shipped
+  2026-07-15)
+- STATUS: Done
 - GROOMED: readiness pass: clear GOAL_CONDITION, points at new src/cron/inbound-to-tracker.ts module + 2026-07-15
 <!-- card-id: 97588dc8-feff-4fe4-8224-1b4d2d211ada -->
 
