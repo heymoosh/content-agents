@@ -229,7 +229,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Discovered during fb4d6b28's Step 3.5 code-review: research.ts search_budget_per_signal (config/outreach.yaml, default 2/signal) is enforced only as prompt text ("search at most N times") passed to the claude-cli subprocess, not as code-level call interception. The hard subprocess timeout (5-8 min) IS genuinely enforced via Node timeout option -- only the per-signal count lacks a code-level backstop.
 - Not a blocker: the timeout already bounds worst-case wall-clock/cost even if the LLM ignores the budget hint. This is a tightening, not a bug.
 - CHAIN: 1
-- STATUS: In Progress
+- Superseded 2026-07-15: this session was ceiling-killed with no commits ever made (see PARKED note below); the resume card 43fa1e02 built and shipped this exact scope (PR #216, merged 2026-07-15, code-enforces the budget via a PreToolUse hook). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - PARKED: hard context/turn ceiling exceeded (turns=206 tokens=194517) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
@@ -651,7 +652,8 @@ CARD TYPE: EPIC
 - Scope (from the parked card): code-enforce research.ts per-signal search budget (config/outreach.yaml search_budget_per_signal, currently prompt-text-only) with a code-level call-interception backstop, not just prompt-text hinting.
 - The stranded worktree above is left in place for inspection but should be discarded (no commits) once this follow-up is picked up.
 - Once this ships, also mark original card 3c6550a6-a388-44cf-a56e-e9d35423b3f1 STATUS: Done with a Superseded note (same pattern already used for 8e8b616e -> fb4d6b28) so it doesn't stay stuck showing STATUS: In Progress forever.
-- STATUS: To Do
+- STATUS: Done
+- SHIP: fixed + merged as PR #216 -- added src/outreach/search-budget-hook.ts, a PreToolUse hook wired in via `claude -p --settings <json>`; denies further WebSearch/WebFetch calls once a run's total call count (computeSearchBudgetTotal: search_budget_per_signal x signal-category count, 3 client / 5 platform) is exhausted, a real external process enforcing the cap rather than the model's own restraint. Denies the tool call rather than killing the subprocess so the PROFILE/EVIDENCE/CLASSIFICATION markers still parse. 732/732 tests green (7 new), typecheck clean, manual stdin/stdout smoke test confirmed allow/allow/deny/allow behavior. Original card 3c6550a6 marked Done too (Superseded note added).
 - GROOMED: readiness pass: scope fully carried forward from parked 3c6550a6, no blocking unknown, no approval-worthy judgment (backend enforcement tightening, not content-generation logic) + 2026-07-15
 <!-- card-id: 43fa1e02-e454-4f02-9a5e-8c8984be16a3 -->
 
