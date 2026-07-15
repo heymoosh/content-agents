@@ -87,7 +87,7 @@ function writeLeadFile(dir: string, opts: {
   decisionNote: string;
 }): void {
   const fitField =
-    opts.kind === "client" ? "classification: unclear   # turnaround | greenfield | unclear | disqualified" : "fit: unclear   # strong | partial | weak | disqualified";
+    opts.kind === "client" ? "classification: unclear   # turnaround | greenfield | unclear | disqualified" : "fit: weak   # strong | partial | weak | disqualified";
   const jsaLine = opts.source === "jsa" ? `\njsa_verdict: ${opts.jsaVerdict ?? "unknown"}` : "";
   const frontmatter =
     `---\n` +

@@ -136,14 +136,19 @@ export function evaluateQualify(input: QualifyInput, evidence: EvidenceItem[]): 
   const worldviewMatch = findValidBySignal(evidence, "worldview-match");
   const personFit = findValidBySignal(evidence, "person-fit");
 
+  // "unclear" is only a legal value for kind: "client" (classification); kind: "platform"'s
+  // fit field only accepts strong|partial|weak|disqualified, so a platform-kind downgrade must
+  // land on "weak" instead (config/outreach VALID_FITS in validate.ts).
+  const downgradeTarget = input.kind === "client" ? "unclear" : "weak";
+
   if (positiveSet.has(claimed)) {
     if (evidence.length === 0) {
-      finalValue = "unclear";
-      reasons.push(`claimed "${claimed}" with zero evidence items, forced to unclear`);
+      finalValue = downgradeTarget;
+      reasons.push(`claimed "${claimed}" with zero evidence items, forced to ${downgradeTarget}`);
     } else if (!worldviewMatch) {
-      finalValue = "unclear";
+      finalValue = downgradeTarget;
       reasons.push(
-        `claimed "${claimed}" with no valid quoted worldview-match evidence (quote and live source required), forced to unclear`,
+        `claimed "${claimed}" with no valid quoted worldview-match evidence (quote and live source required), forced to ${downgradeTarget}`,
       );
     }
   }
