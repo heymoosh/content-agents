@@ -703,7 +703,9 @@ CARD TYPE: EPIC
 - The parked card 3c6550a6-a388-44cf-a56e-e9d35423b3f1 never made any commits (worktree at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-3c6550a6-research-budget-3c6550a6, branch wt/3c6550a6-research-budget-3c6550a6, 0 commits ahead of main, clean status) -- so there is nothing to salvage, this is a clean restart of the same scope, not a resume of partial work.
 - Scope (from the parked card): code-enforce research.ts per-signal search budget (config/outreach.yaml search_budget_per_signal, currently prompt-text-only) with a code-level call-interception backstop, not just prompt-text hinting.
 - The stranded worktree above is left in place for inspection but should be discarded (no commits) once this follow-up is picked up.
-- STATUS: Backlog
+- Once this ships, also mark original card 3c6550a6-a388-44cf-a56e-e9d35423b3f1 STATUS: Done with a Superseded note (same pattern already used for 8e8b616e -> fb4d6b28) so it doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: To Do
+- GROOMED: readiness pass: scope fully carried forward from parked 3c6550a6, no blocking unknown, no approval-worthy judgment (backend enforcement tightening, not content-generation logic) + 2026-07-15
 <!-- card-id: 43fa1e02-e454-4f02-9a5e-8c8984be16a3 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
