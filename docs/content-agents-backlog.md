@@ -304,9 +304,27 @@ REPRO: 1) Analytics tab -> Generate insights (returns quickly if data/analytics.
 OBSERVED: Static ETA text says ~10-60s; actual completion took ~180-200s (close to the server-side 180s hard timeout in src/review/serve.ts:185 INSIGHTS_ASK_TIMEOUT_MS). No intermediate feedback distinguishes "still working, this is normal" from "about to time out." A user watching the literal estimate would reasonably conclude the UI is frozen/broken well before it resolves.
 EXPECTED: Either a more honest ETA (e.g. "~1-3 min"), a progress indicator that doesn't imply a hard ceiling at 60s, or a live elapsed-time counter so users can tell it's still working rather than stuck.
 ROOT CAUSE: ETA string hardcoded in src/review/page.ts:655 (askInsights()): "Claude is looking into it... (~10-60s, may re-run a report)". Actual bound is the 180s server-side spawn timeout (src/review/serve.ts:185, jobs.ts:259-264) with no client-side abort/progress wiring (page.ts post() at line ~302 is a plain fetch with no AbortController). The feature itself works correctly (real synthesis returned, and on true timeout the server returns a clear "Claude timed out after 180s" error) -- this is a UX/messaging accuracy issue, not a functional failure.
-- STATUS: To Do
+- DECISION: approved (Muxin, 2026-07-15) — un-parked; delegated the UX-direction call to the
+  frontend-design skill instead of holding for a manual pick, small change.
+- SHIP: merged (PR #236 -- UI-only, not content-generation logic, per rule 7's
+  review-GUI-tooling carve-out). Went with the elapsed-time counter, reusing this file's existing
+  fmtElapsed()-style muted small-caption text (already used for the Jobs queue's own live elapsed
+  indicator) -- but deliberately NOT wrapped in the app's .pill badge, since a pill here encodes a
+  discrete resolved state (approve/revise/blocked/needs) and a single in-flight action isn't one
+  yet. askInsights() now ticks a live "Ns elapsed"/"Xm Ys elapsed" count every second in place of
+  the static "~10-60s" claim, cleared on both success and failure. Added
+  formatElapsed()/insightsTickerText() as Node-testable pure mirrors of the client-side ticker,
+  matching this file's existing DOM-free-mirror convention. Caught and fixed a real bug via a live
+  browser check (not just node:test, which can't see a syntax error inside the giant inline
+  <script> string): an initial `\"`-escaped client string broke at runtime because renderPage()'s
+  own outer TS template literal consumes that escape before the string reaches the browser,
+  breaking the WHOLE inline script (tab-switching included) -- fixed by single-quoting the string
+  per this file's own established convention. Verified live: ran the GUI, drove Generate insights
+  -> ask a follow-up through Chrome, confirmed the ticker renders and updates (3s elapsed -> 18s
+  elapsed), Ask button disables correctly in flight, zero console errors, both before AND after
+  the quoting fix. 863/863 tests green (5 new), npm run typecheck clean. (shipped 2026-07-15)
+- STATUS: Done
 - GROOMED: UX-messaging fix; hardcoded ETA string pinned (page.ts:655), 180s real bound; author-granted latitude + 2026-07-11
-- PARKED: needs decision (judgment): 3 different UX directions for the ETA text (updated copy / progress indicator / elapsed-time counter); recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: a14693da-75c7-495b-acc2-baadc6973589 -->
 
 **Review tab: video-script/storyboard body clips most content behind an easy-to-miss scroll**
