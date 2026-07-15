@@ -392,10 +392,11 @@ DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 
 - SUPERSEDES 9a7656d9's ask: gate on register/frame-fit (a judgment classification), not on thin per-topic resonance data.
 - RULE 7: routing/content-generation logic -- PR HOLDS for Muxin's review.
 - GOAL_CONDITION: running /atomize on a reflective source produces a recorded 'reflective' classification, no skeleton-framed derivatives, and a platform subset excluding LinkedIn-case/X treatment; a frame-native source gets the full framed fan-out; a fiction teaser is never framed; the classification is stored in the content folder and read (not re-derived) by downstream steps.
-- STATUS: Review
+PR: https://github.com/heymoosh/content-agents/pull/203
+SHIP: held
+- STATUS: Done
 - DEPENDS ON: Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example
 - GROOMED: Muxin-approved scope from 2026-07-10 strategy session; bucket rules + GOAL_CONDITION explicit, depends on beat-template card + 2026-07-10
-PR: https://github.com/heymoosh/content-agents/pull/203 (RULE 7 -- draft, held for review, not auto-merged)
 <!-- card-id: b288d0da-c003-4617-93e4-809e865b7a80 -->
 
 **GUI approve-time scheduling failure is invisible after the fact (silent 'blocked by reuse guard' state)**
