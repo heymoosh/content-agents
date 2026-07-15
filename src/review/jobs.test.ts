@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -220,4 +220,34 @@ test("decodeSpawnFailure uses exitVerb (which may differ from timeoutVerb) for a
 
 test("addVideoJob refuses a slug that isn't a real content folder", () => {
   assert.throws(() => addVideoJob("definitely-not-a-real-content-folder-xyz"), /no such queue/);
+});
+
+// ── Job id uniqueness across a server restart (GUI job logs mixing content from unrelated old
+// runs) ──────────────────────────────────────────────────────────────────────────────────────
+// Root cause: job ids used to be a bare in-process counter (`job-${++jobSeq}`), which resets to 0
+// every time the GUI process restarts. jobLogPath keys the PERSISTED per-job log file purely by
+// that id, and runClaudeSpawn opens it in append mode — so a job "5" from a run last week and job
+// "5" from a run today reused the identical log file path, and the new run's output got appended
+// onto the old run's leftover content instead of starting fresh. That stale, mixed content then
+// surfaced verbatim in the queue UI (both the full "view log" read and the tailed job.error).
+// The fix salts every id with the session's start time (buildJobId's first argument) so two
+// different sessions can never land on the same id even when their own internal sequence numbers
+// (the second argument) happen to line up, exactly as they would across a real restart.
+
+test("buildJobId: two sessions whose internal sequence numbers collide still get different ids", () => {
+  const lastWeeksRun = 1_752_000_000_000; // an earlier server session's start time
+  const todaysRun = 1_752_600_000_000; // a later restart
+  // Both sessions independently counted up to their 5th job — the exact collision the old
+  // `job-${++jobSeq}` scheme hit on every restart.
+  const oldJobFive = buildJobId(lastWeeksRun, 5);
+  const newJobFive = buildJobId(todaysRun, 5);
+  assert.notEqual(oldJobFive, newJobFive);
+});
+
+test("buildJobId: a session-collision id maps to a DIFFERENT persisted log file, so the new run can never inherit the old run's on-disk content", () => {
+  const lastWeeksRun = 1_752_000_000_000;
+  const todaysRun = 1_752_600_000_000;
+  const oldJobFive = buildJobId(lastWeeksRun, 5);
+  const newJobFive = buildJobId(todaysRun, 5);
+  assert.notEqual(jobLogPath(oldJobFive), jobLogPath(newJobFive));
 });
