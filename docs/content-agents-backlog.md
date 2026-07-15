@@ -276,7 +276,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Not exercised by either of Phase 3s 2 real seeded proof leads (both classified weak directly, never hit this downgrade path) -- pre-existing bug, not introduced by Phase 3.
 - GOAL_CONDITION: evaluateQualify() downgrades a platform-kind lead to a legal fit value (e.g. weak, not unclear) when evidence is insufficient; a test exercises this path directly.
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: In Progress
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 <!-- card-id: 19b348f4-7f8a-4790-9393-8e42739ac1a0 -->
 
