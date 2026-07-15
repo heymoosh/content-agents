@@ -276,7 +276,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Policy call, not a mechanical bug: should vault:-sourced evidence (ingested research, source: ingested leads) count as legitimate for qualify's URL-validity check across the whole outreach engine, or should ingested leads get re-verified against a live URL before they can qualify? Affects any future ingested lead, not just Mem.
 - GOAL_CONDITION: qualify.ts either (a) accepts vault: as a legal evidence source alongside https://, with a test proving it does not downgrade client-mem, or (b) Muxin decides ingested evidence must be re-verified against a live source before qualify -- whichever she picks, client-mem/lead.md ends up with a fit verdict that reflects a deliberate decision, not a silent format-driven downgrade.
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: In Progress
 - DECISION: approved -- qualify.ts should accept vault: evidence sources in addition to https://; the real values instrument (founder deep-dives) lives in the Obsidian vault, not the web (2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 <!-- card-id: 4e2e83f3-cd4f-438a-a5a1-15912c1f4f6f -->
