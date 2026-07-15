@@ -270,16 +270,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - PARKED: needs decision (judgment): Substack Notes repost routing logic touches which platforms content reaches; wrong change could misroute or drop review-queue entries; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
 
-**Fix qualify.ts illegal fit:unclear downgrade for platform-kind leads**
-- ORIGIN: follow-up auto-filed while building card 6590efec (Outreach engine Phase 3), found by /code-review --fix.
-- qualify.ts evaluateQualify() hardcodes "unclear" as the downgrade value regardless of kind, but "unclear" is not a legal fit value (validate.ts VALID_FITS is strong|partial|weak|disqualified -- unclear is only legal for client-kind classification). intake.ts has the same latent issue (seeds fit: unclear at intake time). If a platform lead is ever qualified from a claimed strong/partial with zero evidence or no worldview-match quote, it would get downgraded to the illegal value fit: unclear and fail shape validation.
-- Not exercised by either of Phase 3s 2 real seeded proof leads (both classified weak directly, never hit this downgrade path) -- pre-existing bug, not introduced by Phase 3.
-- GOAL_CONDITION: evaluateQualify() downgrades a platform-kind lead to a legal fit value (e.g. weak, not unclear) when evidence is insufficient; a test exercises this path directly.
-- CHAIN: 1
-- STATUS: Review
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-<!-- card-id: 19b348f4-7f8a-4790-9393-8e42739ac1a0 -->
-
 **Decide: should qualify.ts accept vault: evidence sources (not just https://)?**
 - ORIGIN: follow-up auto-filed while building card d4524bd0 (Outreach engine -- Ingest existing research corpus), found by /code-review --fix.
 - client-mem/lead.md is classified turnaround, but its only worldview-match evidence item cites a vault: path (Muxin's own Obsidian notes), not a live https:// URL. qualify.ts isValidSourceUrl only accepts https:// -- the moment outreach:qualify runs on this lead (per its own normal contract), it will silently downgrade Mem from turnaround to unclear, losing a real, cited signal purely because of its source format.
@@ -718,6 +708,16 @@ CARD TYPE: EPIC
 - CHAIN: 1
 - STATUS: To Do
 <!-- card-id: 4e5b33d0-7e6d-42ea-924f-f58641199e02 -->
+
+**Fix qualify.ts illegal fit:unclear downgrade for platform-kind leads**
+- ORIGIN: follow-up auto-filed while building card 6590efec (Outreach engine Phase 3), found by /code-review --fix.
+- qualify.ts evaluateQualify() hardcodes "unclear" as the downgrade value regardless of kind, but "unclear" is not a legal fit value (validate.ts VALID_FITS is strong|partial|weak|disqualified -- unclear is only legal for client-kind classification). intake.ts has the same latent issue (seeds fit: unclear at intake time). If a platform lead is ever qualified from a claimed strong/partial with zero evidence or no worldview-match quote, it would get downgraded to the illegal value fit: unclear and fail shape validation.
+- Not exercised by either of Phase 3s 2 real seeded proof leads (both classified weak directly, never hit this downgrade path) -- pre-existing bug, not introduced by Phase 3.
+- GOAL_CONDITION: evaluateQualify() downgrades a platform-kind lead to a legal fit value (e.g. weak, not unclear) when evidence is insufficient; a test exercises this path directly.
+- CHAIN: 1
+- STATUS: Done
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+<!-- card-id: 19b348f4-7f8a-4790-9393-8e42739ac1a0 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
 - ORIGIN: Muxin, 2026-07-10 -- "if a topic doesn't work on that platform then we shouldn't bother
