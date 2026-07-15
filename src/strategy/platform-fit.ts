@@ -36,6 +36,9 @@ export interface StrategyConfig {
   // loader rather than standing up a second one. Absent on a config that predates lever C.
   cadence_thresholds?: { climb_ratio: number; decline_ratio: number; step: number; max_posts_per_week: number };
   peak_hour_thresholds?: { min_distinct_times: number };
+  // Optional: lever D (card a4c5b42b, src/strategy/frame-fit.ts) reuses this same config file +
+  // loader rather than standing up a second one. Absent on a config that predates lever D.
+  frame_thresholds?: { win_ratio: number };
 }
 
 export function loadStrategyConfig(): StrategyConfig {
