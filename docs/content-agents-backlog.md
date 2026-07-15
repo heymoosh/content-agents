@@ -584,10 +584,41 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: Spin selection reads strategy-computed angle weights per platform; higher-converting narrative frames selected with higher probability; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: To Do
+- SCOPE RECONCILED (Muxin, 2026-07-15): the card's literal ask ("weight spin angles by conversion
+  performance") is not buildable today, confirmed by codebase audit: angle is 1:1 with platform
+  (src/atomize/spin.ts's resolveAngle(platform) is a straight lookup -- no angle A vs angle B to
+  weight within a platform), and no conversion/lead metric exists in the analytics DB (clicks sum
+  to ~40 across 1,229 metric rows, NULL on linkedin/bluesky entirely). Reframed to the one framing
+  contrast the DB actually supports: spin-on vs the verbatim spin-control-run baseline (card
+  f444f440's periodic control run), by engagement, per platform -- src/strategy/frame-fit.ts. This
+  closes the loop on the existing spin-control experiment rather than inventing a fake angle-vs-
+  angle comparison. Recommendation only, same posture as Levers A/B -- src/atomize/spin.ts's
+  per-platform angle stays untouched. Expect mostly insufficient-data today (posts.source untagged
+  on most distributed posts, spin-control coverage accrues one pick/month) -- same overfitting
+  posture as A/B/C, filling in over time. Filed a follow-up card (below) to persist per-post
+  framing tags (angle/case_skeleton/directives_applied) to the DB so a future pass can weight
+  individual angles, not just spin-on/off.
+- SHIP: held (draft PR #226 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
+  needs Muxin's review; real + synthetic before/after samples in PR body, including the reframe
+  rationale; builds on merged Levers A/#220, B/#222, C/#224)
+- STATUS: Review
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14), GOAL_CONDITION explicit, builds on existing per-channel angle templates. PR opens as a HELD draft per rule 7 (content-gen logic: spin-angle selection weighting). (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: a4c5b42b-d3a5-4547-964c-58eb4c4507a4 -->
+
+<!-- card-id: 6b2f9d31-4e7c-4a58-9d0b-1f3a7e2c8b45 -->
+
+**Persist per-post framing tags (angle / case_skeleton / directives_applied) to the analytics DB**
+- Currently a derivative's angle, case_skeleton flag, and directives_applied list live only in per-derivative frontmatter (content/<slug>/derivatives/*.md) -- never written to data/analytics.db
+- Design + implement a linkage so posts.angle (and ideally case_skeleton/directives_applied) get persisted when a post is tagged/ingested, joinable to metrics
+- Unblocks a future pass on Lever D (card a4c5b42b) that weights individual angles/directives by measured performance, not just the coarse spin-on/off split frame-fit.ts computes today
+- Test: a newly-ingested post's angle is queryable via SQL joined to its metrics row
+- GOAL_CONDITION: per-post framing tags are persisted to analytics.db at tag time; a query can join angle/case_skeleton/directives_applied to engagement metrics; npm test green.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: filed by the a4c5b42b (lever D) build worker 2026-07-15 as a data-gap follow-up -- not part of the original epic decomposition.
+- STATUS: To Do
+- DECISION: hold -- needs the frontmatter-to-DB linkage designed (which file/step writes it, whether it's a new posts column or a side table) before scoping the build; not epic-approved on its own, revisit once Lever D's frame-fit signal is showing real reads and a deeper angle-level cut is actually wanted.
+<!-- card-id: 6b2f9d31-4e7c-4a58-9d0b-1f3a7e2c8b45 -->
 
 **Strategy lever E: recommend CTAs by click-through + lead-gen effectiveness per platform**
 - Score per-platform CTA type effectiveness from publish-log + analytics (which CTA drives clicks/replies/conversions)
