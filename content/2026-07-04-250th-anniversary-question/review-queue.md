@@ -19,7 +19,7 @@ AI/society critique). Strategy brief: briefs/2026-06-24-strategy-brief.md.
 | x-2 | x | text | derivatives/x-2.md | 4 | 4 | yes | discard | spin:x, Marie Antoinette / Gini index, cta:source |
 | x-3 | x | text | derivatives/x-3.md | 4 | 4 | yes | discard | spin:x, primary vote urgency, cta:voter tool |
 | x-4 | x | text | derivatives/x-4.md | 4 | 5 | yes | discard | spin:x, Congress + Voter Choice pitch, cta:voter tool |
-| bluesky-1 | bluesky | text | derivatives/bluesky-1.md | 4 | 5 | yes | pending | spin:bluesky, AI promises as UX/fairness gap, cta:source |
+| bluesky-1 | bluesky | text | derivatives/bluesky-1.md | 4 | 5 | yes | discard | spin:bluesky, AI promises as UX/fairness gap, cta:source |
 | bluesky-2 | bluesky | text | derivatives/bluesky-2.md | 4 | 4 | yes | published | spin:bluesky, facts/community over winning arguments, cta:source |
 | bluesky-3 | bluesky | text | derivatives/bluesky-3.md | 4 | 4 | yes | discard | spin:bluesky, primary + Voter Choice pitch, cta:voter tool |
 | community-democratic-resilience | community:democratic-resilience | text | derivatives/community-democratic-resilience.md | 5 | 5 | yes | discard | verbatim, action-oriented per community notes, cta:voter tool |
