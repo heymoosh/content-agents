@@ -200,10 +200,20 @@ could picture — it fails beat 1's test outright. And the subject of the whole 
 herself, not a third-party/client situation, which defeats the case format's actual purpose: a
 client-conversion register (a stranger recognizing "this could be my team"), not personal
 reflection. This happened because no real third-party case existed in the corpus yet when PR #185
-was drafted (card f7b186c2 tracks sourcing one). Until a real third-party case exists in the
-corpus, apply the beat template to whatever source material most resembles a case — even
-autobiographical material — but flag that output to Muxin as a stand-in, not the target end-state
-for this angle.
+was drafted, and the prior interim guidance here told you to force the beat template onto whatever
+source material most resembled a case anyway (even autobiographical material) as a stand-in — that
+is exactly the drift this counter-example documents, so that instruction is now superseded.
+
+**Superseded 2026-07-15 (card f7b186c2/5021f759):** do NOT force the beat template onto non-case
+material as a stand-in anymore. Source-triage's `--case found|not_found` judgment (step 2.5 of
+`.claude/skills/atomize/SKILL.md`) is now the gate: only declare `case_skeleton: true` on a
+derivative when that source was triaged `--case found` — a real, anonymize-able third-party case
+actually exists in the source. When it reads `not_found` (the same legitimate, expected outcome as
+"no beat-2 belief statement"), fall back to normal (non-case) extraction/spin for that platform
+instead — never fabricate a quote or a scene to force the fit, and never draft a
+`case_skeleton: true` derivative off autobiographical material standing in for a case.
+`validate.ts`'s `checkCaseGate` enforces this at the code level: a `case_skeleton: true` derivative
+whose source wasn't triaged `--case found` is a hard violation, not just a prompt hint anymore.
 
 **Dialect preservation (X vs. LinkedIn).** `spin_angles.linkedin` and `spin_angles.x` stay separate
 config entries — never merged. Voice (`config/voice.yaml`, Muxin's cadence) is constant across both;

@@ -88,17 +88,30 @@ derivative, the video script, and the video title/description. The short version
    This is informational only — it flags essays that lack "the move" so Muxin learns the pattern
    over time. It never blocks anything and never changes the bucket above.
 
-   Record both as a fact in `source.md` — you do the judgment, this writes it, and every
-   downstream step (route.ts, validate.ts, this skill's own step 4) reads that fact instead of
-   re-deciding it:
+   Also judge, separately, whether THIS source contains a real, anonymize-able THIRD-PARTY case —
+   a team/client situation (not Muxin's own story), with enough concrete detail (a situation, a
+   quoted assumption, a cost) to extract into the LinkedIn/X case-skeleton beats (card f7b186c2).
+   This is narrower than the beat-2 check above: a source can have a quotable belief statement
+   built entirely from Muxin's own autobiographical material and still have no third-party case to
+   extract (this is exactly what happened to PR #185's sample). Extraction-only and CONDITIONAL:
+   never force or invent a case when one isn't really there — `--case not_found` is a legitimate,
+   expected outcome, and a derivative then falls back to the essay's own argument instead of the
+   case-skeleton beats. `validate.ts`'s `checkCaseGate` code-enforces this: a derivative can only
+   declare `case_skeleton: true` (step 4) when you recorded `--case found` here, so getting this
+   judgment right up front is what makes step 4's case-skeleton option available at all.
+
+   Record all three as facts in `source.md` — you do the judgment, this writes it, and every
+   downstream step (route.ts, validate.ts, this skill's own step 4) reads those facts instead of
+   re-deciding them:
    ```
-   tsx src/atomize/source-triage.ts <folder> <frame-native|reflective|fiction-promo> [--beat2 found|not_found]
+   tsx src/atomize/source-triage.ts <folder> <frame-native|reflective|fiction-promo> [--beat2 found|not_found] [--case found|not_found]
    ```
    It prints the one-line confirmation (`triageSummary()`'s exact text, e.g. `reflective ->
-   Substack + Bluesky only, no frame (LinkedIn case format and X excluded)`) — relay that to Muxin
-   as part of your normal output so she can confirm the call before you draft anything, one
-   judgment call per piece. If she disagrees, re-run the same command with the corrected bucket;
-   it's idempotent (re-triaging replaces the recorded fact, never duplicates it).
+   Substack + Bluesky only, no frame (LinkedIn case format and X excluded)`) plus either flag line
+   if raised — relay all of it to Muxin as part of your normal output so she can confirm the calls
+   before you draft anything, one judgment pass per piece. If she disagrees, re-run the same
+   command with the corrected values; it's idempotent (re-triaging replaces the recorded facts,
+   never duplicates them).
 
    This must be written before step 3.5's `route` call and step 4's drafting: `route.ts --folder`
    reads it to force-exclude a `reflective` source's LinkedIn/X platforms, and `npm run validate`
@@ -167,6 +180,7 @@ derivative, the video script, and the video title/description. The short version
      control_run: true      # only on the one derivative drafted for a due spin-control pick (card f444f440); omit otherwise
      exploration_probe: true   # only on the one derivative routed via step 3.5's --explore flag (card 92bb2ae6)
      outreach_message: true   # only when source.md carries `source_kind: outreach-message` (new-content.ts's resolveFileSource, from a LOCKED /outreach message) — propagate it onto every derivative drafted from that source; src/db/tag-source.ts reads it to tag the shipped post 'atomized-outreach'. Omit otherwise.
+     case_skeleton: true    # ONLY on a linkedin/x derivative drafted under the case-first beat template (references/spin-mode.md), AND only when step 2.5's source-triage recorded --case found for this source. If --case found is not on record, do NOT set this and do NOT use the beat template — fall back to normal (non-case) extraction/spin instead (validate.ts's checkCaseGate hard-gates this; never fabricate a case to force the fit). Omit entirely on every other derivative.
      ---
      <the post text — nothing else>
      ```

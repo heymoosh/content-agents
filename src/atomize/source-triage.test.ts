@@ -12,6 +12,9 @@ import {
   triageSummary,
   beat2Note,
   hasMissingBeat2,
+  readCaseEvidence,
+  hasCaseEvidence,
+  caseNote,
   CASE_SKELETON_PLATFORMS,
 } from "./source-triage.js";
 
@@ -109,6 +112,53 @@ describe("writeSourceClass + readSourceClass: the fact is recorded once, read ba
       const raw = readFileSync(join(dir, "source.md"), "utf8");
       assert.doesNotMatch(raw, /source_class_beat2/);
       assert.equal(beat2Note(dir), undefined);
+    });
+  });
+
+  // Case-evidence fact (card f7b186c2/5021f759): mirrors the beat2Found tests above exactly, same
+  // round-trip + flag pattern, separate frontmatter field (source_class_case).
+  test("caseEvidenceFound: found writes and round-trips found, no flag raised", () => {
+    withSourceMd((dir) => {
+      writeSourceClass(dir, "frame-native", { caseEvidenceFound: true });
+      assert.equal(readCaseEvidence(dir), "found");
+      assert.equal(hasCaseEvidence(dir), true);
+      assert.equal(caseNote(dir), undefined);
+    });
+  });
+
+  test("caseEvidenceFound: false writes and round-trips not_found, raises the fallback flag", () => {
+    withSourceMd((dir) => {
+      writeSourceClass(dir, "frame-native", { caseEvidenceFound: false });
+      assert.equal(readCaseEvidence(dir), "not_found");
+      assert.equal(hasCaseEvidence(dir), false);
+      assert.equal(
+        caseNote(dir),
+        "flag: no anonymize-able third-party case found in source; LinkedIn/X case-skeleton falls back to normal (non-case) spin"
+      );
+    });
+  });
+
+  test("no source_class_case written when opts omitted -- readCaseEvidence is undefined, not a guessed default", () => {
+    withSourceMd((dir) => {
+      writeSourceClass(dir, "frame-native");
+      const raw = readFileSync(join(dir, "source.md"), "utf8");
+      assert.doesNotMatch(raw, /source_class_case/);
+      assert.equal(readCaseEvidence(dir), undefined);
+      assert.equal(hasCaseEvidence(dir), false);
+      assert.equal(caseNote(dir), undefined);
+    });
+  });
+
+  test("beat2 and case-evidence facts are independent -- writing one does not disturb the other", () => {
+    withSourceMd((dir) => {
+      writeSourceClass(dir, "frame-native", { beat2Found: false, caseEvidenceFound: true });
+      assert.equal(hasMissingBeat2(dir), true);
+      assert.equal(readCaseEvidence(dir), "found");
+      // Re-triage does not duplicate either line.
+      writeSourceClass(dir, "frame-native", { beat2Found: false, caseEvidenceFound: true });
+      const raw = readFileSync(join(dir, "source.md"), "utf8");
+      assert.equal((raw.match(/^source_class_beat2:/gm) ?? []).length, 1);
+      assert.equal((raw.match(/^source_class_case:/gm) ?? []).length, 1);
     });
   });
 });
