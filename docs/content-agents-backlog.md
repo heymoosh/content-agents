@@ -362,7 +362,7 @@ GOAL_CONDITION: not yet defined -- scope once Muxin decides which half of the ga
 
 SCOPE DECIDED (Muxin, 2026-07-11): (c) build BOTH halves of the gap. (a) Persist the real scheduleError reason durably when an approve-time schedule attempt fails -- write it to the row's notes column in review-queue.md so it survives past the ephemeral flash-toast (page.ts:435), not just flashed once. (b) Have the reconcile pass (src/review/reconcile.ts) detect a reuse-guard block specifically and report "blocked by reuse guard, eligible again in N days" instead of the generic, alarming "no logged draft" message.
 GOAL_CONDITION: an approve-time schedule failure leaves a durable, human-readable reason persisted on the row (not just a toast); AND the reconcile pass, for a row blocked by the reuse guard, reports "blocked by reuse guard, eligible again in N days" -- e.g. the innovation-nation quote-card-6-linkedin row reads as blocked until ~2026-08-23, not "no logged Typefully draft".
-- STATUS: To Do
+- STATUS: In Progress
 - DECISION: approved -- Muxin already scoped the fix in-card (2026-07-11 SCOPE DECIDED: persist scheduleError reason durably + reuse-guard-aware reconcile message). Low-risk, reversible GUI/bookkeeping fix, no content-generation logic; auto-merges on green CI per rule 7. (pre-flight 2026-07-14)
 - GROOMED: decision c (persist reason + reuse-guard-aware reconcile) recorded; GOAL_CONDITION stated + 2026-07-11
 <!-- card-id: 174f70bd-1dd3-456f-9d66-6945ac88872a -->
