@@ -67,6 +67,42 @@ describe("evaluateQualify: positive classification requires evidence", () => {
   });
 });
 
+describe("evaluateQualify: platform-kind downgrade lands on a legal fit value", () => {
+  // Mirrors VALID_FITS in validate.ts (strong|partial|weak|disqualified) -- "unclear" is not a
+  // legal fit value, so a platform-kind downgrade must never produce it.
+  const VALID_FITS = new Set(["strong", "partial", "weak", "disqualified"]);
+
+  test("zero evidence items forces a platform-kind lead to weak, not unclear", () => {
+    const result = evaluateQualify(
+      baseInput({ kind: "platform", classification: undefined, fit: "strong" }),
+      [],
+    );
+    assert.equal(result.finalValue, "weak");
+    assert.notEqual(result.finalValue, "unclear");
+    assert.ok(VALID_FITS.has(result.finalValue));
+    assert.equal(result.downgraded, true);
+    assert.equal(result.status, "qualified");
+    assert.ok(result.reasons.some((r) => r.includes("forced to weak")));
+  });
+
+  test("evidence present but no valid worldview-match item forces a platform-kind lead to weak", () => {
+    const result = evaluateQualify(
+      baseInput({ kind: "platform", classification: undefined, fit: "partial" }),
+      [PERSON_ITEM],
+    );
+    assert.equal(result.finalValue, "weak");
+    assert.ok(VALID_FITS.has(result.finalValue));
+    assert.equal(result.downgraded, true);
+  });
+
+  test("client-kind downgrade is unchanged: still lands on unclear", () => {
+    const result = evaluateQualify(baseInput({ kind: "client", classification: "turnaround" }), []);
+    assert.equal(result.finalValue, "unclear");
+    assert.equal(result.downgraded, true);
+    assert.ok(result.reasons.some((r) => r.includes("forced to unclear")));
+  });
+});
+
 describe("evaluateQualify: non-jsa lead, single-key path", () => {
   test("valid worldview-match evidence lets a positive classification stand and reach pursue", () => {
     const result = evaluateQualify(baseInput(), [WORLDVIEW_ITEM]);
