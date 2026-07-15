@@ -693,10 +693,14 @@ SHIP: held (draft PR #218 — repo CLAUDE.md Rule 7, src/atomize/ extraction/spi
 - Follow-up to c02ff4aa-4872-4540-8d9f-029ac4b9535a (PARKED: hard context/turn ceiling exceeded, session killed mid-card, never resumed 2026-07-15).
 - The parked card was ceiling-killed before any commits landed -- its worktree (content-agents-worktrees/wt-cta-product-team-value-c02ff4aa, branch wt/cta-product-team-value-c02ff4aa) is still on disk at the same SHA as main, i.e. zero work done. Safe to build fresh from scratch; no partial state to reconcile.
 - Full original scope carries over unchanged: DECISION: approved to build -- NOT subsumed by PR #185. Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily product-team value. Michael Callaway principle: content must be unique AND useful. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7.
-- Once this ships, also mark original card c02ff4aa-4872-4540-8d9f-029ac4b9535a STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28, 3c6550a6 -> 43fa1e02, cccfc43a -> 4e5b33d0) so it doesn't stay stuck showing STATUS: In Progress forever.
-- STATUS: To Do
+- Once this ships (PR merged, not just opened), also mark original card c02ff4aa-4872-4540-8d9f-029ac4b9535a STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28, 3c6550a6 -> 43fa1e02, cccfc43a -> 4e5b33d0) so it doesn't stay stuck showing STATUS: In Progress forever.
+- Built: reused the existing cta_label frontmatter field (previously only read by the explicit-cta override path) to also override the work_with_me-destination CTA's text in the content_type path (src/publish/cta.ts resolveContentTypeCtas/resolveOneContentType) -- additive, omitted cta_label keeps today's generic "Connect on LinkedIn" text unchanged. Updated SKILL.md step 4.5 to instruct when/how to write a tactical line (tone matches spin_angles.linkedin beat 5's soft-availability-close, good-vs-cringy example pair, always safe to omit).
+
+SHIP: held (draft PR #219 — repo CLAUDE.md Rule 7, src/publish/cta.ts CTA-resolution logic + SKILL.md drafting-instruction change, needs Muxin's review; old-vs-new function-output sample in PR body)
+- STATUS: Review
 - DECISION: approved -- carried over from parent c02ff4aa (Muxin: tie source topic to a TACTICAL / immediately-usable CTA; natural, never cringy; orient to attracting paying clients; NOT subsumed by PR #185). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
 - GROOMED: readiness pass: full scope carried forward from parked c02ff4aa (approved to build), worktree = zero commits (safe fresh build), no blocking dependency (propose_dependencies empty); content-gen LOGIC -> ships as HELD draft PR per rule 7 + 2026-07-15
+- CI NOTE: CI: green (2026-07-15) -- PR #219 https://github.com/heymoosh/content-agents/pull/219
 <!-- card-id: d2746598-f27a-403e-ba8c-2d3584fea53e -->
 
 **Rename propose-cards → follow-up-cards; retarget scope to post-card discovery, not cold epic-decomposition**
