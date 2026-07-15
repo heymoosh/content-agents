@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { replyContextHtml, imageMissingHtml } from "./page.js";
+import { replyContextHtml, imageMissingHtml, storyboardJobDone } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
   const row = {
@@ -60,4 +60,52 @@ test("imageMissingHtml: a non-image row renders nothing", () => {
   assert.equal(imageMissingHtml({ kind: "text" }), "");
   assert.equal(imageMissingHtml({ kind: "video" }), "");
   assert.equal(imageMissingHtml({}), "");
+});
+
+// Unit tests for storyboardJobDone() — the pure, DOM-free mirror of the inline logic loadJobs()
+// uses to clear the storyboardSlugs in-flight registry once a piece's real "Generate storyboard"
+// video job actually resolves. Before card fbfea28b, the in-flight indicator (row.storyboardQueued)
+// had no completion signal of its own at all — it only cleared on the NEXT unrelated full-queue
+// refresh, and any background job poll in between wiped it prematurely.
+
+test("storyboardJobDone: no jobs for the slug at all is not done (queue hasn't caught up yet)", () => {
+  assert.equal(storyboardJobDone([], "my-slug"), false);
+});
+
+test("storyboardJobDone: a running video job for the slug is not done", () => {
+  const jobs = [{ kind: "video", slugs: ["my-slug"], status: "running" }];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), false);
+});
+
+test("storyboardJobDone: a queued video job for the slug is not done", () => {
+  const jobs = [{ kind: "video", slugs: ["my-slug"], status: "queued" }];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), false);
+});
+
+test("storyboardJobDone: a done video job for the slug is done", () => {
+  const jobs = [{ kind: "video", slugs: ["my-slug"], status: "done" }];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), true);
+});
+
+test("storyboardJobDone: a failed video job for the slug is done (terminal, not a stuck spinner)", () => {
+  const jobs = [{ kind: "video", slugs: ["my-slug"], status: "failed" }];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), true);
+});
+
+test("storyboardJobDone: one done + one still-running video job for the same slug is NOT done", () => {
+  const jobs = [
+    { kind: "video", slugs: ["my-slug"], status: "done" },
+    { kind: "video", slugs: ["my-slug"], status: "running" },
+  ];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), false);
+});
+
+test("storyboardJobDone: a done job for a DIFFERENT slug does not mark this slug done", () => {
+  const jobs = [{ kind: "video", slugs: ["other-slug"], status: "done" }];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), false);
+});
+
+test("storyboardJobDone: a done job of a non-video kind for the slug is ignored", () => {
+  const jobs = [{ kind: "text", slugs: ["my-slug"], status: "done" }];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), false);
 });

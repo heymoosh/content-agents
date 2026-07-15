@@ -30,6 +30,19 @@ export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): str
   return '<div class="src missing-img">— image not rendered yet —</div>';
 }
 
+// Pure, DOM-free mirror of the inline logic the client <script> below uses to clear its
+// storyboardSlugs in-flight registry once a piece's real "Generate storyboard" video job actually
+// resolves (done or failed) — not the instant the click fires (card fbfea28b: the old row.storyboardQueued
+// flag lived until the NEXT full /api/queue refresh, with nothing clearing it on the job's own
+// completion). True once at least one video job exists for the slug and none of that slug's video
+// jobs are still queued/running; false while the queue hasn't caught up yet (no job for the slug
+// visible) so the hint doesn't flicker off before the real job is even tracked.
+export function storyboardJobDone(jobs: { kind: string; slugs?: string[]; status: string }[], slug: string): boolean {
+  const forSlug = jobs.filter((j) => j.kind === "video" && (j.slugs || []).includes(slug));
+  if (!forSlug.length) return false;
+  return forSlug.every((j) => j.status === "done" || j.status === "failed");
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -304,6 +317,15 @@ const $ = (s, r=document) => r.querySelector(s);
 let DATA = { pieces: [], pending: 0 };
 let showDecided = false;
 const DECIDED = new Set(["published","discard","locked"]);
+// In-flight action registries, keyed by stable row.id / piece.slug — NOT stored on the row/DATA
+// objects. The 3s job poll (setInterval below) calls load() on ANY job status change anywhere,
+// which replaces DATA wholesale and rebuilds every row's DOM from scratch; a flag or "thinking…"
+// innerHTML living on the row/DOM gets clobbered by that unrelated refresh, well before the actual
+// operation finishes (card fbfea28b). Keying by id/slug instead of the row object also survives
+// load() swapping in a fresh row object mid-await.
+const aiPending = new Set();       // row ids with an in-flight Ask-Claude revise
+const dupPending = new Map();      // row id -> target platform, for an in-flight Duplicate
+const storyboardSlugs = new Set(); // piece slugs with an in-flight storyboard (video) job
 
 function flash(msg){ const f=$("#flash"); f.textContent=msg; f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1400); }
 function esc(s){ return (s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -385,10 +407,10 @@ function rowEl(piece, row){
   const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Ask Claude</button>' : "";
   // "Generate storyboard" (card 9e20a616): the video-path dead end — a video-script row you can't
   // approve because storyboard.md doesn't exist yet, and no way to run /video without a terminal.
-  // row.storyboardQueued is a client-only flag (survives until the next full /api/queue refresh,
-  // same pattern as row.aiError) so a queued job reads as queued, not as a dead button.
+  // storyboardSlugs (module-level, keyed by piece.slug — card fbfea28b) tracks the in-flight state
+  // instead of a row flag, so it survives the background poll's load() rebuilding this row's DOM.
   const storyboardBtn = row.canGenerateStoryboard
-    ? (row.storyboardQueued
+    ? (storyboardSlugs.has(piece.slug)
         ? '<span class="hint">✨ generating storyboard… (Add / Queue tab has progress)</span>'
         : '<button class="storyboard" data-act="gen-storyboard">🎬 Generate storyboard</button>')
     : "";
@@ -422,16 +444,23 @@ function rowEl(piece, row){
       '<span class="spacer"></span>'+ storyboardBtn + editBtn + aiBtn + dupBtn + cancelBtn +
     '</div>'+
     '<div class="revisebox"><input placeholder="what needs changing?" value="'+esc(row.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
-    // Reopens (and stays open) when a prior "Ask Claude" attempt failed, so the error — durable
-    // now, not a 1.4s toast — is still visible after the row's next rerender, not wiped by it.
+    // Reopens (and stays open) when a prior "Ask Claude" attempt failed, or while one is in flight
+    // (aiPending, keyed by row.id — card fbfea28b), so the thinking indicator/error is still visible
+    // after the row's next rerender (a background job poll no longer wipes it), not a 1.4s toast.
     // Also durably shows Claude's REFUSAL reason (card 9304e4a5 part 4) — same mechanism, a real
     // explanation instead of a silent no-op.
-    '<div class="aibox'+(row.aiError?" show":"")+'"><input placeholder="tell Claude what to change…" /><button class="send" data-act="ai-send">Send to Claude</button>'+
-      (row.aiError ? '<div class="aierr">⚠ '+esc(row.aiError)+'</div>' : "")+
+    '<div class="aibox'+((row.aiError||aiPending.has(row.id))?" show":"")+'">'+
+      (aiPending.has(row.id)
+        ? '<div class="thinking">✨ Claude is revising… (your subscription, ~10-30s)</div>'
+        : '<input placeholder="tell Claude what to change…" /><button class="send" data-act="ai-send">Send to Claude</button>'+
+          (row.aiError ? '<div class="aierr">⚠ '+esc(row.aiError)+'</div>' : ""))+
     '</div>'+
     (row.duplicatable
-      ? '<div class="dupbox'+(row.dupError?" show":"")+'"><select>'+dupOptions+'</select><button class="send" data-act="dup-send">Duplicate</button>'+
-        (row.dupError ? '<div class="duperr">⚠ '+esc(row.dupError)+'</div>' : "")+
+      ? '<div class="dupbox'+((row.dupError||dupPending.has(row.id))?" show":"")+'">'+
+        (dupPending.has(row.id)
+          ? '<div class="thinking">✨ Claude is drafting the '+esc(dupPending.get(row.id))+' version… (~10-60s)</div>'
+          : '<select>'+dupOptions+'</select><button class="send" data-act="dup-send">Duplicate</button>'+
+            (row.dupError ? '<div class="duperr">⚠ '+esc(row.dupError)+'</div>' : ""))+
       '</div>'
       : "");
 
@@ -483,35 +512,40 @@ async function onAction(e, piece, row, el){
     if(!box.classList.contains("show")) row.aiError = null; // closing dismisses any stale error
     const inp = el.querySelector(".aibox input"); if(inp && box.classList.contains("show")) inp.focus();
   } else if (act === "ai-send"){
+    if(aiPending.has(row.id)) return; // already in flight — don't fire a second real spawn (card fbfea28b)
     const inp = el.querySelector(".aibox input"); const instruction = inp ? inp.value.trim() : "";
     if(!instruction){ flash("Type what you want changed first"); return; }
     row.aiError = null;
-    el.querySelector(".aibox").innerHTML = '<div class="thinking">✨ Claude is revising… (your subscription, ~10-30s)</div>';
-    const r = await post("/api/revise",{slug:piece.slug,id:row.id,instruction});
-    // Durable inline error on the row (survives rerender) instead of a 1.4s auto-hiding toast —
-    // the toast alone made a real failure ("Claude ran but didn't change anything") vanish before
-    // it registered as anything but "nothing's working."
-    if(r.ok){ row.body = r.body; flash("Revised by Claude"); }
-    else { row.aiError = r.error || "error"; }
-    rerender();
+    aiPending.add(row.id); rerender(); // thinking indicator now survives a background job poll's load()
+    try {
+      const r = await post("/api/revise",{slug:piece.slug,id:row.id,instruction});
+      // Durable inline error on the row (survives rerender) instead of a 1.4s auto-hiding toast —
+      // the toast alone made a real failure ("Claude ran but didn't change anything") vanish before
+      // it registered as anything but "nothing's working."
+      if(r.ok){ row.body = r.body; flash("Revised by Claude"); }
+      else { row.aiError = r.error || "error"; }
+    } finally { aiPending.delete(row.id); rerender(); }
   } else if (act === "gen-storyboard"){
     e.target.disabled = true;
     const r = await post("/api/video/generate",{slug:piece.slug});
-    if(r.ok){ row.storyboardQueued = true; flash("Queued — generating storyboard (Add / Queue tab has progress)"); loadJobs(); }
+    if(r.ok){ storyboardSlugs.add(piece.slug); flash("Queued — generating storyboard (Add / Queue tab has progress)"); loadJobs(); }
     else { e.target.disabled = false; flash(r.error || "Could not queue /video"); }
     rerender();
   } else if (act === "dup"){
     const box = el.querySelector(".dupbox"); box.classList.toggle("show");
     if(!box.classList.contains("show")) row.dupError = null; // closing dismisses any stale error
   } else if (act === "dup-send"){
+    if(dupPending.has(row.id)) return; // already in flight — don't fire a second real spawn (card fbfea28b)
     const sel = el.querySelector(".dupbox select");
     const platform = sel ? sel.value : "";
     if(!platform){ flash("No other platform to duplicate to"); return; }
     row.dupError = null;
-    el.querySelector(".dupbox").innerHTML = '<div class="thinking">✨ Claude is drafting the '+esc(platform)+' version… (~10-60s)</div>';
-    const r = await post("/api/duplicate",{slug:piece.slug,id:row.id,platform});
-    if(r.ok){ flash("Duplicated to "+platform+" — new pending row added"); await load(); }
-    else { row.dupError = r.error || "error"; rerender(); }
+    dupPending.set(row.id, platform); rerender(); // thinking indicator now survives a background job poll's load()
+    try {
+      const r = await post("/api/duplicate",{slug:piece.slug,id:row.id,platform});
+      if(r.ok){ flash("Duplicated to "+platform+" — new pending row added"); await load(); }
+      else { row.dupError = r.error || "error"; rerender(); }
+    } finally { dupPending.delete(row.id); rerender(); }
   } else if (act === "cancel"){
     if(!confirm("Cancel this scheduled post? This removes the live draft/post at the provider.")) return;
     e.target.disabled = true;
@@ -846,6 +880,14 @@ async function loadJobs(){
     const before = JSON.stringify(JOBS.map(j=>[j.id,j.status]));
     const r = await fetch("/api/jobs"); JOBS = (await r.json()).jobs || [];
     renderJobs();
+    // Clear a slug's "generating storyboard…" hint once its real video job actually resolves (done
+    // or failed) — inline mirror of storyboardJobDone() in this file's exported section (client
+    // script can't import it; kept in sync by hand, card fbfea28b). Runs before load() below so the
+    // rebuilt review rows already reflect the cleared state instead of racing it.
+    for(const slug of [...storyboardSlugs]){
+      const forSlug = JOBS.filter(j=>j.kind==="video" && (j.slugs||[]).includes(slug));
+      if(forSlug.length && forSlug.every(j=>j.status==="done"||j.status==="failed")) storyboardSlugs.delete(slug);
+    }
     if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))) load(); // a job moved → refresh review rows
   }catch(e){}
 }
