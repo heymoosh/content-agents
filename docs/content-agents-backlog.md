@@ -287,7 +287,7 @@ SCOPE EXTENSION (Muxin approved, 2026-07-10): shape the case-note capture as an 
 - Once Muxin actually sends a client/platform/jobsearch follow-up message by hand, nothing today appends a "contacted"/"followup_sent" tracker event for it -- the Follow-ups tab only offers mark-responded/draft-follow-up/move-on per card 21a5eb84's scope. Need a 4th action (or a CLI command) to log a manual send.
 ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
 CHAIN: 1
-- STATUS: To Do
+- STATUS: In Progress
 - DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 <!-- card-id: bf88258a-5d0f-457a-a403-53a9bbad1648 -->
