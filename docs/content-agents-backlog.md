@@ -575,10 +575,10 @@ CARD TYPE: EPIC
   LinkedIn from 1 to 16; cadence-fit.ts now reports a real peak hour for both (x: 6am PT,
   linkedin: 2pm PT) instead of insufficient-data, no code change needed there per the card's own
   GOAL_CONDITION. 866/866 tests green (12 new), npm run typecheck clean. (shipped 2026-07-15)
-- STATUS: Review
+- STATUS: Done
 - DECISION: approved -- research pass (above) resolved the open question; buildable and free
-  (CLAUDE.md rule 6), no API/scraping tradeoff needed. Parser change still reviewed per this
-  card's own note (held draft PR #234, not auto-merged).
+  (CLAUDE.md rule 6), no API/scraping tradeoff needed. Parser change reviewed per this card's own
+  note; Muxin merged PR #234 2026-07-15.
 <!-- card-id: 6f1a2e9c-8b4a-4c37-9e5f-2b7d4c9a3e61 -->
 
 **Add Threads as a supported publishing platform (official Graph API)**
