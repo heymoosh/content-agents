@@ -7,7 +7,15 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
 import { summarizeThreadChecks } from "./thread-check.js";
 import { summarizeStorytelling } from "./storytelling.js";
-import { readSourceClass, beat2Note, triageEffects, CASE_SKELETON_PLATFORMS, type SourceClass } from "./source-triage.js";
+import {
+  readSourceClass,
+  beat2Note,
+  triageEffects,
+  CASE_SKELETON_PLATFORMS,
+  readCaseEvidence,
+  caseNote,
+  type SourceClass,
+} from "./source-triage.js";
 
 // Validate every derivative in a content folder against config/platforms.yaml.
 //   tsx src/atomize/validate.ts content/2026-06-09-some-post
@@ -135,6 +143,43 @@ export function checkSkeletonGate(
   return violations;
 }
 
+// Case-evidence hard gate (card f7b186c2, Muxin DECISION 2026-07-14): a derivative may declare
+// `case_skeleton: true` — "I built this derivative's beats from a real, anonymize-able
+// third-party case found in this source" — only when source-triage recorded
+// `source_class_case: found` for this source (readCaseEvidence). Unset/undefined counts the same
+// as "not_found" — fail-safe, never guess a case exists. This is a hard violation, same tier as
+// checkSkeletonGate above, not advisory: it is the code-level enforcement of the fallback rule
+// spin-mode.md and config/platforms.yaml's angle text already state in prose ("if the source
+// can't produce [a case], fall back to normal (non-case) extraction/spin — never fabricate a
+// quote or a scene to force the fit"). A prompt hint alone was exactly what let PR #185's sample
+// drift; this makes "never fabricate a client case" an assertion the pipeline enforces, not a
+// suggestion a draft can quietly ignore.
+// The case-skeleton is also extraction-only, stricter than spin's usual best-effort source_lines:
+// a case_skeleton:true derivative must trace to real lines in source.md, or it's a violation too.
+export function checkCaseGate(
+  files: { file: string; platform: string; caseSkeleton?: unknown; sourceLines?: unknown }[],
+  caseEvidence: "found" | "not_found" | undefined
+): string[] {
+  const violations: string[] = [];
+  for (const { file, platform, caseSkeleton, sourceLines } of files) {
+    if (caseSkeleton !== true) continue;
+    if (!(CASE_SKELETON_PLATFORMS as readonly string[]).includes(platform)) continue;
+    if (caseEvidence !== "found") {
+      violations.push(
+        `${file}: declares case_skeleton:true, but source-triage recorded no real anonymize-able case in this source (source_class_case is "${caseEvidence ?? "unset"}") — never force or invent a client case; fall back to normal (non-case) spin instead`
+      );
+      continue;
+    }
+    const hasLines = Array.isArray(sourceLines) && sourceLines.length > 0;
+    if (!hasLines) {
+      violations.push(
+        `${file}: declares case_skeleton:true but has no source_lines — the case-skeleton is extraction-only, it must trace to real lines in source.md`
+      );
+    }
+  }
+  return violations;
+}
+
 function main() {
   const dir = process.argv[2];
   if (!dir) {
@@ -185,6 +230,18 @@ function main() {
     violations.push(...checkSkeletonGate(skeletonFiles, sourceClass));
   }
 
+  // Case-evidence hard gate (card f7b186c2): applies regardless of whether source_class itself
+  // was recorded — a case_skeleton:true derivative with no case-evidence fact on file (triage
+  // never ran the --case check) fails closed, same as one where triage explicitly found none.
+  const caseEvidence = readCaseEvidence(sourceDir);
+  const caseFiles = threadInputs.map(({ file, fm }) => ({
+    file,
+    platform: String(fm.platform ?? ""),
+    caseSkeleton: fm.case_skeleton,
+    sourceLines: fm.source_lines,
+  }));
+  violations.push(...checkCaseGate(caseFiles, caseEvidence));
+
   // Source-triage beat-2 flag (card b288d0da): advisory only, never a gate — helps Muxin learn
   // which essays lack a testable belief statement. Same notes-cell pattern as the storytelling /
   // thread-check advisories below (storytelling.ts's spinPassNote() / thread-check.ts's
@@ -192,6 +249,13 @@ function main() {
   const beat2 = beat2Note(sourceDir);
   if (beat2) {
     console.log(`source-triage: ${beat2}`);
+  }
+
+  // Case-evidence flag (card f7b186c2): advisory only — helps Muxin see which essays had no real
+  // third-party case to draw the LinkedIn/X case-skeleton from.
+  const cnote = caseNote(sourceDir);
+  if (cnote) {
+    console.log(`source-triage: ${cnote}`);
   }
 
   // Home-brand thread-check (config/platforms.yaml `home_brand`): advisory only, never a gate — a

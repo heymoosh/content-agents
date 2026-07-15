@@ -61,18 +61,46 @@ export function hasMissingBeat2(dir: string): boolean {
   return readSourceFm(dir).source_class_beat2 === "not_found";
 }
 
+// Case-evidence fact (card f7b186c2, Muxin DECISION 2026-07-14): a narrower, separate judgment
+// from beat2 above. beat2Found only asks whether a quotable belief statement exists — a derivative
+// can satisfy that using Muxin's OWN autobiographical material (see spin-mode.md's counter-example,
+// which PR #185 hit exactly this way). This fact asks the question the LinkedIn/X case-skeleton
+// actually needs: does this SPECIFIC source contain a real, anonymize-able THIRD-PARTY case — a
+// team/client situation, not Muxin's own story — with enough concrete detail (a situation, a
+// quoted assumption, a cost) to extract into the case-skeleton beats? Judged once per source, same
+// pattern as source_class/source_class_beat2. Extraction-only and CONDITIONAL per the DECISION:
+// never force or invent a case when this reads "not_found" — fall back to the essay's own
+// argument. validate.ts's checkCaseGate is the hard, code-level enforcement of that rule — a
+// derivative may declare `case_skeleton: true` only when this fact reads "found", so the rule is
+// an assertion the pipeline enforces, not merely a prompt hint.
+export function readCaseEvidence(dir: string): "found" | "not_found" | undefined {
+  const v = readSourceFm(dir).source_class_case;
+  return v === "found" || v === "not_found" ? v : undefined;
+}
+
+export function hasCaseEvidence(dir: string): boolean {
+  return readCaseEvidence(dir) === "found";
+}
+
 // WRITE the classification fact into source.md frontmatter. A text-level patch (insert lines
 // before the closing `---`), not a full YAML re-serialize, so the rest of the block — including
 // the canonical_url reminder comment scaffoldContentFolder writes — survives byte-for-byte, and
 // re-triaging the same source is idempotent (old source_class*/lines are replaced, not doubled).
-export function writeSourceClass(dir: string, sourceClass: SourceClass, opts?: { beat2Found?: boolean }): void {
+export function writeSourceClass(
+  dir: string,
+  sourceClass: SourceClass,
+  opts?: { beat2Found?: boolean; caseEvidenceFound?: boolean }
+): void {
   const p = join(dir, "source.md");
   const raw = readFileSync(p, "utf8");
   const { header, body } = splitFrontmatter(raw);
   if (!header) throw new Error(`source.md has no frontmatter block: ${p}`);
-  const stripped = header.replace(/^source_class(_beat2)?:.*\n/gm, "");
+  const stripped = header.replace(/^source_class(_beat2|_case)?:.*\n/gm, "");
   const lines = [`source_class: ${sourceClass}`];
   if (opts?.beat2Found !== undefined) lines.push(`source_class_beat2: ${opts.beat2Found ? "found" : "not_found"}`);
+  if (opts?.caseEvidenceFound !== undefined) {
+    lines.push(`source_class_case: ${opts.caseEvidenceFound ? "found" : "not_found"}`);
+  }
   if (!/---\n$/.test(stripped)) throw new Error(`source.md frontmatter block malformed: ${p}`);
   const patched = stripped.replace(/---\n$/, `${lines.join("\n")}\n---\n`);
   writeFileSync(p, `${patched}\n${body}\n`);
@@ -117,16 +145,26 @@ export function beat2Note(dir: string): string | undefined {
   return hasMissingBeat2(dir) ? "flag: no beat-2 belief statement found" : undefined;
 }
 
+// The Muxin-facing flag for the case-evidence fact above — informational, same as beat2Note,
+// never blocking. It exists so she sees, per source, whether the LinkedIn/X case-skeleton had
+// real third-party material to draw on or fell back to normal spin.
+export function caseNote(dir: string): string | undefined {
+  return readCaseEvidence(dir) === "not_found"
+    ? "flag: no anonymize-able third-party case found in source; LinkedIn/X case-skeleton falls back to normal (non-case) spin"
+    : undefined;
+}
+
 // CLI shim (SKILL.md step 2.5): the tiny script Claude's inline classification judgment gets
 // piped into, same pattern as src/db/tag-posts.ts for pillar tags. Claude does the judgment
-// (reading the source, picking a bucket, checking for a beat-2 belief statement); this just
-// writes the verdict to source.md and prints the Muxin-facing confirmation.
-//   tsx src/atomize/source-triage.ts <content-folder> <frame-native|reflective|fiction-promo> [--beat2 found|not_found]
+// (reading the source, picking a bucket, checking for a beat-2 belief statement, checking for a
+// real third-party case); this just writes the verdict to source.md and prints the Muxin-facing
+// confirmation.
+//   tsx src/atomize/source-triage.ts <content-folder> <frame-native|reflective|fiction-promo> [--beat2 found|not_found] [--case found|not_found]
 function main() {
   const [dirArg, classArg, ...rest] = process.argv.slice(2);
   if (!dirArg || !classArg) {
     console.error(
-      "usage: tsx src/atomize/source-triage.ts <content-folder> <frame-native|reflective|fiction-promo> [--beat2 found|not_found]"
+      "usage: tsx src/atomize/source-triage.ts <content-folder> <frame-native|reflective|fiction-promo> [--beat2 found|not_found] [--case found|not_found]"
     );
     process.exit(1);
   }
@@ -147,11 +185,27 @@ function main() {
     beat2Found = v === "found";
   }
 
+  let caseEvidenceFound: boolean | undefined;
+  const caseIdx = rest.indexOf("--case");
+  if (caseIdx >= 0) {
+    const v = rest[caseIdx + 1];
+    if (v !== "found" && v !== "not_found") {
+      console.error('--case must be "found" or "not_found"');
+      process.exit(1);
+    }
+    caseEvidenceFound = v === "found";
+  }
+
   const dir = dirArg.startsWith("/") ? dirArg : join(repoRoot, dirArg);
-  writeSourceClass(dir, sourceClass, beat2Found === undefined ? undefined : { beat2Found });
+  writeSourceClass(dir, sourceClass, {
+    beat2Found,
+    caseEvidenceFound,
+  });
   console.log(triageSummary(sourceClass));
   const note = beat2Note(dir);
   if (note) console.log(note);
+  const cnote = caseNote(dir);
+  if (cnote) console.log(cnote);
 }
 
 // Run only as a CLI entry point — importing these functions for tests/route.ts/validate.ts must

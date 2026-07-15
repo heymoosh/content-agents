@@ -6,6 +6,7 @@ import {
   routingKeyFor,
   checkRoutingGate,
   checkSkeletonGate,
+  checkCaseGate,
   type PlatformRule,
 } from "./validate.js";
 
@@ -169,6 +170,80 @@ describe("checkSkeletonGate: reflective/fiction-promo sources never carry the ca
     const violations = checkSkeletonGate(
       [{ file: "linkedin-1.md", platform: "linkedin", spin: true, angle: "x" }],
       "reflective"
+    );
+    assert.deepEqual(violations, []);
+  });
+});
+
+describe("checkCaseGate: case_skeleton:true is only legal when source-triage found a real third-party case (card f7b186c2/5021f759)", () => {
+  test("case_skeleton:true, caseEvidence found, has source_lines: passes clean", () => {
+    const violations = checkCaseGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", caseSkeleton: true, sourceLines: [12, 14] }],
+      "found"
+    );
+    assert.deepEqual(violations, []);
+  });
+
+  test("case_skeleton:true but caseEvidence not_found: hard violation, never force/invent a case", () => {
+    const violations = checkCaseGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", caseSkeleton: true, sourceLines: [12] }],
+      "not_found"
+    );
+    assert.equal(violations.length, 1);
+    assert.match(violations[0], /linkedin-1\.md/);
+    assert.match(violations[0], /never force or invent/);
+  });
+
+  test("case_skeleton:true but caseEvidence was never recorded (undefined): fails closed, same as not_found", () => {
+    const violations = checkCaseGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", caseSkeleton: true, sourceLines: [12] }],
+      undefined
+    );
+    assert.equal(violations.length, 1);
+    assert.match(violations[0], /is "unset"/);
+  });
+
+  test("case_skeleton:true, caseEvidence found, but no source_lines: extraction-only violation", () => {
+    const violations = checkCaseGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", caseSkeleton: true }],
+      "found"
+    );
+    assert.equal(violations.length, 1);
+    assert.match(violations[0], /extraction-only/);
+  });
+
+  test("case_skeleton:true, caseEvidence found, empty source_lines array: still a violation", () => {
+    const violations = checkCaseGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", caseSkeleton: true, sourceLines: [] }],
+      "found"
+    );
+    assert.equal(violations.length, 1);
+  });
+
+  test("x is also a case-skeleton platform: same rules apply", () => {
+    const violations = checkCaseGate(
+      [{ file: "x-1.md", platform: "x", caseSkeleton: true, sourceLines: [3] }],
+      "not_found"
+    );
+    assert.equal(violations.length, 1);
+    assert.match(violations[0], /x-1\.md/);
+  });
+
+  test("bluesky is not a case-skeleton platform: case_skeleton:true there is never flagged, regardless of caseEvidence", () => {
+    const violations = checkCaseGate(
+      [{ file: "bluesky-1.md", platform: "bluesky", caseSkeleton: true }],
+      "not_found"
+    );
+    assert.deepEqual(violations, []);
+  });
+
+  test("case_skeleton not true (undefined/false) is never flagged, regardless of caseEvidence", () => {
+    const violations = checkCaseGate(
+      [
+        { file: "linkedin-1.md", platform: "linkedin", sourceLines: [1] },
+        { file: "linkedin-2.md", platform: "linkedin", caseSkeleton: false, sourceLines: [1] },
+      ],
+      "not_found"
     );
     assert.deepEqual(violations, []);
   });
