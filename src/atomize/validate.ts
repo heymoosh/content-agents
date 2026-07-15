@@ -7,6 +7,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
 import { summarizeThreadChecks } from "./thread-check.js";
 import { summarizeStorytelling } from "./storytelling.js";
+import { readSourceClass, beat2Note, triageEffects, CASE_SKELETON_PLATFORMS, type SourceClass } from "./source-triage.js";
 
 // Validate every derivative in a content folder against config/platforms.yaml.
 //   tsx src/atomize/validate.ts content/2026-06-09-some-post
@@ -109,6 +110,31 @@ export function checkRoutingGate(
   return violations;
 }
 
+// Source-triage hard gate (card b288d0da): a reflective or fiction-promo source's derivatives
+// must never carry the LinkedIn/X case-skeleton beat treatment — GOAL_CONDITION says "no
+// skeleton-framed derivatives," not "flagged," so this is a hard violation like checkRoutingGate,
+// never advisory. Reflective's platform exclusion (linkedin/x) is already enforced end-to-end by
+// route.ts + checkRoutingGate above; this gate exists for the case triageEffects still allows the
+// platform (fiction-promo) but forbids the skeleton itself — spin:true + angle:<platform> is how
+// a derivative declares it applied that platform's spin_angles beat template (see checkDerivative
+// above), so that combination on a CASE_SKELETON_PLATFORMS platform is what's checked.
+export function checkSkeletonGate(
+  files: { file: string; platform: string; spin?: unknown; angle?: unknown }[],
+  sourceClass: SourceClass
+): string[] {
+  const violations: string[] = [];
+  if (triageEffects(sourceClass).skeletonAllowed) return violations;
+  for (const { file, platform, spin, angle } of files) {
+    if (!(CASE_SKELETON_PLATFORMS as readonly string[]).includes(platform)) continue;
+    if (spin === true && angle === platform) {
+      violations.push(
+        `${file}: source_class "${sourceClass}" excludes the case-skeleton beat treatment (source-triage.ts triageEffects), but this derivative carries spin:true angle:${platform} for a case-skeleton platform`
+      );
+    }
+  }
+  return violations;
+}
+
 function main() {
   const dir = process.argv[2];
   if (!dir) {
@@ -142,6 +168,30 @@ function main() {
   if (existsSync(routingPath)) {
     const routingDecisions = parseRoutingDecisions(readFileSync(routingPath, "utf8"));
     violations.push(...checkRoutingGate(routingFiles, routingDecisions));
+  }
+
+  // Source-triage skeleton gate (card b288d0da): only applies once a source.md classification
+  // has actually been recorded — readSourceClass returns undefined for an untriaged or
+  // source.md-less folder, in which case the existing default (skeleton allowed) is unaffected.
+  const sourceDir = dir.startsWith("/") ? dir : join(repoRoot, dir);
+  const sourceClass = readSourceClass(sourceDir);
+  if (sourceClass) {
+    const skeletonFiles = threadInputs.map(({ file, fm }) => ({
+      file,
+      platform: String(fm.platform ?? ""),
+      spin: fm.spin,
+      angle: fm.angle,
+    }));
+    violations.push(...checkSkeletonGate(skeletonFiles, sourceClass));
+  }
+
+  // Source-triage beat-2 flag (card b288d0da): advisory only, never a gate — helps Muxin learn
+  // which essays lack a testable belief statement. Same notes-cell pattern as the storytelling /
+  // thread-check advisories below (storytelling.ts's spinPassNote() / thread-check.ts's
+  // threadCheckNote()).
+  const beat2 = beat2Note(sourceDir);
+  if (beat2) {
+    console.log(`source-triage: ${beat2}`);
   }
 
   // Home-brand thread-check (config/platforms.yaml `home_brand`): advisory only, never a gate — a

@@ -1,6 +1,13 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { checkDerivative, parseRoutingDecisions, routingKeyFor, checkRoutingGate, type PlatformRule } from "./validate.js";
+import {
+  checkDerivative,
+  parseRoutingDecisions,
+  routingKeyFor,
+  checkRoutingGate,
+  checkSkeletonGate,
+  type PlatformRule,
+} from "./validate.js";
 
 const PLATFORMS: Record<string, PlatformRule> = {
   x: { max_chars: 280 },
@@ -109,6 +116,60 @@ describe("platform-fit hard gate: derivatives vs routing.md", () => {
   test("checkRoutingGate does not flag format assets absent from routing.md's core platforms", () => {
     const decisions = parseRoutingDecisions(ROUTING_MD);
     const violations = checkRoutingGate([{ file: "video-script.md", platform: "video-script" }], decisions);
+    assert.deepEqual(violations, []);
+  });
+});
+
+describe("checkSkeletonGate: reflective/fiction-promo sources never carry the case-skeleton beat treatment (card b288d0da)", () => {
+  test("frame-native: skeleton allowed, spin:true angle:linkedin passes clean", () => {
+    const violations = checkSkeletonGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", spin: true, angle: "linkedin" }],
+      "frame-native"
+    );
+    assert.deepEqual(violations, []);
+  });
+
+  test("reflective: spin:true angle:linkedin on a case-skeleton platform is a hard violation", () => {
+    const violations = checkSkeletonGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", spin: true, angle: "linkedin" }],
+      "reflective"
+    );
+    assert.equal(violations.length, 1);
+    assert.match(violations[0], /linkedin-1\.md/);
+    assert.match(violations[0], /case-skeleton/);
+  });
+
+  test("reflective: spin:true angle:x on x is also flagged", () => {
+    const violations = checkSkeletonGate([{ file: "x-1.md", platform: "x", spin: true, angle: "x" }], "reflective");
+    assert.equal(violations.length, 1);
+    assert.match(violations[0], /x-1\.md/);
+  });
+
+  test("fiction-promo: spin:true angle:x on x is flagged even though the platform subset is unrestricted", () => {
+    const violations = checkSkeletonGate([{ file: "x-1.md", platform: "x", spin: true, angle: "x" }], "fiction-promo");
+    assert.equal(violations.length, 1);
+  });
+
+  test("fiction-promo: bluesky is not a case-skeleton platform, so spin:true there is never flagged", () => {
+    const violations = checkSkeletonGate(
+      [{ file: "bluesky-1.md", platform: "bluesky", spin: true, angle: "bluesky" }],
+      "fiction-promo"
+    );
+    assert.deepEqual(violations, []);
+  });
+
+  test("reflective: a verbatim (non-spun) linkedin derivative is not flagged by this gate (no skeleton applied)", () => {
+    const violations = checkSkeletonGate([{ file: "linkedin-1.md", platform: "linkedin" }], "reflective");
+    assert.deepEqual(violations, []);
+  });
+
+  test("reflective: spin:true but a mismatched angle (not this platform's own) is not this gate's concern", () => {
+    // A stray/mismatched angle is checkDerivative's job (angle-consistency check); this gate only
+    // fires when spin:true legitimately declares THIS platform's own case-skeleton angle.
+    const violations = checkSkeletonGate(
+      [{ file: "linkedin-1.md", platform: "linkedin", spin: true, angle: "x" }],
+      "reflective"
+    );
     assert.deepEqual(violations, []);
   });
 });

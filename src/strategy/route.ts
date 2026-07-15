@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
 import { runDriftCheck } from "./routing-drift.js";
+import { readSourceClass, triageEffects } from "../atomize/source-triage.js";
 
 // Intelligent content router: decide which platforms a piece should be posted to,
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
@@ -368,6 +369,27 @@ export function applyExplorationOverride(merged: MergedDecision[], pillar: strin
   });
 }
 
+// Source triage's routing hook (card b288d0da, src/atomize/source-triage.ts): force any platform
+// the source's classification excludes (currently only "reflective" -> linkedin+x) to `skip`,
+// confidence "rule" — the same hard-veto confidence mergeDecisions/applyExplorationOverride
+// already treat as un-overridable, so this reuses checkRoutingGate's existing enforcement in
+// validate.ts rather than adding a second gate. Applied BEFORE --explore below so an exploration
+// probe can never punch through a source-triage exclusion, same as it can't punch through an
+// editorial `never` rule.
+export function applySourceTriage(merged: MergedDecision[], excludePlatforms: string[]): MergedDecision[] {
+  if (excludePlatforms.length === 0) return merged;
+  const exclude = new Set(excludePlatforms);
+  return merged.map((d) => {
+    if (!exclude.has(d.platform) || d.decision === "skip") return d;
+    return {
+      ...d,
+      decision: "skip",
+      confidence: "rule",
+      rationale: `source-triage: excluded by source_class (source.md) — was: ${d.rationale}`,
+    };
+  });
+}
+
 function routingMd(pillars: string[], merged: MergedDecision[]): string {
   const fit = (d: MergedDecision) => (d.score == null ? "—" : d.score.toFixed(2));
   const rows = merged
@@ -437,6 +459,19 @@ function main() {
       ? perPillar.get(pillars[0])!.map((d) => ({ ...d, pillars: [pillars[0]] }))
       : mergeDecisions(pillars, perPillar);
 
+  // Parsed early (before --explore) so a source-triage exclusion below is in place as a hard
+  // "rule"-confidence veto before applyExplorationOverride ever runs — same ordering guarantee
+  // as an editorial `never` rule.
+  const fo = args.indexOf("--folder");
+  const folder = fo >= 0 ? args[fo + 1] : undefined;
+  const abs = folder ? (folder.startsWith("/") ? folder : join(repoRoot, folder)) : undefined;
+  if (abs) {
+    const sourceClass = readSourceClass(abs);
+    if (sourceClass) {
+      merged = applySourceTriage(merged, triageEffects(sourceClass).excludePlatforms);
+    }
+  }
+
   const exploreIdx = args.indexOf("--explore");
   if (exploreIdx >= 0) {
     const explorePlatform = args[exploreIdx + 1];
@@ -457,10 +492,7 @@ function main() {
     merged = applyExplorationOverride(merged, pillars[0], explorePlatform);
   }
 
-  const fo = args.indexOf("--folder");
-  if (fo >= 0 && args[fo + 1]) {
-    const folder = args[fo + 1];
-    const abs = folder.startsWith("/") ? folder : join(repoRoot, folder);
+  if (abs) {
     writeFileSync(join(abs, "routing.md"), routingMd(pillars, merged));
     console.error(`wrote ${join(abs, "routing.md")}`);
   }

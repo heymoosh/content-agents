@@ -67,6 +67,45 @@ derivative, the video script, and the video title/description. The short version
    `/publish` log the bet and `/strategy` later grade whether it paid off. If no brief exists,
    proceed with defaults and note that in the review queue header.
 
+2.5. **Source triage — classify the source once** (`src/atomize/source-triage.ts`, card b288d0da).
+   Before drafting or routing anything, judge which ONE of three buckets this source falls into.
+   This is a classification, not composition — you're sorting the piece Muxin already wrote, never
+   inventing a claim about it:
+   - **`frame-native`** — carries a testable belief / "the move": a claim or case worth the
+     LinkedIn/X case-skeleton treatment (see step 4's beat templates). The default when the source
+     doesn't clearly read as one of the other two buckets.
+   - **`reflective`** — personal/reflective register, no testable belief or case to make (worked
+     examples: "What AI Cannot Reach", "More than Bread"). Native to Substack + Bluesky only —
+     NO skeleton ever, and excludes the LinkedIn case format and X's compressed-case treatment
+     from the platform subset entirely.
+   - **`fiction-promo`** — a Build 2 fiction teaser/promo piece linking to `stories/`. Stays in
+     the existing extraction-first cliffhanger style; never framed. Its platform subset is
+     otherwise unrestricted (pillar-driven routing still decides that normally).
+
+   Also judge whether the source contains a clear "beat 2"-style belief statement: a literal
+   quoted assumption, in the holder's own words, that a stranger could picture (see
+   `config/platforms.yaml` `spin_angles.linkedin.angle`'s Beat 2 definition for the exact bar).
+   This is informational only — it flags essays that lack "the move" so Muxin learns the pattern
+   over time. It never blocks anything and never changes the bucket above.
+
+   Record both as a fact in `source.md` — you do the judgment, this writes it, and every
+   downstream step (route.ts, validate.ts, this skill's own step 4) reads that fact instead of
+   re-deciding it:
+   ```
+   tsx src/atomize/source-triage.ts <folder> <frame-native|reflective|fiction-promo> [--beat2 found|not_found]
+   ```
+   It prints the one-line confirmation (`triageSummary()`'s exact text, e.g. `reflective ->
+   Substack + Bluesky only, no frame (LinkedIn case format and X excluded)`) — relay that to Muxin
+   as part of your normal output so she can confirm the call before you draft anything, one
+   judgment call per piece. If she disagrees, re-run the same command with the corrected bucket;
+   it's idempotent (re-triaging replaces the recorded fact, never duplicates it).
+
+   This must be written before step 3.5's `route` call and step 4's drafting: `route.ts --folder`
+   reads it to force-exclude a `reflective` source's LinkedIn/X platforms, and `npm run validate`
+   (step 6) hard-fails any derivative that still carries the LinkedIn/X case-skeleton beat
+   treatment (`spin: true` + `angle: linkedin|x`) on a `reflective` or `fiction-promo` source — so
+   drafting one for an excluded bucket is wasted work, not just a lint fix later.
+
 3. **Tag + extract.** Identify the pillar(s) (rubric: `config/pillars.yaml`). List the 5–10
    most quotable/claimable sentences with their line numbers. Write these to
    `<folder>/extracts.md` — this is the working material for every derivative (and for `/video`
