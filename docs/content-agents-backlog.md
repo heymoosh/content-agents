@@ -678,10 +678,14 @@ CARD TYPE: EPIC
 - Do NOT blind-discard the worktree. Verified this diff already: `npx tsc --noEmit` clean, all 37 existing tests in validate.test.ts + source-triage.test.ts still pass (no regressions), and the logic matches the DECISION faithfully -- this reads as content-complete against the GOAL_CONDITION for the two source files.
 - Two real gaps remain before this can ship: (1) no new tests cover readCaseEvidence/caseNote/checkCaseGate specifically -- add them, mirroring the existing beat2 test pattern in both test files; (2) .claude/skills/atomize/SKILL.md step 2.5 was never updated to instruct Claude to judge case-evidence per source and pass --case found|not_found to source-triage.ts -- right now the new gate would fail-closed forever since nothing ever sets source_class_case. Wire it in alongside the existing --beat2 instruction (SKILL.md line ~95).
 - This is content-generation logic (CLAUDE.md rule 7 -- src/atomize/ extraction/spin logic) -- open as a HELD draft PR with an old-vs-new content sample (a source with a real case vs. one without, showing the gate/fallback behavior), never auto-merge.
-- Once shipped, mark f7b186c2 Done-with-Superseded.
-- STATUS: To Do
+- Once shipped (PR merged, not just opened), mark f7b186c2 Done-with-Superseded.
+- Built both closed gaps plus a third found along the way: references/spin-mode.md's own guidance still told Claude to force the beat template onto non-case (autobiographical) material as a "stand-in" -- the exact drift this card exists to stop, and it directly contradicted the new gate. Updated that guidance + added case_skeleton to SKILL.md step 4's frontmatter example (nothing previously told Claude to ever SET the field, which would have left the gate permanently inert).
+
+SHIP: held (draft PR #218 — repo CLAUDE.md Rule 7, src/atomize/ extraction/spin logic change, needs Muxin's review; old-vs-new function-output sample in PR body)
+- STATUS: Review
 - DECISION: approved -- carried over from parent f7b186c2 (Muxin DECISION 2026-07-14: extraction-only + CONDITIONAL case-evidence; declare case_skeleton only when a real anonymizable third-party case exists IN-source, else fall back to the essay's own argument; never fabricate a client case). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
 - GROOMED: clear GOAL_CONDITION, verified diff (tsc clean, tests pass), 2 explicit remaining gaps + 2026-07-15
+- CI NOTE: CI: green (2026-07-15) -- PR #218 https://github.com/heymoosh/content-agents/pull/218
 <!-- card-id: 5021f759-430b-47df-b965-614359b4f390 -->
 
 **Resume: Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some)**
