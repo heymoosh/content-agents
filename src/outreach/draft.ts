@@ -31,6 +31,13 @@ export type Channel = (typeof CHANNELS)[number];
 
 const DRAFT_TIMEOUT_MS = 120_000; // same order of magnitude as reply-draft.ts's REPLY_TIMEOUT_MS
 
+// Exported so the GUI's draft path (src/review/jobs.ts, card d39258ab) can invoke `claude` with the
+// SAME model as callClaudeDraft below -- the GUI swaps subprocess transport (a logged spawn instead
+// of execFile, for a real log + heartbeat) but must never change what gets generated.
+export function draftModel(): string {
+  return (process.env.CLAUDE_POLISH_MODEL ?? "sonnet").trim();
+}
+
 const POSITIVE_CLASSIFICATIONS = new Set(["turnaround", "greenfield"]);
 const POSITIVE_FITS = new Set(["strong", "partial"]);
 
@@ -83,7 +90,7 @@ export function buildDraftPrompt(opts: {
 }
 
 async function callClaudeDraft(prompt: string): Promise<string> {
-  const model = (process.env.CLAUDE_POLISH_MODEL ?? "sonnet").trim();
+  const model = draftModel();
   let stdout: string;
   try {
     // `--tools ""`: drafting only ever needs Claude to read the prompt and print text -- every
@@ -128,7 +135,10 @@ export interface DraftResult {
   evidenceIds: string[];
 }
 
-export async function runDraft(dirArg: string, opts: { channel?: string } = {}): Promise<DraftResult> {
+export async function runDraft(
+  dirArg: string,
+  opts: { channel?: string; callClaude?: (prompt: string) => Promise<string> } = {},
+): Promise<DraftResult> {
   const absDir = dirArg.startsWith("/") ? dirArg : join(repoRoot, dirArg);
   const leadPath = join(absDir, "lead.md");
   if (!existsSync(leadPath)) throw new Error(`no lead.md found at ${absDir}`);
@@ -173,7 +183,11 @@ export async function runDraft(dirArg: string, opts: { channel?: string } = {}):
   const selected = selectEvidenceForDraft(evidence, classification);
 
   const prompt = buildDraftPrompt({ leadName, channel, classification, classificationLabel, pitchAngle, evidence: selected });
-  const messageBody = await callClaudeDraft(prompt);
+  // GUI callers (src/review/jobs.ts, card d39258ab) inject a callClaude backed by the shared logged
+  // spawn (runClaudeSpawn) instead of this file's own execFile call, for a real job log + heartbeat
+  // -- same model/tools/prompt/timeout either way, only the transport differs. The CLI path below
+  // (main()) and every test always use the default execFile-based callClaudeDraft.
+  const messageBody = await (opts.callClaude ?? callClaudeDraft)(prompt);
 
   const messagesDir = join(absDir, "messages");
   mkdirSync(messagesDir, { recursive: true });
