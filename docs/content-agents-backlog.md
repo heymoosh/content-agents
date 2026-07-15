@@ -225,30 +225,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - PARKED: needs Muxin to physically drop a real voice memo in data/inbox/ before this can run (2026-07-10) — surfaced via morning summary, not a live ask
 <!-- card-id: ae96b8e1-4102-4bd6-af10-8df51d21704d -->
 
-**Code-enforce research.ts per-signal search budget (currently prompt-text-only)**
-- Discovered during fb4d6b28's Step 3.5 code-review: research.ts search_budget_per_signal (config/outreach.yaml, default 2/signal) is enforced only as prompt text ("search at most N times") passed to the claude-cli subprocess, not as code-level call interception. The hard subprocess timeout (5-8 min) IS genuinely enforced via Node timeout option -- only the per-signal count lacks a code-level backstop.
-- Not a blocker: the timeout already bounds worst-case wall-clock/cost even if the LLM ignores the budget hint. This is a tightening, not a bug.
-- CHAIN: 1
-- Superseded 2026-07-15: this session was ceiling-killed with no commits ever made (see PARKED note below); the resume card 43fa1e02 built and shipped this exact scope (PR #216, merged 2026-07-15, code-enforces the budget via a PreToolUse hook). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
-- STATUS: Done
-- DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-- PARKED: hard context/turn ceiling exceeded (turns=206 tokens=194517) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
-<!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
-
-**Update .claude/skills/atomize + outreach SKILL.md for Phase 2 (draft/lock) + Phase 3 (platform-kind)**
-- ORIGIN: follow-up auto-filed while building card d5b34590 (Outreach engine Phase 2: decision gate, draft, lock, /atomize reuse).
-- .claude/skills/atomize/SKILL.md step-4 frontmatter example should document `outreach_message: true` so a live /atomize run actually stamps the marker src/db/tag-source.ts now knows how to read. .claude/skills/outreach/SKILL.md non-negotiable-rule-1 and its subcommand list need draft/lock added, replacing any "Phase 2 not built yet" language.
-- Could not be done inside the Phase 2 build itself -- writes under .claude/ are not grantable to a headless worker in that session (same constraint card ebe652a7 hit; needs an attended/interactive run).
-- EXTENDED (2026-07-10, while building Phase 3 card 6590efec): outreach/SKILL.md also needs a platform-kind walkthrough (mirroring the client-kind flow) and documentation of `outreach:status --targets` -- same headless .claude/ write-permission wall, same attended session can fix both at once.
-- GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
-- CHAIN: 1
-- Superseded 2026-07-15: this session was ceiling-killed but left its uncommitted diff salvageable in the stale worktree; the resume card 4e5b33d0 verified that diff against the GOAL_CONDITION and shipped it as-is (PR #217, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
-- STATUS: Done
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-- PARKED: hard context/turn ceiling exceeded (turns=250 tokens=222823) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
-<!-- card-id: cccfc43a-6547-4f08-aeb4-3e76e7e27c49 -->
-
 **Decide: should atomized-outreach content be excluded from pillar/platform resonance figures?**
 - ORIGIN: follow-up auto-filed while building card d5b34590 (Outreach engine Phase 2). route.ts loadData() already excludes CONTROL_RUN_SOURCE/EXPLORATION_SOURCE from strategy resonance math. Phase 2 deliberately did NOT add the new outreach-message tag-source value to that exclusion list (kept the change local to tag-source.ts per its own scope) since that is a strategy-analytics judgment call, not a Phase 2 build decision.
 - Worth a deliberate call before Phase 4/5 strategy work leans on resonance figures that might now include outreach-sourced follow-up posts (spin reframes of locked outreach messages, run through /atomize like any other content).
@@ -272,20 +248,6 @@ SHIP: held (draft PR #208 — repo CLAUDE.md Rule 7, routing-logic change, needs
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - CI NOTE: CI: green (as of 2026-07-15 08:25 UTC) — PR #208 https://github.com/heymoosh/content-agents/pull/208
 <!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
-
-**Write/source an anonymized case note for the LinkedIn case-first spin angle to work from**
-- ORIGIN: follow-up auto-filed while building card c42769b1 (Update per-channel spin angles), PR #185.
-The new LinkedIn case-first spin angle needs a real anonymized third-party case (a team/client situation, not Muxin's own story) to work from. No such material exists yet in the corpus -- PR #185's old-vs-new sample had to use Muxin's own personal-branding essay as the case study, since it was the only source available, which is honest but not the intended target material (a client/team case, per the card's own LINKEDIN SCOPE). Same reasoning applies more mildly to the X angle's technical-sharpening sample.
-Scope: write or source a short anonymized case note (a real turnaround/greenfield situation Muxin has worked on or observed) as new atomize source material, so the case-first LinkedIn angle has genuine third-party material instead of only self-referential examples. Once it exists, re-run spin on it to confirm the new angle reads as intended against real case material.
-CHAIN: 1
-
-SCOPE EXTENSION (Muxin approved, 2026-07-10): shape the case-note capture as an INTERVIEW TEMPLATE -- five questions mapping one-to-one onto the skeleton beats: (1) what was the situation (with a number/decision), (2) what did the team believe, in their own words, (3) what tested it, (4) what did the miss cost, (5) what's the pattern. Muxin answers in voice or text; Claude transcribes into a case note. She is the author of the answers, so it stays clean under extraction-first (same principle as the voice-notes flow). Target: ~10 minutes of Muxin's time per case.
-- Superseded 2026-07-15: this session was ceiling-killed but left its uncommitted diff salvageable in the stale worktree; the resume card 5021f759 verified that diff, closed 2 remaining gaps plus a third (stale spin-mode.md guidance that contradicted the new gate), and shipped it (PR #218, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
-- STATUS: Done
-- DECISION: close the 'Muxin hand-writes/sources anonymized cases' framing -- she will NOT supply cases. Her intent: the case-first LinkedIn spin is EXTRACTION-ONLY and CONDITIONAL -- for each source the agent checks whether a real, anonymize-able case already exists IN that source; if yes, produce the case-first post; if no real case exists, do NOT force or invent one -- fall back to the essay's own argument. Never fabricate a client case. Content-gen logic (rule 7). Build the conditional detection; candidate home: fold into b288d0da source-triage. (2026-07-14)
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-- PARKED: hard context/turn ceiling exceeded (turns=282 tokens=240549) -- session killed mid-card by the watchdog safety valve, never resumed
-<!-- card-id: f7b186c2-0fe8-40b2-bc6d-0351b630bbda -->
 
 **Wire tracker.ts summarizeFollowups() into the /strategy weekly brief**
 - src/outreach/tracker.ts exports summarizeFollowups() (counts per bucket, due/overdue counts) per card 21a5eb84's scope ("summary for /strategy"), but it is not wired into src/strategy/*'s weekly brief synthesis yet -- that wiring was explicitly out of scope for Phase 4. A future card should decide where/how the weekly brief surfaces follow-up due/overdue counts.
@@ -328,47 +290,6 @@ decides the approach.
 - PARKED: not ready: GOAL_CONDITION not yet defined, depends on which of 3 options Muxin wants + 2026-07-15
 <!-- card-id: e26f6e12-73d6-4378-8be8-f43265e2f139 -->
 
-**Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some) -- check overlap with PR #185 first**
-- ORIGIN: Muxin, 2026-07-10 -- wants the content agent to help surface an angle that ties her
-source topic/insight to a real CTA connecting her brand and work to product-team value, especially
-on platforms likely to attract clients/customers (LinkedIn especially, X to a lesser degree). Basing
-this on "vibes" about what tends to work per platform becoming what people expect there.
-LIKELY OVERLAP -- CHECK THIS FIRST: card c42769b1 (Update per-channel spin angles), built earlier
-today, is currently sitting in an open PR (#185, draft, CI green, held for review per rule 7) that
-already rewrote spin_angles.linkedin to a case-first/client-conversion structure (real anonymized
-situation -> named assumption -> cost of having missed it -> pattern zoom-out LAST -> soft
-availability signal instead of a hard ask) and sharpened spin_angles.x to be more technically
-grounded while keeping the non-engineer-outsider voice. Muxin should review PR #185 before treating
-this as new/unscoped work -- it may already deliver most or all of what this card is asking for.
-Known gap even after PR #185 merges: its own PR body flags that no anonymized third-party case
-existed yet in the corpus, so the LinkedIn sample had to use Muxin's own personal-branding essay as
-the stand-in case (follow-up card f7b186c2 already filed to write/source a real one).
-NEXT STEP (Muxin's explicit ask): wants an AI strategy session (stronger/advanced model) to help
-define the approach for tying source topic to a real CTA per platform, before deciding what (if
-anything) is still needed beyond PR #185 + its follow-up. Do not scope new implementation from this
-card alone -- start by reviewing PR #185's actual result.
-
-DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 (case-first LinkedIn / technical X spin angles) + the new beat-template card (1eeb82a4) + f7b186c2 (real anonymized case note). No separate CTA build. The CTA is the natural last beat of the case skeleton (soft availability signal), not a bolt-on.
-- Superseded 2026-07-15: this session was ceiling-killed before any commits landed; the resume card d2746598 built this exact scope fresh and shipped it (PR #219, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
-- STATUS: Done
-- DECISION: approved to build -- NOT subsumed by PR #185 (that only reworked LinkedIn spin structure + a 'soft availability signal' closer, not a tactical CTA). Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily 'product-team value'. Michael Callaway principle: content must be unique AND useful -> that is what converts to leads/clients. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7 (2026-07-14)
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-- PARKED: hard context/turn ceiling exceeded (turns=302 tokens=250899) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
-<!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
-
-**Nonexistent file path silently treated as plain text, burns minutes of LLM time instead of failing fast**
-- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Add/Queue tab)
-BUG: Pasting a well-formed but nonexistent absolute file path into the Add/Queue box does not surface a fast "file not found" error. Instead it silently falls through to the plain-text code path, materializes the raw path string as fake note content, and dispatches a full LLM atomize job against it - taking minutes with zero progress indication before the model itself figures out the input is garbage.
-UI LOCATION: Add/Queue tab, paste box + "Add to queue" button
-REPRO: Paste an absolute path to a file that does not exist, e.g. /Users/Muxin/Documents/GitHub/content-agents/this/path/does/not/exist/fake-note-12345.md, then click "Add to queue".
-OBSERVED: The job was queued with kind "TEXT" (not "FILE"), even though the pasted string is clearly a file path. It ran for 2m59s with the UI showing only the same static generic startup line ("Warning: no stdin data received in 3s...") the entire time - no incremental progress, no "file not found" message - before finally completing with a (correct, well-reasoned) refusal to atomize a non-content string. Comparable jobs in the same session (plain text, bad URL) completed in 18-76s. There was no way for the user to distinguish this from a hang while it ran.
-EXPECTED: A pasted string that looks like an absolute/relative file path but does not resolve via existsSync() should fail fast with a clear "file not found" error, without spending an LLM turn (multiple minutes) to discover that.
-ROOT CAUSE: classifySource() in src/review/jobs.ts around line 332-345 only returns kind "file" when existsSync(asPath) is true; when the path does not exist it silently falls through to kind "text" (line 343-344) using the raw path string as the label/content instead of surfacing a classification error. addJob() then materializes that raw path string as the literal content of a new .inbox/<id>.md file (jobs.ts ~386) and dispatches it to the claude atomize subprocess, which has no fast local check for "does this look like a path that doesn't exist" and instead spends a full reasoning turn (multiple minutes, several tool calls) concluding the input isn't real content. Fix: when the input matches a path-like pattern (contains / and no spaces, or starts with ~ or a drive letter) but existsSync() fails, return a distinct classification (e.g. kind "file-not-found") and surface an immediate client-side or server-side error instead of dispatching an LLM job.
-- STATUS: Done
-- SHIP: fixed + merged as PR #211 (commit a98292c) -- classifySource() now returns kind "file-not-found" for a path-like string that fails existsSync(), sourceDispatch() short-circuits with an immediate error before addJob()/LLM dispatch; covered by serve.test.ts. Board was stale (still said In Progress); confirmed via git log + gh pr view, no further build needed.
-- GROOMED: clear fail-fast outcome; classifySource() surface + path-like heuristic pinned + 2026-07-11
-<!-- card-id: 4450fd23-5a8e-4673-b0d5-b94e013f1fe7 -->
-
 **Analytics tab: insights follow-up ETA text badly undersells actual wait (~10-60s shown, took ~190s)**
 - ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Analytics tab)
 BUG: The "ask a follow-up" box under Generate insights shows a fixed ETA of "~10-60s, may re-run a report" while the request is in flight. In a real test (query: "why is X underperforming?"), the actual wait was roughly 180-200 seconds before Claude's answer appeared -- 3-4x past the stated upper bound, with zero progress indication or updated messaging during the extra ~2+ minutes of waiting.
@@ -394,70 +315,6 @@ ROOT CAUSE: src/review/page.ts, CSS rule `.body.story` (~line 83): `max-height:2
 - GROOMED: clip-affordance outcome clear; .body.story CSS surface pinned + 2026-07-11
 - PARKED: needs decision (judgment): 2 UX directions for clipped storyboard body (gradient fade vs expand-to-read); recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: dcb91654-efd0-4992-8820-a9d97c40ac2e -->
-
-**Review tab: quote-card rows with body text but no rendered image look identical to a normal card**
-- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab rendering)
-BUG: Quote-card (IMAGE-type) rows whose derivative body text exists but whose image asset has not been rendered yet show NO visual indication that the image is missing — no placeholder box, no broken-image icon, no distinct styling. The only signal is a small amber note buried among unrelated spin/flag notes, e.g. "note: flag: spin pass suggested (low: narrative); image not yet rendered (sandbox blocked .env read)" — same visual weight as routine advisory notes. This is inconsistent with the OTHER missing-asset case (both body AND image absent), which DOES render an explicit placeholder: a plain — no asset generated yet — div (src/review/page.ts ~line 341, confirmed via QUOTE-CARD-1:X / QUOTE-CARD-1:BLUESKY rows in the 2026-07-04-250th-anniversary-question folder).
-UI LOCATION: Review tab, any QUOTE-CARD:* row where body text exists but assetUrl is unset. Confirmed on QUOTE-CARD-1-X, QUOTE-CARD-1-LINKEDIN, QUOTE-CARD-1-BLUESKY in folder 2026-07-05-hey-substack-i-m-looking-for-others-who-feel-int (all three carry "image not yet rendered (sandbox blocked .env read)").
-REPRO: 1) Open Review tab. 2) Find a QUOTE-CARD:* row whose note includes "image not yet rendered". 3) Observe the row renders as plain body text with no image and no distinct missing-image treatment, indistinguishable at a glance from a text-only row or a fully-rendered card.
-OBSERVED: Row typed IMAGE shows text only, with the missing-image fact mentioned only in small buried note text.
-EXPECTED: A row typed IMAGE should visually flag when its image is absent, consistently with the existing no-body-no-image case which already shows an explicit placeholder (— no asset generated yet —). At minimum, this should be as visually prominent, not a note fragment appended after unrelated flags.
-ROOT CAUSE: src/review/rows.ts ~line 209-216 (assetUrl only set if existsSync(...) true) and src/review/page.ts ~line 334-341 (image tag only rendered when assetUrl is set; the no-asset placeholder branch only fires when body is ALSO empty, so a body-with-no-image row falls through to plain text rendering with no placeholder).
-- STATUS: Done
-- SHIP: merged (PR #212) — added explicit "image not rendered yet" placeholder to page.ts's rowEl() preview logic for IMAGE-kind rows with no assetUrl, plus imageMissingHtml() DOM-free mirror + tests (page.test.ts), mirroring the replyContextHtml precedent. No rows.ts change needed — its assetUrl-unset behavior was already correct.
-- GROOMED: mirror existing no-asset placeholder branch for IMAGE rows; rows.ts/page.ts surface pinned + 2026-07-11
-<!-- card-id: 4c3dd6fc-43e5-41a5-b5bd-387139b6296f -->
-
-**Review GUI: in-progress action state (storyboard/duplicate/ask-Claude) reverts to idle before the real job finishes**
-- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab actions)
-BUG: A row's transient in-progress UI state (Generate storyboard's storyboardQueued flag, Duplicate-to-platform's and Ask Claude's "thinking..." indicator) gets silently wiped and the row reverts to its idle/clickable appearance seconds after the click, well before the real backend operation (a claude -p spawn, 10s-2min+) actually finishes.
-UI LOCATION: Review tab, any row with Generate storyboard / Duplicate to platform / Ask Claude buttons.
-REPRO:
-1. Click "Generate storyboard" on a blocked video-script row (e.g. content/2026-06-16-building-an-innovation-nation, row video-script). Flash shows "Queued - generating storyboard", and GET /api/jobs confirms a real job (kind:video, status:queued/running) exists for this folder.
-2. Within ~2-5s, the row re-renders back to showing the plain "Generate storyboard" button (not the expected "generating storyboard..." hint span) - even though the job is still queued/running.
-3. Clicking "Generate storyboard" AGAIN at this point re-fires POST /api/video/generate; the backend's addVideoJob() happens to dedupe by matching arg+status so no second job is actually created here - but the UI gave no indication the first click was still in effect.
-4. Same underlying issue on "Duplicate to platform": clicked Duplicate (x-2 -> linkedin) on content/2026-07-10-human-inference-defining-a-brand-in-an-ai-drench. The dupbox's "Claude is drafting the linkedin version... (~10-60s)" message vanished and the row looked fully idle within a couple seconds, while the real claude -p spawn kept running in the background for well over a minute (confirmed via ps and via the new linkedin-2 row eventually landing in review-queue.md long after the UI had already gone quiet). Unlike Generate storyboard, duplicateToPlatform has no dedupe guard against a second click firing a second real Claude spawn for the same source+target while one is still in flight.
-OBSERVED: The button/indicator reverts to idle almost immediately, well before the real async operation completes, with no visible "still working" state in between.
-EXPECTED: The in-progress indicator (storyboardQueued hint, thinking spinner) should persist until the specific operation actually resolves, regardless of unrelated queue/job activity elsewhere on the page.
-ROOT CAUSE: src/review/page.ts client script - the periodic background poll (setInterval(loadJobs, 3000), gated on any job being queued/running) calls loadJobs(), whose own "a job moved -> refresh review rows" logic (if(before !== JSON.stringify(...)) load();) unconditionally replaces the entire client-side DATA object with a fresh /api/queue response and calls render(), rebuilding every row's DOM from scratch. This clobbers (a) the client-only row.storyboardQueued flag (set by the gen-storyboard handler, never persisted server-side) and (b) any row whose action box was manually set to a "thinking..." innerHTML (ai-send, dup-send handlers in the same file), since render() replaces that DOM node outright. This fires any time ANY job anywhere in the system changes status - not just the job the user just started - so it reproduces easily whenever other queue activity is happening concurrently with a long-running row-level action.
-- STATUS: Done
-- SHIP: merged (PR #213) — moved in-flight state into module-level registries (aiPending, dupPending, storyboardSlugs) keyed by stable row.id/piece.slug instead of row/DOM-attached state, so load()'s wholesale DATA replacement can no longer wipe it. Added the missing double-click dedupe guard on Duplicate. New storyboardJobDone() predicate clears the storyboard hint on the job's real terminal status. Verified with a Chrome-MCP white-box smoke test (simulated in-flight state, called load() directly, confirmed indicators survived) plus 8 new unit tests.
-- GROOMED: persist in-progress indicator outcome clear; poll-render clobber root cause pinned + 2026-07-11
-<!-- card-id: fbfea28b-e730-4234-afaf-9ef25d43b7d9 -->
-
-**Review GUI: Approve is not gated for quote-card rows whose image was never rendered (unlike video/storyboard)**
-- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab actions)
-BUG: approveBlockReason() (src/review/rows.ts ~line 96-110) only checks row.format === "storyboard" and row.format === "video"/"short", blocking Approve with a clear message ("storyboard not rendered yet", "video not rendered yet") when the asset file is missing. There is no equivalent check for row.format === "image" (quote-card rows) - a quote-card row whose PNG was never rendered (images/ dir doesn't exist for the content folder at all) still reports approveBlocked: null, so the Approve button stays fully clickable with no warning.
-UI LOCATION: Review tab, any QUOTE-CARD:* row whose image file does not exist on disk.
-REPRO:
-1. Confirmed via /api/queue: row quote-card-1-linkedin in content/2026-07-10-human-inference-defining-a-brand-in-an-ai-drench has assetUrl undefined and approveBlocked: null, even though images/quote-card-1.png does not exist in that content folder (confirmed on disk, and this is true in the main checkout too, not just the isolated worktree - the image was genuinely never rendered).
-2. Clicked Approve on this row in the GUI - it went through with no warning (approve status set), same UX as approving a fully-rendered card.
-3. In this fixture there are no real Typefully credentials, so scheduleApproved() fails early on the credentials check before ever reaching the missing-image read - the backend's own missing-file check in publishCards() (src/publish/cards.ts ~line 213-216: "missing <path> - render the card first: npm run render -- --still <folder>") never got exercised end-to-end here, though reading that code confirms it IS a clean, per-row-caught error, not a crash.
-OBSERVED: Approve button offers no warning and is fully clickable for a quote-card row with no rendered image; video/storyboard rows get a proactive block, image rows do not.
-EXPECTED: approveBlockReason() should also check row.format === "image" (or equivalently kind === "image") and block Approve with a message like "image not rendered yet - run npm run render -- --still <folder>" when the asset file is missing, mirroring the existing video/storyboard treatment.
-ROOT CAUSE: src/review/rows.ts approveBlockReason() (~line 96-110) has no branch for the image/quote-card format, unlike its storyboard and video/short branches.
-- STATUS: Done
-- SHIP: merged (PR #214) — added the missing image/quote-card branch to approveBlockReason() (rows.ts), mirroring the video/short branch exactly (asset-cell normalization, on-disk exists() check). One function feeds both the client disabled-button/note and the server-side /api/status reject, so this covers both surfaces. Updated the stale test that asserted the old buggy behavior + added 3 new image-gate tests.
-- GROOMED: add image branch to approveBlockReason() (rows.ts ~96-110), fully specified, mirrors video/storyboard + 2026-07-11
-<!-- card-id: a8cb13a4-4bf5-4e29-aaa7-04acc39abd99 -->
-
-**Follow-ups: Draft follow-up failure is invisible to the user**
-- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Follow-ups tab)
-BUG: Draft follow-up (Follow-ups tab, per-lead action) can silently fail with zero durable feedback, and nothing stops duplicate submissions while one is in flight.
-UI LOCATION: Follow-ups tab, Client bucket, PostHog row, Draft follow-up button.
-REPRO:
-1. Open Follow-ups tab, click "Draft follow-up" on a lead (e.g. PostHog).
-2. A toast reads "Drafting follow-up... (your subscription, ~30-60s)" but fades after 1.4s (flash() in src/review/page.ts:295 hardcodes a 1400ms display).
-3. Under real system load the underlying `claude -p` subprocess (src/outreach/draft.ts) can exceed its own 120s timeout (DRAFT_TIMEOUT_MS, src/outreach/draft.ts:32) -- well past the toast's own "~30-60s" estimate.
-4. When it times out, the server returns HTTP 200 with {ok:false, error:"claude -p timed out after 120s during draft"} (src/review/serve.ts:786-791). The client shows this in another 1.4s toast (followupDraft(), src/review/page.ts:763-768) and nothing else.
-5. Verified directly: ran runDraft("outreach/leads/client-posthog") standalone via tsx and reproduced "ERROR: claude -p timed out after 120s during draft". Checked ~/.content-agents/logs/gui-jobs/*.log afterward -- no log file exists for this job at all.
-OBSERVED: If the user is not staring at the screen during the ~1.4s window the toast is visible, they have no way to tell whether the draft is still running, succeeded, or failed -- no entry in the Jobs pill (Add/Queue tab), no persisted log, nothing in the Follow-ups list itself. The "Draft follow-up" button also has no disabled/in-flight state, so a user unsure whether their click registered can click again, queuing a second real `claude -p` subprocess call (confirmed via network tab: two concurrent POST /api/followups/draft-follow-up fired from two clicks) that burns another up-to-120s of subscription usage for the same lead.
-EXPECTED: Draft follow-up should behave like every other Claude-spawning action in this app (atomize, revise, insights): show up in the Jobs pill with live status and a real log link, per the code's own stated intent. The comment at src/review/jobs.ts:651-656 explicitly claims this "reuses the same job queue" and "shows up in the jobs pill with a real log + heartbeat" -- but enqueueFollowUpDraft (src/review/jobs.ts:657-659) calls outreach/draft.ts's runDraft(), which spawns its subprocess via execFile directly (src/outreach/draft.ts:93, imported at line 3) rather than through runClaudeSpawn() (src/review/jobs.ts:241), so it never gets a log file or heartbeat. At minimum the button should disable while its own request is in flight, and the failure/success toast should persist long enough (or land somewhere durable) for the user to actually see it.
-ROOT CAUSE: src/outreach/draft.ts's runDraft() bypasses the shared runClaudeSpawn() logging/heartbeat path (src/review/jobs.ts:241-256) that every other Claude-spawning GUI action uses, contradicting the intent stated in the comment at src/review/jobs.ts:651-656. Separately, src/review/page.ts:763-768 followupDraft() has no in-flight guard (no button disable, no queued-toast persistence) and src/review/page.ts:295 flash() is hardcoded to 1400ms regardless of message importance.
-- STATUS: Done
-- SHIP: merged (PR #215) — client (page.ts): followupDraft() now mirrors the dup-send pattern (fbfea28b) with an fuPending in-flight registry (disables button, durable "drafting..." hint, dedupes a second click to zero fetches) and an fuError durable inline error (survives past 1.4s, points at Add/Queue tab) covering both a server error response and the awaited fetch itself rejecting. Server (jobs.ts/draft.ts): enqueueFollowUpDraft now routes the claude -p subprocess through the shared runClaudeSpawn/decodeSpawnFailure path instead of execFile, so the job gets a real persisted log + heartbeat like every other Claude-spawning GUI action; runDraft() gained an optional callClaude injection seam (default execFile path unchanged for CLI/tests), runClaudeSpawn gained optional model/tools opts + suppressible --permission-mode (purely additive, its 6 existing callers unaffected). Same model/--tools ""/prompt/timeout either way -- not a content-generation logic change, self-vet-merged per rule 7. Verified with a Chrome-MCP white-box smoke test (fixture row injected, since no real outreach lead data exists in this environment) confirming disable/dedupe/durable-error/stale-error-clear/success-clear, plus 725/725 unit tests.
-- GROOMED: route runDraft() through shared runClaudeSpawn() + button in-flight guard; intent clear, minimum floor stated + 2026-07-11
-<!-- card-id: d39258ab-37ff-4b4c-b317-a3eb744059c2 -->
 
 **Outreach tab: long status groups clip cards with no scroll affordance**
 - ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Outreach tab)
@@ -749,14 +606,167 @@ CARD TYPE: EPIC
 - GROOMED: readiness pass: clear GOAL_CONDITION, lightweight post-publish feedback loop scope is concrete + 2026-07-15
 <!-- card-id: 83166c51-e65f-41cc-92eb-53e5e8cf1ea5 -->
 
+**Rename propose-cards → follow-up-cards; retarget scope to post-card discovery, not cold epic-decomposition**
+- ORIGIN: correction to a misunderstanding surfaced 2026-07-15. Muxin's actual intent for this Pre-flight stage was "when the conductor finishes a card, let it propose follow-up cards for anything it discovered mid-work that aligns with the card's epic/goal" — NOT what `propose-cards` (skills/propose-cards/SKILL.md, repo heymoosh/claude-config) actually does today: a cold, Stage-0, pre-batch pass that reads existing epic/goal-flavored cards and decomposes their stated-but-unfiled children from prose, with zero visibility into what any specific card's execution actually produced.
+- WANTED BEHAVIOR: after a card completes (Step 6 / Done), generate up to N follow-up candidates seeded from what THAT card's own work surfaced (new issues found, incomplete edges, related work uncovered) — not from re-reading epic prose cold. Should still respect the epic/goal the completed card traces to, and reuse the current skill's existing safety mechanics (Backlog-only deposit, dedup pass, ORIGIN marker, cap per run, never-auto-promote) — just change the trigger point and the generation input.
+- DECISION (Muxin, 2026-07-15): this REPLACES the existing cold epic-decomposition mode entirely — not a second mode running alongside it.
+- DECISION (Muxin, 2026-07-15): generation runs as a delegated subprocess (same pattern the current skill already uses for its `claude -p` generator), not inline in the conductor's own context — "subprocess may be fine if it works." Still open: exactly what feeds that subprocess (the card's PR diff? its final worker transcript? its Review-stage self-vet notes? some combination) — needs a decision before this builds, don't guess.
+- RENAME: `propose-cards` -> `follow-up-cards` throughout (skill dir, SKILL.md, all cross-references in orchestrate-pipeline SKILL.md / references/preflight.md / references/cold-start.md, any conductor step that invokes it).
+- STATUS: Backlog
+- LANE: claude-config (~/.claude) — this is a conductor-mechanism/global-skill change, not a content-agents content change. Build there per the repo's own conductor carve-out (worktree off ~/.claude, base branch master, no backlog_path).
+<!-- card-id: c8fc8ac3-ac1a-4471-9f22-916752143960 -->
+
+**Code-enforce research.ts per-signal search budget (currently prompt-text-only)**
+- Discovered during fb4d6b28's Step 3.5 code-review: research.ts search_budget_per_signal (config/outreach.yaml, default 2/signal) is enforced only as prompt text ("search at most N times") passed to the claude-cli subprocess, not as code-level call interception. The hard subprocess timeout (5-8 min) IS genuinely enforced via Node timeout option -- only the per-signal count lacks a code-level backstop.
+- Not a blocker: the timeout already bounds worst-case wall-clock/cost even if the LLM ignores the budget hint. This is a tightening, not a bug.
+- CHAIN: 1
+- Superseded 2026-07-15: this session was ceiling-killed with no commits ever made (see PARKED note below); the resume card 43fa1e02 built and shipped this exact scope (PR #216, merged 2026-07-15, code-enforces the budget via a PreToolUse hook). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
+- DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- PARKED: hard context/turn ceiling exceeded (turns=206 tokens=194517) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
+<!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
+
+**Update .claude/skills/atomize + outreach SKILL.md for Phase 2 (draft/lock) + Phase 3 (platform-kind)**
+- ORIGIN: follow-up auto-filed while building card d5b34590 (Outreach engine Phase 2: decision gate, draft, lock, /atomize reuse).
+- .claude/skills/atomize/SKILL.md step-4 frontmatter example should document `outreach_message: true` so a live /atomize run actually stamps the marker src/db/tag-source.ts now knows how to read. .claude/skills/outreach/SKILL.md non-negotiable-rule-1 and its subcommand list need draft/lock added, replacing any "Phase 2 not built yet" language.
+- Could not be done inside the Phase 2 build itself -- writes under .claude/ are not grantable to a headless worker in that session (same constraint card ebe652a7 hit; needs an attended/interactive run).
+- EXTENDED (2026-07-10, while building Phase 3 card 6590efec): outreach/SKILL.md also needs a platform-kind walkthrough (mirroring the client-kind flow) and documentation of `outreach:status --targets` -- same headless .claude/ write-permission wall, same attended session can fix both at once.
+- GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
+- CHAIN: 1
+- Superseded 2026-07-15: this session was ceiling-killed but left its uncommitted diff salvageable in the stale worktree; the resume card 4e5b33d0 verified that diff against the GOAL_CONDITION and shipped it as-is (PR #217, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- PARKED: hard context/turn ceiling exceeded (turns=250 tokens=222823) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
+<!-- card-id: cccfc43a-6547-4f08-aeb4-3e76e7e27c49 -->
+
+**Write/source an anonymized case note for the LinkedIn case-first spin angle to work from**
+- ORIGIN: follow-up auto-filed while building card c42769b1 (Update per-channel spin angles), PR #185.
+The new LinkedIn case-first spin angle needs a real anonymized third-party case (a team/client situation, not Muxin's own story) to work from. No such material exists yet in the corpus -- PR #185's old-vs-new sample had to use Muxin's own personal-branding essay as the case study, since it was the only source available, which is honest but not the intended target material (a client/team case, per the card's own LINKEDIN SCOPE). Same reasoning applies more mildly to the X angle's technical-sharpening sample.
+Scope: write or source a short anonymized case note (a real turnaround/greenfield situation Muxin has worked on or observed) as new atomize source material, so the case-first LinkedIn angle has genuine third-party material instead of only self-referential examples. Once it exists, re-run spin on it to confirm the new angle reads as intended against real case material.
+CHAIN: 1
+
+SCOPE EXTENSION (Muxin approved, 2026-07-10): shape the case-note capture as an INTERVIEW TEMPLATE -- five questions mapping one-to-one onto the skeleton beats: (1) what was the situation (with a number/decision), (2) what did the team believe, in their own words, (3) what tested it, (4) what did the miss cost, (5) what's the pattern. Muxin answers in voice or text; Claude transcribes into a case note. She is the author of the answers, so it stays clean under extraction-first (same principle as the voice-notes flow). Target: ~10 minutes of Muxin's time per case.
+- Superseded 2026-07-15: this session was ceiling-killed but left its uncommitted diff salvageable in the stale worktree; the resume card 5021f759 verified that diff, closed 2 remaining gaps plus a third (stale spin-mode.md guidance that contradicted the new gate), and shipped it (PR #218, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
+- DECISION: close the 'Muxin hand-writes/sources anonymized cases' framing -- she will NOT supply cases. Her intent: the case-first LinkedIn spin is EXTRACTION-ONLY and CONDITIONAL -- for each source the agent checks whether a real, anonymize-able case already exists IN that source; if yes, produce the case-first post; if no real case exists, do NOT force or invent one -- fall back to the essay's own argument. Never fabricate a client case. Content-gen logic (rule 7). Build the conditional detection; candidate home: fold into b288d0da source-triage. (2026-07-14)
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- PARKED: hard context/turn ceiling exceeded (turns=282 tokens=240549) -- session killed mid-card by the watchdog safety valve, never resumed
+<!-- card-id: f7b186c2-0fe8-40b2-bc6d-0351b630bbda -->
+
+**Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some) -- check overlap with PR #185 first**
+- ORIGIN: Muxin, 2026-07-10 -- wants the content agent to help surface an angle that ties her
+source topic/insight to a real CTA connecting her brand and work to product-team value, especially
+on platforms likely to attract clients/customers (LinkedIn especially, X to a lesser degree). Basing
+this on "vibes" about what tends to work per platform becoming what people expect there.
+LIKELY OVERLAP -- CHECK THIS FIRST: card c42769b1 (Update per-channel spin angles), built earlier
+today, is currently sitting in an open PR (#185, draft, CI green, held for review per rule 7) that
+already rewrote spin_angles.linkedin to a case-first/client-conversion structure (real anonymized
+situation -> named assumption -> cost of having missed it -> pattern zoom-out LAST -> soft
+availability signal instead of a hard ask) and sharpened spin_angles.x to be more technically
+grounded while keeping the non-engineer-outsider voice. Muxin should review PR #185 before treating
+this as new/unscoped work -- it may already deliver most or all of what this card is asking for.
+Known gap even after PR #185 merges: its own PR body flags that no anonymized third-party case
+existed yet in the corpus, so the LinkedIn sample had to use Muxin's own personal-branding essay as
+the stand-in case (follow-up card f7b186c2 already filed to write/source a real one).
+NEXT STEP (Muxin's explicit ask): wants an AI strategy session (stronger/advanced model) to help
+define the approach for tying source topic to a real CTA per platform, before deciding what (if
+anything) is still needed beyond PR #185 + its follow-up. Do not scope new implementation from this
+card alone -- start by reviewing PR #185's actual result.
+
+DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 (case-first LinkedIn / technical X spin angles) + the new beat-template card (1eeb82a4) + f7b186c2 (real anonymized case note). No separate CTA build. The CTA is the natural last beat of the case skeleton (soft availability signal), not a bolt-on.
+- Superseded 2026-07-15: this session was ceiling-killed before any commits landed; the resume card d2746598 built this exact scope fresh and shipped it (PR #219, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
+- DECISION: approved to build -- NOT subsumed by PR #185 (that only reworked LinkedIn spin structure + a 'soft availability signal' closer, not a tactical CTA). Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily 'product-team value'. Michael Callaway principle: content must be unique AND useful -> that is what converts to leads/clients. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7 (2026-07-14)
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- PARKED: hard context/turn ceiling exceeded (turns=302 tokens=250899) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
+<!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
+
+**Nonexistent file path silently treated as plain text, burns minutes of LLM time instead of failing fast**
+- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Add/Queue tab)
+BUG: Pasting a well-formed but nonexistent absolute file path into the Add/Queue box does not surface a fast "file not found" error. Instead it silently falls through to the plain-text code path, materializes the raw path string as fake note content, and dispatches a full LLM atomize job against it - taking minutes with zero progress indication before the model itself figures out the input is garbage.
+UI LOCATION: Add/Queue tab, paste box + "Add to queue" button
+REPRO: Paste an absolute path to a file that does not exist, e.g. /Users/Muxin/Documents/GitHub/content-agents/this/path/does/not/exist/fake-note-12345.md, then click "Add to queue".
+OBSERVED: The job was queued with kind "TEXT" (not "FILE"), even though the pasted string is clearly a file path. It ran for 2m59s with the UI showing only the same static generic startup line ("Warning: no stdin data received in 3s...") the entire time - no incremental progress, no "file not found" message - before finally completing with a (correct, well-reasoned) refusal to atomize a non-content string. Comparable jobs in the same session (plain text, bad URL) completed in 18-76s. There was no way for the user to distinguish this from a hang while it ran.
+EXPECTED: A pasted string that looks like an absolute/relative file path but does not resolve via existsSync() should fail fast with a clear "file not found" error, without spending an LLM turn (multiple minutes) to discover that.
+ROOT CAUSE: classifySource() in src/review/jobs.ts around line 332-345 only returns kind "file" when existsSync(asPath) is true; when the path does not exist it silently falls through to kind "text" (line 343-344) using the raw path string as the label/content instead of surfacing a classification error. addJob() then materializes that raw path string as the literal content of a new .inbox/<id>.md file (jobs.ts ~386) and dispatches it to the claude atomize subprocess, which has no fast local check for "does this look like a path that doesn't exist" and instead spends a full reasoning turn (multiple minutes, several tool calls) concluding the input isn't real content. Fix: when the input matches a path-like pattern (contains / and no spaces, or starts with ~ or a drive letter) but existsSync() fails, return a distinct classification (e.g. kind "file-not-found") and surface an immediate client-side or server-side error instead of dispatching an LLM job.
+- SHIP: fixed + merged as PR #211 (commit a98292c) -- classifySource() now returns kind "file-not-found" for a path-like string that fails existsSync(), sourceDispatch() short-circuits with an immediate error before addJob()/LLM dispatch; covered by serve.test.ts. Board was stale (still said In Progress); confirmed via git log + gh pr view, no further build needed.
+- STATUS: Done
+- GROOMED: clear fail-fast outcome; classifySource() surface + path-like heuristic pinned + 2026-07-11
+<!-- card-id: 4450fd23-5a8e-4673-b0d5-b94e013f1fe7 -->
+
+**Review tab: quote-card rows with body text but no rendered image look identical to a normal card**
+- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab rendering)
+BUG: Quote-card (IMAGE-type) rows whose derivative body text exists but whose image asset has not been rendered yet show NO visual indication that the image is missing — no placeholder box, no broken-image icon, no distinct styling. The only signal is a small amber note buried among unrelated spin/flag notes, e.g. "note: flag: spin pass suggested (low: narrative); image not yet rendered (sandbox blocked .env read)" — same visual weight as routine advisory notes. This is inconsistent with the OTHER missing-asset case (both body AND image absent), which DOES render an explicit placeholder: a plain — no asset generated yet — div (src/review/page.ts ~line 341, confirmed via QUOTE-CARD-1:X / QUOTE-CARD-1:BLUESKY rows in the 2026-07-04-250th-anniversary-question folder).
+UI LOCATION: Review tab, any QUOTE-CARD:* row where body text exists but assetUrl is unset. Confirmed on QUOTE-CARD-1-X, QUOTE-CARD-1-LINKEDIN, QUOTE-CARD-1-BLUESKY in folder 2026-07-05-hey-substack-i-m-looking-for-others-who-feel-int (all three carry "image not yet rendered (sandbox blocked .env read)").
+REPRO: 1) Open Review tab. 2) Find a QUOTE-CARD:* row whose note includes "image not yet rendered". 3) Observe the row renders as plain body text with no image and no distinct missing-image treatment, indistinguishable at a glance from a text-only row or a fully-rendered card.
+OBSERVED: Row typed IMAGE shows text only, with the missing-image fact mentioned only in small buried note text.
+EXPECTED: A row typed IMAGE should visually flag when its image is absent, consistently with the existing no-body-no-image case which already shows an explicit placeholder (— no asset generated yet —). At minimum, this should be as visually prominent, not a note fragment appended after unrelated flags.
+ROOT CAUSE: src/review/rows.ts ~line 209-216 (assetUrl only set if existsSync(...) true) and src/review/page.ts ~line 334-341 (image tag only rendered when assetUrl is set; the no-asset placeholder branch only fires when body is ALSO empty, so a body-with-no-image row falls through to plain text rendering with no placeholder).
+- SHIP: merged (PR #212) — added explicit "image not rendered yet" placeholder to page.ts's rowEl() preview logic for IMAGE-kind rows with no assetUrl, plus imageMissingHtml() DOM-free mirror + tests (page.test.ts), mirroring the replyContextHtml precedent. No rows.ts change needed — its assetUrl-unset behavior was already correct.
+- STATUS: Done
+- GROOMED: mirror existing no-asset placeholder branch for IMAGE rows; rows.ts/page.ts surface pinned + 2026-07-11
+<!-- card-id: 4c3dd6fc-43e5-41a5-b5bd-387139b6296f -->
+
+**Review GUI: in-progress action state (storyboard/duplicate/ask-Claude) reverts to idle before the real job finishes**
+- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab actions)
+BUG: A row's transient in-progress UI state (Generate storyboard's storyboardQueued flag, Duplicate-to-platform's and Ask Claude's "thinking..." indicator) gets silently wiped and the row reverts to its idle/clickable appearance seconds after the click, well before the real backend operation (a claude -p spawn, 10s-2min+) actually finishes.
+UI LOCATION: Review tab, any row with Generate storyboard / Duplicate to platform / Ask Claude buttons.
+REPRO:
+1. Click "Generate storyboard" on a blocked video-script row (e.g. content/2026-06-16-building-an-innovation-nation, row video-script). Flash shows "Queued - generating storyboard", and GET /api/jobs confirms a real job (kind:video, status:queued/running) exists for this folder.
+2. Within ~2-5s, the row re-renders back to showing the plain "Generate storyboard" button (not the expected "generating storyboard..." hint span) - even though the job is still queued/running.
+3. Clicking "Generate storyboard" AGAIN at this point re-fires POST /api/video/generate; the backend's addVideoJob() happens to dedupe by matching arg+status so no second job is actually created here - but the UI gave no indication the first click was still in effect.
+4. Same underlying issue on "Duplicate to platform": clicked Duplicate (x-2 -> linkedin) on content/2026-07-10-human-inference-defining-a-brand-in-an-ai-drench. The dupbox's "Claude is drafting the linkedin version... (~10-60s)" message vanished and the row looked fully idle within a couple seconds, while the real claude -p spawn kept running in the background for well over a minute (confirmed via ps and via the new linkedin-2 row eventually landing in review-queue.md long after the UI had already gone quiet). Unlike Generate storyboard, duplicateToPlatform has no dedupe guard against a second click firing a second real Claude spawn for the same source+target while one is still in flight.
+OBSERVED: The button/indicator reverts to idle almost immediately, well before the real async operation completes, with no visible "still working" state in between.
+EXPECTED: The in-progress indicator (storyboardQueued hint, thinking spinner) should persist until the specific operation actually resolves, regardless of unrelated queue/job activity elsewhere on the page.
+ROOT CAUSE: src/review/page.ts client script - the periodic background poll (setInterval(loadJobs, 3000), gated on any job being queued/running) calls loadJobs(), whose own "a job moved -> refresh review rows" logic (if(before !== JSON.stringify(...)) load();) unconditionally replaces the entire client-side DATA object with a fresh /api/queue response and calls render(), rebuilding every row's DOM from scratch. This clobbers (a) the client-only row.storyboardQueued flag (set by the gen-storyboard handler, never persisted server-side) and (b) any row whose action box was manually set to a "thinking..." innerHTML (ai-send, dup-send handlers in the same file), since render() replaces that DOM node outright. This fires any time ANY job anywhere in the system changes status - not just the job the user just started - so it reproduces easily whenever other queue activity is happening concurrently with a long-running row-level action.
+- SHIP: merged (PR #213) — moved in-flight state into module-level registries (aiPending, dupPending, storyboardSlugs) keyed by stable row.id/piece.slug instead of row/DOM-attached state, so load()'s wholesale DATA replacement can no longer wipe it. Added the missing double-click dedupe guard on Duplicate. New storyboardJobDone() predicate clears the storyboard hint on the job's real terminal status. Verified with a Chrome-MCP white-box smoke test (simulated in-flight state, called load() directly, confirmed indicators survived) plus 8 new unit tests.
+- STATUS: Done
+- GROOMED: persist in-progress indicator outcome clear; poll-render clobber root cause pinned + 2026-07-11
+<!-- card-id: fbfea28b-e730-4234-afaf-9ef25d43b7d9 -->
+
+**Review GUI: Approve is not gated for quote-card rows whose image was never rendered (unlike video/storyboard)**
+- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab actions)
+BUG: approveBlockReason() (src/review/rows.ts ~line 96-110) only checks row.format === "storyboard" and row.format === "video"/"short", blocking Approve with a clear message ("storyboard not rendered yet", "video not rendered yet") when the asset file is missing. There is no equivalent check for row.format === "image" (quote-card rows) - a quote-card row whose PNG was never rendered (images/ dir doesn't exist for the content folder at all) still reports approveBlocked: null, so the Approve button stays fully clickable with no warning.
+UI LOCATION: Review tab, any QUOTE-CARD:* row whose image file does not exist on disk.
+REPRO:
+1. Confirmed via /api/queue: row quote-card-1-linkedin in content/2026-07-10-human-inference-defining-a-brand-in-an-ai-drench has assetUrl undefined and approveBlocked: null, even though images/quote-card-1.png does not exist in that content folder (confirmed on disk, and this is true in the main checkout too, not just the isolated worktree - the image was genuinely never rendered).
+2. Clicked Approve on this row in the GUI - it went through with no warning (approve status set), same UX as approving a fully-rendered card.
+3. In this fixture there are no real Typefully credentials, so scheduleApproved() fails early on the credentials check before ever reaching the missing-image read - the backend's own missing-file check in publishCards() (src/publish/cards.ts ~line 213-216: "missing <path> - render the card first: npm run render -- --still <folder>") never got exercised end-to-end here, though reading that code confirms it IS a clean, per-row-caught error, not a crash.
+OBSERVED: Approve button offers no warning and is fully clickable for a quote-card row with no rendered image; video/storyboard rows get a proactive block, image rows do not.
+EXPECTED: approveBlockReason() should also check row.format === "image" (or equivalently kind === "image") and block Approve with a message like "image not rendered yet - run npm run render -- --still <folder>" when the asset file is missing, mirroring the existing video/storyboard treatment.
+ROOT CAUSE: src/review/rows.ts approveBlockReason() (~line 96-110) has no branch for the image/quote-card format, unlike its storyboard and video/short branches.
+- SHIP: merged (PR #214) — added the missing image/quote-card branch to approveBlockReason() (rows.ts), mirroring the video/short branch exactly (asset-cell normalization, on-disk exists() check). One function feeds both the client disabled-button/note and the server-side /api/status reject, so this covers both surfaces. Updated the stale test that asserted the old buggy behavior + added 3 new image-gate tests.
+- STATUS: Done
+- GROOMED: add image branch to approveBlockReason() (rows.ts ~96-110), fully specified, mirrors video/storyboard + 2026-07-11
+<!-- card-id: a8cb13a4-4bf5-4e29-aaa7-04acc39abd99 -->
+
+**Follow-ups: Draft follow-up failure is invisible to the user**
+- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Follow-ups tab)
+BUG: Draft follow-up (Follow-ups tab, per-lead action) can silently fail with zero durable feedback, and nothing stops duplicate submissions while one is in flight.
+UI LOCATION: Follow-ups tab, Client bucket, PostHog row, Draft follow-up button.
+REPRO:
+1. Open Follow-ups tab, click "Draft follow-up" on a lead (e.g. PostHog).
+2. A toast reads "Drafting follow-up... (your subscription, ~30-60s)" but fades after 1.4s (flash() in src/review/page.ts:295 hardcodes a 1400ms display).
+3. Under real system load the underlying `claude -p` subprocess (src/outreach/draft.ts) can exceed its own 120s timeout (DRAFT_TIMEOUT_MS, src/outreach/draft.ts:32) -- well past the toast's own "~30-60s" estimate.
+4. When it times out, the server returns HTTP 200 with {ok:false, error:"claude -p timed out after 120s during draft"} (src/review/serve.ts:786-791). The client shows this in another 1.4s toast (followupDraft(), src/review/page.ts:763-768) and nothing else.
+5. Verified directly: ran runDraft("outreach/leads/client-posthog") standalone via tsx and reproduced "ERROR: claude -p timed out after 120s during draft". Checked ~/.content-agents/logs/gui-jobs/*.log afterward -- no log file exists for this job at all.
+OBSERVED: If the user is not staring at the screen during the ~1.4s window the toast is visible, they have no way to tell whether the draft is still running, succeeded, or failed -- no entry in the Jobs pill (Add/Queue tab), no persisted log, nothing in the Follow-ups list itself. The "Draft follow-up" button also has no disabled/in-flight state, so a user unsure whether their click registered can click again, queuing a second real `claude -p` subprocess call (confirmed via network tab: two concurrent POST /api/followups/draft-follow-up fired from two clicks) that burns another up-to-120s of subscription usage for the same lead.
+EXPECTED: Draft follow-up should behave like every other Claude-spawning action in this app (atomize, revise, insights): show up in the Jobs pill with live status and a real log link, per the code's own stated intent. The comment at src/review/jobs.ts:651-656 explicitly claims this "reuses the same job queue" and "shows up in the jobs pill with a real log + heartbeat" -- but enqueueFollowUpDraft (src/review/jobs.ts:657-659) calls outreach/draft.ts's runDraft(), which spawns its subprocess via execFile directly (src/outreach/draft.ts:93, imported at line 3) rather than through runClaudeSpawn() (src/review/jobs.ts:241), so it never gets a log file or heartbeat. At minimum the button should disable while its own request is in flight, and the failure/success toast should persist long enough (or land somewhere durable) for the user to actually see it.
+ROOT CAUSE: src/outreach/draft.ts's runDraft() bypasses the shared runClaudeSpawn() logging/heartbeat path (src/review/jobs.ts:241-256) that every other Claude-spawning GUI action uses, contradicting the intent stated in the comment at src/review/jobs.ts:651-656. Separately, src/review/page.ts:763-768 followupDraft() has no in-flight guard (no button disable, no queued-toast persistence) and src/review/page.ts:295 flash() is hardcoded to 1400ms regardless of message importance.
+- SHIP: merged (PR #215) — client (page.ts): followupDraft() now mirrors the dup-send pattern (fbfea28b) with an fuPending in-flight registry (disables button, durable "drafting..." hint, dedupes a second click to zero fetches) and an fuError durable inline error (survives past 1.4s, points at Add/Queue tab) covering both a server error response and the awaited fetch itself rejecting. Server (jobs.ts/draft.ts): enqueueFollowUpDraft now routes the claude -p subprocess through the shared runClaudeSpawn/decodeSpawnFailure path instead of execFile, so the job gets a real persisted log + heartbeat like every other Claude-spawning GUI action; runDraft() gained an optional callClaude injection seam (default execFile path unchanged for CLI/tests), runClaudeSpawn gained optional model/tools opts + suppressible --permission-mode (purely additive, its 6 existing callers unaffected). Same model/--tools ""/prompt/timeout either way -- not a content-generation logic change, self-vet-merged per rule 7. Verified with a Chrome-MCP white-box smoke test (fixture row injected, since no real outreach lead data exists in this environment) confirming disable/dedupe/durable-error/stale-error-clear/success-clear, plus 725/725 unit tests.
+- STATUS: Done
+- GROOMED: route runDraft() through shared runClaudeSpawn() + button in-flight guard; intent clear, minimum floor stated + 2026-07-11
+<!-- card-id: d39258ab-37ff-4b4c-b317-a3eb744059c2 -->
+
 **Resume: code-enforce research.ts per-signal search budget (restart -- ceiling-killed session, no commits made)**
 - ORIGIN: follow-up filed by cold-start after the conductor hit the hard context/turn ceiling mid-card on 3c6550a6-a388-44cf-a56e-e9d35423b3f1 ("Code-enforce research.ts per-signal search budget") -- turns=206 tokens=194517.
 - The parked card 3c6550a6-a388-44cf-a56e-e9d35423b3f1 never made any commits (worktree at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-3c6550a6-research-budget-3c6550a6, branch wt/3c6550a6-research-budget-3c6550a6, 0 commits ahead of main, clean status) -- so there is nothing to salvage, this is a clean restart of the same scope, not a resume of partial work.
 - Scope (from the parked card): code-enforce research.ts per-signal search budget (config/outreach.yaml search_budget_per_signal, currently prompt-text-only) with a code-level call-interception backstop, not just prompt-text hinting.
 - The stranded worktree above is left in place for inspection but should be discarded (no commits) once this follow-up is picked up.
 - Once this ships, also mark original card 3c6550a6-a388-44cf-a56e-e9d35423b3f1 STATUS: Done with a Superseded note (same pattern already used for 8e8b616e -> fb4d6b28) so it doesn't stay stuck showing STATUS: In Progress forever.
-- STATUS: Done
 - SHIP: fixed + merged as PR #216 -- added src/outreach/search-budget-hook.ts, a PreToolUse hook wired in via `claude -p --settings <json>`; denies further WebSearch/WebFetch calls once a run's total call count (computeSearchBudgetTotal: search_budget_per_signal x signal-category count, 3 client / 5 platform) is exhausted, a real external process enforcing the cap rather than the model's own restraint. Denies the tool call rather than killing the subprocess so the PROFILE/EVIDENCE/CLASSIFICATION markers still parse. 732/732 tests green (7 new), typecheck clean, manual stdin/stdout smoke test confirmed allow/allow/deny/allow behavior. Original card 3c6550a6 marked Done too (Superseded note added).
+- STATUS: Done
 - GROOMED: readiness pass: scope fully carried forward from parked 3c6550a6, no blocking unknown, no approval-worthy judgment (backend enforcement tightening, not content-generation logic) + 2026-07-15
 <!-- card-id: 43fa1e02-e454-4f02-9a5e-8c8984be16a3 -->
 
@@ -768,8 +778,8 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
 - Once this ships, also mark original card cccfc43a-6547-4f08-aeb4-3e76e7e27c49 STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28 and 3c6550a6 -> 43fa1e02) so it doesn't stay stuck showing STATUS: In Progress forever.
 - CHAIN: 1
-- STATUS: Done
 - SHIP: fixed + merged as PR #217 -- verified the salvaged worktree diff was already content-complete against the GOAL_CONDITION (all 3 parts) and against the actual code (draft.ts/lock.ts exist, status.ts's --targets flag exists, tag-source.ts reads outreach_message) before committing as-is, no further changes needed. Writes under .claude/skills/ in a fresh worktree (a different filesystem path from the main repo's own .claude/) were grantable in this session, resolving the constraint the original card and cccfc43a both flagged. npm test 732/732 green (docs-only change). Original card cccfc43a marked Done too (Superseded note added).
+- STATUS: Done
 - GROOMED: clear GOAL_CONDITION + explicit resume plan, no blocking unknown + 2026-07-15
 <!-- card-id: 4e5b33d0-7e6d-42ea-924f-f58641199e02 -->
 
@@ -802,16 +812,6 @@ SHIP: merged as PR #219 (2026-07-15T17:16:48Z) -- Muxin reviewed and merged. Ori
 - DECISION: approved -- carried over from parent c02ff4aa (Muxin: tie source topic to a TACTICAL / immediately-usable CTA; natural, never cringy; orient to attracting paying clients; NOT subsumed by PR #185). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
 - GROOMED: readiness pass: full scope carried forward from parked c02ff4aa (approved to build), worktree = zero commits (safe fresh build), no blocking dependency (propose_dependencies empty); content-gen LOGIC -> ships as HELD draft PR per rule 7 + 2026-07-15
 <!-- card-id: d2746598-f27a-403e-ba8c-2d3584fea53e -->
-
-**Rename propose-cards → follow-up-cards; retarget scope to post-card discovery, not cold epic-decomposition**
-- ORIGIN: correction to a misunderstanding surfaced 2026-07-15. Muxin's actual intent for this Pre-flight stage was "when the conductor finishes a card, let it propose follow-up cards for anything it discovered mid-work that aligns with the card's epic/goal" — NOT what `propose-cards` (skills/propose-cards/SKILL.md, repo heymoosh/claude-config) actually does today: a cold, Stage-0, pre-batch pass that reads existing epic/goal-flavored cards and decomposes their stated-but-unfiled children from prose, with zero visibility into what any specific card's execution actually produced.
-- WANTED BEHAVIOR: after a card completes (Step 6 / Done), generate up to N follow-up candidates seeded from what THAT card's own work surfaced (new issues found, incomplete edges, related work uncovered) — not from re-reading epic prose cold. Should still respect the epic/goal the completed card traces to, and reuse the current skill's existing safety mechanics (Backlog-only deposit, dedup pass, ORIGIN marker, cap per run, never-auto-promote) — just change the trigger point and the generation input.
-- DECISION (Muxin, 2026-07-15): this REPLACES the existing cold epic-decomposition mode entirely — not a second mode running alongside it.
-- DECISION (Muxin, 2026-07-15): generation runs as a delegated subprocess (same pattern the current skill already uses for its `claude -p` generator), not inline in the conductor's own context — "subprocess may be fine if it works." Still open: exactly what feeds that subprocess (the card's PR diff? its final worker transcript? its Review-stage self-vet notes? some combination) — needs a decision before this builds, don't guess.
-- RENAME: `propose-cards` -> `follow-up-cards` throughout (skill dir, SKILL.md, all cross-references in orchestrate-pipeline SKILL.md / references/preflight.md / references/cold-start.md, any conductor step that invokes it).
-- STATUS: Backlog
-- LANE: claude-config (~/.claude) — this is a conductor-mechanism/global-skill change, not a content-agents content change. Build there per the repo's own conductor carve-out (worktree off ~/.claude, base branch master, no backlog_path).
-<!-- card-id: c8fc8ac3-ac1a-4471-9f22-916752143960 -->
 
 **GUI job logs mix content from unrelated old runs due to append-mode, non-truncated, ID-reused log files**
 - ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Add/Queue tab)
