@@ -143,7 +143,12 @@ export function reconcileRow(row: QueueRow, publishLog: PublishLogRead, live: Li
   // now retired), which this module has no live check for — report "unavailable" for that case
   // instead of a false "mismatch" drift alarm.
   if (logged?.provider === "upload-post") {
-    return { provider: "upload-post", state: "unavailable", reason: "scheduled via the upload-post failover — live reconciliation isn't implemented for that provider yet" };
+    return {
+      provider: "upload-post",
+      state: "unavailable",
+      reason:
+        "scheduled via the retired upload-post failover (no live adapter since PR #130) — check/cancel by hand at upload-post.com",
+    };
   }
   if (live.postpeerPosts === null) {
     return { provider: "postpeer", state: "unavailable", reason: live.postpeerError ?? "could not reach PostPeer" };

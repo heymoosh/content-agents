@@ -1,6 +1,6 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { fetchScheduledPosts } from "./postpeer-status.js";
+import { fetchScheduledPosts, cancelPost } from "./postpeer-status.js";
 
 // fetchScheduledPosts is a thin, read-only GET /v1/posts client (PostPeer publishes no dedicated
 // "list scheduled" endpoint — src/publish/queue-view.ts already hits this same endpoint with the
@@ -71,4 +71,46 @@ test("fetchScheduledPosts survives a transient 503 via fetchWithRetry (real call
   const posts = await fetchScheduledPosts({ sleep: async () => {} });
   assert.equal(calls, 2, "should have retried once after the transient 503");
   assert.deepEqual(posts, [{ id: "999", scheduledFor: undefined, status: undefined, content: undefined }]);
+});
+
+// cancelPost: the review GUI's "Cancel" action (card e4eca4a1) — DELETEs a scheduled PostPeer post
+// by id. Endpoint shape is INFERRED from the same GET /v1/posts convention (no official PostPeer
+// docs cover delete) — these tests only prove this module's own request/response handling, not that
+// the real PostPeer API matches.
+test("cancelPost sends a DELETE to /posts/{id} with the x-access-key header", async () => {
+  process.env.POSTPEER_API_KEY = "test-key";
+  let seenUrl = "";
+  let seenInit: RequestInit | undefined;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    seenUrl = String(input);
+    seenInit = init;
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+  await cancelPost("post-123");
+  assert.equal(seenUrl, "https://api.postpeer.dev/v1/posts/post-123");
+  assert.equal(seenInit?.method, "DELETE");
+  assert.equal((seenInit?.headers as Record<string, string>)["x-access-key"], "test-key");
+});
+
+test("cancelPost treats a 404 (already gone) as success, not an error", async () => {
+  process.env.POSTPEER_API_KEY = "test-key";
+  stubFetch(404, "not found");
+  await cancelPost("post-already-gone"); // must not throw
+});
+
+test("cancelPost throws with the status + body on a real failure", async () => {
+  process.env.POSTPEER_API_KEY = "test-key";
+  stubFetch(500, "server exploded");
+  await assert.rejects(() => cancelPost("post-123"), /500/);
+});
+
+test("cancelPost throws when POSTPEER_API_KEY is missing (never calls fetch)", async () => {
+  delete process.env.POSTPEER_API_KEY;
+  let called = false;
+  globalThis.fetch = (async () => {
+    called = true;
+    throw new Error("should not be called");
+  }) as typeof fetch;
+  await assert.rejects(() => cancelPost("post-123"), /POSTPEER_API_KEY missing/);
+  assert.equal(called, false);
 });

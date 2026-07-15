@@ -45,6 +45,7 @@ import {
   IMAGE_EXT,
   VIDEO_EXT,
   getLiveStateAsOf,
+  cancelScheduled,
 } from "./rows.js";
 import {
   classifySource,
@@ -541,6 +542,42 @@ const server = createServer(async (req, res) => {
         }
       }
       json(res, 200, { ok: true, scheduled, scheduleError });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/cancel") {
+      // Cancel an already-scheduled row's live Typefully/PostPeer draft/post (card e4eca4a1) —
+      // the "Cancel" button next to a row reconcile.ts confirms is actually live. Reuses the SAME
+      // in-flight guard/key as /api/status's schedule call: a cancel racing a schedule for the
+      // same row (double-click, retry) is exactly the kind of duplicate concurrent provider call
+      // that guard exists to prevent, so it isn't worth a second Set.
+      const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const id = String(b.id ?? "");
+      let folder: string;
+      try {
+        folder = safeFolder(slug);
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      const row = readQueue(folder).rows.find((r) => r.id === id);
+      if (!row) {
+        json(res, 404, { ok: false, error: "no such row" });
+        return;
+      }
+      const inFlightKey = `${slug}/${id}`;
+      if (schedulingInFlight.has(inFlightKey)) {
+        json(res, 200, { ok: false, error: "already scheduling/canceling this row — try again in a moment" });
+        return;
+      }
+      schedulingInFlight.add(inFlightKey);
+      let result: { ok: boolean; error?: string };
+      try {
+        result = await cancelScheduled(folder, row);
+      } finally {
+        schedulingInFlight.delete(inFlightKey);
+      }
+      json(res, 200, result);
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/derivative") {

@@ -5,14 +5,15 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { readQueue, writeCell, type QueueRow } from "../publish/queue.js";
+import { readQueue, writeCell, appendPublishLog, type QueueRow } from "../publish/queue.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { fetchScheduledDrafts } from "../publish/typefully.js";
-import { fetchScheduledPosts } from "../publish/postpeer-status.js";
+import { fetchScheduledDrafts, cancelDraft } from "../publish/typefully.js";
+import { fetchScheduledPosts, cancelPost } from "../publish/postpeer-status.js";
 import { classifyThread } from "../atomize/thread-check.js";
 import {
   reconcileRow,
   needsReconciliation,
+  findLoggedRef,
   type LiveProviderState,
   type ReconciledStatus,
   type PublishLogRead,
@@ -345,4 +346,56 @@ export function saveDerivative(slug: string, id: string, body: string): void {
   if (!existsSync(p)) throw new Error("no such derivative");
   const { header } = splitFrontmatter(readFileSync(p, "utf8"));
   writeFileSync(p, header + body.trim() + "\n");
+}
+
+// Live provider cancel calls injected (mirrors serve.ts's SchedulerDeps for scheduleApproved) so
+// cancelScheduled is unit-testable without a real Typefully/PostPeer network call.
+export interface CancelDeps {
+  cancelTypefullyDraft: (draftId: string) => Promise<void>;
+  cancelPostPeerPost: (postId: string) => Promise<void>;
+}
+const DEFAULT_CANCEL_DEPS: CancelDeps = { cancelTypefullyDraft: cancelDraft, cancelPostPeerPost: cancelPost };
+
+// Cancel ONE already-scheduled row's live Typefully/PostPeer draft/post — the review GUI's "Cancel"
+// action (card e4eca4a1: two stale Upload-Post jobs kept firing after the 2026-07-08 rewire because
+// nothing in the pipeline could cancel a scheduled post, so Muxin had to do it by hand on
+// upload-post.com). Keyed off the SAME provider-ref parsing reconcile.ts's live reconciliation
+// already does (findLoggedRef against publish-log.md) rather than re-deriving it a second way.
+//
+// A row logged via the retired Upload-Post provider (PR #130 deleted its adapter wholesale) can't
+// be live-canceled here — this returns an error pointing at the upload-post.com dashboard instead,
+// the same "degrade gracefully, don't pretend to handle it" posture reconcileRow already takes for
+// that provider's "unavailable" state (see reconcile.ts).
+//
+// On success the row flips straight to "discard", never back to "pending" — CLAUDE.md rule 2
+// (nothing publishes without a real review decision) means a canceled row must never later
+// masquerade as still-approved and get picked up by a future schedule pass — and the cancellation
+// is logged to publish-log.md, the same append-only audit trail every schedule call already writes
+// (no cost-log.csv entry: a cancel isn't a billed provider call, unlike the paid generation steps
+// that log there).
+export async function cancelScheduled(
+  folder: string,
+  row: QueueRow,
+  deps: CancelDeps = DEFAULT_CANCEL_DEPS
+): Promise<{ ok: boolean; error?: string }> {
+  if (!needsReconciliation(row)) return { ok: false, error: "this row isn't a scheduled post" };
+  const publishLog = readPublishLogSafe(folder);
+  if (publishLog.error) return { ok: false, error: publishLog.error };
+  const logged = findLoggedRef(publishLog.text, row.id);
+  if (!logged) return { ok: false, error: "no logged provider draft/post id found for this row" };
+  if (logged.provider === "upload-post") {
+    return {
+      ok: false,
+      error: "scheduled via the retired Upload-Post provider (no live adapter since PR #130) — cancel it by hand at upload-post.com",
+    };
+  }
+  try {
+    if (logged.provider === "typefully") await deps.cancelTypefullyDraft(logged.refId);
+    else await deps.cancelPostPeerPost(logged.refId);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  writeCell(folder, row.id, { status: "discard" });
+  appendPublishLog(folder, `${row.id} → canceled (${logged.provider} ref ${logged.refId} removed via review GUI)`);
+  return { ok: true };
 }

@@ -12,7 +12,7 @@
 
 import { test, describe, after } from "node:test";
 import assert from "node:assert/strict";
-import { buildDraftPayload, buildPosts, fetchScheduledDrafts } from "./typefully.js";
+import { buildDraftPayload, buildPosts, fetchScheduledDrafts, cancelDraft } from "./typefully.js";
 
 const POSTS = [{ text: "Verbatim note text spread to a text channel." }];
 
@@ -279,5 +279,65 @@ describe("typefully fetchScheduledDrafts: pagination", () => {
 
     assert.equal(scheduled.length, 80, "every draft must be returned, including those after a short non-final page");
     assert.ok(scheduled.some((d) => d.id === "31"), "item 31 (right after the short page) must not be skipped");
+  });
+});
+
+// cancelDraft: the review GUI's "Cancel" action (card e4eca4a1) — DELETEs a scheduled Typefully
+// draft by id. Endpoint shape is INFERRED from the same /social-sets/{setId}/drafts REST convention
+// every other call in this file uses (no official Typefully docs cover delete) — these tests only
+// prove this module's own request/response handling, not that the real Typefully API matches.
+describe("cancelDraft", () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.TYPEFULLY_API_KEY;
+  const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
+
+  after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TYPEFULLY_API_KEY;
+    else process.env.TYPEFULLY_API_KEY = originalKey;
+    if (originalSetId === undefined) delete process.env.TYPEFULLY_SOCIAL_SET_ID;
+    else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
+  });
+
+  test("sends a DELETE to /social-sets/{setId}/drafts/{draftId} with bearer auth", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    let seenUrl = "";
+    let seenInit: RequestInit | undefined;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      seenUrl = String(input);
+      seenInit = init;
+      return new Response(null, { status: 204 });
+    }) as typeof fetch;
+    await cancelDraft("draft-123");
+    assert.equal(seenUrl, "https://api.typefully.com/v2/social-sets/test-set/drafts/draft-123");
+    assert.equal(seenInit?.method, "DELETE");
+    assert.equal((seenInit?.headers as Record<string, string>).authorization, "Bearer test-key");
+  });
+
+  test("treats a 404 (already gone) as success, not an error", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    globalThis.fetch = (async () => new Response("not found", { status: 404 })) as typeof fetch;
+    await cancelDraft("draft-already-gone"); // must not throw
+  });
+
+  test("throws with the status + body on a real failure", async () => {
+    process.env.TYPEFULLY_API_KEY = "test-key";
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    globalThis.fetch = (async () => new Response("server exploded", { status: 500 })) as typeof fetch;
+    await assert.rejects(() => cancelDraft("draft-123"), /500/);
+  });
+
+  test("throws when TYPEFULLY_API_KEY is missing (never calls fetch)", async () => {
+    delete process.env.TYPEFULLY_API_KEY;
+    process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
+    let called = false;
+    globalThis.fetch = (async () => {
+      called = true;
+      throw new Error("should not be called");
+    }) as typeof fetch;
+    await assert.rejects(() => cancelDraft("draft-123"), /TYPEFULLY_API_KEY missing/);
+    assert.equal(called, false);
   });
 });
