@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
 import { runDriftCheck } from "./routing-drift.js";
-import { readSourceClass, triageEffects } from "../atomize/source-triage.js";
+import { readSourceClass, readSourceKind, triageEffects } from "../atomize/source-triage.js";
 
 // Intelligent content router: decide which platforms a piece should be posted to,
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
@@ -28,8 +28,12 @@ import { readSourceClass, triageEffects } from "../atomize/source-triage.js";
 //          defaults, over two independent windows) — computed/printed only, never written back.
 
 export const PILLARS = ["human-ai", "claude-code", "civic-tech", "career-work", "builder", "other"];
-// Derivative target platforms routing chooses among. Substack is the source channel,
-// not a target. Community targets come from config (defaults / rules), not the DB.
+// Derivative target platforms routing chooses among. Substack is the source channel for ordinary
+// (essay) content, never a target for it — CORE_TEXT deliberately excludes it. The ONE exception is
+// a Substack Note being reposted back to Substack (source_kind: substack-note); that's handled
+// separately below by applySubstackRepost, conditioned on the source, not added here unconditionally
+// (see config/routing.yaml's header comment for the editorial framing). Community targets come from
+// config (defaults / rules), not the DB.
 export const CORE_TEXT = ["x", "linkedin", "bluesky"];
 // posts.source value for a deliberate --no-spin control run (card f444f440, src/strategy/spin-
 // control.ts): a periodic verbatim derivative drafted for an ALREADY-ASSIGNED pillar/platform
@@ -390,6 +394,31 @@ export function applySourceTriage(merged: MergedDecision[], excludePlatforms: st
   });
 }
 
+// The Substack-Notes repost hook (card df11d0db, Muxin-approved 2026-07-10): a Note-derived piece
+// (source_kind: substack-note, source-triage.ts's readSourceKind — set by new-notes.ts when it
+// scaffolds a picked Note) is allowed to route BACK to Substack as a repost, once
+// src/publish/substack.ts is wired to publish it. This is the ONLY path that can add `substack` to
+// a piece's decisions — CORE_TEXT deliberately excludes it, so ordinary (non-Note) content never
+// gets it, no matter what config/routing.yaml's defaults say. Additive rather than a flip (unlike
+// applySourceTriage, which only ever demotes an existing candidate): `substack` was never a
+// candidate for decideForPillar/mergeDecisions in the first place, so this appends a new decision
+// instead of hunting for one to override. A no-op if `substack` is somehow already present.
+export function applySubstackRepost(merged: MergedDecision[], pillars: string[], sourceKind: string): MergedDecision[] {
+  if (sourceKind !== "substack-note") return merged;
+  if (merged.some((d) => d.platform === "substack")) return merged;
+  return [
+    ...merged,
+    {
+      platform: "substack",
+      decision: "include",
+      score: null,
+      confidence: "rule",
+      rationale: "source_kind: substack-note — reposting the Note back to Substack (src/publish/substack.ts)",
+      pillars: [...pillars],
+    },
+  ];
+}
+
 function routingMd(pillars: string[], merged: MergedDecision[]): string {
   const fit = (d: MergedDecision) => (d.score == null ? "—" : d.score.toFixed(2));
   const rows = merged
@@ -470,6 +499,7 @@ function main() {
     if (sourceClass) {
       merged = applySourceTriage(merged, triageEffects(sourceClass).excludePlatforms);
     }
+    merged = applySubstackRepost(merged, pillars, readSourceKind(abs));
   }
 
   const exploreIdx = args.indexOf("--explore");

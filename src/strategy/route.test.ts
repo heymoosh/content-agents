@@ -6,7 +6,9 @@ import Database from "better-sqlite3";
 import { repoRoot } from "../db/db.js";
 import {
   applyExplorationOverride,
+  applySubstackRepost,
   CONTROL_RUN_SOURCE,
+  CORE_TEXT,
   decideForPillar,
   loadData,
   mergeDecisions,
@@ -213,5 +215,53 @@ describe("applyExplorationOverride: the exploration-budget's routing hook (card 
     const merged = [md({ platform: "linkedin", decision: "skip", confidence: "rule", rationale: "editorial rule: never route here" })];
     const out = applyExplorationOverride(merged, "civic-tech", "linkedin");
     assert.deepEqual(out, merged, "a hard veto must not be relabeled 'exploration'");
+  });
+});
+
+describe("CORE_TEXT: substack is never an unconditional routing target", () => {
+  test("substack is absent from CORE_TEXT", () => {
+    assert.ok(!CORE_TEXT.includes("substack"), "substack must only ever be added conditionally, via applySubstackRepost");
+  });
+});
+
+describe("applySubstackRepost: the Substack-Notes repost hook (card df11d0db)", () => {
+  function md(overrides: Partial<MergedDecision>): MergedDecision {
+    return { platform: "x", decision: "include", score: null, confidence: "cold-start", rationale: "", pillars: ["human-ai"], ...overrides };
+  }
+
+  test("a Note-sourced piece (source_kind: substack-note) gets `substack` added as `include`", () => {
+    const merged = [md({ platform: "x" })];
+    const out = applySubstackRepost(merged, ["human-ai"], "substack-note");
+    const sub = out.find((m) => m.platform === "substack");
+    assert.ok(sub, "substack decision must be present");
+    assert.equal(sub!.decision, "include");
+    assert.equal(sub!.confidence, "rule");
+    assert.match(sub!.rationale, /substack-note/);
+    assert.deepEqual(sub!.pillars, ["human-ai"]);
+  });
+
+  test("an ordinary (non-Note) piece — empty source_kind — never gets `substack` added", () => {
+    const merged = [md({ platform: "x" }), md({ platform: "linkedin" })];
+    const out = applySubstackRepost(merged, ["human-ai"], "");
+    assert.equal(out.find((m) => m.platform === "substack"), undefined);
+    assert.deepEqual(out, merged, "non-note content's decisions are completely untouched");
+  });
+
+  test("a piece with a different source_kind (e.g. outreach-message) never gets `substack` added", () => {
+    const merged = [md({ platform: "x" })];
+    const out = applySubstackRepost(merged, ["human-ai"], "outreach-message");
+    assert.equal(out.find((m) => m.platform === "substack"), undefined);
+  });
+
+  test("a no-op when `substack` is already present (never duplicates the entry)", () => {
+    const existing = md({ platform: "substack", decision: "skip", confidence: "cold-start" });
+    const merged = [existing];
+    const out = applySubstackRepost(merged, ["human-ai"], "substack-note");
+    assert.deepEqual(out, merged, "an already-present substack decision is left untouched, not duplicated");
+  });
+
+  test("carries every pillar passed in, for a multi-pillar Note", () => {
+    const out = applySubstackRepost([], ["human-ai", "builder"], "substack-note");
+    assert.deepEqual(out.find((m) => m.platform === "substack")!.pillars, ["human-ai", "builder"]);
   });
 });

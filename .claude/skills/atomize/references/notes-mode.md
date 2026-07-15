@@ -15,9 +15,12 @@ directly and spreads the ones worth spreading.
    brief, tag the pillar, `npm run route`, generate derivatives, validate, queue. A note is short
    and already platform-ready, so the **whole note is the extract** — derivatives are near-verbatim
    cross-posts trimmed to each platform's limit (extraction-first still holds; if a note is too thin
-   for a platform like LinkedIn, the "don't pad, stop" rule applies). Substack is already excluded
-   as a routing target, so a note is never reposted back to where it came from. Muxin still approves
-   every draft in `review-queue.md` before `/publish`.
+   for a platform like LinkedIn, the "don't pad, stop" rule applies). `npm run route` conditionally
+   adds `substack` as a routing target here (route.ts's `applySubstackRepost` hook), because
+   `source_kind: substack-note` is set on this folder's `source.md` — the note IS reposted back to
+   Substack, via `src/publish/substack.ts`. Ordinary (non-Note) essays never get `substack` routed;
+   this only fires for Note-derived content. Muxin still approves every draft in `review-queue.md`
+   before `/publish`.
 
    **Quote card for a note.** The note body IS the quotable unit, so the quote card uses the whole
    note, not a sub-sentence. Put the entire note body in `quote-card-1.md` with `source_lines`
