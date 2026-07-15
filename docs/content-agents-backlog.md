@@ -705,6 +705,7 @@ CARD TYPE: EPIC
 - Do NOT blind-discard the worktree. Before rebuilding from scratch: read the existing diff in that worktree, verify it actually matches the GOAL_CONDITION below, and if so just commit + ship it -- likely far less work than a full redo.
 - Likely root cause of the ceiling: same constraint noted on the original card and on ebe652a7/df11d0db -- writes under .claude/ (even project-local .claude/skills/) are not grantable to a headless worker; committing them needs an attended/interactive session willing to grant that write, not a plain execute pass. Confirm this session actually has that grant before starting, or the same stall will recur.
 - GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
+- Once this ships, also mark original card cccfc43a-6547-4f08-aeb4-3e76e7e27c49 STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28 and 3c6550a6 -> 43fa1e02) so it doesn't stay stuck showing STATUS: In Progress forever.
 - CHAIN: 1
 - STATUS: To Do
 <!-- card-id: 4e5b33d0-7e6d-42ea-924f-f58641199e02 -->
