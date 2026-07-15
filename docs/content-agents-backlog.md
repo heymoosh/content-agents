@@ -176,7 +176,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - LinkedIn has ZERO read access today: the existing browser agent (src/pull/platforms/linkedin.ts) only triggers LinkedIn's own Analytics "Export" button for an xlsx download. There is no code path that reads mentions, comments, or DMs. LinkedIn's official API for this is restricted/partner-gated in practice -- likely means new browser-agent scraping of the notifications/messaging surface, a separate undertaking from what exists today.
 - GOAL_CONDITION: LinkedIn inbound listening (mentions/comments, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for the access approach given LinkedIn's API restrictions.
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: In Progress
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer, same access-path tradeoff as X; LinkedIn scraping of notifications/DMs carries account-risk exposure not yet accepted.
 - GROOMED: readiness pass: clear GOAL_CONDITION, mirrors existing Bluesky v1 pattern (db22283f), points at src/pull/platforms/linkedin.ts + 2026-07-15
