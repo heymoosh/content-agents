@@ -112,6 +112,20 @@ describe("evaluateQualify: non-jsa lead, single-key path", () => {
     assert.equal(result.anchorEntry, undefined);
   });
 
+  test("a vault:-sourced worldview-match evidence item is valid and does not downgrade the classification", () => {
+    // Real repro case (outreach/leads/client-mem/lead.md, E5, source: ingested): a lead citing
+    // Muxin's own Obsidian vault research must not be silently downgraded to "unclear" just
+    // because the source isn't https://.
+    const vaultItem: EvidenceItem = {
+      ...WORLDVIEW_ITEM,
+      source: "vault:Research/Company Research/Mem/Kevin Moody - Deep Profile & Cultural Fit Analysis.md",
+    };
+    const result = evaluateQualify(baseInput({ source: "ingested" }), [vaultItem]);
+    assert.equal(result.finalValue, "turnaround");
+    assert.equal(result.downgraded, false);
+    assert.equal(result.status, "pursue");
+  });
+
   test("disqualified claim short-circuits straight to status passed, no evidence needed", () => {
     const result = evaluateQualify(baseInput({ classification: "disqualified" }), []);
     assert.equal(result.finalValue, "disqualified");
@@ -213,6 +227,25 @@ describe("parseEvidence", () => {
 describe("isValidSourceUrl", () => {
   test("accepts a well-formed http(s) URL with a real-looking hostname", () => {
     assert.equal(isValidSourceUrl("https://example.com/post/1"), true);
+  });
+
+  test("accepts a well-formed vault: path (Obsidian vault evidence source)", () => {
+    assert.equal(
+      isValidSourceUrl("vault:Research/Company Research/Mem/some file.md"),
+      true,
+    );
+  });
+
+  test("rejects a bare vault: with no path", () => {
+    assert.equal(isValidSourceUrl("vault:"), false);
+    assert.equal(isValidSourceUrl("vault:   "), false);
+  });
+
+  test("rejects a placeholder value typo'd behind the vault: prefix", () => {
+    assert.equal(isValidSourceUrl("vault:n/a"), false);
+    assert.equal(isValidSourceUrl("vault:tbd"), false);
+    assert.equal(isValidSourceUrl("vault:(none)"), false);
+    assert.equal(isValidSourceUrl("vault:unknown"), false);
   });
 
   for (const bad of ["", "(none)", "n/a", "TBD", "unknown", "not a url", "ftp://example.com", "https://localhost"]) {
