@@ -15,6 +15,7 @@
     "resonance": "tsx src/strategy/resonance.ts",
     "platform-fit": "tsx src/strategy/platform-fit.ts",
     "media-fit": "tsx src/strategy/media-fit.ts",
+    "cadence-fit": "tsx src/strategy/cadence-fit.ts",
     "audience": "tsx src/strategy/audience.ts",
     "origin-compare": "tsx src/strategy/origin-compare.ts",
     "grade-bets": "tsx src/strategy/grade-bets.ts",

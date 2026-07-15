@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { loadPlatforms } from "../config/platforms.js";
 
@@ -26,15 +27,51 @@ const WEEKDAYS: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 
 // PlatformSchedule without it keep compiling; claimSlots treats an absent value as 1.
 export type PlatformSchedule = { postsPerWeek: number; days: number[]; timePst: string; maxSlotsPerDay?: number };
 
+// Strategy lever C (card ed23f712): config/schedule-overrides.yaml, written by
+// `npm run cadence-fit -- --write` (src/strategy/cadence-fit.ts). It only ever adjusts
+// postsPerWeek/timePst for platforms it lists, and ONLY while `approved: true` there -- Muxin sets
+// that herself after reviewing the proposed numbers. A missing, malformed, or `approved: false`
+// file leaves loadSchedule()'s YAML-derived output completely unchanged (today's behavior).
+interface ScheduleOverridesFile {
+  approved: boolean;
+  overrides: Record<string, { posts_per_week?: number; slot_time_pst?: string }>;
+}
+
+// Resolved lazily, and overridable via env (same CONTENT_AGENTS_TEST_* convention as ledgerPath()
+// above) so tests can point this at an isolated fixture file instead of the real
+// config/schedule-overrides.yaml.
+function overridesPath(): string {
+  return process.env.CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES ?? join(repoRoot, "config", "schedule-overrides.yaml");
+}
+
+// Exported for direct unit testing of the approved/missing/malformed handling, independent of
+// loadPlatforms()'s real config/platforms.yaml.
+export function loadApprovedOverrides(): ScheduleOverridesFile["overrides"] {
+  const path = overridesPath();
+  if (!existsSync(path)) return {};
+  try {
+    const parsed = parse(readFileSync(path, "utf8")) as Partial<ScheduleOverridesFile> | null;
+    if (!parsed?.approved) return {};
+    return parsed.overrides ?? {};
+  } catch {
+    console.error("config/schedule-overrides.yaml: failed to parse — ignoring overrides this run.");
+    return {};
+  }
+}
+
 export function loadSchedule(): Record<string, PlatformSchedule> {
+  const overrides = loadApprovedOverrides();
   const out: Record<string, PlatformSchedule> = {};
   for (const [k, v] of Object.entries(loadPlatforms().platforms)) {
-    if (!v.posts_per_week || !v.slot_days || !v.slot_time_pst) continue;
+    const override = overrides[k];
+    const postsPerWeek = override?.posts_per_week ?? v.posts_per_week;
+    const timePst = override?.slot_time_pst ?? v.slot_time_pst;
+    if (!postsPerWeek || !v.slot_days || !timePst) continue;
     const days = v.slot_days
       .map((s) => WEEKDAYS[s.toLowerCase().slice(0, 3)])
       .filter((n): n is number => n !== undefined);
     if (days.length) {
-      out[k] = { postsPerWeek: v.posts_per_week, days, timePst: v.slot_time_pst, maxSlotsPerDay: v.max_slots_per_day };
+      out[k] = { postsPerWeek, days, timePst, maxSlotsPerDay: v.max_slots_per_day };
     }
   }
   return out;

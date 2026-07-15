@@ -19,6 +19,8 @@ import {
   writeLedgerAtomic,
   claimSlots,
   fmtLa,
+  loadApprovedOverrides,
+  loadSchedule,
   type Claim,
   type PlatformSchedule,
 } from "./slots.js";
@@ -470,5 +472,93 @@ describe("slots.ts: claimSlots", () => {
     // DAILY anchors at 09:00; spaced for the achievable count of 2 (not windowKey p's own cap of 5),
     // the second slot should land at 16:30 (halfway to midnight), not 12:00 (5-way spacing).
     assert.equal(hmFmt.format(new Date(times[1])), "16:30", "second slot must be spaced for the group's real 2/day cap, not p's own 5/day cap");
+  });
+});
+
+// Strategy lever C (card ed23f712): config/schedule-overrides.yaml layered onto loadSchedule().
+// CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES points loadApprovedOverrides()/loadSchedule() at an
+// isolated fixture file (same convention as CONTENT_AGENTS_TEST_LEDGER above), so these tests
+// never touch the real config/schedule-overrides.yaml.
+describe("slots.ts: loadApprovedOverrides — approved/missing/malformed handling", () => {
+  const FIXTURE = join(repoRoot, "data", "test-schedule-overrides.yaml");
+
+  before(() => {
+    process.env.CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES = FIXTURE;
+  });
+
+  after(() => {
+    delete process.env.CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES;
+    if (existsSync(FIXTURE)) unlinkSync(FIXTURE);
+  });
+
+  test("approved: true returns the overrides block", () => {
+    writeFileSync(FIXTURE, `approved: true\ngenerated: "2026-07-15"\noverrides:\n  x:\n    posts_per_week: 8\n`);
+    const overrides = loadApprovedOverrides();
+    assert.deepEqual(overrides, { x: { posts_per_week: 8 } });
+  });
+
+  test("approved: false returns no overrides, even with a populated overrides block", () => {
+    writeFileSync(FIXTURE, `approved: false\ngenerated: "2026-07-15"\noverrides:\n  x:\n    posts_per_week: 8\n`);
+    assert.deepEqual(loadApprovedOverrides(), {});
+  });
+
+  test("a missing file returns no overrides", () => {
+    if (existsSync(FIXTURE)) unlinkSync(FIXTURE);
+    assert.deepEqual(loadApprovedOverrides(), {});
+  });
+
+  test("a malformed file returns no overrides instead of throwing", () => {
+    writeFileSync(FIXTURE, `approved: true\n  overrides: [this is not valid yaml`);
+    assert.deepEqual(loadApprovedOverrides(), {});
+  });
+});
+
+describe("slots.ts: loadSchedule() layers an approved override over config/platforms.yaml", () => {
+  const FIXTURE = join(repoRoot, "data", "test-schedule-overrides.yaml");
+
+  before(() => {
+    process.env.CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES = FIXTURE;
+  });
+
+  after(() => {
+    delete process.env.CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES;
+    if (existsSync(FIXTURE)) unlinkSync(FIXTURE);
+  });
+
+  // Each test starts from a clean (no fixture file) state, so an earlier test's leftover
+  // fixture never leaks into the "baseline" a later test captures.
+  beforeEach(() => {
+    if (existsSync(FIXTURE)) unlinkSync(FIXTURE);
+  });
+
+  test("an approved override changes postsPerWeek/timePst for its platform; other platforms are untouched", () => {
+    const baseline = loadSchedule(); // real config/platforms.yaml, no override file present yet
+    const baseX = baseline.x;
+    assert.ok(baseX, "config/platforms.yaml must have a schedulable x entry for this test to be meaningful");
+
+    writeFileSync(
+      FIXTURE,
+      `approved: true\ngenerated: "2026-07-15"\noverrides:\n  x:\n    posts_per_week: ${baseX.postsPerWeek + 2}\n    slot_time_pst: "05:00"\n`
+    );
+    const overridden = loadSchedule();
+    assert.equal(overridden.x.postsPerWeek, baseX.postsPerWeek + 2);
+    assert.equal(overridden.x.timePst, "05:00");
+    assert.equal(overridden.x.days.length, baseX.days.length, "slot_days is untouched — out of lever C's scope");
+
+    if (baseline.linkedin) {
+      assert.deepEqual(overridden.linkedin, baseline.linkedin, "a platform absent from overrides is completely unchanged");
+    }
+  });
+
+  test("approved: false leaves loadSchedule()'s output identical to the no-override baseline", () => {
+    const baseline = loadSchedule();
+    writeFileSync(FIXTURE, `approved: false\ngenerated: "2026-07-15"\noverrides:\n  x:\n    posts_per_week: 99\n`);
+    assert.deepEqual(loadSchedule(), baseline);
+  });
+
+  test("no fixture file at all leaves loadSchedule()'s output identical to the no-override baseline", () => {
+    const baseline = loadSchedule();
+    if (existsSync(FIXTURE)) unlinkSync(FIXTURE);
+    assert.deepEqual(loadSchedule(), baseline);
   });
 });

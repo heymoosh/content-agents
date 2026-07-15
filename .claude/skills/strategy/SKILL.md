@@ -70,6 +70,16 @@ makes `/cycle` compound instead of restarting every week.
      (e.g. "bluesky: video resonance running 2.1x text — flag `/video` as a strong option when
      atomizing bluesky-routed pieces") — `/atomize` step 2 already reads and applies these
      directives. `insufficient-data`/`steady` reads get no `media_mix` entry — don't manufacture one.
+   - `npm run cadence-fit` → strategy lever C (card ed23f712, epic 2ce597d7): per-platform
+     engagement TREND (climbing / steady / declining, recent 4wk vs prior 4wk) + peak posting
+     HOUR (PT). Unlike lever A this one CAN reach `/publish`'s live scheduler, but only through
+     `config/schedule-overrides.yaml` — `src/publish/slots.ts` ignores it entirely while
+     `approved: false` there. Run `npm run cadence-fit -- --write` to also propose numbers into
+     that file (still inert); Muxin reviews them and sets `approved: true` herself when she wants
+     them live. Same overfitting guard as lever A: a thin window (n<3) or a synthetic/date-only
+     timestamp platform (true today of X and LinkedIn — their analytics don't capture posting
+     hour, only the date) always reads insufficient-data, never a forced trend/peak-hour read.
+     Fold the ranked tables into the brief.
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`.
@@ -192,6 +202,17 @@ makes `/cycle` compound instead of restarting every week.
     platform) and /video's invocation model (always human-invoked) are both unchanged; nothing
     here auto-generates a
     video or a composited quote-card.>
+
+   ## Cadence + timing signal (lever C)
+   <cadence-fit's two ranked tables verbatim (engagement trend, peak posting hour) + 1-2 sentences
+    each on which platforms read climbing/declining and which have a real peak-hour read.
+    Insufficient-data rows get a one-line mention at most; for X/LinkedIn's peak-hour row, name the
+    reason (synthetic date-only timestamps), don't just say "insufficient data." This is the one
+    lever that can actually reach the live scheduler — but only via config/schedule-overrides.yaml,
+    and only once Muxin sets `approved: true` there herself. Always end this section with: "To
+    activate: review the proposed values in config/schedule-overrides.yaml (run
+    `npm run cadence-fit -- --write` to refresh them first), set approved: true, commit. Nothing
+    changes your posting cadence or times until you do.">
 
    ## Spin-control coverage
    <only include this section if `npm run spin-control -- --coverage` printed at least one row
