@@ -189,6 +189,34 @@ describe("reconcileRow — the actual GOAL_CONDITION scenario", () => {
     assert.match(result.reason ?? "", /no logged Typefully draft id/);
   });
 
+  // GOAL_CONDITION (card 174f70bd): a row silently skipped by the reuse guard at approve time never
+  // gets logged to publish-log.md, so it would otherwise fall into the generic "no logged Typefully
+  // draft id" mismatch — reading as broken/lost rather than "temporarily blocked, resolves itself".
+  // serve.ts's scheduleApproved persists the reuse-guard reason into the row's own notes column in
+  // this exact shape; reconcileRow must recover it and report a live day-count instead.
+  test("a row blocked by the reuse guard reports 'eligible again in N days' instead of the generic mismatch", () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    const notes = `schedule failed: blocked by reuse guard, last placed to linkedin ${tenDaysAgo} (min_reuse_days: 60)`;
+    const result = reconcileRow(row({ id: "quote-card-6-linkedin", platform: "linkedin", status: "approve", notes }), { text: "" }, NO_LIVE);
+    assert.equal(result.provider, "typefully");
+    assert.equal(result.state, "mismatch");
+    assert.match(result.reason ?? "", /blocked by reuse guard for linkedin, eligible again in 50 days/);
+  });
+
+  test("a reuse-guard note whose window has already elapsed falls back to the generic mismatch (stale note)", () => {
+    const seventyDaysAgo = new Date(Date.now() - 70 * 86_400_000).toISOString();
+    const notes = `schedule failed: blocked by reuse guard, last placed to linkedin ${seventyDaysAgo} (min_reuse_days: 60)`;
+    const result = reconcileRow(row({ id: "quote-card-6-linkedin", platform: "linkedin", status: "approve", notes }), { text: "" }, NO_LIVE);
+    assert.equal(result.state, "mismatch");
+    assert.match(result.reason ?? "", /no logged Typefully draft id/);
+  });
+
+  test("notes with no reuse-guard marker (or none at all) fall back to the generic mismatch, never crash", () => {
+    const result = reconcileRow(row({ id: "x-1", platform: "x", status: "approve", notes: "some unrelated note" }), { text: "" }, NO_LIVE);
+    assert.equal(result.state, "mismatch");
+    assert.match(result.reason ?? "", /no logged Typefully draft id/);
+  });
+
   test("an approved-but-never-scheduled tiktok row (no publish-log.md entry) is flagged mismatch", () => {
     const result = reconcileRow(row({ id: "tiktok-2", platform: "tiktok", format: "short", status: "approve" }), { text: "" }, NO_LIVE);
     assert.equal(result.provider, "postpeer");

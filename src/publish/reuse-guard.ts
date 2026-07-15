@@ -19,6 +19,7 @@ export interface ReuseCheckResult {
   reason?: string;        // set when !allowed
   lastPlacedAt?: string;  // ISO timestamp of the most recent matching placement (if any)
   daysSince?: number;     // days since last placement (if any)
+  minDays?: number;       // the min_reuse_days window this check was evaluated against
 }
 
 // Load per-platform min_reuse_days from config/platforms.yaml.
@@ -78,7 +79,7 @@ export function checkReuse(
   const minDays = minDaysOverride ?? perPlatform[platform] ?? global;
 
   const last = findLastPlacement(slug, platform);
-  if (!last) return { allowed: true };
+  if (!last) return { allowed: true, minDays };
 
   const daysSince = (Date.now() - last.ms) / (1000 * 86_400);
   if (daysSince < minDays) {
@@ -87,8 +88,9 @@ export function checkReuse(
       reason: `"${slug}" was last published to ${platform} ${daysSince.toFixed(1)} days ago (min_reuse_days: ${minDays})`,
       lastPlacedAt: last.iso,
       daysSince,
+      minDays,
     };
   }
 
-  return { allowed: true, lastPlacedAt: last.iso, daysSince };
+  return { allowed: true, lastPlacedAt: last.iso, daysSince, minDays };
 }
