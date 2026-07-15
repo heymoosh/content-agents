@@ -133,7 +133,6 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - DEPENDS ON: Landing page
 - DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): when the real landing page ships, change the CTA TEXT too (e.g. "Work with me" instead of "Connect on LinkedIn") for the 4 work-flavored types, not just the destination URL.
 - GROOMED: explicit GOAL_CONDITION already on card; pure config swap once Landing page ships; DEPENDS ON already correctly set + 2026-07-08
-- PARKED: needs Muxin call: CTA text for the 4 work-flavored types (keep as-is or update) before this config swap runs - card says her call, flag not decide silently
 <!-- card-id: ae602c84-18ed-4532-8f1b-3bd716e1a10e -->
 
 **Animated HyperFrames companion for the quote+image card variant**
@@ -267,7 +266,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: To Do
 - DECISION: approved -- build the missing Substack Notes repost producer (route.ts) to match Muxin's already-stated 2026-07-10 decision (platform:substack rows should be produced when appropriate); also fix the two stale skill docs. Routing/content-adjacent logic, so PR HOLDS for review per rule 7 regardless of this approval to build. (pre-flight 2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-- PARKED: needs decision (judgment): Substack Notes repost routing logic touches which platforms content reaches; wrong change could misroute or drop review-queue entries; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
 
 **Write/source an anonymized case note for the LinkedIn case-first spin angle to work from**
@@ -376,7 +374,6 @@ ROOT CAUSE: src/review/jobs.ts:201 - module-scoped "let jobSeq = 0" resets to 0 
 - STATUS: To Do
 - DECISION: approved -- truncate/use a unique job id per new job to stop log concatenation. The at-risk data is ephemeral local debug logs only (~/.content-agents/logs/gui-jobs/*.log, not committed, not product data), so the 'destructive' risk is negligible; standard engineering fix, no product-data loss. Non-content-gen logic, auto-merges on green CI. (pre-flight 2026-07-14)
 - GROOMED: clear outcome + precise root cause (append-mode/reused-id log files, jobs.ts:201/247); stateable predicate + 2026-07-11
-- PARKED: needs decision (destructive): fix may need to truncate/overwrite existing job-log files to clear mixed-run content, risking loss of historical debug data; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 89f7dea5-3a74-4732-80cf-d4b98f49f2fe -->
 
 **Nonexistent file path silently treated as plain text, burns minutes of LLM time instead of failing fast**
@@ -522,7 +519,6 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - DECISION: hold -- epic 2ce597d7 already approved this lever's scope 2026-07-14, and seed priors are already stated on this card (X=engineering, LinkedIn=careers/building, Substack=reflective, per Muxin 2026-07-14). Build tonight; PR opens as a HELD draft with before/after samples per rule 7 (routing/content-gen logic) and per the epic's own 'None auto-merges' statement -- no live-posting risk before her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-- PARKED: needs decision (judgment): platform-pillar fit mappings for gating content by pillar performance aren't confirmed; building on unconfirmed mappings risks misrouting and rework; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: c7638362-5149-4b51-b414-17f24a94ccf7 -->
 
 **Strategy lever B: bias media type (text/image/video) by platform resonance trends**
@@ -537,7 +533,6 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14); GOAL_CONDITION and test are explicit. Build worker should verify the analytics + /atomize + /video integration prerequisites actually exist before implementing the bias logic, and note any gap in the PR. PR opens as a HELD draft per rule 7 -- no live-posting risk before review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-- PARKED: needs decision (external): media-mix bias by platform resonance depends on analytics + /atomize + /video integration prerequisites that may not exist yet; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 27dc7d2d-afee-4e20-9552-b8aa58bd6382 -->
 
 **Strategy lever C: adapt posting cadence + time-of-day by engagement trends per platform**
@@ -552,7 +547,6 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). This lever changes live posting cadence/timing, so extra scrutiny is warranted at review -- but building and opening a draft PR carries no live-posting risk by itself (nothing merges/deploys without Muxin's review per rule 7 and the epic's 'None auto-merges' statement). Flag the over-posting/rate-limit risk prominently in the PR description for her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-- PARKED: needs decision (external): auto-adapting posting cadence/time-of-day from engagement trends changes how often/when the engine posts live to real platforms; misconfigured thresholds risk over-posting or rate-limit violations; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: ed23f712-b34d-442c-9d5d-c07b10924924 -->
 
 **Strategy lever D: weight spin angles by conversion performance per platform**
@@ -581,7 +575,6 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). CTA-effectiveness methodology (metrics/weighting/significance threshold) is underspecified; build worker should choose a reasonable default (e.g. click-through rate, minimum sample size) and flag the choice explicitly in the PR for Muxin to adjust at review. PR opens as a HELD draft per rule 7. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-- PARKED: needs decision (judgment): CTA-effectiveness scoring is underspecified (which metrics, weighting, significance threshold) — wrong choices could recommend suboptimal CTAs across all platforms; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: d80411bc-5884-4cfe-a471-a2f887fc36dc -->
 
 **Add Threads as a supported publishing platform (official Graph API)**
@@ -702,6 +695,7 @@ CARD TYPE: EPIC
 - This is content-generation logic (CLAUDE.md rule 7 -- src/atomize/ extraction/spin logic) -- open as a HELD draft PR with an old-vs-new content sample (a source with a real case vs. one without, showing the gate/fallback behavior), never auto-merge.
 - Once shipped, mark f7b186c2 Done-with-Superseded.
 - STATUS: To Do
+- GROOMED: clear GOAL_CONDITION, verified diff (tsc clean, tests pass), 2 explicit remaining gaps + 2026-07-15
 <!-- card-id: 5021f759-430b-47df-b965-614359b4f390 -->
 
 **Follow-ups tab: add a manual mark-as-sent/contacted action**
