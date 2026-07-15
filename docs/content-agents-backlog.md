@@ -398,7 +398,8 @@ REPRO: 1) Open Review tab. 2) Find a QUOTE-CARD:* row whose note includes "image
 OBSERVED: Row typed IMAGE shows text only, with the missing-image fact mentioned only in small buried note text.
 EXPECTED: A row typed IMAGE should visually flag when its image is absent, consistently with the existing no-body-no-image case which already shows an explicit placeholder (— no asset generated yet —). At minimum, this should be as visually prominent, not a note fragment appended after unrelated flags.
 ROOT CAUSE: src/review/rows.ts ~line 209-216 (assetUrl only set if existsSync(...) true) and src/review/page.ts ~line 334-341 (image tag only rendered when assetUrl is set; the no-asset placeholder branch only fires when body is ALSO empty, so a body-with-no-image row falls through to plain text rendering with no placeholder).
-- STATUS: To Do
+- STATUS: Done
+- SHIP: merged (PR #212) — added explicit "image not rendered yet" placeholder to page.ts's rowEl() preview logic for IMAGE-kind rows with no assetUrl, plus imageMissingHtml() DOM-free mirror + tests (page.test.ts), mirroring the replyContextHtml precedent. No rows.ts change needed — its assetUrl-unset behavior was already correct.
 - GROOMED: mirror existing no-asset placeholder branch for IMAGE rows; rows.ts/page.ts surface pinned + 2026-07-11
 <!-- card-id: 4c3dd6fc-43e5-41a5-b5bd-387139b6296f -->
 
@@ -685,6 +686,16 @@ CARD TYPE: EPIC
 - DECISION: approved -- carried over from parent c02ff4aa (Muxin: tie source topic to a TACTICAL / immediately-usable CTA; natural, never cringy; orient to attracting paying clients; NOT subsumed by PR #185). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
 - GROOMED: readiness pass: full scope carried forward from parked c02ff4aa (approved to build), worktree = zero commits (safe fresh build), no blocking dependency (propose_dependencies empty); content-gen LOGIC -> ships as HELD draft PR per rule 7 + 2026-07-15
 <!-- card-id: d2746598-f27a-403e-ba8c-2d3584fea53e -->
+
+**Rename propose-cards → follow-up-cards; retarget scope to post-card discovery, not cold epic-decomposition**
+- ORIGIN: correction to a misunderstanding surfaced 2026-07-15. Muxin's actual intent for this Pre-flight stage was "when the conductor finishes a card, let it propose follow-up cards for anything it discovered mid-work that aligns with the card's epic/goal" — NOT what `propose-cards` (skills/propose-cards/SKILL.md, repo heymoosh/claude-config) actually does today: a cold, Stage-0, pre-batch pass that reads existing epic/goal-flavored cards and decomposes their stated-but-unfiled children from prose, with zero visibility into what any specific card's execution actually produced.
+- WANTED BEHAVIOR: after a card completes (Step 6 / Done), generate up to N follow-up candidates seeded from what THAT card's own work surfaced (new issues found, incomplete edges, related work uncovered) — not from re-reading epic prose cold. Should still respect the epic/goal the completed card traces to, and reuse the current skill's existing safety mechanics (Backlog-only deposit, dedup pass, ORIGIN marker, cap per run, never-auto-promote) — just change the trigger point and the generation input.
+- DECISION (Muxin, 2026-07-15): this REPLACES the existing cold epic-decomposition mode entirely — not a second mode running alongside it.
+- DECISION (Muxin, 2026-07-15): generation runs as a delegated subprocess (same pattern the current skill already uses for its `claude -p` generator), not inline in the conductor's own context — "subprocess may be fine if it works." Still open: exactly what feeds that subprocess (the card's PR diff? its final worker transcript? its Review-stage self-vet notes? some combination) — needs a decision before this builds, don't guess.
+- RENAME: `propose-cards` -> `follow-up-cards` throughout (skill dir, SKILL.md, all cross-references in orchestrate-pipeline SKILL.md / references/preflight.md / references/cold-start.md, any conductor step that invokes it).
+- STATUS: Backlog
+- LANE: claude-config (~/.claude) — this is a conductor-mechanism/global-skill change, not a content-agents content change. Build there per the repo's own conductor carve-out (worktree off ~/.claude, base branch master, no backlog_path).
+<!-- card-id: c8fc8ac3-ac1a-4471-9f22-916752143960 -->
 
 **GUI job logs mix content from unrelated old runs due to append-mode, non-truncated, ID-reused log files**
 - ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Add/Queue tab)
