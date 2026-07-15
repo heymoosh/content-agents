@@ -349,6 +349,7 @@ DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 
 - STATUS: In Progress
 - DECISION: approved to build -- NOT subsumed by PR #185 (that only reworked LinkedIn spin structure + a 'soft availability signal' closer, not a tactical CTA). Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily 'product-team value'. Michael Callaway principle: content must be unique AND useful -> that is what converts to leads/clients. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7 (2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- PARKED: hard context/turn ceiling exceeded (turns=302 tokens=250899) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
 <!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
 
 **GUI approve-time scheduling failure is invisible after the fact (silent 'blocked by reuse guard' state)**
@@ -700,6 +701,14 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - GROOMED: clear GOAL_CONDITION, verified diff (tsc clean, tests pass), 2 explicit remaining gaps + 2026-07-15
 <!-- card-id: 5021f759-430b-47df-b965-614359b4f390 -->
+
+**Resume: Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some)**
+- CHAIN: 1
+- Follow-up to c02ff4aa-4872-4540-8d9f-029ac4b9535a (PARKED: hard context/turn ceiling exceeded, session killed mid-card, never resumed 2026-07-15).
+- The parked card was ceiling-killed before any commits landed -- its worktree (content-agents-worktrees/wt-cta-product-team-value-c02ff4aa, branch wt/cta-product-team-value-c02ff4aa) is still on disk at the same SHA as main, i.e. zero work done. Safe to build fresh from scratch; no partial state to reconcile.
+- Full original scope carries over unchanged: DECISION: approved to build -- NOT subsumed by PR #185. Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily product-team value. Michael Callaway principle: content must be unique AND useful. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7.
+- STATUS: To Do
+<!-- card-id: d2746598-f27a-403e-ba8c-2d3584fea53e -->
 
 **Follow-ups tab: add a manual mark-as-sent/contacted action**
 - Once Muxin actually sends a client/platform/jobsearch follow-up message by hand, nothing today appends a "contacted"/"followup_sent" tracker event for it -- the Follow-ups tab only offers mark-responded/draft-follow-up/move-on per card 21a5eb84's scope. Need a 4th action (or a CLI command) to log a manual send.
