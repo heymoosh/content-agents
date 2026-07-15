@@ -684,6 +684,7 @@ CARD TYPE: EPIC
 - This is content-generation logic (CLAUDE.md rule 7 -- src/atomize/ extraction/spin logic) -- open as a HELD draft PR with an old-vs-new content sample (a source with a real case vs. one without, showing the gate/fallback behavior), never auto-merge.
 - Once shipped, mark f7b186c2 Done-with-Superseded.
 - STATUS: To Do
+- DECISION: approved -- carried over from parent f7b186c2 (Muxin DECISION 2026-07-14: extraction-only + CONDITIONAL case-evidence; declare case_skeleton only when a real anonymizable third-party case exists IN-source, else fall back to the essay's own argument; never fabricate a client case). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
 - GROOMED: clear GOAL_CONDITION, verified diff (tsc clean, tests pass), 2 explicit remaining gaps + 2026-07-15
 <!-- card-id: 5021f759-430b-47df-b965-614359b4f390 -->
 
@@ -694,6 +695,8 @@ CARD TYPE: EPIC
 - Full original scope carries over unchanged: DECISION: approved to build -- NOT subsumed by PR #185. Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily product-team value. Michael Callaway principle: content must be unique AND useful. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7.
 - Once this ships, also mark original card c02ff4aa-4872-4540-8d9f-029ac4b9535a STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28, 3c6550a6 -> 43fa1e02, cccfc43a -> 4e5b33d0) so it doesn't stay stuck showing STATUS: In Progress forever.
 - STATUS: To Do
+- DECISION: approved -- carried over from parent c02ff4aa (Muxin: tie source topic to a TACTICAL / immediately-usable CTA; natural, never cringy; orient to attracting paying clients; NOT subsumed by PR #185). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
+- GROOMED: readiness pass: full scope carried forward from parked c02ff4aa (approved to build), worktree = zero commits (safe fresh build), no blocking dependency (propose_dependencies empty); content-gen LOGIC -> ships as HELD draft PR per rule 7 + 2026-07-15
 <!-- card-id: d2746598-f27a-403e-ba8c-2d3584fea53e -->
 
 **GUI approve-time scheduling failure is invisible after the fact (silent 'blocked by reuse guard' state)**
