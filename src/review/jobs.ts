@@ -352,7 +352,7 @@ export function decodeSpawnFailure(
 export function classifySource(
   raw: string,
   exists: (p: string) => boolean = existsSync,
-): { kind: "url" | "file" | "text"; arg: string; label: string } {
+): { kind: "url" | "file" | "file-not-found" | "text"; arg: string; label: string } {
   const s = raw.trim();
   if (/^https?:\/\//i.test(s)) return { kind: "url", arg: s, label: s };
   const asPath = s.startsWith("~/") ? join(homedir(), s.slice(2)) : s;
@@ -360,8 +360,33 @@ export function classifySource(
   if (s && !s.includes("\n") && s.length < 400 && exists(asPath)) {
     return { kind: "file", arg: asPath, label: basename(asPath) };
   }
+  // A string that LOOKS like a path (a slash with no spaces, a `~/` prefix, or a drive letter)
+  // but doesn't resolve is a typo'd path, not pasted note content — say so fast instead of
+  // materializing the raw string as fake note content and burning an LLM atomize run on it.
+  const looksLikePath =
+    s && !s.includes("\n") && s.length < 400 &&
+    (s.startsWith("~/") || /^[A-Za-z]:[\\/]/.test(s) || (s.includes("/") && !s.includes(" ")));
+  if (looksLikePath) {
+    return { kind: "file-not-found", arg: asPath, label: basename(asPath) };
+  }
   const firstLine = s.split("\n").map((l) => l.trim()).find(Boolean) ?? "pasted text";
   return { kind: "text", arg: "", label: firstLine.replace(/^#\s*/, "").slice(0, 80) };
+}
+
+// Turns a classifySource() result into either a dispatch descriptor for addJob() or an immediate
+// client-facing error — kept separate from the /api/atomize route handler so the file-not-found
+// short circuit is unit-testable without spinning up the HTTP server.
+export function sourceDispatch(
+  c: ReturnType<typeof classifySource>,
+  rawText: string,
+): { error: string } | { kind: AtomizeFamilyKind; arg: string; label: string; rawText?: string } {
+  if (c.kind === "file-not-found") {
+    return { error: `no such file: ${c.arg}` };
+  }
+  if (c.kind === "text") {
+    return { kind: "text", arg: "", label: c.label, rawText };
+  }
+  return { kind: c.kind, arg: c.arg, label: c.label };
 }
 
 // Wall-clock time the job has taken so far — still ticking while running, frozen once it lands.
