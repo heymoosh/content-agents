@@ -280,7 +280,8 @@ Scope: write or source a short anonymized case note (a real turnaround/greenfiel
 CHAIN: 1
 
 SCOPE EXTENSION (Muxin approved, 2026-07-10): shape the case-note capture as an INTERVIEW TEMPLATE -- five questions mapping one-to-one onto the skeleton beats: (1) what was the situation (with a number/decision), (2) what did the team believe, in their own words, (3) what tested it, (4) what did the miss cost, (5) what's the pattern. Muxin answers in voice or text; Claude transcribes into a case note. She is the author of the answers, so it stays clean under extraction-first (same principle as the voice-notes flow). Target: ~10 minutes of Muxin's time per case.
-- STATUS: In Progress
+- Superseded 2026-07-15: this session was ceiling-killed but left its uncommitted diff salvageable in the stale worktree; the resume card 5021f759 verified that diff, closed 2 remaining gaps plus a third (stale spin-mode.md guidance that contradicted the new gate), and shipped it (PR #218, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
 - DECISION: close the 'Muxin hand-writes/sources anonymized cases' framing -- she will NOT supply cases. Her intent: the case-first LinkedIn spin is EXTRACTION-ONLY and CONDITIONAL -- for each source the agent checks whether a real, anonymize-able case already exists IN that source; if yes, produce the case-first post; if no real case exists, do NOT force or invent one -- fall back to the essay's own argument. Never fabricate a client case. Content-gen logic (rule 7). Build the conditional detection; candidate home: fold into b288d0da source-triage. (2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - PARKED: hard context/turn ceiling exceeded (turns=282 tokens=240549) -- session killed mid-card by the watchdog safety valve, never resumed
@@ -348,7 +349,8 @@ anything) is still needed beyond PR #185 + its follow-up. Do not scope new imple
 card alone -- start by reviewing PR #185's actual result.
 
 DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 (case-first LinkedIn / technical X spin angles) + the new beat-template card (1eeb82a4) + f7b186c2 (real anonymized case note). No separate CTA build. The CTA is the natural last beat of the case skeleton (soft availability signal), not a bolt-on.
-- STATUS: In Progress
+- Superseded 2026-07-15: this session was ceiling-killed before any commits landed; the resume card d2746598 built this exact scope fresh and shipped it (PR #219, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
 - DECISION: approved to build -- NOT subsumed by PR #185 (that only reworked LinkedIn spin structure + a 'soft availability signal' closer, not a tactical CTA). Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily 'product-team value'. Michael Callaway principle: content must be unique AND useful -> that is what converts to leads/clients. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7 (2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - PARKED: hard context/turn ceiling exceeded (turns=302 tokens=250899) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
@@ -681,11 +683,10 @@ CARD TYPE: EPIC
 - Once shipped (PR merged, not just opened), mark f7b186c2 Done-with-Superseded.
 - Built both closed gaps plus a third found along the way: references/spin-mode.md's own guidance still told Claude to force the beat template onto non-case (autobiographical) material as a "stand-in" -- the exact drift this card exists to stop, and it directly contradicted the new gate. Updated that guidance + added case_skeleton to SKILL.md step 4's frontmatter example (nothing previously told Claude to ever SET the field, which would have left the gate permanently inert).
 
-SHIP: held (draft PR #218 — repo CLAUDE.md Rule 7, src/atomize/ extraction/spin logic change, needs Muxin's review; old-vs-new function-output sample in PR body)
-- STATUS: Review
+SHIP: merged as PR #218 (2026-07-15T17:16:35Z) -- Muxin reviewed and merged. Original card f7b186c2 marked Done too (Superseded note added).
+- STATUS: Done
 - DECISION: approved -- carried over from parent f7b186c2 (Muxin DECISION 2026-07-14: extraction-only + CONDITIONAL case-evidence; declare case_skeleton only when a real anonymizable third-party case exists IN-source, else fall back to the essay's own argument; never fabricate a client case). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
 - GROOMED: clear GOAL_CONDITION, verified diff (tsc clean, tests pass), 2 explicit remaining gaps + 2026-07-15
-- CI NOTE: CI: green (2026-07-15) -- PR #218 https://github.com/heymoosh/content-agents/pull/218
 <!-- card-id: 5021f759-430b-47df-b965-614359b4f390 -->
 
 **Resume: Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some)**
@@ -696,11 +697,10 @@ SHIP: held (draft PR #218 — repo CLAUDE.md Rule 7, src/atomize/ extraction/spi
 - Once this ships (PR merged, not just opened), also mark original card c02ff4aa-4872-4540-8d9f-029ac4b9535a STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28, 3c6550a6 -> 43fa1e02, cccfc43a -> 4e5b33d0) so it doesn't stay stuck showing STATUS: In Progress forever.
 - Built: reused the existing cta_label frontmatter field (previously only read by the explicit-cta override path) to also override the work_with_me-destination CTA's text in the content_type path (src/publish/cta.ts resolveContentTypeCtas/resolveOneContentType) -- additive, omitted cta_label keeps today's generic "Connect on LinkedIn" text unchanged. Updated SKILL.md step 4.5 to instruct when/how to write a tactical line (tone matches spin_angles.linkedin beat 5's soft-availability-close, good-vs-cringy example pair, always safe to omit).
 
-SHIP: held (draft PR #219 — repo CLAUDE.md Rule 7, src/publish/cta.ts CTA-resolution logic + SKILL.md drafting-instruction change, needs Muxin's review; old-vs-new function-output sample in PR body)
-- STATUS: Review
+SHIP: merged as PR #219 (2026-07-15T17:16:48Z) -- Muxin reviewed and merged. Original card c02ff4aa marked Done too (Superseded note added).
+- STATUS: Done
 - DECISION: approved -- carried over from parent c02ff4aa (Muxin: tie source topic to a TACTICAL / immediately-usable CTA; natural, never cringy; orient to attracting paying clients; NOT subsumed by PR #185). Content-gen LOGIC -> build as HELD draft PR with old-vs-new samples, no auto-merge (rule 7). + 2026-07-15
 - GROOMED: readiness pass: full scope carried forward from parked c02ff4aa (approved to build), worktree = zero commits (safe fresh build), no blocking dependency (propose_dependencies empty); content-gen LOGIC -> ships as HELD draft PR per rule 7 + 2026-07-15
-- CI NOTE: CI: green (2026-07-15) -- PR #219 https://github.com/heymoosh/content-agents/pull/219
 <!-- card-id: d2746598-f27a-403e-ba8c-2d3584fea53e -->
 
 **Rename propose-cards → follow-up-cards; retarget scope to post-card discovery, not cold epic-decomposition**
