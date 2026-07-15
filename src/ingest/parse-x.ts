@@ -1,5 +1,6 @@
 import { parseCsv, findColumn, toInt, toFloat } from "../util/csv.js";
 import { sha256Text } from "../util/hash.js";
+import { xPostTimeIso } from "./snowflake.js";
 import { ImportRow, ParseError } from "./types.js";
 
 // X (Twitter) analytics "content" CSV export. Column names have drifted over the years,
@@ -44,7 +45,10 @@ export function parseX(fileName: string, content: string): ImportRow[] {
     return {
       platform: "x",
       platformPostId: String(id),
-      postedAt: date ? new Date(date).toISOString() : null,
+      // Prefer the real time decoded from the X Snowflake post id; the export's Date column has
+      // no time-of-day, so fall back to a synthetic local-midnight instant when the id isn't a
+      // real snowflake (e.g. the sha256 fallback id used when no id column was found).
+      postedAt: xPostTimeIso(String(id)) ?? (date ? new Date(date).toISOString() : null),
       url: get("url") ?? null,
       contentText: text,
       format: "text",
