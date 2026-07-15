@@ -539,11 +539,28 @@ CARD TYPE: EPIC
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: filed by the ed23f712 (lever C) build worker, 2026-07-15, as a data-gap follow-up --
   not part of the original epic decomposition.
-- STATUS: To Do
-- DECISION: hold -- this is a data/ingest investigation (does the export or API even expose a
-  real timestamp?), not a decided build; needs a quick research pass before scoping the actual
-  change. Not itself content-generation logic (rule 7 doesn't apply), but the eventual parser
-  change should be reviewed since it changes what posts.posted_at means downstream.
+- RESEARCH FINDING (2026-07-15): the card's premise (only a paid API tier or browser scraping
+  could get a real timestamp) was wrong. Both exports already carry the real time, encoded in an
+  id column each parser already reads -- no API call, no scraping needed. X's `Post id` is a
+  Twitter Snowflake (`(id >> 22) + 1288834974657` ms); LinkedIn's `Post URL` embeds an activity id
+  using the same 22-bit shift with no epoch offset (`id >> 22` = raw unix ms). Verified against
+  real exports: X id 2073539791929376785 decodes to 2026-07-04T22:49:45.559Z, matching its export
+  Date "Sat, Jul 4, 2026"; LinkedIn id 7478118288640630786 decodes to 2026-07-01T16:12:16.731Z,
+  matching its export Publish Date "7/1/2026". Free, deterministic, CLAUDE.md rule 6 clean.
+- SHIP: held (draft PR #234 -- per this card's own DECISION note that the parser change should be
+  reviewed since it changes what posts.posted_at means downstream). New src/ingest/snowflake.ts
+  (xPostTimeIso/linkedinPostTimeIso, numeric-id guard + plausible-year sanity check), wired into
+  parse-x.ts/parse-linkedin.ts as the primary postedAt source, falling back to today's synthetic
+  local-midnight behavior when the id isn't a real snowflake (e.g. the sha256 fallback id used
+  when no id column matched). Verified end-to-end: ran a real ingest against data/processed/'s X
+  + LinkedIn exports in a scratch worktree DB -- X posted_at went from 1 distinct UTC hour to 17,
+  LinkedIn from 1 to 16; cadence-fit.ts now reports a real peak hour for both (x: 6am PT,
+  linkedin: 2pm PT) instead of insufficient-data, no code change needed there per the card's own
+  GOAL_CONDITION. 866/866 tests green (12 new), npm run typecheck clean. (shipped 2026-07-15)
+- STATUS: Review
+- DECISION: approved -- research pass (above) resolved the open question; buildable and free
+  (CLAUDE.md rule 6), no API/scraping tradeoff needed. Parser change still reviewed per this
+  card's own note (held draft PR #234, not auto-merged).
 <!-- card-id: 6f1a2e9c-8b4a-4c37-9e5f-2b7d4c9a3e61 -->
 
 **Add Threads as a supported publishing platform (official Graph API)**
