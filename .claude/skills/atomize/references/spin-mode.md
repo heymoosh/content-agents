@@ -9,11 +9,16 @@ which produces strict verbatim extraction exactly like the old default.
 
 **Where the angles live:** `config/platforms.yaml` `spin_angles`, keyed by platform. Each entry
 carries the target `audience` and the approved `angle` statement. Currently: `x` (tech),
-`linkedin` (business/career), `bluesky` (political), and `substack` (society; reserved, since
-Substack is the source channel, not an atomize output target, per `config/routing.yaml`). The
-angles are internal generation config only. Never publish an angle statement verbatim as post
-copy; it shapes the framing, the words still come from Muxin. `src/atomize/spin.ts`
-(`resolveAngle`) is the code's view of the same mapping.
+`linkedin` (business/career), `bluesky` (political), and `substack` (society). Substack is the
+source channel for ordinary essays (never an atomize output target for those), but IS a
+conditional routing target for Substack Notes specifically — a Note (`source_kind: substack-note`)
+gets reposted back to Substack via `route.ts`'s `applySubstackRepost` hook + `src/publish/
+substack.ts` (see `config/routing.yaml` and `references/notes-mode.md` step 3). In practice a
+Note repost skips the extra spin/rehook pass anyway (`spin.ts`'s `appliesRehook` — the whole note
+is already the near-verbatim extract), so the `substack` angle above mostly documents the register,
+not an active rewrite. The angles are internal generation config only. Never publish an angle
+statement verbatim as post copy; it shapes the framing, the words still come from Muxin.
+`src/atomize/spin.ts` (`resolveAngle`) is the code's view of the same mapping.
 
 **LinkedIn and X updated 2026-07-10 (Muxin, per-channel positioning review).** LinkedIn's angle is
 now case-first, not thesis-first: open on one real anonymized situation (never a category), name

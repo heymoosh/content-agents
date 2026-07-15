@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   classifySourceClass,
   readSourceClass,
+  readSourceKind,
   writeSourceClass,
   triageEffects,
   triageSummary,
@@ -126,6 +127,36 @@ describe("readSourceClass: undefined when no fact has been recorded yet (no sour
     withSourceMd((dir) => {
       assert.equal(readSourceClass(dir), undefined);
     });
+  });
+});
+
+describe("readSourceKind: reads source.md's source_kind fact (card df11d0db), never re-derives it", () => {
+  test("missing source.md -> empty string", () => {
+    const dir = mkdtempSync(join(tmpdir(), "source-triage-test-"));
+    try {
+      assert.equal(readSourceKind(dir), "");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("source.md exists but has no source_kind field -> empty string (a plain essay)", () => {
+    withSourceMd((dir) => {
+      assert.equal(readSourceKind(dir), "");
+    });
+  });
+
+  test("source_kind: substack-note is read back verbatim", () => {
+    const dir = mkdtempSync(join(tmpdir(), "source-triage-test-"));
+    try {
+      writeFileSync(
+        join(dir, "source.md"),
+        `---\ntitle: "Some Note"\norigin: https://muxin.substack.com/p/some-note\nsource_kind: substack-note\npublished_at: 2026-07-01\ningested_at: 2026-07-01T00:00:00.000Z\n---\n\nNote body.\n`
+      );
+      assert.equal(readSourceKind(dir), "substack-note");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

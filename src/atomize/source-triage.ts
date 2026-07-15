@@ -45,6 +45,16 @@ export function readSourceClass(dir: string): SourceClass | undefined {
   return classifySourceClass(readSourceFm(dir));
 }
 
+// READ <dir>/source.md's `source_kind` (e.g. "substack-note", written by new-notes.ts/
+// new-content.ts). route.ts's applySubstackRepost hook (card df11d0db) uses this to decide
+// whether a piece is a Note being reposted back to Substack — the only case `substack` is a legal
+// routing target. Empty string when absent/unreadable, same convention as publish/cta.ts's
+// loadSourceKind (duplicated here, not imported, so strategy/ doesn't reach into publish/).
+export function readSourceKind(dir: string): string {
+  const v = readSourceFm(dir).source_kind;
+  return typeof v === "string" ? v.trim() : "";
+}
+
 // The informational "no beat-2 belief statement found" side effect (see triageEffects doc below)
 // — read the same way, from the same recorded fact, never re-derived.
 export function hasMissingBeat2(dir: string): boolean {
