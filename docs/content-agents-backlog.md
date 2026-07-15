@@ -28,11 +28,11 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
   retired-provider case (like Upload-Post) should degrade — at minimum the GUI's "unavailable"
   state should point Muxin at exactly which external dashboard to check/cancel in, since a live
   cancel call isn't possible once an adapter's been deleted.
+- RETRY: 1
+- SHIP: merged (PR #204)
 - STATUS: Done
 - DECISION: none yet — raised 2026-07-15, not scoped or prioritized.
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-- RETRY: 1
-- SHIP: merged (PR #204)
 <!-- card-id: e4eca4a1-b755-4d20-bc20-21426ad46a5a -->
 
 ---
@@ -627,9 +627,9 @@ CARD TYPE: EPIC
 - ORIGIN: follow-up auto-filed from card e4eca4a1 (cancel capability for scheduled posts). Neither Typefully DELETE /v2/social-sets/{setId}/drafts/{id} nor PostPeer DELETE /v1/posts/{id} is officially documented -- endpoint shapes were inferred from existing REST conventions in the codebase and should be verified against a real scheduled post before relying on them in production.
 - GAP: no live smoke test has confirmed either DELETE endpoint actually cancels a real scheduled post at the provider (both are covered by unit tests with injected/fake providers only).
 - ROUGH SCOPE (needs grooming): schedule one disposable Typefully draft and one disposable PostPeer post, then trigger the review GUI Cancel action (or a scratch script calling cancelDraft/cancelPost directly) against each and confirm the provider actually cancels it. Depends on live API access to both providers.
+- CHAIN: 1
 - STATUS: Backlog
 - DECISION: none yet.
-- CHAIN: 1
 <!-- card-id: df9cdce6-2c67-4c69-9578-811efba9dc48 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
