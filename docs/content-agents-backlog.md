@@ -295,6 +295,7 @@ ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Ph
 CHAIN: 1
 - STATUS: Backlog
 - DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
+- PARKED: needs decision (judgment): WHERE/HOW to surface follow-up tracker data in weekly brief not yet decided; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 2a751683-d3a5-46cc-9de2-dd0b25d7edcc -->
 
 **Remove AI smells from writing: add an independent sweep/review-and-edit pass after drafting?**
@@ -544,8 +545,103 @@ ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:au
 - Lever E -- CTA effectiveness: which CTA types actually drive clicks/leads -> recommend the CTA. Ties into c02ff4aa (tactical/useful CTA).
 - SCOPE: all five levers + time-of-day approved by Muxin 2026-07-14. This is an EPIC -- grooming should break out an individual build card per lever, not build it as one blob.
 - RULE 7: every lever's generation change is content-gen LOGIC -> each build card is a HELD draft PR with before/after samples. None auto-merges.
+CARD TYPE: EPIC
 - STATUS: Backlog
 <!-- card-id: 2ce597d7-acdc-4887-af88-1620fbac16f6 -->
+
+**Strategy lever A: gate content by pillar performance per platform (topic-fit routing)**
+- Compute per-platform pillar engagement from analytics each /strategy run
+- Write platform-pillar fit data where route.ts can read it (config/strategy/ or data/strategy/)
+- Route conditionally gates derivative drafting: skip platforms where source pillar underperforms
+- Seed priors: X=engineering thinking, LinkedIn=careers/building, Substack=reflective (per Muxin 2026-07-14)
+- Test: /atomize on a piece strong in Substack pillar but weak in X pillar produces Substack derivatives only, skips X
+- GOAL_CONDITION: route.ts reads strategy-computed pillar-performance signal per platform instead of hardcoded defaults; /atomize skips platforms where source pillar lacks data-backed fit; npm test green.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- STATUS: To Do
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: c7638362-5149-4b51-b414-17f24a94ccf7 -->
+
+**Strategy lever B: bias media type (text/image/video) by platform resonance trends**
+- Compute per-platform media-type resonance: text engagement vs images vs video from analytics
+- Write media preference to config/strategy/ for /atomize + /video to read
+- Bias derivative generation toward highest-resonating media type per platform
+- Default text-first where data is thin; prefer video/images where they demonstrably outperform
+- Test: /atomize on platform where video outperforms text queues prioritized video derivatives
+- GOAL_CONDITION: /atomize + /video read strategy-computed media-type preference per platform; generation biases toward highest-performing media instead of fixed text-first default; npm test green.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- STATUS: To Do
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: 27dc7d2d-afee-4e20-9552-b8aa58bd6382 -->
+
+**Strategy lever C: adapt posting cadence + time-of-day by engagement trends per platform**
+- Compute per-platform engagement trends (climbing/stable/declining) + daily time-of-day peak hours
+- Write adaptive cadence (posts_per_week per platform) + times (slot_time_pst per platform) to config
+- /publish reads dynamic cadence/time windows per platform instead of fixed defaults
+- Post more frequently where engagement is climbing; respect each platform's peak posting hours
+- Test: platform with trending-up engagement shows increased posts_per_week; Typefully scheduling respects per-platform time windows
+- GOAL_CONDITION: /publish reads per-platform posts_per_week + slot_time_pst from strategy output; posting cadence + timing adapt per platform to engagement trends; npm test green.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- STATUS: To Do
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: ed23f712-b34d-442c-9d5d-c07b10924924 -->
+
+**Strategy lever D: weight spin angles by conversion performance per platform**
+- Score which narrative frame (case-first, technical-outsider, etc) drives conversions per platform from publish-log
+- Write angle weight scores to config/strategy/ for spin selection probability
+- Spin logic reads weights; higher-scoring angles selected with higher frequency per platform
+- Builds on existing per-channel angle templates (c42769b1, 1eeb82a4) — this layer weights them by real conversion data
+- Test: /atomize on platform where case-first spin drives conversions preferentially selects case-study angle over other spins
+- GOAL_CONDITION: Spin selection reads strategy-computed angle weights per platform; higher-converting narrative frames selected with higher probability; npm test green.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- STATUS: To Do
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: a4c5b42b-d3a5-4547-964c-58eb4c4507a4 -->
+
+**Strategy lever E: recommend CTAs by click-through + lead-gen effectiveness per platform**
+- Score per-platform CTA type effectiveness from publish-log + analytics (which CTA drives clicks/replies/conversions)
+- Write CTA recommendations to strategy brief + config/strategy/ for content generation to read
+- Content routing + derivative composition read CTA preference; recommend highest-performing CTA per platform
+- Fallback to defaults where data is thin; weight recommendations by statistical significance
+- Test: /strategy identifies platform's best-performing CTA; /atomize + /publish route that CTA in preference for that platform
+- GOAL_CONDITION: /strategy scores CTA effectiveness per platform from analytics; /atomize + /publish read and prioritize highest-converting CTA type per platform; npm test green.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- STATUS: To Do
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: d80411bc-5884-4cfe-a471-a2f887fc36dc -->
+
+**Add Threads as a supported publishing platform (official Graph API)**
+- Meta opened the Threads API to broader third-party publishing in 2026 -- richer post types, search/profile discovery, reply management, and real-time publish/delete notifications for third-party apps.
+- Per Meta's publishing reference (developers.facebook.com/docs/threads/reference/publishing/): text-only posts require a `text` parameter and support an `auto_publish_text` flag for single-call publishing -- a straightforward REST integration, no browser automation needed.
+- Access requires Meta App Review before production use; publishing is rate-limited by an impressions-based formula plus hard 24h caps (per third-party pricing writeups referencing Meta's limits: 250 posts / 1,000 replies / 100 deletions per profile per day) -- worth sizing against current posting cadence in config/platforms.yaml before committing.
+- content-agents currently has no Threads adapter or routing entry; this would be a new src/providers/publish/ adapter (likely direct-API, since Typefully does not support Threads), a config/platforms.yaml cadence entry, and a routing.yaml pillar-fit decision -- same shape as the existing Bluesky/X/LinkedIn integrations.
+- ORIGIN: idea-scout 2026-07-14 — platform-api-change
+- NEEDS DECISION: machine-invented candidate; explicit human promotion required
+- EVIDENCE: https://developers.facebook.com/docs/threads/reference/publishing/ (retrieved 2026-07-14)
+- HYPOTHESIS: The Threads API's publishing reference requires a `text` parameter for text-only posts and supports an `auto_publish_text` flag for single-call publishing, with expanded third-party publishing, search, analytics, and reply-management access for external apps. Uncertainty: Exact current rate limits and whether Meta App Review approval is fast/easy for a solo creator's small volume were not independently confirmed from a primary Meta source (the 250/1,000/100-per-day figures came from a third-party pricing blog, not developers.facebook.com directly) -- needs verification during build before committing to cadence assumptions.
+- GOAL_CONDITION: A /publish run for a content folder with an approved text derivative routed to `threads` creates a live Threads post via the official Threads Graph API (returns a real post ID, verifiable on threads.net), with `threads` present as a platform in config/platforms.yaml and covered by the unified slot scheduler (src/publish/slots.ts) like every other channel.
+- STATUS: To Do
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+- PARKED: needs decision (judgment, idea-scout): new publishing platform; Meta App Review timeline + 250/day rate limit need verification before committing to cadence; recommended: stage — awaiting Muxin's call, 2026-07-14
+<!-- card-id: bad4fb64-135f-4ff5-8e9d-0a622c6491e2 -->
+
+**AI-voice disclosure for video shorts ahead of EU AI Act Article 50 (2026-08-02)**
+- EU AI Act Article 50, effective 2026-08-02, requires that synthetic AI-generated outputs (including audio) be marked in machine-readable form, and per the Code of Practice draft, disclosure should be prominent/user-facing rather than buried in back-end metadata only.
+- content-agents' /video pipeline renders every published short's voiceover via local Kokoro-ONNX TTS -- a fully synthetic voice -- and there is currently no disclosure/label step anywhere in the storyboard-review flow (video/storyboard.md) or in review-queue.md/publish.
+- A separate New York law (A8887-B, effective 2026-06-09) requires conspicuous disclosure of 'synthetic performer' use in ads but explicitly carves out audio-only ads -- narrowing but not eliminating exposure here, since these are full videos (visuals + synthetic narration), not audio-only.
+- Buildable as: a required disclosure field/toggle added at storyboard-approval time in review-queue.md (mirroring how quote-card image-render gating already blocks Approve without a rendered image), rendered as on-screen text/caption in the exported video, plus setting each platform's own native AI-content toggle at upload where one exists (YouTube and TikTok both expose creator-facing AI-content disclosure toggles at upload time).
+- ORIGIN: idea-scout 2026-07-14 — compliance-regulatory
+- NEEDS DECISION: machine-invented candidate; explicit human promotion required
+- EVIDENCE: https://www.dynamisllp.com/knowledge/ai-disclosure-in-2026-recent-developments-and-practical-steps-for-brands-and-influencers (retrieved 2026-07-14)
+- HYPOTHESIS: EU AI Act Article 50 (effective 2026-08-02) requires providers of AI systems generating synthetic outputs to mark those outputs in machine-readable form, and deployers must disclose deepfakes/AI-generated content to end users, with the Code of Practice draft favoring prominent user-facing disclosure over metadata-only marking. Uncertainty: Unclear whether a solo US-based creator with an EU-reachable but not EU-targeted audience is squarely in scope of Article 50's deployer obligations, and unclear whether Kokoro-TTS narration alone (without a synthetic on-screen avatar/face) counts as a 'deepfake' or falls under the narrower 'synthetic audio output' marking duty versus the stricter public-interest-content disclosure duty -- needs a real legal read before deciding exact disclosure copy/placement.
+- GOAL_CONDITION: Every video short produced by /video and pushed live by /publish carries a verifiable AI-voice disclosure (on-screen caption/overlay in the rendered .mp4, or the platform's native AI-generated-content upload toggle set to on) before its review-queue row can be set to `approve`; a storyboard missing this field fails a precheck rather than silently publishing undisclosed synthetic narration.
+- STATUS: Backlog
+- PARKED: needs decision (judgment, idea-scout): EU AI Act Article 50 effective 2026-08-02 (18 days out); scope applicability + disclosure copy/placement undecided; recommended: stage — awaiting Muxin's call, 2026-07-14
+<!-- card-id: 2775170f-14df-4cc0-a045-6d51ebcd9dec -->
 
 **Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example**
 - ORIGIN: Muxin-approved strategy session 2026-07-10 (branding frame discussion; follows PR #185 / card c42769b1).
