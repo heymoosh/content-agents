@@ -9,6 +9,8 @@ import {
   parseResearchResponse,
   mergeResearchIntoLead,
   runResearch,
+  computeSearchBudgetTotal,
+  buildResearchSettings,
 } from "./research.js";
 
 describe("buildResearchPrompt", () => {
@@ -400,5 +402,33 @@ describe("runResearch guard clauses (no subprocess reached)", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// Card 43fa1e02 (resumes 3c6550a6): code-enforce search_budget_per_signal at the subprocess-hook
+// level rather than only via prompt text. computeSearchBudgetTotal/buildResearchSettings are the
+// unit-testable seams around that; the hook's own budget-consumption logic is covered separately
+// in search-budget-hook.test.ts since it lives in its own module.
+describe("computeSearchBudgetTotal", () => {
+  test("client kind multiplies by 3 signal categories (turnaround, greenfield, disqualifying)", () => {
+    assert.equal(computeSearchBudgetTotal("client", 2), 6);
+    assert.equal(computeSearchBudgetTotal("client", 5), 15);
+  });
+
+  test("platform kind multiplies by 5 signal categories (topic-overlap, audience-reality, guest-friendliness, recency, disqualifying)", () => {
+    assert.equal(computeSearchBudgetTotal("platform", 2), 10);
+    assert.equal(computeSearchBudgetTotal("platform", 1), 5);
+  });
+});
+
+describe("buildResearchSettings", () => {
+  test("wires a PreToolUse hook matching WebSearch|WebFetch that shells out to the hook script via tsx", () => {
+    const settings = buildResearchSettings("/fake/repo/src/outreach/search-budget-hook.ts");
+    const hookEntry = settings.hooks.PreToolUse[0];
+    assert.equal(hookEntry.matcher, "WebSearch|WebFetch");
+    assert.equal(hookEntry.hooks.length, 1);
+    assert.equal(hookEntry.hooks[0].type, "command");
+    assert.ok(hookEntry.hooks[0].command.includes("search-budget-hook.ts"));
+    assert.ok(hookEntry.hooks[0].command.includes("tsx"));
   });
 });

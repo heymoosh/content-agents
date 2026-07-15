@@ -1,7 +1,9 @@
 import "../util/env.js";
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync, unlinkSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
@@ -301,8 +303,43 @@ export interface RunResearchResult {
   evidenceCount: number;
 }
 
-async function callClaudeResearch(prompt: string, timeoutMs: number): Promise<string> {
+// Number of closed-checklist signal categories each kind's research prompt walks (buildResearchPrompt
+// step 1: turnaround/greenfield/disqualifying = 3; buildPlatformResearchPrompt step 1:
+// topic-overlap/audience-reality/guest-friendliness/recency/disqualifying = 5). Exported so the
+// total-budget math is unit-testable without a subprocess.
+const SIGNAL_COUNT: Record<LeadKind, number> = { client: 3, platform: 5 };
+
+export function computeSearchBudgetTotal(kind: LeadKind, searchBudgetPerSignal: number): number {
+  return searchBudgetPerSignal * SIGNAL_COUNT[kind];
+}
+
+const SEARCH_BUDGET_HOOK_PATH = join(repoRoot, "src", "outreach", "search-budget-hook.ts");
+const TSX_BIN = join(repoRoot, "node_modules", ".bin", "tsx");
+
+// Builds the `--settings` JSON object for the search-budget PreToolUse hook (card 43fa1e02). Pure
+// and exported so the exact hook wiring is unit-testable without a subprocess -- mirrors
+// buildClaudeSpawnArgs in src/review/jobs.ts.
+export function buildResearchSettings(hookScriptPath: string = SEARCH_BUDGET_HOOK_PATH) {
+  return {
+    hooks: {
+      PreToolUse: [
+        {
+          matcher: "WebSearch|WebFetch",
+          hooks: [{ type: "command", command: `${TSX_BIN} ${hookScriptPath}` }],
+        },
+      ],
+    },
+  };
+}
+
+async function callClaudeResearch(
+  prompt: string,
+  timeoutMs: number,
+  budget: { kind: LeadKind; searchBudgetPerSignal: number },
+): Promise<string> {
   const model = (process.env.CLAUDE_POLISH_MODEL ?? "sonnet").trim();
+  const totalBudget = computeSearchBudgetTotal(budget.kind, budget.searchBudgetPerSignal);
+  const counterFile = join(tmpdir(), `outreach-search-budget-${randomUUID()}.count`);
   let stdout: string;
   try {
     // --permission-mode acceptEdits: the one precedent in this repo (src/review/jobs.ts's
@@ -310,10 +347,25 @@ async function callClaudeResearch(prompt: string, timeoutMs: number): Promise<st
     // without hanging on an interactive approval prompt. This call never lets Claude write files
     // itself -- mergeResearchIntoLead above owns every byte written to lead.md -- so acceptEdits
     // only ever gets exercised for search/fetch in practice.
+    //
+    // --settings wires in a PreToolUse hook (search-budget-hook.ts) that code-enforces
+    // search_budget_per_signal (card 43fa1e02) -- the prior state only ever enforced it as a
+    // sentence in the prompt ("search at most N times"), with nothing stopping a run that ignored
+    // it. The hook denies WebSearch/WebFetch once the run's total call count (computeSearchBudgetTotal)
+    // is exhausted; a real external process makes that call, not the model's own restraint.
     const r = await execFileP(
       "claude",
-      ["-p", prompt, "--model", model, "--permission-mode", "acceptEdits"],
-      { cwd: repoRoot, timeout: timeoutMs, maxBuffer: 20_000_000 },
+      ["-p", prompt, "--model", model, "--permission-mode", "acceptEdits", "--settings", JSON.stringify(buildResearchSettings())],
+      {
+        cwd: repoRoot,
+        timeout: timeoutMs,
+        maxBuffer: 20_000_000,
+        env: {
+          ...process.env,
+          OUTREACH_SEARCH_BUDGET_COUNTER_FILE: counterFile,
+          OUTREACH_SEARCH_BUDGET_TOTAL: String(totalBudget),
+        },
+      },
     );
     stdout = r.stdout;
   } catch (e) {
@@ -325,6 +377,14 @@ async function callClaudeResearch(prompt: string, timeoutMs: number): Promise<st
       throw new Error(`claude -p timed out after ${Math.round(timeoutMs / 60_000)}min during research`);
     }
     throw new Error(`claude -p failed: ${err.stderr?.trim() || (e instanceof Error ? e.message : String(e))}`);
+  } finally {
+    if (existsSync(counterFile)) {
+      try {
+        unlinkSync(counterFile);
+      } catch {
+        // best-effort cleanup only -- a leftover temp counter file is harmless
+      }
+    }
   }
   const text = stdout.trim();
   if (!text) throw new Error("claude -p returned no text during research");
@@ -384,7 +444,10 @@ export async function runResearch(dirArg: string): Promise<RunResearchResult> {
   }
 
   const timeoutMs = config.researchTimeoutMin * 60_000;
-  const text = await callClaudeResearch(prompt, timeoutMs);
+  const text = await callClaudeResearch(prompt, timeoutMs, {
+    kind,
+    searchBudgetPerSignal: config.searchBudgetPerSignal,
+  });
   const parsed = parseResearchResponse(text);
   const defaultClassification = kind === "platform" ? "weak" : "unclear";
 
