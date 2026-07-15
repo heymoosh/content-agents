@@ -161,7 +161,7 @@ derivative, the video script, and the video title/description. The short version
      content_type: [essay_excerpt]   # 1+ of the 8 keys in config/content-types.yaml — classifies what job this post does; drives its CTA(s) at publish time (step 4.5). Omit ONLY when setting an explicit cta override below.
      project_url: https://example.com/my-project   # OPTIONAL, per-post: only set when Muxin confirmed a SPECIFIC project genuinely relevant to THIS post's content (step 4.5 — ask her, never guess/reuse a project just because the content type matched). Omit when she has none or none applies — that CTA line is simply dropped, never defaulted to the essay link or an unrelated project.
      cta: source            # OPTIONAL override: source | <literal-url> | none — wins over content_type when set (e.g. civic-tech's voting-tool link, or a deliberate none). Omit to let content_type drive the CTA.
-     cta_label: "Full essay (free to subscribe):"   # only needed alongside an explicit cta override; content_type-driven CTAs carry their own label from config/content-types.yaml
+     cta_label: "Full essay (free to subscribe):"   # with an explicit cta override, this is its label. With content_type instead (no explicit cta), this OPTIONALLY overrides just the work_with_me line's text on the 4 work-flavored types (card d2746598, step 4.5) -- a tactical, source-topic-tied line instead of the generic "Connect on LinkedIn." Omit to keep the generic default; other stacked CTA lines (source/project) are never affected by it.
      from_brief: briefs/2026-06-14-strategy-brief.md   # the brief whose directives shaped this (or omit if none)
      directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
      control_run: true      # only on the one derivative drafted for a due spin-control pick (card f444f440); omit otherwise
@@ -228,13 +228,31 @@ derivative, the video script, and the video title/description. The short version
      here, and if so what's the URL?" Stamp `project_url` only with what she gives you. If she has
      none, or none is genuinely relevant to this post, omit `project_url` entirely — that CTA line
      is simply dropped, never filled with an unrelated project just to have a link.
-   - **The 4 work-flavored types always carry a "Connect on LinkedIn" CTA — nothing for you to
-     set.** `product_builder_insight`, `project_demo`, `offer_adjacent_post`, and `case_study` are
-     fundamentally "connect for work" asks, so their non-project entry resolves to Muxin's LinkedIn
-     profile (a fixed config value), never the essay/Substack link — an essay pointer doesn't serve
-     a work-with-me intent even when the essay happens to be on-topic. This is fully automatic at
-     publish time; you only ever need to decide `content_type` and, separately, whether a genuinely
-     relevant `project_url` applies.
+   - **The 4 work-flavored types resolve to Muxin's LinkedIn profile by default — but on
+     LinkedIn especially (X to a lesser degree, card d2746598), give that line a TACTICAL,
+     source-topic-tied `cta_label` instead of leaving it generic.** `product_builder_insight`,
+     `project_demo`, `offer_adjacent_post`, and `case_study` are fundamentally "connect for work"
+     asks, so their non-project entry resolves to Muxin's LinkedIn profile (a fixed config value),
+     never the essay/Substack link — that part is automatic, you never set the URL. What you DO
+     set (optional, `cta_label` frontmatter — the same field the literal-`cta` override already
+     uses) is the LINE ITSELF: something the reader could apply RIGHT NOW, tied to THIS post's
+     actual insight, not a generic "Connect on LinkedIn." Michael Callaway principle: content
+     converts to leads/clients by being unique AND useful, not by asking harder. Two rules:
+     - **Tactical, not a pitch.** Good: "Ask your team which assumption nobody's tested this
+       quarter." Bad/cringy: "DM me to see how I can help your team," "Book a call to learn more,"
+       any line that reads as a sales ask rather than something the reader does with THIS post's
+       idea before ever talking to Muxin. The soft-availability-close pattern already in
+       `spin_angles.linkedin`'s beat 5 (`references/spin-mode.md`) is the tone to match: a
+       diagnostic signal ("this is the kind of thing I look for"), not a call-to-action.
+     - **Omitting it is always fine.** No tactical line occurs to you naturally from this specific
+       post → leave `cta_label` unset. The prior generic "Connect on LinkedIn" text is still there
+       as the default; it is never worse than before this card, only improvable when a real
+       tactical line fits. Never force one to avoid leaving it blank — a forced line is worse than
+       the generic default, not better.
+     - This only overrides the work_with_me line's text — a stacked `project`-destination entry
+       (e.g. `product_builder_insight`'s primary "See how I think/work") keeps its own config text
+       regardless; `cta_label` here targets the connect-for-work ask specifically, same as it
+       always has for the literal-`cta` override path above.
    - **The literal-URL override still exists, and still wins.** Civic-tech pieces (and community
      rooms posting civic content) keep pointing at the voting tool exactly as before: set
      `cta: <voting-tool-url>` (+ `cta_label`) directly and skip `content_type` — an explicit `cta`

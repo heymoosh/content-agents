@@ -119,7 +119,8 @@ function resolveOneContentType(
   ctCfg: ContentTypesConfig,
   cfg: CtaConfig,
   canonicalUrl: string | null,
-  projectUrl: string | null
+  projectUrl: string | null,
+  workWithMeLabelOverride: string | null
 ): { ctas: ResolvedCta[]; usedFallback: boolean } {
   const def = ctCfg.types[typeKey];
   if (!def) {
@@ -132,7 +133,14 @@ function resolveOneContentType(
   for (const e of entries) {
     const { url, usedFallback: uf } = resolveEntryUrl(e, projectUrl, canonicalUrl, cfg, ctCfg.workWithMeUrl);
     if (url) {
-      resolved.push({ url, label: e.text });
+      // A per-post cta_label overrides ONLY the work_with_me-destination line's text (card
+      // d2746598, Muxin DECISION 2026-07-14/15: tie source topic to a TACTICAL, immediately-usable
+      // CTA on the 4 "connect for work" content types, instead of the generic canned "Connect on
+      // LinkedIn" every post got before). source/project entries keep their own config text
+      // unconditionally -- this override is scoped to the work-with-me ask specifically, not a
+      // general per-post label override for every stacked CTA line.
+      const label = e.destination === "work_with_me" && workWithMeLabelOverride ? workWithMeLabelOverride : e.text;
+      resolved.push({ url, label });
       if (uf) usedFallback = true;
     }
   }
@@ -143,13 +151,17 @@ function resolveOneContentType(
 // or array of strings) into its CTA lines, stacking ALL matched types' CTAs — never picking one
 // winner when a piece plausibly fits more than one type. Empty/missing `content_type` resolves to
 // no CTAs (the caller's job to fall back to the plain `cta` path). `project` entries resolve from
-// this derivative's own `project_url` frontmatter (per-post, not shared config).
+// this derivative's own `project_url` frontmatter (per-post, not shared config). An optional
+// `cta_label` frontmatter value (the same field the explicit-`cta` override path already reads)
+// overrides the work_with_me entry's text specifically -- omitted, behavior is unchanged from
+// before this card (the generic config text from content-types.yaml).
 export function resolveContentTypeCtas(
   fm: Record<string, unknown>,
   canonicalUrl: string | null,
   cfg: CtaConfig,
   ctCfg: ContentTypesConfig
 ): { ctas: ResolvedCta[]; usedFallback: boolean } {
+  const workWithMeLabelOverride = typeof fm.cta_label === "string" && fm.cta_label.trim() ? fm.cta_label.trim() : null;
   const raw = fm.content_type;
   const types = Array.isArray(raw)
     ? raw.filter((t): t is string => typeof t === "string")
@@ -157,7 +169,9 @@ export function resolveContentTypeCtas(
       ? [raw.trim()]
       : [];
   const projectUrl = typeof fm.project_url === "string" ? fm.project_url.trim() || null : null;
-  const results = types.map((t) => resolveOneContentType(t, ctCfg, cfg, canonicalUrl, projectUrl));
+  const results = types.map((t) =>
+    resolveOneContentType(t, ctCfg, cfg, canonicalUrl, projectUrl, workWithMeLabelOverride)
+  );
   return {
     ctas: results.flatMap((r) => r.ctas),
     usedFallback: results.some((r) => r.usedFallback),
