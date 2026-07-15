@@ -97,6 +97,7 @@ CARD TYPE: EPIC
 - OPEN QUESTIONS for Muxin: (1) publish the raw clip as-is, or add captions / light edit first? (2) which platforms are in-scope for native video by default? (3) delete immediately on publish, or after a short grace window / archive elsewhere first?
 - STATUS: Backlog
 - DECISION: defer — deprioritized, lower priority, new media type. Keep in Backlog. 2026-07-04
+- PARKED: not ready: 3 open questions unresolved (raw-vs-captioned publish, platform scope, delete timing) + already deprioritized (DECISION: defer, 2026-07-04) + 2026-07-15
 <!-- card-id: b0e4ecc5-6120-4b40-a6dd-859c34ca332a -->
 
 **Track a storytelling-improved bucket in bets.md / origin-compare**
@@ -107,6 +108,7 @@ CARD TYPE: EPIC
 - - CHAIN: 1
 - STATUS: Backlog
 - DECISION: defer (pre-flight, 2026-07-07) — data-gated (CHAIN:1 follow-up), needs published volume with the storytelling dimension scored that does not exist yet; nothing to build tonight.
+- PARKED: not ready: phrased as an undecided consider-whether, gated on published volume that does not exist yet + 2026-07-15
 <!-- card-id: f77b6670-d39d-4c13-b9be-004084510e58 -->
 
 **Re-validate storytelling rubric once broader real-data sample exists (n>=20 across >=3 sources)**
@@ -142,6 +144,7 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - STATUS: Backlog
 - DEPENDS ON: Create quote and image cards
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- confirmed not yet prioritized, no build tonight.
+- PARKED: not ready: card explicitly states not scoped/requested by Muxin yet + 2026-07-15
 <!-- card-id: 503a0065-8ddf-4e3f-8a90-af0b671a8572 -->
 
 **Unify resolveCta and resolveEntryUrl's duplicated source/fallback chain**
@@ -173,9 +176,10 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - LinkedIn has ZERO read access today: the existing browser agent (src/pull/platforms/linkedin.ts) only triggers LinkedIn's own Analytics "Export" button for an xlsx download. There is no code path that reads mentions, comments, or DMs. LinkedIn's official API for this is restricted/partner-gated in practice -- likely means new browser-agent scraping of the notifications/messaging surface, a separate undertaking from what exists today.
 - GOAL_CONDITION: LinkedIn inbound listening (mentions/comments, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for the access approach given LinkedIn's API restrictions.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer, same access-path tradeoff as X; LinkedIn scraping of notifications/DMs carries account-risk exposure not yet accepted.
+- GROOMED: readiness pass: clear GOAL_CONDITION, mirrors existing Bluesky v1 pattern (db22283f), points at src/pull/platforms/linkedin.ts + 2026-07-15
 <!-- card-id: aab14467-ac5a-4786-9c93-3bf3b8919222 -->
 
 **Inbound listening: Substack (comment replies)**
@@ -247,6 +251,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - CHAIN: 1
 - STATUS: Backlog
 - DECISION: approved -- exclude atomized-outreach content from pillar/platform resonance figures; outreach is cold B2B, counting it would distort the strategy signal that drives drafting (2026-07-14)
+- PARKED: not ready: title itself is the unresolved strategy-judgment question (now DECISION: approved, but scope/build approach still unwritten) + 2026-07-15
 <!-- card-id: dc47457f-a6b7-49fe-b48d-838b41fc7657 -->
 
 **Build the actual Substack Notes repost path (route.ts target + skill-doc fix)**
@@ -257,6 +262,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - RULE 7: this is src/strategy/route.ts routing-decision logic (which platforms a piece is atomized to) -- content-generation-adjacent logic per CLAUDE.md rule 7. This PR should HOLD for Muxins review.
 - CHAIN: 1
 - STATUS: To Do
+- DECISION: approved -- build the missing Substack Notes repost producer (route.ts) to match Muxin's already-stated 2026-07-10 decision (platform:substack rows should be produced when appropriate); also fix the two stale skill docs. Routing/content-adjacent logic, so PR HOLDS for review per rule 7 regardless of this approval to build. (pre-flight 2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - PARKED: needs decision (judgment): Substack Notes repost routing logic touches which platforms content reaches; wrong change could misroute or drop review-queue entries; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
@@ -307,8 +313,9 @@ CHAIN: 1
 - src/outreach/tracker.ts exports summarizeFollowups() (counts per bucket, due/overdue counts) per card 21a5eb84's scope ("summary for /strategy"), but it is not wired into src/strategy/*'s weekly brief synthesis yet -- that wiring was explicitly out of scope for Phase 4. A future card should decide where/how the weekly brief surfaces follow-up due/overdue counts.
 ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
 CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
 - DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
+- GROOMED: readiness pass: clear reuse task (wire existing summarizeFollowups() into /strategy brief), depends_on already set + 2026-07-15
 - PARKED: needs decision (judgment): WHERE/HOW to surface follow-up tracker data in weekly brief not yet decided; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 2a751683-d3a5-46cc-9de2-dd0b25d7edcc -->
 
@@ -340,6 +347,7 @@ GOAL_CONDITION: not yet defined -- depends on which option(s) Muxin wants; scope
 decides the approach.
 - STATUS: Backlog
 - DECISION: defer (build NOT scheduled) -- research done (docs/research/anti-ai-writing-processes.md): de-AI-ing is a PROCESS problem, not a model/prompt one. Primary path stays Muxin's own: Wispr speech-to-text -> light edit that TRIMS TOWARD the spoken roughness (irregular rhythm + concrete specifics), never smoothing to the AI mean. If any tooling is ever built it is a FLAG-ONLY mechanical sweep of structural tells (em dash, tricolon, 'it's not X it's Y', uniform sentence length, delve/underscore/crucial diction, missing concrete detail) -- surfaces them for Muxin to cut, NEVER an AI rewrite (would violate extraction-first + rule 5). No brand-voice-prompt approach (proven to fail). (2026-07-14)
+- PARKED: not ready: GOAL_CONDITION not yet defined, depends on which of 3 options Muxin wants + 2026-07-15
 <!-- card-id: e26f6e12-73d6-4378-8be8-f43265e2f139 -->
 
 **Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some) -- check overlap with PR #185 first**
@@ -379,6 +387,7 @@ GOAL_CONDITION: not yet defined -- scope once Muxin decides which half of the ga
 SCOPE DECIDED (Muxin, 2026-07-11): (c) build BOTH halves of the gap. (a) Persist the real scheduleError reason durably when an approve-time schedule attempt fails -- write it to the row's notes column in review-queue.md so it survives past the ephemeral flash-toast (page.ts:435), not just flashed once. (b) Have the reconcile pass (src/review/reconcile.ts) detect a reuse-guard block specifically and report "blocked by reuse guard, eligible again in N days" instead of the generic, alarming "no logged draft" message.
 GOAL_CONDITION: an approve-time schedule failure leaves a durable, human-readable reason persisted on the row (not just a toast); AND the reconcile pass, for a row blocked by the reuse guard, reports "blocked by reuse guard, eligible again in N days" -- e.g. the innovation-nation quote-card-6-linkedin row reads as blocked until ~2026-08-23, not "no logged Typefully draft".
 - STATUS: To Do
+- DECISION: approved -- Muxin already scoped the fix in-card (2026-07-11 SCOPE DECIDED: persist scheduleError reason durably + reuse-guard-aware reconcile message). Low-risk, reversible GUI/bookkeeping fix, no content-generation logic; auto-merges on green CI per rule 7. (pre-flight 2026-07-14)
 - GROOMED: decision c (persist reason + reuse-guard-aware reconcile) recorded; GOAL_CONDITION stated + 2026-07-11
 <!-- card-id: 174f70bd-1dd3-456f-9d66-6945ac88872a -->
 
@@ -391,6 +400,7 @@ OBSERVED: Submitted plain text "Just some random plain text idea about productiv
 EXPECTED: A job's status/error and log view should only ever show that job's own output. Old unrelated runs should never bleed into a new job's displayed result.
 ROOT CAUSE: src/review/jobs.ts:201 - module-scoped "let jobSeq = 0" resets to 0 on every server process restart, so job IDs like "job-1" are reused across separate server lifetimes (not unique long-term). jobs.ts:27-30 jobLogPath() keys the on-disk log file purely by that reused ID under a shared, non-project-scoped directory (~/.content-agents/logs/gui-jobs/<id>.log). jobs.ts:247 opens that path with flags "a" (append) and never truncates it before a new job writes to it. Read path: src/review/serve.ts:669-684 (readFileSync(jobLogPath(jobId))) returns the full accumulated multi-run file, and that same content also gets surfaced directly into the job's error field shown inline in the queue UI. Fix should truncate/create-fresh the log file per new job (e.g. flags "w" or delete-before-open), and/or use a globally-unique job id (e.g. include a timestamp or uuid) instead of a process-local reset-to-0 counter.
 - STATUS: To Do
+- DECISION: approved -- truncate/use a unique job id per new job to stop log concatenation. The at-risk data is ephemeral local debug logs only (~/.content-agents/logs/gui-jobs/*.log, not committed, not product data), so the 'destructive' risk is negligible; standard engineering fix, no product-data loss. Non-content-gen logic, auto-merges on green CI. (pre-flight 2026-07-14)
 - GROOMED: clear outcome + precise root cause (append-mode/reused-id log files, jobs.ts:201/247); stateable predicate + 2026-07-11
 - PARKED: needs decision (destructive): fix may need to truncate/overwrite existing job-log files to clear mixed-run content, risking loss of historical debug data; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 89f7dea5-3a74-4732-80cf-d4b98f49f2fe -->
@@ -521,7 +531,8 @@ ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:au
 - SCOPE: all five levers + time-of-day approved by Muxin 2026-07-14. This is an EPIC -- grooming should break out an individual build card per lever, not build it as one blob.
 - RULE 7: every lever's generation change is content-gen LOGIC -> each build card is a HELD draft PR with before/after samples. None auto-merges.
 CARD TYPE: EPIC
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: readiness pass: epic wrapper, scope approved by Muxin 2026-07-14, lever decomposition already done as child cards + 2026-07-15
 <!-- card-id: 2ce597d7-acdc-4887-af88-1620fbac16f6 -->
 
 **Strategy lever A: gate content by pillar performance per platform (topic-fit routing)**
@@ -534,6 +545,7 @@ CARD TYPE: EPIC
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
 - STATUS: To Do
+- DECISION: hold -- epic 2ce597d7 already approved this lever's scope 2026-07-14, and seed priors are already stated on this card (X=engineering, LinkedIn=careers/building, Substack=reflective, per Muxin 2026-07-14). Build tonight; PR opens as a HELD draft with before/after samples per rule 7 (routing/content-gen logic) and per the epic's own 'None auto-merges' statement -- no live-posting risk before her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 - PARKED: needs decision (judgment): platform-pillar fit mappings for gating content by pillar performance aren't confirmed; building on unconfirmed mappings risks misrouting and rework; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: c7638362-5149-4b51-b414-17f24a94ccf7 -->
@@ -548,6 +560,7 @@ CARD TYPE: EPIC
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
 - STATUS: To Do
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14); GOAL_CONDITION and test are explicit. Build worker should verify the analytics + /atomize + /video integration prerequisites actually exist before implementing the bias logic, and note any gap in the PR. PR opens as a HELD draft per rule 7 -- no live-posting risk before review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 - PARKED: needs decision (external): media-mix bias by platform resonance depends on analytics + /atomize + /video integration prerequisites that may not exist yet; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 27dc7d2d-afee-4e20-9552-b8aa58bd6382 -->
@@ -562,6 +575,7 @@ CARD TYPE: EPIC
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
 - STATUS: To Do
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). This lever changes live posting cadence/timing, so extra scrutiny is warranted at review -- but building and opening a draft PR carries no live-posting risk by itself (nothing merges/deploys without Muxin's review per rule 7 and the epic's 'None auto-merges' statement). Flag the over-posting/rate-limit risk prominently in the PR description for her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 - PARKED: needs decision (external): auto-adapting posting cadence/time-of-day from engagement trends changes how often/when the engine posts live to real platforms; misconfigured thresholds risk over-posting or rate-limit violations; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: ed23f712-b34d-442c-9d5d-c07b10924924 -->
@@ -576,6 +590,7 @@ CARD TYPE: EPIC
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
 - STATUS: To Do
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14), GOAL_CONDITION explicit, builds on existing per-channel angle templates. PR opens as a HELD draft per rule 7 (content-gen logic: spin-angle selection weighting). (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: a4c5b42b-d3a5-4547-964c-58eb4c4507a4 -->
 
@@ -589,6 +604,7 @@ CARD TYPE: EPIC
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
 - STATUS: To Do
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). CTA-effectiveness methodology (metrics/weighting/significance threshold) is underspecified; build worker should choose a reasonable default (e.g. click-through rate, minimum sample size) and flag the choice explicitly in the PR for Muxin to adjust at review. PR opens as a HELD draft per rule 7. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 - PARKED: needs decision (judgment): CTA-effectiveness scoring is underspecified (which metrics, weighting, significance threshold) — wrong choices could recommend suboptimal CTAs across all platforms; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: d80411bc-5884-4cfe-a471-a2f887fc36dc -->
@@ -628,8 +644,9 @@ CARD TYPE: EPIC
 - GAP: no live smoke test has confirmed either DELETE endpoint actually cancels a real scheduled post at the provider (both are covered by unit tests with injected/fake providers only).
 - ROUGH SCOPE (needs grooming): schedule one disposable Typefully draft and one disposable PostPeer post, then trigger the review GUI Cancel action (or a scratch script calling cancelDraft/cancelPost directly) against each and confirm the provider actually cancels it. Depends on live API access to both providers.
 - CHAIN: 1
-- STATUS: Backlog
+- STATUS: To Do
 - DECISION: none yet.
+- GROOMED: readiness pass: concrete scope: disposable Typefully draft + PostPeer post, trigger cancel, confirm provider cancels + 2026-07-15
 <!-- card-id: df9cdce6-2c67-4c69-9578-811efba9dc48 -->
 
 **Integrate JSA manual_research.db into Follow-ups tab jobsearch bucket**
@@ -640,7 +657,8 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: Follow-ups tab's jobsearch bucket renders job-search leads from JSA's manual_research.db with correct state derivation from tracker.jsonl; a TARGET verdict from JSA appears as a contact-candidate row with last_touch and next_action computed from tracker history
 - PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: readiness pass: clear GOAL_CONDITION, reuses existing JSA_DB_PATH read-only pattern from Phase 1 + 2026-07-15
 <!-- card-id: 6f6c5d06-082b-4174-9735-77f125549ff5 -->
 
 **Implement follow-up message drafting from the Follow-ups tab**
@@ -651,7 +669,9 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: Clicking 'send-follow-up' on a Follow-ups tab row (any bucket) generates a voice.yaml-compliant draft message in review-queue.md as row type follow-up-draft with source_lines tracing to lead.md + prior touch history; npm test covers draft+approve flow with no network calls in dry-run
 - PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
-- STATUS: Backlog
+- STATUS: To Do
+- DECISION: hold -- epic 659b50f0 already approved this row-shape/action ('send-follow-up', draft-only, no auto-send). Scope is clear (reuses src/atomize/reply-draft.ts pattern for voice.yaml compliance). Message-drafting is content-generation-adjacent logic in spirit of rule 7 (produces text Muxin will read/send), so PR HOLDS for review with a real before/after sample rather than auto-merging. (pre-flight 2026-07-14)
+- GROOMED: readiness pass: clear GOAL_CONDITION, reuses src/atomize/reply-draft.ts pattern, draft-only mirrors db22283f + 2026-07-15
 <!-- card-id: 60743d7a-4919-4776-8c33-596b526c9455 -->
 
 **Wire per-platform inbound listening sources into Follow-ups tracker**
@@ -661,7 +681,8 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: After /cron/inbound-to-tracker runs following an inbound-listening pass, a mention detected on Bluesky appears as a tracker.jsonl event and renders in Follow-ups tab inbound bucket with correct last_touch and next_action ("draft reply" or "responded")
 - PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: readiness pass: clear GOAL_CONDITION, points at new src/cron/inbound-to-tracker.ts module + 2026-07-15
 <!-- card-id: 97588dc8-feff-4fe4-8224-1b4d2d211ada -->
 
 **Measure strategy lever effectiveness against baseline**
@@ -671,7 +692,8 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: A strategy-validation report (printed by /strategy or a separate command) shows per-lever engagement deltas: pieces routed via Lever A to platform-fit pillars show X% resonance lift vs. baseline, media-type bias (Lever B) shows Y% engagement lift, etc.; uncertainty/sample-size flags included where data is thin
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: Backlog
+- STATUS: To Do
+- GROOMED: readiness pass: clear GOAL_CONDITION, lightweight post-publish feedback loop scope is concrete + 2026-07-15
 <!-- card-id: 83166c51-e65f-41cc-92eb-53e5e8cf1ea5 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
