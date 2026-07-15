@@ -32,6 +32,10 @@ export interface StrategyConfig {
   // Optional: lever B (card 27dc7d2d, src/strategy/media-fit.ts) reuses this same config file +
   // loader rather than standing up a second one. Absent on a Lever-A-only config.
   media_thresholds?: { lean_floor: number };
+  // Optional: lever C (card ed23f712, src/strategy/cadence-fit.ts) reuses this same config file +
+  // loader rather than standing up a second one. Absent on a config that predates lever C.
+  cadence_thresholds?: { climb_ratio: number; decline_ratio: number; step: number; max_posts_per_week: number };
+  peak_hour_thresholds?: { min_distinct_times: number };
 }
 
 export function loadStrategyConfig(): StrategyConfig {

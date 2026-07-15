@@ -1,0 +1,9 @@
+# Proposed posting cadence + timing overrides -- strategy lever C (card ed23f712).
+# WRITTEN BY: npm run cadence-fit -- --write (from /strategy). Regenerated each cycle.
+# NOT LIVE until you approve: src/publish/slots.ts ignores every override while `approved: false`.
+# To activate: review the proposed values below, set `approved: true`, commit. A --write rerun
+# whose proposals differ from what's on disk resets this to false, so new numbers always get a
+# fresh review -- an old approval never silently carries over to different numbers.
+approved: false
+generated: ""
+overrides: {}

@@ -25,3 +25,25 @@ media_thresholds:
   lean_floor: 1.5   # ratio of a non-text media type's recency-weighted engagement over text's,
                      # on the same platform, above which the read is "lean toward <media>". Below
                      # min_posts_for_data or <4wks on EITHER side always reads "insufficient data".
+
+# Strategy lever C (card ed23f712, epic 2ce597d7): trend + peak-hour thresholds for
+# src/strategy/cadence-fit.ts. Unlike levers A/B this one CAN reach /publish's live scheduler — but
+# only through config/schedule-overrides.yaml, which stays inert until Muxin sets `approved: true`
+# there. These thresholds only decide what `npm run cadence-fit -- --write` proposes, never what's
+# actually live.
+cadence_thresholds:
+  climb_ratio: 1.2        # recent-4wk / prior-4wk recency-weighted engagement ratio above which a
+                           # platform reads "climbing"; at/below decline_ratio reads "declining";
+                           # between the two reads "steady". Either window under min_posts_for_data
+                           # (config/routing.yaml), or a zero/negative prior average, always reads
+                           # "insufficient data" — never a forced trend on thin/early signal.
+  decline_ratio: 0.8
+  step: 1                  # posts_per_week nudge per --write cycle — one step, never a jump
+                            # (over-posting guard)
+  max_posts_per_week: 10   # hard ceiling clamped onto any proposed posts_per_week (over-posting guard)
+
+peak_hour_thresholds:
+  min_distinct_times: 3    # a platform with fewer distinct PT posting hours than this has
+                            # synthetic/date-only timestamps (true today of X and LinkedIn — see
+                            # card ed23f712's PR notes) and always reads "insufficient data" for
+                            # peak-hour, regardless of post volume.
