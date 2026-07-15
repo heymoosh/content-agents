@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import {
   revisePrompt,
   classifySource,
+  sourceDispatch,
   isSafeRawPath,
   isValidLeadDir,
   approveBlockReason,
@@ -60,8 +61,28 @@ test("classifySource routes urls, existing files, and pasted text", () => {
   assert.equal(text.kind, "text");
   assert.equal(text.label, "An Idea"); // title from the first heading, hash stripped
 
-  // a path-looking string that doesn't resolve is pasted text, not a phantom file
-  assert.equal(classifySource("/nope/missing.md", () => false).kind, "text");
+  // a path-looking string that doesn't resolve is a fast "file not found", never dispatched as
+  // pasted text — a nonexistent path materialized as fake note content used to burn a full LLM
+  // atomize run before the model itself noticed the input was garbage.
+  const missing = classifySource("/nope/missing.md", () => false);
+  assert.equal(missing.kind, "file-not-found");
+  assert.equal(missing.arg, "/nope/missing.md");
+});
+
+test("classifySource recognizes ~/ and drive-letter paths as file-not-found too", () => {
+  assert.equal(classifySource("~/vault/missing.md", () => false).kind, "file-not-found");
+  assert.equal(classifySource("C:\\notes\\missing.md", () => false).kind, "file-not-found");
+  // a slash inside prose (has a space) is still plain pasted text, not a phantom path
+  assert.equal(classifySource("thoughts on love/loss and grief", () => false).kind, "text");
+});
+
+test("sourceDispatch surfaces an immediate error for file-not-found instead of dispatching a job", () => {
+  const dispatch = sourceDispatch(classifySource("/nope/missing.md", () => false), "/nope/missing.md");
+  assert.ok("error" in dispatch);
+  assert.match((dispatch as { error: string }).error, /no such file/);
+
+  const textDispatch = sourceDispatch(classifySource("just some pasted text", () => false), "just some pasted text");
+  assert.equal(("kind" in textDispatch && textDispatch.kind) || null, "text");
 });
 
 // Analytics tab "raw downloaded exports" viewer (Muxin, 2026-07-04): serves files straight out of

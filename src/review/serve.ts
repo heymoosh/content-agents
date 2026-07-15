@@ -50,6 +50,7 @@ import {
 } from "./rows.js";
 import {
   classifySource,
+  sourceDispatch,
   addJob,
   addVideoJob,
   publicJob,
@@ -74,7 +75,7 @@ import { renderPage } from "./page.js";
 // revisePrompt, jobLogPath, lastNonEmptyLine, tailLines, jobElapsedMs). scheduleKind,
 // scheduleApproved, isSafeRawPath, and SchedulerDeps are still defined natively below — this
 // module deliberately keeps scheduling + the whole Strategy/Analytics tab (see comments below).
-export { approveBlockReason, replyToMentionBlockReason, enrich, classifySource, revisePrompt, jobLogPath, lastNonEmptyLine, tailLines, jobElapsedMs };
+export { approveBlockReason, replyToMentionBlockReason, enrich, classifySource, sourceDispatch, revisePrompt, jobLogPath, lastNonEmptyLine, tailLines, jobElapsedMs };
 
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
 
@@ -694,8 +695,12 @@ const server = createServer(async (req, res) => {
         json(res, 400, { ok: false, error: "paste some text, a file path, or a URL first" });
         return;
       }
-      const c = classifySource(source);
-      const job = c.kind === "text" ? addJob("text", "", c.label, source) : addJob(c.kind, c.arg, c.label);
+      const dispatch = sourceDispatch(classifySource(source), source);
+      if ("error" in dispatch) {
+        json(res, 400, { ok: false, error: dispatch.error });
+        return;
+      }
+      const job = addJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText);
       json(res, 200, { ok: true, job: publicJob(job) });
       return;
     }
