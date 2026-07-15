@@ -431,7 +431,8 @@ REPRO:
 OBSERVED: Approve button offers no warning and is fully clickable for a quote-card row with no rendered image; video/storyboard rows get a proactive block, image rows do not.
 EXPECTED: approveBlockReason() should also check row.format === "image" (or equivalently kind === "image") and block Approve with a message like "image not rendered yet - run npm run render -- --still <folder>" when the asset file is missing, mirroring the existing video/storyboard treatment.
 ROOT CAUSE: src/review/rows.ts approveBlockReason() (~line 96-110) has no branch for the image/quote-card format, unlike its storyboard and video/short branches.
-- STATUS: To Do
+- STATUS: Done
+- SHIP: merged (PR #214) — added the missing image/quote-card branch to approveBlockReason() (rows.ts), mirroring the video/short branch exactly (asset-cell normalization, on-disk exists() check). One function feeds both the client disabled-button/note and the server-side /api/status reject, so this covers both surfaces. Updated the stale test that asserted the old buggy behavior + added 3 new image-gate tests.
 - GROOMED: add image branch to approveBlockReason() (rows.ts ~96-110), fully specified, mirrors video/storyboard + 2026-07-11
 <!-- card-id: a8cb13a4-4bf5-4e29-aaa7-04acc39abd99 -->
 
