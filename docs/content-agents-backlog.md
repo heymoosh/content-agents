@@ -384,21 +384,6 @@ DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 
 - DECISION: approved to build -- NOT subsumed by PR #185 (that only reworked LinkedIn spin structure + a 'soft availability signal' closer, not a tactical CTA). Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily 'product-team value'. Michael Callaway principle: content must be unique AND useful -> that is what converts to leads/clients. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7 (2026-07-14)
 <!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
 
-**Source triage step at /atomize time: frame-native / reflective / fiction-promo drives frame on/off + platform subset**
-- ORIGIN: Muxin-approved strategy session 2026-07-10 -- 'a system to help me stay consistent with posting what where, and what should have a frame and shouldn't, without me needing to think about it.'
-- SCOPE: a classification step when a piece enters /atomize (she writes in Obsidian, runs /atomize on the file): classify the SOURCE once as frame-native / reflective / fiction-promo, record it as a fact in the content folder (e.g. routing.md or source frontmatter), and have every downstream step read it instead of re-deciding.
-- BUCKET RULES (Muxin approved): frame-native (carries a testable belief / the move) -> full fan-out, skeleton beats applied per platform dialect. Reflective/personal (e.g. 'What AI Cannot Reach', 'More than Bread') -> NO skeleton ever; skips conversion-facing treatment (LinkedIn case format, X); native to Substack + Bluesky (personal register performs there per platform-pillar data); home = Human Inference landing page + newsletter once live (card 87c86b16), Substack interim. Fiction -> series on Substack; teasers fan out UNFRAMED via the existing extraction-first cliffhanger style.
-- UX: triage shows the classification + resulting platform subset ('frame-native -> LinkedIn/X/Bluesky' or 'reflective -> Substack/newsletter, no frame') for Muxin to confirm -- one judgment call per piece, surfaced in the review flow she already uses. Side effect: flags 'no beat-2 belief statement found' so she learns which essays lack the move.
-- SUPERSEDES 9a7656d9's ask: gate on register/frame-fit (a judgment classification), not on thin per-topic resonance data.
-- RULE 7: routing/content-generation logic -- PR HOLDS for Muxin's review.
-- GOAL_CONDITION: running /atomize on a reflective source produces a recorded 'reflective' classification, no skeleton-framed derivatives, and a platform subset excluding LinkedIn-case/X treatment; a frame-native source gets the full framed fan-out; a fiction teaser is never framed; the classification is stored in the content folder and read (not re-derived) by downstream steps.
-PR: https://github.com/heymoosh/content-agents/pull/203
-SHIP: held
-- STATUS: Done
-- DEPENDS ON: Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example
-- GROOMED: Muxin-approved scope from 2026-07-10 strategy session; bucket rules + GOAL_CONDITION explicit, depends on beat-template card + 2026-07-10
-<!-- card-id: b288d0da-c003-4617-93e4-809e865b7a80 -->
-
 **GUI approve-time scheduling failure is invisible after the fact (silent 'blocked by reuse guard' state)**
 - ORIGIN: Muxin, 2026-07-11 -- "I had a bad experience with the GUI earlier this week and haven't wanted to reopen it since." Reproduced live by opening the Review tab against real queue data.
 CONCRETE REPRO FOUND: row `quote-card-6-linkedin` (content/2026-06-16-building-an-innovation-nation/) shows STATUS: approve but has NO entry in that folder's publish-log.md. The Review tab's reconcile pass (src/review/reconcile.ts) flags it with a red warning: "not found at typefully -- no logged Typefully draft id found for this row."
@@ -644,6 +629,21 @@ CARD TYPE: EPIC
 - STATUS: Backlog
 - PARKED: needs decision (judgment, idea-scout): EU AI Act Article 50 effective 2026-08-02 (18 days out); scope applicability + disclosure copy/placement undecided; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 2775170f-14df-4cc0-a045-6d51ebcd9dec -->
+
+**Source triage step at /atomize time: frame-native / reflective / fiction-promo drives frame on/off + platform subset**
+- ORIGIN: Muxin-approved strategy session 2026-07-10 -- 'a system to help me stay consistent with posting what where, and what should have a frame and shouldn't, without me needing to think about it.'
+- SCOPE: a classification step when a piece enters /atomize (she writes in Obsidian, runs /atomize on the file): classify the SOURCE once as frame-native / reflective / fiction-promo, record it as a fact in the content folder (e.g. routing.md or source frontmatter), and have every downstream step read it instead of re-deciding.
+- BUCKET RULES (Muxin approved): frame-native (carries a testable belief / the move) -> full fan-out, skeleton beats applied per platform dialect. Reflective/personal (e.g. 'What AI Cannot Reach', 'More than Bread') -> NO skeleton ever; skips conversion-facing treatment (LinkedIn case format, X); native to Substack + Bluesky (personal register performs there per platform-pillar data); home = Human Inference landing page + newsletter once live (card 87c86b16), Substack interim. Fiction -> series on Substack; teasers fan out UNFRAMED via the existing extraction-first cliffhanger style.
+- UX: triage shows the classification + resulting platform subset ('frame-native -> LinkedIn/X/Bluesky' or 'reflective -> Substack/newsletter, no frame') for Muxin to confirm -- one judgment call per piece, surfaced in the review flow she already uses. Side effect: flags 'no beat-2 belief statement found' so she learns which essays lack the move.
+- SUPERSEDES 9a7656d9's ask: gate on register/frame-fit (a judgment classification), not on thin per-topic resonance data.
+- RULE 7: routing/content-generation logic -- PR HOLDS for Muxin's review.
+- GOAL_CONDITION: running /atomize on a reflective source produces a recorded 'reflective' classification, no skeleton-framed derivatives, and a platform subset excluding LinkedIn-case/X treatment; a frame-native source gets the full framed fan-out; a fiction teaser is never framed; the classification is stored in the content folder and read (not re-derived) by downstream steps.
+PR: https://github.com/heymoosh/content-agents/pull/203
+SHIP: held
+- STATUS: Done
+- DEPENDS ON: Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example
+- GROOMED: Muxin-approved scope from 2026-07-10 strategy session; bucket rules + GOAL_CONDITION explicit, depends on beat-template card + 2026-07-10
+<!-- card-id: b288d0da-c003-4617-93e4-809e865b7a80 -->
 
 **Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example**
 - ORIGIN: Muxin-approved strategy session 2026-07-10 (branding frame discussion; follows PR #185 / card c42769b1).
