@@ -81,6 +81,14 @@ export function parseEvidence(body: string): EvidenceItem[] {
 export function isValidSourceUrl(url: string): boolean {
   const trimmed = url.trim();
   if (!trimmed || PLACEHOLDER_SOURCES.has(trimmed.toLowerCase())) return false;
+  // vault:<path> -- evidence cited from Muxin's own Obsidian vault (source: ingested leads).
+  // Legal alongside https:// per the outreach-engine plan: the real values instrument (founder
+  // deep-dives) lives in the vault, not the web. A bare "vault:" with no path, or a placeholder
+  // typo'd behind the prefix (e.g. "vault:n/a"), is still rejected.
+  if (/^vault:/i.test(trimmed)) {
+    const path = trimmed.slice("vault:".length).trim();
+    return path.length > 0 && !PLACEHOLDER_SOURCES.has(path.toLowerCase());
+  }
   if (!/^https?:\/\//i.test(trimmed)) return false;
   try {
     return new URL(trimmed).hostname.includes(".");
