@@ -28,9 +28,10 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
   retired-provider case (like Upload-Post) should degrade — at minimum the GUI's "unavailable"
   state should point Muxin at exactly which external dashboard to check/cancel in, since a live
   cancel call isn't possible once an adapter's been deleted.
-- STATUS: In Progress
+- STATUS: Review
 - DECISION: none yet — raised 2026-07-15, not scoped or prioritized.
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- RETRY: 1
 <!-- card-id: e4eca4a1-b755-4d20-bc20-21426ad46a5a -->
 
 ---
@@ -620,6 +621,15 @@ CARD TYPE: EPIC
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - PARKED: needs decision (judgment, idea-scout): EU AI Act Article 50 effective 2026-08-02 (18 days out); scope applicability + disclosure copy/placement undecided; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 2775170f-14df-4cc0-a045-6d51ebcd9dec -->
+
+**Live smoke-test cancel endpoints (Typefully + PostPeer)**
+- ORIGIN: follow-up auto-filed from card e4eca4a1 (cancel capability for scheduled posts). Neither Typefully DELETE /v2/social-sets/{setId}/drafts/{id} nor PostPeer DELETE /v1/posts/{id} is officially documented -- endpoint shapes were inferred from existing REST conventions in the codebase and should be verified against a real scheduled post before relying on them in production.
+- GAP: no live smoke test has confirmed either DELETE endpoint actually cancels a real scheduled post at the provider (both are covered by unit tests with injected/fake providers only).
+- ROUGH SCOPE (needs grooming): schedule one disposable Typefully draft and one disposable PostPeer post, then trigger the review GUI Cancel action (or a scratch script calling cancelDraft/cancelPost directly) against each and confirm the provider actually cancels it. Depends on live API access to both providers.
+- STATUS: Backlog
+- DECISION: none yet.
+- CHAIN: 1
+<!-- card-id: df9cdce6-2c67-4c69-9578-811efba9dc48 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
 - ORIGIN: Muxin, 2026-07-10 -- "if a topic doesn't work on that platform then we shouldn't bother
