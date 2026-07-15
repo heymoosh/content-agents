@@ -492,9 +492,30 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: /strategy scores CTA effectiveness per platform from analytics; /atomize + /publish read and prioritize highest-converting CTA type per platform; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: To Do
+- STATUS: Review
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). CTA-effectiveness methodology (metrics/weighting/significance threshold) is underspecified; build worker should choose a reasonable default (e.g. click-through rate, minimum sample size) and flag the choice explicitly in the PR for Muxin to adjust at review. PR opens as a HELD draft per rule 7. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+- SHIP: reframed as a SCAFFOLD after confirming with Muxin (2026-07-15) -- the literal ask
+  (click-through/lead-gen effectiveness) isn't buildable: clicks sums to ~40 across 1,229 metric
+  rows (NULL on linkedin/bluesky, same wall lever D hit), and which CTA destination a post used was
+  never persisted (computed at publish time in cta.ts, discarded). No CTA-labeled posts have shipped
+  yet either, so there's nothing to backfill. Built the forward-persistence half instead: publish
+  (typefully.ts/cards.ts) now resolves the primary CTA destination (new cta.ts
+  resolvePrimaryCtaDestination, reusing existing resolvers -- no precedence logic duplicated) and
+  stamps a `| cta:<dest>` marker on the bets.md Placed-log row (queue.ts appendBetPlacement),
+  exactly like the existing spin/control-run/exploration markers; tag-source.ts reads it back onto
+  a new posts.cta_destination column (schema.sql + db.ts migration). src/strategy/cta-fit.ts (new,
+  mirrors frame-fit.ts) groups per-platform engagement by CTA destination once 2+ destinations clear
+  the same overfitting guard (n>=min_posts_for_data, >=4wk span) as lever D; today it correctly reads
+  insufficient-data everywhere (verified against real data/analytics.db) since no CTA-tagged posts
+  exist yet -- the lever will light up on its own as future CTA posts accumulate. Recommendation
+  only; methodology (engagement as the click/conversion proxy, per-platform top-vs-runner-up ratio)
+  flagged in the PR per the card's DECISION for Muxin to adjust. Wired into .claude/skills/strategy/
+  SKILL.md (Step 3 npm run cta-fit + Step 4 brief section). Manually verified the full round-trip
+  (marker write -> readPlaced parse -> posts.cta_destination stamp) against a scratch DB copy.
+  npm test 858/858 green (+24 new tests); npm run typecheck clean. Live consumption (prioritizing
+  the winning destination in /publish) deferred to a follow-up card once real signal exists.
+  (shipped 2026-07-15)
 <!-- card-id: d80411bc-5884-4cfe-a471-a2f887fc36dc -->
 
 **Capture real X/LinkedIn post times in ingest (unblocks lever C time-of-day for X/LinkedIn)**

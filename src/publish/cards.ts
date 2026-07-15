@@ -5,7 +5,14 @@ import { pathToFileURL } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, loadContentTypesConfig, resolveCtaLines } from "./cta.js";
+import {
+  loadCtaConfig,
+  loadCanonicalUrl,
+  loadSourceKind,
+  loadContentTypesConfig,
+  resolveCtaLines,
+  resolvePrimaryCtaDestination,
+} from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import {
@@ -269,7 +276,8 @@ export async function publishCards(
       if (manualComment) {
         appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
       }
-      appendBetPlacement(folder, row.id, target, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, caption);
+      const ctaDestination = resolvePrimaryCtaDestination(fm, canonicalUrl, cfg, sourceKind, ctCfg);
+      appendBetPlacement(folder, row.id, target, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, caption, ctaDestination);
       console.log(
         `scheduled: ${row.id} (${target}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
           (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")

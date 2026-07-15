@@ -39,6 +39,9 @@ export interface StrategyConfig {
   // Optional: lever D (card a4c5b42b, src/strategy/frame-fit.ts) reuses this same config file +
   // loader rather than standing up a second one. Absent on a config that predates lever D.
   frame_thresholds?: { win_ratio: number };
+  // Optional: lever E (card d80411bc, src/strategy/cta-fit.ts) reuses this same config file +
+  // loader rather than standing up a second one. Absent on a config that predates lever E.
+  cta_thresholds?: { win_ratio: number };
 }
 
 export function loadStrategyConfig(): StrategyConfig {
