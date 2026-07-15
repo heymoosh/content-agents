@@ -29,6 +29,9 @@ const HALF_LIFE_WEEKS = 4; // matches snapshot.ts / resonance.ts / origin-compar
 export interface StrategyConfig {
   platform_pillar_priors: Record<string, string[]>;
   thresholds: { lean_in_floor: number };
+  // Optional: lever B (card 27dc7d2d, src/strategy/media-fit.ts) reuses this same config file +
+  // loader rather than standing up a second one. Absent on a Lever-A-only config.
+  media_thresholds?: { lean_floor: number };
 }
 
 export function loadStrategyConfig(): StrategyConfig {

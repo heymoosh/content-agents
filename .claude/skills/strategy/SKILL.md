@@ -58,6 +58,18 @@ makes `/cycle` compound instead of restarting every week.
      early signal into a directive. Fold the ranked table into the brief; where a read disagrees
      with `config/routing.yaml`'s defaults, surface it as a suggestion for Muxin to consider by
      hand, same posture as Routing drift flags below — never edit `config/routing.yaml` yourself.
+   - `npm run media-fit` → strategy lever B (card 27dc7d2d, epic 2ce597d7): a per-platform
+     RECOMMENDATION comparing text engagement against quote-card/video engagement (recency-weighted,
+     `config/strategy.yaml`'s `media_thresholds`), labeled lean toward `<media>` / steady /
+     insufficient data. Recommendation only — `/atomize`'s generation contract (always text +
+     quote-card per routed platform) and `/video`'s invocation model (always human-invoked) are
+     both unchanged; nothing here auto-generates a video or a composited quote-card. A thin cell
+     (n<3 or <4wks on EITHER the text or the media side) always reads insufficient-data, never a
+     forced lean/steady read. Where a platform reads lean-toward-`<media>`, add ONE line to the
+     `media_mix` list in **Directives for atomization** below naming the platform + the suggestion
+     (e.g. "bluesky: video resonance running 2.1x text — flag `/video` as a strong option when
+     atomizing bluesky-routed pieces") — `/atomize` step 2 already reads and applies these
+     directives. `insufficient-data`/`steady` reads get no `media_mix` entry — don't manufacture one.
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`.
@@ -170,6 +182,17 @@ makes `/cycle` compound instead of restarting every week.
     is Muxin's cue to consider updating config/routing.yaml's defaults by hand, not an
     instruction to do so automatically.>
 
+   ## Media-mix signal (lever B)
+   <media-fit ranked table verbatim + 1-2 sentences per lean-toward row: which platform/media-type
+    pairs are outperforming text, and by how much. Insufficient-data pairs get a one-line mention
+    at most, never a recommendation. For each lean-toward row, add the corresponding one-line
+    entry to Directives for atomization's media_mix list below (e.g. "bluesky: video resonance
+    running 2.1x text — flag /video as a strong option when atomizing bluesky-routed pieces").
+    Recommendation only — /atomize's generation contract (always text + quote-card per routed
+    platform) and /video's invocation model (always human-invoked) are both unchanged; nothing
+    here auto-generates a
+    video or a composited quote-card.>
+
    ## Spin-control coverage
    <only include this section if `npm run spin-control -- --coverage` printed at least one row
     (some already-assigned pillar/platform pair reached n>=3 control runs) — omit the section
@@ -199,11 +222,17 @@ makes `/cycle` compound instead of restarting every week.
    - channel_emphasis: <channel(s) showing traction>
    - format_notes: <e.g. "short single posts over threads on X">
    - hooks_that_worked: ["<verbatim opening lines from top posts>"]
+   - media_mix: ["<one line per lean-toward read from the Media-mix signal section, e.g.
+     'bluesky: video resonance running 2.1x text — flag /video as a strong option'>"]
    ```
 
-   The `Directives for atomization` block must be **derived from the scorecard**: never carry a
-   directive that maps to a bet you just graded `failed`. Carry-forward TESTs that are still
-   unresolved so a hypothesis gets settled rather than forgotten.
+   The `prioritize_pillar`/`channel_emphasis`/`format_notes`/`hooks_that_worked` keys must be
+   **derived from the scorecard**: never carry a directive that maps to a bet you just graded
+   `failed`. Carry-forward TESTs that are still unresolved so a hypothesis gets settled rather
+   than forgotten. `media_mix` is populated from the Media-mix signal section instead (lever B,
+   card 27dc7d2d) — one line per `lean-toward-<media>` read, omit the key entirely when nothing
+   reads lean-toward this cycle; recommendation only, `/atomize` step 2 reads it as one input to
+   its existing quote+image-variant and `/video`-suggestion judgment calls, never a rule.
 
 5. **Record this cycle's bets.** For each new recommendation, append a bet block to the `## Bets`
    section of `briefs/bets.md` so next cycle can grade it:
