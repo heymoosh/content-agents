@@ -233,6 +233,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - STATUS: In Progress
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- PARKED: hard context/turn ceiling exceeded (turns=206 tokens=194517) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
 
 **Update .claude/skills/atomize + outreach SKILL.md for Phase 2 (draft/lock) + Phase 3 (platform-kind)**
@@ -696,6 +697,14 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - GROOMED: readiness pass: clear GOAL_CONDITION, lightweight post-publish feedback loop scope is concrete + 2026-07-15
 <!-- card-id: 83166c51-e65f-41cc-92eb-53e5e8cf1ea5 -->
+
+**Resume: code-enforce research.ts per-signal search budget (restart -- ceiling-killed session, no commits made)**
+- ORIGIN: follow-up filed by cold-start after the conductor hit the hard context/turn ceiling mid-card on 3c6550a6-a388-44cf-a56e-e9d35423b3f1 ("Code-enforce research.ts per-signal search budget") -- turns=206 tokens=194517.
+- The parked card 3c6550a6-a388-44cf-a56e-e9d35423b3f1 never made any commits (worktree at /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-3c6550a6-research-budget-3c6550a6, branch wt/3c6550a6-research-budget-3c6550a6, 0 commits ahead of main, clean status) -- so there is nothing to salvage, this is a clean restart of the same scope, not a resume of partial work.
+- Scope (from the parked card): code-enforce research.ts per-signal search budget (config/outreach.yaml search_budget_per_signal, currently prompt-text-only) with a code-level call-interception backstop, not just prompt-text hinting.
+- The stranded worktree above is left in place for inspection but should be discarded (no commits) once this follow-up is picked up.
+- STATUS: Backlog
+<!-- card-id: 43fa1e02-e454-4f02-9a5e-8c8984be16a3 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
 - ORIGIN: Muxin, 2026-07-10 -- "if a topic doesn't work on that platform then we shouldn't bother
