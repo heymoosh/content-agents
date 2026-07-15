@@ -245,6 +245,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - CHAIN: 1
 - STATUS: In Progress
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- PARKED: hard context/turn ceiling exceeded (turns=250 tokens=222823) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
 <!-- card-id: cccfc43a-6547-4f08-aeb4-3e76e7e27c49 -->
 
 **Decide: should atomized-outreach content be excluded from pillar/platform resonance figures?**
@@ -707,6 +708,16 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - GROOMED: readiness pass: scope fully carried forward from parked 3c6550a6, no blocking unknown, no approval-worthy judgment (backend enforcement tightening, not content-generation logic) + 2026-07-15
 <!-- card-id: 43fa1e02-e454-4f02-9a5e-8c8984be16a3 -->
+
+**Resume: Update .claude/skills/atomize + outreach SKILL.md for Phase 2/3 (restart -- ceiling-killed session, uncommitted work salvageable)**
+- ORIGIN: follow-up filed by cold-start after the conductor hit the hard context/turn ceiling mid-card on cccfc43a-6547-4f08-aeb4-3e76e7e27c49 ("Update .claude/skills/atomize + outreach SKILL.md for Phase 2 (draft/lock) + Phase 3 (platform-kind)") -- turns=250 tokens=222823.
+- The parked card cccfc43a-6547-4f08-aeb4-3e76e7e27c49 left substantial UNCOMMITTED work in its worktree: /Users/Muxin/Documents/GitHub/content-agents-worktrees/wt-update-atomize-outreach-skill-docs-phase2-3-cccfc43a (branch wt/update-atomize-outreach-skill-docs-phase2-3-cccfc43a), 0 commits but a dirty working tree modifying .claude/skills/atomize/SKILL.md (+1 line, outreach_message frontmatter doc) and .claude/skills/outreach/SKILL.md (+86/-26, draft/lock subcommands + platform-kind flow + status --targets) -- this reads as content-complete against the original GOAL_CONDITION, just never committed.
+- Do NOT blind-discard the worktree. Before rebuilding from scratch: read the existing diff in that worktree, verify it actually matches the GOAL_CONDITION below, and if so just commit + ship it -- likely far less work than a full redo.
+- Likely root cause of the ceiling: same constraint noted on the original card and on ebe652a7/df11d0db -- writes under .claude/ (even project-local .claude/skills/) are not grantable to a headless worker; committing them needs an attended/interactive session willing to grant that write, not a plain execute pass. Confirm this session actually has that grant before starting, or the same stall will recur.
+- GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
+- CHAIN: 1
+- STATUS: To Do
+<!-- card-id: 4e5b33d0-7e6d-42ea-924f-f58641199e02 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
 - ORIGIN: Muxin, 2026-07-10 -- "if a topic doesn't work on that platform then we shouldn't bother
