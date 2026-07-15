@@ -243,7 +243,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - EXTENDED (2026-07-10, while building Phase 3 card 6590efec): outreach/SKILL.md also needs a platform-kind walkthrough (mirroring the client-kind flow) and documentation of `outreach:status --targets` -- same headless .claude/ write-permission wall, same attended session can fix both at once.
 - GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
 - CHAIN: 1
-- STATUS: In Progress
+- Superseded 2026-07-15: this session was ceiling-killed but left its uncommitted diff salvageable in the stale worktree; the resume card 4e5b33d0 verified that diff against the GOAL_CONDITION and shipped it as-is (PR #217, merged 2026-07-15). Marking Done here too so this card doesn't stay stuck showing STATUS: In Progress forever.
+- STATUS: Done
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - PARKED: hard context/turn ceiling exceeded (turns=250 tokens=222823) -- session killed mid-card by the watchdog safety valve, never resumed (2026-07-15)
 <!-- card-id: cccfc43a-6547-4f08-aeb4-3e76e7e27c49 -->
@@ -665,7 +666,8 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
 - Once this ships, also mark original card cccfc43a-6547-4f08-aeb4-3e76e7e27c49 STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28 and 3c6550a6 -> 43fa1e02) so it doesn't stay stuck showing STATUS: In Progress forever.
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: Done
+- SHIP: fixed + merged as PR #217 -- verified the salvaged worktree diff was already content-complete against the GOAL_CONDITION (all 3 parts) and against the actual code (draft.ts/lock.ts exist, status.ts's --targets flag exists, tag-source.ts reads outreach_message) before committing as-is, no further changes needed. Writes under .claude/skills/ in a fresh worktree (a different filesystem path from the main repo's own .claude/) were grantable in this session, resolving the constraint the original card and cccfc43a both flagged. npm test 732/732 green (docs-only change). Original card cccfc43a marked Done too (Superseded note added).
 - GROOMED: clear GOAL_CONDITION + explicit resume plan, no blocking unknown + 2026-07-15
 <!-- card-id: 4e5b33d0-7e6d-42ea-924f-f58641199e02 -->
 
