@@ -527,8 +527,19 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: /atomize + /video read strategy-computed media-type preference per platform; generation biases toward highest-performing media instead of fixed text-first default; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: To Do
-- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14); GOAL_CONDITION and test are explicit. Build worker should verify the analytics + /atomize + /video integration prerequisites actually exist before implementing the bias logic, and note any gap in the PR. PR opens as a HELD draft per rule 7 -- no live-posting risk before review. (pre-flight 2026-07-14)
+- SCOPE RECONCILED (Muxin, 2026-07-15): the card's own test ("queues prioritized video
+  derivatives") is structurally impossible without /atomize auto-invoking /video, which is
+  deliberately the separately-invoked, human-gated, real-cost path (storyboard approval,
+  keyframe approval, "offer cost first, never auto-escalate" per CLAUDE.md rule 6). Raised the
+  conflict; Muxin's call: recommend only, never auto-trigger -- same "inform me, I decide"
+  resolution as Lever A (c7638362), extended to this axis. /atomize's generation contract (always
+  text + quote-card per routed platform) and /video's invocation model (always human-invoked) are
+  both untouched. A thin cell on either side of a text-vs-media comparison always reads
+  insufficient-data, never a forced lean/steady read.
+- SHIP: held (draft PR #222 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
+  needs Muxin's review; before/after sample in PR body, builds on merged Lever A/#220)
+- STATUS: Review
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14); GOAL_CONDITION and test are explicit. Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft per rule 7 -- no live-posting risk before review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: 27dc7d2d-afee-4e20-9552-b8aa58bd6382 -->
 
