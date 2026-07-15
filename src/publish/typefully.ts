@@ -180,6 +180,39 @@ export function rowDraftTitle(rowId: string): string {
   return `${rowId} (content-agents)`;
 }
 
+// Cancel (delete) a scheduled Typefully draft, given the id createDraft returned — the same id
+// logged to publish-log.md as `typefully draft <id>` and reconcile.ts's findLoggedRef/reconcileRow
+// match a live draft by (see rowDraftTitle above). Used by the review GUI's "Cancel" action
+// (src/review/rows.ts cancelScheduled) so a mistakenly-approved or now-stale row can actually be
+// pulled from Typefully instead of only unscheduled locally.
+//
+// GUESS, unverified: Typefully's public docs (docs/setup-typefully.md) only cover draft creation —
+// no delete-draft endpoint is documented anywhere this repo references. This follows the same REST
+// shape as every other /social-sets/{setId}/drafts call above (DELETE .../drafts/{draftId}) rather
+// than a confirmed endpoint. If Typefully's real API differs, the error below at least surfaces the
+// actual HTTP status/body instead of failing silently — flag this for a live smoke-test before
+// relying on it. Doesn't use the shared api() helper: api() always calls res.json(), which would
+// throw on a DELETE's likely-empty response body.
+//
+// A 404 (already gone — e.g. Muxin already canceled it by hand in the Typefully UI) is treated as
+// success, not an error: the end state either way is "no longer scheduled", which is what the
+// caller actually wants. retryOnNetworkError: false — a lost-response network error or 5xx leaves
+// real ambiguity about whether the delete landed; retrying a DELETE is safe to repeat, but silently
+// swallowing a genuine failure as a false "canceled" is worse than surfacing it once.
+export async function cancelDraft(draftId: string): Promise<void> {
+  const setId = await socialSetId();
+  const key = process.env.TYPEFULLY_API_KEY;
+  if (!key) throw new Error("TYPEFULLY_API_KEY missing in .env (generate at typefully.com settings)");
+  const res = await fetchWithRetry(
+    `${BASE}/social-sets/${setId}/drafts/${draftId}`,
+    { method: "DELETE", headers: { authorization: `Bearer ${key}` } },
+    { retryOnNetworkError: false }
+  );
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`typefully DELETE /social-sets/${setId}/drafts/${draftId} → ${res.status} ${await res.text()}`);
+  }
+}
+
 // Read-only: the live Typefully scheduled-draft queue, normalized for the unified view + --list.
 // No writes. Exported so queue-view.ts can merge it with the other channels. `id` is the draft id
 // Typefully itself assigns (also the one logged to publish-log.md as `typefully draft <id>`) — the

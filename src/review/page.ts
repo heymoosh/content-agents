@@ -120,6 +120,8 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .dupbox.show { display:flex; }
   .dupbox select { font:inherit; padding:7px 10px; border:1px solid #7a5a1c; border-radius:7px; background:#fff; }
   .dupbox button.send { border-color:#7a5a1c; background:#7a5a1c; color:#fff; }
+  button.cancel { border-color:var(--red); color:var(--red); }
+  button.cancel:hover { background:#fdecec; }
   .duperr { flex-basis:100%; color:var(--red); font-size:12.5px; font-weight:600; }
   nav.tabs { display:flex; gap:5px; }
   .tab { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:6px 14px;
@@ -346,13 +348,24 @@ function rowEl(piece, row){
   // unlike sched above which is just what the client remembers asking for at approve-time.
   const recon = row.reconciled;
   let reconHtml = "";
+  // "Cancel scheduled post" only shows once live reconciliation actually CONFIRMS a row is still
+  // scheduled at the provider — never on a mere "approved"/"published" status, which can already
+  // be stale (drifted, or provider-side canceled outside this pipeline). Card e4eca4a1.
+  let cancelBtn = "";
   if (recon && recon.state === "scheduled") {
     reconHtml = '<div class="recon-ok">✓ live at '+esc(recon.provider)+(recon.when ? ' · '+esc(recon.when) : '')+'</div>';
+    cancelBtn = '<button class="cancel" data-act="cancel">✕ Cancel scheduled post</button>';
   } else if (recon && recon.state === "mismatch") {
     reconHtml = '<div class="recon-mismatch">⚠ not found at '+esc(recon.provider)+' — '+esc(recon.reason||"mismatch")+'</div>';
+  } else if (recon && recon.state === "unavailable" && recon.provider === "upload-post") {
+    // The retired Upload-Post provider (PR #130 deleted its adapter) has no live check and can't be
+    // canceled from here — point straight at the dashboard instead of a dead-end "unavailable".
+    reconHtml = '<div class="recon-unknown">⚠ scheduled via the retired Upload-Post provider — check/cancel by hand at '+
+      '<a href="https://upload-post.com" target="_blank" rel="noopener">upload-post.com</a></div>';
   } else if (recon && recon.state === "unavailable") {
     reconHtml = '<div class="recon-unknown">provider check unavailable ('+esc(recon.provider)+') — '+esc(recon.reason||"")+'</div>';
   }
+  const cancelErr = row.cancelError ? '<div class="recon-mismatch">⚠ cancel failed: '+esc(row.cancelError)+'</div>' : "";
   const manual = row.manualComment ? '<div class="notes">↳ add as first comment in Typefully: '+esc(row.manualComment)+'</div>' : "";
   const editBtn = row.editable ? '<button data-act="edit">Edit</button>' : "";
   const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Ask Claude</button>' : "";
@@ -386,13 +399,13 @@ function rowEl(piece, row){
       '<span class="fmt">'+esc(row.format)+' · '+esc(row.id)+'</span>'+ spin + thread + origin + src +
       '<span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>'+
     '</div>'+
-    replyContext + preview + notes + sched + reconHtml + manual + blockedNote +
+    replyContext + preview + notes + sched + reconHtml + cancelErr + manual + blockedNote +
     '<div class="actions">'+
       '<button class="approve'+(row.status==="approve"?" on":"")+'" data-act="approve"'+
         (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>'+approveLabel+'</button>'+
       '<button class="revise'+(row.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(row.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
-      '<span class="spacer"></span>'+ storyboardBtn + editBtn + aiBtn + dupBtn +
+      '<span class="spacer"></span>'+ storyboardBtn + editBtn + aiBtn + dupBtn + cancelBtn +
     '</div>'+
     '<div class="revisebox"><input placeholder="what needs changing?" value="'+esc(row.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
     // Reopens (and stays open) when a prior "Ask Claude" attempt failed, so the error — durable
@@ -485,6 +498,14 @@ async function onAction(e, piece, row, el){
     const r = await post("/api/duplicate",{slug:piece.slug,id:row.id,platform});
     if(r.ok){ flash("Duplicated to "+platform+" — new pending row added"); await load(); }
     else { row.dupError = r.error || "error"; rerender(); }
+  } else if (act === "cancel"){
+    if(!confirm("Cancel this scheduled post? This removes the live draft/post at the provider.")) return;
+    e.target.disabled = true;
+    row.cancelError = null;
+    const r = await post("/api/cancel",{slug:piece.slug,id:row.id});
+    if(r.ok){ row.status="discard"; row.reconciled=null; flash("Canceled"); }
+    else { e.target.disabled = false; row.cancelError = r.error || "error"; flash(r.error || "Could not cancel"); }
+    rerender();
   }
 }
 
