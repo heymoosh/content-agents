@@ -230,7 +230,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Discovered during fb4d6b28's Step 3.5 code-review: research.ts search_budget_per_signal (config/outreach.yaml, default 2/signal) is enforced only as prompt text ("search at most N times") passed to the claude-cli subprocess, not as code-level call interception. The hard subprocess timeout (5-8 min) IS genuinely enforced via Node timeout option -- only the per-signal count lacks a code-level backstop.
 - Not a blocker: the timeout already bounds worst-case wall-clock/cost even if the LLM ignores the budget hint. This is a tightening, not a bug.
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: In Progress
 - DEPENDS ON: Resume Outreach engine Phase 1 build (restart — ceiling-killed session, no worktree ever created)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 <!-- card-id: 3c6550a6-a388-44cf-a56e-e9d35423b3f1 -->
