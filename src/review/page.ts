@@ -43,6 +43,23 @@ export function storyboardJobDone(jobs: { kind: string; slugs?: string[]; status
   return forSlug.every((j) => j.status === "done" || j.status === "failed");
 }
 
+// Pure, DOM-free mirror of the inline fmtElapsed(ms) helper the client <script> below uses (both
+// for the Jobs queue's live elapsed time and, since card a14693da, the insights follow-up ticker).
+export function formatElapsed(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+// Pure, DOM-free mirror of the inline "thinking" ticker text the client <script> below builds
+// while awaiting a follow-up insights answer (server-side timeout up to 180s) — replaces a fixed
+// "~10-60s" ETA that badly undersold the real wait with a live elapsed-time count instead, so a
+// user can tell it's still working rather than assume it's frozen (card a14693da). Exists here
+// purely so the text format is Node-testable; the client keeps its own inline copy ticked by a
+// setInterval (same cross-runtime duplication convention as the mirrors above).
+export function insightsTickerText(elapsedMs: number): string {
+  return `✨ Claude is looking into it… (may re-run a report) <span class="ticker">${formatElapsed(elapsedMs)} elapsed</span>`;
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -136,6 +153,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .aibox button.send { border-color:#5b46b8; background:#5b46b8; color:#fff; }
   .aierr { flex-basis:100%; color:var(--red); font-size:12.5px; font-weight:600; }
   .thinking { font-size:13px; color:#5b46b8; font-weight:600; padding:4px 0; }
+  .thinking .ticker { color:var(--muted); font-weight:400; }
   button.storyboard { border-color:var(--blue); color:var(--blue); }
   button.storyboard:hover { background:var(--blue-bg); }
   button.dup { border-color:#7a5a1c; color:#7a5a1c; }
@@ -727,9 +745,20 @@ async function askInsights(){
   inp.value = "";
   renderThread();
   const thinking = document.createElement("div");
-  thinking.className = "thinking"; thinking.textContent = "✨ Claude is looking into it… (~10-60s, may re-run a report)";
+  thinking.className = "thinking";
+  // Honest, live feedback instead of a fixed ETA that undersells the real (up to 180s) wait —
+  // may re-run a report, so a ticking elapsed count beats a static guess (card a14693da).
+  const start = Date.now();
+  const tick = () => { thinking.innerHTML = '✨ Claude is looking into it… (may re-run a report) <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span>'; }; // mirrors insightsTickerText() in this file's Node-side export, kept in sync by hand
+  tick();
+  const timer = setInterval(tick, 1000);
   $("#insightsThread").appendChild(thinking);
-  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory});
+  let r;
+  try {
+    r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory});
+  } finally {
+    clearInterval(timer);
+  }
   $("#insightsAskBtn").disabled = false;
   insightsHistory.push({role:"assistant", content: r.ok ? r.answer : "Failed: "+(r.error||"error")});
   renderThread();
