@@ -501,8 +501,20 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: route.ts reads strategy-computed pillar-performance signal per platform instead of hardcoded defaults; /atomize skips platforms where source pillar lacks data-backed fit; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: To Do
-- DECISION: hold -- epic 2ce597d7 already approved this lever's scope 2026-07-14, and seed priors are already stated on this card (X=engineering, LinkedIn=careers/building, Substack=reflective, per Muxin 2026-07-14). Build tonight; PR opens as a HELD draft with before/after samples per rule 7 (routing/content-gen logic) and per the epic's own 'None auto-merges' statement -- no live-posting risk before her review. (pre-flight 2026-07-14)
+- SCOPE RECONCILED (Muxin, 2026-07-15): this card's literal wording ("route.ts auto-skips
+  underperforming platforms") conflicted with the locked card 7e550e48 decision (fit score never
+  overrides config/routing.yaml's defaults -- auto-gating surprised Muxin) and with 9a7656d9's
+  overfitting/algorithmic-risk flag. Raised the conflict; Muxin's call: "inform me, I decide" --
+  given her explicit concern about overfitting to thin/early signal, this builds the
+  measurement + RECOMMENDATION half only. route.ts's decision logic and config/routing.yaml
+  defaults are untouched (7e550e48 stays intact); nothing auto-changes what /atomize drafts. A
+  thin cell (n<3 or <4wks) always reads insufficient-data, never a forced lean-in/ease-off.
+  Auto-acting on well-proven pairs is deferred to a future data-gated card once volume is thick
+  enough to trust.
+- SHIP: held (draft PR #220 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
+  needs Muxin's review; before/after sample + Bluesky seed-prior confirmation ask in PR body)
+- STATUS: Review
+- DECISION: hold -- epic 2ce597d7 already approved this lever's scope 2026-07-14, and seed priors are already stated on this card (X=engineering, LinkedIn=careers/building, Substack=reflective, per Muxin 2026-07-14). Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft with before/after samples per rule 7 (routing/content-gen logic) and per the epic's own 'None auto-merges' statement -- no live-posting risk before her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: c7638362-5149-4b51-b414-17f24a94ccf7 -->
 
