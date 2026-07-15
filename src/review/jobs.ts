@@ -201,13 +201,33 @@ export const jobs: Job[] = [];
 let jobSeq = 0;
 let draining = false;
 
+// Job ids must stay unique across a server RESTART, not just within one process: they key the
+// persisted per-job log file (jobLogPath) under ~/.content-agents/logs/gui-jobs/, which outlives
+// the process. `jobSeq` alone resets to 0 on every restart, so a bare `job-${++jobSeq}` reissues
+// "job-1", "job-2", ... every time the GUI restarts — colliding with a prior run's ids and, since
+// runClaudeSpawn opens that log file in append mode, silently concatenating this run's output onto
+// whatever an unrelated old run already wrote there (surfaced as mixed-in stale content in the
+// queue UI's error/log view). Prefixing with the process start time makes a collision require two
+// server starts landing in the same millisecond — effectively impossible.
+//
+// buildJobId is the pure piece of that invariant (session start ms + intra-session sequence
+// number), split out so the uniqueness guarantee is directly unit-testable without needing to
+// simulate an actual process restart (jobIdPrefix/jobSeq below are the real module-level wiring).
+export function buildJobId(sessionStartMs: number, seq: number): string {
+  return `job-${sessionStartMs}-${seq}`;
+}
+const jobIdPrefix = Date.now();
+function nextJobId(): string {
+  return buildJobId(jobIdPrefix, ++jobSeq);
+}
+
 // Enqueue an arbitrary async task through the SAME queue/mutex atomize jobs use, so it's bounded
 // by the one `draining` gate and shows up in the jobs pill with a real log + heartbeat (via
 // runClaudeSpawn inside the task). The caller's promise resolves/rejects with whatever `task`
 // returns/throws — the job bookkeeping (status/error/finishedAt) is separate, driven by drain().
 export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const id = `job-${++jobSeq}`;
+    const id = nextJobId();
     const job: Job = {
       id, kind, label, arg: "", status: "queued", slugs: [], error: null,
       createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
@@ -377,7 +397,7 @@ type AtomizeFamilyKind = "url" | "file" | "text" | "notes" | "continue" | "video
 // never trips over spaces in an Obsidian path; urls and "notes" pass straight through. "video" jobs
 // pass their content-folder path straight through too (see addVideoJob) — no materialization needed.
 export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, rawText?: string): Job {
-  const id = `job-${++jobSeq}`;
+  const id = nextJobId();
   let arg = rawArg;
   if (kind === "text" || kind === "file") {
     mkdirSync(INBOX, { recursive: true });
