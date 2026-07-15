@@ -49,6 +49,15 @@ makes `/cycle` compound instead of restarting every week.
 3. **Run the numbers.**
    - `npm run snapshot` → channel performance + data-confidence table
    - `npm run resonance` → pillar × platform map
+   - `npm run platform-fit` → strategy lever A (card c7638362, epic 2ce597d7): a ranked
+     topic-platform fit RECOMMENDATION (lean in / steady / consider easing off / insufficient
+     data), same underlying numbers as resonance + route's fit score, plus Muxin's seed priors
+     from `config/strategy.yaml`. Recommendation only — it never changes what `/atomize` drafts;
+     `route.ts`'s include/skip stays defaults-driven (card 7e550e48). A thin cell (n<3 or <4wks
+     of data) always reads insufficient-data, never a forced lean-in/ease-off — don't over-read
+     early signal into a directive. Fold the ranked table into the brief; where a read disagrees
+     with `config/routing.yaml`'s defaults, surface it as a suggestion for Muxin to consider by
+     hand, same posture as Routing drift flags below — never edit `config/routing.yaml` yourself.
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`.
@@ -152,6 +161,14 @@ makes `/cycle` compound instead of restarting every week.
     persistent divergences" needs no follow-up. A flag is a suggestion for Muxin's own
     re-approval of the defaults list, same posture as the Angle drift check below — it never
     edits config/routing.yaml itself and never blocks the rest of /strategy.>
+
+   ## Topic-platform fit (lever A)
+   <platform-fit ranked table verbatim + 1-2 sentences per notable row: which pairs read lean-in
+    vs consider-easing-off, and whether that matches or runs against config/strategy.yaml's seed
+    priors. Insufficient-data pairs get a one-line mention at most, never a recommendation.
+    Recommendation only — never changes what /atomize drafts on its own; a lean-in/ease-off read
+    is Muxin's cue to consider updating config/routing.yaml's defaults by hand, not an
+    instruction to do so automatically.>
 
    ## Spin-control coverage
    <only include this section if `npm run spin-control -- --coverage` printed at least one row

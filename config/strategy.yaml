@@ -1,0 +1,19 @@
+# Strategy lever A (card c7638362, epic 2ce597d7): seed priors + recommendation thresholds for
+# src/strategy/platform-fit.ts. This file is read-only input to a REPORT — it never changes what
+# /atomize drafts. config/routing.yaml's `defaults:` is what actually gates content generation
+# (that stays defaults-driven, per Muxin's locked card 7e550e48 — a fit score overriding the
+# editorial list surprised her). Lever A informs; Muxin decides.
+
+platform_pillar_priors:      # Muxin's seed priors (epic 2ce597d7 approval, 2026-07-14)
+  x:        [claude-code, builder]   # engineering thinking
+  linkedin: [career-work, builder]   # career + professional development / building
+  substack: [human-ai, civic-tech]   # society + human/reflective thought (Notes only — full
+                                      # essays are never routed to Substack, see routing.yaml)
+  bluesky:  [human-ai, civic-tech]   # carried over from existing platform-pillar-fit memory,
+                                      # not explicitly stated in the epic — confirm at PR review
+
+thresholds:
+  lean_in_floor: 1.3   # fit score (x platform norm) above which a pillar/platform pair reads
+                        # "lean in"; below config/routing.yaml's skip_below_score reads "ease off";
+                        # between the two reads "steady". Below min_posts_for_data or <4wks of
+                        # data always reads "insufficient data" — never a forced recommendation.

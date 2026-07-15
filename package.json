@@ -13,6 +13,7 @@
     "pull:weekly": "tsx src/cron/weekly-pull.ts",
     "snapshot": "tsx src/strategy/snapshot.ts",
     "resonance": "tsx src/strategy/resonance.ts",
+    "platform-fit": "tsx src/strategy/platform-fit.ts",
     "audience": "tsx src/strategy/audience.ts",
     "origin-compare": "tsx src/strategy/origin-compare.ts",
     "grade-bets": "tsx src/strategy/grade-bets.ts",
