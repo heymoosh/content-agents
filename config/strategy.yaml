@@ -47,3 +47,17 @@ peak_hour_thresholds:
                             # synthetic/date-only timestamps (true today of X and LinkedIn — see
                             # card ed23f712's PR notes) and always reads "insufficient data" for
                             # peak-hour, regardless of post volume.
+
+# Strategy lever D (card a4c5b42b, epic 2ce597d7): spin-frame vs verbatim-baseline threshold for
+# src/strategy/frame-fit.ts. RECOMMENDATION ONLY — like levers A/B this never changes what
+# /atomize drafts; it compares spin-on vs spin-control-run engagement per platform and reports
+# whether the spin frame is earning its keep. (The card's original "weight several angles per
+# platform" is deferred: angle is 1:1 with platform today and framing tags aren't in the DB yet
+# — see the follow-up card filed alongside this lever.)
+frame_thresholds:
+  win_ratio: 1.2   # spin-on recency-weighted engagement / spin-off (control) engagement, same
+                    # platform, above which the read is "spin frame winning — keep it." At/below
+                    # 1/win_ratio reads "spin frame losing — verbatim baseline outperforms,
+                    # review." Between reads "even." Either side under min_posts_for_data
+                    # (config/routing.yaml), <4wks of span, or a zero/negative control average,
+                    # always reads "insufficient data" — never a forced read on thin signal.

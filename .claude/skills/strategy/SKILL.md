@@ -80,6 +80,17 @@ makes `/cycle` compound instead of restarting every week.
      timestamp platform (true today of X and LinkedIn — their analytics don't capture posting
      hour, only the date) always reads insufficient-data, never a forced trend/peak-hour read.
      Fold the ranked tables into the brief.
+   - `npm run frame-fit` → strategy lever D (card a4c5b42b, epic 2ce597d7): the card's original ask
+     ("weight spin angles by conversion performance") isn't buildable today — angle is 1:1 with
+     platform (no menu of angles to weight) and no conversion metric exists in the analytics DB —
+     so this instead compares the always-on spin frame against the verbatim control baseline
+     (`npm run spin-control`), by engagement, per platform: frame-winning / even / frame-losing /
+     insufficient data. Recommendation only — `src/atomize/spin.ts`'s per-platform angle is
+     untouched. Because `posts.source` is untagged on most distributed posts until `tag-source`
+     runs, and control coverage accrues slowly (one pick per calendar month), expect mostly
+     insufficient-data today — that's the honest read, not a bug. Fold the ranked table into the
+     brief; case-skeleton/directive-level angle weighting is deferred until those tags are
+     persisted to the DB (see the follow-up card filed alongside this lever).
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`.
@@ -213,6 +224,15 @@ makes `/cycle` compound instead of restarting every week.
     activate: review the proposed values in config/schedule-overrides.yaml (run
     `npm run cadence-fit -- --write` to refresh them first), set approved: true, commit. Nothing
     changes your posting cadence or times until you do.">
+
+   ## Frame-fit signal (lever D)
+   <frame-fit's ranked table verbatim + 1-2 sentences on which platforms read frame-winning vs
+    frame-losing (the always-on spin frame vs the verbatim control baseline). Insufficient-data
+    rows get a one-line mention at most, naming the reason (source untagged / thin control
+    coverage) rather than just "insufficient data" — expect this to be most or all rows until
+    tag-source + spin-control coverage build up. Recommendation only — src/atomize/spin.ts's
+    per-platform angle is unchanged; a frame-losing read is Muxin's cue to consider dialing back
+    spin on that platform by hand, not an instruction to do so automatically.>
 
    ## Spin-control coverage
    <only include this section if `npm run spin-control -- --coverage` printed at least one row
