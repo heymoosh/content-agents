@@ -166,6 +166,7 @@ derivative, the video script, and the video title/description. The short version
      directives_applied: [prioritize_pillar:claude-code, format:short-single]  # which directives you acted on
      control_run: true      # only on the one derivative drafted for a due spin-control pick (card f444f440); omit otherwise
      exploration_probe: true   # only on the one derivative routed via step 3.5's --explore flag (card 92bb2ae6)
+     outreach_message: true   # only when source.md carries `source_kind: outreach-message` (new-content.ts's resolveFileSource, from a LOCKED /outreach message) — propagate it onto every derivative drafted from that source; src/db/tag-source.ts reads it to tag the shipped post 'atomized-outreach'. Omit otherwise.
      ---
      <the post text — nothing else>
      ```
