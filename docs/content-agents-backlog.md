@@ -86,6 +86,7 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: a findings note (extending or superseding docs/storytelling-rubric-validation.md) reports the hook/narrative/resonance distribution across >=20 real scored derivatives spanning >=3 distinct source pieces, states whether hook/resonance still show zero variance, and gives a concrete keep-as-is-or-change recommendation.
 - CHAIN: 1
 - STATUS: To Do
+- DECISION: defer -- leave parked; data not ready (n=6 scored derivatives, single source; needs n>=20 across >=3 sources). Revisit when /atomize runs accumulate scored derivatives spanning multiple source essays (2026-07-14)
 - GROOMED: explicit GOAL_CONDITION already on card; data-gate (n>=20, >=3 sources) is a natural precondition the task itself checks, not a readiness gap + 2026-07-08
 - PARKED: data not ready: card needs n>=20 scored derivatives across >=3 distinct source pieces; repo currently has only 6, all from one source (2026-07-05-hey-substack) - same state as the original validation. Building now would just reproduce that finding. Re-check once more /atomize runs across different essays accumulate scored derivatives.
 <!-- card-id: f1a928d1-3e2e-444e-8f68-058726f3053e -->
@@ -182,6 +183,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 **Bakeoff whisper.cpp vs Gemini on a real Muxin voice memo**
 - CHAIN: depth 1 (follow-up to b1327a9c-3ffc-41df-a822-0c1e85458a1e, whisper.cpp adapter + bakeoff script). Run npm run bakeoff:transcription -- data/inbox/<memo-file> once a real voice memo exists, read both transcripts against what was actually said, and decide whether to flip config/providers.yaml transcription: from gemini to whispercpp. See docs/bakeoffs/whispercpp-vs-gemini-transcription.md OPEN section. PARKED: needs Muxin to physically drop a real voice memo in data/inbox/ (gitignored) before this can run; no synthetic clip can answer the real question. Surface via morning summary, not a live ask.
 - STATUS: Backlog
+- DECISION: drop/won't-build -- no in-app voice-memo transcription needed, so no whisper-vs-Gemini bakeoff and no Gemini API dependency. Muxin uses Wispr (external speech-to-text) and pastes the TEXT into the GUI idea-drop input; /atomize just receives text. Recommend archiving this card (2026-07-14)
 - PARKED: needs Muxin to physically drop a real voice memo in data/inbox/ before this can run (2026-07-10) — surfaced via morning summary, not a live ask
 <!-- card-id: ae96b8e1-4102-4bd6-af10-8df51d21704d -->
 
@@ -208,6 +210,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - Worth a deliberate call before Phase 4/5 strategy work leans on resonance figures that might now include outreach-sourced follow-up posts (spin reframes of locked outreach messages, run through /atomize like any other content).
 - CHAIN: 1
 - STATUS: Backlog
+- DECISION: approved -- exclude atomized-outreach content from pillar/platform resonance figures; outreach is cold B2B, counting it would distort the strategy signal that drives drafting (2026-07-14)
 <!-- card-id: dc47457f-a6b7-49fe-b48d-838b41fc7657 -->
 
 **Build the actual Substack Notes repost path (route.ts target + skill-doc fix)**
@@ -236,6 +239,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - GOAL_CONDITION: qualify.ts either (a) accepts vault: as a legal evidence source alongside https://, with a test proving it does not downgrade client-mem, or (b) Muxin decides ingested evidence must be re-verified against a live source before qualify -- whichever she picks, client-mem/lead.md ends up with a fit verdict that reflects a deliberate decision, not a silent format-driven downgrade.
 - CHAIN: 1
 - STATUS: Backlog
+- DECISION: approved -- qualify.ts should accept vault: evidence sources in addition to https://; the real values instrument (founder deep-dives) lives in the Obsidian vault, not the web (2026-07-14)
 <!-- card-id: 4e2e83f3-cd4f-438a-a5a1-15912c1f4f6f -->
 
 **Write/source an anonymized case note for the LinkedIn case-first spin angle to work from**
@@ -246,6 +250,7 @@ CHAIN: 1
 
 SCOPE EXTENSION (Muxin approved, 2026-07-10): shape the case-note capture as an INTERVIEW TEMPLATE -- five questions mapping one-to-one onto the skeleton beats: (1) what was the situation (with a number/decision), (2) what did the team believe, in their own words, (3) what tested it, (4) what did the miss cost, (5) what's the pattern. Muxin answers in voice or text; Claude transcribes into a case note. She is the author of the answers, so it stays clean under extraction-first (same principle as the voice-notes flow). Target: ~10 minutes of Muxin's time per case.
 - STATUS: Backlog
+- DECISION: close the 'Muxin hand-writes/sources anonymized cases' framing -- she will NOT supply cases. Her intent: the case-first LinkedIn spin is EXTRACTION-ONLY and CONDITIONAL -- for each source the agent checks whether a real, anonymize-able case already exists IN that source; if yes, produce the case-first post; if no real case exists, do NOT force or invent one -- fall back to the essay's own argument. Never fabricate a client case. Content-gen logic (rule 7). Build the conditional detection; candidate home: fold into b288d0da source-triage. (2026-07-14)
 <!-- card-id: f7b186c2-0fe8-40b2-bc6d-0351b630bbda -->
 
 **Follow-ups tab: add a manual mark-as-sent/contacted action**
@@ -291,6 +296,7 @@ OPTIONS TO WEIGH (not yet decided):
 GOAL_CONDITION: not yet defined -- depends on which option(s) Muxin wants; scope this once she
 decides the approach.
 - STATUS: Backlog
+- DECISION: defer (build NOT scheduled) -- research done (docs/research/anti-ai-writing-processes.md): de-AI-ing is a PROCESS problem, not a model/prompt one. Primary path stays Muxin's own: Wispr speech-to-text -> light edit that TRIMS TOWARD the spoken roughness (irregular rhythm + concrete specifics), never smoothing to the AI mean. If any tooling is ever built it is a FLAG-ONLY mechanical sweep of structural tells (em dash, tricolon, 'it's not X it's Y', uniform sentence length, delve/underscore/crucial diction, missing concrete detail) -- surfaces them for Muxin to cut, NEVER an AI rewrite (would violate extraction-first + rule 5). No brand-voice-prompt approach (proven to fail). (2026-07-14)
 <!-- card-id: e26f6e12-73d6-4378-8be8-f43265e2f139 -->
 
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
@@ -321,6 +327,7 @@ implementation from this card alone.
 
 DECISION (Muxin, 2026-07-10 strategy session): RESOLVED BY DESIGN -- no per-topic resonance gating (thin/early signal + algorithmic risk, per the card's own risk flags). Instead gate on register/frame-fit: the new source-triage card (b288d0da) classifies each source as frame-native / reflective / fiction-promo, which drives frame on/off + platform subset. Existing pillar routing + spin stand unchanged. Superseded by b288d0da.
 - STATUS: Backlog
+- DECISION: superseded/close as a standalone card -- immediate source->frame->platform-subset mechanism is handled by b288d0da. Do NOT hardcode a platform-topic gate: it must be DATA-DRIVEN from strategy analysis (which topics/pillars actually perform per platform) and evolve over time. Seed priors only: X rewards engineering thinking, LinkedIn = career + professional development, Substack = society + human/reflective thought. The data-driven-gate work belongs in the strategy layer feeding routing; spin off a Backlog tracker if pursued (2026-07-14)
 <!-- card-id: 9a7656d9-5b53-4e2a-88c7-96abcc5c6b2e -->
 
 **Tie source topic to a real CTA connecting brand/work to product-team value (LinkedIn esp., X some) -- check overlap with PR #185 first**
@@ -345,6 +352,7 @@ card alone -- start by reviewing PR #185's actual result.
 
 DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 (case-first LinkedIn / technical X spin angles) + the new beat-template card (1eeb82a4) + f7b186c2 (real anonymized case note). No separate CTA build. The CTA is the natural last beat of the case skeleton (soft availability signal), not a bolt-on.
 - STATUS: Backlog
+- DECISION: approved to build -- NOT subsumed by PR #185 (that only reworked LinkedIn spin structure + a 'soft availability signal' closer, not a tactical CTA). Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily 'product-team value'. Michael Callaway principle: content must be unique AND useful -> that is what converts to leads/clients. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7 (2026-07-14)
 <!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
 
 **Source triage step at /atomize time: frame-native / reflective / fiction-promo drives frame on/off + platform subset**
@@ -497,6 +505,20 @@ ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:au
 - GROOMED: clip-affordance outcome clear; .notelist max-height:420px pinned (page.ts:140) + 2026-07-11
 <!-- card-id: 218cb426-115b-4eda-90bd-70fe34408e60 -->
 
+**Close the loop: strategy analysis actively steers the content engine**
+- ORIGIN: Muxin request in the 2026-07-14 groom/preflight session; expands and absorbs closed card 9a7656d9.
+- GOAL: /strategy analysis becomes a LIVE input to the content engine -- anything that must follow strategy reads from it, and it evolves as the data changes. Not a one-off gate.
+- Mechanism: /strategy computes per-platform signals from real analytics, writes them where routing/generation can read them; content steps consult those signals instead of hardcoded defaults.
+- Lever A -- Topic/pillar -> platform fit: draft a topic for a platform only where that pillar actually performs there (data-driven, evolving). Absorbs closed card 9a7656d9. Seed priors ONLY: X=engineering thinking, LinkedIn=career + professional development, Substack=society + human/reflective.
+- Lever B -- Media-mix: when images/video are outperforming text on a platform, bias /atomize + /video toward that media there instead of a fixed text-first default.
+- Lever C -- Timing (cadence + time-of-day): feed resonance trends into posts_per_week / slot cadence AND slot_time_pst -- post more where engagement is climbing, AND at the times of day that actually perform per platform, not fixed windows.
+- Lever D -- Spin-angle emphasis: which framing (case-first, technical-outsider, ...) is converting per platform -> weight the angle accordingly.
+- Lever E -- CTA effectiveness: which CTA types actually drive clicks/leads -> recommend the CTA. Ties into c02ff4aa (tactical/useful CTA).
+- SCOPE: all five levers + time-of-day approved by Muxin 2026-07-14. This is an EPIC -- grooming should break out an individual build card per lever, not build it as one blob.
+- RULE 7: every lever's generation change is content-gen LOGIC -> each build card is a HELD draft PR with before/after samples. None auto-merges.
+- STATUS: Backlog
+<!-- card-id: 2ce597d7-acdc-4887-af88-1620fbac16f6 -->
+
 **Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example**
 - ORIGIN: Muxin-approved strategy session 2026-07-10 (branding frame discussion; follows PR #185 / card c42769b1).
 - WHY: PR #185's sample drifted thesis-first because spin_angles describes INTENT in prose; runtime Sonnet follows STRUCTURE far more reliably. Encode the brand skeleton ('everyone treats X as fixed; it's actually a belief; here's what testing it revealed') as named beats with per-beat pass/fail tests, not a description.
@@ -521,10 +543,10 @@ SHIP: held
 - GOAL_CONDITION: `spin_angles.linkedin` reflects the case-first structure above (verified against a real or representative essay run, before/after sample in the PR); `spin_angles.x` reads technically sharper without reading insider-exclusive (verified against a real or representative sample); spin-mode.md guidance updated to match both.
 PR: https://github.com/heymoosh/content-agents/pull/185
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
 - STATUS: Done
 - DECISION: approved (Muxin, 2026-07-10) — LinkedIn case-study reframe confirmed; X clarified as technical-but-still-outside-the-bubble, not a flip to insider voice.
 - GROOMED: explicit structural spec for LinkedIn, explicit direction for X, both map onto existing scaffolding (spin_angles, case_study/product_builder_insight CTA types, existing rehook latitude) — no blocking unknown; PR will hold for review per rule 7 since this is content-generation logic + 2026-07-10
+- CI NOTE: CI: green (as of 2026-07-10T21:58 UTC) -- fixed a stale linkedin spin-angle test assertion that broke on the intentional config rewrite
 - LANE: a
 <!-- card-id: c42769b1-fdf4-4a78-a888-d21ea9a8ef2d -->
 
@@ -611,11 +633,11 @@ CARD TYPE: EPIC
 EXPLICIT GO-AHEAD (Muxin, 2026-07-10): confirmed named individuals + paraphrased why-this-anchor basis + source paths are OK to commit, now that the repo is private. Build as originally scoped.
 PR: https://github.com/heymoosh/content-agents/pull/181
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — extending the same hold-for-review treatment as its Rule-7 sibling outreach cards resolves the parked concern (lack of a review gate before merge) without needing a live call from Muxin; build + draft PR, hold for review
 - GROOMED: scope + sources + GOAL_CONDITION set; depends on Phase 1 (anchors.md/lead formats); no graph DB per Muxin + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T19:56 UTC)
 <!-- card-id: d4524bd0-39ba-4476-a85d-ef0e52a93f79 -->
 
 **Outreach engine — Phase 3: platform config + borrowed-audience target list**
@@ -628,11 +650,11 @@ SHIP: held
 - DEPENDENCY NOTE (2026-07-09, Muxin): Phase 3 only needs Phase 1's qualify.ts + lead.md schema, not Phase 2's draft/lock; was over-conservatively pointed at Phase 2. Unblocks Phase 2 (message quality) and Phase 3 (platform-list quality) to build/review independently once Phase 1 lands.
 PR: https://github.com/heymoosh/content-agents/pull/177
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (platform qualify/pitch-angle prompts are content-generation logic); build + draft PR, hold for review
 - GROOMED: split from b7dcb608 per plan §6 Phase 3; explicit GOAL_CONDITION (also satisfies 30772ba1), DEPENDS ON Phase 2 + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T18:37 UTC)
 <!-- card-id: 6590efec-54ca-4288-9cf7-5e69e034477d -->
 
 **Outreach engine — Phase 2: decision gate, draft, lock, /atomize reuse**
@@ -646,11 +668,11 @@ SHIP: held
 - DEPENDS ON Outreach engine — Phase 1: engine core + client config (seeded leads) -- needs a researched+qualified lead to gate/draft against.
 PR: https://github.com/heymoosh/content-agents/pull/171
 SHIP: held
-- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 - STATUS: Done
 - DEPENDS ON: Outreach engine — Phase 1: engine core + client config (seeded leads)
 - DECISION: hold — card body itself states Rule 7 applies (draft prompt is content-generation logic); build + draft PR, hold for review
 - GROOMED: split from c308a8cf per plan §6 Phase 2; explicit GOAL_CONDITION, rule-1/rule-2 posture pinned, DEPENDS ON Phase 1 + 2026-07-09
+- CI NOTE: CI: green (as of 2026-07-10T16:54 UTC)
 <!-- card-id: d5b34590-4354-49f1-952f-3faaf1ce7d4a -->
 
 **Content agent: find fit clients (lead-gen) — values + "open to changing their mind"**
