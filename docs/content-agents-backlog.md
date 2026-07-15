@@ -28,10 +28,11 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
   retired-provider case (like Upload-Post) should degrade — at minimum the GUI's "unavailable"
   state should point Muxin at exactly which external dashboard to check/cancel in, since a live
   cancel call isn't possible once an adapter's been deleted.
-- STATUS: Review
+- STATUS: Done
 - DECISION: none yet — raised 2026-07-15, not scoped or prioritized.
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - RETRY: 1
+- SHIP: merged (PR #204)
 <!-- card-id: e4eca4a1-b755-4d20-bc20-21426ad46a5a -->
 
 ---
