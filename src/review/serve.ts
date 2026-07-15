@@ -33,7 +33,7 @@ import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import { listLeads } from "../outreach/status.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
-import { buildFollowups, markResponded, moveOn, isBucket } from "../outreach/tracker.js";
+import { buildFollowups, markResponded, markContacted, moveOn, isBucket } from "../outreach/tracker.js";
 import {
   enrich,
   listPieces,
@@ -792,6 +792,20 @@ const server = createServer(async (req, res) => {
         return;
       }
       const event = markResponded(bucket, lead, b.note ? String(b.note) : undefined);
+      json(res, 200, { ok: true, event });
+      return;
+    }
+    // Manual "I sent this by hand" touch (e.g. sent from an email client, outside this tool) --
+    // appends a `followup_sent` event so the due-date clock (re)starts like a drafted-and-sent one.
+    if (req.method === "POST" && url.pathname === "/api/followups/mark-contacted") {
+      const b = await readBody(req);
+      const bucket = String(b.bucket ?? "");
+      const lead = String(b.lead ?? "");
+      if (!lead || !isBucket(bucket)) {
+        json(res, 400, { ok: false, error: "bucket and lead are required" });
+        return;
+      }
+      const event = markContacted(bucket, lead, b.note ? String(b.note) : undefined);
       json(res, 200, { ok: true, event });
       return;
     }

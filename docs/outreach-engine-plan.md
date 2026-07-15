@@ -255,8 +255,9 @@ src/review/  (extensions, no new server)
   serve.ts         # approve semantics for outreach-message rows: Approve = lock (calls lock.ts),
                    # NOT publishText — nothing schedules, nothing sends, Muxin sends manually
   page.ts          # new "Follow-ups" tab: fold tracker.jsonl, render per-row who/bucket/why (locked
-                   # core-message angle)/last touch/next action + due; actions: mark-responded,
-                   # draft-follow-up (enqueues /outreach via the existing job queue), move-on.
+                   # core-message angle)/last touch/next action + due; actions: mark-contacted
+                   # (manual "I sent this by hand" touch), mark-responded, draft-follow-up
+                   # (enqueues /outreach via the existing job queue), move-on.
                    # Anti-patterns per 659b50f0: no CRM aesthetics, no guilt-styling on overdue,
                    # "move on" reads as closing a chapter
 ```

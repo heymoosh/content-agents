@@ -14,6 +14,7 @@ import {
   buildInboundRows,
   buildJobsearchRows,
   markResponded,
+  markContacted,
   moveOn,
   type TrackerEvent,
 } from "./tracker.js";
@@ -369,6 +370,20 @@ describe("markResponded / moveOn", () => {
     try {
       const event = moveOn("platform", "platform-x", undefined, path);
       assert.equal(event.event, "abandoned");
+      assert.deepEqual(readTrackerEvents(path), [event]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("markContacted appends a followup_sent event for the given bucket+lead", () => {
+    const { dir, path } = tmpFile("tracker.jsonl");
+    try {
+      const event = markContacted("jobsearch", "PostHog", "sent via email", path);
+      assert.equal(event.event, "followup_sent");
+      assert.equal(event.bucket, "jobsearch");
+      assert.equal(event.lead, "PostHog");
+      assert.equal(event.note, "sent via email");
       assert.deepEqual(readTrackerEvents(path), [event]);
     } finally {
       rmSync(dir, { recursive: true, force: true });

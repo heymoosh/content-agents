@@ -373,6 +373,14 @@ export function markResponded(bucket: Bucket, lead: string, note?: string, path:
   return event;
 }
 
+// Manual "I sent this by hand" tracker touch -- for a follow-up Muxin sent outside this tool
+// (e.g. in his email client), so the Follow-ups tab's due-date clock still (re)starts correctly.
+export function markContacted(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH): TrackerEvent {
+  const event: TrackerEvent = { ts: new Date().toISOString(), lead, bucket, event: "followup_sent", ...(note ? { note } : {}) };
+  appendTrackerEvent(event, path);
+  return event;
+}
+
 // "Move on" reads as closing a chapter, not failure (659b50f0's explicit anti-pattern) -- the
 // event type is `abandoned` internally, but nothing in the GUI copy should say that word.
 export function moveOn(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH): TrackerEvent {
