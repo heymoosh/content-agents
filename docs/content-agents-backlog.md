@@ -243,7 +243,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - EXTENDED (2026-07-10, while building Phase 3 card 6590efec): outreach/SKILL.md also needs a platform-kind walkthrough (mirroring the client-kind flow) and documentation of `outreach:status --targets` -- same headless .claude/ write-permission wall, same attended session can fix both at once.
 - GOAL_CONDITION: both SKILL.md files describe outreach:draft and outreach:lock as shipped (not pending), atomize/SKILL.md documents the outreach_message: true frontmatter marker, and outreach/SKILL.md documents the platform-kind flow + outreach:status --targets.
 - CHAIN: 1
-- STATUS: To Do
+- STATUS: In Progress
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 <!-- card-id: cccfc43a-6547-4f08-aeb4-3e76e7e27c49 -->
 
