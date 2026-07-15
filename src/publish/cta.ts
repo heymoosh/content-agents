@@ -91,6 +91,15 @@ export interface ResolvedCta {
   label: string;
 }
 
+// The one source/fallback resolution both CTA paths (resolveEntryUrl's `source` destination and
+// resolveCta's `source` value) share: a source-style link is the derivative's own canonical_url,
+// else the configured homepage/fallback. `usedFallback` is the raw "canonical was absent" signal
+// -- callers decide whether a null fallback still counts as a fallback (resolveCta narrows it;
+// resolveEntryUrl uses it as-is).
+function resolveSourceUrl(canonicalUrl: string | null, cfg: CtaConfig): { url: string | null; usedFallback: boolean } {
+  return { url: canonicalUrl ?? cfg.fallbackUrl, usedFallback: canonicalUrl == null };
+}
+
 // A `source` destination resolves exactly like resolveCta's `source` case (the essay's own
 // canonical_url, else the configured homepage/fallback). A `project` destination resolves ONLY to
 // this derivative's own `project_url` frontmatter value; a missing project_url means "omit this
@@ -111,7 +120,7 @@ function resolveEntryUrl(
   if (entry.destination === "work_with_me") {
     return { url: workWithMeUrl, usedFallback: false };
   }
-  return { url: canonicalUrl ?? cfg.fallbackUrl, usedFallback: canonicalUrl == null };
+  return resolveSourceUrl(canonicalUrl, cfg);
 }
 
 function resolveOneContentType(
@@ -246,9 +255,9 @@ export function resolveCta(
     return { url: null, label, usedFallback: false };
   }
   if (rawCta.toLowerCase() === "source") {
-    if (canonicalUrl) return { url: canonicalUrl, label, usedFallback: false };
-    if (cfg.fallbackLabel) label = cfg.fallbackLabel;
-    return { url: cfg.fallbackUrl, label, usedFallback: cfg.fallbackUrl != null };
+    const { url, usedFallback } = resolveSourceUrl(canonicalUrl, cfg);
+    if (usedFallback && cfg.fallbackLabel) label = cfg.fallbackLabel;
+    return { url, label, usedFallback: usedFallback && url != null };
   }
   return { url: rawCta, label, usedFallback: false };
 }

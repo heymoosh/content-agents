@@ -151,11 +151,17 @@ GOAL_CONDITION: with the Landing page live and a real work-with-me URL configure
 - src/publish/cta.ts has two parallel implementations of "resolve a source-style URL, falling back to canonicalUrl ?? cfg.fallbackUrl": resolveCta (the pre-existing pillar/explicit-cta path) and resolveEntryUrl (the new content-type path). They currently agree, but if the source/fallback rule ever changes (e.g. adding a UTM param, changing the homepage fallback), someone has to remember to update both.
 - GOAL_CONDITION: resolveCta and resolveEntryUrl share one primitive for the source/fallback resolution (e.g. resolveEntryUrl calls into resolveCta's fallback logic, or both call a shared helper), with src/publish/cta.test.ts and content-type-cta.test.ts still passing unmodified.
 - CHAIN: 1
-- STATUS: To Do
-- DEPENDS ON: Smarter routing
+- SHIP: added a private resolveSourceUrl(canonicalUrl, cfg) helper (src/publish/cta.ts) as the
+  single source of truth for "canonical_url ?? cfg.fallbackUrl"; resolveEntryUrl's `source` case
+  now calls it directly, resolveCta's `source` case calls it and layers its own label-swap +
+  narrowed usedFallback (canonical-and-fallback-both-null must report usedFallback:false, verified
+  against cta.test.ts's existing assertion). src/publish/cta.test.ts and content-type-cta.test.ts
+  pass unmodified (834/834 total); npm run typecheck clean. Diff scoped to cta.ts alone. The stale
+  `DEPENDS ON: Smarter routing` dangling-ref (flagged by the PARKED note below) is moot now that
+  this ships -- cleared. (shipped 2026-07-15)
+- STATUS: Done
 - DECISION: approved — pure refactor unifying duplicated fallback logic, existing tests must still pass unmodified
 - GROOMED: explicit GOAL_CONDITION + exact files/tests named; backend dedup, CHAIN:1, dependency (Smarter routing) now Done + 2026-07-08
-- PARKED: dangling DEPENDS ON: the original Smarter routing card (6dcaee98) it names is already Done but no longer exists on the board under that title, so the fuzzy dependency matcher cannot resolve it to a Done card and treats it as blocked (dangling ref = blocked, by design). Board bookkeeping only -- needs Muxin (or a groomer pass) to either clear DEPENDS ON or repoint it at a real title; conductor left the link untouched rather than editing a dependency link without approval.
 <!-- card-id: e889e512-92fb-40dd-9669-fdcb51c6be11 -->
 
 **Inbound listening: X (mentions/replies/DMs)**
