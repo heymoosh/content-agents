@@ -632,6 +632,48 @@ CARD TYPE: EPIC
 - DECISION: none yet.
 <!-- card-id: df9cdce6-2c67-4c69-9578-811efba9dc48 -->
 
+**Integrate JSA manual_research.db into Follow-ups tab jobsearch bucket**
+- Epic 659b50f0 specifies jobsearch bucket as 'pluggable per the c308a8cf Level-2 recommendation (native events, or read-only JSA pull if Muxin picks option (a))'
+- Phase 4 (21a5eb84) shipped schema for jobsearch bucket from tracker.jsonl but doesn't explicitly wire JSA's manual_research.db read
+- Need to poll JSA's manual_research.db (read-only via JSA_DB_PATH, existing pattern from Phase 1) and populate Follow-ups tab rows for TARGET/CONSIDER verdicts
+- Row state (contacted→waiting→responded→follow-up-sent, etc.) still tracked natively in tracker.jsonl per option (b), but initial candidate population comes from JSA
+- GOAL_CONDITION: Follow-ups tab's jobsearch bucket renders job-search leads from JSA's manual_research.db with correct state derivation from tracker.jsonl; a TARGET verdict from JSA appears as a contact-candidate row with last_touch and next_action computed from tracker history
+- PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
+- STATUS: Backlog
+<!-- card-id: 6f6c5d06-082b-4174-9735-77f125549ff5 -->
+
+**Implement follow-up message drafting from the Follow-ups tab**
+- Epic 659b50f0 specifies ROW SHAPE includes 'one-click mark-responded / send-follow-up / move-on' but only mark-as-sent is filed (240ba67)
+- send-follow-up action needs to draft a follow-up message (reusing src/atomize/reply-draft.ts pattern for voice.yaml compliance) and surface it in review-queue for approval
+- Message context: locked core-message from the lead's lead.md + time-since-contact + prior message history from tracker.jsonl, draft to review-queue.md as a new row type (follow-up-draft)
+- No auto-send — mirrors the review → approve posture of db22283f (voice replies draft-only)
+- GOAL_CONDITION: Clicking 'send-follow-up' on a Follow-ups tab row (any bucket) generates a voice.yaml-compliant draft message in review-queue.md as row type follow-up-draft with source_lines tracing to lead.md + prior touch history; npm test covers draft+approve flow with no network calls in dry-run
+- PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
+- STATUS: Backlog
+<!-- card-id: 60743d7a-4919-4776-8c33-596b526c9455 -->
+
+**Wire per-platform inbound listening sources into Follow-ups tracker**
+- Inbound listening cards (ec217518, aab14467, 81808fa0) exist but don't explicitly feed into tracker.jsonl — they detect mentions/replies and dedup via ledger, but Follow-ups tab's inbound bucket stays empty
+- Epic 659b50f0 says 'inbound bucket is schema-ready from day one but stays empty until db22283f lands' — db22283f (voice replies) is shipped, but the PLUMBING to append inbound events to tracker.jsonl doesn't exist yet
+- Need a new module (src/cron/inbound-to-tracker.ts or similar) that runs after each inbound-listening pass and writes mentions/replies as tracker.jsonl events (bucket: inbound, who: author, why: extracted mention/reply context)
+- GOAL_CONDITION: After /cron/inbound-to-tracker runs following an inbound-listening pass, a mention detected on Bluesky appears as a tracker.jsonl event and renders in Follow-ups tab inbound bucket with correct last_touch and next_action ("draft reply" or "responded")
+- PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
+- STATUS: Backlog
+<!-- card-id: 97588dc8-feff-4fe4-8224-1b4d2d211ada -->
+
+**Measure strategy lever effectiveness against baseline**
+- Epic 2ce597d7 builds 5 levers that steer content generation, but once deployed they need validation: do they actually improve performance vs. the hardcoded defaults they replace?
+- Each lever card includes a test (e.g. 'Test: /atomize on a piece strong in Substack pillar but weak in X pillar produces Substack derivatives only') but these are unit tests, not outcome measurement
+- Need a lightweight post-publish feedback loop: track which strategy lever was active for each published piece, measure engagement delta (pillar fit → resonance lift, media-type bias → click lift, CTA choice → conversion lift), and surface findings in /strategy brief or a dedicated signals-effectiveness report
+- GOAL_CONDITION: A strategy-validation report (printed by /strategy or a separate command) shows per-lever engagement deltas: pieces routed via Lever A to platform-fit pillars show X% resonance lift vs. baseline, media-type bias (Lever B) shows Y% engagement lift, etc.; uncertainty/sample-size flags included where data is thin
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- STATUS: Backlog
+<!-- card-id: 83166c51-e65f-41cc-92eb-53e5e8cf1ea5 -->
+
 **Only draft content for a platform if the source topic actually fits it (needs a strategy session first)**
 - ORIGIN: Muxin, 2026-07-10 -- "if a topic doesn't work on that platform then we shouldn't bother
 creating a draft for it using atomize." Muxin wasn't sure whether this was already asked for /
