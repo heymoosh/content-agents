@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { replyContextHtml, imageMissingHtml, storyboardJobDone } from "./page.js";
+import { replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, insightsTickerText } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
   const row = {
@@ -108,4 +108,35 @@ test("storyboardJobDone: a done job for a DIFFERENT slug does not mark this slug
 test("storyboardJobDone: a done job of a non-video kind for the slug is ignored", () => {
   const jobs = [{ kind: "text", slugs: ["my-slug"], status: "done" }];
   assert.equal(storyboardJobDone(jobs, "my-slug"), false);
+});
+
+// formatElapsed / insightsTickerText — card a14693da: the insights follow-up "thinking" indicator
+// used to show a fixed "~10-60s" ETA while the real server-side bound is 180s. Replaced with a
+// live elapsed-time count so a long wait reads as "still working," not "frozen."
+test("formatElapsed: under a minute renders as whole seconds", () => {
+  assert.equal(formatElapsed(0), "0s");
+  assert.equal(formatElapsed(42_000), "42s");
+  assert.equal(formatElapsed(59_499), "59s");
+});
+
+test("formatElapsed: a minute or more renders as Xm Ys", () => {
+  assert.equal(formatElapsed(60_000), "1m 0s");
+  assert.equal(formatElapsed(90_000), "1m 30s");
+  assert.equal(formatElapsed(185_000), "3m 5s");
+});
+
+test("insightsTickerText: no longer claims the old misleading fixed ETA", () => {
+  const html = insightsTickerText(45_000);
+  assert.ok(!html.includes("10-60s"), "must not still show the old undersold ETA");
+});
+
+test("insightsTickerText: renders the live elapsed count so the wait reads as ongoing, not stuck", () => {
+  const html = insightsTickerText(45_000);
+  assert.ok(html.includes("45s elapsed"));
+  assert.ok(html.includes("still looking into it") || html.includes("looking into it"));
+});
+
+test("insightsTickerText: elapsed count keeps ticking past a minute, matching the real ~180s bound", () => {
+  const html = insightsTickerText(125_000);
+  assert.ok(html.includes("2m 5s elapsed"));
 });
