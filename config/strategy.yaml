@@ -17,3 +17,11 @@ thresholds:
                         # "lean in"; below config/routing.yaml's skip_below_score reads "ease off";
                         # between the two reads "steady". Below min_posts_for_data or <4wks of
                         # data always reads "insufficient data" — never a forced recommendation.
+
+# Strategy lever B (card 27dc7d2d): media-type fit thresholds for src/strategy/media-fit.ts.
+# Recommendation only — /atomize's generation contract (always text + quote-card per routed
+# platform) and /video's invocation model (always human-invoked) are both untouched by this.
+media_thresholds:
+  lean_floor: 1.5   # ratio of a non-text media type's recency-weighted engagement over text's,
+                     # on the same platform, above which the read is "lean toward <media>". Below
+                     # min_posts_for_data or <4wks on EITHER side always reads "insufficient data".

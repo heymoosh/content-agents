@@ -366,7 +366,10 @@ derivative, the video script, and the video title/description. The short version
       `images/quote-card-N.png`/`.mp4` from part b. Skip this part entirely unless the piece calls
       for it; when you do use it, add its own review-queue row (step 8) pointing at
       `images/quote-card-N-image.png` instead of the typographic PNG — same image model policy
-      (below) applies.
+      (below) applies. If the latest brief's `Directives for atomization` `media_mix` list names
+      this piece's platform as lean-toward-`quote-card` (strategy lever B, card 27dc7d2d), weigh
+      that alongside the "strong visual concept" call above — a data point, not a rule; the
+      variant stays Claude's judgment either way.
 
    Then add one review-queue row per caption (step 8): `quote-card-N-<target> | quote-card:<target>
    | image | images/quote-card-N.png | …`. `publish:cards` posts the shared image to that one
@@ -409,7 +412,11 @@ derivative, the video script, and the video title/description. The short version
    `routing.md`), any derivative flagged for a Spin pass on storytelling, and anything else
    skipped. If Muxin wants a skipped platform anyway, they can say so (or adjust
    `config/routing.yaml`) and you'll generate it. If the piece is a good candidate for a short,
-   mention they can run `/video <folder>`.
+   mention they can run `/video <folder>` — and if the latest brief's `Directives for atomization`
+   `media_mix` list names one of this piece's routed platforms as lean-toward-`video` (strategy
+   lever B, card 27dc7d2d), cite that data point explicitly alongside your own read (e.g. "bluesky
+   video resonance is running 2.1x text this cycle — could be worth a `/video` pass here"). Still
+   a recommendation, never automatic: `/atomize` never invokes `/video` itself.
 
 ## Mode dispatch
 
