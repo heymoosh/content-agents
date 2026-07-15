@@ -567,7 +567,12 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: Follow-ups tab's jobsearch bucket renders job-search leads from JSA's manual_research.db with correct state derivation from tracker.jsonl; a TARGET verdict from JSA appears as a contact-candidate row with last_touch and next_action computed from tracker history
 - PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
-- STATUS: To Do
+- SHIP: verified already shipped, no build needed -- buildJobsearchRows() (src/outreach/tracker.ts)
+  joins JSA TARGET verdicts via the read-only src/outreach/jsa.ts reader, tested in
+  tracker.test.ts. Landed in Phase 1 (#167) + Phase 4 (#187), before this propose-cards-generated
+  card was even filed (2026-07-14). Duplicate of already-shipped work -- concrete instance of the
+  cold-decomposition duplication bug c8fc8ac3 targets. (verified 2026-07-15)
+- STATUS: Done
 - GROOMED: readiness pass: clear GOAL_CONDITION, reuses existing JSA_DB_PATH read-only pattern from Phase 1 + 2026-07-15
 <!-- card-id: 6f6c5d06-082b-4174-9735-77f125549ff5 -->
 
@@ -581,6 +586,17 @@ CARD TYPE: EPIC
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
 - STATUS: To Do
 - DECISION: hold -- epic 659b50f0 already approved this row-shape/action ('send-follow-up', draft-only, no auto-send). Scope is clear (reuses src/atomize/reply-draft.ts pattern for voice.yaml compliance). Message-drafting is content-generation-adjacent logic in spirit of rule 7 (produces text Muxin will read/send), so PR HOLDS for review with a real before/after sample rather than auto-merging. (pre-flight 2026-07-14)
+- SHIP: verified already shipped, no build needed -- enqueueFollowUpDraft (src/review/jobs.ts) ->
+  runDraft (src/outreach/draft.ts, the correct composed-prose Spin path, CLAUDE.md rule 1's scoped
+  exception) writes messages/message-NN.md + a pending review-queue.md row, wired to the Follow-ups
+  tab's "Draft follow-up" button, hardened for durability/dedup/logging in #215. Landed via #187,
+  #207, #215 -- before this propose-cards-generated card was filed (2026-07-14). Scope deltas from
+  the literal card text (satisfied in spirit, not worth a rebuild): reuses outreach/draft.ts not
+  reply-draft.ts; writes a normal `pending` row, not a distinct `follow-up-draft` row type; only
+  fires for client/platform leads with a `dir` (jobsearch/inbound rows have none, so no Draft
+  button there yet -- a real but minor residual, flagged for Muxin's call, not auto-filed as a new
+  card). (verified 2026-07-15)
+- STATUS: Done
 - GROOMED: readiness pass: clear GOAL_CONDITION, reuses src/atomize/reply-draft.ts pattern, draft-only mirrors db22283f + 2026-07-15
 <!-- card-id: 60743d7a-4919-4776-8c33-596b526c9455 -->
 
@@ -591,6 +607,19 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: After /cron/inbound-to-tracker runs following an inbound-listening pass, a mention detected on Bluesky appears as a tracker.jsonl event and renders in Follow-ups tab inbound bucket with correct last_touch and next_action ("draft reply" or "responded")
 - PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
+- VERIFIED NOT BUILT (2026-07-15): confirmed the real gap still stands -- no src/cron/inbound-to-tracker.ts
+  or equivalent exists; nothing appends bucket:"inbound" tracker events; src/cron/bluesky-mentions.ts
+  writes only its own ledger (data/bluesky-mentions-ledger.jsonl); buildInboundRows()
+  (src/outreach/tracker.ts) still returns [] with the literal "(inbound listening not built yet --
+  db22283f)" placeholder note. This is the next real build in this epic, unlike its two siblings
+  (6f6c5d06, 60743d7a) which turned out already shipped.
+- OPEN DESIGN QUESTION (not a readiness gap to guess past): the tracker's event vocabulary
+  (contacted/responded/no_response/followup_sent/scheduled/done/abandoned, src/outreach/tracker.ts)
+  is outbound-oriented ("I reached out"). An inbound mention is the reverse -- someone reached out
+  to Muxin -- so mapping it to next_action "draft reply" vs "responded" needs either a new event
+  semantics (e.g. treat the mention itself as the clock-start, "responded" only once Muxin actually
+  replies) or an explicit documented reverse-mapping decision. Surface this to Muxin before
+  scoping the build, don't guess.
 - STATUS: To Do
 - GROOMED: readiness pass: clear GOAL_CONDITION, points at new src/cron/inbound-to-tracker.ts module + 2026-07-15
 <!-- card-id: 97588dc8-feff-4fe4-8224-1b4d2d211ada -->
@@ -612,6 +641,13 @@ CARD TYPE: EPIC
 - DECISION (Muxin, 2026-07-15): this REPLACES the existing cold epic-decomposition mode entirely — not a second mode running alongside it.
 - DECISION (Muxin, 2026-07-15): generation runs as a delegated subprocess (same pattern the current skill already uses for its `claude -p` generator), not inline in the conductor's own context — "subprocess may be fine if it works." Still open: exactly what feeds that subprocess (the card's PR diff? its final worker transcript? its Review-stage self-vet notes? some combination) — needs a decision before this builds, don't guess.
 - RENAME: `propose-cards` -> `follow-up-cards` throughout (skill dir, SKILL.md, all cross-references in orchestrate-pipeline SKILL.md / references/preflight.md / references/cold-start.md, any conductor step that invokes it).
+- EVIDENCE (2026-07-15, content-agents board hygiene pass): a live instance of exactly the
+  duplication problem this card exists to fix. propose-cards' 2026-07-14 cold decomposition of
+  epic 659b50f0 filed three children (6f6c5d06, 60743d7a, 97588dc8); two of the three
+  (6f6c5d06, 60743d7a) turned out to already be fully shipped by the epic's own Phase 1/4 build
+  (#167, #187, #207, #215) before the cold pass even ran -- because it reads epic prose, not what
+  the epic's actual execution already produced. Only 97588dc8 was a real gap. Concrete data point
+  for this card's WANTED BEHAVIOR (seed from a completed card's own work, not epic prose).
 - STATUS: Backlog
 - LANE: claude-config (~/.claude) — this is a conductor-mechanism/global-skill change, not a content-agents content change. Build there per the repo's own conductor carve-out (worktree off ~/.claude, base branch master, no backlog_path).
 <!-- card-id: c8fc8ac3-ac1a-4471-9f22-916752143960 -->
