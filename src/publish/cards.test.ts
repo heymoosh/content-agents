@@ -1,7 +1,7 @@
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { basePlatform, cardTarget, publishCards } from "./cards.js";
@@ -155,6 +155,58 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     // config/cta.yaml places x's link in the first reply (not inline, not omitted) — same as text.
     assert.equal(xPosts.length, 2, "X CTA goes in a second (reply) post, matching publishText's buildPosts");
     assert.match(xPosts[1].text, /https:\/\/example\.com\/essay/);
+  });
+
+  // Card d80411bc (strategy lever E scaffold): the resolved CTA destination now rides along as a
+  // `| cta:<dest>` marker on the bets.md Placed-log row, so tag-source.ts can later stamp it onto
+  // posts.cta_destination. Verifies both resolution paths land the right marker. bets.md
+  // accumulates across tests in this describe block (only cleaned in `after()`), so each
+  // assertion greps the line for THIS test's own folder (a fresh mkdtemp dir every time), never
+  // the whole file — otherwise an earlier test's marker would false-positive a later assertion.
+  function betsLineFor(folder: string, rowId: string): string {
+    const bets = readFileSync(TEST_BETS_PATH, "utf8");
+    const line = bets.split("\n").find((l) => l.includes(`[${basename(folder)}/${rowId}]`));
+    assert.ok(line, `no Placed-log row found for ${basename(folder)}/${rowId}`);
+    return line!;
+  }
+
+  test("cta:source resolves and marks the Placed-log row `| cta:source`", async () => {
+    stubTypefully();
+    const folder = tmpFolder(
+      `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
+      `---\nplatform: quote-card:x\ncta: source\n---\n`
+    );
+
+    await publishCards(folder, { atOverride: FUTURE_ISO });
+
+    assert.match(betsLineFor(folder, "quote-card-1-x"), /\| cta:source \|/);
+  });
+
+  test("a content_type resolving to work_with_me marks the Placed-log row `| cta:work_with_me`", async () => {
+    stubTypefully();
+    const folder = tmpFolder(
+      `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
+      `---\nplatform: quote-card:x\ncontent_type: [offer_adjacent_post]\n---\n`
+    );
+
+    await publishCards(folder, { atOverride: FUTURE_ISO });
+
+    assert.match(betsLineFor(folder, "quote-card-1-x"), /\| cta:work_with_me \|/);
+  });
+
+  test("a literal-url cta override (not one of the three known destinations) leaves no cta marker", async () => {
+    stubTypefully();
+    const folder = tmpFolder(
+      `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
+      `---\nplatform: quote-card:x\ncta: "https://example.com/essay"\ncta_label: "Full essay:"\n---\n`
+    );
+
+    await publishCards(folder, { atOverride: FUTURE_ISO });
+
+    assert.ok(
+      !/\| cta:/.test(betsLineFor(folder, "quote-card-1-x")),
+      "a literal-url override should not be classified into a cta_destination bucket"
+    );
   });
 
   test("a legacy fan-out quote-card row (no :<platform> target) throws instead of silently misrouting", async () => {

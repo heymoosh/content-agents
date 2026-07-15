@@ -1,9 +1,18 @@
-import { test } from "node:test";
+import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
-import { readQueue, setStatus, stampOrigin, writeCell, storyboardRowStatus, appendRow, type QueueRow } from "./queue.js";
+import {
+  readQueue,
+  setStatus,
+  stampOrigin,
+  writeCell,
+  storyboardRowStatus,
+  appendRow,
+  appendBetPlacement,
+  type QueueRow,
+} from "./queue.js";
 
 // Origin source-tags (Muxin, 2026-07-04): every row awaiting review carries an origin — one of
 // QUEUE_ORIGINS — set at the pipeline that created it. Rows written before this change have no
@@ -284,4 +293,47 @@ test("appendRow strips stray pipes/newlines out of notes so column boundaries ca
   const { rows } = readQueue(dir);
   assert.equal(rows[0].notes, "line one line two   with a pipe");
   rmSync(dir, { recursive: true, force: true });
+});
+
+// appendBetPlacement's ctaDestination param (card d80411bc, strategy lever E scaffold): the
+// `| cta:<dest>` marker it writes is what tag-source.ts reads back onto posts.cta_destination.
+// Isolated from the real briefs/bets.md via CONTENT_AGENTS_TEST_BETS_PATH (same mechanism
+// slots.test.ts uses for CONTENT_AGENTS_TEST_LEDGER, and cards.test.ts already uses for this file).
+describe("appendBetPlacement: ctaDestination marker", () => {
+  const originalBetsPath = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  let testDir: string;
+  let testBetsPath: string;
+
+  before(() => {
+    testDir = mkdtempSync(join(tmpdir(), "queue-bets-test-"));
+    testBetsPath = join(testDir, "bets.md");
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = testBetsPath;
+  });
+
+  after(() => {
+    if (originalBetsPath === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+    else process.env.CONTENT_AGENTS_TEST_BETS_PATH = originalBetsPath;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function lineFor(rowId: string): string {
+    const line = readFileSync(testBetsPath, "utf8").split("\n").find((l) => l.includes(`[essay-01/${rowId}]`));
+    assert.ok(line, `no Placed-log row found for essay-01/${rowId}`);
+    return line!;
+  }
+
+  test("a ctaDestination writes a `| cta:<dest>` marker before the quoted prefix", () => {
+    appendBetPlacement("essay-01", "x-1", "x", "typefully draft 1", {}, "some posted text long enough to match", "source");
+    assert.match(lineFor("x-1"), /\| cta:source \|/);
+  });
+
+  test("an unset ctaDestination (default null) writes no cta marker at all", () => {
+    appendBetPlacement("essay-01", "x-2", "x", "typefully draft 2", {}, "other posted text long enough to match");
+    assert.ok(!/\| cta:/.test(lineFor("x-2")));
+  });
+
+  test("the cta marker coexists with the spin marker, both before the quote", () => {
+    appendBetPlacement("essay-01", "x-3", "x", "typefully draft 3", { spin: true }, "third posted text long enough to match", "work_with_me");
+    assert.match(lineFor("x-3"), /\| spin \| cta:work_with_me \|/);
+  });
 });

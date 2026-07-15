@@ -206,13 +206,17 @@ Never hand-delete placed rows. \`/strategy\` grades bets in the Bets section; th
 // (content-folder, row id) so re-running /publish never double-records. fm/body come from the
 // derivative's frontmatter so the row carries from_brief + directives_applied (the attribution
 // atomize wrote) plus a text prefix used as the later match key against analytics exports.
+// ctaDestination (optional — card d80411bc, strategy lever E scaffold) is the post's resolved
+// primary CTA destination (src/publish/cta.ts's resolvePrimaryCtaDestination), computed by the
+// caller since only it has the CtaConfig/ContentTypesConfig/canonicalUrl needed to resolve it.
 export function appendBetPlacement(
   folder: string,
   rowId: string,
   platform: string,
   ref: string,
   fm: Record<string, unknown> = {},
-  body = ""
+  body = "",
+  ctaDestination: string | null = null
 ): void {
   const path = betsPath();
   mkdirSync(dirname(path), { recursive: true });
@@ -249,7 +253,11 @@ export function appendBetPlacement(
   // the post source = 'atomized-outreach' instead of 'atomized'/'atomized-spin'. Same placement
   // rule as spin — before the quoted prefix.
   const outreachMessage = fm.outreach_message ? ` | outreach-message` : "";
+  // CTA-destination marker (card d80411bc, strategy lever E): tag-source.ts reads this back to
+  // stamp posts.cta_destination. Same placement rule as the other markers — before the quoted
+  // prefix, so the end-anchored quote regex still finds the text at the line's tail.
+  const cta = ctaDestination ? ` | cta:${ctaDestination}` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${cta}${prefix}`;
   writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
 }

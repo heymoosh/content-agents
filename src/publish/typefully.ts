@@ -6,7 +6,14 @@ import { repoRoot } from "../db/db.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
-import { loadCtaConfig, loadCanonicalUrl, loadSourceKind, loadContentTypesConfig, resolveCtaLines } from "./cta.js";
+import {
+  loadCtaConfig,
+  loadCanonicalUrl,
+  loadSourceKind,
+  loadContentTypesConfig,
+  resolveCtaLines,
+  resolvePrimaryCtaDestination,
+} from "./cta.js";
 import { claimSlots, fmtLa } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
@@ -430,7 +437,8 @@ export async function publishText(
     if (manualComment) {
       appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
     }
-    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, body);
+    const ctaDestination = resolvePrimaryCtaDestination(fm, canonicalUrl, cfg, sourceKind, ctCfg);
+    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, body, ctaDestination);
     const verb = noSchedule ? "saved (unscheduled)" : "scheduled";
     console.log(
       `${verb}: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +

@@ -209,6 +209,61 @@ export function resolveCtaLines(
   return { ctas: url ? [{ url, label }] : [], usedFallback };
 }
 
+// First content_type entry (array + primary/secondary order) whose url actually resolves — the
+// SAME entry resolveContentTypeCtas would place first in its stacked ctas[]. Reuses resolveEntryUrl
+// (the single source of truth for how each destination resolves) rather than re-deriving urls;
+// only the SELECTION strategy differs here (first-match, for classification, vs. collect-all).
+function firstResolvedContentTypeDestination(
+  fm: Record<string, unknown>,
+  canonicalUrl: string | null,
+  cfg: CtaConfig,
+  ctCfg: ContentTypesConfig
+): CtaDestination | null {
+  const raw = fm.content_type;
+  const types = Array.isArray(raw)
+    ? raw.filter((t): t is string => typeof t === "string")
+    : typeof raw === "string" && raw.trim()
+      ? [raw.trim()]
+      : [];
+  const projectUrl = typeof fm.project_url === "string" ? fm.project_url.trim() || null : null;
+  for (const typeKey of types) {
+    const def = ctCfg.types[typeKey];
+    if (!def) continue;
+    const entries = def.secondary ? [def.primary, def.secondary] : [def.primary];
+    for (const e of entries) {
+      const { url } = resolveEntryUrl(e, projectUrl, canonicalUrl, cfg, ctCfg.workWithMeUrl);
+      if (url) return e.destination;
+    }
+  }
+  return null;
+}
+
+// The primary CTA destination a published post will actually use — mirrors resolveCtaLines'
+// precedence (explicit fm.cta wins, else content_type routing, else the note-default upgrade)
+// exactly, by delegating to the same two leaf resolvers (firstResolvedContentTypeDestination /
+// resolveCta) rather than re-implementing the branching. Returns null when nothing resolves to a
+// url (no CTA was actually placed) or the CTA is a literal override url (not one of the three
+// known destinations to bucket it under). Used to persist a post's CTA destination for strategy
+// lever E (card d80411bc) — see src/db/tag-source.ts / src/strategy/cta-fit.ts.
+export function resolvePrimaryCtaDestination(
+  fm: Record<string, unknown>,
+  canonicalUrl: string | null,
+  cfg: CtaConfig,
+  sourceKind: string,
+  ctCfg: ContentTypesConfig
+): CtaDestination | null {
+  const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
+  if (!rawCta) {
+    const dest = firstResolvedContentTypeDestination(fm, canonicalUrl, cfg, ctCfg);
+    if (dest) return dest;
+  }
+  const { url } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+  if (!url) return null;
+  let effectiveCta = rawCta;
+  if (sourceKind === "substack-note" && !effectiveCta) effectiveCta = "source";
+  return effectiveCta.toLowerCase() === "source" ? "source" : null;
+}
+
 // The source essay's own URL — what `cta: source` derivatives point at. Pasted into source.md
 // `canonical_url` (auto-filled when atomized from a live URL). Null until it's a real http(s) url.
 export function loadCanonicalUrl(folder: string): string | null {

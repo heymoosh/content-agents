@@ -67,17 +67,20 @@ export interface Placed {
   controlRun: boolean;
   exploration: boolean;
   outreachMessage: boolean;
+  ctaDestination: string | null;
 }
 
-// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | control-run | exploration | outreach-message | \"<text-prefix>\"" rows.
+// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | control-run | exploration | outreach-message | cta:<dest> | \"<text-prefix>\"" rows.
 // The optional ` | spin ` segment (written by appendBetPlacement for spin-experiment derivatives)
 // marks an audience-reframed variant; ` | control-run ` (card f444f440) marks a deliberate
 // --no-spin control run; ` | exploration ` (card 92bb2ae6) marks a deliberate off-assignment
 // exploration-budget probe; ` | outreach-message ` (docs/outreach-engine-plan.md §6 Phase 2)
-// marks a derivative atomized from a locked outreach message. Markers are scoped to the segment
-// BEFORE the quoted post-text prefix — the quote can itself contain a coincidental
-// "| spin |"/"| control-run |"/"| exploration |"/"| outreach-message |" substring (Muxin's own
-// post text), and testing the full line would false-positive on that.
+// marks a derivative atomized from a locked outreach message; ` | cta:<dest> ` (card d80411bc,
+// strategy lever E scaffold) carries the post's resolved primary CTA destination
+// (source/project/work_with_me). Markers are scoped to the segment BEFORE the quoted post-text
+// prefix — the quote can itself contain a coincidental "| spin |"/"| control-run |"/
+// "| exploration |"/"| outreach-message |"/"| cta:... |" substring (Muxin's own post text), and
+// testing the full line would false-positive on that.
 export function readPlaced(path: string = BETS_PATH): Placed[] {
   let text = "";
   try {
@@ -97,7 +100,10 @@ export function readPlaced(path: string = BETS_PATH): Placed[] {
     const controlRun = /\|\s+control-run\s*(\||$)/.test(markerScope);
     const exploration = /\|\s+exploration\s*(\||$)/.test(markerScope);
     const outreachMessage = /\|\s+outreach-message\s*(\||$)/.test(markerScope);
-    if (prefix.length >= 12) out.push({ platform: plat[1], prefix, spin, controlRun, exploration, outreachMessage });
+    const ctaMatch = markerScope.match(/\|\s+cta:(\S+)\s*(\||$)/);
+    const ctaDestination = ctaMatch ? ctaMatch[1] : null;
+    if (prefix.length >= 12)
+      out.push({ platform: plat[1], prefix, spin, controlRun, exploration, outreachMessage, ctaDestination });
   }
   return out;
 }
@@ -121,15 +127,20 @@ export function classifyHit(hit: Placed | undefined): { value: string; tag: stri
 function main() {
   const placed = readPlaced();
   const db = openDb();
-  const posts = db.prepare(`SELECT id, platform, content_text, bet_id, source FROM posts`).all() as {
+  const posts = db.prepare(`SELECT id, platform, content_text, bet_id, source, cta_destination FROM posts`).all() as {
     id: number;
     platform: string;
     content_text: string | null;
     bet_id: string | null;
     source: string | null;
+    cta_destination: string | null;
   }[];
 
   const update = db.prepare("UPDATE posts SET source = ? WHERE id = ?");
+  // cta_destination is set only from a genuine text-match hit (not a bet_id-only match, which
+  // carries no marker) — same posture as spin/control-run/exploration, which also only ride
+  // along on a matched Placed row's markers.
+  const updateCta = db.prepare("UPDATE posts SET cta_destination = ? WHERE id = ?");
   let atomized = 0;
   let spun = 0;
   let controlled = 0;
@@ -142,10 +153,11 @@ function main() {
   const tx = db.transaction(() => {
     for (const p of posts) {
       let value: string;
+      let hit: Placed | undefined;
       if (DISTRIBUTED.has(p.platform)) {
         const content = norm(p.content_text ?? "");
-        // Keep the matched row so its spin/control-run/exploration marker can promote the classification.
-        const hit = placed.find((pl) => pl.platform === p.platform && leadMatch(content, pl.prefix));
+        // Keep the matched row so its spin/control-run/exploration/cta marker can promote the classification.
+        hit = placed.find((pl) => pl.platform === p.platform && leadMatch(content, pl.prefix));
         const matched = !!p.bet_id || !!hit;
         // bet_id-only matches (text edited before posting) lose the spin/control-run/exploration
         // signal → default atomized. Priority order (controlRun > exploration > spin) lives in
@@ -162,6 +174,13 @@ function main() {
         continue; // unknown platform — leave source as-is
       }
       if (value !== p.source) update.run(value, p.id);
+      // cta_destination rides along on the same text-match hit (never a bet_id-only match, which
+      // carries no marker — same posture as spin/control-run/exploration). A hit carrying no
+      // `| cta:<dest> |` marker (posts placed before card d80411bc, or a post whose CTA didn't
+      // resolve) leaves the column untouched.
+      if (hit?.ctaDestination && hit.ctaDestination !== p.cta_destination) {
+        updateCta.run(hit.ctaDestination, p.id);
+      }
       if (value === "organic") organic++;
       else if (value === "atomized-spin") spun++;
       else if (value === CONTROL_RUN_SOURCE) controlled++;

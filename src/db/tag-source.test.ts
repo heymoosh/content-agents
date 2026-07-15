@@ -7,7 +7,16 @@ import { CONTROL_RUN_SOURCE, EXPLORATION_SOURCE } from "../strategy/route.js";
 import { classifyHit, readPlaced, OUTREACH_MESSAGE_SOURCE, type Placed } from "./tag-source.js";
 
 function placed(overrides: Partial<Placed> = {}): Placed {
-  return { platform: "linkedin", prefix: "a real prefix long enough", spin: false, controlRun: false, exploration: false, outreachMessage: false, ...overrides };
+  return {
+    platform: "linkedin",
+    prefix: "a real prefix long enough",
+    spin: false,
+    controlRun: false,
+    exploration: false,
+    outreachMessage: false,
+    ctaDestination: null,
+    ...overrides,
+  };
 }
 
 describe("classifyHit: outreach-message classification + priority ordering", () => {
@@ -84,5 +93,55 @@ describe("readPlaced: parses the ` | outreach-message` marker out of briefs/bets
 
   test("a missing bets.md file returns an empty array, no throw", () => {
     assert.deepEqual(readPlaced(join(repoRoot, "data", ".tag-source-test-bets-nonexistent.md")), []);
+  });
+});
+
+describe("readPlaced: parses the ` | cta:<dest>` marker (card d80411bc, strategy lever E)", () => {
+  const FIXTURE_PATH = join(repoRoot, "data", ".tag-source-test-bets-cta.md");
+
+  after(() => {
+    if (existsSync(FIXTURE_PATH)) unlinkSync(FIXTURE_PATH);
+  });
+
+  test("a placed row carrying `| cta:source` parses with ctaDestination: 'source'", () => {
+    const line =
+      `- placed 2026-07-15T00:00:00.000Z [essay-01/x-1] x → typefully draft 1` +
+      ` | cta:source | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].ctaDestination, "source");
+  });
+
+  test("a placed row carrying `| cta:work_with_me` parses with the underscored value verbatim", () => {
+    const line =
+      `- placed 2026-07-15T00:00:00.000Z [essay-01/x-1] x → typefully draft 1` +
+      ` | cta:work_with_me | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].ctaDestination, "work_with_me");
+  });
+
+  test("a placed row with no cta marker parses with ctaDestination: null", () => {
+    const line =
+      `- placed 2026-07-10T00:00:00.000Z [some-post/text] x → derivatives/x.md` +
+      ` | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].ctaDestination, null);
+  });
+
+  test("the marker is scoped before the quoted text, so a quote merely containing 'cta:source' does not false-positive", () => {
+    const line =
+      `- placed 2026-07-10T00:00:00.000Z [some-post/text] x → derivatives/x.md` +
+      ` | "this post happens to say cta:source right here in the text"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].ctaDestination, null);
+  });
+
+  test("coexists with other markers (spin + cta together)", () => {
+    const line =
+      `- placed 2026-07-15T00:00:00.000Z [essay-01/li-1] linkedin → typefully draft 2` +
+      ` | spin | cta:project | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    const row = readPlaced(FIXTURE_PATH)[0];
+    assert.equal(row.spin, true);
+    assert.equal(row.ctaDestination, "project");
   });
 });

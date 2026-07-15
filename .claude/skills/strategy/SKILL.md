@@ -91,9 +91,21 @@ makes `/cycle` compound instead of restarting every week.
      insufficient-data today — that's the honest read, not a bug. Fold the ranked table into the
      brief; case-skeleton/directive-level angle weighting is deferred until those tags are
      persisted to the DB (see the follow-up card filed alongside this lever).
+   - `npm run cta-fit` → strategy lever E (card d80411bc, epic 2ce597d7): SCAFFOLD, not a live
+     signal yet. The card's original ask ("score CTA click-through + lead-gen effectiveness per
+     platform") isn't buildable today — no click/conversion metric survives ingest, same wall
+     lever D hit — and which CTA destination a post used was never persisted before this card. It
+     now rides along on the bets.md Placed-log (`| cta:<dest>` marker, read back by `tag-source`
+     onto `posts.cta_destination`), so future CTA-tagged posts accumulate real data. Compares
+     per-platform engagement across the three CTA destinations (source/project/work_with_me):
+     clear-winner / even / insufficient-data, same overfitting guard as lever D. Expect
+     insufficient-data on every platform until enough CTA-tagged posts ship — that's the honest
+     state, not a bug. Recommendation only — `src/publish/cta.ts`'s resolution is untouched. Fold
+     the ranked table into the brief.
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
-     `Placed log` + `posts.bet_id`.
+     `Placed log` + `posts.bet_id`. Also stamps `posts.cta_destination` from the same Placed-log
+     rows' `| cta:<dest>` marker (card d80411bc, lever E).
    - `npm run origin-compare` → verbatim-atomized vs spin vs organic engagement per platform.
      Answers "is atomizing earning traction, or is Muxin better off posting natively?" Observational;
      flags INSUFFICIENT groups — don't over-read a gap. It also prints a **Spin control readiness**
@@ -233,6 +245,14 @@ makes `/cycle` compound instead of restarting every week.
     tag-source + spin-control coverage build up. Recommendation only — src/atomize/spin.ts's
     per-platform angle is unchanged; a frame-losing read is Muxin's cue to consider dialing back
     spin on that platform by hand, not an instruction to do so automatically.>
+
+   ## CTA-fit signal (lever E)
+   <cta-fit's ranked table verbatim + 1-2 sentences. If every platform reads insufficient-data
+    (expected until enough CTA-tagged posts ship), say so plainly and name why (no CTA-tagged
+    posts yet / posts.cta_destination only started being stamped once card d80411bc shipped) —
+    don't manufacture a read. Recommendation only — src/publish/cta.ts's CTA resolution is
+    unchanged; a clear-winner read is Muxin's cue to consider favoring that destination by hand on
+    that platform, not an instruction to do so automatically (live consumption is a follow-up).>
 
    ## Spin-control coverage
    <only include this section if `npm run spin-control -- --coverage` printed at least one row

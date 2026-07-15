@@ -61,3 +61,15 @@ frame_thresholds:
                     # review." Between reads "even." Either side under min_posts_for_data
                     # (config/routing.yaml), <4wks of span, or a zero/negative control average,
                     # always reads "insufficient data" — never a forced read on thin signal.
+
+# Strategy lever E (card d80411bc, epic 2ce597d7): CTA-destination fit threshold for
+# src/strategy/cta-fit.ts. SCAFFOLD, not a live signal yet — no CTA-labeled posts have shipped as
+# of 2026-07-15, so posts.cta_destination is empty and every platform reads insufficient-data. This
+# threshold only decides what the lever reports once data accumulates; recommendation only —
+# /atomize's CTA choice and /publish's CTA placement (src/publish/cta.ts) are untouched by this.
+cta_thresholds:
+  win_ratio: 1.2   # top CTA destination's recency-weighted engagement / runner-up's, same
+                    # platform, above which the read is "<destination> clearly wins." Below reads
+                    # "even." Fewer than two destinations clearing min_posts_for_data
+                    # (config/routing.yaml) and a 4wk span always reads "insufficient data" — never
+                    # a forced winner off one thin/early bucket.
