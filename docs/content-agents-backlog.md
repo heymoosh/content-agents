@@ -283,15 +283,6 @@ SCOPE EXTENSION (Muxin approved, 2026-07-10): shape the case-note capture as an 
 - PARKED: hard context/turn ceiling exceeded (turns=282 tokens=240549) -- session killed mid-card by the watchdog safety valve, never resumed
 <!-- card-id: f7b186c2-0fe8-40b2-bc6d-0351b630bbda -->
 
-**Follow-ups tab: add a manual mark-as-sent/contacted action**
-- Once Muxin actually sends a client/platform/jobsearch follow-up message by hand, nothing today appends a "contacted"/"followup_sent" tracker event for it -- the Follow-ups tab only offers mark-responded/draft-follow-up/move-on per card 21a5eb84's scope. Need a 4th action (or a CLI command) to log a manual send.
-ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
-CHAIN: 1
-- STATUS: Review
-- DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-<!-- card-id: bf88258a-5d0f-457a-a403-53a9bbad1648 -->
-
 **Wire tracker.ts summarizeFollowups() into the /strategy weekly brief**
 - src/outreach/tracker.ts exports summarizeFollowups() (counts per bucket, due/overdue counts) per card 21a5eb84's scope ("summary for /strategy"), but it is not wired into src/strategy/*'s weekly brief synthesis yet -- that wiring was explicitly out of scope for Phase 4. A future card should decide where/how the weekly brief surfaces follow-up due/overdue counts.
 ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
@@ -712,6 +703,15 @@ CARD TYPE: EPIC
 - Once shipped, mark f7b186c2 Done-with-Superseded.
 - STATUS: To Do
 <!-- card-id: 5021f759-430b-47df-b965-614359b4f390 -->
+
+**Follow-ups tab: add a manual mark-as-sent/contacted action**
+- Once Muxin actually sends a client/platform/jobsearch follow-up message by hand, nothing today appends a "contacted"/"followup_sent" tracker event for it -- the Follow-ups tab only offers mark-responded/draft-follow-up/move-on per card 21a5eb84's scope. Need a 4th action (or a CLI command) to log a manual send.
+ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
+CHAIN: 1
+- STATUS: Done
+- DEPENDS ON: Outreach engine -- Phase 4: Follow-ups tab + tracker (client/platform/inbound/jobsearch)
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+<!-- card-id: bf88258a-5d0f-457a-a403-53a9bbad1648 -->
 
 **Decide: should qualify.ts accept vault: evidence sources (not just https://)?**
 - ORIGIN: follow-up auto-filed while building card d4524bd0 (Outreach engine -- Ingest existing research corpus), found by /code-review --fix.
