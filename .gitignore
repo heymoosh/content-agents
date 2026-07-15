@@ -24,3 +24,4 @@ out/
 *.log
 docs/*.lock
 .DS_Store
+.conductor-preflight-stamp
