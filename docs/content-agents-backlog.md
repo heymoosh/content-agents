@@ -510,7 +510,7 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: /strategy scores CTA effectiveness per platform from analytics; /atomize + /publish read and prioritize highest-converting CTA type per platform; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: Review
+- STATUS: Done
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). CTA-effectiveness methodology (metrics/weighting/significance threshold) is underspecified; build worker should choose a reasonable default (e.g. click-through rate, minimum sample size) and flag the choice explicitly in the PR for Muxin to adjust at review. PR opens as a HELD draft per rule 7. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 - SHIP: reframed as a SCAFFOLD after confirming with Muxin (2026-07-15) -- the literal ask
@@ -533,7 +533,7 @@ CARD TYPE: EPIC
   (marker write -> readPlaced parse -> posts.cta_destination stamp) against a scratch DB copy.
   npm test 858/858 green (+24 new tests); npm run typecheck clean. Live consumption (prioritizing
   the winning destination in /publish) deferred to a follow-up card once real signal exists. PR #232
-  open, held for Muxin's review per rule 7. (shipped 2026-07-15)
+  merged by Muxin 2026-07-15. (shipped 2026-07-15)
 <!-- card-id: d80411bc-5884-4cfe-a471-a2f887fc36dc -->
 
 **Capture real X/LinkedIn post times in ingest (unblocks lever C time-of-day for X/LinkedIn)**
