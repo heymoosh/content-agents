@@ -263,7 +263,7 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - GOAL_CONDITION: running /atomize notes on a real Substack Note produces a review-queue.md row with platform: substack when appropriate (conditioned on source_kind: substack-note, per the plan), and .claude/skills/atomize/references/notes-mode.md + spin-mode.md no longer say Substack is excluded as a target.
 - RULE 7: this is src/strategy/route.ts routing-decision logic (which platforms a piece is atomized to) -- content-generation-adjacent logic per CLAUDE.md rule 7. This PR should HOLD for Muxins review.
 - CHAIN: 1
-- STATUS: In Progress
+- STATUS: Review
 - DECISION: approved -- build the missing Substack Notes repost producer (route.ts) to match Muxin's already-stated 2026-07-10 decision (platform:substack rows should be produced when appropriate); also fix the two stale skill docs. Routing/content-adjacent logic, so PR HOLDS for review per rule 7 regardless of this approval to build. (pre-flight 2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 <!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
