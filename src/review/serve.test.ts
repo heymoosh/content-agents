@@ -112,14 +112,31 @@ test("approveBlockReason allows the same storyboard row once video/storyboard.md
   assert.equal(reason, null);
 });
 
-test("approveBlockReason never blocks text/image/quote-card rows, even with nothing on disk", () => {
+test("approveBlockReason never blocks text rows, even with nothing on disk", () => {
   const textRow: QueueRow = { id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "pending", notes: "", lineIndex: 1 };
+  const alwaysFalse = () => false;
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", textRow, alwaysFalse), null);
+});
+
+// Quote-card (format=image) rows carry the same missing-render risk as storyboard/video above — a
+// row can land in review-queue.md before /render -- --still ever produces its PNG.
+test("approveBlockReason blocks an image/quote-card row whose PNG isn't rendered yet", () => {
   const imageRow: QueueRow = { id: "quote-card-1", platform: "quote-card", format: "image", asset: "images/quote-card-1.png", status: "pending", notes: "", lineIndex: 2 };
   const cardCaptionRow: QueueRow = { id: "quote-card-6-x", platform: "quote-card:x", format: "image", asset: "images/quote-card-6.png", status: "pending", notes: "", lineIndex: 3 };
   const alwaysFalse = () => false;
-  assert.equal(approveBlockReason("/content/2026-06-16-foo", textRow, alwaysFalse), null);
-  assert.equal(approveBlockReason("/content/2026-06-16-foo", imageRow, alwaysFalse), null);
-  assert.equal(approveBlockReason("/content/2026-06-16-foo", cardCaptionRow, alwaysFalse), null);
+  assert.match(approveBlockReason("/content/2026-06-16-foo", imageRow, alwaysFalse) ?? "", /not rendered yet/);
+  assert.match(approveBlockReason("/content/2026-06-16-foo", cardCaptionRow, alwaysFalse) ?? "", /not rendered yet/);
+});
+
+test("approveBlockReason allows an image/quote-card row once its PNG exists", () => {
+  const imageRow: QueueRow = { id: "quote-card-1", platform: "quote-card", format: "image", asset: "images/quote-card-1.png", status: "pending", notes: "", lineIndex: 2 };
+  const exists = (p: string) => p === "/content/2026-06-16-foo/images/quote-card-1.png";
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", imageRow, exists), null);
+});
+
+test("approveBlockReason doesn't block an image/quote-card row with no asset cell yet (nothing to check)", () => {
+  const noAssetRow: QueueRow = { id: "quote-card-1", platform: "quote-card", format: "image", asset: "—", status: "pending", notes: "", lineIndex: 2 };
+  assert.equal(approveBlockReason("/content/2026-06-16-foo", noAssetRow, () => false), null);
 });
 
 // "video"/"short" rows carry the same missing-render risk as the video-script row above (the

@@ -91,9 +91,10 @@ function firstHeading(folder: string): string {
 // it into video/storyboard.md — the one file src/video/render.ts's own render gate trusts. Approving
 // off the draft alone is a phantom approval: it means nothing to render.ts and misrepresents review
 // as having happened. Same risk for "video"/"short" rows (animated quote-videos, /video's rendered
-// short + its TikTok row — CLAUDE.md backlog card 4bef9a7c) if the row lands in review-queue.md
-// before its asset file does — so those are gated on their own `asset` cell existing on disk too.
-// `exists` is injected (mirrors classifySource below) so this is unit-testable without touching disk.
+// short + its TikTok row — CLAUDE.md backlog card 4bef9a7c) and "image" (quote-card) rows if the row
+// lands in review-queue.md before its asset file does — so those are gated on their own `asset` cell
+// existing on disk too. `exists` is injected (mirrors classifySource below) so this is unit-testable
+// without touching disk.
 export function approveBlockReason(
   folder: string,
   row: QueueRow,
@@ -106,6 +107,11 @@ export function approveBlockReason(
     const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
     if (!asset) return null; // no known gate file to check
     return exists(join(folder, asset)) ? null : "video not rendered yet — run /video";
+  }
+  if (row.format === "image") {
+    const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
+    if (!asset) return null; // no known gate file to check
+    return exists(join(folder, asset)) ? null : "image not rendered yet — run npm run render -- --still <folder>";
   }
   return null;
 }
