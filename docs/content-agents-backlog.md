@@ -526,6 +526,7 @@ ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:au
 CARD TYPE: EPIC
 - STATUS: To Do
 - GROOMED: readiness pass: epic wrapper, scope approved by Muxin 2026-07-14, lever decomposition already done as child cards + 2026-07-15
+- PARKED: needs decision (judgment): deploying strategy levers (A-E) untested against real engagement data carries a risk of degrading content performance; recommended: stage -- build per-lever + validate before wiring live, awaiting Muxin's call, 2026-07-15
 <!-- card-id: 2ce597d7-acdc-4887-af88-1620fbac16f6 -->
 
 **Strategy lever A: gate content by pillar performance per platform (topic-fit routing)**
@@ -708,6 +709,7 @@ CARD TYPE: EPIC
 - Once this ships, also mark original card cccfc43a-6547-4f08-aeb4-3e76e7e27c49 STATUS: Done with a Superseded note (same pattern used for 8e8b616e -> fb4d6b28 and 3c6550a6 -> 43fa1e02) so it doesn't stay stuck showing STATUS: In Progress forever.
 - CHAIN: 1
 - STATUS: To Do
+- GROOMED: clear GOAL_CONDITION + explicit resume plan, no blocking unknown + 2026-07-15
 <!-- card-id: 4e5b33d0-7e6d-42ea-924f-f58641199e02 -->
 
 **Fix qualify.ts illegal fit:unclear downgrade for platform-kind leads**
