@@ -395,6 +395,7 @@ DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 
 - STATUS: Review
 - DEPENDS ON: Beat-template rewrite of spin_angles (LinkedIn + X) + spin-mode.md with exemplar/counter-example
 - GROOMED: Muxin-approved scope from 2026-07-10 strategy session; bucket rules + GOAL_CONDITION explicit, depends on beat-template card + 2026-07-10
+PR: https://github.com/heymoosh/content-agents/pull/203 (RULE 7 -- draft, held for review, not auto-merged)
 <!-- card-id: b288d0da-c003-4617-93e4-809e865b7a80 -->
 
 **GUI approve-time scheduling failure is invisible after the fact (silent 'blocked by reuse guard' state)**
