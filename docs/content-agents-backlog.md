@@ -6,6 +6,34 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 
 ---
 
+**Add cancel capability for scheduled posts, across providers**
+- ORIGIN: raised by Muxin 2026-07-15, live-triaging unexpected LinkedIn quote-card posts in
+  chat. Root cause turned out to be two stale Upload-Post jobs (`quote-card-4`, `quote-card-5` →
+  linkedin+bluesky) scheduled 2026-06-24, before the 2026-07-08 Typefully rewire retired
+  PostPeer/Upload-Post for cards. Muxin had cancelled her Typefully drafts and checked PostPeer,
+  but neither touched these — they lived entirely on upload-post.com, a provider this pipeline
+  can no longer even see live (`src/review/reconcile.ts` reports Upload-Post rows as
+  `"unavailable"`, not a mismatch, because the adapter that talked to its API was deleted
+  wholesale in PR #130). She ended up cancelling them by hand in the upload-post.com dashboard.
+- GAP: no provider adapter in this repo — not Typefully, not PostPeer, not any future one —
+  implements anything beyond schedule/create. `src/review/reconcile.ts` does live READ
+  reconciliation (drift/mismatch detection) but there's no corresponding cancel/delete call
+  anywhere, and no "Cancel" action in the review GUI (`src/review/serve.ts`). Killing a
+  wrongly-scheduled, duplicate, or stale post always means leaving this dashboard and hunting
+  through each provider's own UI by hand.
+- ROUGH SCOPE (needs grooming): add a cancel/delete function to each live provider adapter
+  (Typefully draft delete via its v2 API, PostPeer post cancel via its API) and surface a
+  "Cancel" action in the review GUI next to already-scheduled rows, keyed off the same
+  provider-ref parsing `reconcile.ts` already does (`findLoggedRef`). Also worth deciding how a
+  retired-provider case (like Upload-Post) should degrade — at minimum the GUI's "unavailable"
+  state should point Muxin at exactly which external dashboard to check/cancel in, since a live
+  cancel call isn't possible once an adapter's been deleted.
+- STATUS: Backlog
+- DECISION: none yet — raised 2026-07-15, not scoped or prioritized.
+<!-- card-id: e4eca4a1-b755-4d20-bc20-21426ad46a5a -->
+
+---
+
 **Explore Draw Things (free local) for short-form video gen as a Kling cost-saver**
 - ORIGIN: raised by Muxin 2026-07-07 alongside the quote+image card discussion — a tangent, not scoped yet.
 - Draw Things is a free, local (on-device) image/video-gen app. Worth a bakeoff-style eval against Kling (currently ~$0.08/s via OpenRouter, used for video-broll first+last-frame animation) to see if it can do first+last-frame or general short-clip animation at comparable quality for $0.
