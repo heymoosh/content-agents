@@ -346,7 +346,7 @@ anything) is still needed beyond PR #185 + its follow-up. Do not scope new imple
 card alone -- start by reviewing PR #185's actual result.
 
 DECISION (Muxin, 2026-07-10 strategy session): SUBSUMED -- delivered by PR #185 (case-first LinkedIn / technical X spin angles) + the new beat-template card (1eeb82a4) + f7b186c2 (real anonymized case note). No separate CTA build. The CTA is the natural last beat of the case skeleton (soft availability signal), not a bolt-on.
-- STATUS: To Do
+- STATUS: In Progress
 - DECISION: approved to build -- NOT subsumed by PR #185 (that only reworked LinkedIn spin structure + a 'soft availability signal' closer, not a tactical CTA). Keep: tie source topic to a CTA that is TACTICAL / immediately usable (give the reader something to apply now), not necessarily 'product-team value'. Michael Callaway principle: content must be unique AND useful -> that is what converts to leads/clients. CTAs must feel natural, never cringy; orient to attracting paying clients. Content-gen logic -> draft PR held for review per rule 7 (2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 <!-- card-id: c02ff4aa-4872-4540-8d9f-029ac4b9535a -->
