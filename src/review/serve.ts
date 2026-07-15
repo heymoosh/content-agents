@@ -26,10 +26,11 @@ import { pathToFileURL } from "node:url";
 import { repoRoot, openDb } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { publishText, TEXT_PLATFORMS } from "../publish/typefully.js";
-import { publishCards, isQuoteCardRow } from "../publish/cards.js";
+import { publishCards, isQuoteCardRow, cardTarget, basePlatform } from "../publish/cards.js";
 import { publishTikTok, isTikTokRow } from "../publish/tiktok.js";
 import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
+import { checkReuse } from "../publish/reuse-guard.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import { listLeads } from "../outreach/status.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
@@ -137,6 +138,22 @@ const schedulingInFlight = new Set<string>();
 // scheduleError is RETURNED (never thrown) so the row stays `approve` and the GUI shows why instead
 // of silently losing the approval or crashing the request.
 //
+// Mirrors the platform key each publisher's own reuse-guard call site derives from a row (cards.ts:
+// cardTarget/basePlatform; typefully.ts: the row's own platform; tiktok.ts/youtube.ts/substack.ts: a
+// fixed platform name) — so scheduleApproved (below) can recompute the SAME checkReuse() call a
+// silently-skipping publisher already made, and recover its real reason instead of a generic one.
+// null for a kind the reuse guard never gates (outreach-lock).
+function reuseGuardPlatform(kind: ScheduleKind, row: QueueRow): string | null {
+  switch (kind) {
+    case "text": return row.platform;
+    case "card": return cardTarget(row.platform) ?? basePlatform(row.platform);
+    case "tiktok": return "tiktok";
+    case "video": return "youtube";
+    case "substack": return "substack";
+    default: return null;
+  }
+}
+
 // A publisher can also skip a row WITHOUT throwing (the reuse guard) — it just logs a console.warn
 // and returns []. That must still surface as a scheduleError, not fall through silently: `done[0]
 // ?? null` alone can't tell "no scheduler owns this row" (kind === null, a genuine no-op) apart
@@ -159,6 +176,18 @@ export async function scheduleApproved(
   try {
     const done = await fn(folder, { onlyIds: [row.id] });
     if (done.length === 0) {
+      // The publisher didn't throw, so recompute the check it silently skipped on to find out WHY —
+      // when it's the reuse guard, persist a machine-parseable reason (reconcile.ts's
+      // reuseGuardEligibility below re-derives "eligible again in N days" from this same shape,
+      // reading it back off the row's own notes, days later, with no fs/network call of its own).
+      const platform = reuseGuardPlatform(kind, row);
+      const reuse = platform ? checkReuse(basename(folder), platform) : { allowed: true };
+      if (!reuse.allowed && reuse.lastPlacedAt !== undefined && reuse.minDays !== undefined) {
+        return {
+          scheduled: null,
+          scheduleError: `blocked by reuse guard, last placed to ${platform} ${reuse.lastPlacedAt} (min_reuse_days: ${reuse.minDays})`,
+        };
+      }
       return {
         scheduled: null,
         scheduleError: "not scheduled — blocked by the reuse guard (check the server log for the reason)",
@@ -537,6 +566,19 @@ const server = createServer(async (req, res) => {
         schedulingInFlight.add(inFlightKey);
         try {
           ({ scheduled, scheduleError } = await scheduleApproved(approveFolder, approveRow));
+          // A schedule failure (e.g. the reuse guard) leaves the row at "approve" (scheduleApproved
+          // never flips it to "published") but until now the reason only ever flashed once in the
+          // browser (page.ts's flash toast) — miss it, and the only remaining signal is reconcile.ts
+          // flagging it days later with a generic "not found" mismatch. Persist the real reason into
+          // the row's own notes column so it survives a reload, on top of (not instead of) that flash.
+          if (scheduleError) {
+            const priorNotes = notes !== undefined ? notes : approveRow.notes;
+            const persisted =
+              priorNotes && priorNotes.trim()
+                ? `${priorNotes.trim()} | schedule failed: ${scheduleError}`
+                : `schedule failed: ${scheduleError}`;
+            updateRow(slug, id, "approve", persisted);
+          }
         } finally {
           schedulingInFlight.delete(inFlightKey);
         }

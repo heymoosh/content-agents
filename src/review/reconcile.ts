@@ -95,6 +95,28 @@ export function findLoggedRef(logText: string, rowId: string): LoggedRef | null 
   return found;
 }
 
+// A row the reuse guard silently skipped at schedule time never gets logged to publish-log.md at
+// all (see src/review/serve.ts's scheduleApproved), so it falls into the generic "no logged
+// Typefully draft id" mismatch below — which reads as broken/lost, not "temporarily blocked, will
+// resolve itself". scheduleApproved persists the reuse-guard reason into the row's own notes column
+// in this exact shape when that happens; detect it here and report a live day-count instead. Pure:
+// only reads the row's own notes string and does date arithmetic, no fs/network — same contract as
+// the rest of this module.
+const REUSE_GUARD_NOTE = /blocked by reuse guard, last placed to (\S+) (\S+) \(min_reuse_days: (\d+)\)/;
+
+function reuseGuardEligibility(notes: string): string | null {
+  const m = notes.match(REUSE_GUARD_NOTE);
+  if (!m) return null;
+  const [, platform, lastPlacedIso, minDaysStr] = m;
+  const lastMs = Date.parse(lastPlacedIso);
+  if (Number.isNaN(lastMs)) return null;
+  const minDays = Number(minDaysStr);
+  const daysSince = (Date.now() - lastMs) / 86_400_000;
+  const daysRemaining = Math.ceil(minDays - daysSince);
+  if (daysRemaining <= 0) return null; // window has actually elapsed since — let the normal mismatch stand
+  return `blocked by reuse guard for ${platform}, eligible again in ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}`;
+}
+
 // fmtLa throws on an invalid/unparseable date (Intl.DateTimeFormat rejects an Invalid Date) — a
 // single malformed timestamp from either provider must degrade this ONE row, never crash the whole
 // /api/queue response (there's no per-row error boundary above this call). Returns undefined rather
@@ -129,6 +151,10 @@ export function reconcileRow(row: QueueRow, publishLog: PublishLogRead, live: Li
       return { provider: "typefully", state: "unavailable", reason: live.typefullyError ?? "could not reach Typefully" };
     }
     if (!logged || logged.provider !== "typefully") {
+      const reuseReason = reuseGuardEligibility(row.notes ?? "");
+      if (reuseReason) {
+        return { provider: "typefully", state: "mismatch", reason: reuseReason };
+      }
       return { provider: "typefully", state: "mismatch", reason: "no logged Typefully draft id found for this row" };
     }
     const match = live.typefullyDrafts.find((d) => d.id === logged.refId);
