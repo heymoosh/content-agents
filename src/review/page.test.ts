@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { replyContextHtml } from "./page.js";
+import { replyContextHtml, imageMissingHtml } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
   const row = {
@@ -39,4 +39,25 @@ test("replyContextHtml: renders nothing for a normal text row with no reply_to_t
 
 test("replyContextHtml: renders nothing when reply_to_text is present but origin isn't 'reply to mention'", () => {
   assert.equal(replyContextHtml({ origin: "from /cycle", replyToText: "should not show" }), "");
+});
+
+// Unit tests for imageMissingHtml() — the pure, DOM-free mirror of the inline missing-image
+// placeholder rowEl() renders for a QUOTE-CARD (kind:"image") row whose PNG hasn't been rendered
+// yet. Before card 4c3dd6fc, such a row (body present, assetUrl unset) fell through to plain-text
+// rendering with no missing-image cue at all — indistinguishable from a normal card.
+
+test("imageMissingHtml: an image row with no assetUrl renders the missing-image placeholder", () => {
+  const html = imageMissingHtml({ kind: "image" });
+  assert.ok(html.includes("image not rendered yet"));
+  assert.ok(html.includes("src"), "should reuse the existing .src placeholder styling");
+});
+
+test("imageMissingHtml: an image row WITH an assetUrl renders nothing (the real <img> tag covers it)", () => {
+  assert.equal(imageMissingHtml({ kind: "image", assetUrl: "/assets/quote-card-1.png" }), "");
+});
+
+test("imageMissingHtml: a non-image row renders nothing", () => {
+  assert.equal(imageMissingHtml({ kind: "text" }), "");
+  assert.equal(imageMissingHtml({ kind: "video" }), "");
+  assert.equal(imageMissingHtml({}), "");
 });

@@ -19,6 +19,17 @@ export function replyContextHtml(row: { origin?: string; replyToText?: string; r
   return `<div class="reply-context">↳ replying to: ${esc(snippet)}</div>`;
 }
 
+// Pure, DOM-free mirror of the inline missing-image placeholder the client <script> below renders
+// for a QUOTE-CARD (kind:"image") row whose PNG hasn't been rendered yet (row.assetUrl unset —
+// rows.ts only sets it once existsSync() confirms the file is on disk). Before this, such a row with
+// body text fell through to plain-text rendering with zero missing-image cue, indistinguishable from
+// a normal text row or a fully-rendered card (card 4c3dd6fc). Mirrors the reply-context pair above:
+// same cross-runtime duplication, kept in sync by hand, exists purely so this is Node-testable.
+export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): string {
+  if (row.kind !== "image" || row.assetUrl) return "";
+  return '<div class="src missing-img">— image not rendered yet —</div>';
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -336,6 +347,9 @@ function rowEl(piece, row){
   let preview = "";
   if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
   else if (row.assetUrl && row.kind === "video") preview = '<video class="preview" src="'+row.assetUrl+'" controls muted></video>';
+  // Quote-card row whose PNG hasn't been rendered yet — flag it explicitly instead of falling
+  // through to plain-text rendering, which looked identical to a normal card (card 4c3dd6fc).
+  else if (row.kind === "image") preview = '<div class="src missing-img">— image not rendered yet —</div>';
   if (row.body !== undefined && row.body !== "") {
     const cls = row.kind === "storyboard" ? "body story" : "body";
     preview += '<div class="'+cls+'" data-body>'+esc(row.body)+'</div>';
