@@ -270,17 +270,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - PARKED: needs decision (judgment): Substack Notes repost routing logic touches which platforms content reaches; wrong change could misroute or drop review-queue entries; recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
 
-**Decide: should qualify.ts accept vault: evidence sources (not just https://)?**
-- ORIGIN: follow-up auto-filed while building card d4524bd0 (Outreach engine -- Ingest existing research corpus), found by /code-review --fix.
-- client-mem/lead.md is classified turnaround, but its only worldview-match evidence item cites a vault: path (Muxin's own Obsidian notes), not a live https:// URL. qualify.ts isValidSourceUrl only accepts https:// -- the moment outreach:qualify runs on this lead (per its own normal contract), it will silently downgrade Mem from turnaround to unclear, losing a real, cited signal purely because of its source format.
-- Policy call, not a mechanical bug: should vault:-sourced evidence (ingested research, source: ingested leads) count as legitimate for qualify's URL-validity check across the whole outreach engine, or should ingested leads get re-verified against a live URL before they can qualify? Affects any future ingested lead, not just Mem.
-- GOAL_CONDITION: qualify.ts either (a) accepts vault: as a legal evidence source alongside https://, with a test proving it does not downgrade client-mem, or (b) Muxin decides ingested evidence must be re-verified against a live source before qualify -- whichever she picks, client-mem/lead.md ends up with a fit verdict that reflects a deliberate decision, not a silent format-driven downgrade.
-- CHAIN: 1
-- STATUS: In Progress
-- DECISION: approved -- qualify.ts should accept vault: evidence sources in addition to https://; the real values instrument (founder deep-dives) lives in the Obsidian vault, not the web (2026-07-14)
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-<!-- card-id: 4e2e83f3-cd4f-438a-a5a1-15912c1f4f6f -->
-
 **Write/source an anonymized case note for the LinkedIn case-first spin angle to work from**
 - ORIGIN: follow-up auto-filed while building card c42769b1 (Update per-channel spin angles), PR #185.
 The new LinkedIn case-first spin angle needs a real anonymized third-party case (a team/client situation, not Muxin's own story) to work from. No such material exists yet in the corpus -- PR #185's old-vs-new sample had to use Muxin's own personal-branding essay as the case study, since it was the only source available, which is honest but not the intended target material (a client/team case, per the card's own LINKEDIN SCOPE). Same reasoning applies more mildly to the X angle's technical-sharpening sample.
@@ -711,6 +700,17 @@ CARD TYPE: EPIC
 - STATUS: To Do
 - GROOMED: clear GOAL_CONDITION + explicit resume plan, no blocking unknown + 2026-07-15
 <!-- card-id: 4e5b33d0-7e6d-42ea-924f-f58641199e02 -->
+
+**Decide: should qualify.ts accept vault: evidence sources (not just https://)?**
+- ORIGIN: follow-up auto-filed while building card d4524bd0 (Outreach engine -- Ingest existing research corpus), found by /code-review --fix.
+- client-mem/lead.md is classified turnaround, but its only worldview-match evidence item cites a vault: path (Muxin's own Obsidian notes), not a live https:// URL. qualify.ts isValidSourceUrl only accepts https:// -- the moment outreach:qualify runs on this lead (per its own normal contract), it will silently downgrade Mem from turnaround to unclear, losing a real, cited signal purely because of its source format.
+- Policy call, not a mechanical bug: should vault:-sourced evidence (ingested research, source: ingested leads) count as legitimate for qualify's URL-validity check across the whole outreach engine, or should ingested leads get re-verified against a live URL before they can qualify? Affects any future ingested lead, not just Mem.
+- GOAL_CONDITION: qualify.ts either (a) accepts vault: as a legal evidence source alongside https://, with a test proving it does not downgrade client-mem, or (b) Muxin decides ingested evidence must be re-verified against a live source before qualify -- whichever she picks, client-mem/lead.md ends up with a fit verdict that reflects a deliberate decision, not a silent format-driven downgrade.
+- CHAIN: 1
+- STATUS: Done
+- DECISION: approved -- qualify.ts should accept vault: evidence sources in addition to https://; the real values instrument (founder deep-dives) lives in the Obsidian vault, not the web (2026-07-14)
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+<!-- card-id: 4e2e83f3-cd4f-438a-a5a1-15912c1f4f6f -->
 
 **Fix qualify.ts illegal fit:unclear downgrade for platform-kind leads**
 - ORIGIN: follow-up auto-filed while building card 6590efec (Outreach engine Phase 3), found by /code-review --fix.
