@@ -51,6 +51,7 @@
     "review": "tsx src/review/serve.ts",
     "notes-daily": "tsx src/cron/notes-daily.ts",
     "bluesky-mentions": "tsx src/cron/bluesky-mentions.ts",
+    "inbound-to-tracker": "tsx src/cron/inbound-to-tracker.ts",
     "reply-draft": "tsx src/atomize/reply-draft.ts",
     "outreach:jsa": "tsx src/outreach/jsa.ts",
     "outreach:add": "tsx src/outreach/intake.ts",
