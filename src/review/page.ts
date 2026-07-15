@@ -280,7 +280,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <section class="view" id="followupsView" hidden>
     <div class="strategy">
       <div class="strategy-actions">
-        <span class="hint">Tracks state AFTER a message is sent by hand — nothing here contacts anyone. Mark responded, draft a follow-up touch (reframes the locked message; still lands pending review), or move on.</span>
+        <span class="hint">Tracks state AFTER a message is sent by hand — nothing here contacts anyone. Mark sent, mark responded, draft a follow-up touch (reframes the locked message; still lands pending review), or move on.</span>
       </div>
       <div id="followupsNote"></div>
       <div id="followupsList"><div class="empty">Loading…</div></div>
@@ -751,6 +751,7 @@ function followupRowHtml(row){
       '<div class="ntext"><div class="nmeta">last touch '+followupTouchLabel(row.lastTouch)+' · '+esc(row.nextAction)+'</div>'+
       '<b>'+esc(row.who)+'</b>'+why+'</div>'+
       '<div class="actions">'+
+        '<button class="fu-contacted" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark sent</button>'+
         '<button class="fu-responded" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark responded</button>'+
         draftBtn+
         '<button class="fu-moveon" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Move on</button>'+
@@ -772,13 +773,14 @@ async function loadFollowups(){
     sec.innerHTML = '<div class="notes-head"><h3>'+esc(label)+' ('+rows.length+')</h3></div><div class="notelist">'+inner+'</div>';
     box.appendChild(sec);
   }
+  box.querySelectorAll("button.fu-contacted").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-contacted", b.dataset.bucket, b.dataset.lead)));
   box.querySelectorAll("button.fu-responded").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-responded", b.dataset.bucket, b.dataset.lead)));
   box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", b.dataset.bucket, b.dataset.lead)));
   box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>followupDraft(b.dataset.dir)));
 }
 async function followupAction(action, bucket, lead){
   const r = await post("/api/followups/"+action, {bucket, lead});
-  if(r.ok){ flash(action==="mark-responded" ? "Marked responded" : "Moved on"); loadFollowups(); }
+  if(r.ok){ flash(action==="mark-responded" ? "Marked responded" : action==="mark-contacted" ? "Marked sent" : "Moved on"); loadFollowups(); }
   else flash(r.error || "Failed");
 }
 async function followupDraft(dir){
