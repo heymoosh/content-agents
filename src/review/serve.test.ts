@@ -18,6 +18,10 @@ import {
   lastNonEmptyLine,
   tailLines,
   jobElapsedMs,
+  daysAgo,
+  computeFreshness,
+  parseBriefDate,
+  extractSection,
   type SchedulerDeps,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
@@ -490,4 +494,80 @@ test("jobElapsedMs: keeps ticking against `now` while running", () => {
 test("jobElapsedMs: freezes at finishedAt-startedAt once the job lands", () => {
   const ms = jobElapsedMs({ status: "done", startedAt: 1000, finishedAt: 6000 }, 999_999);
   assert.equal(ms, 5000);
+});
+
+// "Generate insights" data-first fix (Muxin, 2026-07-16): the reports it runs were always live off
+// data/analytics.db — the only stale input was the full latest brief it inlined with no age signal.
+// These four pure helpers replace that with a real "as of" stamp and a trimmed, dated brief excerpt
+// instead of a whole-file dump (mdToHtml has no markdown-link syntax, so the brief is surfaced as a
+// dated reference for the client to render as a real <a>, never as raw brief text in Claude's
+// synthesis prompt/output).
+
+test("daysAgo: same calendar day is 0", () => {
+  const now = new Date("2026-07-16T18:00:00Z").getTime();
+  assert.equal(daysAgo("2026-07-16", now), 0);
+});
+
+test("daysAgo: counts whole days between a date and now", () => {
+  const now = new Date("2026-07-16T12:00:00Z").getTime();
+  assert.equal(daysAgo("2026-06-24", now), 22);
+});
+
+test("daysAgo: accepts a full ISO timestamp, only the date part matters", () => {
+  const now = new Date("2026-07-16T00:00:00Z").getTime();
+  assert.equal(daysAgo("2026-07-12T09:41:00.000Z", now), 4);
+});
+
+test("computeFreshness: null when every date is null/undefined (no data at all)", () => {
+  assert.equal(computeFreshness([null, undefined, null], Date.now()), null);
+});
+
+test("computeFreshness: picks the MOST RECENT of several dates, ignoring nulls", () => {
+  const now = new Date("2026-07-16T00:00:00Z").getTime();
+  const f = computeFreshness([null, "2026-07-01T00:00:00Z", "2026-07-12T09:41:00.000Z", null], now);
+  assert.deepEqual(f, { date: "2026-07-12", ageDays: 4 });
+});
+
+test("parseBriefDate: extracts the date from a well-formed brief filename", () => {
+  assert.equal(parseBriefDate("2026-06-24-strategy-brief.md"), "2026-06-24");
+});
+
+test("parseBriefDate: null for anything that doesn't match the exact pattern", () => {
+  assert.equal(parseBriefDate("strategy-brief.md"), null);
+  assert.equal(parseBriefDate("2026-06-24-strategy-brief.draft.md"), null);
+  assert.equal(parseBriefDate("notes.md"), null);
+});
+
+test("extractSection: pulls one ## section through the next ## heading", () => {
+  const md = [
+    "# Strategy Brief: 2026-06-24",
+    "intro text",
+    "## Last cycle scorecard",
+    "| Bet | Verdict |",
+    "|---|---|",
+    "| 001 | passed |",
+    "## Data confidence",
+    "| Channel | Status |",
+  ].join("\n");
+  const section = extractSection(md, "Last cycle scorecard");
+  assert.match(section ?? "", /^## Last cycle scorecard/);
+  assert.match(section ?? "", /001 \| passed/);
+  assert.ok(!section?.includes("Data confidence"), "must stop before the next ## heading");
+});
+
+test("extractSection: a section at the end of the file runs to EOF", () => {
+  const md = "# Brief\n## Directives for atomization\n- prioritize_pillar: human-ai\n- format_notes: short posts\n";
+  const section = extractSection(md, "Directives for atomization");
+  assert.match(section ?? "", /prioritize_pillar: human-ai/);
+  assert.match(section ?? "", /format_notes: short posts/);
+});
+
+test("extractSection: null when the header isn't present (older or hand-edited brief)", () => {
+  assert.equal(extractSection("# Brief\nsome text, no headers at all", "Directives for atomization"), null);
+});
+
+test("extractSection: header match is case-insensitive but the exact header text still must match", () => {
+  const md = "## directives for atomization\nsome directive\n";
+  assert.match(extractSection(md, "Directives for atomization") ?? "", /some directive/);
+  assert.equal(extractSection(md, "Last cycle scorecard"), null);
 });

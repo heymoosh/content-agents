@@ -60,6 +60,37 @@ export function insightsTickerText(elapsedMs: number): string {
   return `✨ Claude is looking into it… (may re-run a report) <span class="ticker">${formatElapsed(elapsedMs)} elapsed</span>`;
 }
 
+// Pure, DOM-free mirror of the inline renderInsightsMeta(r) the client <script> below builds for
+// the "Generate insights" meta line — a data-freshness stamp, a dated link to the full brief (never
+// the brief's text; mdToHtml has no markdown-link syntax to render one), and an untagged-post
+// warning. Built entirely from the server's deterministic numbers (serve.ts's generateInsights),
+// never from Claude's synthesis text, so it can't be silently dropped or gotten wrong by an LLM
+// pass (Muxin, 2026-07-16: Generate insights already ran live reports off the DB — the only stale
+// input was the whole brief it inlined with no age signal). Same cross-runtime duplication
+// convention as the mirrors above, kept in sync by hand.
+export function fmtDays(n: number): string {
+  return `${n} day${n === 1 ? "" : "s"}`;
+}
+
+export function renderInsightsMeta(r: {
+  freshness?: { date: string; ageDays: number } | null;
+  brief?: { path: string; date: string | null; ageDays: number | null } | null;
+  untagged?: number;
+}): string {
+  const esc = (s: string) =>
+    s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+  const parts: string[] = [];
+  if (r.freshness) parts.push(`Data current as of <b>${esc(r.freshness.date)}</b> (${fmtDays(r.freshness.ageDays)} ago)`);
+  if (r.brief) {
+    const label = esc(r.brief.date || r.brief.path) + (r.brief.ageDays != null ? ` (${fmtDays(r.brief.ageDays)} old)` : "");
+    parts.push(`Brief: <a href="#stratBriefPanel">${label}</a>`);
+  }
+  if (r.untagged && r.untagged > 0) {
+    parts.push(`<span class="warn">⚠ ${r.untagged} untagged post${r.untagged === 1 ? "" : "s"}</span>`);
+  }
+  return parts.length ? `<div class="insights-meta">${parts.join(" · ")}</div>` : "";
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -204,6 +235,9 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .md th { background:#f1ede3; font-weight:700; }
   .md code { background:#efeae0; padding:1px 5px; border-radius:4px; font-size:12px; }
   .insights-panel { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-top:12px; }
+  .insights-meta { font-size:12px; color:var(--muted); margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .insights-meta a { color:var(--blue); }
+  .insights-meta .warn { color:var(--red); font-weight:600; }
   .thread-turn { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
   .thread-turn.q { font-weight:600; color:var(--muted); font-size:13.5px; border-top:none; padding-top:0; }
   .jobs { max-width:820px; margin:24px auto 0; }
@@ -277,7 +311,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="strategy">
       <div class="strategy-actions">
         <button class="primary" id="insightsBtn">Generate insights</button>
-        <span class="hint">Runs the analytics reports, then asks Claude (your subscription, $0) for a short skim: what's working, what's not, the numbers that matter. Nothing here writes data or publishes anything.</span>
+        <span class="hint">Runs the analytics reports live against the current database, then asks Claude (your subscription, $0) for a short skim: what's working, what's not, the numbers that matter, plus any data-hygiene next steps. The prior-cycle brief is linked, dated, not dumped in full. Nothing here writes data or publishes anything.</span>
       </div>
       <div class="insights-panel" id="insightsPanel" hidden>
         <div class="md" id="insightsOut"></div>
@@ -288,7 +322,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         </div>
       </div>
     </div>
-    <div class="notes-panel">
+    <div class="notes-panel" id="stratBriefPanel">
       <div class="notes-head">
         <h3>Latest strategy brief</h3>
         <span class="grow"></span>
@@ -712,7 +746,22 @@ async function askBrief(){
 $("#briefAskBtn").addEventListener("click", askBrief);
 
 // Insights: a Claude-written synthesis (not a raw report dump), plus a follow-up chat thread that
-// can ask Claude to dig into anything — Claude may re-run the reports itself to answer.
+// can ask Claude to dig into anything — Claude may re-run the reports itself to answer. fmtDays/
+// renderInsightsMeta mirror this file's Node-side exports of the same name (kept in sync by hand,
+// same convention as insightsTickerText below) — the meta line is built from deterministic
+// server-side numbers, NOT from Claude's markdown, since mdToHtml has no link syntax and this way
+// the freshness stamp can never be wrong or omitted by an LLM pass.
+function fmtDays(n){ return n+" day"+(n===1?"":"s"); }
+function renderInsightsMeta(r){
+  const parts = [];
+  if(r.freshness) parts.push('Data current as of <b>'+esc(r.freshness.date)+'</b> ('+fmtDays(r.freshness.ageDays)+' ago)');
+  if(r.brief){
+    const label = esc(r.brief.date || r.brief.path) + (r.brief.ageDays!=null ? ' ('+fmtDays(r.brief.ageDays)+' old)' : '');
+    parts.push('Brief: <a href="#stratBriefPanel">'+label+'</a>');
+  }
+  if(r.untagged > 0) parts.push('<span class="warn">⚠ '+r.untagged+' untagged post'+(r.untagged===1?'':'s')+'</span>');
+  return parts.length ? '<div class="insights-meta">'+parts.join(' · ')+'</div>' : '';
+}
 let insightsHistory = [];
 async function generateInsights(){
   $("#insightsBtn").disabled = true;
@@ -722,7 +771,7 @@ async function generateInsights(){
   $("#insightsOut").innerHTML = '<p class="hint">Running the reports, then asking Claude for a synthesis… (~20-40s)</p>';
   const r = await post("/api/strategy/insights", {});
   $("#insightsBtn").disabled = false;
-  if(r.ok){ $("#insightsOut").innerHTML = mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
+  if(r.ok){ $("#insightsOut").innerHTML = renderInsightsMeta(r) + mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
   else { $("#insightsOut").innerHTML = "<p>Failed: "+esc(r.error||"error")+"</p>"; }
 }
 $("#insightsBtn").addEventListener("click", generateInsights);
