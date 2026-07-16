@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { extractSection, parseEvidence, type EvidenceItem } from "./qualify.js";
 
 // outreach:status -- deterministic, non-LLM listing of every outreach/leads/*/lead.md, for
 // `/outreach status` and the GUI's read-only lead review-queue surface (Phase 1 definition of
@@ -87,6 +88,41 @@ export function renderStatusTable(leads: LeadSummary[]): string {
     }
   }
   return lines.join("\n").trim();
+}
+
+// Full-body read of one lead.md, for the review GUI's Outreach tab (card: web-discovery inbox --
+// the prior GUI only ever read frontmatter via summarizeLead, discarding ## Profile/## Evidence/
+// ## Classification/## Pitch entirely, which is exactly why that tab had no clickable sources or
+// why-fit context). Reuses qualify.ts's own extractSection/parseEvidence rather than re-parsing
+// the body a second way -- the same section slicing research.ts's merge logic depends on.
+export interface LeadDetail extends LeadSummary {
+  profile: string; // ## Profile (client/platform) -- doubles as the "what this is" summary for content-example
+  evidence: EvidenceItem[]; // ## Evidence -- each item's `source` is a real, clickable URL when valid
+  classificationNote: string; // ## Classification -- the why-fit reasoning (client/platform) or why-interesting note (content-example)
+  pitch: string; // ## Pitch -- the pitch angle (client/platform) or tentative content angle (content-example)
+}
+
+export function readLeadDetail(dir: string): LeadDetail {
+  const absDir = dir.startsWith("/") ? dir : join(repoRoot, dir);
+  const leadPath = join(absDir, "lead.md");
+  const raw = readFileSync(leadPath, "utf8");
+  const summary = summarizeLead(dir, raw);
+  const { body } = splitFrontmatter(raw);
+  return {
+    ...summary,
+    profile: extractSection(body, "## Profile").trim(),
+    evidence: parseEvidence(body),
+    classificationNote: extractSection(body, "## Classification").trim(),
+    pitch: extractSection(body, "## Pitch").trim(),
+  };
+}
+
+// Every lead's full detail, for the GUI's single-fetch Outreach tab load. Leads are few (single-
+// or low-double-digit count) and each file is tiny, so an N-file read per request is not worth
+// caching or a separate detail endpoint -- kept as one function so /api/outreach/leads can just
+// swap listLeads() for listLeadDetails() without changing its response shape's outer contract.
+export function listLeadDetails(): LeadDetail[] {
+  return listLeads().map((l) => readLeadDetail(l.dir));
 }
 
 // Fit-positive-first ordering for the target list, same "what can I act on" priority as

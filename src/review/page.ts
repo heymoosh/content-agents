@@ -348,7 +348,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <section class="view" id="outreachView" hidden>
     <div class="strategy">
       <div class="strategy-actions">
-        <span class="hint">Read-only (Phase 1 has no send path, nothing here contacts anyone). Add/research/qualify leads from the terminal: <code>/outreach add</code>, then <code>npm run outreach:research -- outreach/leads/&lt;dir&gt;</code>, then <code>npm run outreach:qualify -- outreach/leads/&lt;dir&gt;</code>.</span>
+        <span class="hint">Nothing here contacts anyone. Every source link is clickable; Pursue/Pass just marks your decision. Approve drafts a message for you to edit before it ever sends. Find more via <code>/scout</code> (or <code>/outreach add</code> to seed one by hand).</span>
       </div>
       <div id="outreachList"><div class="empty">Loading…</div></div>
     </div>
@@ -832,18 +832,70 @@ async function loadRaw(){
 }
 $("#rawRefreshBtn").addEventListener("click", loadRaw);
 
-// ── Outreach (Phase 1, read-only) ──
+// ── Outreach / discovery inbox ──
 // Same grouping order as status.ts's own STATUS_ORDER (pursue-ready leads first, cold/terminal
 // statuses last) so this view and npm run outreach:status never disagree about ordering.
 const OUTREACH_STATUS_ORDER = ["pursue","qualified","researched","intake","drafted","locked","passed"];
-async function loadOutreach(){
+// In-flight state for the "Approve -> Draft message" action, same pending/error pattern as the
+// Follow-ups tab's fuPending/fuError (followupDraft) -- a real ~30-120s claude -p spawn, so the
+// button must disable immediately and a dropped connection must still surface a durable error.
+const outPending = new Set();
+const outError = new Map();
+let OUTREACH_LEADS = null;
+
+function outreachSourceLinks(evidence){
+  const items = (evidence||[]).filter(e => e.source && e.source !== "(none)");
+  if(!items.length) return '<div class="src">no cited source yet</div>';
+  return items.map(e => {
+    const quote = e.quote && e.quote !== "(none)" ? '<div class="src">'+esc(e.quote)+'</div>' : "";
+    const link = /^https?:\/\//i.test(e.source)
+      ? '<a href="'+esc(e.source)+'" target="_blank" rel="noopener">'+esc(e.source)+'</a>'
+      : esc(e.source); // vault:<path> citations aren't clickable — shown as plain text
+    return '<div class="src">'+link+'</div>'+quote;
+  }).join("");
+}
+
+function outreachLeadCard(l){
+  const isContentExample = l.kind === "content-example";
+  const field = l.kind === "platform" ? "fit" : "classification";
+  const value = l.classificationOrFit || "unclear";
+  const badge = isContentExample ? esc(l.status||"intake") : esc(field)+'='+esc(value);
+  // Profile = what this candidate IS; classificationNote = why it's being recommended. Shown
+  // separately (content-example leads happen to write the same text to both, client/platform
+  // leads don't) so Muxin always has "what is this" before "why does it fit."
+  const profile = l.profile ? '<div class="ntext" style="margin-top:6px">'+esc(l.profile)+'</div>' : "";
+  const why = (l.classificationNote && l.classificationNote !== l.profile)
+    ? '<div class="ntext" style="margin-top:6px"><b>Why: </b>'+esc(l.classificationNote)+'</div>' : "";
+  const pitch = l.pitch ? '<div class="src">'+(isContentExample?'angle: ':'pitch: ')+esc(l.pitch)+'</div>' : "";
+  const sources = outreachSourceLinks(l.evidence);
+  const pending = outPending.has(l.dir);
+  const err = outError.get(l.dir);
+  const status = pending
+    ? '<div class="hint">drafting… (your subscription, ~30-60s — Add / Queue tab has progress + log)</div>'
+    : err ? '<div class="src">'+esc(err)+' — see Add / Queue tab for the job log</div>' : "";
+  const decided = l.status === "pursue" || l.status === "passed" || l.status === "locked" || l.status === "drafted";
+  const draftBtn = !isContentExample
+    ? '<button class="out-draft" data-dir="'+esc(l.dir)+'"'+((pending)?" disabled":"")+'>'+(pending?"Drafting…":"Approve → Draft message")+'</button>'
+    : "";
+  const pursueBtn = '<button class="out-pursue" data-dir="'+esc(l.dir)+'"'+(decided?" disabled":"")+'>Pursue</button>';
+  const passBtn = '<button class="out-pass" data-dir="'+esc(l.dir)+'"'+(decided?" disabled":"")+'>Pass</button>';
+  return '<div class="notepick"><div class="ntext">'+
+      '<div class="nmeta">'+esc(l.kind)+' · '+esc(l.source)+' · '+badge+'</div>'+
+      '<b>'+esc(l.name)+'</b>'+
+      (l.url ? '<div class="src"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>' : "")+
+      profile+why+pitch+sources+status+
+      '<div class="src">'+esc(l.dir)+'</div>'+
+    '</div>'+
+    '<div class="actions">'+draftBtn+pursueBtn+passBtn+'</div>'+
+  '</div>';
+}
+
+function renderOutreachBox(){
+  if(!OUTREACH_LEADS) return;
   const box = $("#outreachList");
-  box.innerHTML = '<div class="empty">Loading…</div>';
-  const r = await fetch("/api/outreach/leads");
-  const d = await r.json();
-  const leads = (d.leads || []);
+  const leads = OUTREACH_LEADS;
   if(!leads.length){
-    box.innerHTML = '<div class="empty">No outreach leads yet. Run <code>/outreach add</code> (or npm run outreach:add) from the terminal to seed one.</div>';
+    box.innerHTML = '<div class="empty">No outreach leads yet. Run <code>/scout</code> to find some, or <code>/outreach add</code> to seed one by hand.</div>';
     return;
   }
   const groups = new Map();
@@ -857,17 +909,43 @@ async function loadOutreach(){
   for(const key of keys){
     const group = groups.get(key);
     const sec = document.createElement("div"); sec.className = "notes-panel";
-    let rows = "";
-    for(const l of group){
-      const field = l.kind === "platform" ? "fit" : "classification";
-      const value = l.classificationOrFit || "unclear";
-      const angle = l.pitchAngle ? '<div class="src">pitch: '+esc(l.pitchAngle)+'</div>' : "";
-      rows += '<div class="notepick"><div class="ntext"><div class="nmeta">'+esc(l.kind)+' · '+esc(l.source)+' · '+esc(field)+'='+esc(value)+'</div>'+
-        '<b>'+esc(l.name)+'</b>'+angle+'<div class="src">'+esc(l.dir)+'</div></div></div>';
-    }
+    const rows = group.map(outreachLeadCard).join("");
     sec.innerHTML = '<div class="notes-head"><h3>'+esc(key.toUpperCase())+' ('+group.length+')</h3></div><div class="notelist">'+rows+'</div>';
     box.appendChild(sec);
   }
+  box.querySelectorAll("button.out-draft").forEach(b=>b.addEventListener("click", ()=>outreachDraft(b.dataset.dir)));
+  box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
+  box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
+}
+
+async function loadOutreach(){
+  const box = $("#outreachList");
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/outreach/leads");
+  const d = await r.json();
+  OUTREACH_LEADS = d.leads || [];
+  renderOutreachBox();
+}
+
+async function outreachDraft(dir){
+  if(outPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn
+  outError.delete(dir);
+  outPending.add(dir); renderOutreachBox();
+  try {
+    const r = await post("/api/followups/draft-follow-up", {dir});
+    if(r.ok){ flash("Message drafted — edit it below before it's ever sent"); await loadOutreach(); }
+    else { outError.set(dir, r.error || "Failed to draft"); }
+  } catch (e) {
+    outError.set(dir, e instanceof Error ? e.message : String(e));
+  } finally {
+    outPending.delete(dir); renderOutreachBox();
+  }
+}
+
+async function outreachDecide(dir, decision){
+  const r = await post("/api/outreach/decide", {dir, decision});
+  if(r.ok){ flash(decision==="pursue" ? "Marked pursue" : "Passed"); loadOutreach(); }
+  else flash(r.error || "Failed");
 }
 
 // ── Follow-ups (Phase 4) ──
