@@ -259,15 +259,122 @@ function postCount(): number {
   }
 }
 
+function untaggedCount(): number {
+  const db = openDb();
+  try {
+    return (db.prepare("SELECT COUNT(*) AS n FROM posts WHERE pillar IS NULL").get() as { n: number }).n;
+  } finally {
+    db.close();
+  }
+}
+
+// ── Freshness + brief-reference helpers (Muxin, 2026-07-16) ────────────────────────────────────
+// generateInsights already ran the 4 reports live off data/analytics.db — the numbers were never
+// stale. What was misleading is that it ALSO inlined the entire latest brief with no age signal,
+// so a 3-week-old brief read as co-equal to this second's DB query. These give the GUI a real
+// "as of" stamp instead, and let the brief be linked (dated) rather than dumped whole.
+
+export type Freshness = { date: string; ageDays: number };
+
+// Pure: calendar-day difference between an ISO date (yyyy-mm-dd, or any ISO string — only the date
+// part matters) and `nowMs`. `now` is normalized down to its own UTC midnight first, so any time
+// later the same calendar day still reads as "0 days ago" rather than rounding up to 1. Injected
+// `nowMs` keeps this testable without mocking the clock.
+export function daysAgo(dateStr: string, nowMs: number): number {
+  const then = new Date(dateStr.slice(0, 10) + "T00:00:00Z").getTime();
+  const now = new Date(nowMs);
+  const nowMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.max(0, Math.round((nowMidnight - then) / 86_400_000));
+}
+
+// Pure: picks the most recent of a set of possibly-null ISO date strings (e.g. MAX(captured_at),
+// MAX(imported_at)) and turns it into a Freshness stamp. Returns null when there's no data at all.
+export function computeFreshness(dates: (string | null | undefined)[], nowMs: number): Freshness | null {
+  const valid = dates.filter((d): d is string => !!d).sort();
+  if (!valid.length) return null;
+  const date = valid[valid.length - 1].slice(0, 10);
+  return { date, ageDays: daysAgo(date, nowMs) };
+}
+
+// Pure: brief filenames are `YYYY-MM-DD-strategy-brief.md` (same pattern latestBriefPath filters
+// on) — extract just the date.
+export function parseBriefDate(filename: string): string | null {
+  const m = filename.match(/^(\d{4}-\d{2}-\d{2})-strategy-brief\.md$/);
+  return m ? m[1] : null;
+}
+
+// Pure: pulls one `## <header>` section (through the next `## ` heading, or EOF) out of a brief's
+// markdown — used to hand Claude the brief's directives/scorecard without inlining the whole ~10KB
+// file. Returns null if the section isn't present (older briefs, or a hand-edited one).
+export function extractSection(md: string, header: string): string | null {
+  const lines = md.split("\n");
+  const headerRe = new RegExp(`^##\\s+${header.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i");
+  const start = lines.findIndex((l) => headerRe.test(l.trim()));
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^##\s+/.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  const section = lines.slice(start, end).join("\n").trim();
+  return section || null;
+}
+
+type BriefReference = {
+  path: string;
+  date: string | null;
+  ageDays: number | null;
+  directives: string | null;
+  scorecard: string | null;
+};
+
+function briefReference(nowMs: number = Date.now()): BriefReference | null {
+  const abs = latestBriefPath();
+  if (!abs) return null;
+  const filename = basename(abs);
+  const date = parseBriefDate(filename);
+  const text = readFileSync(abs, "utf8");
+  return {
+    path: abs.slice(repoRoot.length + 1),
+    date,
+    ageDays: date ? daysAgo(date, nowMs) : null,
+    directives: extractSection(text, "Directives for atomization"),
+    scorecard: extractSection(text, "Last cycle scorecard"),
+  };
+}
+
+function dataFreshness(nowMs: number = Date.now()): Freshness | null {
+  const db = openDb();
+  try {
+    const metricsRow = db.prepare("SELECT MAX(captured_at) AS d FROM metrics").get() as { d: string | null };
+    const importsRow = db.prepare("SELECT MAX(imported_at) AS d FROM imports").get() as { d: string | null };
+    return computeFreshness([metricsRow.d, importsRow.d], nowMs);
+  } finally {
+    db.close();
+  }
+}
+
+export type InsightsResult = {
+  summary: string;
+  freshness: Freshness | null;
+  brief: { path: string; date: string | null; ageDays: number | null } | null;
+  untagged: number;
+};
+
 // "Generate insights": run the read-only reports ourselves (deterministic, no LLM variance on the
-// numbers), then hand the raw output + latest brief to Claude and ask for a short synthesis — not
-// another raw dump. This is a pure text answer (nothing written to disk), shown straight in the GUI.
-async function generateInsights(): Promise<string> {
+// numbers), then hand the raw output + a TRIMMED, dated brief excerpt to Claude and ask for a short
+// synthesis — not another raw dump. Freshness/brief/untagged are computed here (deterministic, not
+// LLM-dependent) so the GUI can show an "as of" stamp and a dated link instead of trusting the
+// summary text to mention how current anything is. This is otherwise a pure text answer (nothing
+// written to disk), shown straight in the GUI.
+async function generateInsights(): Promise<InsightsResult> {
   // Fail loud and fast, before spending a Claude call: an empty posts table almost always means
   // this checkout's data/analytics.db is a stale/isolated copy (gitignored, never synced between
   // checkouts — see IS_DEV_WORKTREE), not that there's genuinely no data.
   if (postCount() === 0) {
-    return (
+    const summary =
       `**No analytics data in this checkout (0 posts in data/analytics.db).**\n\n` +
       (IS_DEV_WORKTREE
         ? `This GUI is running from a Claude Code dev worktree, which has its own empty, gitignored ` +
@@ -275,8 +382,8 @@ async function generateInsights(): Promise<string> {
           `your main repo checkout instead to see live numbers.\n`
         : `\`data/analytics.db\` is gitignored (per-checkout, never synced by git) — either this checkout ` +
           `has never been ingested, or something pulled into a different copy. Run \`npm run ingest\` / ` +
-          `\`npm run pull\` here, or check you're in the checkout you expect.\n`)
-    );
+          `\`npm run pull\` here, or check you're in the checkout you expect.\n`);
+    return { summary, freshness: null, brief: null, untagged: 0 };
   }
   const sections: string[] = [];
   for (const key of Object.keys(REPORTS)) {
@@ -286,29 +393,40 @@ async function generateInsights(): Promise<string> {
       sections.push(`### ${key}\n(failed: ${e instanceof Error ? e.message : String(e)})`);
     }
   }
-  const briefPath = latestBriefPath();
-  const briefText = briefPath ? readFileSync(briefPath, "utf8") : "(no strategy brief exists yet)";
+  const freshness = dataFreshness();
+  const brief = briefReference();
+  const untagged = untaggedCount();
+  const briefLabel = brief ? `${brief.date ?? "undated"}${brief.ageDays != null ? `, ${brief.ageDays}d old` : ""}` : null;
+  const briefExcerpt = brief
+    ? [brief.scorecard, brief.directives].filter(Boolean).join("\n\n") || "(no directives/scorecard section found)"
+    : null;
   const prompt = [
-    `Muxin Li wants a quick read on his content pipeline's analytics. Below is raw output from the`,
-    `pipeline's own report scripts, plus his latest strategy brief. Do not run any commands or read`,
-    `any other files — just read what's given below and respond.`,
+    `Muxin Li wants a quick read on his content pipeline's analytics. Below is LIVE raw output from`,
+    `the pipeline's own report scripts (run just now, against the current database) — this is the`,
+    `primary source. Below that is a short excerpt from his prior-cycle strategy brief`,
+    `(${briefLabel ?? "none exists yet"}) for context only: it may be stale, so prefer the live`,
+    `numbers and call out anywhere the brief's claims no longer hold. Do not run any commands or`,
+    `read any other files — just read what's given below and respond.`,
     ``,
     `Write a SHORT, high-level synthesis: what's working, what's not, 3-5 concrete numbers that`,
-    `actually matter, and one or two things worth doing next. This is a skim, not a re-statement of`,
-    `the brief — assume he will ask follow-up questions for anything he wants to dig into. Plain`,
-    `markdown (headers/bullets/bold only, no tables). No em dashes, no AI-tell filler phrases`,
-    `("it's not just X, it's Y", "let's unpack", etc.) — write like a sharp PM giving a 30-second`,
-    `verbal update.`,
+    `actually matter, and one or two things worth doing next. Also flag concrete DATA-HYGIENE next`,
+    `steps you see in the reports below (e.g. an untagged-post count, an origin-compare cell marked`,
+    `INSUFFICIENT, a channel below the 4-week data-confidence bar) as specific actions, not just`,
+    `numbers. This is a skim, not a re-statement of the brief — assume he will ask follow-up`,
+    `questions for anything he wants to dig into. Plain markdown (headers/bullets/bold only, no`,
+    `tables). No em dashes, no AI-tell filler phrases ("it's not just X, it's Y", "let's unpack",`,
+    `etc.) — write like a sharp PM giving a 30-second verbal update.`,
     ``,
-    `## Raw report output`,
+    `## Live report output`,
     sections.join("\n\n"),
+    untagged > 0 ? `\n${untagged} posts have no pillar tag (posts.pillar IS NULL) as of this query.` : "",
     ``,
-    `## Latest strategy brief`,
-    briefText,
+    `## Prior-cycle brief excerpt (${briefLabel ?? "none"}) — context only, may be stale`,
+    briefExcerpt ?? "(no strategy brief exists yet)",
   ].join("\n");
   // Routed through the ONE job queue (Codebase review Phase 2) — same log/heartbeat + bounded
   // concurrency every other Claude spawn in this GUI now gets, instead of its own unbounded spawn.
-  return runQueued("insights", "Generate insights", async (job) => {
+  const summary = await runQueued("insights", "Generate insights", async (job) => {
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: STRATEGY_TIMEOUT_MS });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "Claude", timeoutLabel: `${STRATEGY_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
@@ -316,6 +434,12 @@ async function generateInsights(): Promise<string> {
     if (failure) throw new Error(failure);
     return result.stdout.trim();
   });
+  return {
+    summary,
+    freshness,
+    brief: brief ? { path: brief.path, date: brief.date, ageDays: brief.ageDays } : null,
+    untagged,
+  };
 }
 
 // Deep-dive follow-up: unlike generateInsights (which we feed pre-fetched data), Claude is allowed
@@ -787,8 +911,8 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/strategy/insights") {
       try {
-        const summary = await generateInsights();
-        json(res, 200, { ok: true, summary });
+        const { summary, freshness, brief, untagged } = await generateInsights();
+        json(res, 200, { ok: true, summary, freshness, brief, untagged });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }

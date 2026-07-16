@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, insightsTickerText } from "./page.js";
+import { replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, insightsTickerText, fmtDays, renderInsightsMeta } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
   const row = {
@@ -139,4 +139,46 @@ test("insightsTickerText: renders the live elapsed count so the wait reads as on
 test("insightsTickerText: elapsed count keeps ticking past a minute, matching the real ~180s bound", () => {
   const html = insightsTickerText(125_000);
   assert.ok(html.includes("2m 5s elapsed"));
+});
+
+// renderInsightsMeta / fmtDays — card (Muxin, 2026-07-16): "Generate insights" already ran live
+// reports; the fix surfaces a deterministic freshness stamp + a dated brief LINK (never the brief's
+// text — mdToHtml has no markdown-link syntax) + an untagged-post warning, built from the server's
+// numbers so it can't be silently dropped by Claude's synthesis pass.
+
+test("fmtDays: singular for 1, plural otherwise", () => {
+  assert.equal(fmtDays(0), "0 days");
+  assert.equal(fmtDays(1), "1 day");
+  assert.equal(fmtDays(22), "22 days");
+});
+
+test("renderInsightsMeta: renders freshness, a dated brief link, and an untagged warning together", () => {
+  const html = renderInsightsMeta({
+    freshness: { date: "2026-07-12", ageDays: 4 },
+    brief: { path: "briefs/2026-06-24-strategy-brief.md", date: "2026-06-24", ageDays: 22 },
+    untagged: 160,
+  });
+  assert.match(html, /Data current as of <b>2026-07-12<\/b> \(4 days ago\)/);
+  assert.match(html, /<a href="#stratBriefPanel">2026-06-24 \(22 days old\)<\/a>/);
+  assert.match(html, /class="warn">⚠ 160 untagged posts<\/span>/);
+});
+
+test("renderInsightsMeta: omits the untagged warning entirely when the count is 0", () => {
+  const html = renderInsightsMeta({ freshness: { date: "2026-07-16", ageDays: 0 }, brief: null, untagged: 0 });
+  assert.ok(!html.includes("untagged"));
+});
+
+test("renderInsightsMeta: falls back to the brief's path when it has no parseable date", () => {
+  const html = renderInsightsMeta({ brief: { path: "briefs/weird-name.md", date: null, ageDays: null } });
+  assert.match(html, /<a href="#stratBriefPanel">briefs\/weird-name\.md<\/a>/);
+});
+
+test("renderInsightsMeta: empty string when there's nothing to show (0 posts / no brief / no data)", () => {
+  assert.equal(renderInsightsMeta({}), "");
+  assert.equal(renderInsightsMeta({ freshness: null, brief: null, untagged: 0 }), "");
+});
+
+test("renderInsightsMeta: singular '1 untagged post', not 'posts'", () => {
+  const html = renderInsightsMeta({ untagged: 1 });
+  assert.match(html, /⚠ 1 untagged post</); // no trailing 's' before the closing tag
 });
