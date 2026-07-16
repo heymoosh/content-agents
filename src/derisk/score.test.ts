@@ -3,20 +3,20 @@ import assert from "node:assert/strict";
 import {
   parseDerisk,
   lowDimensions,
-  needsAntiSaltyGuard,
-  needsReworkPass,
+  missingBeats,
+  needsFramePass,
   deriskNote,
   summarizeDerisk,
   LOW_SCORE_THRESHOLD,
 } from "./score.js";
 
 const FULL_SCORES = {
-  load_bearing: 4,
+  belief_load_bearing: 4,
   test_cheap: 4,
-  test_decisive: 4,
-  payoff_concrete: 4,
-  reader_runnable: true,
-  constructive: 4,
+  test_reader_runnable: true,
+  decision_named: true,
+  saves_if_false_concrete: 4,
+  has_signoff: true,
 };
 
 describe("parseDerisk: reads fm.derisk_scores.{...}", () => {
@@ -29,15 +29,15 @@ describe("parseDerisk: reads fm.derisk_scores.{...}", () => {
   });
 
   test("undefined when only some fields are present", () => {
-    assert.equal(parseDerisk({ derisk_scores: { load_bearing: 4, test_cheap: 4 } }), undefined);
+    assert.equal(parseDerisk({ derisk_scores: { belief_load_bearing: 4, test_cheap: 4 } }), undefined);
   });
 
   test("undefined when a numeric dimension is a non-number", () => {
-    assert.equal(parseDerisk({ derisk_scores: { ...FULL_SCORES, load_bearing: "4" } }), undefined);
+    assert.equal(parseDerisk({ derisk_scores: { ...FULL_SCORES, belief_load_bearing: "4" } }), undefined);
   });
 
-  test("undefined when reader_runnable is not a boolean", () => {
-    assert.equal(parseDerisk({ derisk_scores: { ...FULL_SCORES, reader_runnable: "true" } }), undefined);
+  test("undefined when a boolean beat is not a boolean", () => {
+    assert.equal(parseDerisk({ derisk_scores: { ...FULL_SCORES, test_reader_runnable: "true" } }), undefined);
   });
 
   test("undefined when derisk_scores is not an object", () => {
@@ -56,81 +56,81 @@ describe(`lowDimensions: soft-gate at <= ${LOW_SCORE_THRESHOLD}`, () => {
 
   test("multiple low dimensions are all reported, in rubric order", () => {
     assert.deepEqual(
-      lowDimensions({ ...FULL_SCORES, load_bearing: 2, payoff_concrete: 3 }),
-      ["load_bearing", "payoff_concrete"],
+      lowDimensions({ ...FULL_SCORES, belief_load_bearing: 2, saves_if_false_concrete: 3 }),
+      ["belief_load_bearing", "saves_if_false_concrete"],
     );
   });
 
-  test("reader_runnable never appears (it's boolean, not scored 1-5)", () => {
-    assert.deepEqual(lowDimensions({ ...FULL_SCORES, reader_runnable: false }), []);
+  test("boolean beats never appear here even when false", () => {
+    assert.deepEqual(lowDimensions({ ...FULL_SCORES, test_reader_runnable: false }), []);
   });
 });
 
-describe("needsAntiSaltyGuard: the reason this lens exists", () => {
-  test("false when reader_runnable is true and constructive is above threshold", () => {
-    assert.equal(needsAntiSaltyGuard(FULL_SCORES), false);
+describe("missingBeats: which boolean frame beats are absent", () => {
+  test("empty when every beat is present", () => {
+    assert.deepEqual(missingBeats(FULL_SCORES), []);
   });
 
-  test("true when reader_runnable is false, even if every score is high", () => {
-    assert.equal(needsAntiSaltyGuard({ ...FULL_SCORES, reader_runnable: false }), true);
+  test("names a single missing beat", () => {
+    assert.deepEqual(missingBeats({ ...FULL_SCORES, has_signoff: false }), ["has_signoff"]);
   });
 
-  test("true when constructive is at/below threshold, even if reader_runnable is true", () => {
-    assert.equal(needsAntiSaltyGuard({ ...FULL_SCORES, constructive: 3 }), true);
+  test("names multiple missing beats, in rubric order", () => {
+    assert.deepEqual(
+      missingBeats({ ...FULL_SCORES, test_reader_runnable: false, has_signoff: false }),
+      ["test_reader_runnable", "has_signoff"],
+    );
+  });
+
+  test("numeric dimensions never appear here", () => {
+    assert.deepEqual(missingBeats({ ...FULL_SCORES, test_cheap: 1 }), []);
   });
 });
 
-describe("needsReworkPass", () => {
-  test("false when everything is high and reader-runnable", () => {
-    assert.equal(needsReworkPass(FULL_SCORES), false);
+describe("needsFramePass: soft signal only, mirrors needsSpinPass", () => {
+  test("false when every beat is present and no dimension is low", () => {
+    assert.equal(needsFramePass(FULL_SCORES), false);
   });
 
-  test("true when the anti-salty guard trips even with no low numeric dimensions", () => {
-    assert.equal(needsReworkPass({ ...FULL_SCORES, reader_runnable: false }), true);
+  test("true when a boolean beat is missing even with all-high numeric scores", () => {
+    assert.equal(needsFramePass({ ...FULL_SCORES, decision_named: false }), true);
   });
 
-  test("true when a non-constructive numeric dimension is low", () => {
-    assert.equal(needsReworkPass({ ...FULL_SCORES, test_decisive: 2 }), true);
+  test("true when a numeric dimension is low even with every beat present", () => {
+    assert.equal(needsFramePass({ ...FULL_SCORES, test_cheap: 2 }), true);
   });
 });
 
 describe("deriskNote: the exact review-queue.md notes-cell suffix", () => {
-  test("undefined when nothing is flagged", () => {
+  test("undefined when the frame is complete and strong", () => {
     assert.equal(deriskNote(FULL_SCORES), undefined);
   });
 
-  test("names the anti-salty guard first when reader_runnable is false", () => {
+  test("names missing beats", () => {
     assert.equal(
-      deriskNote({ ...FULL_SCORES, reader_runnable: false }),
-      "flag: derisk anti-salty guard (reader_runnable: false, constructive: 4)",
+      deriskNote({ ...FULL_SCORES, has_signoff: false }),
+      "flag: derisk frame incomplete (missing: has_signoff)",
     );
   });
 
-  test("names the anti-salty guard when constructive is low, citing both fields", () => {
+  test("names low numeric dimensions separately from missing beats", () => {
     assert.equal(
-      deriskNote({ ...FULL_SCORES, constructive: 2 }),
-      "flag: derisk anti-salty guard (reader_runnable: true, constructive: 2)",
+      deriskNote({ ...FULL_SCORES, belief_load_bearing: 2, test_cheap: 3 }),
+      "flag: derisk frame weak (low: belief_load_bearing, test_cheap)",
     );
   });
 
-  test("names low non-constructive dimensions separately from the anti-salty guard", () => {
+  test("combines both flags with '; ' when both trip, missing beats first", () => {
     assert.equal(
-      deriskNote({ ...FULL_SCORES, load_bearing: 2, test_cheap: 3 }),
-      "flag: derisk weak (low: load_bearing, test_cheap)",
+      deriskNote({ ...FULL_SCORES, test_reader_runnable: false, belief_load_bearing: 2 }),
+      "flag: derisk frame incomplete (missing: test_reader_runnable); flag: derisk frame weak (low: belief_load_bearing)",
     );
   });
 
-  test("combines both flags with '; ' when both trip", () => {
+  test("multiple missing beats and multiple low dimensions all named", () => {
     assert.equal(
-      deriskNote({ ...FULL_SCORES, reader_runnable: false, load_bearing: 2 }),
-      "flag: derisk anti-salty guard (reader_runnable: false, constructive: 4); flag: derisk weak (low: load_bearing)",
-    );
-  });
-
-  test("a low constructive score is not double-counted in the 'weak' list", () => {
-    assert.equal(
-      deriskNote({ ...FULL_SCORES, constructive: 2 }),
-      "flag: derisk anti-salty guard (reader_runnable: true, constructive: 2)",
+      deriskNote({ ...FULL_SCORES, test_reader_runnable: false, has_signoff: false, test_cheap: 1 }),
+      "flag: derisk frame incomplete (missing: test_reader_runnable, has_signoff); flag: derisk frame weak (low: test_cheap)",
     );
   });
 });
@@ -138,24 +138,24 @@ describe("deriskNote: the exact review-queue.md notes-cell suffix", () => {
 describe("summarizeDerisk: advisory rollup for npm run validate, never a gate", () => {
   test("counts only scored sources; unscored ones are skipped, not violations", () => {
     const result = summarizeDerisk([
-      { file: "content/a/source.md", fm: { derisk_scores: { ...FULL_SCORES, load_bearing: 2 } } },
+      { file: "content/a/source.md", fm: { derisk_scores: { ...FULL_SCORES, belief_load_bearing: 2 } } },
       { file: "content/b/source.md", fm: { derisk_scores: FULL_SCORES } },
       { file: "content/c/source.md", fm: { title: "no derisk pass" } },
     ]);
     assert.equal(result.scored, 2);
     assert.equal(result.flagged, 1);
-    assert.deepEqual(result.flaggedFiles, [{ file: "content/a/source.md", low: ["load_bearing"], antiSalty: false }]);
+    assert.deepEqual(result.flaggedFiles, [{ file: "content/a/source.md", low: ["belief_load_bearing"], missing: [] }]);
   });
 
-  test("flags a source with the anti-salty guard tripped even when no numeric dim is low", () => {
+  test("flags a source with a missing beat even when no numeric dim is low", () => {
     const result = summarizeDerisk([
-      { file: "content/a/source.md", fm: { derisk_scores: { ...FULL_SCORES, reader_runnable: false } } },
+      { file: "content/a/source.md", fm: { derisk_scores: { ...FULL_SCORES, decision_named: false } } },
     ]);
     assert.equal(result.flagged, 1);
-    assert.deepEqual(result.flaggedFiles, [{ file: "content/a/source.md", low: [], antiSalty: true }]);
+    assert.deepEqual(result.flaggedFiles, [{ file: "content/a/source.md", low: [], missing: ["decision_named"] }]);
   });
 
-  test("all-high reports zero flagged", () => {
+  test("all-complete-and-strong reports zero flagged", () => {
     const result = summarizeDerisk([{ file: "a.md", fm: { derisk_scores: FULL_SCORES } }]);
     assert.equal(result.flagged, 0);
     assert.deepEqual(result.flaggedFiles, []);
