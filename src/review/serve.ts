@@ -18,7 +18,7 @@
 // Zero new deps: Node's built-in http + the existing queue parser.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -32,8 +32,10 @@ import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { checkReuse } from "../publish/reuse-guard.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
-import { listLeads } from "../outreach/status.js";
+import { listLeadDetails } from "../outreach/status.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
+import { setFrontmatterField } from "../outreach/qualify.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
 import { buildFollowups, markResponded, markContacted, moveOn, isBucket } from "../outreach/tracker.js";
 import {
   enrich,
@@ -814,13 +816,43 @@ const server = createServer(async (req, res) => {
       serveRawFile(res, url.searchParams.get("path") ?? "");
       return;
     }
-    // Read-only outreach lead surfacing (Phase 1 definition of done: "GUI reads lead
-    // review-queues"). No write path here on purpose -- add/research/qualify stay CLI-only
-    // (`/outreach` skill, `npm run outreach:*`) for Phase 1; this endpoint just lets Muxin see
-    // where every seeded lead stands without a terminal. Reuses status.ts's own scan (listLeads)
-    // instead of re-implementing the outreach/leads/*/lead.md read here.
+    // Outreach/discovery inbox (card: web-discovery inbox -- fixes the prior read-only, bare-row
+    // tab: no clickable sources, no why-fit, no way to act). Returns full lead detail (clickable
+    // ## Evidence source URLs + quotes, ## Classification why-fit reasoning, ## Pitch angle) via
+    // status.ts's listLeadDetails(), not just frontmatter. add/research/qualify still stay
+    // CLI-only (`/outreach` skill, `npm run outreach:*`, `/scout` for discovery) -- this endpoint
+    // only reads; the two POST endpoints below are the entire write surface this tab gets.
     if (req.method === "GET" && url.pathname === "/api/outreach/leads") {
-      json(res, 200, { ok: true, leads: listLeads() });
+      json(res, 200, { ok: true, leads: listLeadDetails() });
+      return;
+    }
+    // Muxin's own pursue/pass call on a lead -- the token-spend gate: nothing downstream (a draft
+    // message, a future /derisk run) fires until he decides here. Deliberately NOT run through
+    // qualify.ts's evaluateQualify: this is a human override of (or confirmation of) whatever
+    // classification/fit qualify.ts already computed, not another legality re-derivation. Reuses
+    // qualify.ts's own setFrontmatterField so the frontmatter rewrite can't drift from how every
+    // other outreach status transition writes a field.
+    if (req.method === "POST" && url.pathname === "/api/outreach/decide") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      const decision = String(b.decision ?? "");
+      if (!isValidLeadDir(dir) || (decision !== "pursue" && decision !== "pass")) {
+        json(res, 400, { ok: false, error: "dir must be a valid lead folder and decision must be pursue|pass" });
+        return;
+      }
+      try {
+        const leadPath = join(repoRoot, dir, "lead.md");
+        const raw = readFileSync(leadPath, "utf8");
+        const { header, body } = splitFrontmatter(raw);
+        const status = decision === "pursue" ? "pursue" : "passed";
+        const newHeader = setFrontmatterField(header, "status", status);
+        const date = new Date().toISOString().slice(0, 10);
+        const newBody = `${body.replace(/\n+$/, "")}\n- ${date}: Muxin decided ${decision} (manual, review GUI)\n`;
+        writeFileSync(leadPath, `${newHeader}\n${newBody}`);
+        json(res, 200, { ok: true, dir, status });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
       return;
     }
     // Follow-ups tab (docs/outreach-engine-plan.md §6 Phase 4, backlog card 21a5eb84): folds

@@ -62,6 +62,7 @@
     "outreach:validate": "tsx src/outreach/validate.ts",
     "outreach:lock": "tsx src/outreach/lock.ts",
     "outreach:status": "tsx src/outreach/status.ts",
+    "scout": "tsx src/discovery/discover.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",

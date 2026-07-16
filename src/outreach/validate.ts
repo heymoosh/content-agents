@@ -22,7 +22,11 @@ import { parseEvidence, LEAD_SOURCES } from "./qualify.js";
 // before ever locking a message, so a hand-edited/corrupted file can never become a legal
 // /atomize source through the GUI's approve button.
 
-const VALID_KINDS = new Set(["client", "platform"]);
+// "content-example" (card: web-discovery inbox) is raw material for the separate, opt-in /derisk
+// lens -- a discovered product/company/org example, not an outreach target. It carries neither
+// classification nor fit (see the kind-specific branch below); it reuses every other lead.md
+// convention (required sections, evidence shape) unchanged.
+const VALID_KINDS = new Set(["client", "platform", "content-example"]);
 // Sourced from qualify.ts's LEAD_SOURCES so the two files can't drift on what a valid
 // `source:` value is -- "ingested": pre-existing research (e.g. Muxin's Obsidian vault)
 // snapshotted into a lead.md directly, distinct from "manual" (hand-typed intake), "jsa",
@@ -47,7 +51,7 @@ export function checkLeadShape(file: string, fm: Record<string, unknown>, body: 
 
   const kind = String(fm.kind ?? "");
   if (!VALID_KINDS.has(kind)) {
-    violations.push(`${file}: kind must be "client" or "platform" (got "${kind}")`);
+    violations.push(`${file}: kind must be "client", "platform", or "content-example" (got "${kind}")`);
   }
 
   if (!fm.name || typeof fm.name !== "string" || !fm.name.trim()) {
@@ -90,6 +94,13 @@ export function checkLeadShape(file: string, fm: Record<string, unknown>, body: 
     }
     if (fm.classification !== undefined) {
       violations.push(`${file}: kind: platform should not carry a "classification" field (that's the client-kind field)`);
+    }
+  } else if (kind === "content-example") {
+    if (fm.classification !== undefined) {
+      violations.push(`${file}: kind: content-example should not carry a "classification" field`);
+    }
+    if (fm.fit !== undefined) {
+      violations.push(`${file}: kind: content-example should not carry a "fit" field`);
     }
   }
 

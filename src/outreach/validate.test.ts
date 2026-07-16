@@ -52,6 +52,14 @@ describe("checkLeadShape: a well-formed lead passes with zero violations", () =>
     const fm = baseClientFm({ source: "jsa", jsa_verdict: "TARGET" });
     assert.deepEqual(checkLeadShape("lead.md", fm, REQUIRED_BODY), []);
   });
+
+  // content-example (card: web-discovery inbox) carries neither classification nor fit -- it's
+  // raw material for the separate /derisk lens, not an outreach legality claim.
+  test("kind: content-example, source: discovered, neither classification nor fit", () => {
+    const fm = baseClientFm({ kind: "content-example", source: "discovered", status: "intake" });
+    delete fm.classification;
+    assert.deepEqual(checkLeadShape("lead.md", fm, REQUIRED_BODY), []);
+  });
 });
 
 describe("checkLeadShape: frontmatter field violations", () => {
@@ -116,6 +124,22 @@ describe("checkLeadShape: classification/fit are kind-exclusive", () => {
     const fm = baseClientFm({ kind: "platform", fit: "strong" });
     const violations = checkLeadShape("lead.md", fm, REQUIRED_BODY);
     assert.ok(violations.some((v) => v.includes('should not carry a "classification" field')));
+  });
+
+  test("kind: content-example carrying either a classification or a fit field is flagged", () => {
+    const fmClassification = baseClientFm({ kind: "content-example" });
+    assert.ok(
+      checkLeadShape("lead.md", fmClassification, REQUIRED_BODY).some((v) =>
+        v.includes('content-example should not carry a "classification" field'),
+      ),
+    );
+    const fmFit = baseClientFm({ kind: "content-example", fit: "strong" });
+    delete fmFit.classification;
+    assert.ok(
+      checkLeadShape("lead.md", fmFit, REQUIRED_BODY).some((v) =>
+        v.includes('content-example should not carry a "fit" field'),
+      ),
+    );
   });
 });
 

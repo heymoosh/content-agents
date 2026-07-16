@@ -1,6 +1,9 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { summarizeLead, groupByStatus, renderStatusTable, renderTargetsList, type LeadSummary } from "./status.js";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { summarizeLead, groupByStatus, renderStatusTable, renderTargetsList, readLeadDetail, type LeadSummary } from "./status.js";
 
 function makeLeadMd(overrides: Record<string, string> = {}): string {
   const fields: Record<string, string> = {
@@ -173,5 +176,64 @@ describe("renderTargetsList", () => {
   test("shows a placeholder when a lead has no pitch angle yet", () => {
     const text = renderTargetsList([weakPlatform]);
     assert.ok(text.includes("no pitch angle yet"));
+  });
+});
+
+describe("readLeadDetail", () => {
+  // Uses an absolute tmpdir path (readLeadDetail supports "starts with / else join(repoRoot,...)",
+  // the same convention runResearch/runQualify/runLock use) so this test never touches the real
+  // outreach/leads/ tree.
+  function writeLeadFixture(): string {
+    const dir = mkdtempSync(join(tmpdir(), "status-test-"));
+    const leadMd = [
+      "---",
+      "kind: client",
+      'name: "Acme Co"',
+      "url: https://acme.co",
+      "source: discovered",
+      "status: researched",
+      "classification: greenfield",
+      'pitch_angle: "lead with the shared worldview"',
+      "---",
+      "",
+      "## Profile",
+      "",
+      "Acme makes widgets.",
+      "",
+      "## Evidence",
+      "",
+      '- E1 | signal: worldview-match | person: | source: https://acme.co/blog | quote: "we believe in people" | founder blog post',
+      "",
+      "## Classification",
+      "",
+      "Per E1, a real worldview match.",
+      "",
+      "## Pitch",
+      "",
+      "lead with the shared worldview",
+      "",
+      "## Decision log",
+      "",
+      '- 2026-07-16: discovered via /scout (theme: "career-work")',
+    ].join("\n");
+    writeFileSync(join(dir, "lead.md"), leadMd);
+    return dir;
+  }
+
+  test("parses profile, evidence (with clickable source + quote), classification note, and pitch", () => {
+    const dir = writeLeadFixture();
+    try {
+      const detail = readLeadDetail(dir);
+      assert.equal(detail.name, "Acme Co");
+      assert.equal(detail.classificationOrFit, "greenfield");
+      assert.match(detail.profile, /Acme makes widgets\./);
+      assert.equal(detail.evidence.length, 1);
+      assert.equal(detail.evidence[0].source, "https://acme.co/blog");
+      assert.match(detail.evidence[0].quote, /we believe in people/);
+      assert.match(detail.classificationNote, /Per E1, a real worldview match\./);
+      assert.match(detail.pitch, /lead with the shared worldview/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
