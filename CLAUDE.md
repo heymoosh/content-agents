@@ -20,6 +20,16 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      This is allowed ONLY because every storyboard is reviewed and approved by Muxin in
      `review-queue.md` *before* any render, and nothing auto-publishes. The exception is video
      scripts only; it must never bleed into text/image derivatives.
+   - **Scoped exception — `/derisk` analysis.** `/derisk` (`.claude/skills/derisk/`) is a deliberate,
+     opt-in-only exception: it names a "riskiest belief / cheapest test / payoff" analysis of an
+     external example (a product, business, or org strategy Muxin points it at) — original
+     reasoning, not extracted from Muxin's own prior writing. This is allowed ONLY because (a) it
+     never runs on its own — Muxin invokes it explicitly on an example he chose, never as a default
+     behavior of `/atomize` or any other skill; (b) the riskiest belief is locked through an
+     interactive brainstorm in the session, never asserted unilaterally; and (c) the resulting
+     `source.md` still goes through the full `/atomize` → `review-queue.md` pipeline, so nothing
+     publishes unreviewed (rule 2 still governs). The exception is `/derisk` only; it must never
+     bleed into text/image derivatives or become an automatic step in any other skill.
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
 3. **Browser automation for posting is allowed only with Muxin's explicit approval.** Prefer
