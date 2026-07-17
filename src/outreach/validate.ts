@@ -22,8 +22,9 @@ import { parseEvidence, LEAD_SOURCES } from "./qualify.js";
 // before ever locking a message, so a hand-edited/corrupted file can never become a legal
 // /atomize source through the GUI's approve button.
 
-// "content-example" (card: web-discovery inbox) is raw material for the separate, opt-in /derisk
-// lens -- a discovered product/company/org example, not an outreach target. It carries neither
+// "content-example" (card: web-discovery inbox) is raw material for the separate, opt-in
+// /brand-lens Inspiration mode -- a discovered product/company/org example, not an outreach
+// target. It carries neither
 // classification nor fit (see the kind-specific branch below); it reuses every other lead.md
 // convention (required sections, evidence shape) unchanged.
 const VALID_KINDS = new Set(["client", "platform", "content-example"]);

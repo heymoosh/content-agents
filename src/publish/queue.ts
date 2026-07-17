@@ -28,7 +28,7 @@ function parseOrigin(cell: string | undefined): QueueOrigin | undefined {
 }
 
 // Multi-cut row ids (plan i-want-to-add-mellow-mist): a row drafted from a non-default cut/lens
-// (e.g. "derisk") self-describes it via an id prefix, "derisk/x-1" — NOT a "## derisk" heading
+// (e.g. "short") self-describes it via an id prefix, "short/x-1" — NOT a "## short" heading
 // inserted into the table. review-queue.md is one contiguous GFM table; a heading line between
 // data rows would break GitHub's table parser (it requires an unbroken run of "|" rows), splitting
 // the table into two chunks where the second has no header/separator of its own. The default lens

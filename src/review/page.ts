@@ -273,7 +273,6 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .cut-head { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--line); }
   .cut-lens { font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size:12px; }
   .cut-lens.lens-extract { color:var(--muted); }
-  .cut-lens.lens-derisk { color:var(--red); }
   .cut-head .grow { flex:1; }
   .cut-head button { font-size:11.5px; padding:3px 8px; }
   .cut-body { flex:1; overflow-y:auto; padding:10px 12px; font-size:13.5px; line-height:1.55; }

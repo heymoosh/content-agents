@@ -133,11 +133,11 @@ export interface ContentExampleDiscoveryOpts {
 }
 
 // content-example candidates are NOT outreach targets -- they're raw material for the (separate,
-// opt-in) /derisk lens: a real product/company/org move worth naming a testable, load-bearing
-// belief about. This prompt deliberately does NOT ask the model to name the riskiest belief
-// itself (that's /derisk's interactive, red-teamed job, card-scoped separately) -- it only asks
-// for a real, cited example plus a tentative one-line angle, so Muxin has something concrete to
-// vet before any analysis gets composed.
+// opt-in) /brand-lens Inspiration mode: a real product/company/org move worth naming a testable,
+// load-bearing belief about. This prompt deliberately does NOT ask the model to name the belief
+// under audit itself (that's /brand-lens's job, and Muxin writes any resulting piece) -- it only
+// asks for a real, cited example plus a tentative one-line angle, so Muxin has something concrete
+// to vet.
 export function buildContentExampleDiscoveryPrompt(opts: ContentExampleDiscoveryOpts): string {
   const excludeBlock = opts.excludeNames.length
     ? `Do NOT propose any of these -- already on file: ${opts.excludeNames.join(", ")}.`

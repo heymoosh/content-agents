@@ -126,6 +126,8 @@ communities:
 # of the `signals` below. On a "missing" verdict, Spin (the same per-channel reframing below) weaves
 # `worldview_expanded` in — reusing this approved language, never inventing new claims. Surface/
 # suggest only: a missing or failing check never blocks a piece from being queued or published.
+# Brand language source of truth: config/brand.yaml (Human Inference elements — the /brand-lens
+# skill checks against it). `worldview` below matches brand.yaml's `positioning`; change both.
 home_brand:
   worldview: >-
     I uncover harmful hidden beliefs and why they need to change before AI automates everything.
@@ -144,7 +146,8 @@ home_brand:
 # are never published verbatim as post copy — the post text must still trace back to something
 # Muxin actually wrote. `substack` is both a SOURCE channel (analytics pull) and an atomize
 # routing TARGET for Substack Notes specifically (via /atomize notes -> src/publish/substack.ts;
-# see config/routing.yaml) — full essays/posts are still never routed there.
+# see config/routing.yaml) — full essays/posts are still never routed there. The human-language
+# altitude -> platform taxonomy these angles encode lives in config/brand.yaml `altitudes`.
 spin_angles:
   x:
     audience: tech
