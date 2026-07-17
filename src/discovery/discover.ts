@@ -31,7 +31,7 @@ import type { EvidenceItem } from "../outreach/qualify.js";
 // folder/schema/GUI machinery outreach already has, rather than inventing a parallel inbox format.
 // Nothing here ever contacts anyone or spends without Muxin's say-so: a discovered lead lands at
 // status intake/researched, same as a manually-added one, and only Muxin's own approve action in
-// the review GUI (or `npm run outreach:draft` / a future /derisk run) acts on it further.
+// the review GUI (or `npm run outreach:draft` / a /brand-lens run) acts on it further.
 //
 //   tsx src/discovery/discover.ts [--kinds client,platform,content-example] [--theme "..."] [--limit N]
 //

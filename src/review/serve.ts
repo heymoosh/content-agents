@@ -997,7 +997,7 @@ const server = createServer(async (req, res) => {
       return;
     }
     // Muxin's own pursue/pass call on a lead -- the token-spend gate: nothing downstream (a draft
-    // message, a future /derisk run) fires until he decides here. Deliberately NOT run through
+    // message, a /brand-lens run) fires until he decides here. Deliberately NOT run through
     // qualify.ts's evaluateQualify: this is a human override of (or confirmation of) whatever
     // classification/fit qualify.ts already computed, not another legality re-derivation. Reuses
     // qualify.ts's own setFrontmatterField so the frontmatter rewrite can't drift from how every

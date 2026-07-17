@@ -183,7 +183,7 @@ export function checkCaseGate(
 
 // Every derivative across the default top-level derivatives/ (the "extract" cut, never migrated —
 // plan i-want-to-add-mellow-mist) plus any cuts/<lens>/derivatives/ for an additional lens (e.g.
-// "derisk"). A cut derivative's `file` label is prefixed "cuts/<lens>/" so violation messages
+// "short"). A cut derivative's `file` label is prefixed "cuts/<lens>/" so violation messages
 // disambiguate which version they're about. Pure/exported so it's testable without a real folder
 // tree, same pattern as checkDerivative above.
 export function collectDerivativeTargets(folderDir: string): { file: string; path: string }[] {

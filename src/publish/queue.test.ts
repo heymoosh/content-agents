@@ -341,7 +341,7 @@ describe("appendBetPlacement: ctaDestination marker", () => {
 });
 
 // Multi-cut row ids (plan i-want-to-add-mellow-mist): a row from a non-default lens self-describes
-// via an id prefix ("derisk/x-1"), not a heading inserted into the table — a heading line would
+// via an id prefix ("short/x-1"), not a heading inserted into the table — a heading line would
 // break review-queue.md's single contiguous GFM table.
 describe("cutRowId / rowLens: id-prefix convention for grouping rows by lens", () => {
   test("the default lens (extract) is never prefixed", () => {
@@ -349,7 +349,7 @@ describe("cutRowId / rowLens: id-prefix convention for grouping rows by lens", (
   });
 
   test("a non-default lens prefixes the id", () => {
-    assert.equal(cutRowId("derisk", "x-1"), "derisk/x-1");
+    assert.equal(cutRowId("short", "x-1"), "short/x-1");
   });
 
   test("rowLens reads extract back from an unprefixed id", () => {
@@ -357,21 +357,21 @@ describe("cutRowId / rowLens: id-prefix convention for grouping rows by lens", (
   });
 
   test("rowLens reads the lens back from a prefixed id", () => {
-    assert.equal(rowLens("derisk/x-1"), "derisk");
+    assert.equal(rowLens("short/x-1"), "short");
   });
 
   test("a cut-prefixed id round-trips through readQueue/writeCell unchanged (no table-parsing special-casing needed)", () => {
     const dir = tmpFolder(
       `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
         `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n` +
-        `| derisk/x-1 | x | text | cuts/derisk/derivatives/x-1.md | 4 | 5 | yes | pending | | from /cycle |\n`
+        `| short/x-1 | x | text | cuts/short/derivatives/x-1.md | 4 | 5 | yes | pending | | from /cycle |\n`
     );
     const { rows } = readQueue(dir);
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].id, "derisk/x-1");
-    assert.equal(rows[0].asset, "cuts/derisk/derivatives/x-1.md");
-    assert.equal(rowLens(rows[0].id), "derisk");
-    assert.ok(writeCell(dir, "derisk/x-1", { status: "approve" }));
+    assert.equal(rows[0].id, "short/x-1");
+    assert.equal(rows[0].asset, "cuts/short/derivatives/x-1.md");
+    assert.equal(rowLens(rows[0].id), "short");
+    assert.ok(writeCell(dir, "short/x-1", { status: "approve" }));
     assert.equal(readQueue(dir).rows[0].status, "approve");
     rmSync(dir, { recursive: true, force: true });
   });

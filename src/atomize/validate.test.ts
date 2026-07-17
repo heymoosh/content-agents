@@ -272,22 +272,22 @@ describe("collectDerivativeTargets: scans the default derivatives/ plus every cu
     const dir = tmpFolder();
     mkdirSync(join(dir, "derivatives"), { recursive: true });
     writeFileSync(join(dir, "derivatives", "x-1.md"), "---\nplatform: x\n---\nextract body");
-    addCut(dir, { lens: "derisk", title: "t", text: "t" });
-    writeFileSync(join(dir, "cuts", "derisk", "derivatives", "x-1.md"), "---\nplatform: x\n---\nderisk body");
+    addCut(dir, { lens: "short", title: "t", text: "t" });
+    writeFileSync(join(dir, "cuts", "short", "derivatives", "x-1.md"), "---\nplatform: x\n---\nshort body");
     const targets = collectDerivativeTargets(dir);
     assert.deepEqual(
       targets.map((t) => t.file).sort(),
-      ["cuts/derisk/derivatives/x-1.md", "x-1.md"]
+      ["cuts/short/derivatives/x-1.md", "x-1.md"]
     );
     rmSync(dir, { recursive: true, force: true });
   });
 
   test("no default derivatives/, only a cut's — still finds it", () => {
     const dir = tmpFolder();
-    addCut(dir, { lens: "derisk", title: "t", text: "t" });
-    writeFileSync(join(dir, "cuts", "derisk", "derivatives", "x-1.md"), "---\nplatform: x\n---\nbody");
+    addCut(dir, { lens: "short", title: "t", text: "t" });
+    writeFileSync(join(dir, "cuts", "short", "derivatives", "x-1.md"), "---\nplatform: x\n---\nbody");
     const targets = collectDerivativeTargets(dir);
-    assert.deepEqual(targets.map((t) => t.file), ["cuts/derisk/derivatives/x-1.md"]);
+    assert.deepEqual(targets.map((t) => t.file), ["cuts/short/derivatives/x-1.md"]);
     rmSync(dir, { recursive: true, force: true });
   });
 

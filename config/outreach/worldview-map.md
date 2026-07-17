@@ -1,5 +1,8 @@
 # Worldview map (Phase 1 minimal set)
 
+Brand-element language (positioning, pledge, signature line, altitudes) is canonical in
+`config/brand.yaml` — keep these statements in agreement with it.
+
 docs/outreach-engine-plan.md §9b's full version (10-20 belief statements, each with paraphrase
 variants per community dialect, refreshed suggest-only and rotated across discovery runs) is
 Phase 5 scope (`discover.ts`, not built yet). This Phase 1 file is a smaller, static seed: the

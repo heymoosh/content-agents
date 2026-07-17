@@ -215,10 +215,10 @@ test("cutBody: extract reads extracts.md, returns null before it's drafted", () 
 test("cutBody: a non-default lens reads cuts/<lens>/cut.md's body, frontmatter stripped", () => {
   const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
   try {
-    addCut(folder, { lens: "derisk", title: "t", text: "the composed frame" });
-    const body = cutBody(folder, "derisk");
+    addCut(folder, { lens: "short", title: "t", text: "the composed frame" });
+    const body = cutBody(folder, "short");
     assert.ok(body?.includes("the composed frame"));
-    assert.ok(!body?.includes("lens: derisk"));
+    assert.ok(!body?.includes("lens: short"));
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -237,17 +237,17 @@ test("cutSetForFolder: extract + an additional lens, each with its own comments"
   const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
   try {
     writeFileSync(join(folder, "extracts.md"), "extract body");
-    addCut(folder, { lens: "derisk", title: "t", text: "derisk body" });
-    addCutCommentToFolder(folder, "derisk", 1, "tighten this");
+    addCut(folder, { lens: "short", title: "t", text: "short body" });
+    addCutCommentToFolder(folder, "short", 1, "tighten this");
     const cuts = cutSetForFolder(folder, "demo");
     assert.equal(cuts?.length, 2);
     const extract = cuts?.find((c) => c.lens === "extract");
-    const derisk = cuts?.find((c) => c.lens === "derisk");
+    const short = cuts?.find((c) => c.lens === "short");
     assert.equal(extract?.body, "extract body");
     assert.deepEqual(extract?.comments, []);
-    assert.ok(derisk?.body.includes("derisk body"));
-    assert.equal(derisk?.comments.length, 1);
-    assert.equal(derisk?.comments[0].text, "tighten this");
+    assert.ok(short?.body.includes("short body"));
+    assert.equal(short?.comments.length, 1);
+    assert.equal(short?.comments[0].text, "tighten this");
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -267,9 +267,9 @@ test("saveCutBodyToFolder: overwrites extracts.md whole", () => {
 test("saveCutBodyToFolder: a non-default lens keeps its frontmatter, replaces only the body", () => {
   const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
   try {
-    addCut(folder, { lens: "derisk", title: "t", text: "old" });
-    saveCutBodyToFolder(folder, "derisk", "revised frame");
-    const body = cutBody(folder, "derisk");
+    addCut(folder, { lens: "short", title: "t", text: "old" });
+    saveCutBodyToFolder(folder, "short", "revised frame");
+    const body = cutBody(folder, "short");
     assert.ok(body?.includes("revised frame"));
     assert.ok(!body?.includes("old"));
   } finally {
@@ -280,7 +280,7 @@ test("saveCutBodyToFolder: a non-default lens keeps its frontmatter, replaces on
 test("saveCutBodyToFolder: throws for a lens with no cut.md on disk", () => {
   const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
   try {
-    assert.throws(() => saveCutBodyToFolder(folder, "derisk", "x"), /no such cut/);
+    assert.throws(() => saveCutBodyToFolder(folder, "short", "x"), /no such cut/);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
@@ -311,7 +311,7 @@ test("addCutCommentToFolder / resolveCutCommentInFolder: round-trip, scoped per 
   const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
   try {
     const c1 = addCutCommentToFolder(folder, "extract", 3, "cut this line");
-    addCutCommentToFolder(folder, "derisk", 1, "unrelated, different lens");
+    addCutCommentToFolder(folder, "short", 1, "unrelated, different lens");
     assert.equal(c1.line, 3);
     assert.equal(c1.resolved, false);
     let cuts = cutSetForFolder(folder, "demo");

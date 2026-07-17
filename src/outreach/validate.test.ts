@@ -54,7 +54,7 @@ describe("checkLeadShape: a well-formed lead passes with zero violations", () =>
   });
 
   // content-example (card: web-discovery inbox) carries neither classification nor fit -- it's
-  // raw material for the separate /derisk lens, not an outreach legality claim.
+  // raw material for the separate /brand-lens Inspiration mode, not an outreach legality claim.
   test("kind: content-example, source: discovered, neither classification nor fit", () => {
     const fm = baseClientFm({ kind: "content-example", source: "discovered", status: "intake" });
     delete fm.classification;

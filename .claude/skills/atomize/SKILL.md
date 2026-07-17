@@ -1,6 +1,6 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Proposes cut/version options (extract, derisk, ...) from the same inspiration before formatting anything (step 1.5) — Muxin approves a set conversationally, then each cut atomizes independently. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), /atomize --continue <content-folder> [--cut <lens>] (resume steps 2-8 on an already-scaffolded folder or cut), or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Proposes cut/version options from the same inspiration before formatting anything (step 1.5) — every cut's text is Muxin's own; Muxin approves a set conversationally, then each cut atomizes independently. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), /atomize --continue <content-folder> [--cut <lens>] (resume steps 2-8 on an already-scaffolded folder or cut), or /atomize --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
@@ -53,8 +53,8 @@ once per additional cut, substituting throughout:
   same role `source.md`'s body plays for `extract`).
 - `<folder>/derivatives/` → `<folder>/cuts/<lens>/derivatives/`.
 - A queue row's id gets the lens prefix: `cutRowId(lens, id)` (`src/publish/queue.ts`) — e.g.
-  `derisk/x-1`, so it's traceable to its cut without a table schema change (the `extract` cut is
-  never prefixed, matching every id written before cuts existed).
+  `short/x-1` for a cut whose lens is `short`, so it's traceable to its cut without a table schema
+  change (the `extract` cut is never prefixed, matching every id written before cuts existed).
 `npm run validate -- <folder>` already scans every cut automatically (`collectDerivativeTargets`
 in `src/atomize/validate.ts`) — one call validates all of them, not one call per cut. `routing.md`
 and source-triage facts stay ONE set per content folder, shared by every cut — they all trace back
@@ -79,16 +79,17 @@ to the same `source.md` and the same platform-fit decision.
    formatted per platform, decide which *versions* of this piece are worth drafting from the same
    inspiration. This is a conversational discussion stage, not a review/approval gate — nothing
    here is "queued," nothing publishes.
-   - Propose the applicable lenses with a one-line rationale each: `extract` (Muxin's own verbatim
-     lines, today's default — always applicable) and, when the topic genuinely suits Muxin's
-     branded frame (a hyped claim, a product release, a trend worth de-risking — see
-     `.claude/skills/derisk/SKILL.md`), `derisk`. Don't force a `derisk` cut onto a piece that has
-     no riskiest belief worth naming — it's an offer, not a default.
-   - Draft each chosen cut's *core content* (not yet platform-formatted): for `extract`, this is
-     the 5-10 quotable lines step 3 below would tag anyway, previewed as prose; for `derisk`, run
-     `.claude/skills/derisk/SKILL.md`'s steps 2-5 (lock the riskiest belief with Muxin, evidence
-     pass if needed, cheapest test + named decision + payoff, sign-off) inline, composing the
-     frame.
+   - Propose the applicable versions with a one-line rationale each: `extract` (Muxin's own
+     verbatim lines, today's default — always applicable), and any additional version whose text
+     Muxin supplies (an alternate draft he wrote, a shorter rework, a different framing in his own
+     words). **A non-extract cut's text is always Muxin's — never composed by a lens or skill**
+     (extraction-first, CLAUDE.md rule 1; there is no compose exception here). When the topic
+     suits his brand frame, you may *offer* "want angles first? run `/brand-lens`"
+     (`.claude/skills/brand-lens/SKILL.md`) — it proposes angles he might write from; it never
+     drafts a cut, and it never auto-runs.
+   - Preview each chosen cut's *core content* (not yet platform-formatted): for `extract`, this is
+     the 5-10 quotable lines step 3 below would tag anyway, previewed as prose; for any other
+     lens, it's the Muxin-authored text that version will be built from.
    - Show Muxin each draft and iterate cut-by-cut — in chat ("this one's good, change that one"),
      and/or via `npm run review`'s Cuts tab (`src/review/` — a side-by-side proof-sheet view with
      inline edit and anchored comments; see the plan file's "Stage 1 UI: the Proof Sheet" section)

@@ -12,12 +12,12 @@ function tmpFolder(): string {
 describe("addCut: scaffolds cuts/<lens>/cut.md + derivatives/", () => {
   test("writes cut.md with lens/title/created_at frontmatter and the trimmed body", () => {
     const dir = tmpFolder();
-    const out = addCut(dir, { lens: "derisk", title: 'A "quoted" title', text: "  the composed frame  \n" });
-    assert.equal(out, cutDir(dir, "derisk"));
-    assert.ok(existsSync(join(dir, "cuts", "derisk", "cut.md")));
-    assert.ok(existsSync(join(dir, "cuts", "derisk", "derivatives")));
-    const body = readFileSync(join(dir, "cuts", "derisk", "cut.md"), "utf8");
-    assert.ok(body.includes("lens: derisk"));
+    const out = addCut(dir, { lens: "short", title: 'A "quoted" title', text: "  the composed frame  \n" });
+    assert.equal(out, cutDir(dir, "short"));
+    assert.ok(existsSync(join(dir, "cuts", "short", "cut.md")));
+    assert.ok(existsSync(join(dir, "cuts", "short", "derivatives")));
+    const body = readFileSync(join(dir, "cuts", "short", "cut.md"), "utf8");
+    assert.ok(body.includes("lens: short"));
     assert.ok(body.includes('title: "A \\"quoted\\" title"'));
     assert.ok(body.includes("the composed frame"));
     rmSync(dir, { recursive: true, force: true });
@@ -31,8 +31,8 @@ describe("addCut: scaffolds cuts/<lens>/cut.md + derivatives/", () => {
 
   test("refuses to overwrite an existing cut", () => {
     const dir = tmpFolder();
-    addCut(dir, { lens: "derisk", title: "x", text: "x" });
-    assert.throws(() => addCut(dir, { lens: "derisk", title: "x", text: "y" }), /already exists/);
+    addCut(dir, { lens: "short", title: "x", text: "x" });
+    assert.throws(() => addCut(dir, { lens: "short", title: "x", text: "y" }), /already exists/);
     rmSync(dir, { recursive: true, force: true });
   });
 });
@@ -46,9 +46,9 @@ describe("listCuts: every non-default lens with a cut.md on disk", () => {
 
   test("lists multiple lenses alphabetically", () => {
     const dir = tmpFolder();
-    addCut(dir, { lens: "derisk", title: "x", text: "x" });
+    addCut(dir, { lens: "short", title: "x", text: "x" });
     addCut(dir, { lens: "counter", title: "x", text: "x" });
-    assert.deepEqual(listCuts(dir), ["counter", "derisk"]);
+    assert.deepEqual(listCuts(dir), ["counter", "short"]);
     rmSync(dir, { recursive: true, force: true });
   });
 

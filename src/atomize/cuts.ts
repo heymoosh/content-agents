@@ -4,8 +4,9 @@ import { join } from "node:path";
 // A cut is one version of a content folder's inspiration (source.md), built through an editorial
 // lens (plan i-want-to-add-mellow-mist: "inspiration -> cuts -> approve -> atomize"). "extract" is
 // the default lens and stays at today's top level (source.md/derivatives/) -- no cuts/ subfolder,
-// no migration for existing content. Any additional lens (e.g. "derisk") gets its own
-// cuts/<lens>/cut.md, scaffolded here once Muxin approves that version in Stage 1.
+// no migration for existing content. Any additional lens (e.g. "short") gets its own
+// cuts/<lens>/cut.md, scaffolded here once Muxin approves that version in Stage 1. A non-extract
+// cut's text is always Muxin-authored -- never composed by a lens or skill (CLAUDE.md rule 1).
 
 export const DEFAULT_LENS = "extract";
 

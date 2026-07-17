@@ -13,8 +13,8 @@ default essay convention — everything else about steps 2-8 is unchanged.
 ## `--cut <lens>`
 
 `/atomize --continue <folder> --cut <lens>` (`<lens>` not `extract`): the folder already has
-`cuts/<lens>/cut.md` (step 1.5 already ran `addCut()` for this lens, e.g. after Muxin approved a
-`derisk` cut). Read `cuts/<lens>/cut.md` instead of `source.md`, then run steps 2-8 exactly as
+`cuts/<lens>/cut.md` (step 1.5 already ran `addCut()` for this lens, with Muxin-authored text —
+a non-extract cut is never lens-composed). Read `cuts/<lens>/cut.md` instead of `source.md`, then run steps 2-8 exactly as
 above, per "Cut-aware steps" in SKILL.md: derivatives go in `cuts/<lens>/derivatives/`, and every
 queue row id gets `cutRowId(lens, id)`'s prefix. `routing.md` and source-triage facts are shared
 across every cut in the folder — don't re-run route/triage per cut, reuse what's already there.

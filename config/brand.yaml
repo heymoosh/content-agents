@@ -1,0 +1,59 @@
+# Human Inference — canonical brand elements.
+#
+# The /brand-lens skill checks drafts against THIS file, so brand language evolves here in one
+# place, never inside the skill. Voice and anti-AI-tells are a separate axis: config/voice.yaml.
+# Machine-consumed per-platform angles stay in config/platforms.yaml (spin_angles, home_brand);
+# this file is the human-language source of truth those encodings should agree with.
+#
+# One brand container: Human Inference. (Lost Woods is retired as a container.)
+
+brand: Human Inference
+
+# Brand term + one-line positioning. Wording matches config/platforms.yaml home_brand.worldview —
+# if one changes, change both.
+term: hidden assumptions
+positioning: >-
+  I uncover harmful hidden beliefs and why they need to change before AI automates everything.
+
+# The pledge, verbatim. Used below the "What Now" heading when it fits; long-form only, optional.
+pledge: >-
+  I made a pledge that I would never write about society and leave people with a sense of
+  despair. I will always provide something that you can do about it.
+
+what_now:
+  heading: What Now
+  # The labeled "What Now" section is the treatment for despair-adjacent society pieces: use it
+  # when a piece touches society-level problems that could leave the reader in despair. Not every
+  # post warrants the heading. The universal (softer) requirement is that every piece still ends
+  # with something actionable the reader can touch.
+  earned_when: >-
+    The piece touches society-level problems that could leave the reader in despair.
+  pledge_text_below_heading: optional, long-form only, when it fits
+
+signature_line:
+  # Muxin is DISCOVERING the line, not picking it from a list. Skill behavior until decided:
+  # in draft mode, watch for recurring phrasings across Muxin's drafts that express belief_raw
+  # and flag them as signature-line candidates. Never insert a candidate into the writing.
+  status: discovering
+  belief_raw: >-
+    If we don't surface our hidden assumptions, AI will automate them and expose more gaps than
+    we had before; choosing the future we build with AI starts there.
+  candidates:
+    - "AI doesn't fix our assumptions. It scales them."
+    - "Whatever we don't question, AI will automate."
+    - "Every system runs on beliefs nobody went back to check."
+    - "Before we automate it, let's ask if it's still true."
+
+# Altitude -> platform taxonomy, in lens terms. The machine-consumed audience/angle encoding is
+# config/platforms.yaml spin_angles (which also carries bluesky = political/civic, outside these
+# three altitudes); keep the two in agreement.
+altitudes:
+  technical: x
+  professional: linkedin # professional-adjacent
+  society: substack # society/culture essays
+
+# Structural skeleton of a Human Inference piece.
+skeleton:
+  - belief under audit
+  - the check
+  - what now

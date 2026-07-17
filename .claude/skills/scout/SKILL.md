@@ -22,9 +22,9 @@ Three kinds, one run:
   already filled in, then immediately re-checked by `qualify.ts`'s own downgrade-only legality gate
   (no quoted worldview-match evidence -> forced back to `unclear`/`weak`, same as any other lead).
 - **`content-example`** -- a real product/company/org move that looks like it rests on one clear,
-  testable assumption: raw material for the separate, opt-in `/derisk` lens (not built by this
-  skill). Carries a real cited quote and a *tentative* one-line angle, never a finished analysis --
-  naming the actual riskiest belief is `/derisk`'s interactive, red-teamed job, not this skill's.
+  testable assumption: raw material for the separate, opt-in `/brand-lens` Inspiration mode (not
+  built by this skill). Carries a real cited quote and a *tentative* one-line angle, never a
+  finished analysis -- proposing the actual angles is `/brand-lens`'s job, not this skill's.
 
 ## Non-negotiable rules
 
