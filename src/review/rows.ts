@@ -379,11 +379,22 @@ function writeCutComments(folder: string, all: Record<string, CutComment[]>): vo
   writeFileSync(cutCommentsPath(folder), JSON.stringify(all, null, 2) + "\n");
 }
 
+// A lens is always a slugified name (see src/atomize/cuts.ts's addCut) — this is the one guard
+// every cut function below routes `lens` through before it ever reaches a join(), the same
+// posture saveDerivative() already takes on its `id` param. Without it, a client-supplied `lens`
+// like "../../../secret" would let /api/cut-save write outside the content folder entirely
+// (path.join does NOT sandbox ".." segments) — caught in self-vet before this ever shipped.
+function isValidLens(lens: string): boolean {
+  return /^[a-z][a-z0-9-]*$/.test(lens);
+}
+
 // The extract lens's drafting material is extracts.md (SKILL.md step 3's 5-10 tagged quotable
 // lines) — it has no frontmatter, unlike a real cuts/<lens>/cut.md. Returns null when that lens
-// hasn't been drafted yet (nothing to show for it in the Cuts tab). Exported (folder, not slug) so
-// it's testable against a tmp dir, same as every other pure helper in this file.
+// hasn't been drafted yet (nothing to show for it in the Cuts tab), or when `lens` isn't a valid
+// slug. Exported (folder, not slug) so it's testable against a tmp dir, same as every other pure
+// helper in this file.
 export function cutBody(folder: string, lens: string): string | null {
+  if (!isValidLens(lens)) return null;
   if (lens === DEFAULT_LENS) {
     const p = join(folder, "extracts.md");
     if (!existsSync(p)) return null;
@@ -425,6 +436,7 @@ export function listCutSets(): CutSet[] {
 // preserve); a non-default lens's cut.md keeps its frontmatter block byte-for-byte, same pattern
 // saveDerivative() uses below. Folder-level core exported for testability.
 export function saveCutBodyToFolder(folder: string, lens: string, body: string): void {
+  if (!isValidLens(lens)) throw new Error("bad lens");
   if (lens === DEFAULT_LENS) {
     writeFileSync(join(folder, "extracts.md"), body.trim() + "\n");
     return;
@@ -440,6 +452,7 @@ export function saveCutBody(slug: string, lens: string, body: string): void {
 }
 
 export function addCutCommentToFolder(folder: string, lens: string, line: number, text: string): CutComment {
+  if (!isValidLens(lens)) throw new Error("bad lens");
   const all = readCutComments(folder);
   const comment: CutComment = {
     id: `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,

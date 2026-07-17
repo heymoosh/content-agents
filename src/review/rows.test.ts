@@ -286,6 +286,27 @@ test("saveCutBodyToFolder: throws for a lens with no cut.md on disk", () => {
   }
 });
 
+test("saveCutBodyToFolder / cutBody: a path-traversal lens is rejected before it ever reaches join() (self-vet finding)", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    const evilLens = "../../../../tmp/rows-cuts-escape-marker";
+    assert.throws(() => saveCutBodyToFolder(folder, evilLens, "pwned"), /bad lens/);
+    assert.equal(cutBody(folder, evilLens), null);
+    assert.equal(cutBody(folder, "UPPERCASE"), null); // not a valid slug either
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("addCutCommentToFolder: a path-traversal-shaped lens is rejected too, even though it's only ever used as a JSON key", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    assert.throws(() => addCutCommentToFolder(folder, "../escape", 1, "x"), /bad lens/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
 test("addCutCommentToFolder / resolveCutCommentInFolder: round-trip, scoped per lens", () => {
   const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
   try {
