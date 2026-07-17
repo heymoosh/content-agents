@@ -100,6 +100,56 @@ export interface LeadDetail extends LeadSummary {
   evidence: EvidenceItem[]; // ## Evidence -- each item's `source` is a real, clickable URL when valid
   classificationNote: string; // ## Classification -- the why-fit reasoning (client/platform) or why-interesting note (content-example)
   pitch: string; // ## Pitch -- the pitch angle (client/platform) or tentative content angle (content-example)
+  jsaStats: JsaStat[]; // stat-shaped lines parsed out of ## Profile (JSA-snapshot leads) -- table-ready
+  profileRest: string; // ## Profile minus the jsaStats lines -- the prose worth reading, collapsed in the GUI
+  muxinNotes: string; // ## Muxin notes -- Muxin's own free-text observations, appended via the GUI
+  latestMessage: LeadMessage | null; // newest messages/message-NN.md, if this lead was ever drafted
+}
+
+// One stat-shaped line from a JSA-snapshot ## Profile (see intake.ts formatJsaSnapshot): the
+// `- <label> (JSA): <value>` bullets plus the `JSA verdict:` / `JSA researched date:` header
+// lines. Persona notes and prose paragraphs deliberately DON'T match -- they read better as text.
+export interface JsaStat {
+  label: string;
+  value: string;
+}
+
+// Pure, exported for unit testing: split a ## Profile body into table-ready JSA stats and the
+// remaining prose. Unmatched lines keep their original order.
+export function parseJsaStats(profile: string): { stats: JsaStat[]; rest: string } {
+  const stats: JsaStat[] = [];
+  const rest: string[] = [];
+  for (const line of profile.split("\n")) {
+    const bullet = line.match(/^- (.+?) \(JSA\):\s*(.+)$/);
+    const header = line.match(/^JSA (verdict|researched date):\s*(.+)$/);
+    if (bullet) stats.push({ label: bullet[1].trim(), value: bullet[2].trim() });
+    else if (header) stats.push({ label: `JSA ${header[1]}`, value: header[2].trim() });
+    else rest.push(line);
+  }
+  return { stats, rest: rest.join("\n").replace(/\n{3,}/g, "\n\n").trim() };
+}
+
+// The newest drafted outreach message in a lead folder, for the Outreach tab's inline draft box.
+export interface LeadMessage {
+  file: string; // relative to the lead dir, e.g. "messages/message-02.md"
+  channel: string;
+  status: string; // draft | approved | locked
+  body: string;
+}
+
+export function readLatestMessage(absDir: string): LeadMessage | null {
+  const messagesDir = join(absDir, "messages");
+  if (!existsSync(messagesDir)) return null;
+  const files = readdirSync(messagesDir).filter((f) => /^message-\d+\.md$/.test(f)).sort();
+  if (!files.length) return null;
+  const file = files[files.length - 1];
+  const { fm, body } = splitFrontmatter(readFileSync(join(messagesDir, file), "utf8"));
+  return {
+    file: `messages/${file}`,
+    channel: String(fm.channel ?? ""),
+    status: String(fm.status ?? "draft"),
+    body: body.trim(),
+  };
 }
 
 export function readLeadDetail(dir: string): LeadDetail {
@@ -108,12 +158,18 @@ export function readLeadDetail(dir: string): LeadDetail {
   const raw = readFileSync(leadPath, "utf8");
   const summary = summarizeLead(dir, raw);
   const { body } = splitFrontmatter(raw);
+  const profile = extractSection(body, "## Profile").trim();
+  const { stats, rest } = parseJsaStats(profile);
   return {
     ...summary,
-    profile: extractSection(body, "## Profile").trim(),
+    profile,
     evidence: parseEvidence(body),
     classificationNote: extractSection(body, "## Classification").trim(),
     pitch: extractSection(body, "## Pitch").trim(),
+    jsaStats: stats,
+    profileRest: rest,
+    muxinNotes: extractSection(body, "## Muxin notes").trim(),
+    latestMessage: readLatestMessage(absDir),
   };
 }
 

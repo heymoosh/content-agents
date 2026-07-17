@@ -158,6 +158,55 @@ export async function reviseBrief(instruction: string): Promise<{ path: string; 
   });
 }
 
+// Same "revise ONE file with Claude" pattern as briefRevisePrompt/reviseBrief, scoped to a drafted
+// (never locked) outreach message. Exported so the guardrails (one file, frontmatter intact,
+// evidence-grounded, voice.yaml) are unit-testable — this prompt decides what an outreach message
+// can say, so it's content-generation-adjacent (CLAUDE.md rule 7 flags it at the PR).
+export function outreachMessageRevisePrompt(relPath: string, channel: string, instruction: string): string {
+  return [
+    `Revise ONE file in place for Muxin Li's outreach pipeline: a drafted outreach message (channel: ${channel || "?"}). Do not run shell commands; just edit the one file, then stop.`,
+    ``,
+    `File to edit: ${relPath}`,
+    `Muxin's request: "${instruction}"`,
+    ``,
+    `Rules:`,
+    `- Edit ONLY that one file. Touch nothing else — no lead.md, no other message, no review-queue.md.`,
+    `- Keep the YAML frontmatter block intact (lead, channel, evidence, classification, status). Change only the body (the message text).`,
+    `- Stay grounded in the lead's cited evidence (the lead.md ## Evidence items the frontmatter references) — NEVER invent a fact about the company, the person, or Muxin.`,
+    `- Follow config/voice.yaml: no em dashes, no AI tells, Muxin's plain PM voice.`,
+    `- Be surgical: apply the request, do not rewrite what was not asked.`,
+  ].join("\n");
+}
+
+// Revise a lead's drafted outreach message in place (Outreach tab's "Revise with AI"). Refuses a
+// locked message — a locked text is Muxin's final word; a new angle goes through the existing
+// draft-follow-up path instead. `dir`/`file` are validated by the route (isValidLeadDir + the
+// messages/message-NN.md shape) before this runs.
+export async function reviseOutreachMessage(dir: string, file: string, instruction: string): Promise<{ body: string }> {
+  if (!instruction.trim()) throw new Error("tell Claude what to change first");
+  const abs = join(repoRoot, dir, file);
+  if (!existsSync(abs)) throw new Error("no such message to revise");
+  const before = splitFrontmatter(readFileSync(abs, "utf8"));
+  if (String(before.fm.status ?? "").trim() === "locked") {
+    throw new Error("this message is locked — use Draft follow-up for a new touch instead");
+  }
+  const channel = typeof before.fm.channel === "string" ? before.fm.channel : "";
+  const prompt = outreachMessageRevisePrompt(`${dir}/${file}`, channel, instruction.trim());
+
+  return runQueued("revise", `Revise outreach message: ${dir}/${file}`, async (job) => {
+    const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude revise",
+    });
+    if (failure) throw new Error(failure);
+    const after = splitFrontmatter(readFileSync(abs, "utf8")).body;
+    if (after === before.body) {
+      throw new Error("Claude ran but didn't change anything — try a more specific instruction");
+    }
+    return { body: after.trim() };
+  });
+}
+
 // ── Content ingestion: the GUI's front door ─────────────────────────────────────────────────
 // The review page is an inbox; this is the door. Muxin drops a source — pasted text, a file path
 // (e.g. an Obsidian note), a Substack URL, or "pull my Notes" — and the GUI runs the REAL /atomize
@@ -173,13 +222,16 @@ const ATOMIZE_PERMISSION_MODE = process.env.ATOMIZE_PERMISSION_MODE ?? "acceptEd
 type JobStatus = "queued" | "running" | "done" | "failed";
 // "url" | "file" | "text" | "notes" | "continue" | "video" are the atomize-family kinds (dispatch
 // a slash-command against a folder/source, verified by artifact check — see drain() below).
-// "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" are
-// generic task jobs (run an arbitrary async task via runQueued) — the four call sites complaint 2
-// flagged as spawning unbounded, plus "Duplicate to platform" and the Follow-ups tab's
-// "Draft follow-up". Both families share the same queue/mutex/log/heartbeat.
+// "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" |
+// "strategy" | "scout" are generic task jobs (run an arbitrary async task via runQueued) — the
+// four call sites complaint 2 flagged as spawning unbounded, plus "Duplicate to platform", the
+// Follow-ups tab's "Draft follow-up", the Analytics tab's "Refresh brief" (a full /strategy run),
+// and the Outreach tab's "Scout new leads" (npm run scout). All share the same
+// queue/mutex/log/heartbeat.
 export type JobKind =
   | "url" | "file" | "text" | "notes" | "continue" | "video"
-  | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up";
+  | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up"
+  | "strategy" | "scout";
 interface Job {
   id: string;
   kind: JobKind;
@@ -274,10 +326,14 @@ export function buildClaudeSpawnArgs(
   return args;
 }
 
-export function runClaudeSpawn(
+// Shared spawn-to-job-log core: any command, streamed to the job's persisted log + heartbeat.
+// runClaudeSpawn below is the `claude -p` specialization; runCommandSpawn runs anything else
+// (e.g. the Outreach tab's `npm run scout`) with the identical log/heartbeat/timeout contract.
+function spawnToJobLog(
   job: Job,
-  prompt: string,
-  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
+  command: string,
+  args: string[],
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv }
 ): Promise<ClaudeSpawnResult> {
   mkdirSync(JOB_LOG_DIR, { recursive: true });
   const log = createWriteStream(jobLogPath(job.id), { flags: "a" });
@@ -292,7 +348,7 @@ export function runClaudeSpawn(
     if (line) job.lastStdoutLine = line;
   };
   return new Promise((resolve) => {
-    const child = spawn("claude", buildClaudeSpawnArgs(prompt, opts), {
+    const child = spawn(command, args, {
       cwd: repoRoot,
       timeout: opts.timeoutMs,
       killSignal: "SIGTERM",
@@ -315,6 +371,25 @@ export function runClaudeSpawn(
       });
     });
   });
+}
+
+export function runClaudeSpawn(
+  job: Job,
+  prompt: string,
+  opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
+): Promise<ClaudeSpawnResult> {
+  return spawnToJobLog(job, "claude", buildClaudeSpawnArgs(prompt, opts), opts);
+}
+
+// Non-Claude subprocess through the same queue/log/heartbeat (e.g. `npm run scout`). Pair its
+// result with decodeSpawnFailure({ ..., command: "npm" }) so an ENOENT names the right CLI.
+export function runCommandSpawn(
+  job: Job,
+  command: string,
+  args: string[],
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv }
+): Promise<ClaudeSpawnResult> {
+  return spawnToJobLog(job, command, args, opts);
 }
 
 // Last ~30 lines of a job's persisted log, formatted as a "\n---\n<tail>" suffix to append to an
@@ -348,10 +423,13 @@ export function logTailSuffix(jobId: string): string {
 export function decodeSpawnFailure(
   result: { code: number | null; timedOut: boolean; enoent: boolean },
   jobId: string,
-  opts: { timeoutVerb: string; timeoutLabel: string; exitVerb: string; includeTailOnTimeout?: boolean }
+  opts: { timeoutVerb: string; timeoutLabel: string; exitVerb: string; includeTailOnTimeout?: boolean; command?: string }
 ): string | null {
   if (result.enoent) {
-    return "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs";
+    // `command` names the actual spawned CLI (runCommandSpawn call sites, e.g. "npm") — the
+    // default stays "claude" so every pre-existing call site's message is unchanged.
+    const cli = opts.command ?? "claude";
+    return `the \`${cli}\` CLI isn't on this server's PATH — start the GUI from a terminal where \`${cli}\` runs`;
   }
   if (result.timedOut) {
     const tail = opts.includeTailOnTimeout ? logTailSuffix(jobId) : "";

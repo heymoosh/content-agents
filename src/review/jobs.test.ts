@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -211,6 +211,29 @@ test("decodeSpawnFailure uses exitVerb (which may differ from timeoutVerb) for a
     timeoutVerb: "Claude", timeoutLabel: "180s", exitVerb: "Claude revise",
   });
   assert.equal(result, "Claude revise failed (exit 1)");
+});
+
+test("decodeSpawnFailure names the given command in the enoent message (runCommandSpawn sites spawn npm, not claude)", () => {
+  const result = decodeSpawnFailure({ code: null, timedOut: false, enoent: true }, "job-x", {
+    timeoutVerb: "scout", timeoutLabel: "30 min", exitVerb: "scout", command: "npm",
+  });
+  assert.equal(result, "the `npm` CLI isn't on this server's PATH — start the GUI from a terminal where `npm` runs");
+});
+
+// ── outreachMessageRevisePrompt — the Outreach tab's inline "Revise with AI" on a drafted message.
+// Same single-file guardrail contract as revisePrompt/briefRevisePrompt; content-generation-
+// adjacent (CLAUDE.md rule 7), so the guardrails are pinned here.
+
+test("outreachMessageRevisePrompt scopes to the one message file with frontmatter/evidence/voice guardrails", () => {
+  const p = outreachMessageRevisePrompt("outreach/leads/client-acme-co/messages/message-02.md", "email", "shorter opener");
+  assert.match(p, /outreach\/leads\/client-acme-co\/messages\/message-02\.md/); // the exact file
+  assert.match(p, /channel: email/);
+  assert.match(p, /shorter opener/); // Muxin's instruction included
+  assert.match(p, /Edit ONLY that one file/);
+  assert.match(p, /frontmatter/); // lead/channel/evidence/classification/status stay intact
+  assert.match(p, /NEVER invent a fact/); // evidence-grounded
+  assert.match(p, /voice\.yaml/); // no em dashes / AI tells
+  assert.match(p, /Do not run shell commands/);
 });
 
 // ── buildClaudeSpawnArgs (card d39258ab) — pure argv builder for runClaudeSpawn ─────────────────
