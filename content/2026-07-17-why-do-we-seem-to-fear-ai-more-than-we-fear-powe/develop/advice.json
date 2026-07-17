@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "rounds": [
+    {
+      "index": 1,
+      "trigger": "initial",
+      "replyText": null,
+      "at": "2026-07-17T20:00:00Z",
+      "cards": [
+        {
+          "id": "r1-c1",
+          "kind": "angle",
+          "title": "Belief under audit: limiting frontier AI is what creates a permanent underclass",
+          "summary": "Reader: the X and tech crowd worried that capping frontier models locks in economic inequality. Payoff: they see the underclass already exists, so the fear is pointed at the wrong target. Technical altitude, maps to X. The observable: look up the current US Gini wealth index yourself, one search, under a day. Carried verbatim by line 13.",
+          "lens": "gini-check",
+          "sourceLines": [13],
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c2",
+          "kind": "angle",
+          "title": "Belief under audit: meeting a real threat requires granting supernormal powers",
+          "summary": "Reader: the civic and political audience worried about emergency power consolidation riding in on AI. Payoff: a concrete question to chase instead of a mood, has any society ever answered a genuine threat without handing over supernormal powers. Society and political altitude, maps to Bluesky. The observable: find one historical case in an afternoon of reading. Carried verbatim by lines 15 and 17.",
+          "lens": "power-audit",
+          "sourceLines": [15, 17],
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c3",
+          "kind": "angle",
+          "title": "Belief under audit: you can only argue about wealth and power, you cannot test the assumptions",
+          "summary": "Reader: practitioners and builders who hold strong priors about society, wealth, and power. Payoff: they can check those priors against real data now, hand the problem to Claude and its datasets instead of trading vibes. Professional and builder altitude, maps to LinkedIn. The observable: take one belief you hold about wealth or power and ask Claude to check it against the data, under a day. Carried by line 19 and lines 21-23.",
+          "lens": "assumption-check",
+          "sourceLines": [19, "21-23"],
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c4",
+          "kind": "cta",
+          "title": "CTA check: reads as society_capitalism_piece, ai_agency_thesis second, source is the CTA",
+          "summary": "Per config/content-types.yaml this is a society-level inequality and power reflection (society_capitalism_piece), with the rogue-AI and agency thread also fitting ai_agency_thesis. Both resolve the primary CTA to source, the note's own canonical_url. No project_url is present and none should be guessed. One question for you: on the power-consolidation angle (r1-c2), do you want the voting tool attached as a project CTA (a literal civic-tech override), or keep it source-only. I will not invent a project link.",
+          "lens": null,
+          "sourceLines": null,
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c5",
+          "kind": "spin",
+          "title": "Spin fit: strong on X and Bluesky, LinkedIn falls back to non-case",
+          "summary": "X (tech): strong, the Gini angle names a real observable rather than a generic AI-is-like-X gloss. Bluesky (political): strong, the power-consolidation and fairness-gap framing is its approved angle. LinkedIn (business and career): partial, the source has no work scene with a number plus a literally quoted belief, so it fails beat 2 of the case template and should fall back to normal extraction, not a forced case. Substack (society) builder-philosopher angle fits the material, but Substack essays are not a routing target here.",
+          "lens": null,
+          "sourceLines": null,
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        },
+        {
+          "id": "r1-c6",
+          "kind": "routing",
+          "title": "Routing preview: pillars human-ai and civic-tech, likely x, linkedin, bluesky, democratic-resilience",
+          "summary": "Pillars per config/pillars.yaml: human-ai primary (critique of hype-driven AI fear, who is harmed), civic-tech secondary (power, democratic resilience). I could not run npm run route this session, the shell is blocked by an OS permission error, so this is read from config/routing.yaml, not the deterministic CLI. At cold start (INSUFFICIENT data) the union of defaults is x, linkedin, bluesky, plus community:democratic-resilience from civic-tech's always rule. quote-card is always generated. Re-run the route CLI to confirm before formatting.",
+          "lens": null,
+          "sourceLines": null,
+          "status": "open",
+          "acceptedLens": null,
+          "decidedAt": null
+        }
+      ]
+    }
+  ]
+}

@@ -44,7 +44,7 @@ human-ai. The data confirms LinkedIn rewards the builder/PM register (claude-cod
 | quote-card-6-x | quote-card:x | image | images/quote-card-6.png | 5 | 5 | yes | published | context caption (L106): sets up the YC finding; the quote itself lives on the image |
 | quote-card-6-linkedin | quote-card:linkedin | image | images/quote-card-6.png | 5 | 5 | yes | discard | context caption (L106): corporate-hiring angle; image carries the quote |
 | quote-card-6-bluesky | quote-card:bluesky | image | images/quote-card-6.png | 5 | 5 | yes | discard | context caption (L106/L108): fairness angle; image carries the quote |
-| video-script | video-script | storyboard | — | — | — | — | blocked | script drafted by Claude/sonnet ($0, no OPENROUTER needed) → video/script-draft.md. Next: run /video to storyboard it into video/storyboard.md for review |
+| video-script | video-script | storyboard | — | — | — | — | discard | script drafted by Claude/sonnet ($0, no OPENROUTER needed) → video/script-draft.md. Next: run /video to storyboard it into video/storyboard.md for review |
 | qvid-x | x | video | derivatives/quote-inequality-video.md | 5 | 5 | source | published | animated quote video (silent) |
 | qvid-linkedin | linkedin | video | derivatives/quote-inequality-video.md | 5 | 5 | source | published | animated quote video (silent) |
 | qvid-bluesky | bluesky | video | derivatives/quote-inequality-video.md | 5 | 5 | source | published | animated quote video (silent) |

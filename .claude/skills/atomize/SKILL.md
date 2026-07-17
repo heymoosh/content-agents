@@ -102,6 +102,11 @@ to the same `source.md` and the same platform-fit decision.
      below) — equivalent to `/atomize --continue <folder> --cut <lens>`.
    - This step never blocks generation the way a hard gate would — if Muxin only wants `extract`
      (today's behavior), say so and skip straight to step 2 with zero cuts/ overhead.
+   - The review GUI's **Develop tab** is this step's headless counterpart (`/develop`,
+     `.claude/skills/develop/SKILL.md`): the advisor proposes angle cards there, and an accepted
+     angle arrives here already scaffolded via `addCut()` (its body assembled server-side from
+     Muxin's verbatim `source.md` lines). Its "Format for platforms" button then runs
+     `/atomize --continue <folder> [--cut <lens>]`, picking up from step 2 exactly as below.
 
 2. **Read the latest strategy brief** in `briefs/` (highest date). **Propose** applying its
    `Directives for atomization` — pillar priority, channel emphasis, format notes, hooks that

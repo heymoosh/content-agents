@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -171,6 +171,31 @@ test("runQueued's job bookkeeping (status/error) tracks a failing task, and publ
   assert.ok(!("task" in pub), "publicJob() must never expose the internal task closure");
 });
 
+// ── clearFinishedJobs (GUI "Clear queue" button) — only done/failed entries are removed; drain()
+// finds work via jobs.find(status==="queued"), never by index, so this is safe mid-run.
+
+test("clearFinishedJobs removes done and failed jobs but leaves queued/running untouched", async () => {
+  await assert.rejects(runQueued("revise", "will fail", async () => { throw new Error("boom"); }), /boom/);
+  const justFailed = jobs[jobs.length - 1];
+  let releaseB: () => void = () => {};
+  const pB = runQueued("revise", "running job", () => new Promise<void>((r) => { releaseB = r; }));
+  await new Promise((r) => setTimeout(r, 20));
+  const stillRunning = jobs[jobs.length - 1];
+  assert.equal(stillRunning.status, "running");
+
+  // clearFinishedJobs() sweeps every done/failed job currently in the (module-shared) array, not
+  // just ones added by this test — so assert relative effects, not an absolute before/after count.
+  const removed = clearFinishedJobs();
+  assert.ok(removed >= 1, "at least the failed job from this test should be removed");
+  assert.ok(!jobs.includes(justFailed), "the failed job must be gone");
+  assert.ok(jobs.includes(stillRunning), "a still-running job must survive the clear");
+  assert.equal(jobs.some((j) => j.status === "done" || j.status === "failed"), false);
+
+  releaseB();
+  await pB;
+  clearFinishedJobs(); // cleanup so this test doesn't leak a finished job into later ones
+});
+
 // ── decodeSpawnFailure (card 84afb9e3) — the one enoent/timedOut/non-zero-exit classification ────
 // Previously six near-duplicated if/else-if chains, one per Claude-spawning call site. Pure and
 // deterministic, so every branch (including the two sites disagree on: verb wording, and whether
@@ -234,6 +259,23 @@ test("outreachMessageRevisePrompt scopes to the one message file with frontmatte
   assert.match(p, /NEVER invent a fact/); // evidence-grounded
   assert.match(p, /voice\.yaml/); // no em dashes / AI tells
   assert.match(p, /Do not run shell commands/);
+});
+
+// ── isSpawnTimeout (Generate insights exit-143 bug) ──────────────────────────────────────────────
+// The `claude` native binary catches SIGTERM and exits with numeric code 143 (128+15) instead of
+// dying by signal, so a run we killed for running too long can surface as a plain nonzero exit
+// indistinguishable from a real crash unless code 143 is also treated as a timeout tell.
+test("isSpawnTimeout is true when Node reports the SIGTERM signal directly", () => {
+  assert.equal(isSpawnTimeout(null, "SIGTERM"), true);
+});
+
+test("isSpawnTimeout is true for exit code 143 even with no signal reported (the claude binary's SIGTERM handler)", () => {
+  assert.equal(isSpawnTimeout(143, null), true);
+});
+
+test("isSpawnTimeout is false for a clean exit or an unrelated nonzero exit", () => {
+  assert.equal(isSpawnTimeout(0, null), false);
+  assert.equal(isSpawnTimeout(1, null), false);
 });
 
 // ── buildClaudeSpawnArgs (card d39258ab) — pure argv builder for runClaudeSpawn ─────────────────

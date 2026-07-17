@@ -78,7 +78,7 @@ export function safeFolder(slug: string): string {
   throw new Error("no such queue");
 }
 
-function firstHeading(folder: string): string {
+export function firstHeading(folder: string): string {
   try {
     const m = readFileSync(join(folder, "review-queue.md"), "utf8").match(/^#\s+(.+)$/m);
     if (m) return m[1].replace(/^(?:Outreach review queue|Review queue)\s*[—-]\s*/i, "").trim();
@@ -299,7 +299,7 @@ export function getLiveStateAsOf(): number | null {
 // Every folder directly under `root` that carries its own review-queue.md — the one discovery
 // rule shared by CONTENT (content/<slug>/) and OUTREACH_LEADS (outreach/leads/<kind>-<slug>/), so
 // picking up outreach leads is a second root scanned the same way, not a second parser.
-function listRootFolders(root: string): string[] {
+export function listRootFolders(root: string): string[] {
   try {
     return readdirSync(root, { withFileTypes: true })
       .filter((d) => d.isDirectory() && existsSync(join(root, d.name, "review-queue.md")))
@@ -384,7 +384,7 @@ function writeCutComments(folder: string, all: Record<string, CutComment[]>): vo
 // posture saveDerivative() already takes on its `id` param. Without it, a client-supplied `lens`
 // like "../../../secret" would let /api/cut-save write outside the content folder entirely
 // (path.join does NOT sandbox ".." segments) — caught in self-vet before this ever shipped.
-function isValidLens(lens: string): boolean {
+export function isValidLens(lens: string): boolean {
   return /^[a-z][a-z0-9-]*$/.test(lens);
 }
 
