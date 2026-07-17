@@ -27,6 +27,24 @@ function parseOrigin(cell: string | undefined): QueueOrigin | undefined {
   return QUEUE_ORIGINS.find((o) => o === value);
 }
 
+// Multi-cut row ids (plan i-want-to-add-mellow-mist): a row drafted from a non-default cut/lens
+// (e.g. "derisk") self-describes it via an id prefix, "derisk/x-1" — NOT a "## derisk" heading
+// inserted into the table. review-queue.md is one contiguous GFM table; a heading line between
+// data rows would break GitHub's table parser (it requires an unbroken run of "|" rows), splitting
+// the table into two chunks where the second has no header/separator of its own. The default lens
+// ("extract") is never prefixed, matching every id written before this existed.
+const DEFAULT_LENS = "extract";
+
+export function cutRowId(lens: string, id: string): string {
+  return lens === DEFAULT_LENS ? id : `${lens}/${id}`;
+}
+
+// Which lens a queue row's id belongs to — "extract" for an unprefixed id.
+export function rowLens(id: string): string {
+  const slash = id.indexOf("/");
+  return slash === -1 ? DEFAULT_LENS : id.slice(0, slash);
+}
+
 // True for a review-queue.md line that's an actual data row — not blank, not the header row,
 // not the `|---|---|` separator row. Shared by every reader/writer below so they can't drift on
 // what counts as a row to parse.

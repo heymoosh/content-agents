@@ -10,6 +10,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { fetchScheduledDrafts, cancelDraft } from "../publish/typefully.js";
 import { fetchScheduledPosts, cancelPost } from "../publish/postpeer-status.js";
 import { classifyThread } from "../atomize/thread-check.js";
+import { listCuts, DEFAULT_LENS } from "../atomize/cuts.js";
 import {
   reconcileRow,
   needsReconciliation,
@@ -334,6 +335,139 @@ export async function listPieces(): Promise<Piece[]> {
   });
   pieces.sort((a, b) => b.slug.localeCompare(a.slug)); // newest (date-prefixed) first
   return pieces;
+}
+
+// ── Cuts tab (Stage 1 "Proof Sheet" — plan i-want-to-add-mellow-mist) ──
+// Renders content/<slug>'s versions side by side BEFORE atomize formats anything per platform —
+// the extract lens (never a cuts/ subfolder, see src/atomize/cuts.ts) plus any additional lens's
+// cuts/<lens>/cut.md. Comments are anchored to a line within a cut's body, stored in one JSON
+// sidecar per folder (not a markdown table row — there's no queue row yet at this stage).
+
+export interface CutComment {
+  id: string;
+  line: number; // 1-indexed line within the cut's rendered body
+  text: string;
+  resolved: boolean;
+  createdAt: string;
+}
+
+export interface CutView {
+  lens: string;
+  body: string;
+  comments: CutComment[];
+}
+
+export interface CutSet {
+  slug: string;
+  title: string;
+  cuts: CutView[];
+}
+
+function cutCommentsPath(folder: string): string {
+  return join(folder, "cut-comments.json");
+}
+
+function readCutComments(folder: string): Record<string, CutComment[]> {
+  try {
+    return JSON.parse(readFileSync(cutCommentsPath(folder), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeCutComments(folder: string, all: Record<string, CutComment[]>): void {
+  writeFileSync(cutCommentsPath(folder), JSON.stringify(all, null, 2) + "\n");
+}
+
+// The extract lens's drafting material is extracts.md (SKILL.md step 3's 5-10 tagged quotable
+// lines) — it has no frontmatter, unlike a real cuts/<lens>/cut.md. Returns null when that lens
+// hasn't been drafted yet (nothing to show for it in the Cuts tab). Exported (folder, not slug) so
+// it's testable against a tmp dir, same as every other pure helper in this file.
+export function cutBody(folder: string, lens: string): string | null {
+  if (lens === DEFAULT_LENS) {
+    const p = join(folder, "extracts.md");
+    if (!existsSync(p)) return null;
+    return readFileSync(p, "utf8");
+  }
+  const p = join(folder, "cuts", lens, "cut.md");
+  if (!existsSync(p)) return null;
+  return splitFrontmatter(readFileSync(p, "utf8")).body;
+}
+
+// The folder-level core for a piece's cut set — every one of listCutSets()'s slug-resolving calls
+// funnels through this. Exported so it's testable against a tmp dir instead of the real content/.
+export function cutSetForFolder(folder: string, title: string): CutView[] | null {
+  const comments = readCutComments(folder);
+  const cuts: CutView[] = [];
+  for (const lens of [DEFAULT_LENS, ...listCuts(folder)]) {
+    const body = cutBody(folder, lens);
+    if (body === null) continue;
+    cuts.push({ lens, body, comments: comments[lens] ?? [] });
+  }
+  return cuts.length ? cuts : null;
+}
+
+// Every content folder with at least one drafted cut, for the Cuts tab's list. Outreach leads are
+// excluded — cuts are a content-pipeline concept, leads don't have them.
+export function listCutSets(): CutSet[] {
+  const out: CutSet[] = [];
+  for (const slug of listRootFolders(CONTENT)) {
+    const folder = join(CONTENT, slug);
+    const cuts = cutSetForFolder(folder, slug);
+    if (!cuts) continue;
+    out.push({ slug, title: firstHeading(folder), cuts });
+  }
+  out.sort((a, b) => b.slug.localeCompare(a.slug));
+  return out;
+}
+
+// Save an edited cut body in place — extracts.md is overwritten whole (no frontmatter to
+// preserve); a non-default lens's cut.md keeps its frontmatter block byte-for-byte, same pattern
+// saveDerivative() uses below. Folder-level core exported for testability.
+export function saveCutBodyToFolder(folder: string, lens: string, body: string): void {
+  if (lens === DEFAULT_LENS) {
+    writeFileSync(join(folder, "extracts.md"), body.trim() + "\n");
+    return;
+  }
+  const p = join(folder, "cuts", lens, "cut.md");
+  if (!existsSync(p)) throw new Error("no such cut");
+  const { header } = splitFrontmatter(readFileSync(p, "utf8"));
+  writeFileSync(p, header + body.trim() + "\n");
+}
+
+export function saveCutBody(slug: string, lens: string, body: string): void {
+  saveCutBodyToFolder(safeFolder(slug), lens, body);
+}
+
+export function addCutCommentToFolder(folder: string, lens: string, line: number, text: string): CutComment {
+  const all = readCutComments(folder);
+  const comment: CutComment = {
+    id: `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    line,
+    text,
+    resolved: false,
+    createdAt: new Date().toISOString(),
+  };
+  all[lens] = [...(all[lens] ?? []), comment];
+  writeCutComments(folder, all);
+  return comment;
+}
+
+export function addCutComment(slug: string, lens: string, line: number, text: string): CutComment {
+  return addCutCommentToFolder(safeFolder(slug), lens, line, text);
+}
+
+export function resolveCutCommentInFolder(folder: string, lens: string, commentId: string): boolean {
+  const all = readCutComments(folder);
+  const comment = (all[lens] ?? []).find((c) => c.id === commentId);
+  if (!comment) return false;
+  comment.resolved = true;
+  writeCutComments(folder, all);
+  return true;
+}
+
+export function resolveCutComment(slug: string, lens: string, commentId: string): boolean {
+  return resolveCutCommentInFolder(safeFolder(slug), lens, commentId);
 }
 
 // Rewrite one row's status and/or notes in review-queue.md, matched by id (not a stale line

@@ -261,6 +261,35 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .flash.show { opacity:1; }
   .worktree-banner { background:var(--red-bg); color:var(--red); font-size:12.5px; font-weight:600;
     text-align:center; padding:6px 16px; border-bottom:1px solid var(--red); }
+  /* Cuts tab: "Proof Sheet" — galley-proof columns, blue-pencil margin notes (the one signature
+     element; real copy-editor's mark, not a chat bubble). Reuses the page's own --paper/--ink/
+     --blue tokens rather than inventing a new palette. */
+  .cuts-piece { margin-bottom:22px; }
+  .cuts-piece h2 { font-size:15px; margin:0 0 2px; }
+  .cuts-piece .slug { color:var(--muted); font-size:12px; margin-bottom:10px; }
+  .cuts-board { display:flex; gap:14px; overflow-x:auto; padding-bottom:4px; }
+  .cut-column { flex:0 0 340px; border:1px solid var(--line); border-radius:8px; background:var(--card);
+    display:flex; flex-direction:column; max-height:520px; }
+  .cut-head { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--line); }
+  .cut-lens { font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size:12px; }
+  .cut-lens.lens-extract { color:var(--muted); }
+  .cut-lens.lens-derisk { color:var(--red); }
+  .cut-head .grow { flex:1; }
+  .cut-head button { font-size:11.5px; padding:3px 8px; }
+  .cut-body { flex:1; overflow-y:auto; padding:10px 12px; font-size:13.5px; line-height:1.55; }
+  .cut-line { padding:1px 4px; margin:0 -4px; border-radius:3px; cursor:pointer; white-space:pre-wrap; }
+  .cut-line:hover { background:var(--blue-bg); }
+  .cut-line.has-comment { border-left:3px solid var(--blue); padding-left:5px; margin-left:-8px; }
+  .cut-body textarea { width:100%; height:100%; box-sizing:border-box; border:none; resize:none;
+    font:inherit; background:transparent; color:var(--ink); }
+  .cut-comments { border-top:1px solid var(--line); padding:8px 12px; font-size:12.5px; max-height:160px; overflow-y:auto; }
+  .cut-comment { color:var(--blue); margin-bottom:6px; padding-left:10px; border-left:2px solid var(--blue); }
+  .cut-comment.resolved { color:var(--muted); border-left-color:var(--line); text-decoration:line-through; }
+  .cut-comment .cc-line { font-weight:600; margin-right:4px; }
+  .cut-comment button { font-size:11px; padding:1px 6px; margin-left:6px; border-color:var(--line); color:var(--muted); }
+  .cut-comment-form { display:none; gap:6px; padding:8px 12px; border-top:1px solid var(--line); }
+  .cut-comment-form.show { display:flex; }
+  .cut-comment-form input { flex:1; }
 </style>
 </head>
 <body>
@@ -270,6 +299,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <nav class="tabs">
     <button class="tab on" data-tab="ingest">Add / Queue</button>
     <button class="tab" data-tab="review">Review <span class="count" id="count">0</span></button>
+    <button class="tab" data-tab="cuts">Cuts</button>
     <button class="tab" data-tab="strategy">Analytics</button>
     <button class="tab" data-tab="outreach">Outreach</button>
     <button class="tab" data-tab="followups">Follow-ups</button>
@@ -306,6 +336,14 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   </section>
   <section class="view" id="reviewView" hidden>
     <div id="reviewMain"><div class="empty">Loading…</div></div>
+  </section>
+  <section class="view" id="cutsView" hidden>
+    <div class="strategy">
+      <div class="strategy-actions">
+        <span class="hint">Versions of the same inspiration, side by side, before anything gets formatted per platform — not a review queue, nothing here publishes. Click a line to leave a note; edits save in place.</span>
+      </div>
+      <div id="cutsList"><div class="empty">Loading…</div></div>
+    </div>
   </section>
   <section class="view" id="strategyView" hidden>
     <div class="strategy">
@@ -641,17 +679,19 @@ function render(){
 // Refresh even do?"). It's now tab-aware: doRefresh() below only re-reads whatever the CURRENT tab
 // shows, labeled per tab, with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "ingest";
-function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Refresh leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
+function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Refresh leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
 function setTab(t){
   currentTab = t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
   $("#ingestView").hidden = t!=="ingest";
   $("#reviewView").hidden = t!=="review";
+  $("#cutsView").hidden = t!=="cuts";
   $("#strategyView").hidden = t!=="strategy";
   $("#outreachView").hidden = t!=="outreach";
   $("#followupsView").hidden = t!=="followups";
   $("#decidedWrap").style.display = t==="review" ? "" : "none";
   $("#refresh").textContent = refreshLabelFor(t);
+  if (t==="cuts"){ loadCuts(); }
   if (t==="strategy" && !briefLoaded){ loadBrief(); loadRaw(); }
   if (t==="outreach"){ loadOutreach(); }
   if (t==="followups"){ loadFollowups(); }
@@ -925,6 +965,98 @@ async function loadOutreach(){
   const d = await r.json();
   OUTREACH_LEADS = d.leads || [];
   renderOutreachBox();
+}
+
+// ── Cuts tab: "Proof Sheet" (Stage 1 — plan i-want-to-add-mellow-mist) ──
+// Pre-atomize version review. NOT a review queue: no status, no scheduling, nothing publishes
+// from here. Click a line to leave a blue-pencil note anchored to it (no need to re-describe
+// which cut or which line in chat); Edit swaps a column's body for a textarea, Save writes it back.
+let CUT_SETS = [];
+let cutCommentTarget = null; // {slug, lens} for the currently-open comment form, or null
+
+function cutColumnEl(slug, cut){
+  const col = document.createElement("div"); col.className = "cut-column";
+  const unresolvedLines = new Set(cut.comments.filter(c=>!c.resolved).map(c=>c.line));
+  const lines = cut.body.split("\n").map((line, i) => {
+    const n = i + 1;
+    const cls = "cut-line" + (unresolvedLines.has(n) ? " has-comment" : "");
+    return '<div class="'+cls+'" data-line="'+n+'">'+(esc(line) || "&nbsp;")+'</div>';
+  }).join("");
+  const comments = cut.comments.length
+    ? '<div class="cut-comments">' + cut.comments.map(c =>
+        '<div class="cut-comment'+(c.resolved?" resolved":"")+'"><span class="cc-line">L'+c.line+'</span>'+esc(c.text)+
+        (c.resolved ? "" : ' <button class="cc-resolve" data-id="'+c.id+'">resolve</button>') + '</div>'
+      ).join("") + '</div>'
+    : "";
+  col.innerHTML =
+    '<div class="cut-head"><span class="cut-lens lens-'+esc(cut.lens)+'">'+esc(cut.lens)+'</span><span class="grow"></span>' +
+    '<button class="cc-edit">Edit</button></div>' +
+    '<div class="cut-body">'+lines+'</div>' +
+    comments +
+    '<div class="cut-comment-form"><input placeholder="note on line …" class="cc-input" /><button class="cc-send">Save</button></div>';
+
+  col.querySelectorAll(".cut-line").forEach(el => el.addEventListener("click", () => {
+    cutCommentTarget = { slug, lens: cut.lens, line: Number(el.dataset.line) };
+    const form = col.querySelector(".cut-comment-form");
+    form.classList.add("show");
+    form.querySelector(".cc-input").placeholder = "note on line " + el.dataset.line + " …";
+    form.querySelector(".cc-input").focus();
+  }));
+  col.querySelector(".cc-send").addEventListener("click", async () => {
+    if (!cutCommentTarget || cutCommentTarget.slug !== slug || cutCommentTarget.lens !== cut.lens) return;
+    const input = col.querySelector(".cc-input");
+    const text = input.value.trim();
+    if (!text) return;
+    const r = await post("/api/cut-comment", { slug, lens: cut.lens, line: cutCommentTarget.line, text });
+    if (r.ok) { flash("Note saved"); await loadCuts(); }
+    else flash(r.error || "Failed to save note");
+  });
+  col.querySelectorAll(".cc-resolve").forEach(b => b.addEventListener("click", async () => {
+    const r = await post("/api/cut-comment-resolve", { slug, lens: cut.lens, commentId: b.dataset.id });
+    if (r.ok) await loadCuts(); else flash(r.error || "Failed to resolve");
+  }));
+  col.querySelector(".cc-edit").addEventListener("click", () => {
+    const bodyEl = col.querySelector(".cut-body");
+    const editing = bodyEl.querySelector("textarea");
+    if (editing) return; // already editing
+    const ta = document.createElement("textarea");
+    ta.value = cut.body;
+    bodyEl.innerHTML = ""; bodyEl.appendChild(ta);
+    const editBtn = col.querySelector(".cc-edit");
+    editBtn.textContent = "Save";
+    editBtn.onclick = async () => {
+      const r = await post("/api/cut-save", { slug, lens: cut.lens, body: ta.value });
+      if (r.ok) { flash("Saved"); await loadCuts(); }
+      else flash(r.error || "Failed to save");
+    };
+  });
+  return col;
+}
+
+function renderCutsBox(){
+  const box = $("#cutsList");
+  if (!CUT_SETS.length) {
+    box.innerHTML = '<div class="empty">No cuts drafted yet — run <code>/atomize</code> on something (step 1.5 proposes cuts before formatting anything per platform).</div>';
+    return;
+  }
+  box.innerHTML = "";
+  for (const piece of CUT_SETS) {
+    const sec = document.createElement("div"); sec.className = "cuts-piece";
+    sec.innerHTML = '<h2>'+esc(piece.title)+'</h2><div class="slug">'+esc(piece.slug)+'</div>';
+    const board = document.createElement("div"); board.className = "cuts-board";
+    for (const cut of piece.cuts) board.appendChild(cutColumnEl(piece.slug, cut));
+    sec.appendChild(board);
+    box.appendChild(sec);
+  }
+}
+
+async function loadCuts(){
+  const box = $("#cutsList");
+  box.innerHTML = '<div class="empty">Loading…</div>';
+  const r = await fetch("/api/cuts");
+  const d = await r.json();
+  CUT_SETS = d.cutSets || [];
+  renderCutsBox();
 }
 
 async function outreachDraft(dir){

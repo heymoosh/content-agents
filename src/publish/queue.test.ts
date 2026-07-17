@@ -11,6 +11,8 @@ import {
   storyboardRowStatus,
   appendRow,
   appendBetPlacement,
+  cutRowId,
+  rowLens,
   type QueueRow,
 } from "./queue.js";
 
@@ -335,5 +337,42 @@ describe("appendBetPlacement: ctaDestination marker", () => {
   test("the cta marker coexists with the spin marker, both before the quote", () => {
     appendBetPlacement("essay-01", "x-3", "x", "typefully draft 3", { spin: true }, "third posted text long enough to match", "work_with_me");
     assert.match(lineFor("x-3"), /\| spin \| cta:work_with_me \|/);
+  });
+});
+
+// Multi-cut row ids (plan i-want-to-add-mellow-mist): a row from a non-default lens self-describes
+// via an id prefix ("derisk/x-1"), not a heading inserted into the table — a heading line would
+// break review-queue.md's single contiguous GFM table.
+describe("cutRowId / rowLens: id-prefix convention for grouping rows by lens", () => {
+  test("the default lens (extract) is never prefixed", () => {
+    assert.equal(cutRowId("extract", "x-1"), "x-1");
+  });
+
+  test("a non-default lens prefixes the id", () => {
+    assert.equal(cutRowId("derisk", "x-1"), "derisk/x-1");
+  });
+
+  test("rowLens reads extract back from an unprefixed id", () => {
+    assert.equal(rowLens("x-1"), "extract");
+  });
+
+  test("rowLens reads the lens back from a prefixed id", () => {
+    assert.equal(rowLens("derisk/x-1"), "derisk");
+  });
+
+  test("a cut-prefixed id round-trips through readQueue/writeCell unchanged (no table-parsing special-casing needed)", () => {
+    const dir = tmpFolder(
+      `| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes | origin |\n` +
+        `|----|----------|--------|-------|-------------|------------|-----|--------|-------|--------|\n` +
+        `| derisk/x-1 | x | text | cuts/derisk/derivatives/x-1.md | 4 | 5 | yes | pending | | from /cycle |\n`
+    );
+    const { rows } = readQueue(dir);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].id, "derisk/x-1");
+    assert.equal(rows[0].asset, "cuts/derisk/derivatives/x-1.md");
+    assert.equal(rowLens(rows[0].id), "derisk");
+    assert.ok(writeCell(dir, "derisk/x-1", { status: "approve" }));
+    assert.equal(readQueue(dir).rows[0].status, "approve");
+    rmSync(dir, { recursive: true, force: true });
   });
 });

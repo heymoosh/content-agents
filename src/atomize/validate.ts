@@ -7,6 +7,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 import { resolveAngle } from "./spin.js";
 import { summarizeThreadChecks } from "./thread-check.js";
 import { summarizeStorytelling } from "./storytelling.js";
+import { listCuts, cutDir } from "./cuts.js";
 import {
   readSourceClass,
   beat2Note,
@@ -180,36 +181,57 @@ export function checkCaseGate(
   return violations;
 }
 
+// Every derivative across the default top-level derivatives/ (the "extract" cut, never migrated —
+// plan i-want-to-add-mellow-mist) plus any cuts/<lens>/derivatives/ for an additional lens (e.g.
+// "derisk"). A cut derivative's `file` label is prefixed "cuts/<lens>/" so violation messages
+// disambiguate which version they're about. Pure/exported so it's testable without a real folder
+// tree, same pattern as checkDerivative above.
+export function collectDerivativeTargets(folderDir: string): { file: string; path: string }[] {
+  const derivDir = join(folderDir, "derivatives");
+  const targets: { file: string; path: string }[] = [];
+  if (existsSync(derivDir)) {
+    for (const f of readdirSync(derivDir).filter((f) => f.endsWith(".md"))) {
+      targets.push({ file: f, path: join(derivDir, f) });
+    }
+  }
+  for (const lens of listCuts(folderDir)) {
+    const lensDerivDir = join(cutDir(folderDir, lens), "derivatives");
+    if (!existsSync(lensDerivDir)) continue;
+    for (const f of readdirSync(lensDerivDir).filter((f) => f.endsWith(".md"))) {
+      targets.push({ file: `cuts/${lens}/derivatives/${f}`, path: join(lensDerivDir, f) });
+    }
+  }
+  return targets;
+}
+
 function main() {
   const dir = process.argv[2];
   if (!dir) {
     console.error("usage: tsx src/atomize/validate.ts <content-folder>");
     process.exit(1);
   }
-  const derivDir = join(dir.startsWith("/") ? dir : join(repoRoot, dir), "derivatives");
-  if (!existsSync(derivDir)) {
-    console.error(`no derivatives folder: ${derivDir}`);
-    process.exit(1);
-  }
+  const folderDir = dir.startsWith("/") ? dir : join(repoRoot, dir);
+  const derivDir = join(folderDir, "derivatives");
   const platforms = loadPlatforms().platforms;
 
   const violations: string[] = [];
-  const files = readdirSync(derivDir).filter((f) => f.endsWith(".md"));
-  if (files.length === 0) {
-    console.error(`no derivative .md files in ${derivDir}`);
+
+  const targets = collectDerivativeTargets(folderDir);
+  if (targets.length === 0) {
+    console.error(`no derivative .md files in ${derivDir} or any cuts/*/derivatives/`);
     process.exit(1);
   }
 
   const routingFiles: { file: string; platform: string }[] = [];
   const threadInputs: { file: string; fm: Record<string, unknown> }[] = [];
-  for (const file of files) {
-    const { fm, body } = splitFrontmatter(readFileSync(join(derivDir, file), "utf8"));
+  for (const { file, path } of targets) {
+    const { fm, body } = splitFrontmatter(readFileSync(path, "utf8"));
     violations.push(...checkDerivative(file, fm, body, platforms));
     routingFiles.push({ file, platform: String(fm.platform ?? "") });
     threadInputs.push({ file, fm });
   }
 
-  const routingPath = join(dir.startsWith("/") ? dir : join(repoRoot, dir), "routing.md");
+  const routingPath = join(folderDir, "routing.md");
   if (existsSync(routingPath)) {
     const routingDecisions = parseRoutingDecisions(readFileSync(routingPath, "utf8"));
     violations.push(...checkRoutingGate(routingFiles, routingDecisions));
@@ -218,7 +240,8 @@ function main() {
   // Source-triage skeleton gate (card b288d0da): only applies once a source.md classification
   // has actually been recorded — readSourceClass returns undefined for an untriaged or
   // source.md-less folder, in which case the existing default (skeleton allowed) is unaffected.
-  const sourceDir = dir.startsWith("/") ? dir : join(repoRoot, dir);
+  // Shared by every cut — they all trace back to the same source.md.
+  const sourceDir = folderDir;
   const sourceClass = readSourceClass(sourceDir);
   if (sourceClass) {
     const skeletonFiles = threadInputs.map(({ file, fm }) => ({
@@ -285,7 +308,7 @@ function main() {
     for (const v of violations) console.error(`  - ${v}`);
     process.exit(1);
   }
-  console.log(`ok: ${files.length} derivative(s) within platform limits`);
+  console.log(`ok: ${targets.length} derivative(s) within platform limits`);
 }
 
 // Run only as a CLI entry point — importing checkDerivative for tests must not execute main().

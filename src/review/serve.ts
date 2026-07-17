@@ -49,6 +49,10 @@ import {
   VIDEO_EXT,
   getLiveStateAsOf,
   cancelScheduled,
+  listCutSets,
+  saveCutBody,
+  addCutComment,
+  resolveCutComment,
 } from "./rows.js";
 import {
   classifySource,
@@ -753,6 +757,48 @@ const server = createServer(async (req, res) => {
       const b = await readBody(req);
       saveDerivative(String(b.slug ?? ""), String(b.id ?? ""), String(b.body ?? ""));
       json(res, 200, { ok: true });
+      return;
+    }
+    // Cuts tab (Stage 1 "Proof Sheet" — plan i-want-to-add-mellow-mist): pre-atomize version
+    // review, not a review-queue action — no scheduling, no status, nothing publishes from here.
+    if (req.method === "GET" && url.pathname === "/api/cuts") {
+      json(res, 200, { cutSets: listCutSets() });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/cut-save") {
+      const b = await readBody(req);
+      try {
+        saveCutBody(String(b.slug ?? ""), String(b.lens ?? ""), String(b.body ?? ""));
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/cut-comment") {
+      const b = await readBody(req);
+      const line = Number(b.line);
+      const text = String(b.text ?? "").trim();
+      if (!text || !Number.isFinite(line)) {
+        json(res, 200, { ok: false, error: "a comment needs a line and non-empty text" });
+        return;
+      }
+      try {
+        const comment = addCutComment(String(b.slug ?? ""), String(b.lens ?? ""), line, text);
+        json(res, 200, { ok: true, comment });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/cut-comment-resolve") {
+      const b = await readBody(req);
+      try {
+        const ok = resolveCutComment(String(b.slug ?? ""), String(b.lens ?? ""), String(b.commentId ?? ""));
+        json(res, 200, { ok });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/revise") {
