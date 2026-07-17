@@ -61,6 +61,7 @@ import {
   addVideoJob,
   publicJob,
   jobs,
+  clearFinishedJobs,
   jobLogPath,
   lastNonEmptyLine,
   tailLines,
@@ -220,7 +221,10 @@ const execFileP = promisify(execFile);
 // run (SKILL.md step 2) and routing already reads config/routing.yaml, so an edit here feeds
 // forward into atomize/routing with no new wiring needed.
 const BRIEFS_DIR = join(repoRoot, "briefs");
-const STRATEGY_TIMEOUT_MS = 90_000;
+// 180s (not the original 90s): the insights prompt inlines every report's full output plus the
+// entire latest brief, and a real run was observed timing out at 90s with zero output produced —
+// see the matching bump to isSpawnTimeout's exit-143 handling in jobs.ts.
+const STRATEGY_TIMEOUT_MS = 180_000;
 const INSIGHTS_ASK_TIMEOUT_MS = 180_000; // a deep-dive answer may itself run 1-2 of the reports below
 // A FULL /strategy run (grade bets → reports → Claude-written brief → new bets) — minutes, not
 // seconds. Same order of magnitude as an atomize job, doubled: /strategy runs ~8 report scripts
@@ -229,6 +233,7 @@ const STRATEGY_RUN_TIMEOUT_MS = 30 * 60_000;
 // `npm run scout` runs up to 3 bounded `claude -p` web-search calls (one per kind) — see
 // src/discovery/discover.ts. Its own per-call timeout governs each; this bounds the whole run.
 const SCOUT_TIMEOUT_MS = 30 * 60_000;
+const PULL_TIMEOUT_MS = 15 * 60_000; // real Chrome + saved sessions across 3 platforms — slow on purpose
 
 // Allowlisted, read-only, no-arg report commands only — used server-side to build the insights
 // synthesis, never exposed directly by cmd string from the client (no argv injection surface).
@@ -441,8 +446,12 @@ async function generateInsights(): Promise<InsightsResult> {
   ].join("\n");
   // Routed through the ONE job queue (Codebase review Phase 2) — same log/heartbeat + bounded
   // concurrency every other Claude spawn in this GUI now gets, instead of its own unbounded spawn.
+  // tools: "" disables all tools (confirmed via `claude --help`, same flag draft.ts's
+  // callClaudeDraft already relies on) — the prompt above already forbids running commands or
+  // reading other files and inlines everything needed, so there's no legitimate tool call for this
+  // spawn to make; skipping tool/MCP setup removes one more thing that could eat into the timeout.
   const summary = await runQueued("insights", "Generate insights", async (job) => {
-    const result = await runClaudeSpawn(job, prompt, { timeoutMs: STRATEGY_TIMEOUT_MS });
+    const result = await runClaudeSpawn(job, prompt, { timeoutMs: STRATEGY_TIMEOUT_MS, tools: "" });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "Claude", timeoutLabel: `${STRATEGY_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
     });
@@ -537,6 +546,27 @@ async function runScout(): Promise<void> {
 // single-flight actions above (a second click must not stack a second 30-min run).
 function jobInFlight(kind: "strategy" | "scout"): boolean {
   return jobs.some((j) => j.kind === kind && (j.status === "queued" || j.status === "running"));
+}
+
+// "Pull fresh now": the ONLY thing in this GUI that actually fetches new analytics. The header's
+// "Reload brief + file list" button (doRefresh in page.ts) just re-reads what's already on disk —
+// it never pulls, so it can never surface anything newer than the last real pull. That's normally
+// the Sunday 07:00 launchd cron (config/launchd/com.content-agents.weekly-pull.plist); this button
+// lets Muxin trigger the same `npm run pull -- --ingest` on demand between cron runs. Scope is
+// pull+ingest only (no bluesky, no brief regen) — Muxin still runs Generate insights / /strategy
+// himself once fresh data is in.
+async function pullFreshAnalytics(): Promise<string> {
+  return runQueued("pull", "Pull fresh analytics", async (job) => {
+    const result = await runCommandSpawn(job, "npm", ["run", "pull", "--", "--ingest"], {
+      timeoutMs: PULL_TIMEOUT_MS,
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "Pull", timeoutLabel: `${PULL_TIMEOUT_MS / 60_000} min`, exitVerb: "Pull",
+      includeTailOnTimeout: true, command: "npm",
+    });
+    if (failure) throw new Error(failure);
+    return result.stdout.trim();
+  });
 }
 
 // ── Raw downloaded exports (data/inbox = not-yet-ingested, data/processed = archived after
@@ -1015,6 +1045,11 @@ const server = createServer(async (req, res) => {
       json(res, 200, { jobs: jobs.map(publicJob) });
       return;
     }
+    if (req.method === "POST" && url.pathname === "/api/jobs/clear") {
+      const removed = clearFinishedJobs();
+      json(res, 200, { ok: true, removed });
+      return;
+    }
     if (req.method === "GET" && /^\/api\/jobs\/[^/]+\/log$/.test(url.pathname)) {
       const jobId = url.pathname.split("/")[3];
       if (!jobs.some((j) => j.id === jobId)) {
@@ -1083,6 +1118,15 @@ const server = createServer(async (req, res) => {
       try {
         const answer = await askInsights(question, history);
         json(res, 200, { ok: true, answer });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/strategy/pull") {
+      try {
+        const log = await pullFreshAnalytics();
+        json(res, 200, { ok: true, log });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }

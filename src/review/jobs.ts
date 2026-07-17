@@ -223,15 +223,15 @@ type JobStatus = "queued" | "running" | "done" | "failed";
 // "url" | "file" | "text" | "notes" | "continue" | "video" are the atomize-family kinds (dispatch
 // a slash-command against a folder/source, verified by artifact check — see drain() below).
 // "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" |
-// "strategy" | "scout" are generic task jobs (run an arbitrary async task via runQueued) — the
-// four call sites complaint 2 flagged as spawning unbounded, plus "Duplicate to platform", the
-// Follow-ups tab's "Draft follow-up", the Analytics tab's "Refresh brief" (a full /strategy run),
-// and the Outreach tab's "Scout new leads" (npm run scout). All share the same
-// queue/mutex/log/heartbeat.
+// "pull" | "strategy" | "scout" are generic task jobs (run an arbitrary async task via runQueued)
+// — the four call sites complaint 2 flagged as spawning unbounded, plus "Duplicate to platform",
+// the Follow-ups tab's "Draft follow-up", the Analytics tab's "Pull fresh now" (runCommandSpawn,
+// not a claude spawn) and "Refresh brief" (a full /strategy run), and the Outreach tab's "Scout
+// new leads" (npm run scout). All families share the same queue/mutex/log/heartbeat.
 export type JobKind =
   | "url" | "file" | "text" | "notes" | "continue" | "video"
   | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up"
-  | "strategy" | "scout";
+  | "pull" | "strategy" | "scout";
 interface Job {
   id: string;
   kind: JobKind;
@@ -252,6 +252,20 @@ interface Job {
 export const jobs: Job[] = [];
 let jobSeq = 0;
 let draining = false;
+
+// "Clear queue" (GUI) only ever removes finished entries — queued/running jobs stay untouched.
+// drain() finds work via jobs.find(status==="queued"), not by index, so splicing mid-array here is
+// safe even while a job is actively running.
+export function clearFinishedJobs(): number {
+  let removed = 0;
+  for (let i = jobs.length - 1; i >= 0; i--) {
+    if (jobs[i].status === "done" || jobs[i].status === "failed") {
+      jobs.splice(i, 1);
+      removed++;
+    }
+  }
+  return removed;
+}
 
 // Job ids must stay unique across a server RESTART, not just within one process: they key the
 // persisted per-job log file (jobLogPath) under ~/.content-agents/logs/gui-jobs/, which outlives
@@ -298,43 +312,35 @@ export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => P
   });
 }
 
-// Generic spawn: `claude -p "<prompt>"`, streamed to the job's persisted log + heartbeat exactly
-// like the atomize path (persist + stream, not execFile's 40MB in-memory buffer). Shared by every
-// Claude-spawning call site in the GUI — atomize-family jobs AND task jobs (revise/brief-revise/
-// insights/ask-insights/duplicate) — so they all get the same log file + heartbeat UX. `stdout` is
-// captured separately (not just written to the log) for callers that need Claude's actual answer
-// text (insights/ask) or a refusal marker (revise), since the log interleaves stdout+stderr.
-interface ClaudeSpawnResult {
+// Generic spawn: streamed to the job's persisted log + heartbeat exactly like the atomize path
+// (persist + stream, not execFile's 40MB in-memory buffer). Shared by every subprocess-spawning
+// call site in the GUI — atomize-family jobs AND task jobs (revise/brief-revise/insights/
+// ask-insights/duplicate/pull) — so they all get the same log file + heartbeat UX. `stdout` is
+// captured separately (not just written to the log) for callers that need the process's actual
+// answer text (insights/ask) or a refusal marker (revise), since the log interleaves stdout+stderr.
+interface CommandSpawnResult {
   code: number | null;
   timedOut: boolean;
   enoent: boolean;
   stdout: string;
 }
-// Pure argv builder for runClaudeSpawn, split out so a caller's exact invocation is unit-testable
-// without spawning a real subprocess. `permissionMode: null` omits the --permission-mode flag
-// entirely (draft.ts's callClaudeDraft never passes one, using --model/--tools instead — see
-// enqueueFollowUpDraft below); omitting the option (undefined) keeps the original "acceptEdits"
-// default so every pre-existing caller is unaffected.
-export function buildClaudeSpawnArgs(
-  prompt: string,
-  opts: { permissionMode?: string | null; model?: string; tools?: string }
-): string[] {
-  const args = ["-p", prompt];
-  if (opts.permissionMode !== null) args.push("--permission-mode", opts.permissionMode ?? "acceptEdits");
-  if (opts.model !== undefined) args.push("--model", opts.model);
-  if (opts.tools !== undefined) args.push("--tools", opts.tools);
-  return args;
+// Node's own `timeout` option kills a stuck child with `killSignal` (always SIGTERM here — see
+// runCommandSpawn) once timeoutMs elapses, so seeing that signal back means we timed out, not a
+// crash. But `claude`'s compiled native binary CATCHES SIGTERM and exits with numeric code 143
+// (128+15) instead of dying by signal — so a run we killed for running too long can show up as
+// `code=143, signal=null`, which reads exactly like a plain nonzero-exit crash unless callers also
+// check for 143. killSignal:SIGTERM is the only signal this module ever sends a child, so either
+// tell means our own timeout fired.
+export function isSpawnTimeout(code: number | null, signal: NodeJS.Signals | null): boolean {
+  return signal === "SIGTERM" || code === 143;
 }
 
-// Shared spawn-to-job-log core: any command, streamed to the job's persisted log + heartbeat.
-// runClaudeSpawn below is the `claude -p` specialization; runCommandSpawn runs anything else
-// (e.g. the Outreach tab's `npm run scout`) with the identical log/heartbeat/timeout contract.
-function spawnToJobLog(
+export function runCommandSpawn(
   job: Job,
   command: string,
   args: string[],
   opts: { timeoutMs: number; env?: NodeJS.ProcessEnv }
-): Promise<ClaudeSpawnResult> {
+): Promise<CommandSpawnResult> {
   mkdirSync(JOB_LOG_DIR, { recursive: true });
   const log = createWriteStream(jobLogPath(job.id), { flags: "a" });
   let tailBuf = "";
@@ -352,6 +358,11 @@ function spawnToJobLog(
       cwd: repoRoot,
       timeout: opts.timeoutMs,
       killSignal: "SIGTERM",
+      // Explicitly close the child's stdin (rather than leaving Node's default open, unwritten
+      // pipe) — no caller here ever writes to it, but an unclosed pipe makes `claude -p` wait up
+      // to 3s for stdin input before it warns and proceeds without it ("no stdin data received in
+      // 3s"). Closing it up front skips that wait entirely.
+      stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, ...opts.env },
     });
     let enoent = false;
@@ -365,31 +376,35 @@ function spawnToJobLog(
       // back synchronously right after this promise settles (for the failure tail), and
       // log.end() alone doesn't guarantee the last chunk has hit disk yet.
       log.end(() => {
-        // Node's own `timeout` option kills with `killSignal` once timeoutMs elapses — that's the
-        // one signal we ever send, so seeing it back means we timed out, not a crash.
-        resolve({ code, timedOut: signal === "SIGTERM", enoent, stdout: stdoutBuf });
+        resolve({ code, timedOut: isSpawnTimeout(code, signal), enoent, stdout: stdoutBuf });
       });
     });
   });
 }
 
+// Pure argv builder for runClaudeSpawn, split out so a caller's exact invocation is unit-testable
+// without spawning a real subprocess. `permissionMode: null` omits the --permission-mode flag
+// entirely (draft.ts's callClaudeDraft never passes one, using --model/--tools instead — see
+// enqueueFollowUpDraft below); omitting the option (undefined) keeps the original "acceptEdits"
+// default so every pre-existing caller is unaffected.
+export function buildClaudeSpawnArgs(
+  prompt: string,
+  opts: { permissionMode?: string | null; model?: string; tools?: string }
+): string[] {
+  const args = ["-p", prompt];
+  if (opts.permissionMode !== null) args.push("--permission-mode", opts.permissionMode ?? "acceptEdits");
+  if (opts.model !== undefined) args.push("--model", opts.model);
+  if (opts.tools !== undefined) args.push("--tools", opts.tools);
+  return args;
+}
+
+// `claude -p "<prompt>"` specifically, layered on runCommandSpawn above.
 export function runClaudeSpawn(
   job: Job,
   prompt: string,
   opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
-): Promise<ClaudeSpawnResult> {
-  return spawnToJobLog(job, "claude", buildClaudeSpawnArgs(prompt, opts), opts);
-}
-
-// Non-Claude subprocess through the same queue/log/heartbeat (e.g. `npm run scout`). Pair its
-// result with decodeSpawnFailure({ ..., command: "npm" }) so an ENOENT names the right CLI.
-export function runCommandSpawn(
-  job: Job,
-  command: string,
-  args: string[],
-  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv }
-): Promise<ClaudeSpawnResult> {
-  return spawnToJobLog(job, command, args, opts);
+): Promise<CommandSpawnResult> {
+  return runCommandSpawn(job, "claude", buildClaudeSpawnArgs(prompt, opts), opts);
 }
 
 // Last ~30 lines of a job's persisted log, formatted as a "\n---\n<tail>" suffix to append to an
@@ -420,6 +435,9 @@ export function logTailSuffix(jobId: string): string {
 //   atomize branch of drain()) append the log tail to the timeout message too, while the throw-style
 //   sites (revise/insights/duplicate) don't. Preserved as-is — this is a pure extraction, not a
 //   behavior change.
+// - `command` names the binary in the ENOENT message; defaults to "claude" since every pre-existing
+//   call site spawns `claude` — pullFreshAnalytics (serve.ts) is the first non-claude spawn through
+//   this decoder (`npm`) and passes it explicitly so a missing-npm error doesn't blame `claude`.
 export function decodeSpawnFailure(
   result: { code: number | null; timedOut: boolean; enoent: boolean },
   jobId: string,

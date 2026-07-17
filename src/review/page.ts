@@ -259,7 +259,9 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .thread-turn { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
   .thread-turn.q { font-weight:600; color:var(--muted); font-size:13.5px; border-top:none; padding-top:0; }
   .jobs { max-width:820px; margin:24px auto 0; }
-  .jobs > h3 { font:600 13px/1.3 Georgia,serif; color:var(--muted); margin:0 0 8px; text-transform:uppercase; letter-spacing:.5px; }
+  .jobs-head { display:flex; align-items:center; justify-content:space-between; gap:9px; margin-bottom:8px; }
+  .jobs-head h3 { font:600 13px/1.3 Georgia,serif; color:var(--muted); margin:0; text-transform:uppercase; letter-spacing:.5px; }
+  .jobs-head button { font-size:12px; padding:4px 10px; }
   .job { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 15px;
     margin:9px 0; display:flex; align-items:center; gap:12px; }
   .job .jlabel { flex:1; min-width:0; font-size:14px; }
@@ -382,23 +384,29 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <h3>Latest strategy brief</h3>
         <span class="grow"></span>
         <span class="src" id="briefPath"></span>
+        <button id="briefToggleBtn">Show brief</button>
         <button class="primary" id="briefRefreshBtn" title="Runs the full /strategy skill: grades last cycle's bets, writes a new dated brief, records new bets. Takes minutes.">Refresh brief (runs /strategy)</button>
       </div>
-      <div class="md" id="briefBody">Loading…</div>
-      <div class="aibox show">
-        <input placeholder="tell Claude what to change in the brief…" id="briefAskInput" />
-        <button class="send" id="briefAskBtn">Send to Claude</button>
+      <div id="briefBodyWrap" hidden>
+        <div class="md" id="briefBody">Loading…</div>
+        <div class="aibox show">
+          <input placeholder="tell Claude what to change in the brief…" id="briefAskInput" />
+          <button class="send" id="briefAskBtn">Send to Claude</button>
+        </div>
+        <span class="hint">Edits land in the brief file itself — /atomize and /strategy already read the latest brief every run, so a change here feeds forward with no extra step.</span>
       </div>
-      <span class="hint">Edits land in the brief file itself — /atomize and /strategy already read the latest brief every run, so a change here feeds forward with no extra step. Refresh brief runs the REAL /strategy (your subscription, $0): grades bets against fresh data and writes a new dated brief, same as running it in a terminal.</span>
+      <span class="hint">Refresh brief runs the REAL /strategy (your subscription, $0): grades bets against fresh data and writes a new dated brief, same as running it in a terminal.</span>
     </div>
     <div class="notes-panel">
       <div class="notes-head">
         <h3>Raw downloaded exports</h3>
+        <span class="src" id="rawLastPull"></span>
         <span class="grow"></span>
-        <button id="rawRefreshBtn">Refresh</button>
+        <button class="primary" id="rawPullBtn">Pull fresh now</button>
+        <button id="rawRefreshBtn">Reload list</button>
       </div>
       <div id="rawList"><div class="empty">Loading…</div></div>
-      <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest) — open one yourself if you want to read the raw numbers rather than a computed report.</span>
+      <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest). "Reload list" only re-reads what's already on disk — it does NOT fetch anything new. "Pull fresh now" is the real pull: it launches real Chrome with your saved logins for LinkedIn/X/Substack and can take a few minutes; it otherwise only runs Sundays at 07:00 via cron. Open a file yourself if you want the raw numbers rather than a computed report.</span>
     </div>
   </section>
   <section class="view" id="outreachView" hidden>
@@ -697,7 +705,10 @@ function render(){
 // Refresh even do?"). It's now tab-aware: doRefresh() below only re-reads whatever the CURRENT tab
 // shows, labeled per tab, with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "ingest";
-function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Scout new leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
+// Strategy tab's label is deliberately NOT "...+ exports" — this header refresh only re-reads the
+// brief file + the existing raw-exports list off disk; it never pulls or regenerates (those are
+// the dedicated "Pull fresh now" / "Refresh brief" buttons).
+function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Reload brief + file list" : t==="outreach" ? "Scout new leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
 function setTab(t){
   currentTab = t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
@@ -793,6 +804,19 @@ async function loadBrief(){
   $("#briefBody").innerHTML = mdToHtml(d.content);
   $("#briefPath").textContent = d.path;
 }
+// Collapsed by default — the brief used to render in full the moment the Strategy tab opened,
+// which is the "populates the whole page" behavior Muxin flagged. Now it opens on request: the
+// toggle button, or the dated "Brief: <date>" link Generate Insights renders (delegated listener
+// below, since that link lives inside dynamically-injected insights/brief-revise HTML).
+function setBriefExpanded(open){
+  $("#briefBodyWrap").hidden = !open;
+  $("#briefToggleBtn").textContent = open ? "Hide brief" : "Show brief";
+}
+$("#briefToggleBtn").addEventListener("click", ()=> setBriefExpanded($("#briefBodyWrap").hidden));
+document.addEventListener("click", (e)=>{
+  const a = e.target.closest && e.target.closest('a[href="#stratBriefPanel"]');
+  if(a) setBriefExpanded(true);
+});
 async function askBrief(){
   const inp = $("#briefAskInput"); const instruction = inp.value.trim();
   if(!instruction){ flash("Type what you want changed first"); return; }
@@ -907,7 +931,14 @@ async function loadRaw(){
   const box = $("#rawList");
   box.innerHTML = '<div class="empty">Loading…</div>';
   const r = await fetch("/api/strategy/raw"); const d = await r.json();
-  if(!d.files || !d.files.length){ box.innerHTML = '<div class="empty">No raw exports found in data/inbox or data/processed on this checkout.</div>'; return; }
+  if(!d.files || !d.files.length){
+    box.innerHTML = '<div class="empty">No raw exports found in data/inbox or data/processed on this checkout.</div>';
+    $("#rawLastPull").textContent = "";
+    return;
+  }
+  // Files sort newest-first server-side (listRawFiles) — the first entry's mtime IS the last
+  // successful pull, so staleness is visible at a glance instead of only showing up as a surprise.
+  $("#rawLastPull").textContent = "last pull: "+new Date(d.files[0].mtime).toISOString().slice(0,10);
   box.innerHTML = "";
   for(const f of d.files){
     const el = document.createElement("div"); el.className = "notepick";
@@ -919,6 +950,32 @@ async function loadRaw(){
   }
 }
 $("#rawRefreshBtn").addEventListener("click", loadRaw);
+
+// "Pull fresh now" — the real pull (npm run pull -- --ingest), queued through the same job system
+// as every other Claude/subprocess spawn in this GUI, so it gets a persisted log + heartbeat even
+// though it can take minutes (real Chrome, saved LinkedIn/X/Substack sessions). A ticking elapsed
+// count (not a fixed ETA) mirrors askInsights' own ticker above — card a14693da's fix for the same
+// "don't undersell an honestly-variable wait" problem.
+async function pullFresh(){
+  const btn = $("#rawPullBtn");
+  btn.disabled = true; $("#rawRefreshBtn").disabled = true;
+  const box = $("#rawList");
+  const prevHtml = box.innerHTML;
+  const start = Date.now();
+  const tick = () => { box.innerHTML = '<div class="empty">✨ Pulling fresh analytics… real Chrome, can take a few minutes <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span></div>'; };
+  tick();
+  const timer = setInterval(tick, 1000);
+  let r;
+  try {
+    r = await post("/api/strategy/pull", {});
+  } finally {
+    clearInterval(timer);
+  }
+  btn.disabled = false; $("#rawRefreshBtn").disabled = false;
+  if(r.ok){ flash("Pull complete"); await loadRaw(); }
+  else { box.innerHTML = prevHtml; flash("Pull failed: "+(r.error||"error")); await loadRaw(); }
+}
+$("#rawPullBtn").addEventListener("click", pullFresh);
 
 // ── Outreach / discovery inbox ──
 // Same grouping order as status.ts's own STATUS_ORDER (pursue-ready leads first, cold/terminal
@@ -1353,7 +1410,8 @@ function fmtElapsed(ms){
 function renderJobs(){
   const box = $("#jobs"); box.innerHTML = "";
   if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above. 🌱</div>'; return; }
-  box.innerHTML = '<h3>Queue</h3>';
+  const clearable = JOBS.some(j=>j.status==="done"||j.status==="failed");
+  box.innerHTML = '<div class="jobs-head"><h3>Queue</h3>'+(clearable?'<button id="clearJobsBtn">Clear queue</button>':'')+'</div>';
   for(const j of [...JOBS].reverse()){
     const el = document.createElement("div"); el.className = "job";
     const dot = j.status==="running" ? '<span class="spin-dot"></span>' : "";
@@ -1393,6 +1451,11 @@ async function loadJobs(){
     }
     if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))) load(); // a job moved → refresh review rows
   }catch(e){}
+}
+async function clearJobs(){
+  const r = await post("/api/jobs/clear",{});
+  if(r.ok){ flash(r.removed+" cleared"); loadJobs(); }
+  else flash(r.error || "Could not clear queue");
 }
 async function addSource(){
   const ta = $("#src"); const source = ta.value.trim();
@@ -1464,6 +1527,7 @@ $("#notesList").addEventListener("change",(e)=>{
   const idx = Number(cb.dataset.idx);
   if(cb.checked) selectedNoteIdxs.add(idx); else selectedNoteIdxs.delete(idx);
 });
+$("#jobs").addEventListener("click",(e)=>{ if(e.target.id==="clearJobsBtn") clearJobs(); });
 $("#addBtn").addEventListener("click", addSource);
 $("#notesBtn").addEventListener("click", openNotes);
 $("#notesCloseBtn").addEventListener("click", ()=>{ $("#notesPanel").hidden = true; });
