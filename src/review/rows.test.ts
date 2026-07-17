@@ -3,7 +3,16 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readQueueCached, enrich } from "./rows.js";
+import {
+  readQueueCached,
+  enrich,
+  cutBody,
+  cutSetForFolder,
+  saveCutBodyToFolder,
+  addCutCommentToFolder,
+  resolveCutCommentInFolder,
+} from "./rows.js";
+import { addCut } from "../atomize/cuts.js";
 import type { QueueRow } from "../publish/queue.js";
 import type { LiveProviderState } from "./reconcile.js";
 
@@ -185,6 +194,137 @@ test("duplicatable is false for an image (quote-card) row, even with an asset on
     const row: QueueRow = { id: "quote-card-1", platform: "quote-card", format: "image", asset: "images/quote-card-1.png", status: "pending", notes: "", lineIndex: 0 };
     const out = enrich(folder, "demo", row, { text: "" }, NO_LIVE);
     assert.equal(out.duplicatable, false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+// ── Cuts tab (Stage 1 "Proof Sheet") ──
+
+test("cutBody: extract reads extracts.md, returns null before it's drafted", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    assert.equal(cutBody(folder, "extract"), null);
+    writeFileSync(join(folder, "extracts.md"), "1. a quotable line\n2. another\n");
+    assert.equal(cutBody(folder, "extract"), "1. a quotable line\n2. another\n");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("cutBody: a non-default lens reads cuts/<lens>/cut.md's body, frontmatter stripped", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    addCut(folder, { lens: "derisk", title: "t", text: "the composed frame" });
+    const body = cutBody(folder, "derisk");
+    assert.ok(body?.includes("the composed frame"));
+    assert.ok(!body?.includes("lens: derisk"));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("cutSetForFolder: null when nothing's drafted yet", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    assert.equal(cutSetForFolder(folder, "demo"), null);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("cutSetForFolder: extract + an additional lens, each with its own comments", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    writeFileSync(join(folder, "extracts.md"), "extract body");
+    addCut(folder, { lens: "derisk", title: "t", text: "derisk body" });
+    addCutCommentToFolder(folder, "derisk", 1, "tighten this");
+    const cuts = cutSetForFolder(folder, "demo");
+    assert.equal(cuts?.length, 2);
+    const extract = cuts?.find((c) => c.lens === "extract");
+    const derisk = cuts?.find((c) => c.lens === "derisk");
+    assert.equal(extract?.body, "extract body");
+    assert.deepEqual(extract?.comments, []);
+    assert.ok(derisk?.body.includes("derisk body"));
+    assert.equal(derisk?.comments.length, 1);
+    assert.equal(derisk?.comments[0].text, "tighten this");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("saveCutBodyToFolder: overwrites extracts.md whole", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    writeFileSync(join(folder, "extracts.md"), "old body");
+    saveCutBodyToFolder(folder, "extract", "  new body  \n");
+    assert.equal(cutBody(folder, "extract"), "new body\n");
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("saveCutBodyToFolder: a non-default lens keeps its frontmatter, replaces only the body", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    addCut(folder, { lens: "derisk", title: "t", text: "old" });
+    saveCutBodyToFolder(folder, "derisk", "revised frame");
+    const body = cutBody(folder, "derisk");
+    assert.ok(body?.includes("revised frame"));
+    assert.ok(!body?.includes("old"));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("saveCutBodyToFolder: throws for a lens with no cut.md on disk", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    assert.throws(() => saveCutBodyToFolder(folder, "derisk", "x"), /no such cut/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("saveCutBodyToFolder / cutBody: a path-traversal lens is rejected before it ever reaches join() (self-vet finding)", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    const evilLens = "../../../../tmp/rows-cuts-escape-marker";
+    assert.throws(() => saveCutBodyToFolder(folder, evilLens, "pwned"), /bad lens/);
+    assert.equal(cutBody(folder, evilLens), null);
+    assert.equal(cutBody(folder, "UPPERCASE"), null); // not a valid slug either
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("addCutCommentToFolder: a path-traversal-shaped lens is rejected too, even though it's only ever used as a JSON key", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    assert.throws(() => addCutCommentToFolder(folder, "../escape", 1, "x"), /bad lens/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("addCutCommentToFolder / resolveCutCommentInFolder: round-trip, scoped per lens", () => {
+  const folder = mkdtempSync(join(tmpdir(), "rows-cuts-test-"));
+  try {
+    const c1 = addCutCommentToFolder(folder, "extract", 3, "cut this line");
+    addCutCommentToFolder(folder, "derisk", 1, "unrelated, different lens");
+    assert.equal(c1.line, 3);
+    assert.equal(c1.resolved, false);
+    let cuts = cutSetForFolder(folder, "demo");
+    // no extracts.md/cut.md drafted yet — comments alone don't manufacture a cut view
+    assert.equal(cuts, null);
+    writeFileSync(join(folder, "extracts.md"), "body");
+    cuts = cutSetForFolder(folder, "demo");
+    const extract = cuts?.find((c) => c.lens === "extract");
+    assert.equal(extract?.comments.length, 1);
+    assert.ok(resolveCutCommentInFolder(folder, "extract", c1.id));
+    cuts = cutSetForFolder(folder, "demo");
+    assert.equal(cuts?.find((c) => c.lens === "extract")?.comments[0].resolved, true);
+    assert.equal(resolveCutCommentInFolder(folder, "extract", "no-such-id"), false);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

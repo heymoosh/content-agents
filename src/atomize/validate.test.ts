@@ -1,5 +1,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   checkDerivative,
   parseRoutingDecisions,
@@ -7,8 +10,10 @@ import {
   checkRoutingGate,
   checkSkeletonGate,
   checkCaseGate,
+  collectDerivativeTargets,
   type PlatformRule,
 } from "./validate.js";
+import { addCut } from "./cuts.js";
 
 const PLATFORMS: Record<string, PlatformRule> = {
   x: { max_chars: 280 },
@@ -246,5 +251,49 @@ describe("checkCaseGate: case_skeleton:true is only legal when source-triage fou
       "not_found"
     );
     assert.deepEqual(violations, []);
+  });
+});
+
+describe("collectDerivativeTargets: scans the default derivatives/ plus every cuts/<lens>/derivatives/", () => {
+  function tmpFolder(): string {
+    return mkdtempSync(join(tmpdir(), "validate-cuts-test-"));
+  }
+
+  test("a folder with only the default top-level derivatives/ (no cuts/ at all)", () => {
+    const dir = tmpFolder();
+    mkdirSync(join(dir, "derivatives"), { recursive: true });
+    writeFileSync(join(dir, "derivatives", "x-1.md"), "---\nplatform: x\n---\nbody");
+    const targets = collectDerivativeTargets(dir);
+    assert.deepEqual(targets.map((t) => t.file), ["x-1.md"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a multi-cut folder scans both the default derivatives/ and cuts/<lens>/derivatives/, cut files prefixed for disambiguation", () => {
+    const dir = tmpFolder();
+    mkdirSync(join(dir, "derivatives"), { recursive: true });
+    writeFileSync(join(dir, "derivatives", "x-1.md"), "---\nplatform: x\n---\nextract body");
+    addCut(dir, { lens: "derisk", title: "t", text: "t" });
+    writeFileSync(join(dir, "cuts", "derisk", "derivatives", "x-1.md"), "---\nplatform: x\n---\nderisk body");
+    const targets = collectDerivativeTargets(dir);
+    assert.deepEqual(
+      targets.map((t) => t.file).sort(),
+      ["cuts/derisk/derivatives/x-1.md", "x-1.md"]
+    );
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("no default derivatives/, only a cut's — still finds it", () => {
+    const dir = tmpFolder();
+    addCut(dir, { lens: "derisk", title: "t", text: "t" });
+    writeFileSync(join(dir, "cuts", "derisk", "derivatives", "x-1.md"), "---\nplatform: x\n---\nbody");
+    const targets = collectDerivativeTargets(dir);
+    assert.deepEqual(targets.map((t) => t.file), ["cuts/derisk/derivatives/x-1.md"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("nothing anywhere returns an empty list, not a throw", () => {
+    const dir = tmpFolder();
+    assert.deepEqual(collectDerivativeTargets(dir), []);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

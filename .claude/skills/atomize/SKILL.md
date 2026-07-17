@@ -1,6 +1,6 @@
 ---
 name: atomize
-description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), /atomize --continue <content-folder> (resume steps 2-8 on an already-scaffolded folder), or /atomize --revise <content-folder>.
+description: Build 1 — atomize one piece of Muxin's original content into cheap platform assets (text posts + quote cards) and a review queue. Proposes cut/version options (extract, derisk, ...) from the same inspiration before formatting anything (step 1.5) — Muxin approves a set conversationally, then each cut atomizes independently. Video shorts are a separate skill — /video. Usage - /atomize <substack-url | file | audio-file | pasted text>, /atomize notes (spread your Substack Notes), /atomize --no-spin <arg> (strict verbatim, no audience spin), /atomize --continue <content-folder> [--cut <lens>] (resume steps 2-8 on an already-scaffolded folder or cut), or /atomize --revise <content-folder>.
 ---
 
 # /atomize — content atomization pipeline
@@ -45,6 +45,21 @@ derivative, the video script, and the video title/description. The short version
 - Muxin sounds like a working PM thinking out loud: plain, direct, specific, contrarian when
   earned, never performing. Read each draft aloud before queueing it.
 
+## Cut-aware steps
+
+Steps 2-8 below read as if there's one source. When step 1.5 approved more than one cut, run them
+once per additional cut, substituting throughout:
+- "the source" / `source.md` → that cut's `cuts/<lens>/cut.md` (its body is the drafting material,
+  same role `source.md`'s body plays for `extract`).
+- `<folder>/derivatives/` → `<folder>/cuts/<lens>/derivatives/`.
+- A queue row's id gets the lens prefix: `cutRowId(lens, id)` (`src/publish/queue.ts`) — e.g.
+  `derisk/x-1`, so it's traceable to its cut without a table schema change (the `extract` cut is
+  never prefixed, matching every id written before cuts existed).
+`npm run validate -- <folder>` already scans every cut automatically (`collectDerivativeTargets`
+in `src/atomize/validate.ts`) — one call validates all of them, not one call per cut. `routing.md`
+and source-triage facts stay ONE set per content folder, shared by every cut — they all trace back
+to the same `source.md` and the same platform-fit decision.
+
 ## Steps
 
 1. **Ingest.** `npm run new-content -- <arg>` → prints the content folder path. (Audio files
@@ -60,12 +75,42 @@ derivative, the video script, and the video title/description. The short version
      The title is derived from the first `# heading` or the first non-empty line, so a
      `# Title` line at the top of the paste helps.
 
-2. **Read the latest strategy brief** in `briefs/` (highest date). Apply its
+1.5. **Propose and approve cuts (Stage 1 — plan i-want-to-add-mellow-mist).** Before anything gets
+   formatted per platform, decide which *versions* of this piece are worth drafting from the same
+   inspiration. This is a conversational discussion stage, not a review/approval gate — nothing
+   here is "queued," nothing publishes.
+   - Propose the applicable lenses with a one-line rationale each: `extract` (Muxin's own verbatim
+     lines, today's default — always applicable) and, when the topic genuinely suits Muxin's
+     branded frame (a hyped claim, a product release, a trend worth de-risking — see
+     `.claude/skills/derisk/SKILL.md`), `derisk`. Don't force a `derisk` cut onto a piece that has
+     no riskiest belief worth naming — it's an offer, not a default.
+   - Draft each chosen cut's *core content* (not yet platform-formatted): for `extract`, this is
+     the 5-10 quotable lines step 3 below would tag anyway, previewed as prose; for `derisk`, run
+     `.claude/skills/derisk/SKILL.md`'s steps 2-5 (lock the riskiest belief with Muxin, evidence
+     pass if needed, cheapest test + named decision + payoff, sign-off) inline, composing the
+     frame.
+   - Show Muxin each draft and iterate cut-by-cut — in chat ("this one's good, change that one"),
+     and/or via `npm run review`'s Cuts tab (`src/review/` — a side-by-side proof-sheet view with
+     inline edit and anchored comments; see the plan file's "Stage 1 UI: the Proof Sheet" section)
+     if it's running. Keep iterating until Muxin approves a set of one or more cuts.
+   - Once approved: `extract` needs no extra scaffolding — it's today's top-level `source.md` /
+     `derivatives/` layout, continue straight into step 2. Any OTHER approved lens gets scaffolded
+     via `addCut()` (`src/atomize/cuts.ts`): `addCut(folderDir, { lens, title, text })` writes
+     `cuts/<lens>/cut.md` + `cuts/<lens>/derivatives/`. Then run steps 2-8 again, once per
+     additional approved cut, pointed at that cut instead of `source.md` (see "Cut-aware steps"
+     below) — equivalent to `/atomize --continue <folder> --cut <lens>`.
+   - This step never blocks generation the way a hard gate would — if Muxin only wants `extract`
+     (today's behavior), say so and skip straight to step 2 with zero cuts/ overhead.
+
+2. **Read the latest strategy brief** in `briefs/` (highest date). **Propose** applying its
    `Directives for atomization` — pillar priority, channel emphasis, format notes, hooks that
-   worked. **Record which brief and which directives you acted on** in each derivative's
-   frontmatter (`from_brief`, `directives_applied`, see step 4) — that attribution is what lets
-   `/publish` log the bet and `/strategy` later grade whether it paid off. If no brief exists,
-   proceed with defaults and note that in the review queue header.
+   worked — as an opt-in at step 1.5 or here, rather than always silently applying them: name which
+   directive(s) look relevant to this piece and ask before acting on them. **Record which brief and
+   which directives Muxin accepted** in each derivative's frontmatter (`from_brief`,
+   `directives_applied`, see step 4) — that attribution is what lets `/publish` log the bet and
+   `/strategy` later grade whether it paid off, and it is only ever stamped for a directive Muxin
+   actually accepted, never one you applied silently. If no brief exists, or Muxin declines every
+   directive, proceed with defaults and note that in the review queue header.
 
 2.5. **Source triage — classify the source once** (`src/atomize/source-triage.ts`, card b288d0da).
    Before drafting or routing anything, judge which ONE of three buckets this source falls into.
@@ -393,7 +438,9 @@ derivative, the video script, and the video title/description. The short version
    generated — the routing `include` text platforms, plus ONE `quote-card:<target>` row per routed
    platform for the card (each pointing at the shared `images/quote-card-N.png`, caption from its
    own `quote-card-N-<target>.md`). (id, platform, format, asset path, scores, status=pending,
-   origin). The table schema itself doesn't grow a storytelling or thread-check column
+   origin). On a cut other than `extract` (see "Cut-aware steps" above), the id is `cutRowId(lens,
+   id)` and the asset path is under `cuts/<lens>/derivatives/` or `cuts/<lens>/…` — every row for
+   every cut lands in the SAME `review-queue.md`, one table, no separate queue per cut. The table schema itself doesn't grow a storytelling or thread-check column
    (`native(1-5)` / `brand(1-5)` / `cta` stay as-is — three separate scripts parse that table by
    fixed column position, see `src/publish/queue.ts`); instead, a derivative flagged by step 5's
    soft gate gets `spinPassNote()`'s text appended to its row's `notes` cell, and one still
@@ -435,3 +482,7 @@ invoked, read the corresponding file first and follow its instructions:
 - **`/atomize --continue <folder>`** — the folder is already scaffolded (source.md exists);
   resume at step 2 instead of re-ingesting. Read `references/continue-mode.md` and follow it
   before doing anything else.
+- **`/atomize --continue <folder> --cut <lens>`** — same, but for an additional approved cut from
+  step 1.5 (not `extract`): resume steps 2-8 pointed at `cuts/<lens>/cut.md` instead of
+  `source.md`, per "Cut-aware steps" above. `<lens>`'s `cuts/<lens>/cut.md` must already exist
+  (step 1.5's `addCut()` call) before this runs.
