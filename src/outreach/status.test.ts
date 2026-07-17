@@ -1,9 +1,9 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { summarizeLead, groupByStatus, renderStatusTable, renderTargetsList, readLeadDetail, type LeadSummary } from "./status.js";
+import { summarizeLead, groupByStatus, renderStatusTable, renderTargetsList, readLeadDetail, parseJsaStats, type LeadSummary } from "./status.js";
 
 function makeLeadMd(overrides: Record<string, string> = {}): string {
   const fields: Record<string, string> = {
@@ -232,6 +232,99 @@ describe("readLeadDetail", () => {
       assert.match(detail.evidence[0].quote, /we believe in people/);
       assert.match(detail.classificationNote, /Per E1, a real worldview match\./);
       assert.match(detail.pitch, /lead with the shared worldview/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── parseJsaStats / readLatestMessage / muxinNotes (Outreach tab readability redesign) ──────────
+
+describe("parseJsaStats", () => {
+  const profile = [
+    "Snapshotted from JSA (job-search-agent) manual_research.db at intake.",
+    "JSA verdict: TARGET",
+    "JSA researched date: 2026-03-30",
+    "- PM role quality (JSA): PMs focus on research, data, and context-setting.",
+    "- Job protection (JSA): Strong funding with $70M Series D.",
+    "",
+    "JSA persona note: Ex-founder who wants strategic product ownership",
+    "",
+    "Acme is an open source analytics platform.",
+  ].join("\n");
+
+  test("stat-shaped lines become table rows; prose (incl. persona notes) stays in rest", () => {
+    const { stats, rest } = parseJsaStats(profile);
+    assert.deepEqual(stats, [
+      { label: "JSA verdict", value: "TARGET" },
+      { label: "JSA researched date", value: "2026-03-30" },
+      { label: "PM role quality", value: "PMs focus on research, data, and context-setting." },
+      { label: "Job protection", value: "Strong funding with $70M Series D." },
+    ]);
+    assert.match(rest, /Snapshotted from JSA/);
+    assert.match(rest, /JSA persona note: Ex-founder/);
+    assert.match(rest, /Acme is an open source analytics platform\./);
+    assert.doesNotMatch(rest, /JSA verdict/);
+  });
+
+  test("a profile with no JSA lines (scout/manual lead) parses to zero stats, full rest", () => {
+    const { stats, rest } = parseJsaStats("Acme makes widgets.");
+    assert.equal(stats.length, 0);
+    assert.equal(rest, "Acme makes widgets.");
+  });
+});
+
+describe("readLatestMessage + muxinNotes via readLeadDetail", () => {
+  test("newest messages/message-NN.md is surfaced; ## Muxin notes body is extracted", () => {
+    const dir = mkdtempSync(join(tmpdir(), "status-test-"));
+    try {
+      const leadMd = [
+        "---",
+        "kind: client",
+        'name: "Acme Co"',
+        "url: https://acme.co",
+        "source: jsa",
+        "status: pursue",
+        "classification: greenfield",
+        'pitch_angle: "the honest pitch"',
+        "---",
+        "",
+        "## Profile",
+        "",
+        "Acme makes widgets.",
+        "",
+        "## Muxin notes",
+        "",
+        "- 2026-07-16: loved the founder's blog voice",
+        "",
+        "## Decision log",
+        "",
+        "- 2026-07-10: intake (jsa, verdict=TARGET)",
+      ].join("\n");
+      writeFileSync(join(dir, "lead.md"), leadMd);
+      mkdirSync(join(dir, "messages"));
+      writeFileSync(join(dir, "messages", "message-01.md"), "---\nlead: client-acme-co\nchannel: email\nstatus: draft\n---\n\nfirst draft\n");
+      writeFileSync(join(dir, "messages", "message-02.md"), "---\nlead: client-acme-co\nchannel: email\nstatus: draft\n---\n\nsecond draft\n");
+      const detail = readLeadDetail(dir);
+      assert.equal(detail.latestMessage?.file, "messages/message-02.md");
+      assert.equal(detail.latestMessage?.channel, "email");
+      assert.equal(detail.latestMessage?.status, "draft");
+      assert.equal(detail.latestMessage?.body, "second draft");
+      assert.match(detail.muxinNotes, /loved the founder's blog voice/);
+      assert.equal(detail.jsaStats.length, 0);
+      assert.equal(detail.profileRest, "Acme makes widgets.");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a lead with no messages/ dir and no notes section degrades to null/empty", () => {
+    const dir = mkdtempSync(join(tmpdir(), "status-test-"));
+    try {
+      writeFileSync(join(dir, "lead.md"), makeLeadMd());
+      const detail = readLeadDetail(dir);
+      assert.equal(detail.latestMessage, null);
+      assert.equal(detail.muxinNotes, "");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

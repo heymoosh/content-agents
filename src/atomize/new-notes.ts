@@ -1,11 +1,11 @@
 import "../util/env.js";
-import { writeFileSync, readFileSync, readdirSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb, repoRoot } from "../db/db.js";
 import { fetchSubstackNotes, FetchedNote } from "./fetch-notes.js";
 import { scaffoldContentFolder } from "./new-content.js";
-import { splitFrontmatter } from "../util/frontmatter.js";
+import { readOriginStates, noteReuse } from "./note-reuse.js";
 
 // Pull Muxin's own Substack Notes and (a) ingest their engagement into analytics so resonance.ts
 // / snapshot.ts cover Notes, and (b) let him spread chosen ones to other platforms via the normal
@@ -31,21 +31,10 @@ function noteTitle(text: string): string {
   return firstLine.slice(0, 80);
 }
 
-// Every content/<slug>/source.md carries the `origin:` it was scaffolded from. A note already
-// turned into a content folder shows up here by its own URL, so re-listing doesn't invite
-// scaffolding (and duplicate-folder errors on) the same note twice.
-function alreadyDraftedOrigins(): Set<string> {
-  const contentDir = join(repoRoot, "content");
-  const origins = new Set<string>();
-  if (!existsSync(contentDir)) return origins;
-  for (const folder of readdirSync(contentDir)) {
-    const sourcePath = join(contentDir, folder, "source.md");
-    if (!existsSync(sourcePath)) continue;
-    const { fm } = splitFrontmatter(readFileSync(sourcePath, "utf8"));
-    if (typeof fm.origin === "string") origins.add(fm.origin);
-  }
-  return origins;
-}
+// Every content/<slug>/source.md carries the `origin:` it was scaffolded from. What each matching
+// folder DID (still in review / published-and-how-long-ago / all discarded) decides whether the
+// note may be drafted again — see note-reuse.ts for the rule. Folder names are date-prefixed
+// (new-content.ts), so a re-draft on a later day never collides with the old folder.
 
 // Store each note as an organic `substack-note` post + a metrics snapshot. Mirrors fetch-bluesky.ts:
 // upsert on (platform, platform_post_id) so re-runs refresh engagement and build a recency series.
@@ -86,7 +75,9 @@ function ingestNotes(notes: FetchedNote[]): number {
 }
 
 export interface AnnotatedNote extends FetchedNote {
-  drafted: boolean; // already scaffolded into a content/ folder (matched by origin URL)
+  drafted: boolean; // ever scaffolded into a content/ folder (matched by origin URL)
+  reusable: boolean; // may be selected for another draft right now (note-reuse.ts rule)
+  draftedTag: string; // human label ("in review now", "published Nd ago", ...) — "" if never drafted
 }
 
 // Fetch, ingest engagement, annotate against already-scaffolded folders, and cache. Shared by the
@@ -98,8 +89,9 @@ export async function fetchNotesList(
   const h = handle.replace(/^@/, "");
   const notes = await fetchSubstackNotes(handle, { limit });
   ingestNotes(notes);
-  const drafted = alreadyDraftedOrigins();
-  const annotated = notes.map((n) => ({ ...n, drafted: drafted.has(n.url) }));
+  const states = readOriginStates(join(repoRoot, "content"));
+  const now = Date.now();
+  const annotated = notes.map((n) => ({ ...n, ...noteReuse(states.get(n.url), now) }));
   writeFileSync(CACHE, JSON.stringify({ handle: h, fetchedAt: new Date().toISOString(), notes: annotated }, null, 2));
   return { handle: h, notes: annotated };
 }
@@ -115,7 +107,7 @@ async function listAndIngest(handle: string, limit: number, showAll: boolean): P
   notes.forEach((note, i) => {
     if (!showAll && note.drafted) return;
     const d = note.publishedAt ? note.publishedAt.slice(0, 10) : "????-??-??";
-    const tag = note.drafted ? " [already drafted]" : "";
+    const tag = note.drafted ? ` [${note.draftedTag}]` : "";
     console.log(`${i + 1}. ${d} · eng ${eng(note)} (♥${note.likes} ↻${note.reposts} 💬${note.replies})${tag}`);
     console.log(`   ${note.text.replace(/\s+/g, " ").slice(0, 160)}`);
   });

@@ -216,10 +216,28 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .notepick { display:flex; align-items:flex-start; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line); }
   .notepick:last-child { border-bottom:none; }
   .notepick.drafted { opacity:.5; }
+  .notepick.redraftable { opacity:.85; }
+  .notepick.redraftable .drafted-tag { color:var(--green); }
   .notepick input[type=checkbox] { margin-top:3px; flex:0 0 auto; }
   .notepick .ntext { flex:1; min-width:0; font-size:13.5px; line-height:1.45; }
   .notepick .nmeta { font-size:11.5px; color:var(--muted); margin-bottom:2px; }
   .notepick .nmeta .drafted-tag { color:var(--blue); font-weight:600; }
+  /* Outreach lead cards: why-fit first, JSA logistics as a table, prose collapsed (Muxin,
+     2026-07-16: "a mountain of text with very little signal"). */
+  .kind-badge { font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+    padding:2px 8px; border-radius:5px; background:#e4ecf5; color:#1c4e8a; }
+  .lead-why { margin:6px 0 2px; font-size:14px; line-height:1.5; }
+  .lead-details { margin-top:6px; font-size:13px; }
+  .lead-details summary { cursor:pointer; color:var(--blue); font-size:12.5px; }
+  .lead-details .ntext { margin-top:6px; white-space:pre-wrap; }
+  .jsa-stats { border-collapse:collapse; margin:8px 0; font-size:12.5px; }
+  .jsa-stats th,.jsa-stats td { border:1px solid var(--line); padding:4px 9px; text-align:left; vertical-align:top; }
+  .jsa-stats th { background:#f1ede3; font-weight:600; white-space:nowrap; }
+  .lead-msg { margin-top:10px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
+  .lead-msg textarea.msg-edit { min-height:140px; margin-top:6px; }
+  .lead-notes { margin-top:8px; }
+  .lead-notes .my-notes { white-space:pre-wrap; font-size:13px; color:var(--amber); }
+  .fu-note { font:inherit; font-size:12.5px; padding:5px 9px; border:1px solid var(--line); border-radius:7px; min-width:200px; }
   .notes-actions { display:flex; gap:9px; align-items:center; margin-top:12px; flex-wrap:wrap; }
   .strategy { max-width:820px; margin:0 auto; }
   .strategy-actions { display:flex; gap:9px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
@@ -328,7 +346,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
       <div class="notes-actions">
         <button class="primary" id="notesDraftBtn">Draft selected</button>
-        <span class="hint">Pick the notes worth cross-posting. Draft selected scaffolds a folder per note and runs the normal atomize pipeline (tag, route, draft, validate, queue) — nothing publishes without your review.</span>
+        <span class="hint">Pick the notes worth cross-posting. Draft selected scaffolds a folder per note and runs the normal atomize pipeline (tag, route, draft, validate, queue) — nothing publishes without your review. A note published in the last 30 days stays blocked; a draft you discarded (or published 30+ days ago) is selectable again.</span>
       </div>
     </div>
     <div class="jobs" id="jobs"></div>
@@ -364,13 +382,14 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <h3>Latest strategy brief</h3>
         <span class="grow"></span>
         <span class="src" id="briefPath"></span>
+        <button class="primary" id="briefRefreshBtn" title="Runs the full /strategy skill: grades last cycle's bets, writes a new dated brief, records new bets. Takes minutes.">Refresh brief (runs /strategy)</button>
       </div>
       <div class="md" id="briefBody">Loading…</div>
       <div class="aibox show">
         <input placeholder="tell Claude what to change in the brief…" id="briefAskInput" />
         <button class="send" id="briefAskBtn">Send to Claude</button>
       </div>
-      <span class="hint">Edits land in the brief file itself — /atomize and /strategy already read the latest brief every run, so a change here feeds forward with no extra step.</span>
+      <span class="hint">Edits land in the brief file itself — /atomize and /strategy already read the latest brief every run, so a change here feeds forward with no extra step. Refresh brief runs the REAL /strategy (your subscription, $0): grades bets against fresh data and writes a new dated brief, same as running it in a terminal.</span>
     </div>
     <div class="notes-panel">
       <div class="notes-head">
@@ -385,7 +404,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <section class="view" id="outreachView" hidden>
     <div class="strategy">
       <div class="strategy-actions">
-        <span class="hint">Nothing here contacts anyone. Every source link is clickable; Pursue/Pass just marks your decision. Approve drafts a message for you to edit before it ever sends. Find more via <code>/scout</code> (or <code>/outreach add</code> to seed one by hand).</span>
+        <span class="hint">Nothing here contacts anyone. Every source link is clickable; Pursue/Pass just marks your decision. Approve drafts a message you can edit and revise right here before it's ever sent (by you, by hand). "Scout new leads" (top right) runs the real web-discovery agent and reloads this inbox; <code>/outreach add</code> seeds one by hand.</span>
       </div>
       <div id="outreachList"><div class="empty">Loading…</div></div>
     </div>
@@ -393,7 +412,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <section class="view" id="followupsView" hidden>
     <div class="strategy">
       <div class="strategy-actions">
-        <span class="hint">Tracks state AFTER a message is sent by hand — nothing here contacts anyone. Mark sent, mark responded, draft a follow-up touch (reframes the locked message; still lands pending review), or move on.</span>
+        <span class="hint">Where the data comes from: rows appear once an outreach message is locked (Outreach/Review tab) or an event exists in <code>data/outreach/tracker.jsonl</code> — an append-only log of what YOU record here. Nothing contacts anyone, and nothing knows a message was sent until you click Mark sent (add an optional note, it's kept in the tracker). Mark responded, draft a follow-up touch (reframes the locked message; still lands pending review), or move on.</span>
       </div>
       <div id="followupsNote"></div>
       <div id="followupsList"><div class="empty">Loading…</div></div>
@@ -678,7 +697,7 @@ function render(){
 // Refresh even do?"). It's now tab-aware: doRefresh() below only re-reads whatever the CURRENT tab
 // shows, labeled per tab, with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "ingest";
-function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Refresh leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
+function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Refresh brief + exports" : t==="outreach" ? "Scout new leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
 function setTab(t){
   currentTab = t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
@@ -705,12 +724,15 @@ function markRefreshed(){ lastRefreshedAt = Date.now(); $("#lastRefreshed").text
 // Ingest: the job queue. Review: the full review-queue.md + live-provider rescan (load()) that used
 // to be Refresh's only behavior. Strategy: the brief + raw-exports list (NOT "Generate insights" —
 // that's a real Claude call and stays a deliberate button click, never auto-fired by Refresh).
+// ONE deliberate exception (Muxin, 2026-07-16): on the Outreach tab the button is "Scout new
+// leads" and runs the real /scout web-discovery agent (the old disk-only "Refresh leads" "doesn't
+// seem to do anything" — the tab already reloads itself on every visit anyway).
 async function doRefresh(){
   $("#refresh").disabled = true;
   try {
     if (currentTab === "review") { await load(); await loadJobs(); }
     else if (currentTab === "strategy") { await loadBrief(); await loadRaw(); }
-    else if (currentTab === "outreach") { await loadOutreach(); }
+    else if (currentTab === "outreach") { await scoutRun(); }
     else if (currentTab === "followups") { await loadFollowups(); }
     else { await loadJobs(); }
   } finally {
@@ -783,6 +805,33 @@ async function askBrief(){
   else { $("#briefBody").innerHTML = prevHtml; flash("Revise failed: "+(r.error||"error")); }
 }
 $("#briefAskBtn").addEventListener("click", askBrief);
+
+// "Refresh brief": the FULL /strategy skill as a background job (Muxin, 2026-07-16: the brief
+// never refreshes unless he runs /strategy in a terminal). Same live-elapsed ticker pattern as
+// askInsights — this genuinely takes minutes, so an honest ticking count beats a fake ETA.
+async function refreshBriefRun(){
+  const btn = $("#briefRefreshBtn");
+  btn.disabled = true;
+  const body = $("#briefBody");
+  const prevHtml = body.innerHTML;
+  const start = Date.now();
+  const tick = () => { body.innerHTML = '<p class="thinking">✨ Running the full /strategy skill (grades bets, writes a new dated brief — takes minutes; Add / Queue tab has the log) <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span></p>'; };
+  tick();
+  const timer = setInterval(tick, 1000);
+  loadJobs(); // make the strategy job visible on the Add / Queue tab right away
+  try {
+    const r = await post("/api/strategy/refresh-brief", {});
+    if(r.ok){ flash("Brief refreshed: "+(r.path||"")); await loadBrief(); }
+    else { body.innerHTML = prevHtml; flash(r.error || "Refresh failed — see the job log"); }
+  } catch (e) {
+    body.innerHTML = prevHtml;
+    flash(e instanceof Error ? e.message : String(e));
+  } finally {
+    clearInterval(timer);
+    btn.disabled = false;
+  }
+}
+$("#briefRefreshBtn").addEventListener("click", refreshBriefRun);
 
 // Insights: a Claude-written synthesis (not a raw report dump), plus a follow-up chat thread that
 // can ask Claude to dig into anything — Claude may re-run the reports itself to answer. fmtDays/
@@ -880,7 +929,20 @@ const OUTREACH_STATUS_ORDER = ["pursue","qualified","researched","intake","draft
 // button must disable immediately and a dropped connection must still surface a durable error.
 const outPending = new Set();
 const outError = new Map();
+// In-flight/error state for the inline "Revise with AI" on a lead's drafted message — same
+// module-level pattern (keyed by lead dir) since renderOutreachBox() rebuilds cards wholesale.
+const msgPending = new Set();
+const msgError = new Map();
 let OUTREACH_LEADS = null;
+let scoutInFlight = false;
+
+// What each lead kind IS, said plainly (Muxin, 2026-07-16: "it's not clear from this page whether
+// this is a job, a potential client, a platform to get on").
+const KIND_INFO = {
+  "client": "potential consulting client — pitch a discovery call",
+  "platform": "a stage/audience to get on (podcast, newsletter, community)",
+  "content-example": "raw material for a /derisk writing angle — not an outreach target",
+};
 
 function outreachSourceLinks(evidence){
   const items = (evidence||[]).filter(e => e.source && e.source !== "(none)");
@@ -894,18 +956,29 @@ function outreachSourceLinks(evidence){
   }).join("");
 }
 
+// Card layout (Muxin, 2026-07-16 — "a mountain of text with very little signal"): what this IS
+// (kind badge + plain one-liner), then WHY it fits (pitch angle, upfront), then the JSA logistics
+// as a compact table, cited sources, and the long profile/reasoning prose collapsed behind
+// <details>. Plus his own notes box, and — once a message is drafted — an inline editor with
+// AI revise and plain labels about channel/contact/how sending actually works.
 function outreachLeadCard(l){
   const isContentExample = l.kind === "content-example";
   const field = l.kind === "platform" ? "fit" : "classification";
   const value = l.classificationOrFit || "unclear";
   const badge = isContentExample ? esc(l.status||"intake") : esc(field)+'='+esc(value);
-  // Profile = what this candidate IS; classificationNote = why it's being recommended. Shown
-  // separately (content-example leads happen to write the same text to both, client/platform
-  // leads don't) so Muxin always has "what is this" before "why does it fit."
-  const profile = l.profile ? '<div class="ntext" style="margin-top:6px">'+esc(l.profile)+'</div>' : "";
-  const why = (l.classificationNote && l.classificationNote !== l.profile)
-    ? '<div class="ntext" style="margin-top:6px"><b>Why: </b>'+esc(l.classificationNote)+'</div>' : "";
-  const pitch = l.pitch ? '<div class="src">'+(isContentExample?'angle: ':'pitch: ')+esc(l.pitch)+'</div>' : "";
+  const kindLine = '<span class="kind-badge">'+esc(l.kind)+'</span> '+esc(KIND_INFO[l.kind]||"")+' · '+esc(l.source)+' · '+badge;
+  // WHY first: the frontmatter pitch_angle (one decided sentence) beats dumping the whole
+  // classification argument. The full reasoning + profile prose stay one click away.
+  const whyText = l.pitchAngle || l.pitch;
+  const why = whyText ? '<div class="lead-why"><b>'+(isContentExample?'Angle: ':'Why this fits: ')+'</b>'+esc(whyText)+'</div>' : "";
+  const whyDetails = (l.classificationNote && l.classificationNote !== whyText)
+    ? '<details class="lead-details"><summary>Full why-fit reasoning</summary><div class="ntext">'+esc(l.classificationNote)+'</div></details>' : "";
+  const stats = (l.jsaStats && l.jsaStats.length)
+    ? '<table class="jsa-stats">'+l.jsaStats.map(s=>'<tr><th>'+esc(s.label)+'</th><td>'+esc(s.value)+'</td></tr>').join("")+'</table>'
+    : "";
+  const profileText = (l.profileRest !== undefined ? l.profileRest : l.profile);
+  const profile = profileText
+    ? '<details class="lead-details"><summary>Full profile</summary><div class="ntext">'+esc(profileText)+'</div></details>' : "";
   const sources = outreachSourceLinks(l.evidence);
   const pending = outPending.has(l.dir);
   const err = outError.get(l.dir);
@@ -918,15 +991,45 @@ function outreachLeadCard(l){
     : "";
   const pursueBtn = '<button class="out-pursue" data-dir="'+esc(l.dir)+'"'+(decided?" disabled":"")+'>Pursue</button>';
   const passBtn = '<button class="out-pass" data-dir="'+esc(l.dir)+'"'+(decided?" disabled":"")+'>Pass</button>';
+  // Muxin's own notes on the lead — what stood out, why he's interested — so the "oh yeah, THAT's
+  // why" survives between sessions. Saved dated into lead.md's ## Muxin notes.
+  const notesBox = '<div class="lead-notes">'+
+      (l.muxinNotes ? '<div class="my-notes">'+esc(l.muxinNotes)+'</div>' : "")+
+      '<div class="aibox show"><input class="lead-note-input" placeholder="your note on this lead (what stood out, why interested)…" /><button class="lead-note-save" data-dir="'+esc(l.dir)+'">Save note</button></div>'+
+    '</div>';
+  const msgBox = outreachMessageBox(l);
   return '<div class="notepick"><div class="ntext">'+
-      '<div class="nmeta">'+esc(l.kind)+' · '+esc(l.source)+' · '+badge+'</div>'+
+      '<div class="nmeta">'+kindLine+'</div>'+
       '<b>'+esc(l.name)+'</b>'+
       (l.url ? '<div class="src"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>' : "")+
-      profile+why+pitch+sources+status+
+      why+stats+sources+whyDetails+profile+status+msgBox+notesBox+
       '<div class="src">'+esc(l.dir)+'</div>'+
     '</div>'+
     '<div class="actions">'+draftBtn+pursueBtn+passBtn+'</div>'+
   '</div>';
+}
+
+// The inline drafted-message box: editable while draft/approved, read-only once locked, with the
+// honest mechanics spelled out (channel, no stored contact info, nothing sends itself).
+function outreachMessageBox(l){
+  const msg = l.latestMessage;
+  if(!msg) return "";
+  const honesty = '<div class="src">Channel: '+esc(msg.channel||"?")+' (picked at draft time). No contact info is stored — research keeps public pages only; find the address via the source links above. Nothing sends automatically: Approve on the Review tab locks the text, you send it yourself, then Mark sent on Follow-ups.</div>';
+  if(msg.status === "locked"){
+    return '<div class="lead-msg"><div class="nmeta">message · '+esc(msg.file)+' · locked</div>'+
+      '<div class="body">'+esc(msg.body)+'</div>'+honesty+'</div>';
+  }
+  const revPending = msgPending.has(l.dir);
+  const revErr = msgError.get(l.dir);
+  return '<div class="lead-msg"><div class="nmeta">drafted message · '+esc(msg.file)+' · '+esc(msg.status)+'</div>'+
+    '<textarea class="msg-edit">'+esc(msg.body)+'</textarea>'+
+    '<div class="actions"><button class="msg-save" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Save edits</button></div>'+
+    '<div class="aibox show">'+
+      (revPending
+        ? '<div class="thinking">✨ Claude is revising the message… (your subscription, ~10-30s)</div>'
+        : '<input class="msg-revise-input" placeholder="tell Claude what to change in the message…" /><button class="send msg-revise" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Revise with AI</button>'+
+          (revErr ? '<div class="aierr">⚠ '+esc(revErr)+'</div>' : ""))+
+    '</div>'+honesty+'</div>';
 }
 
 function renderOutreachBox(){
@@ -955,6 +1058,76 @@ function renderOutreachBox(){
   box.querySelectorAll("button.out-draft").forEach(b=>b.addEventListener("click", ()=>outreachDraft(b.dataset.dir)));
   box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
   box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
+  box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
+  box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
+  box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>outreachMsgRevise(b)));
+}
+
+async function outreachSaveNote(b){
+  const inp = b.closest(".lead-notes").querySelector(".lead-note-input");
+  const note = inp ? inp.value.trim() : "";
+  if(!note){ flash("Type a note first"); return; }
+  b.disabled = true;
+  const r = await post("/api/outreach/note", {dir: b.dataset.dir, note});
+  if(r.ok){ flash("Note saved to lead.md"); await loadOutreach(); }
+  else { b.disabled = false; flash(r.error || "Failed to save note"); }
+}
+
+async function outreachMsgSave(b){
+  const ta = b.closest(".lead-msg").querySelector(".msg-edit");
+  const body = ta ? ta.value : "";
+  if(!body.trim()){ flash("Message body can't be empty"); return; }
+  b.disabled = true;
+  const r = await post("/api/outreach/message/save", {dir: b.dataset.dir, file: b.dataset.file, body});
+  if(r.ok){ flash("Saved"); await loadOutreach(); }
+  else { b.disabled = false; flash(r.error || "Failed to save"); }
+}
+
+async function outreachMsgRevise(b){
+  const dir = b.dataset.dir, file = b.dataset.file;
+  if(msgPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn
+  const inp = b.closest(".aibox").querySelector(".msg-revise-input");
+  const instruction = inp ? inp.value.trim() : "";
+  if(!instruction){ flash("Type what you want changed first"); return; }
+  msgError.delete(dir);
+  msgPending.add(dir); renderOutreachBox(); // thinking indicator survives any background rerender
+  try {
+    const r = await post("/api/outreach/message/revise", {dir, file, instruction});
+    if(r.ok){ flash("Message revised by Claude"); await loadOutreach(); }
+    else { msgError.set(dir, r.error || "Failed to revise"); }
+  } catch (e) {
+    msgError.set(dir, e instanceof Error ? e.message : String(e));
+  } finally {
+    msgPending.delete(dir); renderOutreachBox();
+  }
+}
+
+// "Scout new leads": the header button on this tab. A real /scout web-discovery run (minutes) —
+// live elapsed banner at the top of the inbox, then a reload of whatever it found.
+async function scoutRun(){
+  if(scoutInFlight) return;
+  scoutInFlight = true;
+  const box = $("#outreachList");
+  const banner = document.createElement("div");
+  banner.className = "hint";
+  banner.style.padding = "10px 4px";
+  const start = Date.now();
+  const tick = () => { banner.textContent = "✨ Scouting the web for new client/platform leads… (bounded searches on your subscription, takes minutes — Add / Queue tab has the log) · "+fmtElapsed(Date.now()-start)+" elapsed"; };
+  tick();
+  const timer = setInterval(tick, 1000);
+  box.prepend(banner);
+  loadJobs(); // make the scout job visible on the Add / Queue tab right away
+  try {
+    const r = await post("/api/outreach/scout", {});
+    if(r.ok){ flash("Scout finished — inbox reloaded"); }
+    else flash(r.error || "Scout failed — see the job log");
+  } catch (e) {
+    flash(e instanceof Error ? e.message : String(e));
+  } finally {
+    clearInterval(timer);
+    scoutInFlight = false;
+    await loadOutreach();
+  }
 }
 
 async function loadOutreach(){
@@ -976,7 +1149,11 @@ let cutCommentTarget = null; // {slug, lens} for the currently-open comment form
 function cutColumnEl(slug, cut){
   const col = document.createElement("div"); col.className = "cut-column";
   const unresolvedLines = new Set(cut.comments.filter(c=>!c.resolved).map(c=>c.line));
-  const lines = cut.body.split("\n").map((line, i) => {
+  // NB: double-escaped newline — this whole client script lives inside renderPage()'s template
+  // literal, so a single-backslash escape here is emitted as a REAL newline inside the string
+  // and breaks the entire script at parse time (shipped broken in #244 — the GUI's JS didn't
+  // parse at all).
+  const lines = cut.body.split("\\n").map((line, i) => {
     const n = i + 1;
     const cls = "cut-line" + (unresolvedLines.has(n) ? " has-comment" : "");
     return '<div class="'+cls+'" data-line="'+n+'">'+(esc(line) || "&nbsp;")+'</div>';
@@ -1096,10 +1273,14 @@ function followupRowHtml(row){
   const status = pending
     ? '<div class="hint">drafting… (your subscription, ~30-60s — Add / Queue tab has progress + log)</div>'
     : err ? '<div class="src">'+esc(err)+' — see Add / Queue tab for the job log</div>' : "";
+  // Optional note per action (kept in tracker.jsonl's own note field — the server side already
+  // accepted one, the GUI just never sent it): "sent via their contact form", "replied on LinkedIn".
+  const noteInput = disabled ? "" : '<input class="fu-note" placeholder="optional note (saved to the tracker)…" />';
   return '<div class="notepick">'+
       '<div class="ntext"><div class="nmeta">last touch '+followupTouchLabel(row.lastTouch)+' · '+esc(row.nextAction)+'</div>'+
       '<b>'+esc(row.who)+'</b>'+why+status+'</div>'+
       '<div class="actions">'+
+        noteInput+
         '<button class="fu-contacted" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark sent</button>'+
         '<button class="fu-responded" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark responded</button>'+
         draftBtn+
@@ -1123,9 +1304,10 @@ function renderFollowupsBox(){
     sec.innerHTML = '<div class="notes-head"><h3>'+esc(label)+' ('+rows.length+')</h3></div><div class="notelist">'+inner+'</div>';
     box.appendChild(sec);
   }
-  box.querySelectorAll("button.fu-contacted").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-contacted", b.dataset.bucket, b.dataset.lead)));
-  box.querySelectorAll("button.fu-responded").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-responded", b.dataset.bucket, b.dataset.lead)));
-  box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", b.dataset.bucket, b.dataset.lead)));
+  const rowNote = (b) => { const inp = b.closest(".actions").querySelector(".fu-note"); return inp ? inp.value.trim() : ""; };
+  box.querySelectorAll("button.fu-contacted").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-contacted", b.dataset.bucket, b.dataset.lead, rowNote(b))));
+  box.querySelectorAll("button.fu-responded").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-responded", b.dataset.bucket, b.dataset.lead, rowNote(b))));
+  box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", b.dataset.bucket, b.dataset.lead, rowNote(b))));
   box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>followupDraft(b.dataset.dir)));
 }
 async function loadFollowups(){
@@ -1137,8 +1319,8 @@ async function loadFollowups(){
   FOLLOWUPS_DATA = d;
   renderFollowupsBox();
 }
-async function followupAction(action, bucket, lead){
-  const r = await post("/api/followups/"+action, {bucket, lead});
+async function followupAction(action, bucket, lead, note){
+  const r = await post("/api/followups/"+action, note ? {bucket, lead, note} : {bucket, lead});
   if(r.ok){ flash(action==="mark-responded" ? "Marked responded" : action==="mark-contacted" ? "Marked sent" : "Moved on"); loadFollowups(); }
   else flash(r.error || "Failed");
 }
@@ -1224,9 +1406,16 @@ async function addSource(){
 // ── Substack Notes checklist (manual pick, replaces the old one-click "Pull Substack Notes") ──
 let NOTES = [];
 let notesShowDrafted = false;
+// Selections keyed by the note's stable cache idx, NOT the DOM — renderNotes() rebuilds the list
+// wholesale (e.g. toggling "show already drafted"), which used to silently wipe every ticked
+// checkbox (Muxin, 2026-07-16). A selection survives being filtered out of view; Draft selected
+// drafts everything in this set.
+const selectedNoteIdxs = new Set();
 function noteMeta(n){
   const d = n.publishedAt ? n.publishedAt.slice(0,10) : "????-??-??";
-  const tag = n.drafted ? ' <span class="drafted-tag">already drafted</span>' : "";
+  // draftedTag ("in review now" / "published Nd ago" / "drafted before, discarded") comes from the
+  // server's note-reuse rule — never recomputed client-side.
+  const tag = n.drafted ? ' <span class="drafted-tag">'+esc(n.draftedTag||"already drafted")+'</span>' : "";
   return d+' · eng '+n.eng+' (♥'+n.likes+' ↻'+n.reposts+' 💬'+n.replies+')'+tag;
 }
 function renderNotes(){
@@ -1235,9 +1424,12 @@ function renderNotes(){
   if(!visible.length){ box.innerHTML = '<div class="empty">'+(NOTES.length? "All notes are already drafted." : "No notes found.")+'</div>'; return; }
   box.innerHTML = "";
   for(const n of visible){
+    // Blocked = drafted and not reusable (still in review, or published inside the 30-day
+    // cooldown). A discarded or long-ago-published note is selectable again, just labeled.
+    const blocked = n.drafted && !n.reusable;
     const el = document.createElement("label");
-    el.className = "notepick" + (n.drafted ? " drafted" : "");
-    el.innerHTML = '<input type="checkbox" data-idx="'+n.idx+'" '+(n.drafted?"disabled":"")+'>'+
+    el.className = "notepick" + (blocked ? " drafted" : n.drafted ? " redraftable" : "");
+    el.innerHTML = '<input type="checkbox" data-idx="'+n.idx+'" '+(blocked?"disabled":"")+(selectedNoteIdxs.has(n.idx)?" checked":"")+'>'+
       '<div class="ntext"><div class="nmeta">'+noteMeta(n)+'</div>'+esc(n.text.replace(/\\s+/g," ").slice(0,220))+'</div>';
     box.appendChild(el);
   }
@@ -1249,20 +1441,29 @@ async function openNotes(){
   const data = await r.json();
   if(!data.ok){ $("#notesList").innerHTML = '<div class="empty">'+esc(data.error||"Failed to load notes")+'</div>'; return; }
   NOTES = data.notes;
+  selectedNoteIdxs.clear(); // fresh fetch = fresh cache indices; stale selections must not map onto new notes
   renderNotes();
 }
 async function draftSelectedNotes(){
-  const indices = [...document.querySelectorAll('#notesList input[type=checkbox]:checked')].map(cb=>Number(cb.dataset.idx));
+  const indices = [...selectedNoteIdxs].sort((a,b)=>a-b);
   if(!indices.length){ flash("Pick at least one note"); return; }
   $("#notesDraftBtn").disabled = true;
   const r = await post("/api/notes/pick",{indices});
   $("#notesDraftBtn").disabled = false;
   if(r.ok){
     flash(r.jobs.length+" note(s) queued");
+    selectedNoteIdxs.clear();
     $("#notesPanel").hidden = true;
     loadJobs();
   } else flash(r.error || "Failed");
 }
+// Delegated so it survives every renderNotes() rebuild — the checkboxes themselves are recreated.
+$("#notesList").addEventListener("change",(e)=>{
+  const cb = e.target;
+  if(!cb || cb.type !== "checkbox" || cb.dataset.idx === undefined) return;
+  const idx = Number(cb.dataset.idx);
+  if(cb.checked) selectedNoteIdxs.add(idx); else selectedNoteIdxs.delete(idx);
+});
 $("#addBtn").addEventListener("click", addSource);
 $("#notesBtn").addEventListener("click", openNotes);
 $("#notesCloseBtn").addEventListener("click", ()=>{ $("#notesPanel").hidden = true; });

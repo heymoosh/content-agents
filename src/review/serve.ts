@@ -68,9 +68,11 @@ import {
   revisePrompt,
   reviseDerivative,
   reviseBrief,
+  reviseOutreachMessage,
   duplicateToPlatform,
   runQueued,
   runClaudeSpawn,
+  runCommandSpawn,
   decodeSpawnFailure,
   enqueueFollowUpDraft,
 } from "./jobs.js";
@@ -220,6 +222,13 @@ const execFileP = promisify(execFile);
 const BRIEFS_DIR = join(repoRoot, "briefs");
 const STRATEGY_TIMEOUT_MS = 90_000;
 const INSIGHTS_ASK_TIMEOUT_MS = 180_000; // a deep-dive answer may itself run 1-2 of the reports below
+// A FULL /strategy run (grade bets → reports → Claude-written brief → new bets) — minutes, not
+// seconds. Same order of magnitude as an atomize job, doubled: /strategy runs ~8 report scripts
+// plus a long synthesis pass.
+const STRATEGY_RUN_TIMEOUT_MS = 30 * 60_000;
+// `npm run scout` runs up to 3 bounded `claude -p` web-search calls (one per kind) — see
+// src/discovery/discover.ts. Its own per-call timeout governs each; this bounds the whole run.
+const SCOUT_TIMEOUT_MS = 30 * 60_000;
 
 // Allowlisted, read-only, no-arg report commands only — used server-side to build the insights
 // synthesis, never exposed directly by cmd string from the client (no argv injection surface).
@@ -483,6 +492,53 @@ async function askInsights(question: string, history: { role: string; content: s
   });
 }
 
+// "Refresh brief": run the REAL /strategy skill headlessly (same claude -p slash-command dispatch
+// the atomize/video jobs use — the brief is Claude-authored by the skill's own multi-step judgment,
+// there is no deterministic brief generator to call instead). It grades last cycle's bets, writes a
+// new dated briefs/YYYY-MM-DD-strategy-brief.md, and appends new bets to briefs/bets.md — exactly
+// what a terminal /strategy run does (Muxin's pick, 2026-07-16: the full run, not a brief-only
+// synthesis). Verified by artifact like every atomize-family job: a new-or-updated brief file must
+// actually exist afterward, or the job fails with the log tail.
+async function refreshBrief(): Promise<{ path: string }> {
+  const before = latestBriefPath();
+  const beforeMtime = before && existsSync(before) ? statSync(before).mtimeMs : 0;
+  return runQueued("strategy", "Refresh strategy brief (/strategy)", async (job) => {
+    const result = await runClaudeSpawn(job, "/strategy", { timeoutMs: STRATEGY_RUN_TIMEOUT_MS });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "/strategy", timeoutLabel: `${STRATEGY_RUN_TIMEOUT_MS / 60_000} min`,
+      exitVerb: "/strategy", includeTailOnTimeout: true,
+    });
+    if (failure) throw new Error(failure);
+    const after = latestBriefPath();
+    const changed = after && (after !== before || statSync(after).mtimeMs > beforeMtime);
+    if (!after || !changed) {
+      throw new Error("/strategy ran but no new or updated brief landed in briefs/ — check the job log");
+    }
+    return { path: after.slice(repoRoot.length + 1) };
+  });
+}
+
+// "Scout new leads": run the real web-discovery agent (`npm run scout` → src/discovery/discover.ts,
+// which spawns its own bounded claude -p web searches and writes qualified candidates into
+// outreach/leads/ — see .claude/skills/scout/SKILL.md). Discovery only: nothing here contacts
+// anyone or drafts a message; new leads land status researched/intake for Muxin to Pursue/Pass.
+async function runScout(): Promise<void> {
+  await runQueued("scout", "Scout new leads (npm run scout)", async (job) => {
+    const result = await runCommandSpawn(job, "npm", ["run", "scout"], { timeoutMs: SCOUT_TIMEOUT_MS });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: "scout", timeoutLabel: `${SCOUT_TIMEOUT_MS / 60_000} min`,
+      exitVerb: "scout", includeTailOnTimeout: true, command: "npm",
+    });
+    if (failure) throw new Error(failure);
+  });
+}
+
+// True while a job of `kind` is queued or running — backs the 409 guard on the two long-running
+// single-flight actions above (a second click must not stack a second 30-min run).
+function jobInFlight(kind: "strategy" | "scout"): boolean {
+  return jobs.some((j) => j.kind === kind && (j.status === "queued" || j.status === "running"));
+}
+
 // ── Raw downloaded exports (data/inbox = not-yet-ingested, data/processed = archived after
 // ingest) — the actual CSV/JSON/XLSX files pulled from each platform, for Muxin to open and read
 // himself rather than trusting only the computed reports above.
@@ -525,6 +581,41 @@ export function isSafeRawPath(relPath: string): boolean {
 // posture as rows.ts's safeFolder() explicitly rejecting "..".
 export function isValidLeadDir(dir: string): boolean {
   return /^outreach\/leads\/[A-Za-z0-9][\w.-]*$/.test(dir);
+}
+
+// The Outreach tab's inline draft editor may only touch a lead's own messages/message-NN.md —
+// same allowlist posture as isValidLeadDir above (no "..", no absolute paths, no other files).
+export function isValidMessageFile(file: string): boolean {
+  return /^messages\/message-\d+\.md$/.test(file);
+}
+
+// Pure, exported for unit testing: append one dated note line under a lead.md's `## Muxin notes`
+// section, creating the section (before `## Decision log` when present, else at the end) if it
+// doesn't exist yet. Muxin's own memory-jogger per lead ("what I liked, what stood out") — plain
+// human text in the lead file itself, so it survives any GUI and travels with the lead.
+export function appendLeadNote(raw: string, note: string, date: string): string {
+  const { header, body } = splitFrontmatter(raw);
+  const line = `- ${date}: ${note}`;
+  const lines = body.replace(/\n+$/, "").split("\n");
+  const sectionAt = lines.findIndex((l) => l.trim() === "## Muxin notes");
+  if (sectionAt !== -1) {
+    let end = lines.length;
+    for (let i = sectionAt + 1; i < lines.length; i++) {
+      if (/^##\s+/.test(lines[i])) {
+        end = i;
+        break;
+      }
+    }
+    // Insert at the section's end, before any trailing blank line that separates the next section.
+    while (end > sectionAt + 1 && lines[end - 1].trim() === "") end--;
+    lines.splice(end, 0, line);
+  } else {
+    const decisionAt = lines.findIndex((l) => l.trim() === "## Decision log");
+    const section = ["## Muxin notes", "", line, ""];
+    if (decisionAt === -1) lines.push("", ...section.slice(0, 3));
+    else lines.splice(decisionAt, 0, ...section);
+  }
+  return `${header}\n${lines.join("\n").replace(/\n+$/, "")}\n`;
 }
 
 function serveRawFile(res: ServerResponse, relPath: string): void {
@@ -896,6 +987,8 @@ const server = createServer(async (req, res) => {
           replies: n.replies,
           eng: n.likes + n.replies * 3 + n.reposts * 2,
           drafted: n.drafted,
+          reusable: n.reusable,
+          draftedTag: n.draftedTag,
         })),
       });
       return;
@@ -952,6 +1045,23 @@ const server = createServer(async (req, res) => {
       try {
         const { path, content } = await reviseBrief(String(b.instruction ?? ""));
         json(res, 200, { ok: true, path, content });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Refresh brief": kicks a FULL /strategy run (grades bets, writes a new dated brief + bets —
+    // Muxin's pick over a brief-only synthesis). Single-flight: 409 while one is already going.
+    // The response resolves only when the run finishes (same long-await contract as /api/strategy/
+    // pull-style jobs); progress is visible via /api/jobs + the job log meanwhile.
+    if (req.method === "POST" && url.pathname === "/api/strategy/refresh-brief") {
+      if (jobInFlight("strategy")) {
+        json(res, 409, { ok: false, error: "a /strategy run is already in progress — see the Add / Queue tab" });
+        return;
+      }
+      try {
+        const { path } = await refreshBrief();
+        json(res, 200, { ok: true, path });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
@@ -1020,6 +1130,89 @@ const server = createServer(async (req, res) => {
         const newBody = `${body.replace(/\n+$/, "")}\n- ${date}: Muxin decided ${decision} (manual, review GUI)\n`;
         writeFileSync(leadPath, `${newHeader}\n${newBody}`);
         json(res, 200, { ok: true, dir, status });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Scout new leads" (Muxin, 2026-07-16: the old "Refresh leads" only re-read disk and "doesn't
+    // seem to do anything") — runs the real /scout web-discovery agent as a background job, then
+    // the client reloads the inbox. Single-flight like refresh-brief. Discovery only (rule: no
+    // send path); found leads land researched/intake awaiting Pursue/Pass.
+    if (req.method === "POST" && url.pathname === "/api/outreach/scout") {
+      if (jobInFlight("scout")) {
+        json(res, 409, { ok: false, error: "a scout run is already in progress — see the Add / Queue tab" });
+        return;
+      }
+      try {
+        await runScout();
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // Muxin's own free-text note on a lead ("what I liked, what stood out") — appended dated under
+    // lead.md's ## Muxin notes so it travels with the lead file, same write posture as decide above.
+    if (req.method === "POST" && url.pathname === "/api/outreach/note") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      const note = String(b.note ?? "").trim();
+      if (!isValidLeadDir(dir) || !note) {
+        json(res, 400, { ok: false, error: "dir must be a valid lead folder and note must be non-empty" });
+        return;
+      }
+      try {
+        const leadPath = join(repoRoot, dir, "lead.md");
+        const raw = readFileSync(leadPath, "utf8");
+        writeFileSync(leadPath, appendLeadNote(raw, note, new Date().toISOString().slice(0, 10)));
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // Inline manual edit of a lead's drafted message (Outreach tab). Body-only: frontmatter is
+    // preserved verbatim; a locked message is refused (locked = Muxin's final, approved text).
+    // Nothing here sends anything — the edited draft still goes through Review-tab lock + a
+    // by-hand send (CLAUDE.md rule 2 analog).
+    if (req.method === "POST" && url.pathname === "/api/outreach/message/save") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      const file = String(b.file ?? "");
+      const newBody = String(b.body ?? "");
+      if (!isValidLeadDir(dir) || !isValidMessageFile(file) || !newBody.trim()) {
+        json(res, 400, { ok: false, error: "need a valid lead folder, a messages/message-NN.md file, and non-empty body" });
+        return;
+      }
+      try {
+        const abs = join(repoRoot, dir, file);
+        const { header, fm } = splitFrontmatter(readFileSync(abs, "utf8"));
+        if (String(fm.status ?? "").trim() === "locked") {
+          json(res, 200, { ok: false, error: "this message is locked — use Draft follow-up for a new touch instead" });
+          return;
+        }
+        // `header` keeps its own trailing newline (splitFrontmatter's byte-exact block).
+        writeFileSync(abs, `${header}\n${newBody.trim()}\n`);
+        json(res, 200, { ok: true, body: newBody.trim() });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Revise with AI" on a drafted outreach message — same headless-Claude single-file revise
+    // pattern as a derivative/brief (reviseOutreachMessage in jobs.ts, routed through the one queue).
+    if (req.method === "POST" && url.pathname === "/api/outreach/message/revise") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      const file = String(b.file ?? "");
+      if (!isValidLeadDir(dir) || !isValidMessageFile(file)) {
+        json(res, 400, { ok: false, error: "need a valid lead folder and a messages/message-NN.md file" });
+        return;
+      }
+      try {
+        const { body } = await reviseOutreachMessage(dir, file, String(b.instruction ?? ""));
+        json(res, 200, { ok: true, body });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }

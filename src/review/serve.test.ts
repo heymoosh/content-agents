@@ -9,6 +9,8 @@ import {
   sourceDispatch,
   isSafeRawPath,
   isValidLeadDir,
+  isValidMessageFile,
+  appendLeadNote,
   approveBlockReason,
   replyToMentionBlockReason,
   scheduleKind,
@@ -570,4 +572,65 @@ test("extractSection: header match is case-insensitive but the exact header text
   const md = "## directives for atomization\nsome directive\n";
   assert.match(extractSection(md, "Directives for atomization") ?? "", /some directive/);
   assert.equal(extractSection(md, "Last cycle scorecard"), null);
+});
+
+// ── isValidMessageFile — the Outreach tab's inline draft editor may only touch a lead's own
+// messages/message-NN.md, same allowlist posture as isValidLeadDir.
+
+test("isValidMessageFile accepts only the messages/message-NN.md shape", () => {
+  assert.equal(isValidMessageFile("messages/message-01.md"), true);
+  assert.equal(isValidMessageFile("messages/message-12.md"), true);
+  assert.equal(isValidMessageFile("messages/../lead.md"), false);
+  assert.equal(isValidMessageFile("/etc/passwd"), false);
+  assert.equal(isValidMessageFile("lead.md"), false);
+  assert.equal(isValidMessageFile("messages/message-.md"), false);
+  assert.equal(isValidMessageFile(""), false);
+});
+
+// ── appendLeadNote — Muxin's per-lead notes ("what stood out, why interested"), appended dated
+// under lead.md's ## Muxin notes so the memory-jogger travels with the lead file itself.
+
+const LEAD_RAW = [
+  "---",
+  "kind: client",
+  'name: "Acme Co"',
+  "---",
+  "",
+  "## Profile",
+  "",
+  "Acme makes widgets.",
+  "",
+  "## Decision log",
+  "",
+  "- 2026-07-10: intake",
+  "",
+].join("\n");
+
+test("appendLeadNote creates ## Muxin notes before ## Decision log when the section is missing", () => {
+  const out = appendLeadNote(LEAD_RAW, "loved the founder's blog voice", "2026-07-16");
+  const notesAt = out.indexOf("## Muxin notes");
+  const decisionAt = out.indexOf("## Decision log");
+  assert.ok(notesAt !== -1 && decisionAt !== -1 && notesAt < decisionAt, "notes section lands before the decision log");
+  assert.match(out, /- 2026-07-16: loved the founder's blog voice/);
+  assert.match(out, /^---\n/, "frontmatter block survives");
+  assert.match(out, /Acme makes widgets\./, "profile body survives");
+});
+
+test("appendLeadNote appends into an existing ## Muxin notes section, keeping order", () => {
+  const withSection = appendLeadNote(LEAD_RAW, "first note", "2026-07-16");
+  const out = appendLeadNote(withSection, "second note", "2026-07-17");
+  const first = out.indexOf("first note");
+  const second = out.indexOf("second note");
+  const decisionAt = out.indexOf("## Decision log");
+  assert.ok(first !== -1 && second !== -1 && first < second, "notes accumulate in order");
+  assert.ok(second < decisionAt, "new note stays inside the notes section, not after the decision log");
+  assert.equal(out.match(/## Muxin notes/g)?.length, 1, "no duplicate section");
+});
+
+test("appendLeadNote appends the section at the end when there is no ## Decision log", () => {
+  const raw = "---\nkind: client\n---\n\n## Profile\n\nAcme.\n";
+  const out = appendLeadNote(raw, "note", "2026-07-16");
+  assert.match(out, /## Muxin notes/);
+  assert.ok(out.indexOf("## Muxin notes") > out.indexOf("## Profile"));
+  assert.match(out, /- 2026-07-16: note/);
 });
