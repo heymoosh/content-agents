@@ -17,7 +17,8 @@ import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { resolveAngle } from "../atomize/spin.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { CONTENT, safeFolder } from "./rows.js";
+import { CONTENT, safeFolder, isValidLens } from "./rows.js";
+import { roundCount } from "./develop.js";
 import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { runDraft, draftModel, type DraftResult } from "../outreach/draft.js";
 
@@ -228,8 +229,12 @@ type JobStatus = "queued" | "running" | "done" | "failed";
 // the Follow-ups tab's "Draft follow-up", the Analytics tab's "Pull fresh now" (runCommandSpawn,
 // not a claude spawn) and "Refresh brief" (a full /strategy run), and the Outreach tab's "Scout
 // new leads" (npm run scout). All families share the same queue/mutex/log/heartbeat.
+// "develop" | "develop-reply" are the Develop tab's advisor rounds — same slash-command-dispatch
+// shape as the atomize family (`/develop <arg>`), verified by their own artifact check (a new
+// parseable round in develop/advice.json — see runDevelopJob below).
 export type JobKind =
   | "url" | "file" | "text" | "notes" | "continue" | "video"
+  | "develop" | "develop-reply"
   | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up"
   | "pull" | "strategy" | "scout";
 interface Job {
@@ -529,28 +534,33 @@ function listSlugs(): string[] {
 // dispatches `/video <arg>` instead. Both are verified by artifact (not exit code) in drain() below.
 type AtomizeFamilyKind = "url" | "file" | "text" | "notes" | "continue" | "video";
 
+// Copy a pasted-text or file source into .inbox under a stable, space-free name so the skill's
+// `npm run new-content -- <arg>` never trips over spaces in an Obsidian path. Shared by addJob
+// (atomize family) and addDevelopJob — the same door, two destinations.
+function materializeInboxArg(kind: "text" | "file", rawArg: string, id: string, rawText?: string): string {
+  mkdirSync(INBOX, { recursive: true });
+  if (kind === "text") {
+    const arg = join(INBOX, `${id}.md`);
+    writeFileSync(arg, (rawText ?? "").trim() + "\n");
+    return arg;
+  }
+  const content = readFileSync(rawArg, "utf8");
+  const stem = basename(rawArg).replace(/\.[^.]+$/, "");
+  const safe = stem.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "note";
+  const arg = join(INBOX, `${safe}-${id}.md`);
+  // Keep the note's title: if it has no heading, seed one from the filename so the skill doesn't
+  // fall back to the safe filename.
+  writeFileSync(arg, (/^#\s+/m.test(content) ? "" : `# ${stem}\n\n`) + content);
+  return arg;
+}
+
 // Materialize a source into a stable, space-free arg for /atomize, then queue it. Pasted text and
-// file sources are copied into .inbox (space-free names) so the skill's `npm run new-content -- <arg>`
-// never trips over spaces in an Obsidian path; urls and "notes" pass straight through. "video" jobs
-// pass their content-folder path straight through too (see addVideoJob) — no materialization needed.
+// file sources are copied into .inbox (space-free names) via materializeInboxArg; urls and "notes"
+// pass straight through. "video" jobs pass their content-folder path straight through too (see
+// addVideoJob) — no materialization needed.
 export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, rawText?: string): Job {
   const id = nextJobId();
-  let arg = rawArg;
-  if (kind === "text" || kind === "file") {
-    mkdirSync(INBOX, { recursive: true });
-    if (kind === "text") {
-      arg = join(INBOX, `${id}.md`);
-      writeFileSync(arg, (rawText ?? "").trim() + "\n");
-    } else {
-      const content = readFileSync(rawArg, "utf8");
-      const stem = basename(rawArg).replace(/\.[^.]+$/, "");
-      const safe = stem.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "note";
-      arg = join(INBOX, `${safe}-${id}.md`);
-      // Keep the note's title: if it has no heading, seed one from the filename so /atomize doesn't
-      // fall back to the safe filename.
-      writeFileSync(arg, (/^#\s+/m.test(content) ? "" : `# ${stem}\n\n`) + content);
-    }
-  }
+  const arg = kind === "text" || kind === "file" ? materializeInboxArg(kind, rawArg, id, rawText) : rawArg;
   const job: Job = {
     id, kind, label, arg, status: "queued", slugs: [], error: null,
     createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
@@ -569,6 +579,97 @@ export function addVideoJob(slug: string): Job {
   const existing = jobs.find((j) => j.kind === "video" && j.arg === arg && (j.status === "queued" || j.status === "running"));
   if (existing) return existing;
   return addJob("video", arg, `Generate storyboard: ${slug}`);
+}
+
+// ── Develop tab: the advisor stage ──────────────────────────────────────────────────────────────
+// `/develop <arg>` runs the advisor skill headlessly: it reads the source, runs the checks (brand
+// angles, CTA sense-check, platform spin fit, routing preview) and appends a recommendation round
+// to develop/advice.json + develop/log.md. It NEVER drafts a cut or a derivative — accept/dismiss
+// are deterministic server-side actions (src/review/develop.ts), and formatting is a separate
+// explicit "Format for platforms" click. Same queue, same artifact-verified contract.
+
+// True while a develop/develop-reply job for this content folder is queued or running — the
+// /api/develop/reply route refuses a second concurrent round for the same folder (409-style).
+export function developJobInFlight(slug: string): boolean {
+  const arg = join("content", slug);
+  return jobs.some(
+    (j) => (j.kind === "develop" || j.kind === "develop-reply") && j.arg === arg && (j.status === "queued" || j.status === "running"),
+  );
+}
+
+// Start an advisor round. `source` uses the same classify/materialize door as /api/atomize (url /
+// file / pasted text); an existing folder comes in as `{ slug }` instead. Reply rounds are
+// enqueued by addDevelopReplyJob AFTER serve.ts persisted the reply to develop/log.md — the spawn
+// argv stays a fixed `/develop content/<slug>`, no free text in it.
+export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, rawText?: string): Job {
+  const id = nextJobId();
+  const arg = kind === "url" ? rawArg : materializeInboxArg(kind, rawArg, id, rawText);
+  const job: Job = {
+    id, kind: "develop", label: `Develop: ${label}`, arg, status: "queued", slugs: [], error: null,
+    createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
+  };
+  jobs.push(job);
+  void drain();
+  return job;
+}
+
+export function addDevelopFolderJob(slug: string, kind: "develop" | "develop-reply" = "develop"): Job {
+  safeFolder(slug); // throws "no such queue" if slug isn't a real content folder
+  const arg = join("content", slug);
+  const existing = jobs.find(
+    (j) => (j.kind === "develop" || j.kind === "develop-reply") && j.arg === arg && (j.status === "queued" || j.status === "running"),
+  );
+  if (existing) return existing; // idempotent against a double-click, like addVideoJob
+  const label = kind === "develop-reply" ? `Advisor reply: ${slug}` : `Develop: ${slug}`;
+  const job: Job = {
+    id: nextJobId(), kind, label, arg, status: "queued", slugs: [], error: null,
+    createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
+  };
+  jobs.push(job);
+  void drain();
+  return job;
+}
+
+// "Format for platforms" arg builder — pure, exported for a direct unit test. The extract lens is
+// the top-level default (no cuts/ subfolder — src/atomize/cuts.ts), so it takes no --cut flag.
+export function buildFormatArg(slug: string, lens: string): string {
+  return lens === "extract" ? `--continue content/${slug}` : `--continue content/${slug} --cut ${lens}`;
+}
+
+// Parse a continue-job's arg back into its folder (+ optional cut lens). Pure + exported for unit
+// tests; returns null on any shape this module didn't itself build.
+export function parseContinueArg(arg: string): { folder: string; lens?: string } | null {
+  const m = /^--continue\s+(\S+)(?:\s+--cut\s+(\S+))?\s*$/.exec(arg);
+  if (!m) return null;
+  if (m[2] !== undefined && !isValidLens(m[2])) return null;
+  return m[2] ? { folder: m[1], lens: m[2] } : { folder: m[1] };
+}
+
+// Artifact snapshot for a continue job: how many queue rows the folder has, and how many files sit
+// in the derivatives dir the job targets (top-level for extract, cuts/<lens>/derivatives for a
+// cut). `deps` injected so the growth predicate is unit-testable without a real folder.
+export interface ContinueArtifacts {
+  rows: number;
+  derivatives: number;
+}
+export function continueArtifactCounts(folderAbs: string, lens?: string): ContinueArtifacts {
+  let rows = 0;
+  try {
+    rows = readQueue(folderAbs).rows.length;
+  } catch {
+    /* no queue yet — counts as 0 */
+  }
+  const derivDir = lens ? join(folderAbs, "cuts", lens, "derivatives") : join(folderAbs, "derivatives");
+  let derivatives = 0;
+  try {
+    derivatives = readdirSync(derivDir).length;
+  } catch {
+    /* dir not created yet — counts as 0 */
+  }
+  return { rows, derivatives };
+}
+export function continueJobProgressed(before: ContinueArtifacts, after: ContinueArtifacts): boolean {
+  return after.rows > before.rows || after.derivatives > before.derivatives;
 }
 
 interface AtomizeRunResult {
@@ -611,6 +712,67 @@ async function runVideoJob(job: Job): Promise<void> {
   job.error = failure ?? `/video ran but produced no video/storyboard.md — check the view-log link${logTailSuffix(job.id)}`;
 }
 
+// Spawn `/develop <arg>` headlessly and verify by artifact: a NEW, parseable round must have
+// landed in develop/advice.json (roundCount uses the tolerant readAdvice parse, so a run that
+// exits 0 but writes garbage JSON still fails loudly here instead of rendering nothing). For a
+// start-from-source job the folder doesn't exist yet — diff listSlugs() like the atomize branch,
+// then check the new folder's round count against 0.
+const DEVELOP_TIMEOUT_MS = 10 * 60_000;
+async function runDevelopJob(job: Job): Promise<void> {
+  const isFolderArg = job.arg.startsWith("content/");
+  const beforeSlugs = isFolderArg ? null : new Set(listSlugs());
+  const beforeRounds = isFolderArg ? roundCount(join(repoRoot, job.arg)) : 0;
+  const result = await runClaudeSpawn(job, `/develop ${job.arg}`, {
+    timeoutMs: DEVELOP_TIMEOUT_MS,
+    permissionMode: ATOMIZE_PERMISSION_MODE,
+  });
+  const failure = decodeSpawnFailure(result, job.id, {
+    timeoutVerb: "the advisor", timeoutLabel: `${DEVELOP_TIMEOUT_MS / 60000} min`,
+    exitVerb: "the advisor", includeTailOnTimeout: true,
+  });
+  let slug: string | null = isFolderArg ? basename(job.arg) : null;
+  if (!isFolderArg) {
+    const created = listSlugs().filter((s) => !beforeSlugs!.has(s));
+    // Prefer the created folder that actually carries an advisor round; fall back to any created.
+    slug = created.find((s) => roundCount(join(CONTENT, s)) > 0) ?? created[0] ?? null;
+  }
+  const rounds = slug ? roundCount(isFolderArg ? join(repoRoot, job.arg) : join(CONTENT, slug)) : 0;
+  job.status = !failure && slug && rounds > beforeRounds ? "done" : "failed";
+  if (job.status === "done") {
+    job.slugs = [slug!];
+    return;
+  }
+  job.error = failure ?? `the advisor ran but wrote no new round to develop/advice.json — check the view-log link${logTailSuffix(job.id)}`;
+}
+
+// A `--continue` job runs on an ALREADY-scaffolded folder, so drain()'s new-folder diff can never
+// see it — before this branch existed, a perfectly clean continue run finished with a misleading
+// "created no new content folder" error and no "→ review" link (hit by both the notes-pick flow
+// and the Develop tab's Format for platforms). Verified instead by in-folder artifact: queue rows
+// or the targeted derivatives dir grew.
+async function runContinueJob(job: Job): Promise<void> {
+  const parsed = parseContinueArg(job.arg);
+  const folderAbs = parsed ? join(repoRoot, parsed.folder) : null;
+  const before = folderAbs ? continueArtifactCounts(folderAbs, parsed?.lens) : null;
+  const result = await runAtomizeJob(job);
+  const failure = decodeSpawnFailure(result, job.id, {
+    timeoutVerb: "atomize", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
+    exitVerb: "atomize", includeTailOnTimeout: true,
+  });
+  // An unparseable arg (not built by this module) degrades to exit-code-only verification rather
+  // than failing a run we can't inspect.
+  const progressed =
+    !folderAbs || !before ? true : continueJobProgressed(before, continueArtifactCounts(folderAbs, parsed?.lens));
+  job.status = !failure && progressed ? "done" : "failed";
+  if (job.status === "done") {
+    if (parsed) job.slugs = [basename(parsed.folder)]; // enables the jobs pill's "→ review" jump link
+    return;
+  }
+  job.error =
+    failure ??
+    `formatting ran but added no new rows or derivatives in ${parsed?.folder ?? job.arg} — check the view-log link${logTailSuffix(job.id)}`;
+}
+
 // Process the queue one job at a time — every kind (atomize-family AND task jobs) shares this one
 // `draining` mutex, so GUI-wide Claude concurrency is bounded no matter which button fired it.
 async function drain(): Promise<void> {
@@ -644,7 +806,23 @@ async function drain(): Promise<void> {
     return;
   }
 
-  // Atomize-family (url/file/text/notes/continue): diff the content folders before/after to link
+  if (job.kind === "develop" || job.kind === "develop-reply") {
+    await runDevelopJob(job);
+    job.finishedAt = Date.now();
+    draining = false;
+    void drain();
+    return;
+  }
+
+  if (job.kind === "continue") {
+    await runContinueJob(job);
+    job.finishedAt = Date.now();
+    draining = false;
+    void drain();
+    return;
+  }
+
+  // Atomize-family (url/file/text/notes): diff the content folders before/after to link
   // the job to whatever it created (claude's stdout isn't reliable).
   const before = new Set(listSlugs());
   const result = await runAtomizeJob(job);

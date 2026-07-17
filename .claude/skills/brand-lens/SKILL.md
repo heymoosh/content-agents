@@ -22,8 +22,12 @@ to CLAUDE.md rule 1 is needed because nothing it produces enters the pipeline as
 
 ## Other rules
 
-1. **Opt-in only.** Never runs as a side effect of `/atomize`, `/scout`, or any other skill.
-   Muxin invokes it explicitly. (`/atomize` step 1.5 may *offer* it; it never auto-runs it.)
+1. **Opt-in only.** Never runs as a silent side effect of `/atomize`, `/scout`, or any other
+   skill. Muxin invokes it explicitly — by typing `/brand-lens`, or by clicking **Develop** (or
+   replying to the advisor) in the review GUI: the `/develop` skill
+   (`.claude/skills/develop/SKILL.md`) applies this skill's inspiration-mode rubric on that
+   explicit request, under the same propose-and-flag hard rule. (`/atomize` step 1.5 may *offer*
+   it; it never auto-runs it.)
 2. **Evidence discipline** (same as `/outreach research`): when a flag or angle rests on a
    checkable fact, cite a real quote with a live source URL, or don't claim it.
 3. **Voice.** The skill's own output prose (annotations, angle proposals) follows

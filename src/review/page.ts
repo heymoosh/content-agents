@@ -309,6 +309,30 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .cut-comment-form { display:none; gap:6px; padding:8px 12px; border-top:1px solid var(--line); }
   .cut-comment-form.show { display:flex; }
   .cut-comment-form input { flex:1; }
+  /* Develop tab: advisor recommendation cards. The one signature element is the verbatim
+     pull-quote — Muxin's own lines, set in the page's serif behind a blue-pencil rule (visually
+     rhyming with the Cuts tab's margin notes) — so "what the advisor thinks" (plain sans) and
+     "what's actually Muxin's" (serif quote, the only text that can become a cut) never blur. */
+  .dev-card { background:var(--card); border:1px solid var(--line); border-radius:11px;
+    padding:14px 16px; margin:10px 0; box-shadow:0 1px 0 rgba(0,0,0,.02); }
+  .dev-card.decided { opacity:.62; }
+  .dev-kind { font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+    padding:2px 8px; border-radius:5px; flex:0 0 auto; }
+  .dev-kind.angle { background:var(--blue-bg); color:var(--blue); }
+  .dev-kind.cta { background:var(--amber-bg); color:var(--amber); }
+  .dev-kind.spin { background:#efeafd; color:#5b46b8; }
+  .dev-kind.routing { background:var(--green-bg); color:var(--green); }
+  .dev-kind.note { background:#efeae0; color:#5a5346; }
+  .dev-summary { font-size:13.5px; color:#4a453c; margin:4px 0 6px; white-space:pre-wrap; }
+  .dev-preview-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-top:8px; }
+  .dev-preview { font:15px/1.65 Georgia,"Times New Roman",serif; white-space:pre-wrap;
+    margin:4px 0 6px; padding:10px 14px; background:var(--paper);
+    border-left:3px solid var(--blue); border-radius:0 8px 8px 0; }
+  .dev-lens { font:inherit; font-size:12.5px; padding:5px 9px; border:1px solid var(--line); border-radius:7px; width:150px; }
+  .dev-round-reply { font-size:13px; color:var(--muted); font-weight:600; margin:14px 0 2px; }
+  .dev-format { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:10px 0 4px;
+    padding:10px 14px; border:1px dashed var(--line); border-radius:9px; }
+  .dev-working { font-size:13px; color:#5b46b8; font-weight:600; margin:6px 0; }
 </style>
 </head>
 <body>
@@ -317,6 +341,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <h1>Content studio</h1>
   <nav class="tabs">
     <button class="tab on" data-tab="ingest">Add / Queue</button>
+    <button class="tab" data-tab="develop">Develop</button>
     <button class="tab" data-tab="review">Review <span class="count" id="count">0</span></button>
     <button class="tab" data-tab="cuts">Cuts</button>
     <button class="tab" data-tab="strategy">Analytics</button>
@@ -348,10 +373,20 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
       <div class="notes-actions">
         <button class="primary" id="notesDraftBtn">Draft selected</button>
-        <span class="hint">Pick the notes worth cross-posting. Draft selected scaffolds a folder per note and runs the normal atomize pipeline (tag, route, draft, validate, queue) — nothing publishes without your review. A note published in the last 30 days stays blocked; a draft you discarded (or published 30+ days ago) is selectable again.</span>
+        <span class="hint">Pick the notes worth cross-posting. Draft selected scaffolds a folder per note and runs the normal production pipeline (tag, route, draft, validate, queue) — nothing publishes without your review. A note published in the last 30 days stays blocked; a draft you discarded (or published 30+ days ago) is selectable again.</span>
       </div>
     </div>
     <div class="jobs" id="jobs"></div>
+  </section>
+  <section class="view" id="developView" hidden>
+    <div class="ingest">
+      <textarea id="devSrc" placeholder="Drop a URL, a file path, or paste an idea — the advisor reads it and proposes angles before anything gets formatted. (⌘/Ctrl+Enter)"></textarea>
+      <div class="ingest-actions">
+        <button class="primary" id="devStartBtn">Develop</button>
+        <span class="hint">The advisor proposes brand angles built from your own lines, sanity-checks the CTA, and previews platform fit and routing. Runs on your subscription ($0), one round at a time — the Add / Queue tab has the job log. Nothing formats or publishes until you say so.</span>
+      </div>
+    </div>
+    <div class="strategy" id="devSessions" style="margin-top:18px"><div class="empty">Loading…</div></div>
   </section>
   <section class="view" id="reviewView" hidden>
     <div id="reviewMain"><div class="empty">Loading…</div></div>
@@ -708,11 +743,12 @@ let currentTab = "ingest";
 // Strategy tab's label is deliberately NOT "...+ exports" — this header refresh only re-reads the
 // brief file + the existing raw-exports list off disk; it never pulls or regenerates (those are
 // the dedicated "Pull fresh now" / "Refresh brief" buttons).
-function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Reload brief + file list" : t==="outreach" ? "Scout new leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
+function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="develop" ? "Refresh develop" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Reload brief + file list" : t==="outreach" ? "Scout new leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
 function setTab(t){
   currentTab = t;
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
   $("#ingestView").hidden = t!=="ingest";
+  $("#developView").hidden = t!=="develop";
   $("#reviewView").hidden = t!=="review";
   $("#cutsView").hidden = t!=="cuts";
   $("#strategyView").hidden = t!=="strategy";
@@ -720,6 +756,7 @@ function setTab(t){
   $("#followupsView").hidden = t!=="followups";
   $("#decidedWrap").style.display = t==="review" ? "" : "none";
   $("#refresh").textContent = refreshLabelFor(t);
+  if (t==="develop"){ loadDevelop(); loadJobs(); }
   if (t==="cuts"){ loadCuts(); }
   if (t==="strategy" && !briefLoaded){ loadBrief(); loadRaw(); }
   if (t==="outreach"){ loadOutreach(); }
@@ -742,6 +779,7 @@ async function doRefresh(){
   $("#refresh").disabled = true;
   try {
     if (currentTab === "review") { await load(); await loadJobs(); }
+    else if (currentTab === "develop") { await loadDevelop(); await loadJobs(); }
     else if (currentTab === "strategy") { await loadBrief(); await loadRaw(); }
     else if (currentTab === "outreach") { await scoutRun(); }
     else if (currentTab === "followups") { await loadFollowups(); }
@@ -1269,7 +1307,7 @@ function cutColumnEl(slug, cut){
 function renderCutsBox(){
   const box = $("#cutsList");
   if (!CUT_SETS.length) {
-    box.innerHTML = '<div class="empty">No cuts drafted yet — run <code>/atomize</code> on something (step 1.5 proposes cuts before formatting anything per platform).</div>';
+    box.innerHTML = '<div class="empty">No cuts yet — accept an angle in the Develop tab, or run <code>/atomize</code> in a terminal (its step 1.5 proposes cuts before anything is formatted per platform).</div>';
     return;
   }
   box.innerHTML = "";
@@ -1291,6 +1329,121 @@ async function loadCuts(){
   CUT_SETS = d.cutSets || [];
   renderCutsBox();
 }
+
+// ── Develop tab: the advisor stage ──
+// Recommendation cards from a queued /develop round. Accept builds a real cut from Muxin's own
+// verbatim source lines (server-side, deterministic — the serif preview shown IS the text that
+// gets accepted, resolved live from source.md); Dismiss just marks the card; the reply box runs
+// another advisor round as a job. "Format for platforms" hands the chosen cuts to the normal
+// formatting pipeline (/atomize --continue), where every draft still lands pending in Review.
+let DEV_SESSIONS = [];
+const devReplyPending = new Set(); // slugs with a just-clicked reply, before the job shows in JOBS
+
+function devWorking(slug){
+  return devReplyPending.has(slug) || JOBS.some(j =>
+    (j.kind==="develop"||j.kind==="develop-reply") && (j.status==="queued"||j.status==="running") &&
+    (j.label==="Develop: "+slug || j.label==="Advisor reply: "+slug));
+}
+function devKindLabel(k){ return k==="cta"?"CTA check":k==="spin"?"platform spin":k; }
+function devCardHtml(slug, card){
+  const decided = card.status !== "open";
+  const badge = '<span class="dev-kind '+esc(card.kind)+'">'+esc(devKindLabel(card.kind))+'</span>';
+  const lineRefs = (card.sourceLines||[]).map(x=>"L"+x).join(", ");
+  const preview = card.previewText !== undefined
+    ? '<div class="dev-preview-label">your lines, verbatim ('+esc(lineRefs)+')</div><div class="dev-preview">'+esc(card.previewText)+'</div>'
+    : (card.previewError ? '<div class="aierr">⚠ '+esc(card.previewError)+'</div>' : "");
+  const summary = card.summary ? '<div class="dev-summary">'+esc(card.summary)+'</div>' : "";
+  let actions = "";
+  if (card.status === "accepted") actions = '<div class="scheduled">✓ cut created: '+esc(card.acceptedLens||"")+' — see the Cuts tab</div>';
+  else if (card.status === "dismissed") actions = "";
+  else if (card.kind === "angle" && card.previewText !== undefined) {
+    actions = '<div class="actions"><input class="dev-lens" value="'+esc(card.lens||"")+'" title="name for this cut (lowercase-with-dashes)" />'+
+      '<button class="dev-accept" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Accept as cut</button>'+
+      '<button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Dismiss</button></div>';
+  } else {
+    actions = '<div class="actions"><button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Got it — dismiss</button></div>';
+  }
+  return '<div class="dev-card'+(decided?" decided":"")+'">'+
+    '<div class="rowhead">'+badge+'<b>'+esc(card.title)+'</b></div>'+summary+preview+actions+'</div>';
+}
+function devSessionEl(s){
+  const sec = document.createElement("section"); sec.className = "piece";
+  let html = '<h2>'+esc(s.title)+'</h2><div class="slug">'+esc(s.slug)+'</div>';
+  for (const round of s.rounds){
+    if (round.trigger === "reply" && round.replyText) html += '<div class="dev-round-reply">You asked: '+esc(round.replyText)+'</div>';
+    for (const card of round.cards) html += devCardHtml(s.slug, card);
+  }
+  if (devWorking(s.slug)) html += '<div class="dev-working">✨ the advisor is working on another round… (Add / Queue tab has the log)</div>';
+  else html += '<div class="aibox show"><input class="dev-reply-input" placeholder="tell the advisor what to change or dig into…" /><button class="send dev-reply" data-slug="'+esc(s.slug)+'">Ask the advisor</button></div>';
+  const lensChecks = ["extract"].concat(s.cuts).map(l =>
+    '<label class="toggle"><input type="checkbox" class="dev-fmt-lens" value="'+esc(l)+'" checked /> '+esc(l)+'</label>').join("");
+  html += '<div class="dev-format"><span class="hint" style="flex:1;min-width:200px">Happy with the message? Format for platforms runs the production pipeline (route, draft per platform, quote cards, validate) — every draft still lands pending in Review, nothing publishes.</span>'+
+    lensChecks+'<button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Format for platforms</button></div>';
+  sec.innerHTML = html;
+  return sec;
+}
+function renderDevelop(){
+  const box = $("#devSessions");
+  box.innerHTML = "";
+  if (!DEV_SESSIONS.length){
+    box.innerHTML = '<div class="empty">No advisor sessions yet. Drop an idea above and hit Develop — the advisor answers with angles and checks to react to, not a finished draft.</div>';
+    return;
+  }
+  for (const s of DEV_SESSIONS) box.appendChild(devSessionEl(s));
+}
+async function loadDevelop(){
+  const r = await fetch("/api/develop"); const d = await r.json();
+  DEV_SESSIONS = d.sessions || [];
+  renderDevelop();
+}
+async function devStart(){
+  const ta = $("#devSrc"); const source = ta.value.trim();
+  if(!source){ flash("Paste something first"); return; }
+  $("#devStartBtn").disabled = true;
+  const r = await post("/api/develop/start",{source});
+  $("#devStartBtn").disabled = false;
+  if(r.ok){ ta.value=""; flash("Queued — the advisor is reading"); loadJobs(); }
+  else flash(r.error || "Could not queue");
+}
+$("#devStartBtn").addEventListener("click", devStart);
+$("#devSrc").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") devStart(); });
+// Delegated — devSessions is rebuilt wholesale on every load, same pattern as the notes list.
+$("#devSessions").addEventListener("click", async (e)=>{
+  const t = e.target;
+  if (!t || !t.classList) return;
+  if (t.classList.contains("dev-accept")){
+    const lensInput = t.closest(".actions").querySelector(".dev-lens");
+    t.disabled = true;
+    const body = {slug:t.dataset.slug, cardId:t.dataset.card};
+    if (lensInput && lensInput.value.trim()) body.lens = lensInput.value.trim();
+    const r = await post("/api/develop/accept", body);
+    if(r.ok){ flash("Cut created: "+r.lens+" — see the Cuts tab"); await loadDevelop(); }
+    else { t.disabled = false; flash(r.error || "Could not accept"); }
+  } else if (t.classList.contains("dev-dismiss")){
+    t.disabled = true;
+    const r = await post("/api/develop/dismiss", {slug:t.dataset.slug, cardId:t.dataset.card});
+    if(r.ok){ await loadDevelop(); } else { t.disabled = false; flash(r.error || "Could not dismiss"); }
+  } else if (t.classList.contains("dev-reply")){
+    const slug = t.dataset.slug;
+    const inp = t.closest(".aibox").querySelector(".dev-reply-input");
+    const reply = inp ? inp.value.trim() : "";
+    if(!reply){ flash("Type something for the advisor first"); return; }
+    devReplyPending.add(slug); renderDevelop();
+    try {
+      const r = await post("/api/develop/reply", {slug, reply});
+      if(r.ok){ flash("Queued — the advisor is thinking"); await loadJobs(); }
+      else flash(r.error || "Could not queue the reply");
+    } finally { devReplyPending.delete(slug); renderDevelop(); }
+  } else if (t.classList.contains("dev-format-btn")){
+    const slug = t.dataset.slug;
+    const lenses = [...t.closest(".dev-format").querySelectorAll(".dev-fmt-lens")].filter(c=>c.checked).map(c=>c.value);
+    if(!lenses.length){ flash("Pick at least one cut"); return; }
+    t.disabled = true;
+    const r = await post("/api/develop/format", {slug, lenses});
+    if(r.ok){ flash("Queued "+r.jobs.length+" formatting job(s) — drafts land pending in Review"); loadJobs(); }
+    else { t.disabled = false; flash(r.error || "Could not queue formatting"); }
+  }
+});
 
 async function outreachDraft(dir){
   if(outPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn
@@ -1449,7 +1602,10 @@ async function loadJobs(){
       const forSlug = JOBS.filter(j=>j.kind==="video" && (j.slugs||[]).includes(slug));
       if(forSlug.length && forSlug.every(j=>j.status==="done"||j.status==="failed")) storyboardSlugs.delete(slug);
     }
-    if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))) load(); // a job moved → refresh review rows
+    if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))){
+      load(); // a job moved → refresh review rows
+      if(currentTab==="develop") loadDevelop(); // a finished advisor round renders its new cards
+    }
   }catch(e){}
 }
 async function clearJobs(){

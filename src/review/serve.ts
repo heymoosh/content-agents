@@ -76,7 +76,13 @@ import {
   runCommandSpawn,
   decodeSpawnFailure,
   enqueueFollowUpDraft,
+  addDevelopJob,
+  addDevelopFolderJob,
+  developJobInFlight,
+  buildFormatArg,
 } from "./jobs.js";
+import { listDevelopSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
+import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
@@ -919,6 +925,119 @@ const server = createServer(async (req, res) => {
         json(res, 200, { ok });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // ── Develop tab: the advisor stage ─────────────────────────────────────────────────────────
+    // A queued `/develop` round proposes recommendation cards (angles/CTA/spin/routing) — nothing
+    // here formats, queues, or publishes anything. Accept/dismiss are deterministic server-side
+    // writes (src/review/develop.ts): an accepted angle becomes a cut whose body is assembled
+    // ONLY from Muxin's verbatim source.md lines, never from advisor text (CLAUDE.md rule 1).
+    if (req.method === "GET" && url.pathname === "/api/develop") {
+      json(res, 200, { sessions: listDevelopSessions() });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/start") {
+      const b = await readBody(req);
+      const slug = String(b.slug ?? "").trim();
+      try {
+        if (slug) {
+          json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug)) });
+          return;
+        }
+        const source = String(b.source ?? "");
+        if (!source.trim()) {
+          json(res, 400, { ok: false, error: "paste some text, a file path, or a URL first" });
+          return;
+        }
+        const dispatch = sourceDispatch(classifySource(source), source);
+        if ("error" in dispatch) {
+          json(res, 400, { ok: false, error: dispatch.error });
+          return;
+        }
+        if (dispatch.kind === "notes" || dispatch.kind === "continue" || dispatch.kind === "video") {
+          json(res, 400, { ok: false, error: "drop a URL, file path, or pasted text here" });
+          return;
+        }
+        const job = addDevelopJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText);
+        json(res, 200, { ok: true, job: publicJob(job) });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/reply") {
+      const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const reply = String(b.reply ?? "").trim();
+      if (!reply) {
+        json(res, 400, { ok: false, error: "type a reply for the advisor first" });
+        return;
+      }
+      try {
+        if (developJobInFlight(slug)) {
+          json(res, 409, { ok: false, error: "the advisor is already working on this piece — wait for that round to land" });
+          return;
+        }
+        // Persist the reply BEFORE enqueueing: the spawn argv stays a fixed `/develop
+        // content/<slug>`, and the reply is on disk for the audit trail even if the job dies.
+        appendReplyBySlug(slug, reply);
+        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop-reply")) });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/accept") {
+      const b = await readBody(req);
+      try {
+        const result = acceptAngleBySlug(
+          String(b.slug ?? ""),
+          String(b.cardId ?? ""),
+          b.lens === undefined ? undefined : String(b.lens),
+          b.title === undefined ? undefined : String(b.title),
+        );
+        json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/dismiss") {
+      const b = await readBody(req);
+      try {
+        dismissCardBySlug(String(b.slug ?? ""), String(b.cardId ?? ""));
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Format for platforms": one `continue` job per selected cut, resuming the normal /atomize
+    // steps 2-8 on the already-scaffolded folder/cut. Everything still lands `pending` in the
+    // Review tab — CLAUDE.md rule 2 holds, nothing here publishes.
+    if (req.method === "POST" && url.pathname === "/api/develop/format") {
+      const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const lenses = Array.isArray(b.lenses) ? b.lenses.map(String) : [];
+      if (!lenses.length) {
+        json(res, 400, { ok: false, error: "pick at least one cut to format" });
+        return;
+      }
+      try {
+        const folder = safeFolder(slug);
+        const known = new Set(["extract", ...listCuts(folder)]);
+        const unknown = lenses.filter((l) => !known.has(l));
+        if (unknown.length) {
+          json(res, 400, { ok: false, error: `no such cut: ${unknown.join(", ")}` });
+          return;
+        }
+        const queued = lenses.map((lens) =>
+          publicJob(addJob("continue", buildFormatArg(slug, lens), `Format for platforms: ${slug} (${lens})`)),
+        );
+        json(res, 200, { ok: true, jobs: queued });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
       return;
     }
