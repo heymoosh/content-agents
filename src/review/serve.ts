@@ -86,6 +86,7 @@ import { listDevelopSessions, listContentSessions, acceptAngleBySlug, dismissCar
 import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
 import { buildStudioHome } from "./studio.js";
+import { readSignals, appendBacklogCard } from "./signals.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich) or jobs.ts (classifySource,
@@ -968,6 +969,24 @@ const server = createServer(async (req, res) => {
     // ONLY from Muxin's verbatim source.md lines, never from advisor text (CLAUDE.md rule 1).
     if (req.method === "GET" && url.pathname === "/api/develop") {
       json(res, 200, { sessions: listDevelopSessions() });
+      return;
+    }
+    // Signals room (design 3e): the deterministic read of the latest brief, and the one write —
+    // sending an adjustment to the repo backlog as a card. Muxin decides; nothing self-adopts.
+    if (req.method === "GET" && url.pathname === "/api/signals") {
+      json(res, 200, readSignals());
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/signals/backlog") {
+      const b = await readBody(req);
+      const title = String(b.title ?? "").trim();
+      const detail = String(b.detail ?? "").trim();
+      if (!title || !detail) {
+        json(res, 400, { ok: false, error: "an adjustment needs a title and its rationale" });
+        return;
+      }
+      const signals = readSignals();
+      json(res, 200, appendBacklogCard({ title, detail, briefPath: signals.briefPath, date: new Date().toISOString().slice(0, 10) }));
       return;
     }
     // Studio home (design 3c): counts, the ranked needs-you list, and the team's honest status.
