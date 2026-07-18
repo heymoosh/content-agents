@@ -108,12 +108,99 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
     --red:#9a2f2f; --red-bg:#f6e6e3; --blue:#2f5d9a; --blue-bg:#e6ecf5; --accent:#1c1a17;
   }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--paper); color:var(--ink);
-    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-  header { position:sticky; top:0; z-index:5; background:rgba(250,248,243,.92);
-    backdrop-filter:blur(8px); border-bottom:1px solid var(--line); padding:14px 22px;
+  /* The studio desk (Content Studio Riff design): the page is a walnut desk, each work surface a
+     sheet of paper laid on it. Warm-paper tokens keep styling everything ON the sheets. */
+  body { margin:0; color:var(--ink);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh; background-color:#231508;
+    background-image:radial-gradient(120% 80% at 50% -12%, rgba(234,202,150,.20), rgba(234,202,150,0) 55%),
+      repeating-linear-gradient(90deg, rgba(0,0,0,.42) 0 2px, rgba(120,80,40,.06) 2px 4px, transparent 4px 236px),
+      repeating-linear-gradient(90.6deg, rgba(255,255,255,.022) 0 1px, transparent 1px 6px, rgba(0,0,0,.12) 6px 7px, transparent 7px 13px),
+      repeating-linear-gradient(89.4deg, rgba(0,0,0,.10) 0 2px, transparent 2px 9px),
+      linear-gradient(180deg, #45311d 0%, #2b1b0e 55%, #1d1006 100%);
+    background-attachment:fixed; }
+  header { position:sticky; top:0; z-index:5; background:rgba(29,16,6,.88);
+    backdrop-filter:blur(8px); border-bottom:1px solid rgba(230,213,175,.16); padding:13px 26px;
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+  h1 { font:700 14px/1.2 Georgia,"Times New Roman",serif; margin:0; letter-spacing:.2px; color:#e6d5af; }
+  nav.rooms { display:flex; gap:18px; }
+  .room { border:none; background:none; padding:2px 0 4px; font:inherit; font-size:13px;
+    color:#b7a686; cursor:pointer; border-bottom:1.5px solid transparent; border-radius:0; }
+  .room:hover { color:#f4e8ca; border-color:transparent; }
+  .room.on { color:#f4e8ca; font-weight:600; border-bottom-color:#cbaf87; }
+  .room .count { background:#f4e8ca; color:#3a2a12; margin-left:6px; }
+  .desk-date { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89876; }
+  header .hint { color:#a89876; }
+  header > button#refresh { border:1px solid rgba(230,213,175,.4); background:transparent; color:#e6d5af; }
+  header > button#refresh:hover { border-color:#e6d5af; }
+  header label.toggle { color:#a89876; }
+  /* Paper sheets on the desk */
+  .sheet { position:relative; background:#fbf9f4; border-radius:5px; margin:26px auto;
+    max-width:1040px; padding:44px 56px 40px;
+    box-shadow:0 34px 66px -24px rgba(45,36,20,.5), 0 8px 22px rgba(45,36,20,.16); }
+  .sheet-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  .sheet-head h2 { font:400 26px/1.25 Georgia,"Times New Roman",serif; margin:0; }
+  .sheet-sub { font-size:13.5px; color:#8a7f6d; margin-top:5px; }
+  .mono-note { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b0a488; }
+  /* Capture sheet (3a): the blank page */
+  .capture-title { font:400 40px/1.2 Georgia,"Times New Roman",serif; letter-spacing:-.01em; margin-bottom:16px; }
+  .capture textarea { width:100%; min-height:110px; font:17px/1.6 Georgia,"Times New Roman",serif;
+    padding:4px 0; border:none; outline:none; background:transparent; resize:vertical; color:var(--ink); }
+  .capture textarea::placeholder { color:#a89a80; }
+  .director-line { margin-top:34px; padding-top:20px; border-top:1px solid #efe7d6;
+    display:flex; align-items:flex-start; gap:14px; }
+  .d-avatar { width:30px; height:30px; border-radius:50%; background:#efeafd; border:1px solid #d8cff2;
+    display:flex; align-items:center; justify-content:center; font:italic 700 14px/1 Georgia,serif;
+    color:#5b46b8; flex:none; }
+  .d-line-main { font-size:13.5px; line-height:1.5; color:#4a453c; }
+  .d-line-sub { font-size:12.5px; color:#8a7f6d; font-style:italic; }
+  /* Workbench session sheets (3b): main column + director margin */
+  .session { padding:0; overflow:hidden; }
+  .session-grid { display:grid; grid-template-columns:minmax(0,1fr) 300px; }
+  .session-main { padding:44px 36px 40px 56px; min-width:0; }
+  .session-margin { border-left:1px solid #efe7d6; padding:44px 26px 36px 24px; background:#faf7f0;
+    display:flex; flex-direction:column; gap:16px; }
+  .wb-title { font:600 20px/1.3 Georgia,"Times New Roman",serif; margin-bottom:16px; }
+  .wb-label { font:italic 400 13px/1.5 Georgia,serif; color:#a89a80; margin-bottom:12px; }
+  .wb-source { font:400 19px/1.55 Georgia,"Times New Roman",serif; color:var(--ink);
+    padding-left:18px; border-left:2px solid var(--blue); white-space:pre-wrap; }
+  .wb-source.clamped { max-height:180px; overflow:hidden;
+    -webkit-mask-image:linear-gradient(180deg,#000 60%,transparent); mask-image:linear-gradient(180deg,#000 60%,transparent); }
+  .wb-expand { font-size:12.5px; color:#7a7266; border-bottom:1px solid #d8cfbb; cursor:pointer; width:fit-content; margin-top:6px; }
+  .wb-sep { margin:36px 0 0; display:flex; align-items:center; gap:12px; }
+  .wb-sep span.rule { height:1px; flex:1; background:#efe7d6; }
+  .wb-sep span.txt { font:italic 400 14px/1 Georgia,serif; color:#a89a80; }
+  .wb-cut { margin-top:26px; }
+  .wb-cut-head { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .wb-cut-head .lens { font:600 13px/1 Georgia,serif; color:#5b46b8; }
+  .wb-cut-head .sub { font-size:12px; color:#8a7f6d; font-style:italic; }
+  .wb-cut-body { font:400 22px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); white-space:pre-wrap; }
+  .wb-cut textarea { width:100%; min-height:140px; font:400 18px/1.55 Georgia,serif; padding:10px 12px;
+    border:1px solid var(--muted); border-radius:8px; background:#fff; }
+  .wb-handoff { margin-top:40px; padding-top:22px; border-top:1px solid #efe7d6;
     display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
-  h1 { font:600 17px/1.2 Georgia,"Times New Roman",serif; margin:0; letter-spacing:.2px; }
+  .wb-handoff .note { font-size:13px; color:#7a7266; line-height:1.5; max-width:340px; }
+  .wb-links { margin-top:14px; display:flex; gap:20px; flex-wrap:wrap; }
+  .wb-link { font-size:13px; color:#7a7266; border-bottom:1px solid #d8cfbb; padding-bottom:1px; cursor:pointer; background:none; border-top:none; border-left:none; border-right:none; border-radius:0; padding-top:0; padding-left:0; padding-right:0; }
+  .wb-check { display:flex; flex-direction:column; gap:5px; padding-left:12px; border-left:2px solid #d8cff2; }
+  .wb-check.sand { border-left-color:#e6dcc4; }
+  .wb-check.green { border-left-color:#cbe0d1; }
+  .wb-check .t { font-size:12.5px; font-weight:600; color:var(--ink); }
+  .wb-check .t .verdict { color:#5b46b8; }
+  .wb-check.sand .t .verdict { color:#a89a80; }
+  .wb-check.green .t .verdict { color:var(--green); }
+  .wb-check .d { font-size:12.5px; line-height:1.5; color:#5a5346; }
+  .wb-margin-cap { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; letter-spacing:.06em; }
+  .wb-margin-sub { font:italic 400 13px/1.5 Georgia,serif; color:#8a7f6d; }
+  .wb-reply { margin-top:auto; padding-top:16px; border-top:1px solid #efe7d6; display:flex; flex-direction:column; gap:8px; }
+  .wb-reply input { font:italic 13px/1.4 Georgia,serif; border:1px solid #e6dcc4; background:#fbf9f4;
+    border-radius:8px; padding:8px 12px; color:var(--ink); width:100%; }
+  .wb-proposal { margin-top:26px; padding:14px 16px; background:#faf7f0; border:1px solid #efe7d6; border-radius:10px; }
+  /* Outreach room subnav (Leads | Follow-ups) */
+  .subnav { display:flex; gap:3px; align-items:center; background:rgba(0,0,0,.28); border-radius:20px;
+    padding:3px; width:fit-content; margin:22px auto 0; }
+  .subtab { font-size:12px; color:#e6d5af; border:none; background:none; border-radius:16px; padding:4px 13px; cursor:pointer; }
+  .subtab.on { font-weight:600; background:#f4e8ca; color:#3a2a12; }
   .count { background:var(--accent); color:var(--paper); border-radius:20px; padding:2px 11px;
     font-size:13px; font-weight:600; }
   .grow { flex:1; }
@@ -122,7 +209,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
     color:var(--ink); border-radius:7px; padding:6px 12px; transition:.12s; }
   button:hover { border-color:var(--muted); }
   button:disabled { opacity:.4; cursor:default; }
-  main { max-width:860px; margin:0 auto; padding:22px 22px 120px; }
+  main { max-width:1100px; margin:0 auto; padding:6px 22px 120px; }
   .piece { margin:26px 0 8px; }
   .piece > h2 { font:600 15px/1.3 Georgia,serif; margin:0 0 2px; }
   .piece > .slug { color:var(--muted); font-size:12px; margin-bottom:12px; }
@@ -196,11 +283,6 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   button.cancel { border-color:var(--red); color:var(--red); }
   button.cancel:hover { background:#fdecec; }
   .duperr { flex-basis:100%; color:var(--red); font-size:12.5px; font-weight:600; }
-  nav.tabs { display:flex; gap:5px; }
-  .tab { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:6px 14px;
-    font-weight:600; color:var(--muted); display:flex; align-items:center; gap:7px; }
-  .tab.on { background:var(--accent); color:var(--paper); border-color:var(--accent); }
-  .tab.on .count { background:var(--paper); color:var(--accent); }
   .view[hidden] { display:none; }
   .ingest { max-width:820px; margin:0 auto; }
   .ingest textarea { width:100%; min-height:130px; font:15px/1.6 inherit; padding:13px 15px;
@@ -281,34 +363,6 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .flash.show { opacity:1; }
   .worktree-banner { background:var(--red-bg); color:var(--red); font-size:12.5px; font-weight:600;
     text-align:center; padding:6px 16px; border-bottom:1px solid var(--red); }
-  /* Cuts tab: "Proof Sheet" — galley-proof columns, blue-pencil margin notes (the one signature
-     element; real copy-editor's mark, not a chat bubble). Reuses the page's own --paper/--ink/
-     --blue tokens rather than inventing a new palette. */
-  .cuts-piece { margin-bottom:22px; }
-  .cuts-piece h2 { font-size:15px; margin:0 0 2px; }
-  .cuts-piece .slug { color:var(--muted); font-size:12px; margin-bottom:10px; }
-  .cuts-board { display:flex; gap:14px; overflow-x:auto; padding-bottom:4px; }
-  .cut-column { flex:0 0 340px; border:1px solid var(--line); border-radius:8px; background:var(--card);
-    display:flex; flex-direction:column; max-height:520px; }
-  .cut-head { display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--line); }
-  .cut-lens { font-weight:700; letter-spacing:.03em; text-transform:uppercase; font-size:12px; }
-  .cut-lens.lens-extract { color:var(--muted); }
-  .cut-head .grow { flex:1; }
-  .cut-head button { font-size:11.5px; padding:3px 8px; }
-  .cut-body { flex:1; overflow-y:auto; padding:10px 12px; font-size:13.5px; line-height:1.55; }
-  .cut-line { padding:1px 4px; margin:0 -4px; border-radius:3px; cursor:pointer; white-space:pre-wrap; }
-  .cut-line:hover { background:var(--blue-bg); }
-  .cut-line.has-comment { border-left:3px solid var(--blue); padding-left:5px; margin-left:-8px; }
-  .cut-body textarea { width:100%; height:100%; box-sizing:border-box; border:none; resize:none;
-    font:inherit; background:transparent; color:var(--ink); }
-  .cut-comments { border-top:1px solid var(--line); padding:8px 12px; font-size:12.5px; max-height:160px; overflow-y:auto; }
-  .cut-comment { color:var(--blue); margin-bottom:6px; padding-left:10px; border-left:2px solid var(--blue); }
-  .cut-comment.resolved { color:var(--muted); border-left-color:var(--line); text-decoration:line-through; }
-  .cut-comment .cc-line { font-weight:600; margin-right:4px; }
-  .cut-comment button { font-size:11px; padding:1px 6px; margin-left:6px; border-color:var(--line); color:var(--muted); }
-  .cut-comment-form { display:none; gap:6px; padding:8px 12px; border-top:1px solid var(--line); }
-  .cut-comment-form.show { display:flex; }
-  .cut-comment-form input { flex:1; }
   /* Develop tab: advisor recommendation cards. The one signature element is the verbatim
      pull-quote — Muxin's own lines, set in the page's serif behind a blue-pencil rule (visually
      rhyming with the Cuts tab's margin notes) — so "what the advisor thinks" (plain sans) and
@@ -339,68 +393,78 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
 ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (${opts.repoRoot}) — data/content here is isolated and gitignored, not synced with your main repo. Numbers may look empty/stale even when your real pipeline is fine.</div>` : ""}
 <header>
   <h1>Content studio</h1>
-  <nav class="tabs">
-    <button class="tab on" data-tab="ingest">Add / Queue</button>
-    <button class="tab" data-tab="develop">Develop</button>
-    <button class="tab" data-tab="review">Review <span class="count" id="count">0</span></button>
-    <button class="tab" data-tab="cuts">Cuts</button>
-    <button class="tab" data-tab="strategy">Analytics</button>
-    <button class="tab" data-tab="outreach">Outreach</button>
-    <button class="tab" data-tab="followups">Follow-ups</button>
+  <nav class="rooms">
+    <button class="room on" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
+    <button class="room" data-room="studio">Studio</button>
+    <button class="room" data-room="outreach">Outreach</button>
+    <button class="room" data-room="fiction">Fiction</button>
+    <button class="room" data-room="signals">Signals</button>
   </nav>
   <span class="grow"></span>
-  <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
+  <span class="desk-date" id="deskDate"></span>
   <span class="hint" id="lastRefreshed" style="min-width:0"></span>
-  <button id="refresh" title="Refreshes only the tab you're looking at">Refresh queue</button>
+  <button id="refresh" title="Refreshes only the room you're looking at">Refresh</button>
 </header>
 <main>
-  <section class="view" id="ingestView">
-    <div class="ingest">
-      <textarea id="src" placeholder="Paste an idea, a file path to an Obsidian note, or a Substack URL, then Add to queue. (⌘/Ctrl+Enter)"></textarea>
+  <section class="view" id="roomContent">
+    <div class="sheet capture">
+      <div class="capture-title" id="captureTitle">What's on your mind today?</div>
+      <textarea id="src" placeholder="Start typing. Paste a link, a file path, or half a sentence. Nothing is a form. (⌘/Ctrl+Enter hands it over)"></textarea>
       <div class="ingest-actions">
-        <button class="primary" id="addBtn">Add to queue</button>
+        <button class="primary" id="devStartBtn">Hand it to your director</button>
+        <button id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
         <button id="notesBtn">Browse Substack Notes</button>
-        <span class="hint">One source per add. Claude drafts it on your subscription ($0), one at a time, so keep adding while it works. LinkedIn/X posts aren't re-importable; paste the text to expand one.</span>
+      </div>
+      <div class="director-line">
+        <span class="d-avatar">d</span>
+        <div>
+          <div class="d-line-main">Your creative director is here when you want a read.</div>
+          <div class="d-line-sub">Won't touch a word without your say. Handles the platforms, the visuals, the posting. Asks you only for the calls that are yours. <span style="color:#5b46b8;">— your director</span></div>
+        </div>
+      </div>
+      <div class="notes-panel" id="notesPanel" hidden>
+        <div class="notes-head">
+          <h3>Substack Notes</h3>
+          <label class="toggle"><input type="checkbox" id="notesShowDrafted" /> show already drafted</label>
+          <span class="grow"></span>
+          <button id="notesCloseBtn">Close</button>
+        </div>
+        <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
+        <div class="notes-actions">
+          <button class="primary" id="notesDraftBtn">Draft selected</button>
+          <span class="hint">Pick the notes worth cross-posting. Each one gets a folder and goes through the production pipeline; every draft still waits for your yes below. A note published in the last 30 days stays blocked.</span>
+        </div>
       </div>
     </div>
-    <div class="notes-panel" id="notesPanel" hidden>
-      <div class="notes-head">
-        <h3>Substack Notes</h3>
-        <label class="toggle"><input type="checkbox" id="notesShowDrafted" /> show already drafted</label>
+    <div id="workbench"></div>
+    <div class="sheet" id="reviewSheet">
+      <div class="sheet-head">
+        <h2>Drafts for your yes</h2>
         <span class="grow"></span>
-        <button id="notesCloseBtn">Close</button>
+        <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
       </div>
-      <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
-      <div class="notes-actions">
-        <button class="primary" id="notesDraftBtn">Draft selected</button>
-        <span class="hint">Pick the notes worth cross-posting. Draft selected scaffolds a folder per note and runs the normal production pipeline (tag, route, draft, validate, queue) — nothing publishes without your review. A note published in the last 30 days stays blocked; a draft you discarded (or published 30+ days ago) is selectable again.</span>
-      </div>
-    </div>
-    <div class="jobs" id="jobs"></div>
-  </section>
-  <section class="view" id="developView" hidden>
-    <div class="ingest">
-      <textarea id="devSrc" placeholder="Drop a URL, a file path, or paste an idea — the advisor reads it and proposes angles before anything gets formatted. (⌘/Ctrl+Enter)"></textarea>
-      <div class="ingest-actions">
-        <button class="primary" id="devStartBtn">Develop</button>
-        <span class="hint">The advisor proposes brand angles built from your own lines, sanity-checks the CTA, and previews platform fit and routing. Runs on your subscription ($0), one round at a time — the Add / Queue tab has the job log. Nothing formats or publishes until you say so.</span>
-      </div>
-    </div>
-    <div class="strategy" id="devSessions" style="margin-top:18px"><div class="empty">Loading…</div></div>
-  </section>
-  <section class="view" id="reviewView" hidden>
-    <div id="reviewMain"><div class="empty">Loading…</div></div>
-  </section>
-  <section class="view" id="cutsView" hidden>
-    <div class="strategy">
-      <div class="strategy-actions">
-        <span class="hint">Versions of the same inspiration, side by side, before anything gets formatted per platform — not a review queue, nothing here publishes. Click a line to leave a note; edits save in place.</span>
-      </div>
-      <div id="cutsList"><div class="empty">Loading…</div></div>
+      <div class="sheet-sub">Approve schedules it. Nothing posts without a yes here.</div>
+      <div id="reviewMain" style="margin-top:14px"><div class="empty">Loading…</div></div>
     </div>
   </section>
-  <section class="view" id="strategyView" hidden>
-    <div class="strategy">
+  <section class="view" id="roomStudio" hidden>
+    <div class="sheet">
+      <div class="sheet-head"><h2>Your team, working</h2></div>
+      <div class="sheet-sub">Live queue with honest elapsed times and logs. The full one-glance overview (needs-you list, counts across every room) lands in the next build.</div>
+      <div class="jobs" id="jobs" style="max-width:none;margin-top:10px"></div>
+    </div>
+  </section>
+  <section class="view" id="roomFiction" hidden>
+    <div class="sheet">
+      <div class="sheet-head"><h2>The fiction desk</h2></div>
+      <div class="sheet-sub">Coming in a later build: your canon (world, philosophy, plot line, voice &amp; characters) editable in place, plus promo shortcuts. Chapter drafting and line-by-line review stay in your GitHub flow. Until then: <code>/story</code> in a terminal.</div>
+    </div>
+  </section>
+  <section class="view" id="roomSignals" hidden>
+    <div class="sheet">
+    <div class="sheet-head"><h2>Signals</h2></div>
+    <div class="sheet-sub">The read on what's working, what isn't, and what's too weak to trust. The full analyst layout lands in a later build.</div>
+    <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
         <button class="primary" id="insightsBtn">Generate insights</button>
         <span class="hint">Runs the analytics reports live against the current database, then asks Claude (your subscription, $0) for a short skim: what's working, what's not, the numbers that matter, plus any data-hygiene next steps. The prior-cycle brief is linked, dated, not dumped in full. Nothing here writes data or publishes anything.</span>
@@ -443,22 +507,23 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div id="rawList"><div class="empty">Loading…</div></div>
       <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest). "Reload list" only re-reads what's already on disk — it does NOT fetch anything new. "Pull fresh now" is the real pull: it launches real Chrome with your saved logins for LinkedIn/X/Substack and can take a few minutes; it otherwise only runs Sundays at 07:00 via cron. Open a file yourself if you want the raw numbers rather than a computed report.</span>
     </div>
-  </section>
-  <section class="view" id="outreachView" hidden>
-    <div class="strategy">
-      <div class="strategy-actions">
-        <span class="hint">Nothing here contacts anyone. Every source link is clickable; Pursue/Pass just marks your decision. Approve drafts a message you can edit and revise right here before it's ever sent (by you, by hand). "Scout new leads" (top right) runs the real web-discovery agent and reloads this inbox; <code>/outreach add</code> seeds one by hand.</span>
-      </div>
-      <div id="outreachList"><div class="empty">Loading…</div></div>
     </div>
   </section>
-  <section class="view" id="followupsView" hidden>
-    <div class="strategy">
-      <div class="strategy-actions">
-        <span class="hint">Where the data comes from: rows appear once an outreach message is locked (Outreach/Review tab) or an event exists in <code>data/outreach/tracker.jsonl</code> — an append-only log of what YOU record here. Nothing contacts anyone, and nothing knows a message was sent until you click Mark sent (add an optional note, it's kept in the tracker). Mark responded, draft a follow-up touch (reframes the locked message; still lands pending review), or move on.</span>
-      </div>
+  <section class="view" id="roomOutreach" hidden>
+    <div class="subnav">
+      <button class="subtab on" data-sub="leads">Leads</button>
+      <button class="subtab" data-sub="followups">Follow-ups</button>
+    </div>
+    <div class="sheet" id="outreachPane">
+      <div class="sheet-head"><h2>Leads</h2></div>
+      <div class="sheet-sub">Dossiers from your scout. Pursue or pass marks the call; a drafted message is yours to edit, and only you ever send it.</div>
+      <div id="outreachList" style="margin-top:14px"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="sheet" id="followupsPane" hidden>
+      <div class="sheet-head"><h2>Follow-ups</h2></div>
+      <div class="sheet-sub">Everything you've sent, and what's next. The clock starts when you click Mark sent. Nothing here sends anything.</div>
       <div id="followupsNote"></div>
-      <div id="followupsList"><div class="empty">Loading…</div></div>
+      <div id="followupsList" style="margin-top:14px"><div class="empty">Loading…</div></div>
     </div>
   </section>
 </main>
@@ -568,7 +633,7 @@ function rowEl(piece, row){
   // instead of a row flag, so it survives the background poll's load() rebuilding this row's DOM.
   const storyboardBtn = row.canGenerateStoryboard
     ? (storyboardSlugs.has(piece.slug)
-        ? '<span class="hint">✨ generating storyboard… (Add / Queue tab has progress)</span>'
+        ? '<span class="hint">✨ generating storyboard… (the Studio room has progress)</span>'
         : '<button class="storyboard" data-act="gen-storyboard">🎬 Generate storyboard</button>')
     : "";
   // "Duplicate to platform" (card 9304e4a5's missing "create a post for another platform"):
@@ -685,7 +750,7 @@ async function onAction(e, piece, row, el){
   } else if (act === "gen-storyboard"){
     e.target.disabled = true;
     const r = await post("/api/video/generate",{slug:piece.slug});
-    if(r.ok){ storyboardSlugs.add(piece.slug); flash("Queued — generating storyboard (Add / Queue tab has progress)"); loadJobs(); }
+    if(r.ok){ storyboardSlugs.add(piece.slug); flash("Queued — generating storyboard (the Studio room has progress)"); loadJobs(); }
     else { e.target.disabled = false; flash(r.error || "Could not queue /video"); }
     rerender();
   } else if (act === "dup"){
@@ -730,59 +795,57 @@ function render(){
     for (const row of rows) sec.appendChild(rowEl(piece, row));
     main.appendChild(sec);
   }
-  $("#count").textContent = pending + " pending";
+  $("#count").textContent = String(pending);
+  $("#count").hidden = pending === 0;
   if (!shown) main.innerHTML = '<div class="empty">Nothing '+(showDecided?"here yet":"awaiting review")+'. 🎉</div>';
 }
 
-// ── tabs ──
-// Refresh used to always do the same global rescan (load() + loadJobs()) no matter which tab was
-// open, and never touched the Analytics tab at all — confusing (backlog card 3625b185: "what does
-// Refresh even do?"). It's now tab-aware: doRefresh() below only re-reads whatever the CURRENT tab
-// shows, labeled per tab, with a "last refreshed HH:MM" stamp so its effect is visible.
-let currentTab = "ingest";
-// Strategy tab's label is deliberately NOT "...+ exports" — this header refresh only re-reads the
-// brief file + the existing raw-exports list off disk; it never pulls or regenerates (those are
-// the dedicated "Pull fresh now" / "Refresh brief" buttons).
-function refreshLabelFor(t){ return t==="review" ? "Refresh review" : t==="develop" ? "Refresh develop" : t==="cuts" ? "Refresh cuts" : t==="strategy" ? "Reload brief + file list" : t==="outreach" ? "Scout new leads" : t==="followups" ? "Refresh follow-ups" : "Refresh queue"; }
-function setTab(t){
+// ── rooms ──
+// Five rooms on the desk (Content Studio Riff): Content, Studio, Outreach, Fiction, Signals.
+// Refresh stays room-aware: it only re-reads whatever the CURRENT room shows, labeled per room,
+// with a "last refreshed HH:MM" stamp so its effect is visible.
+let currentTab = "content";
+let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
+function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
+function setRoom(t){
   currentTab = t;
-  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
-  $("#ingestView").hidden = t!=="ingest";
-  $("#developView").hidden = t!=="develop";
-  $("#reviewView").hidden = t!=="review";
-  $("#cutsView").hidden = t!=="cuts";
-  $("#strategyView").hidden = t!=="strategy";
-  $("#outreachView").hidden = t!=="outreach";
-  $("#followupsView").hidden = t!=="followups";
-  $("#decidedWrap").style.display = t==="review" ? "" : "none";
+  document.querySelectorAll(".room").forEach(b=>b.classList.toggle("on", b.dataset.room===t));
+  $("#roomContent").hidden = t!=="content";
+  $("#roomStudio").hidden = t!=="studio";
+  $("#roomOutreach").hidden = t!=="outreach";
+  $("#roomFiction").hidden = t!=="fiction";
+  $("#roomSignals").hidden = t!=="signals";
   $("#refresh").textContent = refreshLabelFor(t);
-  if (t==="develop"){ loadDevelop(); loadJobs(); }
-  if (t==="cuts"){ loadCuts(); }
-  if (t==="strategy" && !briefLoaded){ loadBrief(); loadRaw(); }
-  if (t==="outreach"){ loadOutreach(); }
-  if (t==="followups"){ loadFollowups(); }
+  if (t==="content"){ loadContent(); }
+  if (t==="studio"){ loadJobs(); }
+  if (t==="signals" && !briefLoaded){ loadBrief(); loadRaw(); }
+  if (t==="outreach"){ setOutreachSub(outreachSub); }
 }
-document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click", ()=>setTab(b.dataset.tab)));
+document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
+function setOutreachSub(s){
+  outreachSub = s;
+  document.querySelectorAll(".subtab").forEach(b=>b.classList.toggle("on", b.dataset.sub===s));
+  $("#outreachPane").hidden = s!=="leads";
+  $("#followupsPane").hidden = s!=="followups";
+  $("#refresh").textContent = refreshLabelFor("outreach");
+  if (s==="leads") loadOutreach(); else loadFollowups();
+}
+document.querySelectorAll(".subtab").forEach(b=>b.addEventListener("click", ()=>setOutreachSub(b.dataset.sub)));
 
 let lastRefreshedAt = null;
 function fmtHHMM(ms){ const d = new Date(ms); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
 function markRefreshed(){ lastRefreshedAt = Date.now(); $("#lastRefreshed").textContent = "last refreshed "+fmtHHMM(lastRefreshedAt); }
 
-// Re-reads only what the ACTIVE tab shows — never a Claude spawn, never the other tabs' data.
-// Ingest: the job queue. Review: the full review-queue.md + live-provider rescan (load()) that used
-// to be Refresh's only behavior. Strategy: the brief + raw-exports list (NOT "Generate insights" —
-// that's a real Claude call and stays a deliberate button click, never auto-fired by Refresh).
-// ONE deliberate exception (Muxin, 2026-07-16): on the Outreach tab the button is "Scout new
-// leads" and runs the real /scout web-discovery agent (the old disk-only "Refresh leads" "doesn't
-// seem to do anything" — the tab already reloads itself on every visit anyway).
+// Re-reads only what the ACTIVE room shows — never a Claude spawn, never the other rooms' data.
+// ONE deliberate exception (Muxin, 2026-07-16): on the Outreach room's Leads pane the button is
+// "Scout new leads" and runs the real /scout web-discovery agent (the pane already reloads itself
+// on every visit anyway).
 async function doRefresh(){
   $("#refresh").disabled = true;
   try {
-    if (currentTab === "review") { await load(); await loadJobs(); }
-    else if (currentTab === "develop") { await loadDevelop(); await loadJobs(); }
-    else if (currentTab === "strategy") { await loadBrief(); await loadRaw(); }
-    else if (currentTab === "outreach") { await scoutRun(); }
-    else if (currentTab === "followups") { await loadFollowups(); }
+    if (currentTab === "content") { await loadContent(); await load(); await loadJobs(); }
+    else if (currentTab === "signals") { await loadBrief(); await loadRaw(); }
+    else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
     else { await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
@@ -877,10 +940,10 @@ async function refreshBriefRun(){
   const body = $("#briefBody");
   const prevHtml = body.innerHTML;
   const start = Date.now();
-  const tick = () => { body.innerHTML = '<p class="thinking">✨ Running the full /strategy skill (grades bets, writes a new dated brief — takes minutes; Add / Queue tab has the log) <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span></p>'; };
+  const tick = () => { body.innerHTML = '<p class="thinking">✨ Running the full /strategy skill (grades bets, writes a new dated brief — takes minutes; the Studio room has the log) <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span></p>'; };
   tick();
   const timer = setInterval(tick, 1000);
-  loadJobs(); // make the strategy job visible on the Add / Queue tab right away
+  loadJobs(); // make the strategy job visible in the Studio room right away
   try {
     const r = await post("/api/strategy/refresh-brief", {});
     if(r.ok){ flash("Brief refreshed: "+(r.path||"")); await loadBrief(); }
@@ -1078,8 +1141,8 @@ function outreachLeadCard(l){
   const pending = outPending.has(l.dir);
   const err = outError.get(l.dir);
   const status = pending
-    ? '<div class="hint">drafting… (your subscription, ~30-60s — Add / Queue tab has progress + log)</div>'
-    : err ? '<div class="src">'+esc(err)+' — see Add / Queue tab for the job log</div>' : "";
+    ? '<div class="hint">drafting… (your subscription, ~30-60s — the Studio room has progress + log)</div>'
+    : err ? '<div class="src">'+esc(err)+' — see the Studio room for the job log</div>' : "";
   const decided = l.status === "pursue" || l.status === "passed" || l.status === "locked" || l.status === "drafted";
   const draftBtn = !isContentExample
     ? '<button class="out-draft" data-dir="'+esc(l.dir)+'"'+((pending)?" disabled":"")+'>'+(pending?"Drafting…":"Approve → Draft message")+'</button>'
@@ -1207,11 +1270,11 @@ async function scoutRun(){
   banner.className = "hint";
   banner.style.padding = "10px 4px";
   const start = Date.now();
-  const tick = () => { banner.textContent = "✨ Scouting the web for new client/platform leads… (bounded searches on your subscription, takes minutes — Add / Queue tab has the log) · "+fmtElapsed(Date.now()-start)+" elapsed"; };
+  const tick = () => { banner.textContent = "✨ Scouting the web for new client/platform leads… (bounded searches on your subscription, takes minutes — the Studio room has the log) · "+fmtElapsed(Date.now()-start)+" elapsed"; };
   tick();
   const timer = setInterval(tick, 1000);
   box.prepend(banner);
-  loadJobs(); // make the scout job visible on the Add / Queue tab right away
+  loadJobs(); // make the scout job visible in the Studio room right away
   try {
     const r = await post("/api/outreach/scout", {});
     if(r.ok){ flash("Scout finished — inbox reloaded"); }
@@ -1234,181 +1297,124 @@ async function loadOutreach(){
   renderOutreachBox();
 }
 
-// ── Cuts tab: "Proof Sheet" (Stage 1 — plan i-want-to-add-mellow-mist) ──
-// Pre-atomize version review. NOT a review queue: no status, no scheduling, nothing publishes
-// from here. Click a line to leave a blue-pencil note anchored to it (no need to re-describe
-// which cut or which line in chat); Edit swaps a column's body for a textarea, Save writes it back.
-let CUT_SETS = [];
-let cutCommentTarget = null; // {slug, lens} for the currently-open comment form, or null
-
-function cutColumnEl(slug, cut){
-  const col = document.createElement("div"); col.className = "cut-column";
-  const unresolvedLines = new Set(cut.comments.filter(c=>!c.resolved).map(c=>c.line));
-  // NB: double-escaped newline — this whole client script lives inside renderPage()'s template
-  // literal, so a single-backslash escape here is emitted as a REAL newline inside the string
-  // and breaks the entire script at parse time (shipped broken in #244 — the GUI's JS didn't
-  // parse at all).
-  const lines = cut.body.split("\\n").map((line, i) => {
-    const n = i + 1;
-    const cls = "cut-line" + (unresolvedLines.has(n) ? " has-comment" : "");
-    return '<div class="'+cls+'" data-line="'+n+'">'+(esc(line) || "&nbsp;")+'</div>';
-  }).join("");
-  const comments = cut.comments.length
-    ? '<div class="cut-comments">' + cut.comments.map(c =>
-        '<div class="cut-comment'+(c.resolved?" resolved":"")+'"><span class="cc-line">L'+c.line+'</span>'+esc(c.text)+
-        (c.resolved ? "" : ' <button class="cc-resolve" data-id="'+c.id+'">resolve</button>') + '</div>'
-      ).join("") + '</div>'
-    : "";
-  col.innerHTML =
-    '<div class="cut-head"><span class="cut-lens lens-'+esc(cut.lens)+'">'+esc(cut.lens)+'</span><span class="grow"></span>' +
-    '<button class="cc-edit">Edit</button></div>' +
-    '<div class="cut-body">'+lines+'</div>' +
-    comments +
-    '<div class="cut-comment-form"><input placeholder="note on line …" class="cc-input" /><button class="cc-send">Save</button></div>';
-
-  col.querySelectorAll(".cut-line").forEach(el => el.addEventListener("click", () => {
-    cutCommentTarget = { slug, lens: cut.lens, line: Number(el.dataset.line) };
-    const form = col.querySelector(".cut-comment-form");
-    form.classList.add("show");
-    form.querySelector(".cc-input").placeholder = "note on line " + el.dataset.line + " …";
-    form.querySelector(".cc-input").focus();
-  }));
-  col.querySelector(".cc-send").addEventListener("click", async () => {
-    if (!cutCommentTarget || cutCommentTarget.slug !== slug || cutCommentTarget.lens !== cut.lens) return;
-    const input = col.querySelector(".cc-input");
-    const text = input.value.trim();
-    if (!text) return;
-    const r = await post("/api/cut-comment", { slug, lens: cut.lens, line: cutCommentTarget.line, text });
-    if (r.ok) { flash("Note saved"); await loadCuts(); }
-    else flash(r.error || "Failed to save note");
-  });
-  col.querySelectorAll(".cc-resolve").forEach(b => b.addEventListener("click", async () => {
-    const r = await post("/api/cut-comment-resolve", { slug, lens: cut.lens, commentId: b.dataset.id });
-    if (r.ok) await loadCuts(); else flash(r.error || "Failed to resolve");
-  }));
-  col.querySelector(".cc-edit").addEventListener("click", () => {
-    const bodyEl = col.querySelector(".cut-body");
-    const editing = bodyEl.querySelector("textarea");
-    if (editing) return; // already editing
-    const ta = document.createElement("textarea");
-    ta.value = cut.body;
-    bodyEl.innerHTML = ""; bodyEl.appendChild(ta);
-    const editBtn = col.querySelector(".cc-edit");
-    editBtn.textContent = "Save";
-    editBtn.onclick = async () => {
-      const r = await post("/api/cut-save", { slug, lens: cut.lens, body: ta.value });
-      if (r.ok) { flash("Saved"); await loadCuts(); }
-      else flash(r.error || "Failed to save");
-    };
-  });
-  return col;
-}
-
-function renderCutsBox(){
-  const box = $("#cutsList");
-  if (!CUT_SETS.length) {
-    box.innerHTML = '<div class="empty">No cuts yet — accept an angle in the Develop tab, or run <code>/atomize</code> in a terminal (its step 1.5 proposes cuts before anything is formatted per platform).</div>';
-    return;
-  }
-  box.innerHTML = "";
-  for (const piece of CUT_SETS) {
-    const sec = document.createElement("div"); sec.className = "cuts-piece";
-    sec.innerHTML = '<h2>'+esc(piece.title)+'</h2><div class="slug">'+esc(piece.slug)+'</div>';
-    const board = document.createElement("div"); board.className = "cuts-board";
-    for (const cut of piece.cuts) board.appendChild(cutColumnEl(piece.slug, cut));
-    sec.appendChild(board);
-    box.appendChild(sec);
-  }
-}
-
-async function loadCuts(){
-  const box = $("#cutsList");
-  box.innerHTML = '<div class="empty">Loading…</div>';
-  const r = await fetch("/api/cuts");
-  const d = await r.json();
-  CUT_SETS = d.cutSets || [];
-  renderCutsBox();
-}
-
-// ── Develop tab: the advisor stage ──
-// Recommendation cards from a queued /develop round. Accept builds a real cut from Muxin's own
-// verbatim source lines (server-side, deterministic — the serif preview shown IS the text that
-// gets accepted, resolved live from source.md); Dismiss just marks the card; the reply box runs
-// another advisor round as a job. "Format for platforms" hands the chosen cuts to the normal
-// formatting pipeline (/atomize --continue), where every draft still lands pending in Review.
-let DEV_SESSIONS = [];
+// ── Content room: the workbench (Content Studio Riff 3a/3b) ──
+// One sheet per active piece: Muxin's source verbatim in serif behind the blue pencil, each cut
+// rendered as the message it is, the director's checks in the margin, one clear handoff. Accept
+// still builds cuts server-side from verbatim lines only (what you see IS what gets accepted);
+// the reply box runs another advisor round as a queued job; "Hand it to the team" runs the
+// formatting pipeline. Nothing publishes — every draft lands below in "Drafts for your yes".
+let WB_SESSIONS = [];
 const devReplyPending = new Set(); // slugs with a just-clicked reply, before the job shows in JOBS
+const wbExpanded = new Set();      // slugs whose full source text is expanded
 
 function devWorking(slug){
   return devReplyPending.has(slug) || JOBS.some(j =>
     (j.kind==="develop"||j.kind==="develop-reply") && (j.status==="queued"||j.status==="running") &&
     (j.label==="Develop: "+slug || j.label==="Advisor reply: "+slug));
 }
-function devKindLabel(k){ return k==="cta"?"CTA check":k==="spin"?"platform spin":k; }
-function devCardHtml(slug, card){
-  const decided = card.status !== "open";
-  const badge = '<span class="dev-kind '+esc(card.kind)+'">'+esc(devKindLabel(card.kind))+'</span>';
-  const lineRefs = (card.sourceLines||[]).map(x=>"L"+x).join(", ");
-  const preview = card.previewText !== undefined
-    ? '<div class="dev-preview-label">your lines, verbatim ('+esc(lineRefs)+')</div><div class="dev-preview">'+esc(card.previewText)+'</div>'
+function fmtDay(iso){
+  if(!iso) return "";
+  const p = iso.split("-");
+  const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return MO[(Number(p[1])||1)-1]+" "+Number(p[2]);
+}
+function lineRefsText(refs){
+  const parts = (refs||[]).map(String);
+  if(!parts.length) return "";
+  return (parts.length===1 ? "line " : "lines ")+parts.join(", ");
+}
+function wbCheckHtml(cls, verdict, label, textHtml){
+  return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(verdict)+'</span> · '+esc(label)+'</span><span class="d">'+textHtml+'</span></div>';
+}
+function wbMarginHtml(s){
+  const kindLabel = {cta:"CTA check", spin:"Platform spin", routing:"Routing", note:"Note"};
+  const checks = [];
+  const last = s.rounds.length ? s.rounds[s.rounds.length-1] : null;
+  if(last) for(const c of last.cards){
+    if(c.kind==="angle") continue;
+    checks.push(wbCheckHtml("", "checked", kindLabel[c.kind]||c.kind, esc(c.summary||c.title)));
+  }
+  // The extraction guarantee, synthesized from the cuts' own recorded provenance.
+  const withLines = s.cuts.filter(c=>c.sourceLines && c.sourceLines.length);
+  if(withLines.length){
+    const refs = withLines.map(c=>lineRefsText(c.sourceLines)).join("; ");
+    checks.push(wbCheckHtml("green", "held", "Extraction", esc("Every word is yours ("+refs+"), verbatim and trimmed. Nothing composed.")));
+  }
+  const body = checks.length ? checks.join("")
+    : '<div class="wb-margin-sub">No director notes on this piece yet.</div>';
+  const reply = devWorking(s.slug)
+    ? '<div class="dev-working">✨ your director is working on a round… (Studio has the log)</div>'
+    : '<div class="wb-reply"><input class="wb-reply-input" placeholder="Push back, or ask for another angle…" data-slug="'+esc(s.slug)+'" />'+
+      '<button class="wb-reply-send" data-slug="'+esc(s.slug)+'">'+(s.rounds.length?"Send to your director":"Ask for a read")+'</button>'+
+      '<span class="mono-note">a round takes 30s to a few min. real time.</span></div>';
+  return '<div class="session-margin">'+
+    '<div><div class="wb-margin-cap">WHAT YOUR DIRECTOR CHECKED</div>'+
+    (s.rounds.length ? '<div class="wb-margin-sub">Ran the lenses against your words. Kept only what earned its place.</div>' : "")+
+    '</div>'+body+reply+'</div>';
+}
+function wbAngleHtml(slug, card){
+  const refs = lineRefsText(card.sourceLines);
+  const preview = card.previewText!==undefined
+    ? '<div class="dev-preview-label">your lines, verbatim ('+esc(refs)+')</div><div class="dev-preview">'+esc(card.previewText)+'</div>'
     : (card.previewError ? '<div class="aierr">⚠ '+esc(card.previewError)+'</div>' : "");
-  const summary = card.summary ? '<div class="dev-summary">'+esc(card.summary)+'</div>' : "";
-  let actions = "";
-  if (card.status === "accepted") actions = '<div class="scheduled">✓ cut created: '+esc(card.acceptedLens||"")+' — see the Cuts tab</div>';
-  else if (card.status === "dismissed") actions = "";
-  else if (card.kind === "angle" && card.previewText !== undefined) {
-    actions = '<div class="actions"><input class="dev-lens" value="'+esc(card.lens||"")+'" title="name for this cut (lowercase-with-dashes)" />'+
-      '<button class="dev-accept" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Accept as cut</button>'+
-      '<button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Dismiss</button></div>';
-  } else {
-    actions = '<div class="actions"><button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Got it — dismiss</button></div>';
-  }
-  return '<div class="dev-card'+(decided?" decided":"")+'">'+
-    '<div class="rowhead">'+badge+'<b>'+esc(card.title)+'</b></div>'+summary+preview+actions+'</div>';
+  const actions = card.previewText!==undefined
+    ? '<div class="actions"><input class="dev-lens" value="'+esc(card.lens||"")+'" title="name for this cut (lowercase-with-dashes)" /><button class="dev-accept" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Accept as cut</button><button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Dismiss</button></div>'
+    : '<div class="actions"><button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Dismiss</button></div>';
+  return '<div class="wb-proposal">'+
+    '<div class="wb-cut-head"><span class="lens">Your director proposes a cut</span><span class="sub">'+esc(card.lens||"")+'</span></div>'+
+    '<div style="font-weight:600;font-size:14px;margin-bottom:4px;">'+esc(card.title)+'</div>'+
+    (card.summary?'<div class="dev-summary">'+esc(card.summary)+'</div>':"")+preview+actions+'</div>';
 }
-function devSessionEl(s){
-  const sec = document.createElement("section"); sec.className = "piece";
-  let html = '<h2>'+esc(s.title)+'</h2><div class="slug">'+esc(s.slug)+'</div>';
-  for (const round of s.rounds){
-    if (round.trigger === "reply" && round.replyText) html += '<div class="dev-round-reply">You asked: '+esc(round.replyText)+'</div>';
-    for (const card of round.cards) html += devCardHtml(s.slug, card);
+function wbSessionEl(s){
+  const sheet = document.createElement("div");
+  sheet.className = "sheet session";
+  const expanded = wbExpanded.has(s.slug);
+  const longSource = s.sourceBody.length > 420;
+  const openAngles = [];
+  for(const round of s.rounds) for(const c of round.cards) if(c.kind==="angle" && c.status==="open") openAngles.push(c);
+  let main = '<div class="wb-title">'+esc(s.title)+'</div>'+
+    '<div class="wb-label">You wrote'+(s.date?", "+fmtDay(s.date):"")+'</div>'+
+    '<div class="wb-source'+((longSource&&!expanded)?" clamped":"")+'">'+esc(s.sourceBody)+'</div>'+
+    (longSource?'<div class="wb-expand" data-slug="'+esc(s.slug)+'">'+(expanded?"show less":"read the whole page")+'</div>':"");
+  if(s.cuts.length){
+    main += '<div class="wb-sep"><span class="rule"></span><span class="txt">your director shaped '+(s.cuts.length>1?"cuts":"a cut")+'</span><span class="rule"></span></div>';
+    for(const c of s.cuts){
+      main += '<div class="wb-cut" data-lens="'+esc(c.lens)+'">'+
+        '<div class="wb-cut-head"><span class="lens">The cut</span><span class="sub">'+esc(c.lens)+' · still your words, trimmed</span><span class="grow"></span><button class="wb-link wb-cut-edit" data-slug="'+esc(s.slug)+'" data-lens="'+esc(c.lens)+'">Edit the cut</button></div>'+
+        '<div class="wb-cut-body">'+esc(c.body)+'</div></div>';
+    }
   }
-  if (devWorking(s.slug)) html += '<div class="dev-working">✨ the advisor is working on another round… (Add / Queue tab has the log)</div>';
-  else html += '<div class="aibox show"><input class="dev-reply-input" placeholder="tell the advisor what to change or dig into…" /><button class="send dev-reply" data-slug="'+esc(s.slug)+'">Ask the advisor</button></div>';
-  const lensChecks = ["extract"].concat(s.cuts).map(l =>
+  for(const card of openAngles) main += wbAngleHtml(s.slug, card);
+  const lensChecks = ["extract"].concat(s.cuts.map(c=>c.lens)).map(l =>
     '<label class="toggle"><input type="checkbox" class="dev-fmt-lens" value="'+esc(l)+'" checked /> '+esc(l)+'</label>').join("");
-  html += '<div class="dev-format"><span class="hint" style="flex:1;min-width:200px">Happy with the message? Format for platforms runs the production pipeline (route, draft per platform, quote cards, validate) — every draft still lands pending in Review, nothing publishes.</span>'+
-    lensChecks+'<button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Format for platforms</button></div>';
-  sec.innerHTML = html;
-  return sec;
+  main += '<div class="wb-handoff"><button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Hand it to the team →</button>'+
+    '<span class="note">They shape it for each platform, make the visuals, hold it for posting. Every draft comes back below for your yes.</span>'+lensChecks+'</div>';
+  if(s.pending) main += '<div class="wb-links"><span class="wb-link wb-goto-review">'+s.pending+' draft'+(s.pending===1?"":"s")+' below, waiting for your yes ↓</span></div>';
+  sheet.innerHTML = '<div class="session-grid"><div class="session-main">'+main+'</div>'+wbMarginHtml(s)+'</div>';
+  return sheet;
 }
-function renderDevelop(){
-  const box = $("#devSessions");
+function renderWorkbench(){
+  const box = $("#workbench");
   box.innerHTML = "";
-  if (!DEV_SESSIONS.length){
-    box.innerHTML = '<div class="empty">No advisor sessions yet. Drop an idea above and hit Develop — the advisor answers with angles and checks to react to, not a finished draft.</div>';
-    return;
-  }
-  for (const s of DEV_SESSIONS) box.appendChild(devSessionEl(s));
+  for(const s of WB_SESSIONS) box.appendChild(wbSessionEl(s));
 }
-async function loadDevelop(){
-  const r = await fetch("/api/develop"); const d = await r.json();
-  DEV_SESSIONS = d.sessions || [];
-  renderDevelop();
+async function loadContent(){
+  const r = await fetch("/api/content"); const d = await r.json();
+  WB_SESSIONS = d.sessions || [];
+  renderWorkbench();
 }
 async function devStart(){
-  const ta = $("#devSrc"); const source = ta.value.trim();
-  if(!source){ flash("Paste something first"); return; }
+  const ta = $("#src"); const source = ta.value.trim();
+  if(!source){ flash("Write or paste something first"); return; }
   $("#devStartBtn").disabled = true;
   const r = await post("/api/develop/start",{source});
   $("#devStartBtn").disabled = false;
-  if(r.ok){ ta.value=""; flash("Queued — the advisor is reading"); loadJobs(); }
-  else flash(r.error || "Could not queue");
+  if(r.ok){ ta.value=""; flash("Handed over — your director is reading"); loadJobs(); }
+  else flash(r.error || "Could not hand it over");
 }
 $("#devStartBtn").addEventListener("click", devStart);
-$("#devSrc").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") devStart(); });
-// Delegated — devSessions is rebuilt wholesale on every load, same pattern as the notes list.
-$("#devSessions").addEventListener("click", async (e)=>{
+// Delegated — the workbench is rebuilt wholesale on every load, same pattern as the notes list.
+$("#workbench").addEventListener("click", async (e)=>{
   const t = e.target;
   if (!t || !t.classList) return;
   if (t.classList.contains("dev-accept")){
@@ -1417,31 +1423,55 @@ $("#devSessions").addEventListener("click", async (e)=>{
     const body = {slug:t.dataset.slug, cardId:t.dataset.card};
     if (lensInput && lensInput.value.trim()) body.lens = lensInput.value.trim();
     const r = await post("/api/develop/accept", body);
-    if(r.ok){ flash("Cut created: "+r.lens+" — see the Cuts tab"); await loadDevelop(); }
+    if(r.ok){ flash("Cut made: "+r.lens+" — your words, on the page"); await loadContent(); }
     else { t.disabled = false; flash(r.error || "Could not accept"); }
   } else if (t.classList.contains("dev-dismiss")){
     t.disabled = true;
     const r = await post("/api/develop/dismiss", {slug:t.dataset.slug, cardId:t.dataset.card});
-    if(r.ok){ await loadDevelop(); } else { t.disabled = false; flash(r.error || "Could not dismiss"); }
-  } else if (t.classList.contains("dev-reply")){
+    if(r.ok){ await loadContent(); } else { t.disabled = false; flash(r.error || "Could not dismiss"); }
+  } else if (t.classList.contains("wb-reply-send")){
     const slug = t.dataset.slug;
-    const inp = t.closest(".aibox").querySelector(".dev-reply-input");
+    const inp = t.closest(".wb-reply").querySelector(".wb-reply-input");
     const reply = inp ? inp.value.trim() : "";
-    if(!reply){ flash("Type something for the advisor first"); return; }
-    devReplyPending.add(slug); renderDevelop();
+    const session = WB_SESSIONS.find(x=>x.slug===slug);
+    const hasRounds = session && session.rounds.length;
+    if(!reply && hasRounds){ flash("Type something for your director first"); return; }
+    devReplyPending.add(slug); renderWorkbench();
     try {
-      const r = await post("/api/develop/reply", {slug, reply});
-      if(r.ok){ flash("Queued — the advisor is thinking"); await loadJobs(); }
-      else flash(r.error || "Could not queue the reply");
-    } finally { devReplyPending.delete(slug); renderDevelop(); }
+      const r = reply
+        ? await post("/api/develop/reply", {slug, reply})
+        : await post("/api/develop/start", {slug});
+      if(r.ok){ flash("Handed over — your director is on it"); await loadJobs(); }
+      else flash(r.error || "Could not queue the round");
+    } finally { devReplyPending.delete(slug); renderWorkbench(); }
   } else if (t.classList.contains("dev-format-btn")){
     const slug = t.dataset.slug;
-    const lenses = [...t.closest(".dev-format").querySelectorAll(".dev-fmt-lens")].filter(c=>c.checked).map(c=>c.value);
+    const lenses = [...t.closest(".session-main").querySelectorAll(".dev-fmt-lens")].filter(c=>c.checked).map(c=>c.value);
     if(!lenses.length){ flash("Pick at least one cut"); return; }
     t.disabled = true;
     const r = await post("/api/develop/format", {slug, lenses});
-    if(r.ok){ flash("Queued "+r.jobs.length+" formatting job(s) — drafts land pending in Review"); loadJobs(); }
+    if(r.ok){ flash("Handed to the team — "+r.jobs.length+" formatting job(s); drafts land below for your yes"); loadJobs(); }
     else { t.disabled = false; flash(r.error || "Could not queue formatting"); }
+  } else if (t.classList.contains("wb-cut-edit")){
+    const cutEl = t.closest(".wb-cut");
+    if(t.dataset.mode === "save"){
+      const ta = cutEl.querySelector("textarea");
+      const r = await post("/api/cut-save", {slug:t.dataset.slug, lens:t.dataset.lens, body:ta ? ta.value : ""});
+      if(r.ok){ flash("Saved"); await loadContent(); }
+      else flash(r.error || "Could not save");
+    } else {
+      const bodyEl = cutEl.querySelector(".wb-cut-body");
+      const ta = document.createElement("textarea");
+      ta.value = bodyEl.textContent;
+      bodyEl.replaceWith(ta);
+      t.textContent = "Save"; t.dataset.mode = "save";
+    }
+  } else if (t.classList.contains("wb-expand")){
+    const slug = t.dataset.slug;
+    if(wbExpanded.has(slug)) wbExpanded.delete(slug); else wbExpanded.add(slug);
+    renderWorkbench();
+  } else if (t.classList.contains("wb-goto-review")){
+    $("#reviewSheet").scrollIntoView({behavior:"smooth", block:"start"});
   }
 });
 
@@ -1481,8 +1511,8 @@ function followupRowHtml(row){
   // toast alone made a real ~30-120s-long failure vanish before anyone not staring at the screen
   // could see it (same anti-pattern the ai-send/dup-send toast was already fixed for, card fbfea28b).
   const status = pending
-    ? '<div class="hint">drafting… (your subscription, ~30-60s — Add / Queue tab has progress + log)</div>'
-    : err ? '<div class="src">'+esc(err)+' — see Add / Queue tab for the job log</div>' : "";
+    ? '<div class="hint">drafting… (your subscription, ~30-60s — the Studio room has progress + log)</div>'
+    : err ? '<div class="src">'+esc(err)+' — see the Studio room for the job log</div>' : "";
   // Optional note per action (kept in tracker.jsonl's own note field — the server side already
   // accepted one, the GUI just never sent it): "sent via their contact form", "replied on LinkedIn".
   const noteInput = disabled ? "" : '<input class="fu-note" placeholder="optional note (saved to the tracker)…" />';
@@ -1582,7 +1612,7 @@ function renderJobs(){
     box.appendChild(el);
   }
   box.querySelectorAll("a.jump").forEach(a=>a.addEventListener("click",(e)=>{
-    e.preventDefault(); setTab("review");
+    e.preventDefault(); setRoom("content");
     load().then(()=>{
       const d = [...document.querySelectorAll(".piece .slug")].find(x=>x.textContent===a.dataset.slug);
       if(d) d.scrollIntoView({behavior:"smooth", block:"start"});
@@ -1604,7 +1634,7 @@ async function loadJobs(){
     }
     if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))){
       load(); // a job moved → refresh review rows
-      if(currentTab==="develop") loadDevelop(); // a finished advisor round renders its new cards
+      if(currentTab==="content") loadContent(); // a finished advisor round renders its new sheets
     }
   }catch(e){}
 }
@@ -1689,14 +1719,21 @@ $("#notesBtn").addEventListener("click", openNotes);
 $("#notesCloseBtn").addEventListener("click", ()=>{ $("#notesPanel").hidden = true; });
 $("#notesShowDrafted").addEventListener("change",(e)=>{ notesShowDrafted = e.target.checked; renderNotes(); });
 $("#notesDraftBtn").addEventListener("click", draftSelectedNotes);
-$("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") addSource(); });
+$("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") devStart(); });
 setInterval(()=>{ if(JOBS.some(j=>j.status==="queued"||j.status==="running")) loadJobs(); }, 3000);
 
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
-setTab("ingest");
+setRoom("content");
+// The desk header's live date ("Thursday · Jul 17").
+{
+  const now = new Date();
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  $("#deskDate").textContent = DAYS[now.getDay()]+" · "+MO[now.getMonth()]+" "+now.getDate();
+}
 // Match doRefresh()'s ordering: stamp "last refreshed" once the initial data has actually
 // landed, not the instant the page starts loading it (load()/loadJobs() are async).
-Promise.all([load(), loadJobs()]).finally(markRefreshed);
+Promise.all([load(), loadJobs(), loadContent()]).finally(markRefreshed);
 </script>
 </body>
 </html>`;

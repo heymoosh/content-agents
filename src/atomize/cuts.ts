@@ -14,6 +14,11 @@ export interface CutSource {
   lens: string;
   title: string;
   text: string;
+  // Optional provenance: the source.md line refs the text was assembled from (a number, or an
+  // inclusive "start-end" range string — the derivative source_lines convention). Written into
+  // cut.md frontmatter so a reading surface can say "lines 10 and 12, verbatim" without
+  // re-deriving it.
+  sourceLines?: (number | string)[];
 }
 
 // Path to a non-default cut's folder: content/<slug>/cuts/<lens>/. Never called for "extract".
@@ -31,9 +36,12 @@ export function addCut(folderDir: string, src: CutSource): string {
   const dir = cutDir(folderDir, src.lens);
   if (existsSync(join(dir, "cut.md"))) throw new Error(`already exists: ${dir}/cut.md`);
   mkdirSync(join(dir, "derivatives"), { recursive: true });
+  const sourceLines = src.sourceLines?.length
+    ? `\nsource_lines: [${src.sourceLines.map((r) => (typeof r === "number" ? r : `"${r}"`)).join(", ")}]`
+    : "";
   writeFileSync(
     join(dir, "cut.md"),
-    `---\nlens: ${src.lens}\ntitle: "${src.title.replace(/"/g, '\\"')}"\ncreated_at: ${new Date().toISOString()}\n---\n\n${src.text.trim()}\n`
+    `---\nlens: ${src.lens}\ntitle: "${src.title.replace(/"/g, '\\"')}"\ncreated_at: ${new Date().toISOString()}${sourceLines}\n---\n\n${src.text.trim()}\n`
   );
   return dir;
 }

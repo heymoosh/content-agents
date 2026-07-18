@@ -81,7 +81,7 @@ import {
   developJobInFlight,
   buildFormatArg,
 } from "./jobs.js";
-import { listDevelopSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
+import { listDevelopSessions, listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
 import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
 
@@ -935,6 +935,12 @@ const server = createServer(async (req, res) => {
     // ONLY from Muxin's verbatim source.md lines, never from advisor text (CLAUDE.md rule 1).
     if (req.method === "GET" && url.pathname === "/api/develop") {
       json(res, 200, { sessions: listDevelopSessions() });
+      return;
+    }
+    // The Content room's workbench aggregate: per active piece — Muxin's source verbatim, the
+    // advisor rounds, each cut as a readable message with provenance, pending review count.
+    if (req.method === "GET" && url.pathname === "/api/content") {
+      json(res, 200, { sessions: listContentSessions() });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/develop/start") {
