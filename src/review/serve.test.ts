@@ -25,6 +25,7 @@ import {
   parseBriefDate,
   extractSection,
   type SchedulerDeps,
+  appendLeadContact,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
@@ -633,4 +634,15 @@ test("appendLeadNote appends the section at the end when there is no ## Decision
   assert.match(out, /## Muxin notes/);
   assert.ok(out.indexOf("## Muxin notes") > out.indexOf("## Profile"));
   assert.match(out, /- 2026-07-16: note/);
+});
+
+// ── appendLeadContact (design 3d "WHO YOU'D REACH") ─────────────────────────────────────────────
+test("appendLeadContact creates ## Contacts before ## Decision log and appends without duplicating", () => {
+  const raw = `---\nkind: client\nname: "PostHog"\n---\n\n## Profile\n\ntext\n\n## Decision log\n\n- 2026-07-01: researched\n`;
+  const once = appendLeadContact(raw, "Jamie R.", "community lead");
+  assert.match(once, /## Contacts\n\n- Jamie R\. \| community lead\n/);
+  assert.ok(once.indexOf("## Contacts") < once.indexOf("## Decision log"));
+  const twice = appendLeadContact(once, "Annika L.", "");
+  assert.match(twice, /- Jamie R\. \| community lead\n- Annika L\.\n/);
+  assert.throws(() => appendLeadContact(twice, "jamie r.", "any"), /already a contact/);
 });

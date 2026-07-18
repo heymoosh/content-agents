@@ -37,6 +37,10 @@ export interface TrackerEvent {
   lead: string; // outreach/leads/<dir> basename (client/platform), JSA company name (jobsearch), or a free-form id (inbound)
   bucket: Bucket;
   event: TrackerEventType;
+  // The PERSON this touch concerns (design: "Different people at the same org get separate
+  // clocks, both linked to the one org dossier"). Absent on lead-level events (the pre-person
+  // rows) and on buckets that key on a person already (inbound handles).
+  person?: string;
   channel?: string;
   message?: string;
   next?: string;
@@ -176,9 +180,10 @@ export function nextActionLabel(state: LeadState): string {
 }
 
 export interface FollowupRow {
-  key: string; // `${bucket}:${lead}` -- unique row id for the GUI's row actions
+  key: string; // `${bucket}:${lead}:${person}` -- unique row id for the GUI's row actions
   bucket: Bucket;
   lead: string; // the tracker `lead` key (what mark-responded/move-on/draft-follow-up address)
+  person?: string; // set when this row is one person's clock at a multi-contact lead
   who: string;
   why: string;
   dir?: string; // repo-relative outreach/leads/<dir>, client/platform rows only (draft-follow-up target)
@@ -189,13 +194,19 @@ export interface FollowupRow {
   nextAction: string;
   dueDate: string | null;
   abandonDate: string | null;
+  // Origin context (design 3g: "you won't have to remember any of it"): what you said (locked
+  // message excerpt + file) and the dossier's fit read -- client/platform rows only.
+  saidExcerpt?: string;
+  messageFile?: string;
+  fit?: string;
 }
 
-function rowFromState(state: LeadState, who: string, why: string, dir?: string): FollowupRow {
+function rowFromState(state: LeadState, who: string, why: string, dir?: string, person?: string): FollowupRow {
   return {
-    key: `${state.bucket}:${state.lead}`,
+    key: `${state.bucket}:${state.lead}:${person ?? ""}`,
     bucket: state.bucket,
     lead: state.lead,
+    ...(person ? { person } : {}),
     who,
     why,
     dir,
@@ -211,23 +222,30 @@ function rowFromState(state: LeadState, who: string, why: string, dir?: string):
 
 const LEADS_ROOT = join(repoRoot, "outreach", "leads");
 
-interface LockedMessageInfo {
+export interface LockedMessageInfo {
   messageId: string;
   channel?: string;
+  excerpt?: string; // first line-ish of the locked body -- the ledger's "What you said" cell
 }
 
 // The most recently LOCKED message under a lead folder's messages/ dir, if any -- draft.ts
 // numbers messages sequentially (message-01, message-02, ...) and a follow-up touch reframes
 // the current locked core message (plan §5 stage 9), so the highest-numbered locked one wins.
-function latestLockedMessage(leadDirAbs: string): LockedMessageInfo | null {
+// Exported for serve.ts's mark-sent route: the message a first send most plausibly refers to.
+export function latestLockedMessage(leadDirAbs: string): LockedMessageInfo | null {
   const messagesDir = join(leadDirAbs, "messages");
   if (!existsSync(messagesDir)) return null;
   const files = readdirSync(messagesDir).filter((f) => /^message-\d+\.md$/.test(f)).sort();
   let latest: LockedMessageInfo | null = null;
   for (const f of files) {
-    const { fm } = splitFrontmatter(readFileSync(join(messagesDir, f), "utf8"));
+    const { fm, body } = splitFrontmatter(readFileSync(join(messagesDir, f), "utf8"));
     if (String(fm.status ?? "") === "locked") {
-      latest = { messageId: f.replace(/\.md$/, ""), channel: typeof fm.channel === "string" ? fm.channel : undefined };
+      const excerpt = body.trim().replace(/\s+/g, " ").slice(0, 160);
+      latest = {
+        messageId: f.replace(/\.md$/, ""),
+        channel: typeof fm.channel === "string" ? fm.channel : undefined,
+        excerpt: excerpt || undefined,
+      };
     }
   }
   return latest;
@@ -263,10 +281,31 @@ export function buildClientPlatformRows(
     if (!locked && leadEvents.length === 0) continue;
 
     const { fm } = splitFrontmatter(readFileSync(leadPath, "utf8"));
-    const state = foldLeadEvents(leadDirName, kind, leadEvents, config, nowIso);
-    const who = String(fm.name ?? leadDirName);
+    const leadName = String(fm.name ?? leadDirName);
     const why = String(fm.pitch_angle ?? "").trim() || "(no pitch angle recorded)";
-    rows.push(rowFromState({ ...state, channel: state.channel ?? locked?.channel }, who, why, `outreach/leads/${leadDirName}`));
+    const dir = `outreach/leads/${leadDirName}`;
+
+    // One clock PER PERSON at the lead: events carrying `person` fold into their own row
+    // ("Annika L. · PostHog" and "James H. · PostHog" run separate clocks, both linked to the one
+    // dossier). Events without a person stay a lead-level row -- also the shape of every event
+    // written before person tracking existed, so history keeps rendering unchanged.
+    const persons = [...new Set(leadEvents.map((e) => e.person ?? ""))].sort();
+    if (!persons.includes("")) persons.unshift("");
+    for (const person of persons) {
+      const personEvents = leadEvents.filter((e) => (e.person ?? "") === person);
+      // Skip an empty lead-level group when person rows exist -- the persons carry the state.
+      if (person === "" && personEvents.length === 0 && persons.length > 1) continue;
+      const state = foldLeadEvents(leadDirName, kind, personEvents, config, nowIso);
+      const who = person ? `${person} · ${leadName}` : leadName;
+      const row = rowFromState({ ...state, channel: state.channel ?? locked?.channel }, who, why, dir, person || undefined);
+      if (locked) {
+        row.saidExcerpt = locked.excerpt;
+        row.messageFile = `messages/${locked.messageId}.md`;
+      }
+      const fit = String((kind === "platform" ? fm.fit : fm.classification) ?? "").trim();
+      if (fit) row.fit = fit;
+      rows.push(row);
+    }
   }
   return rows;
 }
@@ -379,24 +418,45 @@ export function summarizeFollowups(result: FollowupsResult): FollowupBucketSumma
 // Both just append a tracker event -- neither contacts anyone or transmits anything (CLAUDE.md
 // rule 2 analog / plan §7: no send path exists anywhere in this codebase).
 
-export function markResponded(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH): TrackerEvent {
-  const event: TrackerEvent = { ts: new Date().toISOString(), lead, bucket, event: "responded", ...(note ? { note } : {}) };
+export function markResponded(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH, person?: string): TrackerEvent {
+  const event: TrackerEvent = { ts: new Date().toISOString(), lead, bucket, event: "responded", ...(person ? { person } : {}), ...(note ? { note } : {}) };
   appendTrackerEvent(event, path);
   return event;
 }
 
 // Manual "I sent this by hand" tracker touch -- for a follow-up Muxin sent outside this tool
 // (e.g. in his email client), so the Follow-ups tab's due-date clock still (re)starts correctly.
-export function markContacted(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH): TrackerEvent {
-  const event: TrackerEvent = { ts: new Date().toISOString(), lead, bucket, event: "followup_sent", ...(note ? { note } : {}) };
+export function markContacted(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH, person?: string): TrackerEvent {
+  const event: TrackerEvent = { ts: new Date().toISOString(), lead, bucket, event: "followup_sent", ...(person ? { person } : {}), ...(note ? { note } : {}) };
+  appendTrackerEvent(event, path);
+  return event;
+}
+
+// "Mark as sent" (design 3d): the FIRST send of a locked message to a specific person over a
+// specific channel. This is the step that puts the person on the follow-ups ledger -- it appends
+// the previously-unused `contacted` event with person + channel + which message, and the
+// due-date clock starts from here. Nothing is transmitted; Muxin already sent it by hand.
+export function markSent(
+  bucket: Bucket,
+  lead: string,
+  opts: { person?: string; channel?: string; message?: string; note?: string },
+  path: string = TRACKER_PATH,
+): TrackerEvent {
+  const event: TrackerEvent = {
+    ts: new Date().toISOString(), lead, bucket, event: "contacted",
+    ...(opts.person ? { person: opts.person } : {}),
+    ...(opts.channel ? { channel: opts.channel } : {}),
+    ...(opts.message ? { message: opts.message } : {}),
+    ...(opts.note ? { note: opts.note } : {}),
+  };
   appendTrackerEvent(event, path);
   return event;
 }
 
 // "Move on" reads as closing a chapter, not failure (659b50f0's explicit anti-pattern) -- the
 // event type is `abandoned` internally, but nothing in the GUI copy should say that word.
-export function moveOn(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH): TrackerEvent {
-  const event: TrackerEvent = { ts: new Date().toISOString(), lead, bucket, event: "abandoned", ...(note ? { note } : {}) };
+export function moveOn(bucket: Bucket, lead: string, note?: string, path: string = TRACKER_PATH, person?: string): TrackerEvent {
+  const event: TrackerEvent = { ts: new Date().toISOString(), lead, bucket, event: "abandoned", ...(person ? { person } : {}), ...(note ? { note } : {}) };
   appendTrackerEvent(event, path);
   return event;
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { summarizeLead, groupByStatus, renderStatusTable, renderTargetsList, readLeadDetail, parseJsaStats, type LeadSummary } from "./status.js";
+import { summarizeLead, groupByStatus, renderStatusTable, renderTargetsList, readLeadDetail, parseJsaStats, type LeadSummary, parseContacts } from "./status.js";
 
 function makeLeadMd(overrides: Record<string, string> = {}): string {
   const fields: Record<string, string> = {
@@ -329,4 +329,14 @@ describe("readLatestMessage + muxinNotes via readLeadDetail", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+// ── parseContacts (## Contacts → per-person clocks) ─────────────────────────────────────────────
+test("parseContacts reads `- Name | role` lines, tolerating a bare name", () => {
+  const body = "## Profile\n\ntext\n\n## Contacts\n\n- Jamie R. | community lead\n- Sam\n\n## Decision log\n";
+  assert.deepEqual(parseContacts(body), [
+    { name: "Jamie R.", role: "community lead" },
+    { name: "Sam", role: "" },
+  ]);
+  assert.deepEqual(parseContacts("## Profile\n\nno contacts here\n"), []);
 });

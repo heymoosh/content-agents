@@ -36,7 +36,8 @@ import { listLeadDetails } from "../outreach/status.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
-import { buildFollowups, markResponded, markContacted, moveOn, isBucket } from "../outreach/tracker.js";
+import { buildFollowups, markResponded, markContacted, moveOn, markSent, latestLockedMessage, isBucket } from "../outreach/tracker.js";
+import { CHANNELS } from "../outreach/draft.js";
 import {
   enrich,
   listPieces,
@@ -648,6 +649,37 @@ export function appendLeadNote(raw: string, note: string, date: string): string 
   } else {
     const decisionAt = lines.findIndex((l) => l.trim() === "## Decision log");
     const section = ["## Muxin notes", "", line, ""];
+    if (decisionAt === -1) lines.push("", ...section.slice(0, 3));
+    else lines.splice(decisionAt, 0, ...section);
+  }
+  return `${header}\n${lines.join("\n").replace(/\n+$/, "")}\n`;
+}
+
+// Pure, exported for unit testing: append one `- Name | role` line under a lead.md's
+// `## Contacts` section (design 3d "WHO YOU'D REACH"), creating the section before
+// `## Decision log` (else at the end) when absent -- same placement contract as appendLeadNote.
+// Refuses a duplicate name (case-insensitive) so a double-click can't double a person.
+export function appendLeadContact(raw: string, name: string, role: string): string {
+  const { header, body } = splitFrontmatter(raw);
+  const line = role.trim() ? `- ${name} | ${role.trim()}` : `- ${name}`;
+  const lines = body.replace(/\n+$/, "").split("\n");
+  const sectionAt = lines.findIndex((l) => l.trim() === "## Contacts");
+  if (sectionAt !== -1) {
+    let end = lines.length;
+    for (let i = sectionAt + 1; i < lines.length; i++) {
+      if (/^##\s+/.test(lines[i])) { end = i; break; }
+    }
+    for (let i = sectionAt + 1; i < end; i++) {
+      const m = lines[i].match(/^-\s+(.+?)(?:\s*\|.*)?$/);
+      if (m && m[1].trim().toLowerCase() === name.toLowerCase()) {
+        throw new Error(`"${name}" is already a contact on this lead`);
+      }
+    }
+    while (end > sectionAt + 1 && lines[end - 1].trim() === "") end--;
+    lines.splice(end, 0, line);
+  } else {
+    const decisionAt = lines.findIndex((l) => l.trim() === "## Decision log");
+    const section = ["## Contacts", "", line, ""];
     if (decisionAt === -1) lines.push("", ...section.slice(0, 3));
     else lines.splice(decisionAt, 0, ...section);
   }
@@ -1323,6 +1355,54 @@ const server = createServer(async (req, res) => {
     }
     // Muxin's own free-text note on a lead ("what I liked, what stood out") — appended dated under
     // lead.md's ## Muxin notes so it travels with the lead file, same write posture as decide above.
+    // "WHO YOU'D REACH" (design 3d): add a person to a lead's ## Contacts. Each contact gets its
+    // own follow-up clock once marked sent; nothing here contacts anyone.
+    if (req.method === "POST" && url.pathname === "/api/outreach/contact/add") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      const name = String(b.name ?? "").trim().replace(/[|\n]/g, " ");
+      const role = String(b.role ?? "").trim().replace(/[|\n]/g, " ");
+      if (!isValidLeadDir(dir) || !name) {
+        json(res, 400, { ok: false, error: "a valid lead dir and a contact name are required" });
+        return;
+      }
+      try {
+        const leadPath = join(repoRoot, dir, "lead.md");
+        writeFileSync(leadPath, appendLeadContact(readFileSync(leadPath, "utf8"), name, role));
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Mark as sent" (design 3d): the step that puts a person on the follow-ups ledger. Appends a
+    // `contacted` tracker event carrying person + channel + which locked message -- the due-date
+    // clock starts here. Nothing is transmitted; Muxin already sent it by hand.
+    if (req.method === "POST" && url.pathname === "/api/outreach/mark-sent") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      const person = String(b.person ?? "").trim();
+      const channel = String(b.channel ?? "").trim();
+      if (!isValidLeadDir(dir)) {
+        json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
+        return;
+      }
+      if (channel && !(CHANNELS as readonly string[]).includes(channel)) {
+        json(res, 400, { ok: false, error: `channel must be one of ${CHANNELS.join(", ")}` });
+        return;
+      }
+      const leadDirName = dir.split("/").pop()!;
+      const bucket = leadDirName.startsWith("platform-") ? "platform" : "client";
+      const locked = latestLockedMessage(join(repoRoot, dir));
+      const event = markSent(bucket, leadDirName, {
+        person: person || undefined,
+        channel: channel || locked?.channel,
+        message: locked?.messageId,
+        note: b.note ? String(b.note) : undefined,
+      });
+      json(res, 200, { ok: true, event });
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/outreach/note") {
       const b = await readBody(req);
       const dir = String(b.dir ?? "");
@@ -1402,7 +1482,7 @@ const server = createServer(async (req, res) => {
         json(res, 400, { ok: false, error: "bucket and lead are required" });
         return;
       }
-      const event = markResponded(bucket, lead, b.note ? String(b.note) : undefined);
+      const event = markResponded(bucket, lead, b.note ? String(b.note) : undefined, undefined, b.person ? String(b.person) : undefined);
       json(res, 200, { ok: true, event });
       return;
     }
@@ -1416,7 +1496,7 @@ const server = createServer(async (req, res) => {
         json(res, 400, { ok: false, error: "bucket and lead are required" });
         return;
       }
-      const event = markContacted(bucket, lead, b.note ? String(b.note) : undefined);
+      const event = markContacted(bucket, lead, b.note ? String(b.note) : undefined, undefined, b.person ? String(b.person) : undefined);
       json(res, 200, { ok: true, event });
       return;
     }
@@ -1430,7 +1510,7 @@ const server = createServer(async (req, res) => {
         json(res, 400, { ok: false, error: "bucket and lead are required" });
         return;
       }
-      const event = moveOn(bucket, lead, b.note ? String(b.note) : undefined);
+      const event = moveOn(bucket, lead, b.note ? String(b.note) : undefined, undefined, b.person ? String(b.person) : undefined);
       json(res, 200, { ok: true, event });
       return;
     }
@@ -1446,7 +1526,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
-        const result = await enqueueFollowUpDraft(dir, b.channel ? String(b.channel) : undefined);
+        const result = await enqueueFollowUpDraft(dir, b.channel ? String(b.channel) : undefined, b.recipient ? String(b.recipient) : undefined);
         json(res, 200, { ok: true, result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });

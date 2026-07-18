@@ -104,6 +104,32 @@ export interface LeadDetail extends LeadSummary {
   profileRest: string; // ## Profile minus the jsaStats lines -- the prose worth reading, collapsed in the GUI
   muxinNotes: string; // ## Muxin notes -- Muxin's own free-text observations, appended via the GUI
   latestMessage: LeadMessage | null; // newest messages/message-NN.md, if this lead was ever drafted
+  // The matchmaker read (design 3d): written to Muxin, not pitch-strategy prose. Emitted by the
+  // updated /outreach research+qualify skills as frontmatter; empty strings on legacy leads (the
+  // GUI falls back to pitchAngle labeled as a legacy read until the lead is re-qualified).
+  whyThem: string; // "Why them, for you"
+  whyMe: string; // "Why you, for them"
+  whyMutual: string; // the one-paragraph mutual-fit read shown as the dossier headline
+  segment: string; // platform | org-role | org-mission -- "" on legacy leads (GUI derives a display fallback)
+  contacts: Contact[]; // ## Contacts -- the people at this lead (each gets its own follow-up clock)
+  suggestedContacts: string[]; // evidence person: names not yet in ## Contacts (one-click add)
+}
+
+// One person at a lead (design 3d "WHO YOU'D REACH"): `## Contacts` body lines shaped
+// `- <name> | <role>`. Parsed leniently -- a bare `- <name>` line is a contact with no role.
+export interface Contact {
+  name: string;
+  role: string;
+}
+
+export function parseContacts(body: string): Contact[] {
+  const section = extractSection(body, "## Contacts");
+  const contacts: Contact[] = [];
+  for (const line of section.split("\n")) {
+    const m = line.match(/^-\s+(.+?)(?:\s*\|\s*(.*))?$/);
+    if (m && m[1].trim()) contacts.push({ name: m[1].trim(), role: (m[2] ?? "").trim() });
+  }
+  return contacts;
 }
 
 // One stat-shaped line from a JSA-snapshot ## Profile (see intake.ts formatJsaSnapshot): the
@@ -134,6 +160,7 @@ export interface LeadMessage {
   file: string; // relative to the lead dir, e.g. "messages/message-02.md"
   channel: string;
   status: string; // draft | approved | locked
+  recipient: string; // the person this message addresses ("" on legacy messages)
   body: string;
 }
 
@@ -148,6 +175,7 @@ export function readLatestMessage(absDir: string): LeadMessage | null {
     file: `messages/${file}`,
     channel: String(fm.channel ?? ""),
     status: String(fm.status ?? "draft"),
+    recipient: String(fm.recipient ?? ""),
     body: body.trim(),
   };
 }
@@ -160,16 +188,33 @@ export function readLeadDetail(dir: string): LeadDetail {
   const { body } = splitFrontmatter(raw);
   const profile = extractSection(body, "## Profile").trim();
   const { stats, rest } = parseJsaStats(profile);
+  const { fm } = splitFrontmatter(raw);
+  const evidence = parseEvidence(body);
+  const contacts = parseContacts(body);
+  const known = new Set(contacts.map((c) => c.name.toLowerCase()));
+  // Evidence `person:` fields carry occasional non-contacts: placeholder "(blank)"-style values,
+  // and Muxin (a quote BY Muxin cited as evidence is not someone to reach).
+  const suggestedContacts = [...new Set(
+    evidence
+      .map((e) => e.person.trim())
+      .filter((p) => p && !p.startsWith("(") && !/^muxin\b/i.test(p) && !known.has(p.toLowerCase())),
+  )];
   return {
     ...summary,
     profile,
-    evidence: parseEvidence(body),
+    evidence,
     classificationNote: extractSection(body, "## Classification").trim(),
     pitch: extractSection(body, "## Pitch").trim(),
     jsaStats: stats,
     profileRest: rest,
     muxinNotes: extractSection(body, "## Muxin notes").trim(),
     latestMessage: readLatestMessage(absDir),
+    whyThem: String(fm.why_them ?? "").trim(),
+    whyMe: String(fm.why_me ?? "").trim(),
+    whyMutual: String(fm.why_mutual ?? "").trim(),
+    segment: String(fm.segment ?? "").trim(),
+    contacts,
+    suggestedContacts,
   };
 }
 

@@ -196,6 +196,55 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .wb-reply input { font:italic 13px/1.4 Georgia,serif; border:1px solid #e6dcc4; background:#fbf9f4;
     border-radius:8px; padding:8px 12px; color:var(--ink); width:100%; }
   .wb-proposal { margin-top:26px; padding:14px 16px; background:#faf7f0; border:1px solid #efe7d6; border-radius:10px; }
+  /* Outreach room (3d/3g): the dossier on the desk + the follow-ups ledger */
+  .lead-rail { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:16px; border-bottom:1px solid #efe7d6; margin-bottom:20px; }
+  .lead-chip { display:inline-flex; align-items:center; gap:7px; border:1px solid #e6dcc4; background:#fbf9f4;
+    border-radius:20px; padding:4px 12px; font-size:12.5px; color:#5a5346; cursor:pointer; }
+  .lead-chip.on { border:1.5px solid var(--ink); background:#fff; color:var(--ink); }
+  .lead-chip .dot { width:7px; height:7px; border-radius:50%; flex:none; }
+  .lead-chip .k { color:#8a7f6d; }
+  .seg-chip { font:700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
+    text-transform:uppercase; padding:2px 8px; border-radius:5px; }
+  .seg-chip.platform { background:var(--blue-bg); color:var(--blue); }
+  .seg-chip.org-role { background:var(--amber-bg); color:var(--amber); }
+  .seg-chip.org-mission { background:var(--green-bg); color:var(--green); }
+  .seg-chip.content-example { background:#efeae0; color:#5a5346; }
+  .fit-chip { font:700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
+    text-transform:uppercase; padding:2px 8px; border-radius:5px; background:var(--green-bg); color:var(--green); }
+  .legacy-chip { font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#8a6a2a; background:var(--amber-bg); padding:2px 8px; border-radius:9px; }
+  .dossier-grid { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:0 28px; }
+  .dossier-why { font:400 22px/1.5 Georgia,"Times New Roman",serif; color:var(--ink); margin:8px 0 0; }
+  .mm-grid { display:flex; flex-direction:column; gap:14px; margin:24px 0 0; }
+  .mm-row { display:grid; grid-template-columns:120px 1fr; gap:16px; align-items:baseline; }
+  .mm-row .k { font:italic 400 14px/1.4 Georgia,serif; color:#8a7f6d; }
+  .mm-row .v { font-size:14px; line-height:1.55; color:#3a352c; }
+  .who-box { margin:22px 0 0; padding:14px 16px; background:#faf7f0; border:1px solid #efe7d6; border-radius:10px; }
+  .who-chip { display:inline-flex; align-items:center; gap:8px; border:1.5px solid var(--ink); background:#fff;
+    border-radius:20px; padding:5px 12px; font-size:13px; margin:0 6px 6px 0; }
+  .who-chip .role { color:#8a7f6d; }
+  .who-suggest { display:inline-flex; align-items:center; gap:8px; border:1px dashed #d8cfbb; background:#fbf9f4;
+    border-radius:20px; padding:5px 12px; font-size:13px; color:#5a5346; margin:0 6px 6px 0; }
+  .who-suggest button { font-size:11.5px; padding:1px 8px; }
+  .sent-bar { margin-top:14px; background:#faf7f0; border:1px solid #efe7d6; border-radius:10px; padding:14px 16px;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .sent-bar select, .sent-bar input.fu-note { font:inherit; font-size:12.5px; border:1px solid #d8cfbb; background:#fbf9f4;
+    border-radius:7px; padding:5px 10px; color:var(--ink); }
+  .sent-bar button.go { border:none; background:var(--green); color:#fbf9f4; border-radius:7px; padding:6px 13px; font-weight:600; }
+  .ev-quote { font:italic 400 13px/1.55 Georgia,serif; color:#3a352c; }
+  .ev-src { font-size:12px; color:#7a7266; border-bottom:1px solid #d8cfbb; width:fit-content; text-decoration:none; }
+  /* Follow-ups ledger rows */
+  .fu-row { padding:18px 0 14px; border-top:1px solid #efe7d6; }
+  .fu-head { display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:14px; align-items:baseline; }
+  .fu-dot { width:8px; height:8px; border-radius:50%; margin-top:4px; }
+  .fu-name { font-size:16px; font-weight:600; color:var(--ink); }
+  .fu-org { font-size:15px; color:#5a5346; font-weight:400; }
+  .fu-meta { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#8a7f6d; margin-top:3px; }
+  .fu-next { font-size:14px; font-weight:600; }
+  .fu-origin { margin:14px 0 12px 26px; background:#faf7f0; border:1px solid #efe7d6; border-radius:10px;
+    padding:16px 18px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+  .fu-origin .cap { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+  .fu-origin .cell { font-size:13px; line-height:1.5; color:#3a352c; }
+  .fu-actions { margin-left:26px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   /* Outreach room subnav (Leads | Follow-ups) */
   .subnav { display:flex; gap:3px; align-items:center; background:rgba(0,0,0,.28); border-radius:20px;
     padding:3px; width:fit-content; margin:22px auto 0; }
@@ -542,12 +591,6 @@ const DECIDED = new Set(["published","discard","locked"]);
 const aiPending = new Set();       // row ids with an in-flight Ask-Claude revise
 const dupPending = new Map();      // row id -> target platform, for an in-flight Duplicate
 const storyboardSlugs = new Set(); // piece slugs with an in-flight storyboard (video) job
-// Follow-ups tab (card d39258ab): fuPending mirrors dupPending's in-flight guard (dedupe + disabled
-// button), fuError mirrors row.dupError's durable failure — the Follow-ups list is rebuilt wholesale
-// by loadFollowups() rather than per-row rerender(), so both live here keyed by lead dir, not on a
-// row object that gets replaced every load.
-const fuPending = new Set();       // lead dirs with an in-flight Draft follow-up
-const fuError = new Map();         // lead dir -> last draft-follow-up error
 
 function flash(msg){ const f=$("#flash"); f.textContent=msg; f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1400); }
 function esc(s){ return (s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -1078,116 +1121,133 @@ async function pullFresh(){
 }
 $("#rawPullBtn").addEventListener("click", pullFresh);
 
-// ── Outreach / discovery inbox ──
-// Same grouping order as status.ts's own STATUS_ORDER (pursue-ready leads first, cold/terminal
-// statuses last) so this view and npm run outreach:status never disagree about ordering.
-const OUTREACH_STATUS_ORDER = ["pursue","qualified","researched","intake","drafted","locked","passed"];
-// In-flight state for the "Approve -> Draft message" action, same pending/error pattern as the
-// Follow-ups tab's fuPending/fuError (followupDraft) -- a real ~30-120s claude -p spawn, so the
-// button must disable immediately and a dropped connection must still surface a durable error.
+// ── Outreach room: the dossier on the desk (Content Studio Riff 3d) ──
+// One lead at a time, read like a briefing: the matchmaker read up top (why them / why you /
+// mutual), the people to reach with their own follow-up clocks, the message you shape, and the
+// one honest logistics step — "Mark as sent" — that starts the ledger clock. Legacy leads (no
+// matchmaker fields yet) fall back to their pitch angle with a "legacy read" chip until
+// re-qualified. Nothing here contacts anyone.
+let OUTREACH_LEADS = null;
+let activeLeadDir = null;
+let scoutInFlight = false;
 const outPending = new Set();
 const outError = new Map();
-// In-flight/error state for the inline "Revise with AI" on a lead's drafted message — same
-// module-level pattern (keyed by lead dir) since renderOutreachBox() rebuilds cards wholesale.
 const msgPending = new Set();
 const msgError = new Map();
-let OUTREACH_LEADS = null;
-let scoutInFlight = false;
 
-// What each lead kind IS, said plainly (Muxin, 2026-07-16: "it's not clear from this page whether
-// this is a job, a potential client, a platform to get on").
-const KIND_INFO = {
-  "client": "potential consulting client — pitch a discovery call",
-  "platform": "a stage/audience to get on (podcast, newsletter, community)",
-  "content-example": "raw material for a /derisk writing angle — not an outreach target",
+function leadSegment(l){
+  if (l.segment) return l.segment;
+  if (l.kind === "platform") return "platform";
+  if (l.kind === "client") return l.source === "jsa" ? "org-role" : "org-mission";
+  return "content-example";
+}
+const SEG_INFO = {
+  "platform":        { label:"Platform",      dot:"#2f5d9a", line:"a stage or audience that could host you" },
+  "org-role":        { label:"Org · role",    dot:"#9a6b12", line:"values fit with an open role behind it" },
+  "org-mission":     { label:"Org · mission", dot:"#2f7d46", line:"values-aligned, worth knowing" },
+  "content-example": { label:"Example",       dot:"#7a7266", line:"raw material for a writing angle" },
 };
 
-function outreachSourceLinks(evidence){
-  const items = (evidence||[]).filter(e => e.source && e.source !== "(none)");
-  if(!items.length) return '<div class="src">no cited source yet</div>';
-  return items.map(e => {
-    const quote = e.quote && e.quote !== "(none)" ? '<div class="src">'+esc(e.quote)+'</div>' : "";
-    const link = /^https?:\/\//i.test(e.source)
-      ? '<a href="'+esc(e.source)+'" target="_blank" rel="noopener">'+esc(e.source)+'</a>'
-      : esc(e.source); // vault:<path> citations aren't clickable — shown as plain text
-    return '<div class="src">'+link+'</div>'+quote;
+function outreachMarginHtml(l){
+  const evs = [...(l.evidence||[])].sort((a,b)=>(b.signal==="worldview-match"?1:0)-(a.signal==="worldview-match"?1:0));
+  const items = evs.slice(0,5).map(e=>{
+    const quote = e.quote && e.quote!=="(none)" ? '<div class="ev-quote">"'+esc(e.quote)+'"</div>'
+      : (e.description ? '<div class="d">'+esc(e.description)+'</div>' : "");
+    const link = /^https?:\/\//i.test(e.source) ? '<a class="ev-src" href="'+esc(e.source)+'" target="_blank" rel="noopener">source ↗</a>' : "";
+    const cls = e.signal==="worldview-match" ? "green" : "sand";
+    return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+link+'</div>';
   }).join("");
+  const stats = (l.jsaStats||[]).slice(0,3).map(s=>'<div class="d" style="font-size:12.5px;color:#5a5346;">'+esc(s.label)+': '+esc(s.value)+'</div>').join("");
+  const profile = (l.profileRest||l.profile) ? '<details class="lead-details"><summary>Full profile</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.profileRest||l.profile)+'</div></details>' : "";
+  const reasoning = l.classificationNote ? '<details class="lead-details"><summary>Full why-fit reasoning</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.classificationNote)+'</div></details>' : "";
+  return '<div class="session-margin"><div class="wb-margin-cap">WHY THIS IS ON YOUR DESK</div>'+items+
+    (stats?'<div>'+stats+'</div>':"")+reasoning+profile+
+    '<div class="wb-reply"><span class="mono-note">This page stays tied to the follow-up row. Months from now: the why, what you said, the date, one click.</span></div></div>';
 }
 
-// Card layout (Muxin, 2026-07-16 — "a mountain of text with very little signal"): what this IS
-// (kind badge + plain one-liner), then WHY it fits (pitch angle, upfront), then the JSA logistics
-// as a compact table, cited sources, and the long profile/reasoning prose collapsed behind
-// <details>. Plus his own notes box, and — once a message is drafted — an inline editor with
-// AI revise and plain labels about channel/contact/how sending actually works.
-function outreachLeadCard(l){
-  const isContentExample = l.kind === "content-example";
-  const field = l.kind === "platform" ? "fit" : "classification";
-  const value = l.classificationOrFit || "unclear";
-  const badge = isContentExample ? esc(l.status||"intake") : esc(field)+'='+esc(value);
-  const kindLine = '<span class="kind-badge">'+esc(l.kind)+'</span> '+esc(KIND_INFO[l.kind]||"")+' · '+esc(l.source)+' · '+badge;
-  // WHY first: the frontmatter pitch_angle (one decided sentence) beats dumping the whole
-  // classification argument. The full reasoning + profile prose stay one click away.
-  const whyText = l.pitchAngle || l.pitch;
-  const why = whyText ? '<div class="lead-why"><b>'+(isContentExample?'Angle: ':'Why this fits: ')+'</b>'+esc(whyText)+'</div>' : "";
-  const whyDetails = (l.classificationNote && l.classificationNote !== whyText)
-    ? '<details class="lead-details"><summary>Full why-fit reasoning</summary><div class="ntext">'+esc(l.classificationNote)+'</div></details>' : "";
-  const stats = (l.jsaStats && l.jsaStats.length)
-    ? '<table class="jsa-stats">'+l.jsaStats.map(s=>'<tr><th>'+esc(s.label)+'</th><td>'+esc(s.value)+'</td></tr>').join("")+'</table>'
-    : "";
-  const profileText = (l.profileRest !== undefined ? l.profileRest : l.profile);
-  const profile = profileText
-    ? '<details class="lead-details"><summary>Full profile</summary><div class="ntext">'+esc(profileText)+'</div></details>' : "";
-  const sources = outreachSourceLinks(l.evidence);
-  const pending = outPending.has(l.dir);
-  const err = outError.get(l.dir);
-  const status = pending
-    ? '<div class="hint">drafting… (your subscription, ~30-60s — the Studio room has progress + log)</div>'
-    : err ? '<div class="src">'+esc(err)+' — see the Studio room for the job log</div>' : "";
-  const decided = l.status === "pursue" || l.status === "passed" || l.status === "locked" || l.status === "drafted";
-  const draftBtn = !isContentExample
-    ? '<button class="out-draft" data-dir="'+esc(l.dir)+'"'+((pending)?" disabled":"")+'>'+(pending?"Drafting…":"Approve → Draft message")+'</button>'
-    : "";
-  const pursueBtn = '<button class="out-pursue" data-dir="'+esc(l.dir)+'"'+(decided?" disabled":"")+'>Pursue</button>';
-  const passBtn = '<button class="out-pass" data-dir="'+esc(l.dir)+'"'+(decided?" disabled":"")+'>Pass</button>';
-  // Muxin's own notes on the lead — what stood out, why he's interested — so the "oh yeah, THAT's
-  // why" survives between sessions. Saved dated into lead.md's ## Muxin notes.
-  const notesBox = '<div class="lead-notes">'+
-      (l.muxinNotes ? '<div class="my-notes">'+esc(l.muxinNotes)+'</div>' : "")+
-      '<div class="aibox show"><input class="lead-note-input" placeholder="your note on this lead (what stood out, why interested)…" /><button class="lead-note-save" data-dir="'+esc(l.dir)+'">Save note</button></div>'+
-    '</div>';
-  const msgBox = outreachMessageBox(l);
-  return '<div class="notepick"><div class="ntext">'+
-      '<div class="nmeta">'+kindLine+'</div>'+
-      '<b>'+esc(l.name)+'</b>'+
-      (l.url ? '<div class="src"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>' : "")+
-      why+stats+sources+whyDetails+profile+status+msgBox+notesBox+
-      '<div class="src">'+esc(l.dir)+'</div>'+
-    '</div>'+
-    '<div class="actions">'+draftBtn+pursueBtn+passBtn+'</div>'+
-  '</div>';
-}
-
-// The inline drafted-message box: editable while draft/approved, read-only once locked, with the
-// honest mechanics spelled out (channel, no stored contact info, nothing sends itself).
 function outreachMessageBox(l){
   const msg = l.latestMessage;
   if(!msg) return "";
-  const honesty = '<div class="src">Channel: '+esc(msg.channel||"?")+' (picked at draft time). No contact info is stored — research keeps public pages only; find the address via the source links above. Nothing sends automatically: Approve on the Review tab locks the text, you send it yourself, then Mark sent on Follow-ups.</div>';
+  const recip = msg.recipient ? ' · to '+esc(msg.recipient) : "";
   if(msg.status === "locked"){
-    return '<div class="lead-msg"><div class="nmeta">message · '+esc(msg.file)+' · locked</div>'+
-      '<div class="body">'+esc(msg.body)+'</div>'+honesty+'</div>';
+    return '<div class="lead-msg"><div class="nmeta">locked message · '+esc(msg.file)+recip+' · '+esc(msg.channel||"?")+'</div>'+
+      '<div class="body">'+esc(msg.body)+'</div>'+
+      '<div class="src">Locked means ready. You send it yourself; log it below so the clock starts.</div></div>';
   }
   const revPending = msgPending.has(l.dir);
   const revErr = msgError.get(l.dir);
-  return '<div class="lead-msg"><div class="nmeta">drafted message · '+esc(msg.file)+' · '+esc(msg.status)+'</div>'+
+  return '<div class="lead-msg"><div class="nmeta">drafted message · '+esc(msg.file)+recip+' · '+esc(msg.status)+'</div>'+
     '<textarea class="msg-edit">'+esc(msg.body)+'</textarea>'+
     '<div class="actions"><button class="msg-save" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Save edits</button></div>'+
     '<div class="aibox show">'+
       (revPending
-        ? '<div class="thinking">✨ Claude is revising the message… (your subscription, ~10-30s)</div>'
-        : '<input class="msg-revise-input" placeholder="tell Claude what to change in the message…" /><button class="send msg-revise" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Revise with AI</button>'+
+        ? '<div class="thinking">✨ revising… (your subscription, ~10-30s)</div>'
+        : '<input class="msg-revise-input" placeholder="what should change in the message?" /><button class="send msg-revise" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Revise with AI</button>'+
           (revErr ? '<div class="aierr">⚠ '+esc(revErr)+'</div>' : ""))+
-    '</div>'+honesty+'</div>';
+    '</div>'+
+    '<div class="src">Approve on this page locks the text. Nothing sends itself.</div></div>';
+}
+
+function whoBoxHtml(l){
+  const chips = (l.contacts||[]).map(c=>'<span class="who-chip"><b>'+esc(c.name)+'</b>'+(c.role?'<span class="role">'+esc(c.role)+'</span>':"")+'</span>').join("");
+  const suggested = (l.suggestedContacts||[]).map(n=>'<span class="who-suggest">'+esc(n)+'<button class="who-add" data-dir="'+esc(l.dir)+'" data-name="'+esc(n)+'">+ add</button></span>').join("");
+  return '<div class="who-box">'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;"><span class="wb-margin-cap">WHO YOU WOULD REACH</span><span class="grow"></span></div>'+
+    '<div>'+chips+suggested+'</div>'+
+    '<div class="aibox show" style="margin-top:8px;"><input class="who-name" placeholder="name" style="max-width:160px;" /><input class="who-role" placeholder="role (optional)" style="max-width:180px;" /><button class="who-save" data-dir="'+esc(l.dir)+'">Add contact</button></div>'+
+    '<div class="src" style="margin-top:8px;">One lead can hold many people. Each gets its own drafted message and its own follow-up clock.</div>'+
+  '</div>';
+}
+
+function sentBarHtml(l){
+  const msg = l.latestMessage;
+  if(!msg || msg.status !== "locked") return "";
+  const channels = ["email","linkedin-dm","contact-form","podcast-pitch"];
+  const chanSel = '<select class="sent-channel">'+channels.map(c=>'<option value="'+c+'"'+(c===(msg.channel||"email")?" selected":"")+'>'+c+'</option>').join("")+'</select>';
+  const people = (l.contacts||[]).map(c=>c.name);
+  const personSel = '<select class="sent-person"><option value="">(no specific person)</option>'+people.map(n=>'<option value="'+esc(n)+'"'+(msg.recipient===n?" selected":"")+'>'+esc(n)+'</option>').join("")+'</select>';
+  return '<div class="sent-bar">'+
+    '<div style="display:flex;flex-direction:column;gap:2px;min-width:220px;flex:1;"><span style="font-size:13px;font-weight:600;">Sent it? Log it so the clock starts.</span><span class="src">This is the step that puts them on the follow-ups ledger, with the date, channel, and this message.</span></div>'+
+    personSel+chanSel+'<button class="go sent-go" data-dir="'+esc(l.dir)+'">Mark as sent</button>'+
+  '</div>';
+}
+
+function dossierHtml(l){
+  const seg = leadSegment(l);
+  const info = SEG_INFO[seg] || SEG_INFO["content-example"];
+  const undecided = !["pursue","passed","locked","drafted"].includes(l.status);
+  const pending = outPending.has(l.dir);
+  const err = outError.get(l.dir);
+  const fitChip = l.classificationOrFit ? '<span class="fit-chip">'+esc(l.classificationOrFit)+'</span>' : "";
+  const provChip = l.source === "jsa" ? '<span class="legacy-chip">research: JSA</span>' : "";
+  const hasMatchmaker = l.whyMutual || l.whyThem || l.whyMe;
+  const headline = l.whyMutual || l.pitchAngle || l.pitch || "(no read recorded yet)";
+  const legacy = hasMatchmaker ? "" : ' <span class="legacy-chip">legacy read — re-qualify for the matchmaker version</span>';
+  const mm = hasMatchmaker
+    ? '<div class="mm-grid">'+
+      (l.whyThem?'<div class="mm-row"><span class="k">Why them, for you</span><span class="v">'+esc(l.whyThem)+'</span></div>':"")+
+      (l.whyMe?'<div class="mm-row"><span class="k">Why you, for them</span><span class="v">'+esc(l.whyMe)+'</span></div>':"")+
+      '</div>'
+    : "";
+  const status = pending
+    ? '<div class="hint">drafting… (your subscription, ~30-60s — the Studio room has progress + log)</div>'
+    : err ? '<div class="aierr">⚠ '+esc(err)+' — see the Studio room for the job log</div>' : "";
+  const decideBtns = l.kind==="content-example" ? "" :
+    '<div class="wb-handoff">'+
+      (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Worth pursuing</button><button class="out-pass" data-dir="'+esc(l.dir)+'">Pass</button>' : "")+
+      ((l.status==="pursue"||l.status==="qualified") && !pending ? '<button class="out-draft" data-dir="'+esc(l.dir)+'">Draft the message</button>' : "")+
+      '<span class="note">Pursue or pass just marks your call. Drafting writes a message for you to shape; only you ever send it.</span>'+
+    '</div>';
+  const notes = '<div class="lead-notes">'+
+    (l.muxinNotes ? '<div class="my-notes">'+esc(l.muxinNotes)+'</div>' : "")+
+    '<div class="aibox show"><input class="lead-note-input" placeholder="your note on this lead (what stood out)…" /><button class="lead-note-save" data-dir="'+esc(l.dir)+'">Save note</button></div></div>';
+  return '<div class="dossier-grid"><div style="min-width:0;">'+
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="seg-chip '+esc(seg)+'">'+esc(info.label)+'</span>'+fitChip+'<span class="src">'+esc(info.line)+'</span><span class="grow"></span>'+provChip+'</div>'+
+    '<div class="wb-label" style="margin:14px 0 0;">Why this matters to you, in plain terms'+legacy+'</div>'+
+    '<div class="dossier-why">'+esc(headline)+'</div>'+
+    mm + whoBoxHtml(l) + status + outreachMessageBox(l) + sentBarHtml(l) + decideBtns + notes +
+    (l.url?'<div class="src" style="margin-top:10px;"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>':"")+
+  '</div>'+outreachMarginHtml(l)+'</div>';
 }
 
 function renderOutreachBox(){
@@ -1195,30 +1255,46 @@ function renderOutreachBox(){
   const box = $("#outreachList");
   const leads = OUTREACH_LEADS;
   if(!leads.length){
-    box.innerHTML = '<div class="empty">No outreach leads yet. Run <code>/scout</code> to find some, or <code>/outreach add</code> to seed one by hand.</div>';
+    box.innerHTML = '<div class="empty">No leads yet. Scout new leads (top right) runs the discovery agent; /outreach add seeds one by hand.</div>';
     return;
   }
-  const groups = new Map();
-  for(const l of leads){
-    const key = l.status || "(no status)";
-    if(!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(l);
-  }
-  const keys = [...OUTREACH_STATUS_ORDER.filter(k=>groups.has(k)), ...[...groups.keys()].filter(k=>!OUTREACH_STATUS_ORDER.includes(k))];
-  box.innerHTML = "";
-  for(const key of keys){
-    const group = groups.get(key);
-    const sec = document.createElement("div"); sec.className = "notes-panel";
-    const rows = group.map(outreachLeadCard).join("");
-    sec.innerHTML = '<div class="notes-head"><h3>'+esc(key.toUpperCase())+' ('+group.length+')</h3></div><div class="notelist">'+rows+'</div>';
-    box.appendChild(sec);
-  }
+  const undecided = leads.find(l=>!["pursue","passed","locked","drafted"].includes(l.status));
+  if(!activeLeadDir || !leads.some(l=>l.dir===activeLeadDir)) activeLeadDir = (undecided||leads[0]).dir;
+  const rail = leads.map(l=>{
+    const seg = leadSegment(l); const info = SEG_INFO[seg]||SEG_INFO["content-example"];
+    return '<span class="lead-chip'+(l.dir===activeLeadDir?" on":"")+'" data-dir="'+esc(l.dir)+'"><span class="dot" style="background:'+info.dot+'"></span>'+esc(l.name||l.dir)+'<span class="k">'+esc(info.label.toLowerCase())+'</span></span>';
+  }).join("");
+  const active = leads.find(l=>l.dir===activeLeadDir);
+  box.innerHTML = '<div class="lead-rail">'+rail+'</div>'+(active?dossierHtml(active):"");
+  box.querySelectorAll(".lead-chip").forEach(c=>c.addEventListener("click",()=>{ activeLeadDir = c.dataset.dir; renderOutreachBox(); }));
   box.querySelectorAll("button.out-draft").forEach(b=>b.addEventListener("click", ()=>outreachDraft(b.dataset.dir)));
   box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
   box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
   box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
   box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
   box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>outreachMsgRevise(b)));
+  box.querySelectorAll("button.who-add").forEach(b=>b.addEventListener("click", ()=>outreachAddContact(b.dataset.dir, b.dataset.name, "")));
+  box.querySelectorAll("button.who-save").forEach(b=>b.addEventListener("click", ()=>{
+    const wrap = b.closest(".who-box");
+    outreachAddContact(b.dataset.dir, wrap.querySelector(".who-name").value.trim(), wrap.querySelector(".who-role").value.trim());
+  }));
+  box.querySelectorAll("button.sent-go").forEach(b=>b.addEventListener("click", ()=>{
+    const bar = b.closest(".sent-bar");
+    outreachMarkSent(b.dataset.dir, bar.querySelector(".sent-person").value, bar.querySelector(".sent-channel").value);
+  }));
+}
+
+async function outreachAddContact(dir, name, role){
+  if(!name){ flash("Type a name first"); return; }
+  const r = await post("/api/outreach/contact/add", {dir, name, role});
+  if(r.ok){ flash(name+" added"); await loadOutreach(); }
+  else flash(r.error || "Could not add the contact");
+}
+
+async function outreachMarkSent(dir, person, channel){
+  const r = await post("/api/outreach/mark-sent", {dir, person, channel});
+  if(r.ok){ flash("Logged — the clock starts today. See Follow-ups."); await loadOutreach(); }
+  else flash(r.error || "Could not log the send");
 }
 
 async function outreachSaveNote(b){
@@ -1234,7 +1310,7 @@ async function outreachSaveNote(b){
 async function outreachMsgSave(b){
   const ta = b.closest(".lead-msg").querySelector(".msg-edit");
   const body = ta ? ta.value : "";
-  if(!body.trim()){ flash("Message body can't be empty"); return; }
+  if(!body.trim()){ flash("Message body cannot be empty"); return; }
   b.disabled = true;
   const r = await post("/api/outreach/message/save", {dir: b.dataset.dir, file: b.dataset.file, body});
   if(r.ok){ flash("Saved"); await loadOutreach(); }
@@ -1243,15 +1319,15 @@ async function outreachMsgSave(b){
 
 async function outreachMsgRevise(b){
   const dir = b.dataset.dir, file = b.dataset.file;
-  if(msgPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn
+  if(msgPending.has(dir)) return; // already in flight — never a second real claude -p spawn
   const inp = b.closest(".aibox").querySelector(".msg-revise-input");
   const instruction = inp ? inp.value.trim() : "";
-  if(!instruction){ flash("Type what you want changed first"); return; }
+  if(!instruction){ flash("Type what should change first"); return; }
   msgError.delete(dir);
-  msgPending.add(dir); renderOutreachBox(); // thinking indicator survives any background rerender
+  msgPending.add(dir); renderOutreachBox();
   try {
     const r = await post("/api/outreach/message/revise", {dir, file, instruction});
-    if(r.ok){ flash("Message revised by Claude"); await loadOutreach(); }
+    if(r.ok){ flash("Message revised"); await loadOutreach(); }
     else { msgError.set(dir, r.error || "Failed to revise"); }
   } catch (e) {
     msgError.set(dir, e instanceof Error ? e.message : String(e));
@@ -1260,8 +1336,7 @@ async function outreachMsgRevise(b){
   }
 }
 
-// "Scout new leads": the header button on this tab. A real /scout web-discovery run (minutes) —
-// live elapsed banner at the top of the inbox, then a reload of whatever it found.
+// "Scout new leads": the header button on this room's Leads pane. A real /scout run (minutes).
 async function scoutRun(){
   if(scoutInFlight) return;
   scoutInFlight = true;
@@ -1270,14 +1345,14 @@ async function scoutRun(){
   banner.className = "hint";
   banner.style.padding = "10px 4px";
   const start = Date.now();
-  const tick = () => { banner.textContent = "✨ Scouting the web for new client/platform leads… (bounded searches on your subscription, takes minutes — the Studio room has the log) · "+fmtElapsed(Date.now()-start)+" elapsed"; };
+  const tick = () => { banner.textContent = "✨ Scouting for new leads… (bounded searches on your subscription, takes minutes — the Studio room has the log) · "+fmtElapsed(Date.now()-start)+" elapsed"; };
   tick();
   const timer = setInterval(tick, 1000);
   box.prepend(banner);
   loadJobs(); // make the scout job visible in the Studio room right away
   try {
     const r = await post("/api/outreach/scout", {});
-    if(r.ok){ flash("Scout finished — inbox reloaded"); }
+    if(r.ok){ flash("Scout finished — leads reloaded"); }
     else flash(r.error || "Scout failed — see the job log");
   } catch (e) {
     flash(e instanceof Error ? e.message : String(e));
@@ -1290,12 +1365,13 @@ async function scoutRun(){
 
 async function loadOutreach(){
   const box = $("#outreachList");
-  box.innerHTML = '<div class="empty">Loading…</div>';
+  if(!OUTREACH_LEADS) box.innerHTML = '<div class="empty">Loading…</div>';
   const r = await fetch("/api/outreach/leads");
   const d = await r.json();
   OUTREACH_LEADS = d.leads || [];
   renderOutreachBox();
 }
+
 
 // ── Content room: the workbench (Content Studio Riff 3a/3b) ──
 // One sheet per active piece: Muxin's source verbatim in serif behind the blue pencil, each cut
@@ -1480,8 +1556,12 @@ async function outreachDraft(dir){
   outError.delete(dir);
   outPending.add(dir); renderOutreachBox();
   try {
-    const r = await post("/api/followups/draft-follow-up", {dir});
-    if(r.ok){ flash("Message drafted — edit it below before it's ever sent"); await loadOutreach(); }
+    // Recipient defaults to the lead's first contact so the message frontmatter carries the
+    // person its follow-up clock will belong to.
+    const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
+    const recipient = lead && lead.contacts && lead.contacts.length ? lead.contacts[0].name : undefined;
+    const r = await post("/api/followups/draft-follow-up", recipient ? {dir, recipient} : {dir});
+    if(r.ok){ flash("Drafted — shape it here before you ever send it"); await loadOutreach(); }
     else { outError.set(dir, r.error || "Failed to draft"); }
   } catch (e) {
     outError.set(dir, e instanceof Error ? e.message : String(e));
@@ -1492,94 +1572,123 @@ async function outreachDraft(dir){
 
 async function outreachDecide(dir, decision){
   const r = await post("/api/outreach/decide", {dir, decision});
-  if(r.ok){ flash(decision==="pursue" ? "Marked pursue" : "Passed"); loadOutreach(); }
+  if(r.ok){ flash(decision==="pursue" ? "Marked worth pursuing" : "Passed"); loadOutreach(); }
   else flash(r.error || "Failed");
 }
 
-// ── Follow-ups (Phase 4) ──
-// Fixed bucket order (not data-driven) so the 4 reason-buckets always render in the same place,
-// including an empty "Inbound" section before db22283f lands (schema-ready, never omitted).
-const FOLLOWUP_BUCKETS = [["client","Client"],["platform","Platform"],["jobsearch","Job search"],["inbound","Inbound"]];
-function followupTouchLabel(iso){ return iso ? iso.slice(0,10) : "never"; }
+// ── Follow-ups ledger (Content Studio Riff 3g) ──
+// Everything sent, and what's next — every row tied back to its origin: why you reached out,
+// what you said, the dossier. Two people at one org are two rows with two clocks (the tracker
+// folds per person). Calm copy from nextActionLabel; nothing here sends anything.
+const FU_FILTERS = [["all","All"],["platform","Platform"],["client","Org"],["jobsearch","Job search"],["inbound","Inbound"]];
+let fuFilter = "all";
+let FOLLOWUPS_DATA = null;
+const fuPending = new Set();
+const fuError = new Map();
+const fuOpen = new Set(); // row keys with the origin block expanded
+
+function fuDotColor(status){
+  return status==="due"||status==="overdue" ? "#9a6b12"
+    : status==="responded" ? "#2f7d46"
+    : status==="waiting" ? "#2f5d9a"
+    : status==="done"||status==="abandoned" ? "#d8d2c6"
+    : "#b0a488";
+}
+function fuNextColor(status){
+  return status==="due"||status==="overdue" ? "#9a6b12" : status==="responded" ? "#2f7d46" : "#8a7f6d";
+}
+function fuAllRows(){
+  const d = FOLLOWUPS_DATA;
+  if(!d || !d.buckets) return [];
+  const rows = [];
+  for(const bucket of ["client","platform","jobsearch","inbound"]) for(const r of (d.buckets[bucket]||[])) rows.push(r);
+  return rows;
+}
 function followupRowHtml(row){
-  const why = row.why ? '<div class="src">'+esc(row.why)+'</div>' : "";
   const disabled = row.status==="done" || row.status==="abandoned";
   const pending = row.dir ? fuPending.has(row.dir) : false;
   const err = row.dir ? fuError.get(row.dir) : null;
-  const draftBtn = row.dir ? '<button class="fu-draft" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'" data-dir="'+esc(row.dir)+'"'+((disabled||pending)?" disabled":"")+'>'+(pending?"Drafting…":"Draft follow-up")+'</button>' : "";
-  // Durable inline status (card d39258ab) instead of only a 1.4s auto-hiding flash() toast — the
-  // toast alone made a real ~30-120s-long failure vanish before anyone not staring at the screen
-  // could see it (same anti-pattern the ai-send/dup-send toast was already fixed for, card fbfea28b).
+  const open = fuOpen.has(row.key);
+  const nameParts = row.person ? [row.person, row.who.replace(row.person+" · ","")] : [row.who, ""];
+  const sentLine = (row.channel?esc(row.channel):"—")+(row.lastTouch?' · last touch '+esc(row.lastTouch.slice(0,10)):' · never');
+  const origin = open ? '<div class="fu-origin">'+
+      '<div><div class="cap">Why you reached out</div><div class="cell">'+esc(row.why)+'</div></div>'+
+      '<div><div class="cap">What you said</div>'+(row.saidExcerpt?'<div class="cell" style="font:italic 400 13px/1.55 Georgia,serif;">"…'+esc(row.saidExcerpt)+'…"</div>':'<div class="cell">no locked message on file</div>')+'</div>'+
+      '<div><div class="cap">The dossier</div><div class="cell">'+(row.fit?esc(row.fit)+' fit':'—')+(row.dir?' · <span class="wb-link fu-reopen" data-dir="'+esc(row.dir)+'">reopen ↗</span>':"")+'</div></div>'+
+    '</div>' : "";
   const status = pending
-    ? '<div class="hint">drafting… (your subscription, ~30-60s — the Studio room has progress + log)</div>'
-    : err ? '<div class="src">'+esc(err)+' — see the Studio room for the job log</div>' : "";
-  // Optional note per action (kept in tracker.jsonl's own note field — the server side already
-  // accepted one, the GUI just never sent it): "sent via their contact form", "replied on LinkedIn".
-  const noteInput = disabled ? "" : '<input class="fu-note" placeholder="optional note (saved to the tracker)…" />';
-  return '<div class="notepick">'+
-      '<div class="ntext"><div class="nmeta">last touch '+followupTouchLabel(row.lastTouch)+' · '+esc(row.nextAction)+'</div>'+
-      '<b>'+esc(row.who)+'</b>'+why+status+'</div>'+
-      '<div class="actions">'+
-        noteInput+
-        '<button class="fu-contacted" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark sent</button>'+
-        '<button class="fu-responded" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Mark responded</button>'+
-        draftBtn+
-        '<button class="fu-moveon" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'"'+(disabled?" disabled":"")+'>Move on</button>'+
-      '</div>'+
-    '</div>';
+    ? '<div class="hint" style="margin-left:26px;">drafting… (the Studio room has progress + log)</div>'
+    : err ? '<div class="aierr" style="margin-left:26px;">⚠ '+esc(err)+'</div>' : "";
+  const draftBtn = row.dir && !disabled ? '<button class="fu-draft" data-dir="'+esc(row.dir)+'" data-person="'+esc(row.person||"")+'"'+(pending?" disabled":"")+'>'+(pending?"Drafting…":"Draft a follow-up")+'</button>' : "";
+  const noteInput = disabled ? "" : '<input class="fu-note" placeholder="optional note (kept in the ledger)…" />';
+  return '<div class="fu-row">'+
+    '<div class="fu-head"><span class="fu-dot" style="background:'+fuDotColor(row.status)+'"></span>'+
+      '<div><span class="fu-name">'+esc(nameParts[0])+'</span>'+(row.person?' <span class="fu-org">· '+esc(nameParts[1])+'</span>':"")+
+      ' <span class="seg-chip '+(row.bucket==="platform"?"platform":row.bucket==="client"?"org-role":"content-example")+'">'+esc(row.bucket==="client"?"org":row.bucket)+'</span>'+
+      '<div class="fu-meta">'+sentLine+' · <span class="wb-link fu-toggle" data-key="'+esc(row.key)+'">'+(open?"hide why":"show why")+'</span></div></div>'+
+      '<span class="fu-next" style="color:'+fuNextColor(row.status)+'">'+esc(row.nextAction)+'</span></div>'+
+    origin + status +
+    '<div class="fu-actions">'+noteInput+
+      '<button class="fu-responded" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'" data-person="'+esc(row.person||"")+'"'+(disabled?" disabled":"")+'>They replied</button>'+
+      '<button class="fu-contacted" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'" data-person="'+esc(row.person||"")+'"'+(disabled?" disabled":"")+'>I nudged them</button>'+
+      draftBtn+
+      '<button class="fu-moveon" data-bucket="'+esc(row.bucket)+'" data-lead="'+esc(row.lead)+'" data-person="'+esc(row.person||"")+'"'+(disabled?" disabled":"")+'>Move on</button>'+
+    '</div>'+
+  '</div>';
 }
-// Last fetched /api/followups payload, cached so an in-flight/error change (fuPending/fuError) can
-// rerender the list without a network refetch — mirrors DATA's role for the review queue.
-let FOLLOWUPS_DATA = null;
 function renderFollowupsBox(){
   if(!FOLLOWUPS_DATA) return;
-  const d = FOLLOWUPS_DATA;
   const box = $("#followupsList");
-  $("#followupsNote").innerHTML = d.jobsearchNote ? '<div class="hint">Job search bucket: '+esc(d.jobsearchNote)+'</div>' : "";
-  box.innerHTML = "";
-  for(const [bucket,label] of FOLLOWUP_BUCKETS){
-    const rows = (d.buckets && d.buckets[bucket]) || [];
-    const sec = document.createElement("div"); sec.className = "notes-panel";
-    const inner = rows.length ? rows.map(followupRowHtml).join("") : '<div class="empty">Nothing here yet.</div>';
-    sec.innerHTML = '<div class="notes-head"><h3>'+esc(label)+' ('+rows.length+')</h3></div><div class="notelist">'+inner+'</div>';
-    box.appendChild(sec);
-  }
-  const rowNote = (b) => { const inp = b.closest(".actions").querySelector(".fu-note"); return inp ? inp.value.trim() : ""; };
-  box.querySelectorAll("button.fu-contacted").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-contacted", b.dataset.bucket, b.dataset.lead, rowNote(b))));
-  box.querySelectorAll("button.fu-responded").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-responded", b.dataset.bucket, b.dataset.lead, rowNote(b))));
-  box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", b.dataset.bucket, b.dataset.lead, rowNote(b))));
-  box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>followupDraft(b.dataset.dir)));
+  $("#followupsNote").innerHTML = FOLLOWUPS_DATA.jobsearchNote ? '<div class="hint">Job search bucket: '+esc(FOLLOWUPS_DATA.jobsearchNote)+'</div>' : "";
+  const rows = fuAllRows();
+  const counts = {all: rows.length};
+  for(const [k] of FU_FILTERS) if(k!=="all") counts[k] = rows.filter(r=>r.bucket===k).length;
+  const chips = FU_FILTERS.map(([k,label])=>'<span class="lead-chip'+(fuFilter===k?" on":"")+'" data-f="'+k+'">'+label+' '+ (counts[k]||0) +'</span>').join("");
+  const visible = rows.filter(r=>fuFilter==="all"||r.bucket===fuFilter);
+  box.innerHTML = '<div class="lead-rail">'+chips+'</div>'+
+    (visible.length ? visible.map(followupRowHtml).join("") : '<div class="empty">Nothing here yet. A row appears when you lock a message or mark a send.</div>');
+  box.querySelectorAll(".lead-chip").forEach(c=>c.addEventListener("click",()=>{ fuFilter=c.dataset.f; renderFollowupsBox(); }));
+  box.querySelectorAll(".fu-toggle").forEach(t=>t.addEventListener("click",()=>{
+    if(fuOpen.has(t.dataset.key)) fuOpen.delete(t.dataset.key); else fuOpen.add(t.dataset.key);
+    renderFollowupsBox();
+  }));
+  box.querySelectorAll(".fu-reopen").forEach(t=>t.addEventListener("click",()=>{ activeLeadDir=t.dataset.dir; setOutreachSub("leads"); }));
+  const rowNote = (b) => { const inp = b.closest(".fu-actions").querySelector(".fu-note"); return inp ? inp.value.trim() : ""; };
+  const args = (b) => { const o={bucket:b.dataset.bucket, lead:b.dataset.lead}; const n=rowNote(b); if(n) o.note=n; if(b.dataset.person) o.person=b.dataset.person; return o; };
+  box.querySelectorAll("button.fu-responded").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-responded", args(b))));
+  box.querySelectorAll("button.fu-contacted").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-contacted", args(b))));
+  box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", args(b))));
+  box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>followupDraft(b.dataset.dir, b.dataset.person)));
 }
 async function loadFollowups(){
   const box = $("#followupsList");
-  box.innerHTML = '<div class="empty">Loading…</div>';
+  if(!FOLLOWUPS_DATA) box.innerHTML = '<div class="empty">Loading…</div>';
   const r = await fetch("/api/followups");
   const d = await r.json();
   if(!d.ok){ box.innerHTML = '<div class="empty">'+esc(d.error||"failed to load")+'</div>'; return; }
   FOLLOWUPS_DATA = d;
   renderFollowupsBox();
 }
-async function followupAction(action, bucket, lead, note){
-  const r = await post("/api/followups/"+action, note ? {bucket, lead, note} : {bucket, lead});
-  if(r.ok){ flash(action==="mark-responded" ? "Marked responded" : action==="mark-contacted" ? "Marked sent" : "Moved on"); loadFollowups(); }
+async function followupAction(action, body){
+  const r = await post("/api/followups/"+action, body);
+  if(r.ok){ flash(action==="mark-responded" ? "Marked replied" : action==="mark-contacted" ? "Nudge logged — clock restarted" : "Moved on"); loadFollowups(); }
   else flash(r.error || "Failed");
 }
-async function followupDraft(dir){
-  if(fuPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn (card fbfea28b precedent)
+async function followupDraft(dir, person){
+  if(fuPending.has(dir)) return; // already in flight — never a second real claude -p spawn
   fuError.delete(dir);
-  fuPending.add(dir); renderFollowupsBox(); // button disables immediately, survives any background rerender
+  fuPending.add(dir); renderFollowupsBox();
   try {
-    const r = await post("/api/followups/draft-follow-up", {dir});
-    if(r.ok){ flash("Follow-up drafted — review it on the Outreach tab"); await loadFollowups(); }
+    const r = await post("/api/followups/draft-follow-up", person ? {dir, recipient: person} : {dir});
+    if(r.ok){ flash("Follow-up drafted — shape it on the Leads pane"); await loadFollowups(); }
     else { fuError.set(dir, r.error || "Failed to draft"); }
   } catch (e) {
-    // The awaited fetch itself can reject (dropped connection, proxy timeout on a ~30-120s request)
-    // — previously unhandled, so NOTHING was shown at all. Now it lands as the same durable error.
     fuError.set(dir, e instanceof Error ? e.message : String(e));
   } finally {
     fuPending.delete(dir); renderFollowupsBox();
   }
 }
+
 
 // ── ingest + job queue ──
 let JOBS = [];
