@@ -62,6 +62,7 @@ export function buildDraftPrompt(opts: {
   classificationLabel?: string;
   pitchAngle: string;
   evidence: EvidenceItem[];
+  recipient?: string; // the named person this message addresses (design 3d: per-person outreach)
 }): string {
   const evidenceLines = opts.evidence
     .map((e) => {
@@ -73,6 +74,7 @@ export function buildDraftPrompt(opts: {
     `You are drafting ONE outreach message for Muxin Li to send BY HAND to ${opts.leadName} (docs/outreach-engine-plan.md stage 6, DRAFT). Print ONLY the message body to stdout: no subject line, no preamble, no quote marks around it, no explanation, nothing else.`,
     ``,
     `Channel: ${opts.channel}`,
+    ...(opts.recipient ? [`Recipient: ${opts.recipient} -- open the message addressed to this person by name (a natural greeting in Muxin's voice, e.g. "Hi ${opts.recipient.split(" ")[0]},"), and write it TO them, not to the company in the abstract.`] : []),
     `${opts.classificationLabel ?? "Classification"}: ${opts.classification}`,
     `Approved pitch angle: ${opts.pitchAngle || "(none recorded, find the honest angle from the evidence below)"}`,
     ``,
@@ -186,7 +188,8 @@ export async function runDraft(
   const pitchAngle = String(fm.pitch_angle ?? "");
   const selected = selectEvidenceForDraft(evidence, classification);
 
-  const prompt = buildDraftPrompt({ leadName, channel, classification, classificationLabel, pitchAngle, evidence: selected });
+  const promptRecipient = (opts.recipient ?? "").trim() || undefined;
+  const prompt = buildDraftPrompt({ leadName, channel, classification, classificationLabel, pitchAngle, evidence: selected, recipient: promptRecipient });
   // GUI callers (src/review/jobs.ts, card d39258ab) inject a callClaude backed by the shared logged
   // spawn (runClaudeSpawn) instead of this file's own execFile call, for a real job log + heartbeat
   // -- same model/tools/prompt/timeout either way, only the transport differs. The CLI path below

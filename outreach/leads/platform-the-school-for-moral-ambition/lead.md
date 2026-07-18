@@ -6,6 +6,9 @@ source: manual
 status: qualified   # intake | researched | qualified | pursue | passed | drafted | locked
 fit: partial   # strong | partial | weak | disqualified
 pitch_angle: "insufficient evidence for a pitch angle yet"
+why_them: "A 25,000-member community across 150+ countries where you already have a foothold: you got good traction in their democracy reform channel and found others working on the same problems (E8). The blog is fellows and staff only with no open-pitch page, and the podcast is Dutch-language career-change interviews, so those two doors are closed."
+why_me: "Honestly, thin. Their whole focus is tobacco and the protein transition, with no AI, product, or tech-fairness thread anywhere in their materials (E1, E2), so there's no visible gap your work fills. Bregman names AI once in his book's closing chapter (E3), but SMA's own publications never pick it up."
+why_mutual: "This isn't a real pitch target and I wouldn't dress it up as one. The two surfaces that could host you, the blog and the podcast, don't take outside contributors (E5, E6), and your topics don't line up with their two causes. The one honest thread is the community itself, where you're already active and getting something out of it, so keep showing up in those channels instead of chasing a guest slot that doesn't exist here."
 ---
 
 ## Profile

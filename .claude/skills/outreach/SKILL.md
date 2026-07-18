@@ -85,6 +85,13 @@ timeout (`research_timeout_min`). It writes, per lead:
   confirmation-only pass.
 - `classification`/`fit` and `pitch_angle` in frontmatter, plus the rationale in
   `## Classification` and the angle in `## Pitch`.
+- **The matchmaker read** in frontmatter: `why_them` (what this lead concretely offers Muxin),
+  `why_me` (what Muxin brings that they are visibly missing), `why_mutual` (the 2-3 sentence
+  "why you two, now" read). All three are written directly TO Muxin, second person, in
+  `config/voice.yaml` voice, grounded ONLY in the cited evidence — never invented interest.
+  The GUI's dossier leads with `why_mutual`; a lead without these fields renders its
+  `pitch_angle` as a labeled legacy read. Backfill an existing lead without re-researching:
+  `npm run outreach:matchmaker -- outreach/leads/<dir>` (evidence-only, no web access).
 - `status: researched`.
 
 ### Platform-kind: the client-kind flow's sibling
@@ -129,7 +136,10 @@ Refuses outright unless the lead's `classification` is `turnaround`/`greenfield`
 message via a `claude -p` subprocess (`--tools ""`, no web access — every fact it can cite
 already lives in the evidence `research.ts` gathered), citing only real, specific evidence items
 (the two-sided rule: name something concrete and true about this lead, never a generic template),
-following `config/voice.yaml`. Writes `outreach/leads/<slug>/messages/message-NN.md` at `status:
+following `config/voice.yaml`. When a recipient is given (the GUI passes the lead's contact; the
+draft addresses that person by name and is written to them, not to the company in the abstract),
+the message frontmatter records `recipient:` — that name is what the per-person follow-up clock
+keys on after Mark-as-sent. Writes `outreach/leads/<slug>/messages/message-NN.md` at `status:
 draft` and appends a `status: pending` row to that lead's review queue — **never** `approve`,
 Muxin reviews every message in the GUI before anything can lock.
 

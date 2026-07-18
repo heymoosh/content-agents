@@ -15,6 +15,7 @@ import {
   parseEvidence,
   extractSection,
   setFrontmatterField,
+  upsertFrontmatterField,
   type EvidenceItem,
   type LeadKind,
 } from "./qualify.js";
@@ -107,6 +108,10 @@ export function buildResearchPrompt(opts: {
     `<1-2 short paragraphs of rationale citing the evidence item ids above, e.g. "per E2, E4". Must not assert a worldview match without citing a worldview-match evidence item that carries a real quote.>`,
     ``,
     `PITCH_ANGLE: <one sentence: the specific, honest angle a pitch to this company would use, naming the real match found, or "insufficient evidence for a pitch angle yet" if classification is unclear or disqualified>`,
+    ``,
+    `WHY_THEM: <1-2 sentences written directly TO Muxin ("A standing audience of...", "Their PM org gives you..."): what this company concretely offers, grounded in the evidence above. No em dashes.>`,
+    `WHY_ME: <1-2 sentences TO Muxin: what Muxin brings that they are visibly missing, grounded in cited evidence, never invented interest. No em dashes.>`,
+    `WHY_MUTUAL: <2-3 sentences TO Muxin, the matchmaker read: if you were a great networker pairing two people who ought to meet, why these two, and why now. Direct address, concrete, energetic but honest; zero strategy-memo prose; cite only real evidence. No em dashes.>`,
   ].join("\n");
 }
 
@@ -174,6 +179,10 @@ export function buildPlatformResearchPrompt(opts: {
     `<1-2 short paragraphs of rationale citing the evidence item ids above, e.g. "per E2, E4". Must not assert a worldview match without citing a worldview-match evidence item that carries a real quote.>`,
     ``,
     `PITCH_ANGLE: <one sentence: the specific, honest angle a pitch to this platform would use, grounded in the closest spin_angles match and naming the real overlap found, or "insufficient evidence for a pitch angle yet" if classification is weak or disqualified>`,
+    ``,
+    `WHY_THEM: <1-2 sentences written directly TO Muxin ("A standing audience of...", "Their PM org gives you..."): what this platform concretely offers, grounded in the evidence above. No em dashes.>`,
+    `WHY_ME: <1-2 sentences TO Muxin: what Muxin brings that they are visibly missing, grounded in cited evidence, never invented interest. No em dashes.>`,
+    `WHY_MUTUAL: <2-3 sentences TO Muxin, the matchmaker read: if you were a great networker pairing two people who ought to meet, why these two, and why now. Direct address, concrete, energetic but honest; zero strategy-memo prose; cite only real evidence. No em dashes.>`,
   ].join("\n");
 }
 
@@ -184,6 +193,9 @@ const RESPONSE_MARKERS = [
   "CLASSIFICATION_NOTE",
   "CLASSIFICATION",
   "PITCH_ANGLE",
+  "WHY_THEM",
+  "WHY_ME",
+  "WHY_MUTUAL",
 ];
 
 export interface ParsedResearch {
@@ -194,6 +206,12 @@ export interface ParsedResearch {
   classification: string;
   classificationNote: string;
   pitchAngle: string;
+  // The matchmaker read (design 3d), written TO Muxin: why them / why Muxin / why the pair.
+  // Optional so pre-existing fixtures and the discovery pipeline's candidate shape stay valid;
+  // parseResearchResponse always fills them ("" when the model omitted a marker).
+  whyThem?: string;
+  whyMe?: string;
+  whyMutual?: string;
 }
 
 // Parses the section-marker output format above. Order-independent and tolerant of a missing
@@ -225,6 +243,9 @@ export function parseResearchResponse(text: string): ParsedResearch {
     classification: get("CLASSIFICATION").toLowerCase().trim(),
     classificationNote: get("CLASSIFICATION_NOTE"),
     pitchAngle: get("PITCH_ANGLE"),
+    whyThem: get("WHY_THEM"),
+    whyMe: get("WHY_ME"),
+    whyMutual: get("WHY_MUTUAL"),
   };
 }
 
@@ -271,6 +292,11 @@ export function mergeResearchIntoLead(opts: {
   let header = setFrontmatterField(opts.header, fieldName, classification);
   header = setFrontmatterField(header, "status", "researched");
   header = setFrontmatterField(header, "pitch_angle", yamlQuote(parsed.pitchAngle || "(not yet drafted)"));
+  // Matchmaker read: only written when the model actually produced one, so a legacy-format
+  // response (or a re-merge of old output) never clobbers existing fields with blanks.
+  if (parsed.whyThem) header = upsertFrontmatterField(header, "why_them", yamlQuote(parsed.whyThem));
+  if (parsed.whyMe) header = upsertFrontmatterField(header, "why_me", yamlQuote(parsed.whyMe));
+  if (parsed.whyMutual) header = upsertFrontmatterField(header, "why_mutual", yamlQuote(parsed.whyMutual));
 
   let body = replaceSection(opts.body, "## Profile", (old) =>
     isPlaceholderSection(old) || !old ? parsed.profile || "(no profile summary returned)" : `${old}\n\n---\n\n${parsed.profile}`,

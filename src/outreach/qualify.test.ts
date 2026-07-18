@@ -7,8 +7,7 @@ import {
   hasQuote,
   isValidEvidenceItem,
   type EvidenceItem,
-  type QualifyInput,
-} from "./qualify.js";
+  type QualifyInput, upsertFrontmatterField } from "./qualify.js";
 
 const WORLDVIEW_ITEM: EvidenceItem = {
   id: "E1",
@@ -270,4 +269,14 @@ describe("isValidEvidenceItem", () => {
     assert.equal(isValidEvidenceItem({ ...WORLDVIEW_ITEM, quote: "(none)" }), false);
     assert.equal(isValidEvidenceItem({ ...WORLDVIEW_ITEM, source: "tbd" }), false);
   });
+});
+
+// ── upsertFrontmatterField: inserts a NEW field (setFrontmatterField deliberately no-ops) ───────
+test("upsertFrontmatterField updates an existing field and inserts a missing one before the closing ---", () => {
+  const header = "---\nkind: client\nstatus: pursue   # comment\n---\n";
+  const updated = upsertFrontmatterField(header, "status", "passed");
+  assert.match(updated, /status: passed   # comment/);
+  const inserted = upsertFrontmatterField(header, "why_mutual", '"the read"');
+  assert.match(inserted, /why_mutual: "the read"\n---\n/);
+  assert.equal(upsertFrontmatterField("no frontmatter here", "x", "y"), "no frontmatter here");
 });

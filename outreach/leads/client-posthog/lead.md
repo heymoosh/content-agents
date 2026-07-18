@@ -7,6 +7,9 @@ jsa_verdict: TARGET
 status: pursue   # intake | researched | qualified | pursue | passed | drafted | locked
 classification: greenfield   # turnaround | greenfield | unclear | disqualified
 pitch_angle: "PostHog is publicly mid-exploration on a genuinely new, unshipped direction (AI-generated PRs) the same way its own CEO has publicly admitted getting a foundational product-org assumption wrong before (E6, E7), so the honest pitch opens with Muxin's pattern for surfacing the untested assumption inside that new direction, in the same spirit as Hawkins's own \"I was wrong\" post, rather than a generic PMF pitch."
+why_them: "A highly autonomous PM role built for ex-founders, centered on research and context-setting instead of roadmap ticket-pushing (E3), inside a company that just opened \"Act 2\" going deeper into devtools with AI-generated PRs (E1). They run open salaries, open roadmap, and 2-to-6 person teams with no management layer, so the strategic influence is real, not on paper."
+why_me: "They are shipping the earliest AI-PR versions to early adopters for feedback (E2), which is exactly the moment an untested assumption hides inside a new direction and nobody has named it yet. That surfacing is what you do, and Hawkins has already said out loud that his own product-org assumptions were wrong twice (E6, E7), so he is primed to hear it."
+why_mutual: "A founder who publicly posted \"I used to think you don't need product people, I was wrong\" (E6) is the rare person who will not flinch when you open with the assumption inside their new bet instead of a generic pitch. They are mid-exploration on AI PRs right now (E1, E2), so the timing is the whole thing: the assumption is still cheap to name before it hardens. The honest risk to flag is E5, the top-down-via-Slack Glassdoor commentary, which cuts against the \"surface it together\" read, so watch whether the openness is real or just Hawkins's personal brand."
 ---
 
 ## Profile
