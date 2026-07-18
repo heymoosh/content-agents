@@ -196,6 +196,22 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .wb-reply input { font:italic 13px/1.4 Georgia,serif; border:1px solid #e6dcc4; background:#fbf9f4;
     border-radius:8px; padding:8px 12px; color:var(--ink); width:100%; }
   .wb-proposal { margin-top:26px; padding:14px 16px; background:#faf7f0; border:1px solid #efe7d6; border-radius:10px; }
+  /* Studio home (3c): stat tiles + the ranked needs-you list + the team margin */
+  .stat-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:20px; }
+  .stat-tile { border:1px solid #efe7d6; border-radius:10px; padding:14px 16px; background:#faf7f0;
+    display:flex; flex-direction:column; gap:3px; }
+  .stat-tile .n { font:400 30px/1 Georgia,serif; }
+  .stat-tile .l { font-size:12px; color:#5a5346; line-height:1.3; }
+  .ny-row { display:grid; grid-template-columns:82px 1fr auto; gap:16px; align-items:baseline;
+    padding:13px 0; border-top:1px solid #efe7d6; }
+  .ny-room { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase; letter-spacing:.05em; color:#5a5346; }
+  .ny-row.urgent .ny-room { color:#9a6b12; }
+  .ny-text { font-size:15px; color:var(--ink); }
+  .ny-detail { color:#8a7f6d; }
+  .team-row { display:flex; align-items:flex-start; gap:10px; }
+  .team-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex:none; }
+  .team-name { font-size:13px; font-weight:600; color:var(--ink); }
+  .team-line { font-size:12px; color:#8a7f6d; }
   /* Outreach room (3d/3g): the dossier on the desk + the follow-ups ledger */
   .lead-rail { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:16px; border-bottom:1px solid #efe7d6; margin-bottom:20px; }
   .lead-chip { display:inline-flex; align-items:center; gap:7px; border:1px solid #e6dcc4; background:#fbf9f4;
@@ -497,9 +513,15 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomStudio" hidden>
+    <div class="sheet session">
+      <div class="session-grid">
+        <div class="session-main" id="studioMain"><div class="empty">Loading…</div></div>
+        <div class="session-margin" id="studioTeam"></div>
+      </div>
+    </div>
     <div class="sheet">
-      <div class="sheet-head"><h2>Your team, working</h2></div>
-      <div class="sheet-sub">Live queue with honest elapsed times and logs. The full one-glance overview (needs-you list, counts across every room) lands in the next build.</div>
+      <div class="sheet-head"><h2>The queue</h2></div>
+      <div class="sheet-sub">Every background job, honest elapsed time, a log link. Nothing here needs babysitting.</div>
       <div class="jobs" id="jobs" style="max-width:none;margin-top:10px"></div>
     </div>
   </section>
@@ -860,7 +882,7 @@ function setRoom(t){
   $("#roomSignals").hidden = t!=="signals";
   $("#refresh").textContent = refreshLabelFor(t);
   if (t==="content"){ loadContent(); }
-  if (t==="studio"){ loadJobs(); }
+  if (t==="studio"){ loadStudio(); loadJobs(); }
   if (t==="signals" && !briefLoaded){ loadBrief(); loadRaw(); }
   if (t==="outreach"){ setOutreachSub(outreachSub); }
 }
@@ -889,7 +911,7 @@ async function doRefresh(){
     if (currentTab === "content") { await loadContent(); await load(); await loadJobs(); }
     else if (currentTab === "signals") { await loadBrief(); await loadRaw(); }
     else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
-    else { await loadJobs(); }
+    else { if(currentTab==="studio") await loadStudio(); await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
     markRefreshed();
@@ -1576,6 +1598,62 @@ async function outreachDecide(dir, decision){
   else flash(r.error || "Failed");
 }
 
+// ── Studio home (Content Studio Riff 3c) ──
+// The one screen that spans all five rooms. Never starts work; shows what needs Muxin (ranked)
+// and what the team is doing, from real queue/ledger data. Click-throughs land in the room that
+// owns each item.
+let STUDIO = null;
+function studioDateLine(){
+  const now = new Date();
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MO = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return DAYS[now.getDay()]+", "+MO[now.getMonth()]+" "+now.getDate();
+}
+function renderStudio(){
+  if(!STUDIO) return;
+  const c = STUDIO.counts;
+  const tiles = [
+    [c.draftsToReview, "drafts to review", "#9a6b12", "content"],
+    [c.dossiersToRead, "dossiers to read", "#2f5d9a", "outreach"],
+    [c.followupsDue, "follow-ups due", "#9a6b12", "followups"],
+    [c.postsHolding, "posts holding for slots", "#2f7d46", null],
+  ].map(t=>'<div class="stat-tile"'+(t[3]?' style="cursor:pointer" data-goto="'+t[3]+'"':'')+'><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></div>').join("");
+  const rows = (STUDIO.needsYou||[]).map(n=>
+    '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
+    '<span class="ny-text">'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
+    '<span class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+'>'+esc(n.action)+'</span></div>'
+  ).join("");
+  $("#studioMain").innerHTML =
+    '<div class="wb-label" style="margin-bottom:2px">'+studioDateLine()+'</div>'+
+    '<div style="font:400 30px/1.25 Georgia,serif;margin:2px 0 4px;">Everything happening, at a glance</div>'+
+    '<div class="sheet-sub" style="max-width:560px">This screen never starts work, that is what Content is for. It shows what needs you and what the team is doing, so you never go hunting room by room.</div>'+
+    '<div class="stat-tiles">'+tiles+'</div>'+
+    '<div style="margin-top:30px;"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Needs you today</div>'+
+    (rows || '<div class="empty" style="padding:20px">Nothing needs you right now. 🎉</div>')+'</div>';
+  const dot = (state)=> state==="working" ? "#5b46b8" : state==="recent" ? "#2f7d46" : "#d8d2c6";
+  $("#studioTeam").innerHTML = '<div class="wb-margin-cap">YOUR TEAM, WORKING</div>'+
+    (STUDIO.team||[]).map(m=>'<div class="team-row"><span class="team-dot" style="background:'+dot(m.state)+'"></span><div><div class="team-name">'+esc(m.name)+'</div><div class="team-line">'+esc(m.line)+'</div></div></div>').join("")+
+    '<div class="wb-reply"><span class="mono-note">You bring the yes. They handle the brand phrase, the CTA, the spin, the visuals, the posting. Nothing goes out until you say so.</span></div>';
+  document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
+    const room = a.dataset.room;
+    if(room==="content"){ setRoom("content"); $("#reviewSheet").scrollIntoView(); }
+    else if(room==="outreach"){ if(a.dataset.dir) activeLeadDir=a.dataset.dir; setRoom("outreach"); setOutreachSub("leads"); }
+    else if(room==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
+    else setRoom(room);
+  }));
+  document.querySelectorAll("#studioMain .stat-tile[data-goto]").forEach(t=>t.addEventListener("click",()=>{
+    const g = t.dataset.goto;
+    if(g==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
+    else if(g==="outreach"){ setRoom("outreach"); setOutreachSub("leads"); }
+    else { setRoom("content"); if(g==="content") $("#reviewSheet").scrollIntoView(); }
+  }));
+}
+async function loadStudio(){
+  const r = await fetch("/api/studio");
+  STUDIO = await r.json();
+  renderStudio();
+}
+
 // ── Follow-ups ledger (Content Studio Riff 3g) ──
 // Everything sent, and what's next — every row tied back to its origin: why you reached out,
 // what you said, the dossier. Two people at one org are two rows with two clocks (the tracker
@@ -1744,6 +1822,7 @@ async function loadJobs(){
     if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))){
       load(); // a job moved → refresh review rows
       if(currentTab==="content") loadContent(); // a finished advisor round renders its new sheets
+      if(currentTab==="studio") loadStudio(); // counts and the team panel just changed
     }
   }catch(e){}
 }

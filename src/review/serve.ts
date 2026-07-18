@@ -85,6 +85,7 @@ import {
 import { listDevelopSessions, listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
 import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
+import { buildStudioHome } from "./studio.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich) or jobs.ts (classifySource,
@@ -967,6 +968,11 @@ const server = createServer(async (req, res) => {
     // ONLY from Muxin's verbatim source.md lines, never from advisor text (CLAUDE.md rule 1).
     if (req.method === "GET" && url.pathname === "/api/develop") {
       json(res, 200, { sessions: listDevelopSessions() });
+      return;
+    }
+    // Studio home (design 3c): counts, the ranked needs-you list, and the team's honest status.
+    if (req.method === "GET" && url.pathname === "/api/studio") {
+      json(res, 200, await buildStudioHome());
       return;
     }
     // The Content room's workbench aggregate: per active piece — Muxin's source verbatim, the
