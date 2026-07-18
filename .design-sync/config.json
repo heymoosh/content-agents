@@ -1,0 +1,5 @@
+{
+  "projectId": "81e218c9-b6f2-4e7f-ae10-66257fea43d2",
+  "shape": "hand-authored",
+  "notes": "Not a component-library sync: this project is a redesign workspace (brief + guidelines + tokens + current-state snapshot cards) hand-authored for Claude Design sessions. No _ds_bundle.js, no sync anchor; a re-sync just re-uploads the bundle."
+}
