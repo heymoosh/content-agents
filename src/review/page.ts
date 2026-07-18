@@ -533,8 +533,10 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   </section>
   <section class="view" id="roomSignals" hidden>
     <div class="sheet">
-    <div class="sheet-head"><h2>Signals</h2></div>
-    <div class="sheet-sub">The read on what's working, what isn't, and what's too weak to trust. The full analyst layout lands in a later build.</div>
+    <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
+    <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
+    <div id="signalsTop"><div class="empty">Loading…</div></div>
+    <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
         <button class="primary" id="insightsBtn">Generate insights</button>
@@ -883,7 +885,7 @@ function setRoom(t){
   $("#refresh").textContent = refreshLabelFor(t);
   if (t==="content"){ loadContent(); }
   if (t==="studio"){ loadStudio(); loadJobs(); }
-  if (t==="signals" && !briefLoaded){ loadBrief(); loadRaw(); }
+  if (t==="signals"){ loadSignals(); if(!briefLoaded){ loadBrief(); loadRaw(); } }
   if (t==="outreach"){ setOutreachSub(outreachSub); }
 }
 document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
@@ -909,7 +911,7 @@ async function doRefresh(){
   $("#refresh").disabled = true;
   try {
     if (currentTab === "content") { await loadContent(); await load(); await loadJobs(); }
-    else if (currentTab === "signals") { await loadBrief(); await loadRaw(); }
+    else if (currentTab === "signals") { await loadSignals(); await loadBrief(); await loadRaw(); }
     else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
     else { if(currentTab==="studio") await loadStudio(); await loadJobs(); }
   } finally {
@@ -1596,6 +1598,59 @@ async function outreachDecide(dir, decision){
   const r = await post("/api/outreach/decide", {dir, decision});
   if(r.ok){ flash(decision==="pursue" ? "Marked worth pursuing" : "Passed"); loadOutreach(); }
   else flash(r.error || "Failed");
+}
+
+// ── Signals room (Content Studio Riff 3e) ──
+// Deterministic read of the latest brief: per-channel confidence cards and the brief's own
+// [DO MORE]/[TEST]/[DO LESS] recommendations as "worth changing, your call" cards. Send to
+// backlog files a card for the Claude Code pipeline; nothing changes by itself.
+let SIGNALS = null;
+const sigSent = new Set();
+function signalStatusLabel(c){
+  return c.status.startsWith("OK") ? c.weeks+" wks of data" : "insufficient · directional only";
+}
+function renderSignals(){
+  if(!SIGNALS) return;
+  $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
+  const box = $("#signalsTop");
+  if(!SIGNALS.briefPath){
+    box.innerHTML = '<div class="empty">No strategy brief yet. Run Refresh brief below (or /strategy in a terminal) and this page fills in.</div>';
+    return;
+  }
+  const fitCards = (SIGNALS.confidence||[]).map(c=>{
+    const ok = c.status.startsWith("OK");
+    return '<div class="stat-tile"><span style="font:600 14px/1.3 Georgia,serif;">'+esc(c.channel)+'</span>'+
+      '<span class="l" style="color:'+(ok?"#2f7d46":"#9a6b12")+'">'+esc(signalStatusLabel(c))+'</span>'+
+      '<span class="l">'+c.posts+' posts on record</span></div>';
+  }).join("");
+  const weak = (SIGNALS.confidence||[]).filter(c=>!c.status.startsWith("OK"));
+  const recs = (SIGNALS.recommendations||[]).map((r,i)=>{
+    const sent = sigSent.has(r.title);
+    return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
+      '<div class="dev-summary">'+esc(r.rationale)+'</div>'+
+      '<div class="actions">'+(sent
+        ? '<span class="scheduled">✓ filed to the backlog — the pipeline grooms it from here</span>'
+        : '<button class="primary sig-send" data-i="'+i+'">Send to backlog</button><span class="src">Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships.</span>')+
+      '</div></div>';
+  }).join("");
+  box.innerHTML =
+    '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
+    (weak.length?'<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>':"")+
+    '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+
+    '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>'+
+    (recs||'<div class="empty" style="padding:14px">The latest brief carries no recommendations.</div>')+'</div>';
+  box.querySelectorAll(".sig-send").forEach(b=>b.addEventListener("click", async ()=>{
+    const r = SIGNALS.recommendations[Number(b.dataset.i)];
+    b.disabled = true;
+    const res = await post("/api/signals/backlog", {title: r.title, detail: "["+r.type+"] "+r.rationale});
+    if(res.ok){ sigSent.add(r.title); flash("Filed to the backlog"); renderSignals(); }
+    else { b.disabled = false; flash(res.error || "Could not file it"); if((res.error||"").includes("already")) { sigSent.add(r.title); renderSignals(); } }
+  }));
+}
+async function loadSignals(){
+  const r = await fetch("/api/signals");
+  SIGNALS = await r.json();
+  renderSignals();
 }
 
 // ── Studio home (Content Studio Riff 3c) ──
