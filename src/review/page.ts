@@ -526,9 +526,11 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomFiction" hidden>
-    <div class="sheet">
-      <div class="sheet-head"><h2>The fiction desk</h2></div>
-      <div class="sheet-sub">Coming in a later build: your canon (world, philosophy, plot line, voice &amp; characters) editable in place, plus promo shortcuts. Chapter drafting and line-by-line review stay in your GitHub flow. Until then: <code>/story</code> in a terminal.</div>
+    <div class="sheet session">
+      <div class="session-grid">
+        <div class="session-main" id="fictionMain"><div class="empty">Loading…</div></div>
+        <div class="session-margin" id="fictionSide"></div>
+      </div>
     </div>
   </section>
   <section class="view" id="roomSignals" hidden>
@@ -873,7 +875,7 @@ function render(){
 // with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "content";
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
-function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
+function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
   currentTab = t;
   document.querySelectorAll(".room").forEach(b=>b.classList.toggle("on", b.dataset.room===t));
@@ -887,6 +889,7 @@ function setRoom(t){
   if (t==="studio"){ loadStudio(); loadJobs(); }
   if (t==="signals"){ loadSignals(); if(!briefLoaded){ loadBrief(); loadRaw(); } }
   if (t==="outreach"){ setOutreachSub(outreachSub); }
+  if (t==="fiction"){ loadFiction(); }
 }
 document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
 function setOutreachSub(s){
@@ -913,6 +916,7 @@ async function doRefresh(){
     if (currentTab === "content") { await loadContent(); await load(); await loadJobs(); }
     else if (currentTab === "signals") { await loadSignals(); await loadBrief(); await loadRaw(); }
     else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
+    else if (currentTab === "fiction") { await loadFiction(); }
     else { if(currentTab==="studio") await loadStudio(); await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
@@ -1598,6 +1602,76 @@ async function outreachDecide(dir, decision){
   const r = await post("/api/outreach/decide", {dir, decision});
   if(r.ok){ flash(decision==="pursue" ? "Marked worth pursuing" : "Passed"); loadOutreach(); }
   else flash(r.error || "Failed");
+}
+
+// ── Fiction desk (Content Studio Riff 3f) ──
+// The canon underneath the series, editable in place: world bible, plot line, character sheets.
+// canon.md is append-only (story:lock owns it) and renders read-only. Chapter drafting and
+// line-by-line review stay in the GitHub /story flow; the promo shortcuts in the margin are the
+// only bridge to the rest of the studio, and they just seed the Content capture for Muxin.
+let FICTION = null;
+let ficSeries = null;
+let ficDocPath = null;
+let ficDocData = null;
+async function loadFiction(){
+  const r = await fetch("/api/fiction");
+  FICTION = (await r.json()).series || [];
+  if(!FICTION.length){
+    $("#fictionMain").innerHTML = '<div class="empty">No series on the desk yet. Start one with /story new in a terminal.</div>';
+    $("#fictionSide").innerHTML = "";
+    return;
+  }
+  if(!ficSeries || !FICTION.some(s=>s.slug===ficSeries)) ficSeries = FICTION[0].slug;
+  const series = FICTION.find(s=>s.slug===ficSeries);
+  if(!ficDocPath || !series.docs.some(d=>d.path===ficDocPath)) ficDocPath = series.docs[0].path;
+  const dr = await fetch("/api/fiction/doc?series="+encodeURIComponent(ficSeries)+"&path="+encodeURIComponent(ficDocPath));
+  ficDocData = await dr.json();
+  renderFiction();
+}
+function renderFiction(){
+  const series = FICTION.find(s=>s.slug===ficSeries);
+  const d = ficDocData;
+  const doc = series.docs.find(x=>x.path===ficDocPath);
+  const history = (d.history||[]).length ? '<details class="lead-details" style="margin-top:10px"><summary>Version history</summary><div class="ntext" style="font-size:12px">'+d.history.map(esc).join("<br>")+'</div></details>' : "";
+  $("#fictionMain").innerHTML =
+    '<div class="wb-label">'+esc(series.title)+' · your canon</div>'+
+    '<div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 14px;">'+esc(doc.label)+'</div>'+
+    '<div id="ficBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:520px;overflow:auto;">'+esc(d.body)+'</div>'+
+    '<div class="actions" style="margin-top:12px">'+
+      (doc.editable
+        ? '<button class="primary" id="ficEditBtn">Edit in place</button><span class="src">Saves straight to your canon. What you save here is what the drafts build from.</span>'
+        : '<span class="src">Append-only: /story lock writes this ledger; the desk only reads it.</span>')+
+    '</div>'+history+
+    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Chapter drafting and line-by-line review stay in your GitHub flow (/story), where you already work sentence by sentence. This desk holds the canon underneath it.</div>';
+  $("#fictionSide").innerHTML =
+    '<div class="wb-margin-cap">YOUR CANON · CLICK TO OPEN</div>'+
+    series.docs.map(x=>'<div class="lead-chip'+(x.path===ficDocPath?" on":"")+'" style="display:flex" data-path="'+esc(x.path)+'">'+esc(x.label)+'</div>').join("")+
+    '<div class="wb-reply"><div class="wb-margin-cap">PROMOTE THE SERIES</div>'+
+    '<span class="wb-link" id="ficPromoNote">Start a launch note in Content</span>'+
+    '<span class="mono-note">Promo is the only bridge to the rest of the studio: teasers quote LOCKED chapters verbatim. Character art: /illustrate '+esc(ficSeries)+' character &lt;name&gt; in a terminal.</span></div>';
+  document.querySelectorAll("#fictionSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ ficDocPath=c.dataset.path; loadFiction(); }));
+  const editBtn = $("#ficEditBtn");
+  if(editBtn) editBtn.addEventListener("click", ()=>{
+    const bodyEl = $("#ficBody");
+    if(editBtn.dataset.mode==="save"){
+      const ta = bodyEl.querySelector("textarea");
+      post("/api/fiction/doc",{series:ficSeries, path:ficDocPath, body: ta?ta.value:""}).then(r=>{
+        if(r.ok){ flash("Saved to your canon"); loadFiction(); } else flash(r.error||"Could not save");
+      });
+      return;
+    }
+    const ta = document.createElement("textarea");
+    ta.value = ficDocData.body;
+    ta.style.cssText = "width:100%;min-height:420px;font:400 15px/1.7 Georgia,serif;border:none;background:transparent;resize:vertical;";
+    bodyEl.innerHTML=""; bodyEl.appendChild(ta);
+    editBtn.textContent = "Save to canon"; editBtn.dataset.mode = "save";
+  });
+  const promo = $("#ficPromoNote");
+  if(promo) promo.addEventListener("click", ()=>{
+    setRoom("content");
+    $("#src").value = "Launch note for "+series.title+": ";
+    $("#src").focus();
+  });
 }
 
 // ── Signals room (Content Studio Riff 3e) ──
