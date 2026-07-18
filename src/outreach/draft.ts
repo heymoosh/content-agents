@@ -137,7 +137,11 @@ export interface DraftResult {
 
 export async function runDraft(
   dirArg: string,
-  opts: { channel?: string; callClaude?: (prompt: string) => Promise<string> } = {},
+  // `recipient` names the person the message addresses ("Jamie R."). Recorded into the message
+  // frontmatter as provenance for the per-person follow-up clock; NOT fed into the drafting
+  // prompt here (the prompt is content-generation logic -- addressing the recipient by name in
+  // the composed text is the /outreach skill's held change, not this plumbing's).
+  opts: { channel?: string; recipient?: string; callClaude?: (prompt: string) => Promise<string> } = {},
 ): Promise<DraftResult> {
   const absDir = dirArg.startsWith("/") ? dirArg : join(repoRoot, dirArg);
   const leadPath = join(absDir, "lead.md");
@@ -198,10 +202,12 @@ export async function runDraft(
   const leadSlug = basename(absDir);
   const evidenceIds = selected.map((e) => e.id);
   const classificationField = kind === "platform" ? `fit: ${classification}\n` : `classification: ${classification}\n`;
+  const recipient = (opts.recipient ?? "").trim().replace(/\n/g, " ");
   const frontmatter =
     `---\n` +
     `lead: ${leadSlug}\n` +
     `channel: ${channel}\n` +
+    (recipient ? `recipient: "${recipient.replace(/"/g, '\\"')}"\n` : "") +
     `evidence: [${evidenceIds.join(", ")}]\n` +
     classificationField +
     `status: draft   # draft | approved | locked\n` +

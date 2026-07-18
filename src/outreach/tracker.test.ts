@@ -16,6 +16,7 @@ import {
   markResponded,
   markContacted,
   moveOn,
+  markSent,
   type TrackerEvent,
 } from "./tracker.js";
 
@@ -387,6 +388,79 @@ describe("markResponded / moveOn", () => {
       assert.deepEqual(readTrackerEvents(path), [event]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── Per-person clocks + markSent (design 3d/3g: "different people at the same org get separate
+// clocks, both linked to the one org dossier") ──────────────────────────────────────────────────
+
+describe("per-person follow-up rows", () => {
+  let dir: string;
+  let leadsRoot: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "tracker-person-test-"));
+    leadsRoot = join(dir, "leads");
+    mkdirSync(leadsRoot, { recursive: true });
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  test("two people at one lead fold into two separate rows with separate clocks", () => {
+    writeLead(leadsRoot, "client-posthog", { lockedMessage: true, pitchAngle: "the angle" });
+    const events: TrackerEvent[] = [
+      { ts: "2026-07-01T00:00:00.000Z", lead: "client-posthog", bucket: "client", event: "contacted", person: "Annika L.", channel: "linkedin-dm" },
+      { ts: "2026-07-08T00:00:00.000Z", lead: "client-posthog", bucket: "client", event: "contacted", person: "James H.", channel: "email" },
+    ];
+    const rows = buildClientPlatformRows("client", events, CONFIG, leadsRoot, "2026-07-10T00:00:00.000Z");
+    assert.equal(rows.length, 2);
+    const annika = rows.find((r) => r.person === "Annika L.")!;
+    const james = rows.find((r) => r.person === "James H.")!;
+    assert.equal(annika.status, "due"); // contacted Jul 1, client window 7 days, now Jul 10
+    assert.equal(james.status, "waiting"); // contacted Jul 8
+    assert.match(annika.who, /Annika L\./);
+    assert.notEqual(annika.key, james.key);
+    assert.equal(annika.dir, "outreach/leads/client-posthog"); // both link to the ONE dossier
+    assert.equal(james.dir, "outreach/leads/client-posthog");
+  });
+
+  test("a lead with person rows gets no empty lead-level row; legacy person-less events still render", () => {
+    writeLead(leadsRoot, "client-posthog", { lockedMessage: true });
+    const withPerson: TrackerEvent[] = [
+      { ts: "2026-07-08T00:00:00.000Z", lead: "client-posthog", bucket: "client", event: "contacted", person: "James H." },
+    ];
+    assert.equal(buildClientPlatformRows("client", withPerson, CONFIG, leadsRoot, "2026-07-10T00:00:00.000Z").length, 1);
+    const legacy: TrackerEvent[] = [
+      { ts: "2026-07-08T00:00:00.000Z", lead: "client-posthog", bucket: "client", event: "followup_sent" },
+    ];
+    const rows = buildClientPlatformRows("client", legacy, CONFIG, leadsRoot, "2026-07-10T00:00:00.000Z");
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].person, undefined);
+  });
+
+  test("markSent appends a `contacted` event carrying person + channel + message", () => {
+    const { dir: d, path } = tmpFile("tracker.jsonl");
+    try {
+      const event = markSent("client", "client-posthog", { person: "Jamie R.", channel: "email", message: "message-01" }, path);
+      assert.equal(event.event, "contacted");
+      assert.equal(event.person, "Jamie R.");
+      assert.equal(event.channel, "email");
+      assert.equal(event.message, "message-01");
+      assert.deepEqual(readTrackerEvents(path), [event]);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  test("markResponded/moveOn stamp the person through to the event", () => {
+    const { dir: d, path } = tmpFile("tracker.jsonl");
+    try {
+      markResponded("client", "client-posthog", "intro call", path, "James H.");
+      moveOn("client", "client-posthog", undefined, path, "Annika L.");
+      const [a, b] = readTrackerEvents(path);
+      assert.equal(a.person, "James H.");
+      assert.equal(b.person, "Annika L.");
+    } finally {
+      rmSync(d, { recursive: true, force: true });
     }
   });
 });

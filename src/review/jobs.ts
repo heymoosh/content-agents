@@ -998,10 +998,11 @@ export async function duplicateToPlatform(
 // lockdown, same prompt, same timeout as draft.ts's own execFile call. Only transport + error
 // wording differ.
 const DRAFT_TIMEOUT_MS = 120_000; // mirrors outreach/draft.ts's own (private) DRAFT_TIMEOUT_MS
-export async function enqueueFollowUpDraft(dir: string, channel?: string): Promise<DraftResult> {
+export async function enqueueFollowUpDraft(dir: string, channel?: string, recipient?: string): Promise<DraftResult> {
   return runQueued("draft-follow-up", `Draft follow-up: ${dir}`, (job) =>
     runDraft(dir, {
       channel,
+      recipient,
       callClaude: async (prompt) => {
         const result = await runClaudeSpawn(job, prompt, {
           timeoutMs: DRAFT_TIMEOUT_MS,
