@@ -12,10 +12,11 @@
 // body. What the GUI previews (previewText below) is resolved by the same function, so
 // what-you-see-is-what-you-accept.
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { addCut, listCuts, DEFAULT_LENS } from "../atomize/cuts.js";
-import { CONTENT, safeFolder, isValidLens, firstHeading, listRootFolders } from "./rows.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
+import { CONTENT, safeFolder, isValidLens, firstHeading, listRootFolders, readQueueCached, DECIDED } from "./rows.js";
 
 export type AdviceCardKind = "angle" | "cta" | "spin" | "routing" | "note";
 export type AdviceCardStatus = "open" | "accepted" | "dismissed";
@@ -185,7 +186,12 @@ export function acceptAngle(
   if (listCuts(folder).includes(lens)) throw new Error(`a "${lens}" cut already exists`);
   const body = extractSourceLines(folder, card.sourceLines);
   if (!body.trim()) throw new Error("the referenced source lines are empty");
-  const cutDir = addCut(folder, { lens, title: (titleOverride ?? card.title) || lens, text: body });
+  const cutDir = addCut(folder, {
+    lens,
+    title: (titleOverride ?? card.title) || lens,
+    text: body,
+    sourceLines: card.sourceLines, // provenance for reading surfaces ("lines 10 and 12, verbatim")
+  });
   card.status = "accepted";
   card.acceptedLens = lens;
   card.decidedAt = new Date().toISOString();
@@ -253,6 +259,80 @@ export function listDevelopSessions(): DevelopSession[] {
   const out: DevelopSession[] = [];
   for (const slug of listRootFolders(CONTENT)) {
     const session = developSessionForFolder(join(CONTENT, slug), slug);
+    if (session) out.push(session);
+  }
+  out.sort((a, b) => b.slug.localeCompare(a.slug));
+  return out;
+}
+
+// ── The Content room (workbench) aggregate ──────────────────────────────────────────────────────
+// One shape per active piece for the studio desk's Content room: Muxin's source verbatim, the
+// advisor session (if any), each cut as a readable message with provenance, and how many drafts
+// are still pending in review. A folder is "active" when it has an advisor session, a non-extract
+// cut, or pending review rows — settled folders stay reachable through the review list instead of
+// piling up on the desk.
+
+export interface ContentCutView {
+  lens: string;
+  title: string;
+  body: string;
+  sourceLines?: (number | string)[];
+}
+
+export interface ContentSession {
+  slug: string;
+  title: string;
+  date: string; // from the folder's YYYY-MM-DD prefix ("" when unprefixed)
+  sourceBody: string;
+  rounds: DevelopSession["rounds"]; // [] when no advisor session yet
+  cuts: ContentCutView[];
+  pending: number;
+}
+
+export function contentSessionForFolder(folder: string, slug: string): ContentSession | null {
+  let sourceBody = "";
+  try {
+    sourceBody = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8")).body.trim();
+  } catch {
+    return null; // no source.md — not a workbench piece
+  }
+  const session = developSessionForFolder(folder, slug);
+  const cuts: ContentCutView[] = [];
+  for (const lens of listCuts(folder)) {
+    try {
+      const { fm, body } = splitFrontmatter(readFileSync(join(folder, "cuts", lens, "cut.md"), "utf8"));
+      cuts.push({
+        lens,
+        title: typeof fm.title === "string" ? fm.title : lens,
+        body: body.trim(),
+        sourceLines: Array.isArray(fm.source_lines) ? (fm.source_lines as (number | string)[]) : undefined,
+      });
+    } catch {
+      /* unreadable cut — skip it rather than sinking the whole room */
+    }
+  }
+  let pending = 0;
+  try {
+    pending = readQueueCached(folder).filter((r) => !DECIDED.has(r.status)).length;
+  } catch {
+    /* no queue yet */
+  }
+  if (!session && !cuts.length && !pending) return null;
+  return {
+    slug,
+    title: firstHeading(folder),
+    date: /^(\d{4}-\d{2}-\d{2})-/.exec(slug)?.[1] ?? "",
+    sourceBody,
+    rounds: session?.rounds ?? [],
+    cuts,
+    pending,
+  };
+}
+
+export function listContentSessions(): ContentSession[] {
+  const out: ContentSession[] = [];
+  for (const slug of listRootFolders(CONTENT)) {
+    const session = contentSessionForFolder(join(CONTENT, slug), slug);
     if (session) out.push(session);
   }
   out.sort((a, b) => b.slug.localeCompare(a.slug));

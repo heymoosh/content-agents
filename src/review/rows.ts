@@ -28,7 +28,7 @@ export const OUTREACH_LEADS = join(repoRoot, "outreach", "leads");
 // A row is "decided" once it's out of the review inbox. Everything else needs Muxin's eyes.
 // "locked" (an outreach-message row's terminal state — see lock.ts) counts as decided too: it's
 // not still awaiting Muxin, just like "published"/"discard".
-const DECIDED = new Set(["published", "discard", "locked"]);
+export const DECIDED = new Set(["published", "discard", "locked"]);
 export const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 export const VIDEO_EXT = new Set([".mp4", ".webm", ".mov"]);
 
