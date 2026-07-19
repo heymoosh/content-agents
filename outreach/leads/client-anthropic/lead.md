@@ -6,6 +6,10 @@ source: ingested
 status: researched   # intake | researched | qualified | pursue | passed | drafted | locked
 classification: greenfield   # turnaround | greenfield | unclear | disqualified
 pitch_angle: "Anthropic's own product organization (Labs, run by former CPO Mike Krieger) is publicly, currently naming the exact failure pattern Muxin specializes in catching, building the full thing only to discover afterward that a core assumption was untested, and its hiring bar and its people's own public statements already reward exactly the kind of outside challenge and mind-changing her work requires, so the honest pitch is Muxin's pattern for surfacing the untested assumption before the build-and-tear-down cycle, aimed at a team that has already said out loud this is its own weak spot."
+why_them: "Anthropic Labs runs on two-week bets it expects to kill, and it has exactly one PM for all of Labs with more roles open (E1, E2). That is a fast build-and-cut shop that is short on the judgment layer, scout plus builder, that decides what is worth pursuing before the team commits."
+why_me: "Krieger has said on record they have built the full thing, hit a broken core assumption, and torn it down for a V2 (E4). That teardown is the exact cost your pattern removes by naming the untested assumption first, and their hiring already screens for people who changed their mind from research or safety feedback (E9), so the trait you sell is one they are actively filtering for."
+why_mutual: "They keep naming this failure out loud: the over-built thing that dies on a late assumption (E4), the internal-versus-external drift on Cowork (E7), the reversed no-onboarding principle (E10). Their hiring bar rewards the outside push and the changed mind over defending the call (E9), which is the environment your work needs to land. The timing is plain: they are hiring into that gap right now, they have said the gap is real, and your read catches it a cycle before the teardown."
+why_source: claude-cli
 ---
 
 ## Profile

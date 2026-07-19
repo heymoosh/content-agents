@@ -10,6 +10,7 @@ import type {
   TextPolishProvider,
   VideoBrollProvider,
   ProseProvider,
+  AnalystProvider,
 } from "./types.js";
 
 // Adapter lookup: config/providers.yaml maps capability → provider name → module in
@@ -23,6 +24,7 @@ const DIR_FOR: Record<Capability, string> = {
   "text-polish": "polish",
   "video-broll": "broll",
   prose: "prose",
+  analyst: "analyst",
 };
 
 function readProviders(): Record<string, unknown> {
@@ -98,6 +100,10 @@ export const getTextPolish = () => load<TextPolishProvider>("text-polish");
 // Fiction prose (Build 2). getProse() uses the global config/providers.yaml `prose` entry;
 // getProseNamed() lets a series.yaml override the model for one series without a config edit.
 export const getProse = () => load<ProseProvider>("prose");
+
+// Analysis/interpretation work (insights, the matchmaker read). Default adapter "routed":
+// GPT via the local Codex CLI first, Claude fallback on unavailability. See types.ts.
+export const getAnalyst = () => load<AnalystProvider>("analyst");
 export const getProseNamed = (name: string) => importProvider<ProseProvider>("prose", name);
 
 // Animated scene engine. Like getImage(), returns the adapter plus its `video_broll_params`

@@ -86,6 +86,7 @@ import { listDevelopSessions, listContentSessions, acceptAngleBySlug, dismissCar
 import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
 import { buildStudioHome } from "./studio.js";
+import { getAnalyst } from "../providers/registry.js";
 import { readSignals, appendBacklogCard } from "./signals.js";
 import { listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory } from "./fiction.js";
 
@@ -388,6 +389,8 @@ function dataFreshness(nowMs: number = Date.now()): Freshness | null {
 
 export type InsightsResult = {
   summary: string;
+  engine?: string; // which analyst engine answered ("gpt-codex" | "claude-cli")
+  fallbackReason?: string; // set when GPT was unavailable and Claude answered — says why
   freshness: Freshness | null;
   brief: { path: string; date: string | null; ageDays: number | null } | null;
   untagged: number;
@@ -460,16 +463,19 @@ async function generateInsights(): Promise<InsightsResult> {
   // callClaudeDraft already relies on) — the prompt above already forbids running commands or
   // reading other files and inlines everything needed, so there's no legitimate tool call for this
   // spawn to make; skipping tool/MCP setup removes one more thing that could eat into the timeout.
-  const summary = await runQueued("insights", "Generate insights", async (job) => {
-    const result = await runClaudeSpawn(job, prompt, { timeoutMs: STRATEGY_TIMEOUT_MS, tools: "" });
-    const failure = decodeSpawnFailure(result, job.id, {
-      timeoutVerb: "Claude", timeoutLabel: `${STRATEGY_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
-    });
-    if (failure) throw new Error(failure);
-    return result.stdout.trim();
+  // The model call goes through the ANALYST provider (config/providers.yaml `analyst: routed`):
+  // GPT via the local Codex CLI first — Muxin's explicit 2026-07-19 call for analysis and
+  // interpretation work — falling back to Claude when Codex is unavailable (usage limits
+  // included; the fallback reason carries the limit message so the GUI can say when it clears).
+  // The prompt is fully self-contained (everything inlined above), which is the analyst contract.
+  const analysis = await runQueued("insights", "Generate insights", async () => {
+    const analyst = await getAnalyst();
+    return analyst.analyze({ prompt, timeoutMs: STRATEGY_TIMEOUT_MS });
   });
   return {
-    summary,
+    summary: analysis.text,
+    engine: analysis.engine,
+    fallbackReason: analysis.fallbackReason,
     freshness,
     brief: brief ? { path: brief.path, date: brief.date, ageDays: brief.ageDays } : null,
     untagged,
@@ -1315,8 +1321,8 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/strategy/insights") {
       try {
-        const { summary, freshness, brief, untagged } = await generateInsights();
-        json(res, 200, { ok: true, summary, freshness, brief, untagged });
+        const result = await generateInsights();
+        json(res, 200, { ok: true, ...result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }

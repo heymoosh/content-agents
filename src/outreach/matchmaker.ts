@@ -10,16 +10,14 @@
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
+import { getAnalyst } from "../providers/registry.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { extractSection, parseEvidence, upsertFrontmatterField } from "./qualify.js";
 import { logCost } from "../util/cost-log.js";
 
-const execFileP = promisify(execFile);
-const TIMEOUT_MS = 120_000;
+const TIMEOUT_MS = 240_000;
 
 // Pure prompt assembly, exported for unit tests. Mirrors research.ts's WHY_* output contract
 // exactly -- one rubric, two entry points.
@@ -95,21 +93,20 @@ export async function runMatchmaker(dirArg: string): Promise<{ dir: string; wrot
     evidenceLines,
   });
 
-  // `--tools ""`: same lockdown as draft.ts -- every citable fact is already in the prompt.
-  const { stdout } = await execFileP("claude", ["-p", prompt, "--tools", ""], {
-    cwd: repoRoot,
-    timeout: TIMEOUT_MS,
-    maxBuffer: 5_000_000,
-  });
-  const parsed = parseMatchmakerResponse(stdout);
+  // The ANALYST provider (GPT-first via Codex, Claude fallback -- Muxin's 2026-07-19 routing
+  // call: understanding who to reach and why is analysis work). The prompt is self-contained.
+  const analyst = await getAnalyst();
+  const analysis = await analyst.analyze({ prompt, timeoutMs: TIMEOUT_MS });
+  const parsed = parseMatchmakerResponse(analysis.text);
   const wrote: string[] = [];
   let newHeader = header;
   if (parsed.whyThem) { newHeader = upsertFrontmatterField(newHeader, "why_them", yamlQuote(parsed.whyThem)); wrote.push("why_them"); }
   if (parsed.whyMe) { newHeader = upsertFrontmatterField(newHeader, "why_me", yamlQuote(parsed.whyMe)); wrote.push("why_me"); }
   if (parsed.whyMutual) { newHeader = upsertFrontmatterField(newHeader, "why_mutual", yamlQuote(parsed.whyMutual)); wrote.push("why_mutual"); }
   if (!wrote.length) throw new Error("model returned no WHY_* blocks -- lead.md left untouched");
+  newHeader = upsertFrontmatterField(newHeader, "why_source", analysis.engine); wrote.push(`why_source=${analysis.engine}`);
   writeFileSync(leadPath, `${newHeader}\n${body.trim()}\n`);
-  logCost({ step: "outreach:matchmaker", detail: String(fm.name ?? dirArg), costUsd: 0 });
+  logCost({ step: "outreach:matchmaker", detail: `${String(fm.name ?? dirArg)} (${analysis.engine})`, costUsd: analysis.costUsd });
   return { dir: dirArg, wrote };
 }
 

@@ -1,6 +1,12 @@
 # Provider selection — one line per capability.
 # Swapping providers = add an adapter file in src/providers/<capability>/ and change the name here.
 # "none" disables the capability (pipeline steps that need it are skipped).
+analyst: routed        # Analysis + interpretation (Generate insights, the outreach matchmaker read).
+# GPT-FIRST by Muxin's explicit call (2026-07-19): "GPT is better at telling me very clearly and
+# cleanly what the hell is going on in the data." Runs the local Codex CLI on the ChatGPT
+# SUBSCRIPTION ($0 marginal, no OpenRouter) and falls back to claude-cli when Codex is
+# unavailable (usage limits, not installed) — the GUI shows which engine actually answered.
+# Drafting/voice work NEVER routes here; Claude keeps everything written in Muxin's voice.
 tts: kokoro            # local + free; needs kokoro-fastapi + whisper.cpp (see docs/setup-kokoro.md). Swap to "elevenlabs" if quality disappoints.
 image: openrouter-image   # default image ADAPTER. COST-FIRST: Riverflow by default; step UP only on request, never automatically.
 # Image model + settings passed to generate(). render.ts picks a profile per job:
