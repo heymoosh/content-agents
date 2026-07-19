@@ -21,10 +21,16 @@
       "product-direction",
       "security",
       "irreversible",
-      "production-mutation"
+      "production-mutation",
+      "visual"
     ],
     "guardrail_paths": [
-      "config/voice.yaml"
+      "config/voice.yaml",
+      "src/atomize/**",
+      "src/strategy/**",
+      "src/video/script.ts",
+      "src/video/quote-image-card.ts",
+      "src/fiction/draft.ts"
     ]
   }
 }
