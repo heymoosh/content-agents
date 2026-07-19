@@ -196,6 +196,22 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .wb-reply input { font:italic 13px/1.4 Georgia,serif; border:1px solid #e6dcc4; background:#fbf9f4;
     border-radius:8px; padding:8px 12px; color:var(--ink); width:100%; }
   .wb-proposal { margin-top:26px; padding:14px 16px; background:#faf7f0; border:1px solid #efe7d6; border-radius:10px; }
+  /* Studio home (3c): stat tiles + the ranked needs-you list + the team margin */
+  .stat-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:20px; }
+  .stat-tile { border:1px solid #efe7d6; border-radius:10px; padding:14px 16px; background:#faf7f0;
+    display:flex; flex-direction:column; gap:3px; }
+  .stat-tile .n { font:400 30px/1 Georgia,serif; }
+  .stat-tile .l { font-size:12px; color:#5a5346; line-height:1.3; }
+  .ny-row { display:grid; grid-template-columns:82px 1fr auto; gap:16px; align-items:baseline;
+    padding:13px 0; border-top:1px solid #efe7d6; }
+  .ny-room { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase; letter-spacing:.05em; color:#5a5346; }
+  .ny-row.urgent .ny-room { color:#9a6b12; }
+  .ny-text { font-size:15px; color:var(--ink); }
+  .ny-detail { color:#8a7f6d; }
+  .team-row { display:flex; align-items:flex-start; gap:10px; }
+  .team-dot { width:8px; height:8px; border-radius:50%; margin-top:5px; flex:none; }
+  .team-name { font-size:13px; font-weight:600; color:var(--ink); }
+  .team-line { font-size:12px; color:#8a7f6d; }
   /* Outreach room (3d/3g): the dossier on the desk + the follow-ups ledger */
   .lead-rail { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:16px; border-bottom:1px solid #efe7d6; margin-bottom:20px; }
   .lead-chip { display:inline-flex; align-items:center; gap:7px; border:1px solid #e6dcc4; background:#fbf9f4;
@@ -497,22 +513,32 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomStudio" hidden>
+    <div class="sheet session">
+      <div class="session-grid">
+        <div class="session-main" id="studioMain"><div class="empty">Loading…</div></div>
+        <div class="session-margin" id="studioTeam"></div>
+      </div>
+    </div>
     <div class="sheet">
-      <div class="sheet-head"><h2>Your team, working</h2></div>
-      <div class="sheet-sub">Live queue with honest elapsed times and logs. The full one-glance overview (needs-you list, counts across every room) lands in the next build.</div>
+      <div class="sheet-head"><h2>The queue</h2></div>
+      <div class="sheet-sub">Every background job, honest elapsed time, a log link. Nothing here needs babysitting.</div>
       <div class="jobs" id="jobs" style="max-width:none;margin-top:10px"></div>
     </div>
   </section>
   <section class="view" id="roomFiction" hidden>
-    <div class="sheet">
-      <div class="sheet-head"><h2>The fiction desk</h2></div>
-      <div class="sheet-sub">Coming in a later build: your canon (world, philosophy, plot line, voice &amp; characters) editable in place, plus promo shortcuts. Chapter drafting and line-by-line review stay in your GitHub flow. Until then: <code>/story</code> in a terminal.</div>
+    <div class="sheet session">
+      <div class="session-grid">
+        <div class="session-main" id="fictionMain"><div class="empty">Loading…</div></div>
+        <div class="session-margin" id="fictionSide"></div>
+      </div>
     </div>
   </section>
   <section class="view" id="roomSignals" hidden>
     <div class="sheet">
-    <div class="sheet-head"><h2>Signals</h2></div>
-    <div class="sheet-sub">The read on what's working, what isn't, and what's too weak to trust. The full analyst layout lands in a later build.</div>
+    <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
+    <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
+    <div id="signalsTop"><div class="empty">Loading…</div></div>
+    <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
         <button class="primary" id="insightsBtn">Generate insights</button>
@@ -849,7 +875,7 @@ function render(){
 // with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "content";
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
-function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
+function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
   currentTab = t;
   document.querySelectorAll(".room").forEach(b=>b.classList.toggle("on", b.dataset.room===t));
@@ -860,9 +886,10 @@ function setRoom(t){
   $("#roomSignals").hidden = t!=="signals";
   $("#refresh").textContent = refreshLabelFor(t);
   if (t==="content"){ loadContent(); }
-  if (t==="studio"){ loadJobs(); }
-  if (t==="signals" && !briefLoaded){ loadBrief(); loadRaw(); }
+  if (t==="studio"){ loadStudio(); loadJobs(); }
+  if (t==="signals"){ loadSignals(); if(!briefLoaded){ loadBrief(); loadRaw(); } }
   if (t==="outreach"){ setOutreachSub(outreachSub); }
+  if (t==="fiction"){ loadFiction(); }
 }
 document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
 function setOutreachSub(s){
@@ -887,9 +914,10 @@ async function doRefresh(){
   $("#refresh").disabled = true;
   try {
     if (currentTab === "content") { await loadContent(); await load(); await loadJobs(); }
-    else if (currentTab === "signals") { await loadBrief(); await loadRaw(); }
+    else if (currentTab === "signals") { await loadSignals(); await loadBrief(); await loadRaw(); }
     else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
-    else { await loadJobs(); }
+    else if (currentTab === "fiction") { await loadFiction(); }
+    else { if(currentTab==="studio") await loadStudio(); await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
     markRefreshed();
@@ -1576,6 +1604,185 @@ async function outreachDecide(dir, decision){
   else flash(r.error || "Failed");
 }
 
+// ── Fiction desk (Content Studio Riff 3f) ──
+// The canon underneath the series, editable in place: world bible, plot line, character sheets.
+// canon.md is append-only (story:lock owns it) and renders read-only. Chapter drafting and
+// line-by-line review stay in the GitHub /story flow; the promo shortcuts in the margin are the
+// only bridge to the rest of the studio, and they just seed the Content capture for Muxin.
+let FICTION = null;
+let ficSeries = null;
+let ficDocPath = null;
+let ficDocData = null;
+async function loadFiction(){
+  const r = await fetch("/api/fiction");
+  FICTION = (await r.json()).series || [];
+  if(!FICTION.length){
+    $("#fictionMain").innerHTML = '<div class="empty">No series on the desk yet. Start one with /story new in a terminal.</div>';
+    $("#fictionSide").innerHTML = "";
+    return;
+  }
+  if(!ficSeries || !FICTION.some(s=>s.slug===ficSeries)) ficSeries = FICTION[0].slug;
+  const series = FICTION.find(s=>s.slug===ficSeries);
+  if(!ficDocPath || !series.docs.some(d=>d.path===ficDocPath)) ficDocPath = series.docs[0].path;
+  const dr = await fetch("/api/fiction/doc?series="+encodeURIComponent(ficSeries)+"&path="+encodeURIComponent(ficDocPath));
+  ficDocData = await dr.json();
+  renderFiction();
+}
+function renderFiction(){
+  const series = FICTION.find(s=>s.slug===ficSeries);
+  const d = ficDocData;
+  const doc = series.docs.find(x=>x.path===ficDocPath);
+  const history = (d.history||[]).length ? '<details class="lead-details" style="margin-top:10px"><summary>Version history</summary><div class="ntext" style="font-size:12px">'+d.history.map(esc).join("<br>")+'</div></details>' : "";
+  $("#fictionMain").innerHTML =
+    '<div class="wb-label">'+esc(series.title)+' · your canon</div>'+
+    '<div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 14px;">'+esc(doc.label)+'</div>'+
+    '<div id="ficBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:520px;overflow:auto;">'+esc(d.body)+'</div>'+
+    '<div class="actions" style="margin-top:12px">'+
+      (doc.editable
+        ? '<button class="primary" id="ficEditBtn">Edit in place</button><span class="src">Saves straight to your canon. What you save here is what the drafts build from.</span>'
+        : '<span class="src">Append-only: /story lock writes this ledger; the desk only reads it.</span>')+
+    '</div>'+history+
+    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Chapter drafting and line-by-line review stay in your GitHub flow (/story), where you already work sentence by sentence. This desk holds the canon underneath it.</div>';
+  $("#fictionSide").innerHTML =
+    '<div class="wb-margin-cap">YOUR CANON · CLICK TO OPEN</div>'+
+    series.docs.map(x=>'<div class="lead-chip'+(x.path===ficDocPath?" on":"")+'" style="display:flex" data-path="'+esc(x.path)+'">'+esc(x.label)+'</div>').join("")+
+    '<div class="wb-reply"><div class="wb-margin-cap">PROMOTE THE SERIES</div>'+
+    '<span class="wb-link" id="ficPromoNote">Start a launch note in Content</span>'+
+    '<span class="mono-note">Promo is the only bridge to the rest of the studio: teasers quote LOCKED chapters verbatim. Character art: /illustrate '+esc(ficSeries)+' character &lt;name&gt; in a terminal.</span></div>';
+  document.querySelectorAll("#fictionSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ ficDocPath=c.dataset.path; loadFiction(); }));
+  const editBtn = $("#ficEditBtn");
+  if(editBtn) editBtn.addEventListener("click", ()=>{
+    const bodyEl = $("#ficBody");
+    if(editBtn.dataset.mode==="save"){
+      const ta = bodyEl.querySelector("textarea");
+      post("/api/fiction/doc",{series:ficSeries, path:ficDocPath, body: ta?ta.value:""}).then(r=>{
+        if(r.ok){ flash("Saved to your canon"); loadFiction(); } else flash(r.error||"Could not save");
+      });
+      return;
+    }
+    const ta = document.createElement("textarea");
+    ta.value = ficDocData.body;
+    ta.style.cssText = "width:100%;min-height:420px;font:400 15px/1.7 Georgia,serif;border:none;background:transparent;resize:vertical;";
+    bodyEl.innerHTML=""; bodyEl.appendChild(ta);
+    editBtn.textContent = "Save to canon"; editBtn.dataset.mode = "save";
+  });
+  const promo = $("#ficPromoNote");
+  if(promo) promo.addEventListener("click", ()=>{
+    setRoom("content");
+    $("#src").value = "Launch note for "+series.title+": ";
+    $("#src").focus();
+  });
+}
+
+// ── Signals room (Content Studio Riff 3e) ──
+// Deterministic read of the latest brief: per-channel confidence cards and the brief's own
+// [DO MORE]/[TEST]/[DO LESS] recommendations as "worth changing, your call" cards. Send to
+// backlog files a card for the Claude Code pipeline; nothing changes by itself.
+let SIGNALS = null;
+const sigSent = new Set();
+function signalStatusLabel(c){
+  return c.status.startsWith("OK") ? c.weeks+" wks of data" : "insufficient · directional only";
+}
+function renderSignals(){
+  if(!SIGNALS) return;
+  $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
+  const box = $("#signalsTop");
+  if(!SIGNALS.briefPath){
+    box.innerHTML = '<div class="empty">No strategy brief yet. Run Refresh brief below (or /strategy in a terminal) and this page fills in.</div>';
+    return;
+  }
+  const fitCards = (SIGNALS.confidence||[]).map(c=>{
+    const ok = c.status.startsWith("OK");
+    return '<div class="stat-tile"><span style="font:600 14px/1.3 Georgia,serif;">'+esc(c.channel)+'</span>'+
+      '<span class="l" style="color:'+(ok?"#2f7d46":"#9a6b12")+'">'+esc(signalStatusLabel(c))+'</span>'+
+      '<span class="l">'+c.posts+' posts on record</span></div>';
+  }).join("");
+  const weak = (SIGNALS.confidence||[]).filter(c=>!c.status.startsWith("OK"));
+  const recs = (SIGNALS.recommendations||[]).map((r,i)=>{
+    const sent = sigSent.has(r.title);
+    return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
+      '<div class="dev-summary">'+esc(r.rationale)+'</div>'+
+      '<div class="actions">'+(sent
+        ? '<span class="scheduled">✓ filed to the backlog — the pipeline grooms it from here</span>'
+        : '<button class="primary sig-send" data-i="'+i+'">Send to backlog</button><span class="src">Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships.</span>')+
+      '</div></div>';
+  }).join("");
+  box.innerHTML =
+    '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
+    (weak.length?'<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>':"")+
+    '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+
+    '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>'+
+    (recs||'<div class="empty" style="padding:14px">The latest brief carries no recommendations.</div>')+'</div>';
+  box.querySelectorAll(".sig-send").forEach(b=>b.addEventListener("click", async ()=>{
+    const r = SIGNALS.recommendations[Number(b.dataset.i)];
+    b.disabled = true;
+    const res = await post("/api/signals/backlog", {title: r.title, detail: "["+r.type+"] "+r.rationale});
+    if(res.ok){ sigSent.add(r.title); flash("Filed to the backlog"); renderSignals(); }
+    else { b.disabled = false; flash(res.error || "Could not file it"); if((res.error||"").includes("already")) { sigSent.add(r.title); renderSignals(); } }
+  }));
+}
+async function loadSignals(){
+  const r = await fetch("/api/signals");
+  SIGNALS = await r.json();
+  renderSignals();
+}
+
+// ── Studio home (Content Studio Riff 3c) ──
+// The one screen that spans all five rooms. Never starts work; shows what needs Muxin (ranked)
+// and what the team is doing, from real queue/ledger data. Click-throughs land in the room that
+// owns each item.
+let STUDIO = null;
+function studioDateLine(){
+  const now = new Date();
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MO = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return DAYS[now.getDay()]+", "+MO[now.getMonth()]+" "+now.getDate();
+}
+function renderStudio(){
+  if(!STUDIO) return;
+  const c = STUDIO.counts;
+  const tiles = [
+    [c.draftsToReview, "drafts to review", "#9a6b12", "content"],
+    [c.dossiersToRead, "dossiers to read", "#2f5d9a", "outreach"],
+    [c.followupsDue, "follow-ups due", "#9a6b12", "followups"],
+    [c.postsHolding, "posts holding for slots", "#2f7d46", null],
+  ].map(t=>'<div class="stat-tile"'+(t[3]?' style="cursor:pointer" data-goto="'+t[3]+'"':'')+'><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></div>').join("");
+  const rows = (STUDIO.needsYou||[]).map(n=>
+    '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
+    '<span class="ny-text">'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
+    '<span class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+'>'+esc(n.action)+'</span></div>'
+  ).join("");
+  $("#studioMain").innerHTML =
+    '<div class="wb-label" style="margin-bottom:2px">'+studioDateLine()+'</div>'+
+    '<div style="font:400 30px/1.25 Georgia,serif;margin:2px 0 4px;">Everything happening, at a glance</div>'+
+    '<div class="sheet-sub" style="max-width:560px">This screen never starts work, that is what Content is for. It shows what needs you and what the team is doing, so you never go hunting room by room.</div>'+
+    '<div class="stat-tiles">'+tiles+'</div>'+
+    '<div style="margin-top:30px;"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Needs you today</div>'+
+    (rows || '<div class="empty" style="padding:20px">Nothing needs you right now. 🎉</div>')+'</div>';
+  const dot = (state)=> state==="working" ? "#5b46b8" : state==="recent" ? "#2f7d46" : "#d8d2c6";
+  $("#studioTeam").innerHTML = '<div class="wb-margin-cap">YOUR TEAM, WORKING</div>'+
+    (STUDIO.team||[]).map(m=>'<div class="team-row"><span class="team-dot" style="background:'+dot(m.state)+'"></span><div><div class="team-name">'+esc(m.name)+'</div><div class="team-line">'+esc(m.line)+'</div></div></div>').join("")+
+    '<div class="wb-reply"><span class="mono-note">You bring the yes. They handle the brand phrase, the CTA, the spin, the visuals, the posting. Nothing goes out until you say so.</span></div>';
+  document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
+    const room = a.dataset.room;
+    if(room==="content"){ setRoom("content"); $("#reviewSheet").scrollIntoView(); }
+    else if(room==="outreach"){ if(a.dataset.dir) activeLeadDir=a.dataset.dir; setRoom("outreach"); setOutreachSub("leads"); }
+    else if(room==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
+    else setRoom(room);
+  }));
+  document.querySelectorAll("#studioMain .stat-tile[data-goto]").forEach(t=>t.addEventListener("click",()=>{
+    const g = t.dataset.goto;
+    if(g==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
+    else if(g==="outreach"){ setRoom("outreach"); setOutreachSub("leads"); }
+    else { setRoom("content"); if(g==="content") $("#reviewSheet").scrollIntoView(); }
+  }));
+}
+async function loadStudio(){
+  const r = await fetch("/api/studio");
+  STUDIO = await r.json();
+  renderStudio();
+}
+
 // ── Follow-ups ledger (Content Studio Riff 3g) ──
 // Everything sent, and what's next — every row tied back to its origin: why you reached out,
 // what you said, the dossier. Two people at one org are two rows with two clocks (the tracker
@@ -1744,6 +1951,7 @@ async function loadJobs(){
     if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))){
       load(); // a job moved → refresh review rows
       if(currentTab==="content") loadContent(); // a finished advisor round renders its new sheets
+      if(currentTab==="studio") loadStudio(); // counts and the team panel just changed
     }
   }catch(e){}
 }

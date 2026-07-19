@@ -85,6 +85,9 @@ import {
 import { listDevelopSessions, listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
 import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
+import { buildStudioHome } from "./studio.js";
+import { readSignals, appendBacklogCard } from "./signals.js";
+import { listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory } from "./fiction.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich) or jobs.ts (classifySource,
@@ -967,6 +970,57 @@ const server = createServer(async (req, res) => {
     // ONLY from Muxin's verbatim source.md lines, never from advisor text (CLAUDE.md rule 1).
     if (req.method === "GET" && url.pathname === "/api/develop") {
       json(res, 200, { sessions: listDevelopSessions() });
+      return;
+    }
+    // Fiction desk (design 3f): canon browse/edit only. Chapters stay in the GitHub /story flow;
+    // canon.md is append-only and renders read-only. The Build 2 wall holds — nothing here
+    // composes prose or crosses into the content pipeline except by Muxin starting a promo note.
+    if (req.method === "GET" && url.pathname === "/api/fiction") {
+      json(res, 200, { series: listFictionSeries() });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/fiction/doc") {
+      try {
+        const slug = url.searchParams.get("series") ?? "";
+        const path = url.searchParams.get("path") ?? "";
+        const { doc, body } = readFictionDoc(slug, path);
+        json(res, 200, { ok: true, doc, body, history: await fictionDocHistory(slug, path) });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/fiction/doc") {
+      const b = await readBody(req);
+      try {
+        saveFictionDoc(String(b.series ?? ""), String(b.path ?? ""), String(b.body ?? ""));
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // Signals room (design 3e): the deterministic read of the latest brief, and the one write —
+    // sending an adjustment to the repo backlog as a card. Muxin decides; nothing self-adopts.
+    if (req.method === "GET" && url.pathname === "/api/signals") {
+      json(res, 200, readSignals());
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/signals/backlog") {
+      const b = await readBody(req);
+      const title = String(b.title ?? "").trim();
+      const detail = String(b.detail ?? "").trim();
+      if (!title || !detail) {
+        json(res, 400, { ok: false, error: "an adjustment needs a title and its rationale" });
+        return;
+      }
+      const signals = readSignals();
+      json(res, 200, appendBacklogCard({ title, detail, briefPath: signals.briefPath, date: new Date().toISOString().slice(0, 10) }));
+      return;
+    }
+    // Studio home (design 3c): counts, the ranked needs-you list, and the team's honest status.
+    if (req.method === "GET" && url.pathname === "/api/studio") {
+      json(res, 200, await buildStudioHome());
       return;
     }
     // The Content room's workbench aggregate: per active piece — Muxin's source verbatim, the
