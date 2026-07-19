@@ -9,6 +9,11 @@ test("classifyCodexAvailability catches the usage-limit shapes and stays quiet o
   assert.match(classifyCodexAvailability("error: rate limit exceeded, resets at 04:00 UTC")!, /rate limit/i);
   assert.match(classifyCodexAvailability("You are out of usage credits for this billing cycle")!, /out of usage credits/i);
   assert.match(classifyCodexAvailability("Not logged in — run codex login")!, /not logged in/i);
+  // the shape a signed-out/expired-auth codex actually emits (observed live 2026-07-19)
+  assert.match(
+    classifyCodexAvailability("ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: HTTP error: 401 Unauthorized, url: wss://api.openai.com/v1/responses")!,
+    /401 Unauthorized/,
+  );
   assert.equal(classifyCodexAvailability("ANALYST-PROBE-OK\ntokens used\n9,450"), null);
 });
 

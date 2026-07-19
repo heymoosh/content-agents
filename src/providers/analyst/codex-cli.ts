@@ -58,6 +58,10 @@ export function classifyCodexAvailability(output: string): string | null {
     /resets? (at|on|in)/i,
     /not logged in/i,
     /login required/i,
+    // a signed-out / expired-auth codex fails with a raw HTTP status, not a friendly message
+    // (observed live 2026-07-19: "failed to connect to websocket: HTTP error: 401 Unauthorized")
+    /\b401\b|unauthorized/i,
+    /\b403\b|forbidden/i,
   ];
   for (const line of output.split("\n")) {
     if (patterns.some((re) => re.test(line))) return line.trim();
