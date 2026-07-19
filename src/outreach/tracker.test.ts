@@ -108,6 +108,22 @@ describe("foldLeadEvents: due-date / overdue math", () => {
     assert.equal(state.status, "overdue");
   });
 
+  test("channel survives channel-less events (nudge/reply keep the original channel)", () => {
+    // Found by the 2026-07-19 GUI click-through: after "I nudged them" the row's channel
+    // flipped from linkedin-dm to the locked message's frontmatter default.
+    const events: TrackerEvent[] = [
+      { ts: "2026-07-10T00:00:00.000Z", lead: "client-acme-co", bucket: "client", event: "contacted", channel: "linkedin-dm" },
+      { ts: "2026-07-12T00:00:00.000Z", lead: "client-acme-co", bucket: "client", event: "followup_sent" },
+    ];
+    const state = foldLeadEvents("client-acme-co", "client", events, CONFIG, "2026-07-13T00:00:00.000Z");
+    assert.equal(state.channel, "linkedin-dm");
+    // ...and a terminal event keeps it too
+    const state2 = foldLeadEvents("client-acme-co", "client",
+      [...events, { ts: "2026-07-14T00:00:00.000Z", lead: "client-acme-co", bucket: "client", event: "responded" }],
+      CONFIG, "2026-07-15T00:00:00.000Z");
+    assert.equal(state2.channel, "linkedin-dm");
+  });
+
   test("platform bucket uses its own, wider windows (10 / 45 days)", () => {
     const events: TrackerEvent[] = [{ ts: "2026-07-01T00:00:00.000Z", lead: "platform-x", bucket: "platform", event: "contacted" }];
     // 9 days out: client would already be "due" (7d), platform should still be "waiting" (10d)

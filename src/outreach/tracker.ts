@@ -122,12 +122,16 @@ export function foldLeadEvents(
   if (events.length === 0) {
     return { lead: leadKey, bucket, lastEvent: null, lastTouch: null, status: "not_contacted", dueDate: null, abandonDate: null };
   }
-  const latest = [...events].sort((a, b) => a.ts.localeCompare(b.ts))[events.length - 1];
+  const sorted = [...events].sort((a, b) => a.ts.localeCompare(b.ts));
+  const latest = sorted[sorted.length - 1];
+  // The channel survives channel-less events: a nudge or reply doesn't change HOW Muxin first
+  // reached out, so the row keeps showing the channel from the last event that named one.
+  const channel = latest.channel ?? [...sorted].reverse().find((e) => e.channel)?.channel;
 
   if (latest.event === "re_researched" || latest.event === "inbound_received") {
     return {
       lead: leadKey, bucket, lastEvent: latest.event, lastTouch: latest.ts, lastNote: latest.note,
-      channel: latest.channel, status: "not_contacted", dueDate: null, abandonDate: null,
+      channel, status: "not_contacted", dueDate: null, abandonDate: null,
     };
   }
 
@@ -135,7 +139,7 @@ export function foldLeadEvents(
   if (terminal) {
     return {
       lead: leadKey, bucket, lastEvent: latest.event, lastTouch: latest.ts, lastNote: latest.note,
-      channel: latest.channel, status: terminal, dueDate: null, abandonDate: null,
+      channel, status: terminal, dueDate: null, abandonDate: null,
     };
   }
 
@@ -148,7 +152,7 @@ export function foldLeadEvents(
   const status: LeadStatus = today >= abandonDate ? "overdue" : today >= dueDate ? "due" : "waiting";
   return {
     lead: leadKey, bucket, lastEvent: latest.event, lastTouch: latest.ts, lastNote: latest.note,
-    channel: latest.channel, status, dueDate, abandonDate,
+    channel, status, dueDate, abandonDate,
   };
 }
 

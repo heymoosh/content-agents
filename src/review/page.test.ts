@@ -182,3 +182,63 @@ test("renderInsightsMeta: singular '1 untagged post', not 'posts'", () => {
   const html = renderInsightsMeta({ untagged: 1 });
   assert.match(html, /⚠ 1 untagged post</); // no trailing 's' before the closing tag
 });
+
+// ── Wiring guards (added after the 2026-07-19 click-through audit) ─────────────────────────────
+// Two failure classes bit or nearly bit this page before: an emitted <script> that doesn't parse
+// (the #244 regression — a stray backtick/apostrophe in the template literal), and a client
+// fetch path with no matching serve.ts route (a dead button). Both become test failures here.
+
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { renderPage } from "./page.js";
+import { repoRoot } from "../db/db.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+
+function emittedScripts(): string[] {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const scripts: string[] = [];
+  const re = /<script>([\s\S]*?)<\/script>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) scripts.push(m[1]);
+  return scripts;
+}
+
+test("wiring guard: every emitted <script> block parses as JavaScript", () => {
+  const scripts = emittedScripts();
+  assert.ok(scripts.length > 0, "renderPage should emit at least one <script> block");
+  for (const body of scripts) {
+    // parse-only: new Function throws SyntaxError on a broken script without running it
+    assert.doesNotThrow(() => new Function(body), "emitted client script must parse");
+  }
+});
+
+test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
+  const script = emittedScripts().join("\n");
+  const serveSrc = readFileSync(join(HERE, "serve.ts"), "utf8");
+
+  const routes = new Set<string>();
+  for (const m of serveSrc.matchAll(/url\.pathname === "(\/api\/[^"]+)"/g)) routes.add(m[1]);
+  // the one regex route: GET /api/jobs/<id>/log
+  const routePrefixes = /\/api\\\/jobs\\\//.test(serveSrc) || serveSrc.includes("^\\/api\\/jobs\\/") ? ["/api/jobs/"] : [];
+
+  // client refs: "…/api/foo" (exact) or "…/api/foo/" + concat (prefix). Query strings stop the match.
+  const refs = new Set<string>();
+  for (const m of script.matchAll(/["'](\/api\/[a-zA-Z0-9/_-]*)/g)) refs.add(m[1]);
+  assert.ok(refs.size >= 40, `expected the client to reference many routes, got ${refs.size}`);
+
+  // forward: every client ref resolves to a route
+  for (const ref of refs) {
+    const ok = ref.endsWith("/")
+      ? [...routes].some((r) => r.startsWith(ref)) || routePrefixes.some((p) => p.startsWith(ref) || ref.startsWith(p))
+      : routes.has(ref) || routePrefixes.some((p) => ref.startsWith(p));
+    assert.ok(ok, `client calls ${ref} but serve.ts has no matching route (dead button)`);
+  }
+
+  // reverse: every route is reachable from the page (exact ref, or via a "/api/foo/"+x concat)
+  for (const route of routes) {
+    const ok = refs.has(route) || [...refs].some((ref) => ref.endsWith("/") && route.startsWith(ref));
+    assert.ok(ok, `serve.ts route ${route} has no caller in the page (orphan route)`);
+  }
+});
