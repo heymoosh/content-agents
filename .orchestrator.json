@@ -3,5 +3,34 @@
   "base_branch": "main",
   "deploy_workflow": "",
   "ready_statuses": ["To Do"],
-  "delivery": { "mode": "merge" }
+  "delivery": { "mode": "merge" },
+  "merge_policy": {
+    "schema_version": 1,
+    "merge_mechanics": "auto-when-green",
+    "reviewer_model": true,
+    "auto_merge_categories": [
+      "content",
+      "docs",
+      "tooling",
+      "backend",
+      "config",
+      "test",
+      "chore"
+    ],
+    "always_hold_categories": [
+      "product-direction",
+      "security",
+      "irreversible",
+      "production-mutation",
+      "visual"
+    ],
+    "guardrail_paths": [
+      "config/voice.yaml",
+      "src/atomize/**",
+      "src/strategy/**",
+      "src/video/script.ts",
+      "src/video/quote-image-card.ts",
+      "src/fiction/draft.ts"
+    ]
+  }
 }
