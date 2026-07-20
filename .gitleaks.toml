@@ -3,13 +3,8 @@ title = "content-agents gitleaks config"
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Verified false positives"
-fingerprints = [
-  # gitleaks' generic linkedin-client-id rule pattern-matches on this
-  # string, but it's LinkedIn's own public login page URL, not a
-  # credential. Verified 2026-07-20 by inspecting the flagged commit
-  # directly (git show ccc9db6...:src/pull/platforms/linkedin.ts) -- the
-  # "secret" is literally `loginUrl: "https://www.linkedin.com/login"`.
-  "ccc9db6343119aadfc676bec4fb15166ff4ddb11:src/pull/platforms/linkedin.ts:linkedin-client-id:67",
+[[allowlists]]
+description = "Verified false positive: LinkedIn's own public login URL, not a credential"
+regexes = [
+  '''https://www\.linkedin\.com/login''',
 ]
