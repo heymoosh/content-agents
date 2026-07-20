@@ -34,7 +34,15 @@ file, don't restart from scratch.
 |---|---|---|
 | No Dependabot config | weekly, advisory | Added `.github/dependabot.yml` (npm + github-actions, weekly). |
 | No dependency-audit job | weekly, advisory | Added `.github/workflows/dependency-audit.yml`, schedule-only (`workflow_dispatch` + weekly cron), never runs on `pull_request` — matches "advisory," never a merge gate. |
-| Secret scanning | on by default (free), regardless of class (invariant 2) | Added `.github/workflows/secret-scan.yml` — runs the open-source `gitleaks` CLI directly via its published Docker image on every push/PR. Repo is private, so GitHub's native secret scanning needs GitHub Advanced Security (paid); the `gitleaks-action` wrapper also requires a license for private repos, so this runs the OSS scanner directly instead — same detection, no license. Fails the job hard on a real finding (unlike the advisory dependency-audit job — a leaked secret isn't informational); not wired as a required status check, that branch-protection call is Muxin's. |
+| Secret scanning | on by default (free), regardless of class (invariant 2) | Added `.github/workflows/secret-scan.yml` — runs the open-source `gitleaks` CLI directly via its published Docker image on `push` to `main` + every PR. Repo is private, so GitHub's native secret scanning needs GitHub Advanced Security (paid); the `gitleaks-action` wrapper also requires a license for private repos, so this runs the OSS scanner directly instead — same detection, no license. Fails the job hard on a real finding (unlike the advisory dependency-audit job — a leaked secret isn't informational); not wired as a required status check, that branch-protection call is Muxin's. |
+
+**First run found one flag — verified as a false positive, not a real leak.** gitleaks'
+`linkedin-client-id` rule matched `loginUrl: "https://www.linkedin.com/login"` in
+`src/pull/platforms/linkedin.ts` (commit `ccc9db6`, 2026-07-03) — that's LinkedIn's own
+public login page URL, not a credential; confirmed by reading the flagged commit directly
+rather than assuming. Allowlisted by exact fingerprint in `.gitleaks.toml` (not by path or
+rule-wide, so a real future secret in that same file still gets caught) with the reasoning
+in a comment. Nothing was rotated or treated as a real leak because it isn't one.
 
 Baseline `npm audit --audit-level=high` run on 2026-07-20 found **9
 advisories (6 high)** — `ws` (via `@remotion/renderer`/`@remotion/studio`)
