@@ -1,0 +1,24 @@
+name: Dependency audit
+
+on:
+  schedule:
+    # Weekly, advisory per the Class A/B loop table (docs/maintenance-loops.md
+    # in simple-kanban): no deploy config here, no external-user data, so no
+    # PR-blocking audit — this is a scheduled, informational scan only. A
+    # baseline run found 9 advisories (6 high) in dependencies; see
+    # docs/maintenance.md.
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
