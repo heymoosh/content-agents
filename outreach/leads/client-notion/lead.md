@@ -6,6 +6,10 @@ source: ingested
 status: researched   # intake | researched | qualified | pursue | passed | drafted | locked
 classification: greenfield   # turnaround | greenfield | unclear | disqualified
 pitch_angle: "Notion's own CEO is publicly, currently naming the exact problem Muxin's practice exists to solve, that AI teams are bolting chatbots onto workflows designed for humans instead of rethinking the workflow itself, and backs it with a real, specific track record of reversing a shipped product decision once he found the untested assumption underneath it, so the honest pitch is that Notion is actively inventing its agentic-org playbook in public right now and needs exactly the untested-assumption-surfacing Muxin does to get that new direction right the first time, not a generic AI-strategy pitch."
+why_them: "Notion is inventing its agentic-org playbook live right now (Custom Agents launched February 2026, 700+ internal agents against ~1,000 people), and Zhao says out loud that nobody has the answer yet (E8). That is a client actively building in a space where surfacing the untested assumption is the whole job, not a nice-to-have."
+why_me: "Zhao already named your exact thesis, that teams are bolting chatbots onto workflows built for humans instead of rethinking the work (E1/E4), but naming it is not the same as having someone whose practice is finding the assumption underneath a shipped decision. He has done that reversal himself once (shipped non-Lego pieces, took him a year-plus to see it was wrong, E7); you do that on purpose and faster."
+why_mutual: "They are in the \"waterwheel phase\" by their own words (E1) and calling the current work \"baby steps\" (E3), which means the direction is still soft and the cost of a wrong assumption is highest right now, before it hardens. You get in while Zhao is publicly admitting he does not have the right answer (E8), not after the playbook is locked. One honest caution: final taste and direction concentrate in Zhao (E9), so this only works if the read lands with him, not a delegate."
+why_source: claude-cli
 ---
 
 ## Profile

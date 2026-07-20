@@ -6,6 +6,10 @@ source: ingested
 status: researched   # intake | researched | qualified | pursue | passed | drafted | locked
 classification: turnaround   # turnaround | greenfield | unclear | disqualified
 pitch_angle: "Mem just proved, at the highest possible cost, that it will tear down and rebuild its own core product rather than defend a broken assumption, which makes it a company structurally ready to hear that the next untested assumption sits one layer up, in the capture/organization-first architecture it rebuilt twice without ever validating whether get organized is worth more to a user than get things done."
+why_them: "Mem offers you a live, high-stakes product problem: a 12-person team rebuilt its core over 20 months, yet the product still rests on an untested capture-and-organization premise."
+why_me: "You bring the question Mem appears to be missing: whether getting organized matters more to users than getting things done. You can test that assumption before the team spends another cycle rebuilding around it."
+why_mutual: "Kevin already judges product-market fit by whether users would notice if the product disappeared, so your user-outcome lens should land. The timing is unusually sharp because Mem 2.0 proves the team will make hard changes, while its moat against general AI tools remains unresolved. You would still need to earn strategic trust directly with Kevin, since he makes the product calls."
+why_source: gpt-codex
 ---
 
 ## Profile

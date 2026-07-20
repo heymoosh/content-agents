@@ -432,3 +432,22 @@ describe("buildResearchSettings", () => {
     assert.ok(hookEntry.hooks[0].command.includes("tsx"));
   });
 });
+
+// ── Matchmaker read (design 3d): WHY_* markers parse and merge into frontmatter ─────────────────
+test("parseResearchResponse picks up the WHY_* matchmaker blocks", () => {
+  const text = "PROFILE:\np\n\nEVIDENCE:\n\nCLASSIFICATION: greenfield\nCLASSIFICATION_NOTE:\nn\n\nPITCH_ANGLE: a\nWHY_THEM: A standing audience.\nWHY_ME: You bring the frame.\nWHY_MUTUAL: Why you two, now.\n";
+  const parsed = parseResearchResponse(text);
+  assert.equal(parsed.whyThem, "A standing audience.");
+  assert.equal(parsed.whyMe, "You bring the frame.");
+  assert.equal(parsed.whyMutual, "Why you two, now.");
+});
+
+test("mergeResearchIntoLead writes why_* frontmatter only when present", () => {
+  const header = "---\nkind: client\nname: \"Acme\"\nstatus: intake\n---\n";
+  const body = "## Profile\n\n(none yet)\n\n## Evidence\n\n(none yet)\n\n## Classification\n\n(none yet)\n\n## Pitch\n\n(none yet)\n";
+  const withWhy = mergeResearchIntoLead({ header, body, parsed: { profile: "p", evidenceBlock: "", evidence: [], disconfirmation: "", classification: "greenfield", classificationNote: "n", pitchAngle: "a", whyThem: "them", whyMe: "me", whyMutual: "mutual" } });
+  assert.match(withWhy.header, /why_them: "them"/);
+  assert.match(withWhy.header, /why_mutual: "mutual"/);
+  const withoutWhy = mergeResearchIntoLead({ header, body, parsed: { profile: "p", evidenceBlock: "", evidence: [], disconfirmation: "", classification: "greenfield", classificationNote: "n", pitchAngle: "a" } });
+  assert.ok(!/why_them/.test(withoutWhy.header));
+});

@@ -111,6 +111,7 @@ export interface LeadDetail extends LeadSummary {
   whyMe: string; // "Why you, for them"
   whyMutual: string; // the one-paragraph mutual-fit read shown as the dossier headline
   segment: string; // platform | org-role | org-mission -- "" on legacy leads (GUI derives a display fallback)
+  whySource: string; // which analyst engine wrote the why_* fields ("gpt-codex" | "claude-cli" | "")
   contacts: Contact[]; // ## Contacts -- the people at this lead (each gets its own follow-up clock)
   suggestedContacts: string[]; // evidence person: names not yet in ## Contacts (one-click add)
 }
@@ -213,6 +214,7 @@ export function readLeadDetail(dir: string): LeadDetail {
     whyMe: String(fm.why_me ?? "").trim(),
     whyMutual: String(fm.why_mutual ?? "").trim(),
     segment: String(fm.segment ?? "").trim(),
+    whySource: String(fm.why_source ?? "").trim(),
     contacts,
     suggestedContacts,
   };

@@ -1038,6 +1038,8 @@ $("#briefRefreshBtn").addEventListener("click", refreshBriefRun);
 function fmtDays(n){ return n+" day"+(n===1?"":"s"); }
 function renderInsightsMeta(r){
   const parts = [];
+  if(r.engine === "gpt-codex") parts.push('<span style="color:#5b46b8;font-weight:600">analyst · GPT (Codex)</span>');
+  else if(r.engine === "claude-cli") parts.push('<span style="color:#5b46b8;font-weight:600">analyst · Claude</span>'+(r.fallbackReason?' <span title="'+esc(r.fallbackReason)+'">(GPT unavailable — hover for why)</span>':''));
   if(r.freshness) parts.push('Data current as of <b>'+esc(r.freshness.date)+'</b> ('+fmtDays(r.freshness.ageDays)+' ago)');
   if(r.brief){
     const label = esc(r.brief.date || r.brief.path) + (r.brief.ageDays!=null ? ' ('+fmtDays(r.brief.ageDays)+' old)' : '');
@@ -1247,7 +1249,7 @@ function dossierHtml(l){
   const pending = outPending.has(l.dir);
   const err = outError.get(l.dir);
   const fitChip = l.classificationOrFit ? '<span class="fit-chip">'+esc(l.classificationOrFit)+'</span>' : "";
-  const provChip = l.source === "jsa" ? '<span class="legacy-chip">research: JSA</span>' : "";
+  const provChip = (l.whySource === "gpt-codex" ? '<span class="legacy-chip" style="background:#efeafd;color:#5b46b8">why: analyst, GPT-routed</span>' : l.whySource === "claude-cli" ? '<span class="legacy-chip">why: analyst, Claude</span>' : "")+(l.source === "jsa" ? '<span class="legacy-chip">research: JSA</span>' : "");
   const hasMatchmaker = l.whyMutual || l.whyThem || l.whyMe;
   const headline = l.whyMutual || l.pitchAngle || l.pitch || "(no read recorded yet)";
   const legacy = hasMatchmaker ? "" : ' <span class="legacy-chip">legacy read — re-qualify for the matchmaker version</span>';

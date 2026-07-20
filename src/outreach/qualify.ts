@@ -200,6 +200,23 @@ export function setFrontmatterField(header: string, field: string, value: string
   return lines.join("\n");
 }
 
+// setFrontmatterField silently no-ops on a field the header doesn't carry yet (deliberate for
+// the update-only call sites above). This variant INSERTS a missing field before the closing
+// `---` instead -- what the matchmaker read needs, since legacy lead.md frontmatter predates
+// why_them/why_me/why_mutual entirely.
+export function upsertFrontmatterField(header: string, field: string, value: string): string {
+  const updated = setFrontmatterField(header, field, value);
+  if (updated !== header || header.split("\n").some((l) => l.startsWith(`${field}:`))) return updated;
+  const lines = header.split("\n");
+  let closing = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].trim() === "---") { closing = i; break; }
+  }
+  if (closing <= 0) return header; // no real frontmatter block -- nothing safe to insert into
+  lines.splice(closing, 0, `${field}: ${value}`);
+  return lines.join("\n");
+}
+
 const ANCHORS_PATH = join(repoRoot, "config", "outreach", "anchors.md");
 
 // Dedup by name + company substring match. Not a database, a small append-only reference file --

@@ -57,6 +57,7 @@
     "outreach:jsa": "tsx src/outreach/jsa.ts",
     "outreach:add": "tsx src/outreach/intake.ts",
     "outreach:research": "tsx src/outreach/research.ts",
+    "outreach:matchmaker": "tsx src/outreach/matchmaker.ts",
     "outreach:qualify": "tsx src/outreach/qualify.ts",
     "outreach:draft": "tsx src/outreach/draft.ts",
     "outreach:validate": "tsx src/outreach/validate.ts",
