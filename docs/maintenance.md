@@ -40,9 +40,14 @@ file, don't restart from scratch.
 `linkedin-client-id` rule matched `loginUrl: "https://www.linkedin.com/login"` in
 `src/pull/platforms/linkedin.ts` (commit `ccc9db6`, 2026-07-03) — that's LinkedIn's own
 public login page URL, not a credential; confirmed by reading the flagged commit directly
-rather than assuming. Allowlisted by exact fingerprint in `.gitleaks.toml` (not by path or
-rule-wide, so a real future secret in that same file still gets caught) with the reasoning
-in a comment. Nothing was rotated or treated as a real leak because it isn't one.
+rather than assuming. The bundled gitleaks version rejected a fingerprint-only `[allowlist]`
+table (its schema needs `commits`/`paths`/`regexes`/`stopwords`), and a `regexes` check on the
+literal URL string still didn't suppress it against the live CI run, so the final fix
+allowlists by `paths` on this one small (107-line) file instead — read in full first to confirm
+it holds nothing else secret-shaped (just this login URL plus one public analytics-page URL).
+Narrower than a rule-wide or repo-wide exemption, but broader than a single-fingerprint match;
+documented in a `.gitleaks.toml` comment. Nothing was rotated or treated as a real leak because
+it isn't one.
 
 Baseline `npm audit --audit-level=high` run on 2026-07-20 found **9
 advisories (6 high)** — `ws` (via `@remotion/renderer`/`@remotion/studio`)
