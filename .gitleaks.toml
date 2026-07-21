@@ -1,0 +1,10 @@
+title = "content-agents gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Verified false positive: src/pull/platforms/linkedin.ts only holds LinkedIn's own public URLs (login + analytics pages), not credentials -- full file checked 2026-07-20, no other secret-shaped content"
+paths = [
+  '''src/pull/platforms/linkedin\.ts''',
+]
