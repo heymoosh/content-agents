@@ -70,7 +70,7 @@
     "check": "npm run typecheck"
   },
   "dependencies": {
-    "@atproto/api": "^0.13.35",
+    "@atproto/api": "^0.20.30",
     "@mozilla/readability": "^0.6.0",
     "@remotion/bundler": "^4.0.474",
     "@remotion/captions": "^4.0.474",
