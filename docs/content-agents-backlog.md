@@ -6,6 +6,64 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 
 ---
 
+**Dependabot sweep (2026-07-24) — 5 major-version bumps closed unreviewed, need individual re-evaluation**
+- ORIGIN: `/babysit-prs` triage of 12 open Dependabot PRs. Per Muxin's instruction, all 12 were
+  closed without merging so they stop sitting open indefinitely; these 5 carry an actual major
+  version jump (not just a patch/minor bump) and deserve a real look before anyone reapplies them
+  by hand or lets Dependabot reopen them.
+- **`zod` 3.25.76 → 4.4.3** (PR #271, closed). Zod v4 is a documented rewrite with breaking API
+  changes from v3 (error customization, `.parse`/schema composition changes upstream). No CVE/
+  security advisory cited by Dependabot — this is a feature-breaking major bump, not a security
+  fix. Needs a real compile+test pass against this repo's actual zod usage before reapplying.
+- **`better-sqlite3` 11.10.0 → 12.11.1** (PR #270, closed). Mostly native-binary/prebuild churn
+  (Electron v42 support, Node v26 prebuilds, SQLite bumped to 3.53.1) — changelog shows no JS API
+  breaking changes, but two releases in the chain (`v12.11.0`, `v12.9.1`) were marked "NOT A VIABLE
+  RELEASE" by the maintainer (fixed in the immediately-following patch). If this is reapplied,
+  pin directly to `12.11.1`, not a bare `^12`.
+- **`typescript` 5.9.3 → 7.0.2** (PR #269, closed). This skips v6 entirely (5.9 → 7.0) — a two-
+  major-version jump, near-certain to surface new strictness/type errors across the codebase.
+  Dependabot also flagged a maintainer-identity change worth noting: "This version was pushed to
+  npm by `microsoft1es`, a new releaser for typescript since your current version." Not
+  necessarily suspicious (large orgs rotate publishing accounts) but worth a quick sanity check
+  before trusting the package wholesale. Needs its own PR with a full `tsc --noEmit` pass, not a
+  drive-by bump.
+- **`actions/setup-node` 4 → 7** (PR #262, closed). Major bump, ESM migration + `@actions/cache`
+  upgrade upstream. Low local risk (GitHub-hosted runners handle this transparently) but confirm
+  CI still passes after reapplying, not just assume it.
+- **`actions/checkout` 4 → 7** (PR #261, closed). Major bump with an explicit upstream
+  `[BREAKING]` note: v6.1.0 backported "safer `pull_request_target` defaults" (see
+  https://github.blog/changelog/2026-06-18-safer-pull_request_target-defaults-for-github-actions-checkout/),
+  changing fork-PR checkout behavior for `pull_request_target`/`workflow_run` triggers. Check
+  whether any workflow in `.github/workflows/` uses `pull_request_target` with a fork checkout
+  before reapplying — if so, this could change what actually gets checked out.
+- STATUS: Backlog
+- DECISION: none yet — the 12 PRs themselves are closed (not merged); this card is the follow-up
+  decision point for whether/when to manually reapply each of these 5, one at a time, with its own
+  test pass.
+<!-- card-id: cb08c639-02d5-4b26-9c6b-229a31f87d08 -->
+
+---
+
+**Dependabot sweep (2026-07-24) — 7 routine minor/patch bumps closed unreviewed**
+- ORIGIN: same `/babysit-prs` triage as the major-version card above. These 7 are ordinary patch/
+  minor bumps with no breaking-change language or CVE/security-advisory citations in Dependabot's
+  own changelog excerpts — lower priority to revisit than the 5 major bumps, but listed here so
+  the repo isn't silently behind without a record of what was skipped.
+  - `@remotion/captions` 4.0.474 → 4.0.495 (PR #272, closed)
+  - `@remotion/cli` 4.0.474 → 4.0.495 (PR #268, closed)
+  - `@remotion/bundler` 4.0.474 → 4.0.495 (PR #267, closed)
+  - `@remotion/renderer` 4.0.474 → 4.0.495 (PR #266, closed)
+  - `remotion` 4.0.474 → 4.0.495 (PR #263, closed) — note all 5 Remotion packages should be
+    bumped together in one PR if reapplied by hand; Dependabot opened them as 5 separate PRs.
+  - `@atproto/api` 0.13.35 → 0.20.30 (PR #265, closed) — minor-version jump (0.13 → 0.20) is
+    larger than it looks since atproto is still pre-1.0 and treats minor bumps as its de facto
+    major axis; worth a quick smoke test of the Bluesky posting path if reapplied, not a blind bump.
+  - `tsx` (dev dependency) 4.22.4 → 4.23.1 (PR #264, closed)
+- STATUS: Backlog
+- DECISION: none yet — closed without merging per Muxin's instruction; low urgency to revisit
+  individually, but worth reapplying in a single batch PR when someone has a spare CI cycle.
+<!-- card-id: e55d201a-2bf0-497b-8141-2a84217b7a3b -->
+
 **Funding + mission-aligned role search for Voter Choice — wire `kind: funding` into the outreach engine**
 - ORIGIN: Muxin's Boardy AI conversation (2026-07-24) asking it to find funding for Voter Choice
   (https://voter-choice.vercel.app) that doesn't take equity/IP, plus mission-aligned full-time
