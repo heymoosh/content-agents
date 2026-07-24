@@ -33,9 +33,10 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - **`actions/checkout` 4 → 7** (PR #261, closed). Major bump with an explicit upstream
   `[BREAKING]` note: v6.1.0 backported "safer `pull_request_target` defaults" (see
   https://github.blog/changelog/2026-06-18-safer-pull_request_target-defaults-for-github-actions-checkout/),
-  changing fork-PR checkout behavior for `pull_request_target`/`workflow_run` triggers. Check
-  whether any workflow in `.github/workflows/` uses `pull_request_target` with a fork checkout
-  before reapplying — if so, this could change what actually gets checked out.
+  changing fork-PR checkout behavior for `pull_request_target`/`workflow_run` triggers. Checked
+  (2026-07-24): no workflow in `.github/workflows/` uses `pull_request_target`, so this repo isn't
+  actually exposed to that behavior change — safe to reapply without the extra caution the
+  upstream note would otherwise call for.
 - STATUS: Backlog
 - DECISION: none yet — the 12 PRs themselves are closed (not merged); this card is the follow-up
   decision point for whether/when to manually reapply each of these 5, one at a time, with its own
