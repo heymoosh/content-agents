@@ -9,11 +9,18 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 **Funding + mission-aligned role search for Voter Choice — wire `kind: funding` into the outreach engine**
 - ORIGIN: Muxin's Boardy AI conversation (2026-07-24) asking it to find funding for Voter Choice
   (https://voter-choice.vercel.app) that doesn't take equity/IP, plus mission-aligned full-time
-  roles leaning on that project. Boardy has already started surfacing and introducing people —
-  logged in `outreach/boardy-intros.md` — and Muxin gave detailed, specific search criteria
-  (four funding channels, non-dilutive-first priority order, the Nava Labs worked example, the
-  founder-studio/residency equity caveat, current oligarchy/money-in-politics focus lens) now
-  written up as `config/outreach/funding.md`.
+  roles leaning on that project. Muxin gave detailed, specific search criteria (four funding
+  channels, non-dilutive-first priority order, the Nava Labs worked example, the
+  founder-studio/residency equity caveat, current oligarchy/money-in-politics focus lens), written
+  up as `config/outreach/funding.md`. People Boardy has surfaced/introduced so far are real leads
+  (`source: boardy`, alongside `manual`/`jsa`/`discovered`/`ingested` in `LEAD_SOURCES`) —
+  `outreach/leads/client-dino-alabre`, `client-pradnya-haldipur`, `client-michael-carter`,
+  `client-aaron-hill`, `client-zach-berke`, `client-trudy-hall`, `client-peter-koechley`,
+  `client-ben-bilbrough`, `client-lee-white` — per Muxin's correction (2026-07-24): "Boardy is
+  just a channel, this should all go into the existing tracker logic, not be treated separately."
+  Each currently carries `classification: unclear` since none of them are turnaround/greenfield
+  consulting prospects — the classification vocabulary has no category yet for a funding/routing
+  contact, which is exactly this card's gap.
 - SCOPE: `LeadKind` (`src/outreach/{intake,research,qualify,draft,validate}.ts`) is currently
   `client | platform | content-example` only. This card is: add `funding` as a fourth kind,
   following the exact precedent the platform-kind Phase 3 addition set (same `add` → `research` →
@@ -21,15 +28,14 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
   | weak | disqualified` mirroring platform-kind rather than a new vocabulary), `research.ts`
   reading `config/outreach/funding.md` as its closed-checklist rubric instead of clients.md/
   platforms.md, and `/scout` extended to discover funding-kind candidates the same way it already
-  discovers client/platform ones. Follow-up tracking can likely reuse the existing `client` or a
-  new bucket in `tracker.jsonl`/`config/outreach.yaml` — open decision, not yet ratified.
+  discovers client/platform ones. Follow-up tracking can likely reuse the existing `client` bucket
+  or a new one in `tracker.jsonl`/`config/outreach.yaml` — open decision, not yet ratified.
+  Migrating the 9 `source: boardy` leads above from `kind: client`/`classification: unclear` to
+  `kind: funding` (once it exists) is part of this card's own done-definition.
 - OPEN DECISIONS (ratify before building, same discipline as docs/outreach-engine-plan.md §2):
   which tracker bucket funding-kind leads use for follow-up windows; whether role-fit leads
   (the second-priority full-time roles) are `kind: funding` too or reuse `kind: client` with a
-  Voter-Choice-specific angle; how `outreach/boardy-intros.md`'s manually-logged contacts fold in
-  once a person converts into a real lead (currently that file is a plain, unwired log — see its
-  own header note on why forcing it into `tracker.jsonl` today would make rows invisible in the
-  Follow-ups GUI).
+  Voter-Choice-specific angle.
 - STATUS: Backlog
 - DECISION: none yet — new card, needs Muxin's build-vs-defer call before Phase 1 of this slice starts.
 <!-- card-id: ff07cf66-06a3-41a4-bdfc-7f3a113a4d00 -->

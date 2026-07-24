@@ -70,9 +70,9 @@ team shaped like this) and role fit (what a paid position on a team shaped like 
 When evaluating a person (not a company/fund) as a lead in this lane, the useful roles are: a
 founder, a hiring principal, a team lead, a trusted introducer, or a specialist recruiter. These
 are routing/access contacts more than funders themselves — value them for who they can connect
-Muxin to, not just for what they can offer directly (see `outreach/boardy-intros.md` for worked
-examples of this exact pattern — e.g. a specialist recruiter surfaced as a routing connection
-rather than a direct funder).
+Muxin to, not just for what they can offer directly (see the `source: boardy` leads under
+`outreach/leads/` — e.g. `client-dino-alabre` — for worked examples of this exact pattern: a
+specialist recruiter surfaced as a routing connection rather than a direct funder).
 
 ## Shared values — referenced, not duplicated
 
