@@ -31,7 +31,8 @@ const VALID_KINDS = new Set(["client", "platform", "content-example"]);
 // Sourced from qualify.ts's LEAD_SOURCES so the two files can't drift on what a valid
 // `source:` value is -- "ingested": pre-existing research (e.g. Muxin's Obsidian vault)
 // snapshotted into a lead.md directly, distinct from "manual" (hand-typed intake), "jsa",
-// and "discovered".
+// "discovered", and "boardy" (a person/opportunity a networking-AI intro surfaced -- the intro
+// itself is the citable evidence, same posture as an "ingested" vault citation).
 const VALID_SOURCES: Set<string> = new Set(LEAD_SOURCES);
 const VALID_STATUSES = new Set([
   "intake",

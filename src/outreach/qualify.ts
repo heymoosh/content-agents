@@ -25,8 +25,8 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 // being discarded.
 
 export type LeadKind = "client" | "platform";
-export type LeadSource = "manual" | "jsa" | "discovered" | "ingested";
-export const LEAD_SOURCES: readonly LeadSource[] = ["manual", "jsa", "discovered", "ingested"];
+export type LeadSource = "manual" | "jsa" | "discovered" | "ingested" | "boardy";
+export const LEAD_SOURCES: readonly LeadSource[] = ["manual", "jsa", "discovered", "ingested", "boardy"];
 
 const CLIENT_POSITIVE = new Set(["turnaround", "greenfield"]);
 const PLATFORM_POSITIVE = new Set(["strong", "partial"]);
