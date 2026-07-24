@@ -19,9 +19,8 @@ Indigenous partners (energy systems, sovereignty, mission-aligned funding). Surf
 after no direct program operator or fiscal sponsor was found.
 
 This is a `source: boardy` lead: the record below comes from Boardy AI's own written assessment,
-not independent web research. This is the most recent lead in the thread -- Muxin said yes
-(10:56) but Boardy's confirmation that the connection request was actually sent had not yet
-appeared before the conversation excerpt ends.
+not independent web research. Muxin said yes (10:56) and confirmed separately (2026-07-24) that
+Boardy did reach out to Lee -- the connection request is out.
 
 ## Evidence
 
@@ -46,6 +45,6 @@ he accepts: what does his funder/program map look like, and does anything on it 
 
 ## Decision log
 
-- 2026-07-24: intake (source: boardy) -- Muxin said "yes" 10:56; Boardy's send confirmation had not yet appeared in the chat thread as of this snapshot.
-- 2026-07-24: status set to pursue (Muxin's own approval to connect counts as the DECISION GATE go-ahead) pending confirmation the request was sent, then his acceptance.
-- NEXT: confirm with Boardy that the connection request actually went out.
+- 2026-07-24: intake (source: boardy) -- Muxin said "yes" 10:56; Boardy sent the connection request (confirmed by Muxin separately, 2026-07-24).
+- 2026-07-24: status set to pursue (Muxin's own approval to connect counts as the DECISION GATE go-ahead) pending his acceptance.
+- 2026-07-24: tracker event recorded (contacted, channel: boardy-intro) now that the send is confirmed -- this lead now surfaces in the Follow-ups tab alongside the other 7 pursued Boardy leads.
