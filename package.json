@@ -80,7 +80,7 @@
     "better-sqlite3": "^11.8.1",
     "exceljs": "^4.4.0",
     "linkedom": "^0.18.13",
-    "playwright": "^1.49.1",
+    "playwright": "^1.62.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "remotion": "^4.0.474",
