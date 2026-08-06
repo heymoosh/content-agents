@@ -72,7 +72,7 @@
   "dependencies": {
     "@atproto/api": "^0.13.35",
     "@mozilla/readability": "^0.6.0",
-    "@remotion/bundler": "^4.0.474",
+    "@remotion/bundler": "^4.0.500",
     "@remotion/captions": "^4.0.474",
     "@remotion/cli": "^4.0.474",
     "@remotion/renderer": "^4.0.474",
