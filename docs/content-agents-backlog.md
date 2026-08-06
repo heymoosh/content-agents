@@ -606,3 +606,28 @@ CARD TYPE: EPIC
 - STATUS: Backlog
 - LANE: claude-config (~/.claude) — this is a conductor-mechanism/global-skill change, not a content-agents content change. Build there per the repo's own conductor carve-out (worktree off ~/.claude, base branch master, no backlog_path).
 <!-- card-id: c8fc8ac3-ac1a-4471-9f22-916752143960 -->
+
+**Wire an event-driven deep-security-review trigger for PRs touching secrets/credentials/publish adapters**
+- ORIGIN: maintenance-audit 2026-07-20 -- from PR #260's Class A profile: the loop-table row "Deep security review (agent)" is event-only for this class (fires when a PR touches auth/secrets/data handling), but nothing currently detects that condition and routes such a PR to a security-review pass before merge.
+- GAP: no wiring exists (in CI, in the conductor, or as a repo convention) that flags a PR touching .env-adjacent config, src/pull/login.ts (browser-login credential handling), src/publish/*.ts (third-party publish adapters with API keys), or similar credential/data-handling paths for a mandatory security-review HOLD before merge.
+- SCOPE (needs grooming): likely a lightweight path-filter check (e.g. a paths-filter-based CI job) that flags matching PRs, paired with a conductor-side rule treating a PR touching those paths as HOLD-tier (mandatory security review) rather than self-vet auto-merge -- mirrors the maturity ladder's Stage 3 security-cadence rule, wired earlier since this repo already holds real third-party credentials.
+- GOAL_CONDITION: a PR touching any of {.env*, src/pull/**, src/publish/**, config/providers.yaml, or other credential/auth-adjacent paths} is automatically flagged (CI check or conductor-side rule) as requiring a security review before merge, instead of relying on a human/agent noticing.
+- STATUS: Backlog
+<!-- card-id: 9cff827f-2d3d-471b-a3d2-813a7752ebc7 -->
+
+**Monthly codebase-health-report loop -> refactor cards**
+- ORIGIN: maintenance-audit 2026-07-20 -- loop-table row "Codebase health report -> refactor cards" targets monthly for Class A; no such loop exists for content-agents today.
+- GAP: nothing currently produces a periodic report surfacing hotspots (modules absorbing repeated bug fixes, complexity spikes, dead code) that files refactor cards. Per the rubric this is a report that FILES cards for hotspots -- never a loop that refactors directly (calendar-driven refactoring without a signal is an explicit anti-pattern).
+- SCOPE (needs grooming): a monthly job (Claude cloud Routine or a scheduled conductor pass) that inspects git-log churn plus file size/complexity over src/** and files up to N Backlog cards for genuine hotspots, same noise-guardrail (dedup, cap) as propose-cards/idea-scout.
+- GOAL_CONDITION: a monthly health-report run produces zero-to-few Backlog cards naming specific hotspot files/modules and the evidence (churn count, size, or duplicated logic) behind each, capped and deduped like the other loops.
+- STATUS: Backlog
+<!-- card-id: 64e433e3-122b-48e2-bbb9-7edfa20736e9 -->
+
+**Local review server binds all interfaces, not localhost-only (src/review/serve.ts)**
+- ORIGIN: maintenance-audit 2026-07-20 -- concrete finding from this pass's security-relevant review of the audit surface, not a hypothetical gap.
+- FINDING: src/review/serve.ts calls server.listen(PORT, ...) with no host argument. Node defaults to binding 0.0.0.0 (all interfaces) in that case, so despite the console log printing "http://localhost:${PORT}", the review server is actually reachable from the local network, not just localhost.
+- WHY IT MATTERS: this server has no authentication and both reads and writes real state -- approve/revise/discard on the review queue, and per the file's own imports it triggers real publish calls (publishText, publishCards, publishTikTok, publishShorts, publishSubstack) and some routes shell out via execFile. Anyone on the same LAN/Wi-Fi network could reach it while npm run review is active.
+- SCOPE (needs grooming): pass an explicit host of '127.0.0.1' to server.listen so it only binds the loopback interface; confirm no existing workflow (e.g. deliberately reaching the review GUI from another device) depends on LAN reachability before changing it -- if one does, gate LAN access behind an explicit opt-in/env var instead of the current unintentional default.
+- GOAL_CONDITION: npm run review's server only accepts connections from 127.0.0.1 by default; a request from another machine on the same network is refused, unless an explicit opt-in is set.
+- STATUS: Backlog
+<!-- card-id: fb7a55d2-8c48-405e-aa4a-8b410b67e874 -->
