@@ -25,3 +25,6 @@ out/
 docs/*.lock
 .DS_Store
 .conductor-preflight-stamp
+
+# design-sync capture output (regenerate with npm run design:capture)
+.design-sync/build/

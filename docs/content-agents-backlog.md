@@ -631,3 +631,13 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: npm run review's server only accepts connections from 127.0.0.1 by default; a request from another machine on the same network is refused, unless an explicit opt-in is set.
 - STATUS: Backlog
 <!-- card-id: fb7a55d2-8c48-405e-aa4a-8b410b67e874 -->
+
+**Outreach evidence links render the literal string `/^https?:/` instead of a link (src/review/page.ts:1186)**
+- ORIGIN: 2026-08-06 design-sync capture -- caught while snapshotting the real Outreach room for the Claude Design workspace, not from a report.
+- FINDING: the whole client `<script>` (page.ts lines 606-2056) lives inside a TypeScript template literal, so a regex written there needs doubled backslashes -- line 934 correctly writes `/\\*\\*(.+?)\\*\\*/g`. Line 1186 in `outreachMarginHtml` writes `/^https?:\/\//i` with single backslashes, so the template literal collapses `\/` to `/` and the browser actually receives `/^https?://i.test(...)`. That parses as the regex `/^https?:/` divided by a second regex rather than as a test, so `link` ends up holding a RegExp object; string-concatenating it prints the literal text `/^https?:/` where the "source ↗" link should be.
+- WHY IT MATTERS: every cited piece of evidence in the "WHY THIS IS ON YOUR DESK" rail loses its link. The citation is the whole point of a dossier -- Muxin cannot click through to check a quote, and instead sees regex source in the middle of a reading surface.
+- WHY CI MISSED IT: page.test.ts's wiring guard only asserts every emitted `<script>` parses (`new Function`). The mangled form is still syntactically valid JavaScript, just semantically wrong, so it passes.
+- FIX (small, known): double the backslashes on page.ts:1186 to match the surrounding convention. Worth also scanning the emitted script for any other single-backslash regex with the same bug, and considering a test that asserts a lead with an `https://` source renders an `<a class="ev-src">`.
+- GOAL_CONDITION: an evidence item whose source is an http(s) URL renders a clickable "source ↗" link, and no rendered room contains the substring `/^https?:` anywhere in its markup.
+- STATUS: Backlog
+<!-- card-id: ed1ea25f-0807-4332-a550-92a6ab252d8b -->

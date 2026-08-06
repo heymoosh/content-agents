@@ -50,6 +50,7 @@
     "publish:all": "tsx src/publish/all.ts",
     "queue": "tsx src/publish/queue-view.ts",
     "review": "tsx src/review/serve.ts",
+    "design:capture": "node scripts/design-sync-capture.mjs",
     "notes-daily": "tsx src/cron/notes-daily.ts",
     "bluesky-mentions": "tsx src/cron/bluesky-mentions.ts",
     "inbound-to-tracker": "tsx src/cron/inbound-to-tracker.ts",
