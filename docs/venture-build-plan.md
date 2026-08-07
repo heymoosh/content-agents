@@ -80,62 +80,71 @@ This build needs the queue schema extended with:
 
 **Open dependency:** humaninference.ai has an About page and no signup form or email capture. Phase 2 cannot produce a working checkpoint deliverable until that exists. This plan doesn't scope building it (a "no code in the plan doc" decision), so it needs to either land as prep work before Phase 2 starts, or become an explicit first sub-step of Phase 2. What it must do is fixed by §E.1 below; what stores the addresses and sends the mail is Open question 3.
 
-### E.1 What Phase 2 actually produces — the approach, not a product's fields
+### E.1 What Phase 2 actually produces — the approach
 
-The framework's own delivery shape, distilled here so it lives in this repo rather than in a vendor's
-page builder. It is deliberately tool-neutral: these are the parts and the reasons, and any stack
-that can render a page, capture an email and send one message satisfies it.
+The framework's delivery shape, distilled here so it lives in this repo instead of only in a note
+outside it. Everything below is what the source prescribes; where this plan adds a judgment of its
+own it says so.
 
 **The sequence, end to end:** a post sends people to a landing page → the landing page trades a lead
 magnet for an email → one welcome email delivers the magnet → a one-question survey fires
-immediately after signup. That is the whole funnel. The source is explicit that no complex sequence
-is needed to start, and the minimum viable system is 5 posts/week, 1 lead magnet, 1 offer, 1 welcome
-email.
+immediately after download. That is the whole funnel; the source is explicit that no complex funnel
+is needed to start. Minimum viable system: 5 posts/week, 1 lead magnet, 1 offer, 1 welcome email.
 
-**Landing page** — drafted as labeled blocks, not as an essay:
-
-```
-PAGE TITLE          internal only, never shown
-HERO HEADLINE       the main promise
-HERO SUBHEADLINE    who it is for + what they get
-BENEFIT 1/2/3       concrete, not adjectives
-BUTTON LABEL        short CTA
-FORM INTRO TEXT     one sentence above the opt-in
-THANK YOU MESSAGE   what happens after signup
-```
-
-Blocks rather than prose for one reason that outlives any tool: copy that arrives as an essay has to
-be translated into page fields by hand, every time, and that translation is where voice gets lost
-and where the work stalls.
-
-**The form** — email address, and nothing else unless the magnet cannot be delivered without it.
-Every extra field costs signups, and Phase 3's data comes from the survey, not from the form.
-
-**Welcome email:**
+**The required copy blocks.** The framework's own condensed set, and the only part that is
+normative:
 
 ```
-EMAIL SUBJECT       subject line
-PREVIEW TEXT        inbox preview
-EMAIL BODY          thanks for downloading / here's what it does / here's when you'll hear from me
-CTA LINK TEXT       link text for the magnet
+HEADLINE              the promise
+SUBHEADLINE           who it is for + what they get
+THREE BENEFITS        specific, not adjectives
+BUTTON LABEL          obvious
+WELCOME EMAIL SUBJECT
+WELCOME EMAIL BODY
+SURVEY QUESTION       What are you stuck on right now?
 ```
 
-The body is three beats, in that order, and the third one sets a real cadence ("every Saturday") so
-the next email is expected rather than an interruption.
+Why blocks at all, in the source's own terms: the topic gets abstract quickly, and blocks force the
+copy to stay concrete — the headline has to make a clear promise, the benefits have to be specific,
+the button has to be obvious, the email has to deliver the thing, the survey has to capture useful
+language. The landing page also works as a test of the idea: if the problem and the quick win can't
+be expressed in a headline, three benefits and a button, the topic isn't sharp enough yet.
 
-**The survey** — one question, fired immediately after download: *"What are you stuck on right
-now?"* This is the single most important output of Phase 2, because Phase 3's problem, outline and
-price are shaped from these answers and nothing else. It fires at signup rather than later because
-that is the only moment the person is guaranteed to be paying attention.
+A fuller breakdown exists in the source (page title, hero headline, hero subheadline, three
+benefits, button label, form intro text, thank-you message; and for the email, subject, preview
+text, body, CTA link text). **It is not normative** — it was written to line up one-for-one with a
+hosted page builder's input fields. Treat it as a checklist of things a page usually needs, not as a
+schema to conform to. The seven blocks above are the requirement.
 
-**Lead magnet:**
+**The form.** The page trades the magnet for an email address. The source prescribes nothing beyond
+that, so neither does this plan; how many fields the form carries is a decision for whoever builds
+it.
+
+**Welcome email.** Three beats, in order: thanks for downloading, here's what it does, here's when
+you'll hear from me. That third beat sets a real cadence ("you'll hear from me every Saturday").
+Keep it simple — the source is explicit that no complex sequence is needed.
+
+**The survey.** One question, fired immediately after download: *"What are you stuck on right
+now?"* Surveying every new subscriber at that moment is one of the framework's central practices
+(the source's author reports ~900,000 data points across 200,000 subscribers from doing exactly
+this). Its answers are a primary input to Phase 3, though not the only one: Phase 3 clusters survey
+answers **together with** email replies, comments and DMs, which is why `responses.jsonl` carries a
+`source` field per entry rather than assuming everything arrived by survey.
+
+**Lead magnet.** Structure:
 
 ```
-TITLE / INTRO (why this exists, who it helps) / SECTION 1-3 (practical ideas) / ACTION STEP
+TITLE / INTRO (why this exists, who it helps) / SECTION 1-3 (practical ideas) /
+ACTION STEP (what to do next) / FEEDBACK PROMPT (the question that feeds the research loop)
 ```
 
-It should bridge toward the future product: a magnet whose content makes the survey answer *more
-specific* is doing its job, one that merely satisfies the reader is not.
+Structure alone is not enough — the framework's constraints are what make a magnet valid: solve
+exactly **one narrow, frustrating problem**, consumable in **under 10 minutes**, actionable with no
+fluff, giving a quick win right away. Narrow means "how to make perfect dough in 10 minutes", not
+"how to make pizza". The decision rule is to choose the narrowest painful problem you can help
+someone solve in under 10 minutes **where the signup also teaches them what they need next**, and
+the formula is audience + painful moment + fast win + your proof. A magnet that satisfies the block
+list but fails these is framework-invalid.
 
 **What this means for the capture layer we build.** It has to render those blocks, store an email,
 deliver a file, send one message, and record a one-question answer against the respondent. That is
