@@ -304,7 +304,10 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .src { font-size:11px; color:var(--muted); }
   .body { white-space:pre-wrap; font-size:14.5px; line-height:1.6; margin:4px 0 6px;
     padding:11px 13px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
-  .body.story { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; color:#4a453c; max-height:260px; overflow:auto; }
+  /* No max-height: a video script is read in FULL before it is approved, and a fixed 260px window
+     with only macOS's auto-hiding overlay scrollbar as the cue hid most of a typical script behind
+     a scroll nobody could see. The sheet itself scrolls, so letting this grow hides nothing. */
+  .body.story { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; color:#4a453c; }
   textarea { width:100%; min-height:120px; font:14.5px/1.6 inherit; padding:11px 13px;
     border:1px solid var(--muted); border-radius:8px; background:#fff; resize:vertical; }
   img.preview { max-width:340px; width:100%; border-radius:8px; border:1px solid var(--line); display:block; }
@@ -359,7 +362,9 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
     border-radius:10px; padding:14px 16px; }
   .notes-head { display:flex; align-items:center; gap:12px; margin-bottom:8px; flex-wrap:wrap; }
   .notes-head h3 { font:600 14px/1.3 Georgia,serif; margin:0; }
-  .notelist { max-height:420px; overflow:auto; }
+  /* .notelist deliberately has no height rule. Same reason as .body.story above: a fixed 420px
+     window clipped whole notes mid-card with no visible scrollbar, so a complete list and a
+     truncated one looked identical. The page scrolls already. */
   .notepick { display:flex; align-items:flex-start; gap:10px; padding:9px 4px; border-bottom:1px solid var(--line); }
   .notepick:last-child { border-bottom:none; }
   .notepick.drafted { opacity:.5; }
