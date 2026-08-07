@@ -4,7 +4,7 @@
 
 **Revision note:** a Codex review of the first draft found it not implementation-ready — a false "reuse `src/publish/*` unedited" claim (Typefully can't post to Substack), no schema for non-post deliverables (landing pages, surveys, emails), the composition exception missing from root `CLAUDE.md`, "approved" vs "published" vs "live" conflated, an undefined response-gate data model, non-idempotent checkpoints, and verification limited to typechecking. This revision resolves those: two of the original open questions are now locked-in decisions (Phase 1's publish path, the landing-page destination), and the schema/state-machine/idempotency gaps are specified below instead of left implicit. What's still genuinely open is in **Open questions** at the bottom.
 
-**Source of truth for the actual phase logic:** `Personal Obsidian/Projects/Monetizing Projects/One-Person Business Engine (Justin Welsh Session).md`. That doc holds the Starter Kit's phases/checkpoints/rules (pulled from the source PDF) plus the real decision logic for every judgment call (platform pick, idea ranking, lead magnet generation and selection, response clustering, problem scoring, product outline, pricing) and the real 25-question intro interview — all extracted directly from Kajabi's Cofounder AI. This plan is about *where that logic runs and how it holds state*, not what the logic is. When scaffolding, read that doc first — but see the "distilled rules spec" guardrail below before wiring phase scripts directly to it.
+**Source of truth for the actual phase logic:** `Personal Obsidian/Projects/Monetizing Projects/One-Person Business Engine (Justin Welsh Session).md`. That doc holds the Starter Kit's phases/checkpoints/rules (pulled from the source PDF) plus the real decision logic for every judgment call (platform pick, idea ranking, lead magnet generation and selection, response clustering, problem scoring, product outline, pricing) and the real 25-question intro interview. This plan is about *where that logic runs and how it holds state*, not what the logic is. When scaffolding, read that doc first — but see the "distilled rules spec" guardrail below before wiring phase scripts directly to it.
 
 ## Why this build, and why it can't be Atomize
 
@@ -76,7 +76,70 @@ This build needs the queue schema extended with:
 
 **Phase 1 (Substack essays + Notes) does not go through Typefully.** `TEXT_PLATFORMS` is x/linkedin/bluesky only; Substack was never in it, so "reuse `review-queue.md` → `/publish` → Typefully... just sourced from `venture/<slug>/phase-1/`" in the original plan doesn't work — that pipeline can't address Substack at all. Instead, Phase 1 reuses the two mechanisms CLAUDE.md rule 3 already defines: full essays go out as a `ready-to-paste/<file>`, Muxin pastes it into Substack herself, and the checkpoint's delivery evidence is the live URL she confirms back; Notes go through the existing constrained browser agent (`src/publish/substack.ts`), same review-gated as everything else, with the agent's own posted-confirmation as delivery evidence. Both are already-built, already-approved mechanisms — the fix here is which one Phase 1 actually uses, not new publish machinery.
 
-**Landing page + welcome email target humaninference.ai** (Muxin's own site), not Kajabi and not Substack's built-in tools. Reasoning: keeping email capture and survey embedding under her own control rather than depending on Substack's email/survey support, and expecting some signups to come from outside Substack entirely. **Open dependency:** humaninference.ai currently has an About page and no signup form or email capture built. Phase 2 cannot produce a working checkpoint deliverable until that exists — this plan doesn't scope building it (a "no code in the plan doc" build-what's-needed decision is Muxin's, not assumed here), so it needs to either land as prep work before Phase 2 starts, or become an explicit first sub-step of Phase 2. See Open questions below — the form/email backend for humaninference.ai (ConvertKit, Mailchimp, something custom, or something already moving under a different project) still needs an answer.
+**Landing page + welcome email target humaninference.ai** (Muxin's own site), and the capture layer is **built, not rented** (Muxin, 2026-08-06). Email capture and the survey stay under her own control, on her own domain, rather than depending on a hosted funnel product or Substack's built-in email/survey support — signups are expected from outside Substack entirely, and a rented funnel makes the subscriber list and the copy shape somebody else's schema.
+
+**Open dependency:** humaninference.ai has an About page and no signup form or email capture. Phase 2 cannot produce a working checkpoint deliverable until that exists. This plan doesn't scope building it (a "no code in the plan doc" decision), so it needs to either land as prep work before Phase 2 starts, or become an explicit first sub-step of Phase 2. What it must do is fixed by §E.1 below; what stores the addresses and sends the mail is Open question 3.
+
+### E.1 What Phase 2 actually produces — the approach, not a product's fields
+
+The framework's own delivery shape, distilled here so it lives in this repo rather than in a vendor's
+page builder. It is deliberately tool-neutral: these are the parts and the reasons, and any stack
+that can render a page, capture an email and send one message satisfies it.
+
+**The sequence, end to end:** a post sends people to a landing page → the landing page trades a lead
+magnet for an email → one welcome email delivers the magnet → a one-question survey fires
+immediately after signup. That is the whole funnel. The source is explicit that no complex sequence
+is needed to start, and the minimum viable system is 5 posts/week, 1 lead magnet, 1 offer, 1 welcome
+email.
+
+**Landing page** — drafted as labeled blocks, not as an essay:
+
+```
+PAGE TITLE          internal only, never shown
+HERO HEADLINE       the main promise
+HERO SUBHEADLINE    who it is for + what they get
+BENEFIT 1/2/3       concrete, not adjectives
+BUTTON LABEL        short CTA
+FORM INTRO TEXT     one sentence above the opt-in
+THANK YOU MESSAGE   what happens after signup
+```
+
+Blocks rather than prose for one reason that outlives any tool: copy that arrives as an essay has to
+be translated into page fields by hand, every time, and that translation is where voice gets lost
+and where the work stalls.
+
+**The form** — email address, and nothing else unless the magnet cannot be delivered without it.
+Every extra field costs signups, and Phase 3's data comes from the survey, not from the form.
+
+**Welcome email:**
+
+```
+EMAIL SUBJECT       subject line
+PREVIEW TEXT        inbox preview
+EMAIL BODY          thanks for downloading / here's what it does / here's when you'll hear from me
+CTA LINK TEXT       link text for the magnet
+```
+
+The body is three beats, in that order, and the third one sets a real cadence ("every Saturday") so
+the next email is expected rather than an interruption.
+
+**The survey** — one question, fired immediately after download: *"What are you stuck on right
+now?"* This is the single most important output of Phase 2, because Phase 3's problem, outline and
+price are shaped from these answers and nothing else. It fires at signup rather than later because
+that is the only moment the person is guaranteed to be paying attention.
+
+**Lead magnet:**
+
+```
+TITLE / INTRO (why this exists, who it helps) / SECTION 1-3 (practical ideas) / ACTION STEP
+```
+
+It should bridge toward the future product: a magnet whose content makes the survey answer *more
+specific* is doing its job, one that merely satisfies the reader is not.
+
+**What this means for the capture layer we build.** It has to render those blocks, store an email,
+deliver a file, send one message, and record a one-question answer against the respondent. That is
+the whole requirement, and it is why Open question 3 is a build decision rather than a purchase.
 
 ## Files
 
@@ -100,7 +163,7 @@ This build needs the queue schema extended with:
 
 1. **Name for the build and the first venture's slug.** "Build 3" and `venture/` are placeholders in this doc. What does Muxin want to call the civic tech venture itself (the slug used for `venture/<slug>/`)?
 2. **State format: plain markdown files (fiction's approach) vs. a couple of SQLite rows (Build 0/1's approach).** Venture state is low-volume and read by a human as often as by scripts, which argues for markdown like fiction. Recommend markdown; confirm before scaffolding.
-3. **What backs the humaninference.ai signup form + email capture (and ideally the embedded survey)?** ConvertKit, Mailchimp, something custom, or something already moving under a separate project. Phase 2 can't be scaffolded against a concrete output target until this is answered, and it's a prerequisite for Checkpoint 2 regardless of who builds it or when.
+3. **How do we build the capture layer on humaninference.ai?** DECIDED (Muxin, 2026-08-06): built, not rented -- no hosted funnel product, and not Substack's built-in email/survey. What it must do is fully specified in E.1 (render the copy blocks, store an email, deliver a file, send one message, record one survey answer per respondent). What remains open is the implementation: what stores subscribers, what actually sends mail from the domain, and whether that lands as prep work before Phase 2 or as its explicit first sub-step. It is a prerequisite for Checkpoint 2 either way.
 4. **Phase 1's exact format split.** "Long-form Substack essays and Notes" is decided (Section E); the count/ratio isn't — the original plan assumed exactly 3 posts, all one format. How many of each, and does Checkpoint 1 require every one of them live, or a minimum subset?
 
 ## Related
