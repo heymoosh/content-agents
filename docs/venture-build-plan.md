@@ -60,6 +60,8 @@ New skill `/venture` (parallel to `/story`):
 
 The original plan's "venture phase deliverable" row type can't actually work with the queue as it exists: `src/publish/queue.ts`'s `QueueRow` only has `platform`/`format`/`status`/`notes`/`origin` — no way to say a row isn't meant to publish anywhere, or which checkpoint it belongs to. The review app compounds this: `src/review/rows.ts` recognizes exactly five `kind`s (text/image/video/storyboard/outreach-message), discovers rows only from two roots (`content/` and `outreach/leads/`), and `saveDerivative`/`enrich` assume an editable body lives at `derivatives/<id>.md`. Landing-page copy, surveys, welcome emails, a product outline, and thank-you notes don't fit any of that — they'd become rows the app can't render or edit correctly, not harmless new rows.
 
+**The concrete contract for everything in this section — exact field names, enum values, who writes each field, both state machines with their allowed transitions and actors, the per-artifact-kind matrix, evidence shapes, the checkpoint read model the GUI renders, and the legacy-row mapping — is in `docs/venture-schema-contract.md`. Design and build against that document; this section is the summary.**
+
 This build needs the queue schema extended with:
 
 - `artifact_kind` — e.g. `text-post-longform`, `text-post-note`, `landing-page-copy`, `welcome-email`, `survey`, `product-outline`, `price-decision`, `thank-you-note`.
