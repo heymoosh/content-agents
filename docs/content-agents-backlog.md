@@ -352,9 +352,10 @@ REPRO: 1) Open Review tab. 2) Scroll to a VIDEO-SCRIPT/STORYBOARD row. 3) Observ
 OBSERVED: Script text truncated at a fixed 260px height with only a faint overlay scrollbar as the sole discoverability cue; a reviewer skimming the queue could easily approve/discard a video script without ever seeing most of its content.
 EXPECTED: Either a visible scroll affordance (persistent thin scrollbar or fade-out gradient at the clipped edge), or a taller default height / expand-to-read control for the video-script kind specifically, since these bodies are read in full before approval (unlike short social post excerpts).
 ROOT CAUSE: src/review/page.ts, CSS rule `.body.story` (~line 83): `max-height:260px; overflow:auto;` with no companion visual affordance signaling clipped content.
-- STATUS: To Do
+- DECISION (Muxin, 2026-08-06): let it grow -- drop the max-height entirely rather than add a fade or an expand control. The sheet already scrolls, so nothing is hidden and there is no second scroll region to discover.
+- RESOLVED 2026-08-06: removed `max-height:260px; overflow:auto` from `.body.story` (src/review/page.ts). A video script now renders at full height. Verified the emitted page no longer contains `max-height:260px`.
+- STATUS: Done
 - GROOMED: clip-affordance outcome clear; .body.story CSS surface pinned + 2026-07-11
-- PARKED: needs decision (judgment): 2 UX directions for clipped storyboard body (gradient fade vs expand-to-read); recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: dcb91654-efd0-4992-8820-a9d97c40ac2e -->
 
 **Outreach tab: long status groups clip cards with no scroll affordance**
@@ -368,9 +369,10 @@ REPRO:
 OBSERVED: A correctly-fetched, correctly-rendered card (Notion) and an entire correctly-rendered card (Superhuman) are invisible with no affordance telling the user there's more to scroll to. This took direct DOM/network inspection to distinguish from a real data-loss bug -- a normal user has no way to tell the difference and would reasonably conclude the app lost or failed to render their data.
 EXPECTED: Either remove the fixed max-height (let the group grow with the page, since the outer page already scrolls), or add a visible scroll cue (a bottom fade gradient, a persistent thin scrollbar via `scrollbar-gutter`/webkit-scrollbar styling, or a "N more" indicator) so a clipped list is visually distinguishable from a complete one.
 ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:auto; }`. Shared by the Outreach tab's per-status groups and the Follow-ups tab's per-bucket lists (same class), so any bucket with enough rows/text is subject to the same silent clipping.
-- STATUS: To Do
+- DECISION (Muxin, 2026-08-06): same call as dcb91654 -- remove the cap, no scroll affordance.
+- RESOLVED 2026-08-06: removed `max-height:420px; overflow:auto` from `.notelist` (src/review/page.ts). NOTE: the Outreach half of this card had already been overtaken by the five-room desk redesign: Outreach status groups no longer exist, so `.notelist` was by then used only by the Substack Notes browser, which is what this fix covers. Verified the emitted page no longer contains `max-height:420px`.
+- STATUS: Done
 - GROOMED: clip-affordance outcome clear; .notelist max-height:420px pinned (page.ts:140) + 2026-07-11
-- PARKED: needs decision (judgment): 2 layout directions for clipped status groups (remove max-height vs add scroll affordance); recommended: hold — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 218cb426-115b-4eda-90bd-70fe34408e60 -->
 
 **Close the loop: strategy analysis actively steers the content engine**
@@ -629,7 +631,9 @@ CARD TYPE: EPIC
 - WHY IT MATTERS: this server has no authentication and both reads and writes real state -- approve/revise/discard on the review queue, and per the file's own imports it triggers real publish calls (publishText, publishCards, publishTikTok, publishShorts, publishSubstack) and some routes shell out via execFile. Anyone on the same LAN/Wi-Fi network could reach it while npm run review is active.
 - SCOPE (needs grooming): pass an explicit host of '127.0.0.1' to server.listen so it only binds the loopback interface; confirm no existing workflow (e.g. deliberately reaching the review GUI from another device) depends on LAN reachability before changing it -- if one does, gate LAN access behind an explicit opt-in/env var instead of the current unintentional default.
 - GOAL_CONDITION: npm run review's server only accepts connections from 127.0.0.1 by default; a request from another machine on the same network is refused, unless an explicit opt-in is set.
-- STATUS: Backlog
+- DECISION (Muxin, 2026-08-06): lock it to loopback. He never opens the studio from another device, so no opt-in env flag was added; if that changes, add one explicitly rather than widening the default.
+- RESOLVED 2026-08-06: `server.listen(PORT, "127.0.0.1", ...)` in src/review/serve.ts. Verified live: the listening socket is `TCP 127.0.0.1:4713 (LISTEN)`, localhost returns 200, and the machine's own LAN address is refused.
+- STATUS: Done
 <!-- card-id: fb7a55d2-8c48-405e-aa4a-8b410b67e874 -->
 
 **Outreach evidence links render the literal string `/^https?:/` instead of a link (src/review/page.ts:1186)**
@@ -639,5 +643,6 @@ CARD TYPE: EPIC
 - WHY CI MISSED IT: page.test.ts's wiring guard only asserts every emitted `<script>` parses (`new Function`). The mangled form is still syntactically valid JavaScript, just semantically wrong, so it passes.
 - FIX (small, known): double the backslashes on page.ts:1186 to match the surrounding convention. Worth also scanning the emitted script for any other single-backslash regex with the same bug, and considering a test that asserts a lead with an `https://` source renders an `<a class="ev-src">`.
 - GOAL_CONDITION: an evidence item whose source is an http(s) URL renders a clickable "source ↗" link, and no rendered room contains the substring `/^https?:` anywhere in its markup.
-- STATUS: Backlog
+- RESOLVED 2026-08-06 (PR #288): doubled the backslashes at page.ts:1186. Found and fixed a second instance of the same bug class at page.ts:658 (`/\s+/g` emitted as `/s+/g`, so the "replying to" preview replaced runs of the letter "s" with a space). Added two mutation-tested guards: a source-level even-backslash invariant over the client script body, and a regression test asserting on the emitted output.
+- STATUS: Done
 <!-- card-id: ed1ea25f-0807-4332-a550-92a6ab252d8b -->

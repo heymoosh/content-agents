@@ -1565,7 +1565,13 @@ const server = createServer(async (req, res) => {
 // Start the server only when run directly (npm run review), so tests can import revisePrompt et al.
 // without binding the port.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  server.listen(PORT, () => {
+  // Loopback ONLY, deliberately. This server has no authentication and it both writes real state
+  // (approve / revise / discard) and triggers real publishes, so binding every interface — Node's
+  // default when no host is passed — put it on the local Wi-Fi for anyone to drive. It also made
+  // the console line below a lie. Muxin never opens the studio from another device (2026-08-06),
+  // so there is no opt-in flag to keep: if that ever changes, add one explicitly rather than
+  // widening the default.
+  server.listen(PORT, "127.0.0.1", () => {
     console.log(`\n  Review queue → http://localhost:${PORT}\n`);
     console.log("  Approve / revise / discard / edit every pending derivative in one place.");
     console.log("  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.\n");
