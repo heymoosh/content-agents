@@ -80,75 +80,32 @@ This build needs the queue schema extended with:
 
 **Open dependency:** humaninference.ai has an About page and no signup form or email capture. Phase 2 cannot produce a working checkpoint deliverable until that exists. This plan doesn't scope building it (a "no code in the plan doc" decision), so it needs to either land as prep work before Phase 2 starts, or become an explicit first sub-step of Phase 2. What it must do is fixed by §E.1 below; what stores the addresses and sends the mail is Open question 3.
 
-### E.1 What Phase 2 actually produces — the approach
+### E.1 Phase 2's deliverable shape — pointer, not a copy
 
-The framework's delivery shape, distilled here so it lives in this repo instead of only in a note
-outside it. Everything below is what the source prescribes; where this plan adds a judgment of its
-own it says so.
+**Do not restate the framework here.** The landing-page copy blocks, the welcome email's structure,
+the survey question, the lead magnet's shape and the constraints that make one valid all live in the
+source note named at the top of this doc. Read them there. A second copy in this repo would drift
+from the note the first time either changes, and drift is worse than a lookup.
 
-**The sequence, end to end:** a post sends people to a landing page → the landing page trades a lead
-magnet for an email → one welcome email delivers the magnet → a one-question survey fires
-immediately after download. That is the whole funnel; the source is explicit that no complex funnel
-is needed to start. Minimum viable system: 5 posts/week, 1 lead magnet, 1 offer, 1 welcome email.
+What belongs here is only what this build decided, which the note cannot tell you:
 
-**The required copy blocks.** The framework's own condensed set, and the only part that is
-normative:
+- **The capture layer is built, not rented** (Muxin, 2026-08-06). No hosted funnel product, and not
+  Substack's built-in email/survey. Email capture and the survey stay on Muxin's own domain and
+  under her own control; signups are expected from outside Substack entirely, and a rented funnel
+  makes both the subscriber list and the copy's shape somebody else's schema.
+- **What that layer must do**, derived from the note's delivery shape: render the framework's copy
+  blocks, store an email address, deliver a file, send one message, and record one survey answer
+  against the respondent. That is the whole requirement, and it is why Open question 3 is a build
+  decision rather than a purchase.
+- **One caution when reading the note for copy blocks.** It carries two block lists: the framework's
+  required set, and a longer one written to line up with a hosted page builder's input fields. Only
+  the first is normative. Treat the longer list as a checklist of things a page usually needs, never
+  as a schema to conform to — conforming to it would reimport the vendor lock-in this build exists
+  to avoid.
 
-```
-HEADLINE              the promise
-SUBHEADLINE           who it is for + what they get
-THREE BENEFITS        specific, not adjectives
-BUTTON LABEL          obvious
-WELCOME EMAIL SUBJECT
-WELCOME EMAIL BODY
-SURVEY QUESTION       What are you stuck on right now?
-```
-
-Why blocks at all, in the source's own terms: the topic gets abstract quickly, and blocks force the
-copy to stay concrete — the headline has to make a clear promise, the benefits have to be specific,
-the button has to be obvious, the email has to deliver the thing, the survey has to capture useful
-language. The landing page also works as a test of the idea: if the problem and the quick win can't
-be expressed in a headline, three benefits and a button, the topic isn't sharp enough yet.
-
-A fuller breakdown exists in the source (page title, hero headline, hero subheadline, three
-benefits, button label, form intro text, thank-you message; and for the email, subject, preview
-text, body, CTA link text). **It is not normative** — it was written to line up one-for-one with a
-hosted page builder's input fields. Treat it as a checklist of things a page usually needs, not as a
-schema to conform to. The seven blocks above are the requirement.
-
-**The form.** The page trades the magnet for an email address. The source prescribes nothing beyond
-that, so neither does this plan; how many fields the form carries is a decision for whoever builds
-it.
-
-**Welcome email.** Three beats, in order: thanks for downloading, here's what it does, here's when
-you'll hear from me. That third beat sets a real cadence ("you'll hear from me every Saturday").
-Keep it simple — the source is explicit that no complex sequence is needed.
-
-**The survey.** One question, fired immediately after download: *"What are you stuck on right
-now?"* Surveying every new subscriber at that moment is one of the framework's central practices
-(the source's author reports ~900,000 data points across 200,000 subscribers from doing exactly
-this). Its answers are a primary input to Phase 3, though not the only one: Phase 3 clusters survey
-answers **together with** email replies, comments and DMs, which is why `responses.jsonl` carries a
-`source` field per entry rather than assuming everything arrived by survey.
-
-**Lead magnet.** Structure:
-
-```
-TITLE / INTRO (why this exists, who it helps) / SECTION 1-3 (practical ideas) /
-ACTION STEP (what to do next) / FEEDBACK PROMPT (the question that feeds the research loop)
-```
-
-Structure alone is not enough — the framework's constraints are what make a magnet valid: solve
-exactly **one narrow, frustrating problem**, consumable in **under 10 minutes**, actionable with no
-fluff, giving a quick win right away. Narrow means "how to make perfect dough in 10 minutes", not
-"how to make pizza". The decision rule is to choose the narrowest painful problem you can help
-someone solve in under 10 minutes **where the signup also teaches them what they need next**, and
-the formula is audience + painful moment + fast win + your proof. A magnet that satisfies the block
-list but fails these is framework-invalid.
-
-**What this means for the capture layer we build.** It has to render those blocks, store an email,
-deliver a file, send one message, and record a one-question answer against the respondent. That is
-the whole requirement, and it is why Open question 3 is a build decision rather than a purchase.
+**Record which version of the note a venture was built against.** The note is a live file. Stamp its
+content hash and date into `canon.md` at kickoff so a decision made in Phase 3 can always be traced
+to the rules as they read at the time. That buys reproducibility without duplicating anything.
 
 ## Files
 
