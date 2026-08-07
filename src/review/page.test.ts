@@ -257,8 +257,10 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
 //                                                 silently ate the rest of the ternary
 //
 // So this asserts the invariant directly at the source level, where it is unambiguous: inside the
-// script body every backslash run must be even-length. The only legitimate odd cases are the
-// template literal's own escapes, \` and \$, which are consumed on purpose.
+// script body every backslash run must be even-length. The ONLY legitimate odd cases are the two
+// escapes a template literal genuinely needs: \` (there is no other way to write a backtick) and
+// \${ (suppressing a placeholder). A lone \$ is NOT exempt — it emits a bare $, which silently
+// turns a literal-dollar regex into an end-of-input anchor, exactly the class of bug this catches.
 test("client <script> source: every backslash is doubled, so regexes survive the template literal", () => {
   const src = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
   const open = src.indexOf("\n<script>\n");
@@ -269,9 +271,10 @@ test("client <script> source: every backslash is doubled, so regexes survive the
   const offenders: string[] = [];
   src.slice(open, close).split("\n").forEach((line, i) => {
     for (const m of line.matchAll(/\\+/g)) {
-      const next = line[m.index! + m[0].length];
-      // \` and \$ are the template literal's own escapes and are meant to be consumed.
-      if (m[0].length % 2 === 1 && next !== "`" && next !== "$") {
+      const rest = line.slice(m.index! + m[0].length);
+      // Only \` and \${ are consumed on purpose. A lone \$ is a real defect, not an escape.
+      const isTemplateEscape = rest.startsWith("`") || rest.startsWith("${");
+      if (m[0].length % 2 === 1 && !isTemplateEscape) {
         offenders.push(`page.ts:${before + i}: ${line.trim().slice(0, 120)}`);
         return;
       }
@@ -287,16 +290,27 @@ test("client <script> source: every backslash is doubled, so regexes survive the
 
 // Regression cover for the two specific defects above, asserting on what the BROWSER receives
 // rather than on the source, so a future refactor of how the page is assembled still gets caught.
+//
+// These assert on the WHOLE surrounding expression, not just the regex. A bare `/\s+/g` check
+// would be untethered — the emitted script contains more than one of those, so deleting the
+// reply-context one entirely would still pass. Likewise a bare `class="ev-src"` check proves
+// nothing: that substring survived intact even when the broken regex commented the line out.
 test("client <script> output: the two regexes that shipped broken now emit correctly", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
 
   // "replying to" preview: must collapse whitespace, not eat every letter "s".
-  assert.ok(script.includes("/\\s+/g"), "the reply-context snippet must emit /\\s+/g");
+  assert.ok(
+    script.includes('replyText.replace(/\\s+/g," ").slice(0,220)'),
+    "the reply-context snippet must emit its whitespace-collapse intact",
+  );
   assert.ok(!script.includes("/s+/g"), "emitted /s+/g would replace runs of 's' with a space");
 
-  // Outreach evidence link: must test the URL, not comment the ternary out.
-  assert.ok(script.includes("/^https?:\\/\\//i"), "the evidence-link test must emit /^https?:\\/\\//i");
+  // Outreach evidence link: the regex must still be wired into the ternary that builds the <a>,
+  // not merely present somewhere in the file.
+  assert.ok(
+    script.includes('/^https?:\\/\\//i.test(e.source) ? \'<a class="ev-src"'),
+    "the evidence-link test must emit as a live ternary guarding the <a class=\"ev-src\"> tag",
+  );
   assert.ok(!script.includes("/^https?:///i"), "emitted /^https?:///i turns the rest of the line into a comment");
-  assert.ok(script.includes('class="ev-src"'), "the evidence source link must survive into the page");
 });

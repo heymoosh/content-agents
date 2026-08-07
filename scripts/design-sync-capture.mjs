@@ -82,34 +82,98 @@ const NOTE_CSS = `
   .dscard-note b { color:#1c1a17; }
 `;
 
+// Refuse to start if anything already answers on the port. A 200 there proves only that SOMETHING
+// is listening, never that it is ours — and polling HTTP to decide readiness loses the race every
+// time, because the pre-existing server answers instantly while our child needs a second to boot
+// and die of EADDRINUSE. Checking up front makes the failure deterministic instead of timing-dependent.
+async function assertPortFree() {
+  try {
+    await fetch(BASE, { signal: AbortSignal.timeout(2000) });
+  } catch {
+    return; // nothing there, which is what we want
+  }
+  throw new Error(
+    `something is already serving ${BASE}. Refusing to capture, because the snapshots would come ` +
+      `from that server rather than a fresh one. Stop it, or set DESIGN_CAPTURE_PORT to a free port.`,
+  );
+}
+
 function startServer() {
   const child = spawn("node", ["--import", "tsx", "src/review/serve.ts"], {
     cwd: repoRoot,
     env: { ...process.env, REVIEW_PORT: String(PORT) },
     stdio: ["ignore", "pipe", "pipe"],
   });
+  child.stdout.on("data", (b) => { child.out = (child.out ?? "") + b.toString("utf8"); });
   child.stderr.on("data", (b) => process.stderr.write(`[serve] ${b}`));
+  child.on("exit", (code, signal) => { child.diedEarly = { code, signal }; });
+  child.on("error", (e) => { child.diedEarly = { error: e.message }; });
   return child;
 }
 
-async function waitForServer(timeoutMs = 60000) {
+// Readiness comes from OUR child announcing itself on its own stdout, not from a port responding.
+async function waitForServer(child, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try {
-      const res = await fetch(BASE);
-      if (res.ok) return;
-    } catch {
-      /* not up yet */
+    if (child.diedEarly) {
+      throw new Error(
+        `the review server we spawned exited before it was ready (${JSON.stringify(child.diedEarly)}). ` +
+          `Port ${PORT} is most likely already in use. Stop the other server, or set ` +
+          `DESIGN_CAPTURE_PORT to a free port.`,
+      );
     }
-    await new Promise((r) => setTimeout(r, 500));
+    if (child.out?.includes(`http://localhost:${PORT}`)) {
+      const res = await fetch(BASE).catch(() => null);
+      if (res?.ok) return;
+    }
+    await new Promise((r) => setTimeout(r, 300));
   }
-  throw new Error(`review server did not come up on ${BASE} within ${timeoutMs}ms`);
+  throw new Error(`review server did not announce itself on ${BASE} within ${timeoutMs}ms`);
 }
 
+// Same-origin assets (quote-card PNGs, video previews) are referenced by relative URL, which
+// resolves to nothing once a card is opened as a file:// page or uploaded to the design project.
+// Inline images as data URIs so a card is genuinely self-contained; swap video for a labelled
+// placeholder, since a playing video means nothing in a static design snapshot anyway.
+async function inlineAssets(markup) {
+  const urls = [...markup.matchAll(/<(img|video)\b[^>]*\bsrc="(\/[^"]*)"/g)];
+  let out = markup;
+  for (const [, tag, url] of urls) {
+    if (tag === "video") {
+      out = out.replace(
+        new RegExp(`<video\\b[^>]*\\bsrc="${url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>(</video>)?`),
+        `<div class="preview" style="display:flex;align-items:center;justify-content:center;` +
+          `height:180px;background:#efe9db;border:1px solid #e7e1d6;border-radius:8px;` +
+          `font:12px ui-monospace,Menlo,monospace;color:#7a7266">video preview (not embedded)</div>`,
+      );
+      continue;
+    }
+    try {
+      const res = await fetch(new URL(url, BASE));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const type = res.headers.get("content-type") ?? "image/png";
+      const b64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+      out = out.split(`"${url}"`).join(`"data:${type};base64,${b64}"`);
+    } catch (e) {
+      throw new Error(`could not inline asset ${url} (${e.message}) — the card would ship a broken image`);
+    }
+  }
+  return out;
+}
+
+await assertPortFree();
 const server = startServer();
 let browser;
+// A bare SIGINT/SIGTERM bypasses `finally`, which would leave the spawned review server listening
+// after the capture is gone. Kill the child on the way out, then re-raise so the exit code is honest.
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.once(sig, () => {
+    server.kill();
+    process.exit(sig === "SIGINT" ? 130 : 143);
+  });
+}
 try {
-  await waitForServer();
+  await waitForServer(server);
   rmSync(BUILD, { recursive: true, force: true });
   mkdirSync(CARDS, { recursive: true });
   mkdirSync(join(BUILD, "tokens"), { recursive: true });
@@ -117,7 +181,9 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 1400 } });
   const consoleErrors = [];
+  const pageErrors = [];
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
+  page.on("pageerror", (e) => pageErrors.push(e.message));
   await page.goto(BASE, { waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
 
@@ -134,12 +200,29 @@ try {
   const written = [];
   for (const r of ROOMS) {
     await page.click(`.room[data-room="${r.room}"]`);
-    await page.waitForTimeout(2000);
-    const markup = await page.evaluate((id) => {
+    // Wait for the room's own loaders to resolve, NOT a fixed delay. A card snapshotted mid-load
+    // captures "Loading…" placeholders, and the blank-check below would still pass it: the header,
+    // the note banner and the empty sheet clear the height and text thresholds on their own.
+    try {
+      await page.waitForFunction(
+        (id) => {
+          const el = document.getElementById(id);
+          return !!el && !/Loading…/.test(el.innerText);
+        },
+        r.section,
+        { timeout: 30000 },
+      );
+    } catch {
+      throw new Error(`room "${r.room}": still showing "Loading…" after 30s — its API never resolved`);
+    }
+    await page.waitForTimeout(500); // let the final paint settle
+
+    const raw = await page.evaluate((id) => {
       const el = document.getElementById(id);
       return el ? el.outerHTML : null;
     }, r.section);
-    if (!markup) throw new Error(`room "${r.room}": #${r.section} not found — did the room ids change?`);
+    if (!raw) throw new Error(`room "${r.room}": #${r.section} not found — did the room ids change?`);
+    const markup = await inlineAssets(raw);
 
     // Rooms that were not the active tab keep `hidden`; unhide so the card renders standalone.
     const body = markup.replace(/^(<section[^>]*?)\s+hidden(="")?/, "$1");
@@ -173,17 +256,38 @@ ${body}
   }
   written.push("tokens/app-shipped.css");
 
+  // A page error means the room we just snapshotted may be half-rendered. Fail rather than upload
+  // an authoritative-looking card built from a broken run.
+  if (pageErrors.length) {
+    throw new Error(`the app threw during capture, so the snapshots are not trustworthy:\n${pageErrors.join("\n")}`);
+  }
+
   // A captured card that renders blank is worse than none: it looks authoritative and says nothing.
+  // Check the ROOM's own content, not the whole document, so the header and note banner cannot
+  // carry an empty card past this gate. Also fail on any asset that still fails to load.
   for (const r of ROOMS) {
+    const badAssets = [];
+    const onFailed = (req) => badAssets.push(req.url());
+    page.on("requestfailed", onFailed);
     await page.goto(`file://${join(CARDS, r.file)}`);
     await page.waitForTimeout(300);
-    const ok = await page.evaluate(() => {
+    page.off("requestfailed", onFailed);
+
+    const stat = await page.evaluate(() => {
       const s = document.querySelector("section.view");
-      return !!s && s.getBoundingClientRect().height > 100 && document.body.innerText.trim().length > 200;
+      if (!s) return null;
+      return { height: s.getBoundingClientRect().height, chars: s.innerText.trim().length };
     });
-    if (!ok) throw new Error(`card ${r.file} renders empty — fix the capture before uploading it`);
+    if (!stat) throw new Error(`card ${r.file} has no room section at all`);
+    if (stat.height < 100 || stat.chars < 200) {
+      throw new Error(`card ${r.file} renders essentially empty (${stat.height}px, ${stat.chars} chars of room text)`);
+    }
+    if (badAssets.length) {
+      throw new Error(`card ${r.file} references assets that do not load: ${badAssets.join(", ")}`);
+    }
   }
-  console.log(`\nall ${ROOMS.length} cards render non-empty. console errors during capture: ${consoleErrors.length}`);
+  console.log(`\nall ${ROOMS.length} cards render non-empty with every asset resolving.`);
+  console.log(`console errors during capture: ${consoleErrors.length}`);
   if (consoleErrors.length) console.log(consoleErrors.join("\n"));
 
   writeFileSync(join(BUILD, "MANIFEST.txt"), written.join("\n") + "\n");
@@ -193,6 +297,15 @@ ${body}
   for (const p of written) console.log(`  ${p}`);
   console.log(`\nPROSE NOT CAPTURED — update by hand if the story changed: README.md, guidelines/*.md, tokens/tokens.css`);
 } finally {
-  if (browser) await browser.close();
-  server.kill();
+  // Nested, so a browser.close() that itself rejects can never skip killing the server.
+  try {
+    if (browser) await browser.close();
+  } finally {
+    if (!server.diedEarly) {
+      const exited = new Promise((r) => server.once("exit", r));
+      server.kill();
+      // Don't return while the port is still held: the next run would hit EADDRINUSE.
+      await Promise.race([exited, new Promise((r) => setTimeout(r, 5000))]);
+    }
+  }
 }
