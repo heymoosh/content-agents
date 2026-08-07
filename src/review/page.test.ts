@@ -242,3 +242,61 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
     assert.ok(ok, `serve.ts route ${route} has no caller in the page (orphan route)`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Escaping guard for the client <script>.
+//
+// The whole client script is authored inside a TypeScript template literal, so the template
+// swallows one level of backslash before the browser ever sees the code. A regex written there
+// needs DOUBLED backslashes: `/\\s+/g` in the source is what emits `/\s+/g` to the browser.
+// Two real bugs shipped from getting this wrong, and neither was caught by the existing
+// "every emitted <script> parses" guard, because both mangled forms are still valid JavaScript:
+//
+//   /\s+/g        emitted as  /s+/g            — replaced runs of the letter "s" with a space
+//   /^https?:\/\//i  emitted as  /^https?:///i  — a regex, then // starting a LINE COMMENT, which
+//                                                 silently ate the rest of the ternary
+//
+// So this asserts the invariant directly at the source level, where it is unambiguous: inside the
+// script body every backslash run must be even-length. The only legitimate odd cases are the
+// template literal's own escapes, \` and \$, which are consumed on purpose.
+test("client <script> source: every backslash is doubled, so regexes survive the template literal", () => {
+  const src = readFileSync(new URL("./page.ts", import.meta.url), "utf8");
+  const open = src.indexOf("\n<script>\n");
+  const close = src.indexOf("\n</script>\n");
+  assert.ok(open > 0 && close > open, "could not locate the client <script> body in page.ts");
+
+  const before = src.slice(0, open).split("\n").length; // 1-indexed line of the <script> tag
+  const offenders: string[] = [];
+  src.slice(open, close).split("\n").forEach((line, i) => {
+    for (const m of line.matchAll(/\\+/g)) {
+      const next = line[m.index! + m[0].length];
+      // \` and \$ are the template literal's own escapes and are meant to be consumed.
+      if (m[0].length % 2 === 1 && next !== "`" && next !== "$") {
+        offenders.push(`page.ts:${before + i}: ${line.trim().slice(0, 120)}`);
+        return;
+      }
+    }
+  });
+  assert.deepEqual(
+    offenders,
+    [],
+    "un-doubled backslash inside the client <script> — the template literal will eat it before the " +
+      "browser sees it. Double it (\\\\s, \\\\/):\n" + offenders.join("\n"),
+  );
+});
+
+// Regression cover for the two specific defects above, asserting on what the BROWSER receives
+// rather than on the source, so a future refactor of how the page is assembled still gets caught.
+test("client <script> output: the two regexes that shipped broken now emit correctly", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+
+  // "replying to" preview: must collapse whitespace, not eat every letter "s".
+  assert.ok(script.includes("/\\s+/g"), "the reply-context snippet must emit /\\s+/g");
+  assert.ok(!script.includes("/s+/g"), "emitted /s+/g would replace runs of 's' with a space");
+
+  // Outreach evidence link: must test the URL, not comment the ternary out.
+  assert.ok(script.includes("/^https?:\\/\\//i"), "the evidence-link test must emit /^https?:\\/\\//i");
+  assert.ok(!script.includes("/^https?:///i"), "emitted /^https?:///i turns the rest of the line into a comment");
+  assert.ok(script.includes('class="ev-src"'), "the evidence source link must survive into the page");
+});

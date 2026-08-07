@@ -655,7 +655,7 @@ function rowEl(piece, row){
   // then the raw frontmatter key, in case row-enrichment surfaces it un-cased.
   const replyText = row.replyToText ?? row.reply_to_text;
   const replyContext = (row.origin === "reply to mention" && replyText)
-    ? '<div class="reply-context">↳ replying to: '+esc(replyText.replace(/\s+/g," ").slice(0,220))+'</div>'
+    ? '<div class="reply-context">↳ replying to: '+esc(replyText.replace(/\\s+/g," ").slice(0,220))+'</div>'
     : "";
   let preview = "";
   if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
@@ -1183,7 +1183,7 @@ function outreachMarginHtml(l){
   const items = evs.slice(0,5).map(e=>{
     const quote = e.quote && e.quote!=="(none)" ? '<div class="ev-quote">"'+esc(e.quote)+'"</div>'
       : (e.description ? '<div class="d">'+esc(e.description)+'</div>' : "");
-    const link = /^https?:\/\//i.test(e.source) ? '<a class="ev-src" href="'+esc(e.source)+'" target="_blank" rel="noopener">source ↗</a>' : "";
+    const link = /^https?:\\/\\//i.test(e.source) ? '<a class="ev-src" href="'+esc(e.source)+'" target="_blank" rel="noopener">source ↗</a>' : "";
     const cls = e.signal==="worldview-match" ? "green" : "sand";
     return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+link+'</div>';
   }).join("");
