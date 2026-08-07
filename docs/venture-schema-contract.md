@@ -155,7 +155,8 @@ draft is merely *scheduled*. Nothing about that proves anything is publicly live
 
 Three different words because they are three different acts: **discard** throws away something that
 never went anywhere, **cancel** stops something already in flight, **retract** takes down something
-that was public. Only retract needs its own evidence.
+that was public. Only retract records anything of its own: a `retraction` attestation (§4.2),
+written alongside the original `evidence` and never over it.
 
 `delivery_mode: none` artifacts have no delivery side-effect at all: their `delivery_status` is
 `not_applicable` from creation and never changes, through every editorial transition above.
@@ -172,7 +173,7 @@ awaiting_approval ──approved──▶ ready ──hand off──▶ handed_o
         └────discarded────▶ cancelled ◀────discarded─────────────────┘           │
                                  ▲                                               │
                                  └──────────────retract──────────────────────────┘
-                                                                    (retract requires evidence)
+                                                    (retract writes `retraction`, keeps `evidence`)
         failed ──retry──▶ ready
 ```
 
@@ -216,7 +217,7 @@ bearing on it.
 `live_confirmed → cancelled` is the only transition that walks something back after it was public.
 It writes a `retraction` object (§4.2) **without touching `evidence`**, because the artifact really
 was live and erasing that record would falsify the history a cleared checkpoint rests on. The
-retraction needs its own attestation, since the system can no more verify a takedown than it could
+`retraction` carries its own attestation, since the system can no more verify a takedown than it could
 verify the original posting. It sets `editorial_status` to `discarded` in the same operation. A checkpoint that had cleared on the
 strength of that artifact does **not** silently un-clear; it records a `retracted` event in
 `canon.md` and surfaces on the phase screen, because unwinding a cleared checkpoint automatically
@@ -230,7 +231,7 @@ This is the design-facing table — the enumerated states Muxin will actually se
 |---|---|---|---|
 | `draft` | `awaiting_approval` | "awaiting your yes" | Approve, Discard, Edit |
 | `draft` | `not_applicable` | "awaiting your yes" | Approve, Discard, Edit |
-| `approved` | `not_applicable` | "done" | Restore to draft |
+| `approved` | `not_applicable` | "done" | Discard, Restore to draft |
 | `approved` | `ready` | "approved, not sent yet" | Discard, Restore to draft, (system hands off) |
 | `approved` | `handed_off` (app) | "scheduled, not live yet" | Confirm live, Cancel |
 | `approved` | `handed_off` (manual) | "waiting on you to put it live" | Confirm live (URL or attestation), Report failed, Cancel |
@@ -440,7 +441,7 @@ Each row's delivery side-effect is exactly the corresponding §2 transition; whe
 | `POST …/artifact/<id>/body` | rewrites the file at `body_path` | only while `editable` |
 | `POST …/artifact/<id>/confirm` | supplies `evidence`, delivery `handed_off → live_confirmed` | only from `handed_off`; evidence must meet the kind's minimum (§3) |
 | `POST …/artifact/<id>/report-failed` | delivery `handed_off → failed`, writes `failure` | manual mode only — the app learns app-mode failures itself |
-| `POST …/artifact/<id>/retract` | §2.1 — writes `retraction`, keeps `evidence`, `→ discarded`, delivery `→ cancelled` | only from `live_confirmed`; requires an attestation |
+| `POST …/artifact/<id>/retract` | §2.1 — writes `retraction`, keeps `evidence`, `→ discarded`, delivery `→ cancelled` | only from `live_confirmed`; the `retraction` attestation is required, `evidence` is untouched |
 | `POST …/artifact/<id>/retry` | delivery `failed → ready` | only when `failure.retryable` |
 | `POST …/checkpoint/<id>/clear` | appends the ledger event, unlocks the next phase | only when the checkpoint's `state` is `open` and every required artifact is complete; a checkpoint already `cleared` is a no-op (§5.3) |
 
@@ -453,8 +454,9 @@ keep working. This mapping is **read-only** — nothing rewrites a legacy row an
 are not migrated.
 
 Legacy `status` values actually stored are empty, `pending` (`reply-draft.ts:244`), `approve`,
-`revise` (`page.ts:791`), `published`, `discard` and `locked` (`rows.ts:31`). **`needs` is not one of
-them** — it is only the GUI's display fallback for an empty status
+`revise` (written by the GUI's save-note action, `page.ts:795`), `published` (see below), `discard`,
+and `locked` (written by `outreach/lock.ts:103`; `rows.ts:31` only classifies it as decided).
+**`needs` is not one of them** — it is only the GUI's display fallback for an empty status
 (`statusLabel(s){ return s ? s : "needs"; }`, `page.ts:638`), and a mapping that treats it as stored
 would be mapping a label.
 
@@ -468,25 +470,34 @@ would be mapping a label.
 | `locked` | `approved` | `not_applicable` (an outreach message is final text, not something sent) |
 | `discard` | `discarded` | `cancelled` |
 
-**`published` does not mean one thing.** Two publishers write it with opposite meanings:
+**`published` does not mean one thing.** Seven call sites across six publishers write it, and they
+do not agree on what it asserts:
 
-- **Typefully** (`x`, `linkedin`, `bluesky`) calls `setStatus(folder, row, "published")` the moment
-  `createDraft` returns (`typefully.ts:434`) — and it does so for an *unscheduled* draft too, where
-  `publishAt` is null and Typefully saves a non-firing draft (`typefully.ts:426`). Nothing about
-  that row is public. → **`handed_off`**.
-- **The Substack Notes agent** sets the same value only after actually firing the post, in the phase
-  its own comment describes as "the claimed slot has arrived: fire exactly once, mark the row
-  published" (`substack.ts:240`). That row genuinely is live. → **`live_confirmed`**.
+| Publisher | What `published` actually means there | Maps to |
+|---|---|---|
+| Typefully (`typefully.ts:434`) | a draft was created — including an *unscheduled*, non-firing one (`typefully.ts:426`). Nothing is public | `handed_off` |
+| Substack Notes agent (`substack.ts:246`) | the post was fired: "the claimed slot has arrived: fire exactly once, mark the row published" | `live_confirmed` |
+| TikTok / PostPeer (`tiktok.ts:204`) | scheduled for a future time | `handed_off` |
+| Quote cards (`cards.ts:232`, `cards.ts:272`) | scheduled at the image relay | `handed_off` |
+| Ready-to-paste (`paste-files.ts:37`) | a `.txt` file was written for Muxin to paste. Emphatically not public | `handed_off` |
+| YouTube (`youtube.ts:161`) | **ambiguous** — with a slot it is scheduled; with no slot it uploads at `YOUTUBE_PRIVACY`, which if `public` means the video is live *before* this line runs | see below |
 
-So the mapping keys off the row's `platform`, which legacy rows carry: `substack` →
-`live_confirmed`, everything else → `handed_off`. Collapsing both into one value would either claim
-scheduled drafts are live (the exact conflation this contract exists to eliminate) or deny that
-posted Notes ever went out.
+So the mapping keys off the row's `platform`: `substack` → `live_confirmed`, everything else →
+`handed_off`.
 
-`evidence` is always `null` for legacy rows: neither publisher records a verifiable reference on the
-row itself — Typefully's draft id and the Substack agent's `ref` both go to `publish-log.md`. A
-`live_confirmed` legacy row is therefore trusted on the publisher's behavior, not on evidence, and a
-screen should not offer to open a link it does not have.
+**YouTube is knowingly understated.** Whether a given legacy YouTube row went straight public is not
+recorded on the row — it depended on a slot and an environment variable at run time — so the mapping
+cannot recover it and does not try. It reads `handed_off` even where the video may be live.
+
+That understatement is the deliberate direction of every ambiguity here. Reading `handed_off` for
+something actually live is a recoverable inaccuracy in a read-only compatibility view. Reading
+`live_confirmed` for something merely scheduled is the precise conflation this contract exists to
+eliminate, and it would be unfalsifiable, because:
+
+`evidence` is always `null` for legacy rows. No publisher records a verifiable reference on the row
+itself — Typefully's draft id, the Substack agent's `ref`, YouTube's URL all go to
+`publish-log.md`. A `live_confirmed` legacy row is trusted on the publisher's behavior, not on
+evidence, and a screen must not offer to open a link it does not have.
 
 `delivery_mode` / `publishable` by legacy kind:
 
