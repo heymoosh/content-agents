@@ -1,6 +1,10 @@
 <!-- Source: Claude Design project "Content Studio Riff" (09c28898-3226-4fe5-8702-ac0d81fab484),
      content-studio-vision.md, retrieved verbatim 2026-07-19. This is the written intent behind
-     the five-room review GUI (PRs #248–#256); check design decisions against it. -->
+     the six-room review GUI (PRs #248–#256); check design decisions against it.
+     Revised 2026-08-07: Venture locked in as the permanent sixth room, after Studio and before
+     Content (see the 2026-08-07 audit handoff and docs/venture-build-plan.md — the handoff is an
+     external planning document Muxin holds outside this repo, not a file checked in under docs/).
+     Everything else in this file is unchanged from the 2026-07-19 original except where noted. -->
 
 # Content Studio — what I actually want out of this system
 
@@ -19,9 +23,10 @@ my insights, my voice, my thoughts. It automates only the repetitive stuff.
 The division is the whole point:
 
 - **I bring** the insight, the instinct, the nuance, the final yes.
-- **The team handles** the repetition: tying in a branding phrase, adding a CTA to a landing
-  page or newsletter, spot checks on format and storytelling hooks, applying best practices,
-  picking the platform and media and format, generating visuals, doing the per-platform posting.
+- **The team handles** the repetition: tying in a branding phrase, choosing the right ask for
+  where the piece sits and checking it actually fits the message, spot checks on format and
+  storytelling hooks, applying best practices, picking the platform and media and format,
+  generating visuals, doing the per-platform posting.
 
 I don't want to remember to "apply this framing" or "use that tagline." I don't want to think
 about which platform, what media, what format, or handle posting. I don't want to manually make
@@ -46,24 +51,54 @@ The old app got this backwards: the "cut" showed me a raw working file full of p
 notes and line-number citations. I had no idea what message it made, what lens was applied, or
 why. That is plumbing. A cut should read as a message.
 
-## The five rooms
+## The six rooms
 
-Everything lives in five rooms. Any single object (a content idea, an outreach lead, a fiction
-scene) opens as the same conversation described above.
+Everything lives in six rooms. Any single object (a content idea, a venture step, an outreach
+lead, a fiction scene) opens as the same conversation described above.
 
 1. **Studio (home).** One capture bar for anything. One "needs your judgment" queue that mixes
    everything, ranked by my day. The team's background work shown honestly with real elapsed
    times. Not a dashboard shouting metrics.
 
-2. **Content.** The Workbench. My thought, the advisor's lens recommendations, the cut (the core
+2. **Venture.** See the dedicated section below.
+
+3. **Content.** The Workbench. My thought, the advisor's lens recommendations, the cut (the core
    message I edit before formatting), then the team formats it per platform. I never pick
    platform or media. Every draft still waits for my yes in Review before anything schedules.
+   Content coming from a venture step goes through this exact same room, not a separate one. It
+   just carries a plain tag saying where it came from: "From Venture" or "From Studio."
 
-3. **Outreach.** See the dedicated section below.
+4. **Outreach.** See the dedicated section below.
 
-4. **Fiction.** See below. The only overlap with the rest of the system is social promo.
+5. **Fiction.** See below. The only overlap with the rest of the system is social promo.
 
-5. **Signals.** See below.
+6. **Signals.** See below.
+
+## Venture, in detail
+
+Venture is where I choose and run the business side: the audience, the problem, the lead
+magnet, the offer, and whatever step the venture is actually on right now. It is the
+business-strategy room, not a second Workbench. It does not own every content idea. A Studio
+idea can stand on its own with no venture attached at all, same as always.
+
+Locked in (2026-08-07): Venture is a permanent room, not a temporary mode tucked inside Studio.
+I don't want this reopened as a question later.
+
+It runs on the same Content engine everyone else uses. A venture step hands its primary piece
+to Content: same cut, same lens checks, same Format for platforms, same Review, same publish
+gate. I never get a second, different pipeline just because an idea started in Venture.
+Cross-platform versions of a venture piece go through the normal Format for platforms step once
+the primary piece is approved and live. They don't have to clear the venture's own step first.
+
+The CTA on a venture piece comes from where the venture actually is right now (early posts,
+building the list, testing the offer, running the business) and whether this specific message
+actually earns that ask. It is not decided by how the last post performed. One piece gets one
+clear ask, or none. A landing page is a place a CTA can point to. It is not the strategy itself.
+
+Brand pillars still apply here, same as everywhere. A slow week or a quiet post does not turn
+off a pillar or a platform on its own. If a post barely gets seen but brings in a subscriber or
+a lead, that is a business win, not a failed post, and Signals should say so plainly, not bury
+it in an engagement number.
 
 ## Outreach, in detail
 
@@ -120,6 +155,14 @@ So Signals should: show where I fit per platform (and admit when it's still lear
 what's working tied to real posts, name what's too weak to trust so I don't chase noise, and
 propose adjustments I adopt or decline. Adopting one means the system starts doing it. My voice
 stays cohesive throughout.
+
+Signals should never collapse everything into one score. Keep four things separate: attention
+(did people see it), conversation (did people reply, comment, save it), audience (did it bring a
+landing visit or an opt-in), and business (did it lead to a call, an inquiry, a sale). A quiet
+post that brings in one lead is a business win, not a failed post, even if the reach number is
+small. And low engagement on a pillar or a platform is never on its own a reason to quietly turn
+it off. Signals can tell me a pillar is landing softer somewhere right now. It still needs my
+yes before anything about the pillar or the routing actually changes.
 
 ## Fiction, in detail
 
