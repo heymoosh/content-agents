@@ -114,14 +114,50 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - PARKED: unbuildable headlessly — Draw Things is a native GUI macOS app requiring local GPU + manual model download/run; video-gen capability now confirmed via research, but the actual bakeoff needs Muxin's hands-on session, not a coding agent
 <!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
 
+**POSSE essay routing — point the essay CTA fallback at humaninference.ai**
+- ORIGIN: Muxin, 2026-08-18 — confirmed POSSE strategy (publish essays on her own site first,
+  syndicate to platforms, drive traffic back so the audience is owned, not rented). Landing page
+  (87c86b16) is live at humaninference.ai and hosts full essays with their own URLs, not a single
+  static page.
+- WHAT SHIPPED: `config/cta.yaml`'s `source_fallback.url` changed from the Substack home to
+  `https://humaninference.ai`. The per-essay case needed no code change — `cta: source` already
+  resolves generically from each content folder's `source.md canonical_url`, whatever domain that
+  URL is on — so future essays just need their humaninference.ai URL pasted into `canonical_url`
+  the same way a Substack URL was pasted before.
+- NOTE: `work_with_me_url` in `config/content-types.yaml` is unchanged (still the LinkedIn
+  stand-in) — see ae602c84, which now depends on the lead-gen offer card below, not on the landing
+  page being live.
+- STATUS: Done
+<!-- card-id: 504362d7-a6d3-45f8-bcd7-8bf1a1fd8739 -->
+
+**Lead-gen offer for the work-with-me CTA**
+- ORIGIN: Muxin, 2026-08-18 — "we should be creating a leadgen and using THAT leadgen as the CTA.
+  Because we have to offer something of value." The landing page alone (humaninference.ai) should
+  not be the work-with-me CTA target; a real lead magnet / offer needs to exist first, and that
+  becomes the CTA destination instead.
+- SCOPE: not fully defined yet — needs Muxin's input on what the offer actually is (a lead magnet
+  is composed, original content/product, not something to invent unprompted). Muxin noted
+  (2026-08-18) she doesn't have a settled offer yet, but a stated guess is enough to start
+  testing — this overlaps with the Venture build's "Offer" phase (docs/venture-build-plan.md),
+  which is exploring the same question ("what do people want, need, will pay for") more broadly.
+  Whether this ships as a small standalone lead-magnet page or as the first real output of the
+  Venture build is an open call — flag it to Muxin rather than deciding silently.
+- STATUS: Backlog
+- DEPENDS ON: Muxin's input on what the offer is (even a first guess)
+- DECISION: none yet — needs Muxin's direction on the offer itself before any build starts.
+<!-- card-id: 646e6cb6-ef3e-4f41-a189-e189cb831b5f -->
+
 **Landing page**
 - Landing page for content CTAs (work-with-me / project pages / read-the-essay).
-- Worked on OUTSIDE this repo. Smarter routing depends on this being live.
-- When the landing page is live, mark this Done so Smarter routing unblocks.
-- STATUS: To Do
-- DECISION: defer — external; built outside this repo. Mark Done when the landing page is live to unblock Smarter routing
-- GROOMED: clear scoped card, no blocking unknown + 2026-07-10
-- PARKED: external work per its own DECISION: defer -- landing page is built outside this repo; conductor should never claim/build this card, only mark Done by hand once the real landing page is live.
+- Worked on OUTSIDE this repo.
+- LIVE (Muxin, 2026-08-18): humaninference.ai is live and hosts full essays with their own URLs
+  (a real blog, not a single static page). Essay CTA routing already points there — see the
+  `source_fallback` change in config/cta.yaml, same day.
+- CORRECTION (2026-08-18): the landing page going live does NOT unblock the "swap work-with-me to
+  the landing page" card (ae602c84) the way this card originally assumed. Muxin does not want the
+  bare landing page used as a general CTA — only as the essay host. `work-with-me` needs an actual
+  lead-gen offer first (see new card, below). ae602c84's DEPENDS ON is updated accordingly.
+- STATUS: Done
 <!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
 **Growth via borrowed audiences (other people's platforms), not just native social**
@@ -194,11 +230,11 @@ CARD TYPE: EPIC
 **Smarter routing — swap the LinkedIn work-with-me stand-in for the real landing page**
 - Follow-up to 6dcaee98 (Smarter routing), UPDATED 2026-07-08 (again) per Muxin's PR #140 feedback: "work with me" now HAS a real (if provisional) destination — Muxin's LinkedIn profile (`https://www.linkedin.com/in/muxinli`), wired as a `work_with_me` destination in `config/content-types.yaml` (`work_with_me_url`). `product_builder_insight`, `project_demo`, `offer_adjacent_post`, and `case_study` (the 4 work-flavored types) all resolve to "Connect on LinkedIn" today, unconditionally — none of them fall back to the essay link or resolve to zero CTAs. This SUPERSEDES the card's original premise (it previously assumed no real destination existed at all).
 - Remaining scope, once Landing page (87c86b16) ships with a real work-with-me page: flip `work_with_me_url` in `config/content-types.yaml` from the LinkedIn profile to the real landing-page URL — a pure config change, no code/reclassification needed (same pattern as project links). Whether the CTA TEXT should also change at that point (e.g. "Work with me" instead of "Connect on LinkedIn") is Muxin's call when the time comes — flag it, don't decide silently.
-GOAL_CONDITION: with the Landing page live and a real work-with-me URL configured, `work_with_me_url` in `config/content-types.yaml` points at the real URL instead of LinkedIn; the 4 work-flavored types' CTA text is confirmed with Muxin (unchanged or updated, her call); every other content type is unchanged.
+GOAL_CONDITION: with a real lead-gen offer live and a real work-with-me URL configured, `work_with_me_url` in `config/content-types.yaml` points at the offer's own URL instead of LinkedIn; the 4 work-flavored types' CTA text is confirmed with Muxin (unchanged or updated, her call); every other content type is unchanged.
 - STATUS: To Do
-- DEPENDS ON: Landing page
-- DECISION: approved — Muxin confirmed (2026-07-10, pre-flight): when the real landing page ships, change the CTA TEXT too (e.g. "Work with me" instead of "Connect on LinkedIn") for the 4 work-flavored types, not just the destination URL.
-- GROOMED: explicit GOAL_CONDITION already on card; pure config swap once Landing page ships; DEPENDS ON already correctly set + 2026-07-08
+- DEPENDS ON: Lead-gen offer for work-with-me CTA (new card, below) — NOT just the landing page. Landing page (87c86b16) is live and Done, but Muxin does not want it used as the work-with-me CTA target on its own (2026-08-18): "we should be creating a leadgen and using THAT leadgen as the CTA. Because we have to offer something of value."
+- DECISION: approved in principle, blocked on the lead-gen offer existing — Muxin confirmed (2026-07-10) the CTA TEXT should change too (e.g. "Work with me") once it points somewhere real; refined (2026-08-18) that "somewhere real" means the lead-gen offer, not the bare landing page.
+- GROOMED: explicit GOAL_CONDITION already on card; pure config swap once the lead-gen offer ships; DEPENDS ON corrected 2026-08-18
 <!-- card-id: ae602c84-18ed-4532-8f1b-3bd716e1a10e -->
 
 **Animated HyperFrames companion for the quote+image card variant**

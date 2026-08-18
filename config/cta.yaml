@@ -3,11 +3,15 @@
 # /publish (typefully) then PLACES that link per `placement` for the platform — so the post body
 # stays clean (Muxin's words only) and the link never triggers an algorithm penalty.
 #
-# Brand-building funnel (no product to sell yet): a "read more" CTA sends people to the
-# SOURCE essay itself (where the Substack subscribe prompt also lives) — converting rented
-# platform attention into OWNED audience. When there's no specific essay to point at, it falls
-# back to the Substack home. Civic-tech posts point at the voting tool. Donations stay
-# secondary — never the headline ask.
+# POSSE (Publish on Own Site, Syndicate Elsewhere, Muxin 2026-08-18): a "read more" CTA sends
+# people to the SOURCE essay itself, hosted on humaninference.ai (where the subscribe prompt also
+# lives) — converting rented platform attention into OWNED audience. When there's no specific
+# essay to point at, it falls back to the humaninference.ai home. Civic-tech posts point at the
+# voting tool. Donations stay secondary — never the headline ask.
+#
+# The landing page itself (humaninference.ai) is NOT a general-purpose CTA — it only appears here
+# as the essay's own host. Do not point `work_with_me` (config/content-types.yaml) at it; that
+# needs an actual lead-gen offer first (Muxin, 2026-08-18) — see docs/content-agents-backlog.md.
 
 targets:                 # default CTA per pillar — /atomize fills `cta` + `cta_label` from here
   human-ai:
@@ -33,7 +37,7 @@ targets:                 # default CTA per pillar — /atomize fills `cta` + `ct
 # (voice memo, raw thought, or `canonical_url` not pasted into source.md). /publish swaps in
 # this url + label so the funnel still converts to an owned subscriber instead of breaking.
 source_fallback:
-  url: "https://humaninference.substack.com"
+  url: "https://humaninference.ai"
   label: "More from me (free to subscribe):"
 
 placement:               # WHERE the link goes per platform (from Branding/.../Platform Reference.md)
