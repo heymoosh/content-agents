@@ -4,6 +4,7 @@ import { rmSync } from "node:fs";
 import {
   createArtifact,
   transitionArtifact,
+  updateArtifactFields,
   readArtifact,
   readArtifacts,
   readyForDelivery,
@@ -160,6 +161,28 @@ describe("transitionArtifact -- rejects invalid transitions, accepts valid ones"
   });
 });
 
+describe("updateArtifactFields -- structured-artifact field edits, separate from the state machine", () => {
+  test("patches a key inside fields without touching editorial/delivery status", () => {
+    createArtifact(
+      SLUG,
+      rules,
+      baseInput({ artifact_id: "p1-plan", artifact_kind: "phase_1_research_plan", fields: { plan_version: 1 } })
+    );
+    const next = updateArtifactFields(SLUG, "p1-plan", { reviewed_by_muxin: true }, "t1");
+    assert.equal(next.fields?.reviewed_by_muxin, true);
+    assert.equal(next.fields?.plan_version, 1);
+    assert.equal(next.editorial_status, "draft"); // untouched
+  });
+
+  test("readArtifact reflects the latest fields patch", () => {
+    createArtifact(SLUG, rules, baseInput({ artifact_id: "p1-plan", artifact_kind: "phase_1_research_plan" }));
+    updateArtifactFields(SLUG, "p1-plan", { reviewed_by_muxin: false }, "t1");
+    updateArtifactFields(SLUG, "p1-plan", { reviewed_by_muxin: true }, "t2");
+    const a = readArtifact(SLUG, "p1-plan");
+    assert.equal(a?.fields?.reviewed_by_muxin, true);
+  });
+});
+
 describe("readyForDelivery -- each condition alone is insufficient", () => {
   function withStatus(overrides: Partial<VentureArtifact>): VentureArtifact {
     return {
@@ -169,6 +192,7 @@ describe("readyForDelivery -- each condition alone is insufficient", () => {
       title: "t",
       body_path: null,
       checkpoint_id: null,
+      fields: null,
       delivery_mode: "app",
       publishable: true,
       editorial_status: "approved",
