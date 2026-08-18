@@ -15,6 +15,11 @@ export interface FetchedNote {
   likes: number; // reaction_count
   reposts: number; // restacks
   replies: number; // children_count
+  views?: number;
+  subscriberTotal?: number;
+  authorUserId?: string;
+  /** The original feed item, retained for the research raw capture. */
+  raw?: unknown;
 }
 
 // A browser-like UA, not a custom one: Substack's WAF appears to block requests whose UA reads
@@ -50,6 +55,8 @@ interface FeedComment {
   reaction_count?: number;
   restacks?: number;
   children_count?: number;
+  views?: number;
+  view_count?: number;
 }
 interface FeedItem {
   type?: string;
@@ -58,7 +65,12 @@ interface FeedItem {
   comment?: FeedComment;
 }
 
-async function resolveUserId(handle: string): Promise<{ id: number; handle: string; name: string }> {
+async function resolveUserId(handle: string): Promise<{
+  id: number;
+  handle: string;
+  name: string;
+  subscriberTotal?: number;
+}> {
   const h = handle.replace(/^@/, "").trim();
   const res = await fetch(`https://substack.com/api/v1/user/${encodeURIComponent(h)}/public_profile`, {
     headers: UA,
@@ -66,7 +78,13 @@ async function resolveUserId(handle: string): Promise<{ id: number; handle: stri
   if (!res.ok) throw new Error(`Substack profile fetch failed for @${h} → ${res.status}`);
   const prof = (await res.json()) as { id?: number; handle?: string; name?: string };
   if (!prof.id) throw new Error(`could not resolve Substack user id for @${h} (is the handle right?)`);
-  return { id: prof.id, handle: prof.handle ?? h, name: prof.name ?? h };
+  const subscriberTotal =
+    typeof (prof as { subscriber_count?: unknown }).subscriber_count === "number"
+      ? (prof as { subscriber_count: number }).subscriber_count
+      : typeof (prof as { subscriberCount?: unknown }).subscriberCount === "number"
+        ? (prof as { subscriberCount: number }).subscriberCount
+        : undefined;
+  return { id: prof.id, handle: prof.handle ?? h, name: prof.name ?? h, subscriberTotal };
 }
 
 // An item is one of Muxin's OWN original notes (not a reply, not a comment on an essay, not a
@@ -84,15 +102,21 @@ function isOwnNote(it: FeedItem, userId: number): boolean {
   );
 }
 
-export async function fetchSubstackNotes(handle: string, opts: { limit?: number } = {}): Promise<FetchedNote[]> {
+export async function fetchSubstackNotes(
+  handle: string,
+  opts: { limit?: number; maxPages?: number; delayMs?: number; sleep?: (milliseconds: number) => Promise<void> } = {}
+): Promise<FetchedNote[]> {
   const limit = opts.limit ?? 20;
-  const { id, handle: resolvedHandle } = await resolveUserId(handle);
+  const maxPages = opts.maxPages ?? 25;
+  const { id, handle: resolvedHandle, subscriberTotal } = await resolveUserId(handle);
 
   const out: FetchedNote[] = [];
   let cursor: string | undefined;
+  const seenCursors = new Set<string>();
   // The reader feed mixes notes with the user's latest posts; page until we have `limit` notes
   // or the feed runs out. Cap pages so a sparse feed can't loop forever.
-  for (let page = 0; page < 25 && out.length < limit; page++) {
+  for (let page = 0; page < maxPages && out.length < limit; page++) {
+    if (page > 0 && opts.delayMs && opts.sleep) await opts.sleep(opts.delayMs);
     const u = new URL(`https://substack.com/api/v1/reader/feed/profile/${id}`);
     if (cursor) u.searchParams.set("cursor", cursor);
     const res = await fetch(u, { headers: UA });
@@ -112,11 +136,30 @@ export async function fetchSubstackNotes(handle: string, opts: { limit?: number 
         likes: c.reaction_count ?? 0,
         reposts: c.restacks ?? 0,
         replies: c.children_count ?? 0,
+        views: typeof c.views === "number" ? c.views : c.view_count,
+        subscriberTotal,
+        authorUserId: String(id),
+        raw: it,
       });
       if (out.length >= limit) break;
     }
     if (!data.nextCursor) break;
+    if (seenCursors.has(data.nextCursor)) {
+      throw new Error("Substack Notes feed repeated an opaque cursor");
+    }
+    seenCursors.add(data.nextCursor);
     cursor = data.nextCursor;
   }
+  if (cursor && out.length < limit && maxPages !== Number.POSITIVE_INFINITY) {
+    throw new Error("Substack Notes feed exhausted its page cap before enumeration completed");
+  }
   return out;
+}
+
+/** Enumerate the complete public Notes archive for research capture. */
+export function fetchAllSubstackNotes(
+  handle: string,
+  opts: { delayMs?: number; sleep?: (milliseconds: number) => Promise<void> } = {}
+): Promise<FetchedNote[]> {
+  return fetchSubstackNotes(handle, { ...opts, limit: Number.POSITIVE_INFINITY, maxPages: Number.POSITIVE_INFINITY });
 }
