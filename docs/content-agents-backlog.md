@@ -571,9 +571,92 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: per-post framing tags are persisted to analytics.db at tag time; a query can join angle/case_skeleton/directives_applied to engagement metrics; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: filed by the a4c5b42b (lever D) build worker 2026-07-15 as a data-gap follow-up -- not part of the original epic decomposition.
+- SCOPE NOTE (build worker, 2026-08-18): PR #311 (card 83166c51, lever-effectiveness.ts) loosely
+  cited this card as "the" follow-up that would close the Lever A/B/C tracking gap ("Closing this
+  gap needs a persisted routing-decision field on `posts` (related: card 6b2f9d31, open, hold)").
+  That citation was a mis-scope -- this card's actual, still-narrower filed ask (persist
+  angle/case_skeleton/directives_applied so a future pass can weight individual spin angles within
+  Lever D) is a different thing from the A/B/C routing/media/cadence attribution gap, and doesn't
+  address it. The real fix for that gap now lives elsewhere: Lever C's half shipped directly (a
+  follow-up PR stacked on #311, `posts.cadence_source` -- no new card needed, already built); Levers
+  A and B are proposed, pending Muxin's sign-off, as cards 2ed2bc5a and 30257501. This card's own
+  scope (angle/case_skeleton persistence) remains open and unbuilt -- unchanged by any of that.
 - STATUS: To Do
 - DECISION: hold -- needs the frontmatter-to-DB linkage designed (which file/step writes it, whether it's a new posts column or a side table) before scoping the build; not epic-approved on its own, revisit once Lever D's frame-fit signal is showing real reads and a deeper angle-level cut is actually wanted.
 <!-- card-id: 6b2f9d31-4e7c-4a58-9d0b-1f3a7e2c8b45 -->
+
+**Strategy lever A follow-through: deliberate periodic control run to measure whether routing actually follows platform-fit**
+- Epic 2ce597d7's validation pass (card 83166c51, PR #311) confirmed Lever A (platform-fit,
+  c7638362) is a genuine INSUFFICIENT-TRACKING gap, not a thin-data one: config/routing.yaml's
+  `defaults` gates /atomize's routing unconditionally (card 7e550e48's locked decision -- a fit
+  score never overrides the editorial list), so no post's routing ever varies based on Lever A's
+  read. There is no "followed the recommendation" bucket to compare against a baseline, at any
+  sample size.
+- The only existing precedent for creating that bucket deliberately is Lever D's periodic
+  spin-control run (card f444f440, src/strategy/spin-control.ts): a small, explicitly-tagged,
+  human-reviewed probe post that gives a downstream lever something real to measure. Lever A's
+  analog would be a periodic, deliberate "route AGAINST platform-fit's read" control run on an
+  already-assigned pillar/platform pair -- e.g. drafting for a platform Lever A currently reads
+  ease-off/lean-in-elsewhere, to see whether the fit read actually predicts engagement. This is
+  DIFFERENT from exploration.ts's off-assignment probes (card 92bb2ae6), which test UNTESTED
+  pillar/platform pairs never assigned by routing.yaml at all -- this would deliberately go
+  against a lever's read on a pair that IS assigned, to see if the lever's read holds up.
+- Same mechanics precedent as spin-control/exploration: a deliberate marker on the placed-log row
+  (e.g. `| platform-fit-control`) -> tag-source.ts reads it back onto a dedicated posts.source
+  value or new attribution column -> route.ts's loadData() excludes it from ordinary
+  pillar/platform resonance figures (same posture as CONTROL_RUN_SOURCE/EXPLORATION_SOURCE) so a
+  deliberate off-recommendation post never poisons the very signal it's measuring. Queues through
+  the normal review-queue.md approval flow -- no auto-publish (CLAUDE.md rule 2 still governs).
+- NOT BUILT HERE: this card only proposes the mechanism. Building it means some posts will
+  deliberately go to a platform/topic pairing that's a worse fit than the routing default would
+  otherwise pick -- a live-posting product choice, not just a schema change, and needs Muxin's
+  explicit sign-off on running that kind of control experiment before any code lands.
+- GOAL_CONDITION (once approved): a periodic, capped-frequency control run deliberately posts
+  against Lever A's current fit read for an already-routed pillar/platform pair, tagged distinctly
+  from ordinary atomized posts and excluded from route.ts's resonance figures; Lever A's own report
+  (or lever-effectiveness.ts) can then show a real followed-vs-contradicted engagement delta.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: filed by the lever-effectiveness follow-up build worker, 2026-08-18, from PR #311's
+  confirmed Lever A tracking gap (see card 83166c51's SHIP note and src/strategy/lever-effectiveness.ts's LEVER_TRACKING_GAPS).
+- STATUS: Backlog
+- DECISION: none yet -- needs Muxin's explicit sign-off on running a deliberate control experiment before this builds (posting a piece against a topic/platform pairing that's a worse fit than the routing default -- a live-posting product choice, not just a schema change).
+<!-- card-id: 2ed2bc5a-887b-4158-b449-f623f1c7369b -->
+
+**Strategy lever B follow-through: deliberate periodic control run to measure whether media choice actually follows media-fit**
+- Epic 2ce597d7's validation pass (card 83166c51, PR #311) confirmed Lever B (media-fit,
+  27dc7d2d) is a genuine INSUFFICIENT-TRACKING gap, not a thin-data one: /atomize's generation
+  contract (always text + quote-card per routed platform, card 27dc7d2d's own SCOPE RECONCILED
+  decision) is unconditional -- no post's media choice ever varies based on Lever B's read, so
+  there is no "followed the recommendation" bucket to compare, at any sample size.
+- The only existing precedent for creating that bucket deliberately is Lever D's periodic
+  spin-control run (card f444f440, src/strategy/spin-control.ts). Lever B's analog would be a
+  periodic, deliberate, human-approved forced media variant against the always-both contract --
+  e.g. skipping the quote-card (or skipping plain text) for one probe post on a platform/pillar
+  pair Lever B currently reads lean-toward/steady, to see whether the media-type read actually
+  predicts engagement. Unlike video (which stays fully out of scope -- /video's invocation model
+  is deliberately always human-invoked per CLAUDE.md rule 6, untouched by this), this is scoped to
+  the text vs. quote-card axis /atomize already produces both sides of today.
+- Same mechanics precedent as spin-control/exploration: a deliberate marker on the placed-log row
+  (e.g. `| media-fit-control`) -> tag-source.ts reads it back onto a dedicated posts.source value
+  or new attribution column -> route.ts's/media-fit.ts's loadData() excludes it from ordinary
+  media-type resonance figures (same posture as CONTROL_RUN_SOURCE/EXPLORATION_SOURCE) so a
+  deliberate forced-variant post never poisons the signal it's measuring. Queues through the normal
+  review-queue.md approval flow -- no auto-publish (CLAUDE.md rule 2 still governs).
+- NOT BUILT HERE: this card only proposes the mechanism. Building it means some posts will
+  deliberately skip a media type /atomize's default contract would otherwise always generate -- a
+  live-posting product choice, not just a schema change, and needs Muxin's explicit sign-off before
+  any code lands.
+- GOAL_CONDITION (once approved): a periodic, capped-frequency control run deliberately forces (or
+  withholds) a media variant against Lever B's current read for an already-routed platform, tagged
+  distinctly from ordinary atomized posts and excluded from the ordinary media-type resonance
+  figures; Lever B's own report (or lever-effectiveness.ts) can then show a real
+  followed-vs-contradicted engagement delta.
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: filed by the lever-effectiveness follow-up build worker, 2026-08-18, from PR #311's
+  confirmed Lever B tracking gap (see card 83166c51's SHIP note and src/strategy/lever-effectiveness.ts's LEVER_TRACKING_GAPS).
+- STATUS: Backlog
+- DECISION: none yet -- needs Muxin's explicit sign-off on running a deliberate control experiment before this builds (forcing/withholding a media type on some posts, deviating from /atomize's always-both default -- a live-posting product choice, not just a schema change).
+<!-- card-id: 30257501-e308-476c-819d-f0d72e2c89bb -->
 
 **Add Threads as a supported publishing platform (official Graph API)**
 - Meta opened the Threads API to broader third-party publishing in 2026 -- richer post types, search/profile discovery, reply management, and real-time publish/delete notifications for third-party apps.

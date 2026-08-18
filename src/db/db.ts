@@ -24,6 +24,9 @@ export function openDb(): Database.Database {
   if (!cols.some((c) => c.name === "cta_destination")) {
     db.exec("ALTER TABLE posts ADD COLUMN cta_destination TEXT");
   }
+  if (!cols.some((c) => c.name === "cadence_source")) {
+    db.exec("ALTER TABLE posts ADD COLUMN cadence_source TEXT");
+  }
   if (!cols.some((c) => c.name === "media_type")) {
     db.exec("ALTER TABLE posts ADD COLUMN media_type TEXT");
     // Backfill from format column so existing rows are immediately queryable.
@@ -39,6 +42,7 @@ export function openDb(): Database.Database {
   db.exec("CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_posts_media_type ON posts(media_type)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_posts_cta_destination ON posts(cta_destination)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_posts_cadence_source ON posts(cadence_source)");
   return db;
 }
 

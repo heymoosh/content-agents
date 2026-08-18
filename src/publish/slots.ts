@@ -59,6 +59,16 @@ export function loadApprovedOverrides(): ScheduleOverridesFile["overrides"] {
   }
 }
 
+// Strategy lever C follow-through (epic 2ce597d7): tells a caller whether a given platform's
+// cadence, AT THE MOMENT OF THE CALL, is being driven by an active config/schedule-overrides.yaml
+// entry or the static config/platforms.yaml default — the "which path did THIS publish actually
+// take" answer lever-effectiveness.ts's LEVER_TRACKING_GAPS previously flagged as missing for
+// Lever C. Reuses loadApprovedOverrides() (the exact same source loadSchedule() itself consults),
+// so this can never disagree with what loadSchedule() actually did for that platform.
+export function cadenceSourceFor(platform: string): "override" | "default" {
+  return loadApprovedOverrides()[platform] ? "override" : "default";
+}
+
 export function loadSchedule(): Record<string, PlatformSchedule> {
   const overrides = loadApprovedOverrides();
   const out: Record<string, PlatformSchedule> = {};

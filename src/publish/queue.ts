@@ -227,6 +227,12 @@ Never hand-delete placed rows. \`/strategy\` grades bets in the Bets section; th
 // ctaDestination (optional — card d80411bc, strategy lever E scaffold) is the post's resolved
 // primary CTA destination (src/publish/cta.ts's resolvePrimaryCtaDestination), computed by the
 // caller since only it has the CtaConfig/ContentTypesConfig/canonicalUrl needed to resolve it.
+// cadenceSource (optional — strategy lever C follow-through, epic 2ce597d7) is 'override' | 'default',
+// computed by the caller from src/publish/slots.ts's cadenceSourceFor(platform) at the moment this
+// post's slot was actually claimed. Only src/publish/typefully.ts's text-platform path (the one
+// channel config/schedule-overrides.yaml's overrides actually apply to) ever passes a non-null
+// value; every other publish path leaves it null (not 'default') since it never made the
+// determination at all.
 export function appendBetPlacement(
   folder: string,
   rowId: string,
@@ -234,7 +240,8 @@ export function appendBetPlacement(
   ref: string,
   fm: Record<string, unknown> = {},
   body = "",
-  ctaDestination: string | null = null
+  ctaDestination: string | null = null,
+  cadenceSource: string | null = null
 ): void {
   const path = betsPath();
   mkdirSync(dirname(path), { recursive: true });
@@ -275,7 +282,11 @@ export function appendBetPlacement(
   // stamp posts.cta_destination. Same placement rule as the other markers — before the quoted
   // prefix, so the end-anchored quote regex still finds the text at the line's tail.
   const cta = ctaDestination ? ` | cta:${ctaDestination}` : "";
+  // Cadence-source marker (strategy lever C follow-through, epic 2ce597d7): tag-source.ts reads
+  // this back to stamp posts.cadence_source. Same placement rule as the other markers — before
+  // the quoted prefix, so the end-anchored quote regex still finds the text at the line's tail.
+  const cadence = cadenceSource ? ` | cadence:${cadenceSource}` : "";
   const prefix = body ? ` | "${body.replace(/\s+/g, " ").trim().slice(0, 80)}"` : "";
-  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${cta}${prefix}`;
+  const line = `- placed ${new Date().toISOString()} [${key}] ${platform} → ${ref}${fromBrief}${directives}${spin}${controlRun}${exploration}${outreachMessage}${cta}${cadence}${prefix}`;
   writeFileSync(path, existing.replace(/\n*$/, "\n") + line + "\n");
 }

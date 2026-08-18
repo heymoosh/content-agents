@@ -103,16 +103,20 @@ makes `/cycle` compound instead of restarting every week.
      state, not a bug. Recommendation only — `src/publish/cta.ts`'s resolution is untouched. Fold
      the ranked table into the brief.
    - `npm run lever-effectiveness` → strategy-lever validation (card 83166c51, epic 2ce597d7):
-     answers "do the 5 levers this epic built actually measure something?" by combining lever D's
-     and lever E's real computed deltas (the same reads `npm run frame-fit`/`npm run cta-fit` print,
-     reused not recomputed) into one report, plus an explicit **insufficient tracking** note for
-     levers A/B/C — `posts` persists pillar/media_type/source/cta_destination but nothing records
-     whether a post's routing, media choice, or publish slot actually FOLLOWED that lever's
-     recommendation, so a before/after lift for A/B/C is not honestly computable today (a tracking
-     gap, not a thin-data one — don't wait for more posts to fix it). Optional dedicated report, run
-     on demand — not required every cycle; when run, fold its two tables + tracking-gap note into a
-     `## Lever effectiveness` brief section if Muxin wants it in that cycle's brief, otherwise just
-     show it to her directly.
+     answers "do the 5 levers this epic built actually measure something?" by combining lever C's,
+     D's, and E's real computed deltas (the same reads `npm run cadence-fit`/`npm run frame-fit`/
+     `npm run cta-fit` print, reused not recomputed) into one report, plus an explicit
+     **insufficient tracking** note for levers A/B — `posts` persists pillar/media_type but nothing
+     records whether a post's routing or media choice actually FOLLOWED that lever's
+     recommendation, so a before/after lift for A/B is not honestly computable today (a tracking
+     gap, not a thin-data one — don't wait for more posts to fix it; proposed fix pending Muxin's
+     sign-off, cards 2ed2bc5a/30257501). Lever C's own gap closed once `posts.cadence_source`
+     ('override' | 'default', stamped at slot-claim time by `src/publish/typefully.ts`) started
+     being persisted — expect insufficient-data there too until Muxin approves an override in
+     config/schedule-overrides.yaml and posts accumulate under it. Optional dedicated report, run
+     on demand — not required every cycle; when run, fold its three tables + A/B tracking-gap note
+     into a `## Lever effectiveness` brief section if Muxin wants it in that cycle's brief,
+     otherwise just show it to her directly.
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`. Also stamps `posts.cta_destination` from the same Placed-log

@@ -15,6 +15,7 @@ function placed(overrides: Partial<Placed> = {}): Placed {
     exploration: false,
     outreachMessage: false,
     ctaDestination: null,
+    cadenceSource: null,
     ...overrides,
   };
 }
@@ -143,5 +144,55 @@ describe("readPlaced: parses the ` | cta:<dest>` marker (card d80411bc, strategy
     const row = readPlaced(FIXTURE_PATH)[0];
     assert.equal(row.spin, true);
     assert.equal(row.ctaDestination, "project");
+  });
+});
+
+describe("readPlaced: parses the ` | cadence:<source>` marker (strategy lever C follow-through, epic 2ce597d7)", () => {
+  const FIXTURE_PATH = join(repoRoot, "data", ".tag-source-test-bets-cadence.md");
+
+  after(() => {
+    if (existsSync(FIXTURE_PATH)) unlinkSync(FIXTURE_PATH);
+  });
+
+  test("a placed row carrying `| cadence:override` parses with cadenceSource: 'override'", () => {
+    const line =
+      `- placed 2026-08-18T00:00:00.000Z [essay-01/x-1] x → typefully draft 1` +
+      ` | cadence:override | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].cadenceSource, "override");
+  });
+
+  test("a placed row carrying `| cadence:default` parses with cadenceSource: 'default'", () => {
+    const line =
+      `- placed 2026-08-18T00:00:00.000Z [essay-01/x-1] x → typefully draft 1` +
+      ` | cadence:default | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].cadenceSource, "default");
+  });
+
+  test("a placed row with no cadence marker parses with cadenceSource: null", () => {
+    const line =
+      `- placed 2026-08-18T00:00:00.000Z [some-post/text] x → derivatives/x.md` +
+      ` | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].cadenceSource, null);
+  });
+
+  test("the marker is scoped before the quoted text, so a quote merely containing 'cadence:override' does not false-positive", () => {
+    const line =
+      `- placed 2026-08-18T00:00:00.000Z [some-post/text] x → derivatives/x.md` +
+      ` | "this post happens to say cadence:override right here in the text"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    assert.equal(readPlaced(FIXTURE_PATH)[0].cadenceSource, null);
+  });
+
+  test("coexists with the cta marker (cta + cadence together)", () => {
+    const line =
+      `- placed 2026-08-18T00:00:00.000Z [essay-01/li-1] linkedin → typefully draft 2` +
+      ` | cta:project | cadence:default | "a real posted line of text that is long enough to match"\n`;
+    writeFileSync(FIXTURE_PATH, `# Placed log\n\n${line}`);
+    const row = readPlaced(FIXTURE_PATH)[0];
+    assert.equal(row.ctaDestination, "project");
+    assert.equal(row.cadenceSource, "default");
   });
 });
