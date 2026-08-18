@@ -1,6 +1,6 @@
 # Venture rules
 
-**Status:** Draft normative specification for Muxin's approval. Not implemented.
+**Status:** Confirmed by Muxin (2026-08-18) — all §12 open items resolved. Not yet implemented; build is intentionally paused (POSSE routing push takes priority) until Muxin resumes it.
 
 **Rules version:** `venture-rules-2026-08-07-draft-1`
 
@@ -1178,19 +1178,16 @@ The system MUST NOT:
 and before Content (2026-08-07, `docs/content-studio-vision.md`). It is not a mode inside Studio.
 This draft does not reopen that question and no future revision should either.
 
-This draft cannot become final until Muxin confirms the remaining items:
+**Confirmed by Muxin (2026-08-18):**
 
-1. **Phase 1 format:** exact mix of Substack posts and Notes.
-2. **Checkpoint 2:** whether to adopt the proposed end-to-end predicate.
-3. **Capture implementation:** subscriber store and email provider.
-4. **Survey path:** confirmation page, welcome email, or both.
-5. **State store:** Markdown plus JSONL or SQLite.
+1. **Phase 1 format:** 3 posts total, `substack-post`/`text-post-note` mix decided per idea; Checkpoint 1 requires all 3 live.
+2. **Checkpoint 2:** adopt the proposed end-to-end predicate (§6.8).
+3. **Capture implementation:** Resend as the email provider; subscriber store implementation (JSONL file, per item 5) is a build-time detail.
+4. **Survey path:** confirmation page as primary, linked from the welcome email, email replies as secondary input.
+5. **State store:** Markdown plus JSONL.
+6. **First venture's slug/name:** `voter-choice`.
+7. **Phase/day structure:** approved to loosen the fixed 14-day scaffolding into a test-and-read-responses loop (see `docs/venture-build-plan.md` Open questions #7) — the actual redesign is not yet drafted; still needs Muxin's sign-off on the specific new structure before it replaces this file's Day 1/Day 14 scaffolding (§4.4, §8.5, and the Day-14-scorecard rules throughout).
 
-Current recommendations:
-
-- adopt the proposed end-to-end Checkpoint 2 predicate;
-- use the confirmation page as the primary survey, link from email, and accept replies as secondary input;
-- keep Markdown plus JSONL at the design stage unless implementation evidence favors SQLite;
 - end Phase 4 with a human decision, not a fourth checkpoint.
 
 ## 13. Required verification
