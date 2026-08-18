@@ -102,6 +102,17 @@ makes `/cycle` compound instead of restarting every week.
      insufficient-data on every platform until enough CTA-tagged posts ship — that's the honest
      state, not a bug. Recommendation only — `src/publish/cta.ts`'s resolution is untouched. Fold
      the ranked table into the brief.
+   - `npm run lever-effectiveness` → strategy-lever validation (card 83166c51, epic 2ce597d7):
+     answers "do the 5 levers this epic built actually measure something?" by combining lever D's
+     and lever E's real computed deltas (the same reads `npm run frame-fit`/`npm run cta-fit` print,
+     reused not recomputed) into one report, plus an explicit **insufficient tracking** note for
+     levers A/B/C — `posts` persists pillar/media_type/source/cta_destination but nothing records
+     whether a post's routing, media choice, or publish slot actually FOLLOWED that lever's
+     recommendation, so a before/after lift for A/B/C is not honestly computable today (a tracking
+     gap, not a thin-data one — don't wait for more posts to fix it). Optional dedicated report, run
+     on demand — not required every cycle; when run, fold its two tables + tracking-gap note into a
+     `## Lever effectiveness` brief section if Muxin wants it in that cycle's brief, otherwise just
+     show it to her directly.
    - `npm run tag-source` → classify each post's origin: atomized (shipped by /publish from a
      content folder) vs organic (posted natively / a Substack note). Deterministic — matches the
      `Placed log` + `posts.bet_id`. Also stamps `posts.cta_destination` from the same Placed-log
