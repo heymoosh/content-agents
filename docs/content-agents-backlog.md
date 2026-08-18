@@ -6,6 +6,22 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 
 ---
 
+**Dependabot sweep (2026-08-11) — 10 routine minor/patch bumps merged**
+- ORIGIN: backlog + open-PR review, 2026-08-18. 10 Dependabot PRs opened 2026-08-11 (`playwright`
+  1.62.0→1.62.1 #306, `remotion` 4.0.505→4.0.507 #305, `better-sqlite3` 13.0.1→13.0.3 #304,
+  `@remotion/captions` #303, `tsx` 4.22.4→4.23.12 #302, `@remotion/renderer` #301,
+  `@remotion/bundler` #300, `@types/node` 26.1.2→26.2.0 #299, `@remotion/cli` #298, `@atproto/api`
+  0.13.35→0.20.38 #297) had sat open a week, all green CI, none a major-version jump. Merged all 10.
+- MECHANICS NOTE: merging them one after another caused `package-lock.json` conflicts on 4 of the
+  10 (#303, #301, #300, #299) once the earlier ones landed — asked Dependabot to rebase each
+  (`@dependabot rebase` comment); auto-merge was already armed on all 4, so they finish on their
+  own once Dependabot updates the branch. Confirm all 4 actually merged next time this repo is
+  checked.
+- STATUS: Done
+<!-- card-id: 8f3c1d5a-6e42-4b91-9a2c-7d4e5f6b8c1e -->
+
+---
+
 **Dependabot sweep (2026-07-24) — 5 major-version bumps closed unreviewed, need individual re-evaluation**
 - ORIGIN: `/babysit-prs` triage of 12 open Dependabot PRs. Per Muxin's instruction, all 12 were
   closed without merging so they stop sitting open indefinitely; these 5 carry an actual major
@@ -333,7 +349,8 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - CHAIN: 1
 
 SHIP: held (draft PR #208 — repo CLAUDE.md Rule 7, routing-logic change, needs Muxin's review; old-vs-new content sample in PR body)
-- STATUS: Review
+- MERGED 2026-08-18: PR #208 is merged.
+- STATUS: Done
 - DECISION: approved -- build the missing Substack Notes repost producer (route.ts) to match Muxin's already-stated 2026-07-10 decision (platform:substack rows should be produced when appropriate); also fix the two stale skill docs. Routing/content-adjacent logic, so PR HOLDS for review per rule 7 regardless of this approval to build. (pre-flight 2026-07-14)
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - CI NOTE: CI: green (as of 2026-07-15 08:25 UTC) — PR #208 https://github.com/heymoosh/content-agents/pull/208
@@ -449,7 +466,8 @@ CARD TYPE: EPIC
   enough to trust.
 - SHIP: held (draft PR #220 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
   needs Muxin's review; before/after sample + Bluesky seed-prior confirmation ask in PR body)
-- STATUS: Review
+- MERGED 2026-08-18: PR #220 is merged.
+- STATUS: Done
 - DECISION: hold -- epic 2ce597d7 already approved this lever's scope 2026-07-14, and seed priors are already stated on this card (X=engineering, LinkedIn=careers/building, Substack=reflective, per Muxin 2026-07-14). Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft with before/after samples per rule 7 (routing/content-gen logic) and per the epic's own 'None auto-merges' statement -- no live-posting risk before her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: c7638362-5149-4b51-b414-17f24a94ccf7 -->
@@ -474,7 +492,8 @@ CARD TYPE: EPIC
   insufficient-data, never a forced lean/steady read.
 - SHIP: held (draft PR #222 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
   needs Muxin's review; before/after sample in PR body, builds on merged Lever A/#220)
-- STATUS: Review
+- MERGED 2026-08-18: PR #222 is merged.
+- STATUS: Done
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14); GOAL_CONDITION and test are explicit. Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft per rule 7 -- no live-posting risk before review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: 27dc7d2d-afee-4e20-9552-b8aa58bd6382 -->
@@ -506,7 +525,8 @@ CARD TYPE: EPIC
   AND a live-scheduler seam, needs Muxin's review; before/after sample + the four over-posting
   guards + the X/LinkedIn timestamp gap all called out in PR body; builds on merged Levers
   A/#220 and B/#222)
-- STATUS: Review
+- MERGED 2026-08-18: PR #224 is merged.
+- STATUS: Done
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). This lever changes live posting cadence/timing, so extra scrutiny is warranted at review -- but building and opening a draft PR carries no live-posting risk by itself (nothing merges/deploys without Muxin's review per rule 7 and the epic's 'None auto-merges' statement). Flag the over-posting/rate-limit risk prominently in the PR description for her review. (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: ed23f712-b34d-442c-9d5d-c07b10924924 -->
@@ -537,7 +557,8 @@ CARD TYPE: EPIC
 - SHIP: held (draft PR #226 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
   needs Muxin's review; real + synthetic before/after samples in PR body, including the reframe
   rationale; builds on merged Levers A/#220, B/#222, C/#224)
-- STATUS: Review
+- MERGED 2026-08-18: PR #226 is merged.
+- STATUS: Done
 - DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14), GOAL_CONDITION explicit, builds on existing per-channel angle templates. PR opens as a HELD draft per rule 7 (content-gen logic: spin-angle selection weighting). (pre-flight 2026-07-14)
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 <!-- card-id: a4c5b42b-d3a5-4547-964c-58eb4c4507a4 -->
