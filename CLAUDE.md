@@ -7,6 +7,11 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 - **Build 2 — Fiction**: a serialized, monetized fiction series written chapter-by-chapter
   (`stories/`). The one place AI *composes* original prose. Deliberately walled off from
   Builds 0/1 — see `stories/CLAUDE.md`.
+- **Build 3 — Venture**: a phased solo-business sprint (intake → Attention → Audience → Offer →
+  Operations) that composes original business-testing content — post ideas, probe posts, and
+  later a lead magnet, an offer, an operating plan (`venture/`). The second place AI *composes*
+  original work, and unlike Build 2 it ships under Muxin's own byline in her own voice.
+  Deliberately walled off from Builds 0/1 — see `venture/CLAUDE.md`.
 
 ## Non-negotiable rules
 
@@ -20,6 +25,18 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      This is allowed ONLY because every storyboard is reviewed and approved by Muxin in
      `review-queue.md` *before* any render, and nothing auto-publishes. The exception is video
      scripts only; it must never bleed into text/image derivatives.
+   - **Scoped exception — Build 3 (Venture).** `venture/` composes original business-testing copy:
+     Phase 1's ten post ideas and three drafted probe posts, then later phases' lead magnet,
+     landing page, emails, offer and operating plan. There is no source essay, so no
+     `source_lines`. Allowed ONLY because every judgment step ends in a decision record Muxin
+     selects, every user-facing draft is editorially approved by her, and nothing publishes
+     without her explicit action. **The exemption is from tracing, not from truthfulness** —
+     `venture/rules.md` §3.9's no-invented-proof rule keeps rule 1's real prohibition alive inside
+     the exception: never assert a result, customer, number, or experience Muxin did not have.
+     Unlike Build 2, **rule 5 applies in full here** — this copy ships in Muxin's nonfiction voice
+     under her own name, so `config/voice.yaml` governs it completely. See `venture/CLAUDE.md`.
+     The exception is Venture-composed business copy only; it must never bleed into text/image
+     derivatives.
    - `/brand-lens` (`.claude/skills/brand-lens/`) is NOT an exception to this rule: it proposes
      angles and flags branding gaps against `config/brand.yaml`, but never composes or rewrites
      prose that enters the pipeline as content.
@@ -53,7 +70,9 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    a PR open for Muxin's explicit review is a change to the *code/prompts that decide what content
    says* — `src/atomize/` extraction or spin logic, quote-card copy/image-prompt generation logic,
    video script/storyboard drafting logic, `src/strategy/` brief-synthesis logic, Build 2 fiction
-   chapter-drafting logic. That is judgment-affecting and needs her eyes every time. Everything
+   chapter-drafting logic, Build 3 Venture phase logic and gate predicates (`src/venture/**`), its
+   runtime rubric input (`venture/rules.yaml`), and its skill prompts (`.claude/skills/venture/**`).
+   That is judgment-affecting and needs her eyes every time. Everything
    else auto-merges on green CI, full stop — including: the generated content itself committed to
    git (derivatives, quote-card text, drafted chapters), review-queue/publish-log/ledger state,
    backlog bookkeeping, docs, scripts, infra, config. Committing already-generated or
@@ -85,6 +104,10 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 | Review | **Muxin, by hand** | — | — | statuses in `review-queue.md` |
 | Publish | `/publish` | `npm run publish:*` | — | Typefully drafts, YouTube upload, TikTok scheduled post (PostPeer), quote-card scheduled post (PostPeer/Upload-Post, `publish:cards`), `ready-to-paste/`, `publish-log.md`, `briefs/bets.md` Placed log |
 | Whole cycle | `/cycle` | all of the above | orchestration | — |
+| Venture intake | `/venture new <slug>` | `npm run venture:new` | 25-question interview one question at a time, voice evidence, Day 14 scorecard fields | `venture/<slug>/intake.md` |
+| Venture Phase 1 | `/venture <slug>` | `npm run venture:phase1` | research plan (Muxin-reviewed before drafting), platform pick, 10 ideas + 4-factor rank, 3 selected with distinct-unknown coverage, drafted across `substack-post`/`text-post-note` with `claim_refs` | `venture/<slug>/phase-1-attention/`, `decisions.jsonl`, `artifacts.jsonl` |
+| Venture deliver | `/venture <slug> deliver` | `npm run venture:deliver` | — | `ready-to-paste/` (essay) or a live Substack Note via the shared scheduler |
+| Venture checkpoint | `/venture <slug> checkpoint` | `npm run venture:checkpoint` | verify each required artifact is editorially approved AND delivery-confirmed live, pace recorded | `canon.md` ledger event, next phase unlocked |
 
 ## Conductor: reaching into job-search-agent (JSA)
 
