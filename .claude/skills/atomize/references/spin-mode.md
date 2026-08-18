@@ -115,6 +115,15 @@ invented.
 review-queue.md `notes` cell — a suggestion to run this pass, never a block. Muxin's `approve` in
 review-queue.md is still the only real gate.
 
+**Pattern options for the reorder/lead-line decision.** `references/hook-patterns.md` catalogs
+proven sentence SHAPES (not text) for how to open — pulled from real creators in Muxin's adjacent
+niches. When re-hooking, it's fine to pick a shape that fits the source material's actual content
+and lead-line specifics into it. Read that file's "How to use this" section first: fill every shape
+using only facts already in the source, never the file's own attributed examples' wording — the
+same reframe-never-invent rule as everywhere else in this pass. For civic/social-issues source
+material specifically, prefer the joyful-activism register in that file over the outrage register
+unless the source itself is genuinely grief- or anger-toned (Muxin, 2026-08-18).
+
 ## Beat-template rewrite: LinkedIn + X (Muxin, 2026-07-10)
 
 PR #185's LinkedIn/X angles (2026-07-10, section above) described the case-first structure in
