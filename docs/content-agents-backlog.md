@@ -663,7 +663,7 @@ CARD TYPE: EPIC
   never a fabricated lift number. No small honest A/B/C bonus signal was forced in: their existing
   scripts (`platform-fit`/`media-fit`/`cadence-fit`) already print the current pillar/media/cadence
   snapshot, and reprinting that here would not be a before/after delta, just noise.
-- SHIP: held (draft PR #<PR_NUMBER> — repo CLAUDE.md Rule 7, content-generation-adjacent strategy
+- SHIP: held (draft PR #311 — repo CLAUDE.md Rule 7, content-generation-adjacent strategy
   logic (src/strategy/), needs Muxin's review; real report output against production
   data/analytics.db in the PR body — both levers read insufficient-data today, the same honest
   expected state lever E's own PR (#232) hit; methodology default flagged: no A/B/C bonus signal
