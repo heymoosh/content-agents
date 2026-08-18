@@ -24,17 +24,19 @@ type: TEST
 claim: "civic-tech is a real X performer, not noise (currently 1.7 avg but only n=6)."
 hypothesis_metric: civic-tech X posts reach n ≥ 10 with avg engagement ≥ 1.3
 status: carried
-underperform_streak: 0
+underperform_streak: 1
 grade: 2026-06-24 — civic-tech X avg 1.63 (clears 1.3) but n=8, still short of 10. Trending right; carry one more cycle.
+grade: 2026-08-18 — civic-tech/X avg 1.8 (clears 1.3), n=8 — identical n to eight weeks ago, zero new civic-tech X posts landed in the gap. Not a performance failure, an activity failure: the sample can't grow without deliberately posting more. Carried, flagged as a [TEST] recommendation this cycle.
 
 ## bet:2026-06-16-003
 brief: briefs/2026-06-16-strategy-brief.md
 type: DO_LESS
 claim: "Cutting default personal/off-pillar 'other' posting on X raises overall X engagement."
 hypothesis_metric: share of X posts tagged 'other' drops below 25% (now ~31%) AND overall X avg engagement rises above 1.3
-status: carried
-underperform_streak: 1
+status: retired
+underperform_streak: 2
 grade: 2026-06-24 — 'other' share fell 31%→23% (condition met) but overall X avg stuck at 1.28 (<1.3). The cut tidied the mix without lifting engagement; X is structurally low. Carry, but the real lesson is the X ceiling, not the mix.
+grade: 2026-08-18 — 'other' share crept back up to 28% (worse than last cycle's 23%) and overall X avg is 1.24, still under 1.3. Failed a second consecutive cycle with no improvement. Retired — X's low engagement is structural for this account, not a content-mix problem; not worth carrying a third time.
 
 ## bet:2026-06-16-004
 brief: briefs/2026-06-16-strategy-brief.md
@@ -50,22 +52,41 @@ brief: briefs/2026-06-24-strategy-brief.md
 type: DO_MORE
 claim: "Substack Notes are the highest-ROI surface; notes out-engage essays by multiples."
 hypothesis_metric: substack-note avg engagement stays ≥ 5 and ≥ 3× essay reactions, n ≥ 15
-status: open
-underperform_streak: 0
+status: retired
+underperform_streak: 1
+grade: 2026-08-18 — notes avg 10.6 (rc 10.6), n=32 (clears n≥15 and the ≥5 floor); essays avg 10.9 (rc 14.3), n=10. Notes does NOT out-engage essays by multiples — they're statistically even, and essays' recency-weighted read is higher, meaning essays are trending better, not worse. Failed. Retired — the standing "Notes are highest-ROI" assumption doesn't hold at this sample size.
 
 ## bet:2026-06-24-002
 brief: briefs/2026-06-24-strategy-brief.md
 type: TEST
 claim: "Atomized/pipeline posts out-engage organic hand-posts on X."
 hypothesis_metric: atomized X avg engagement > organic X avg with atomized n ≥ 10
-status: open
+status: confirmed
 underperform_streak: 0
+grade: 2026-08-18 — atomized X avg 3.1, n=15 (clears n≥10); organic X avg 1.1, n=236. Atomized beats organic by nearly 3x. Passed. Caveat: all 15 atomized posts landed in one tight window (a single batch), not spread across weeks — a real result, but not yet a repeated one.
 
 ## bet:2026-06-24-003
 brief: briefs/2026-06-24-strategy-brief.md
 type: DO_LESS
 claim: "Routing society/human-ai essays to LinkedIn underperforms; keep LinkedIn for claude-code/career/personal."
 hypothesis_metric: atomized human-ai LinkedIn avg < organic LinkedIn avg, confirmed at atomized n ≥ 5
+status: carried
+underperform_streak: 0
+grade: 2026-08-18 — atomized human-ai LinkedIn avg 0.0, n=4 — one post short of the n≥5 bar to confirm. Direction is stark (0.0 vs organic 4.4) but not yet confirmable. Carried.
+
+## bet:2026-08-18-001
+brief: briefs/2026-08-18-strategy-brief.md
+type: DO_MORE
+claim: "Run /atomize + /publish on new material again — atomized posts already beat organic on X by ~3x, but the pipeline has placed exactly one post in six weeks."
+hypothesis_metric: atomized post count across platforms crosses 20+ by next cycle (from 36 today), with atomized X engagement holding above 2x organic at n ≥ 25
+status: open
+underperform_streak: 0
+
+## bet:2026-08-18-002
+brief: briefs/2026-08-18-strategy-brief.md
+type: TEST
+claim: "The picked spin-control run (human-ai/x) lands this cycle, unblocking a real frame-fit read."
+hypothesis_metric: a post exists next cycle with control_run: true, source: x, pillar: human-ai
 status: open
 underperform_streak: 0
 - placed 2026-06-17T00:00:33.397Z [2026-06-16-building-an-innovation-nation/x-1] x → typefully draft 9540317 | from_brief: briefs/2026-06-16-strategy-brief.md | directives: prioritize_pillar:human-ai, x:contrarian-lead, voice:no-ai-tells | "Extreme inequality is the natural outcome of a perfectly fair economy. Wealth be"
