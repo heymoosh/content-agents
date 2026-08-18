@@ -1,6 +1,8 @@
 # Venture rules
 
-**Status:** Confirmed by Muxin (2026-08-18) — all §12 open items resolved. Not yet implemented; build is intentionally paused (POSSE routing push takes priority) until Muxin resumes it.
+**Status:** Confirmed by Muxin (2026-08-18) — all §12 open items resolved. Phase 1 build resumed
+2026-08-18; `venture/rules.yaml` (Phase-1-scoped) is the runtime input phase scripts load — see
+`src/venture/rules.ts`.
 
 **Rules version:** `venture-rules-2026-08-07-draft-1`
 

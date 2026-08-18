@@ -1,0 +1,81 @@
+# Runtime rules input for Build 3 (Venture) phase scripts. venture/rules.md is the prose
+# authority and does NOT execute -- a phase script loads ONLY this file. src/venture/rules.ts
+# validates this file's rules_version against what's stamped in a venture's canon.md at kickoff.
+#
+# Phase-1-scoped only. Sections for Phase 2-4 are not yet encoded -- see the `# not yet encoded`
+# markers below, each pointing at the venture/rules.md section that covers it. Partial coverage is
+# deliberate and visible, never silent (see the parity test, src/venture/rules.test.ts).
+
+rules_version: venture-rules-2026-08-07-draft-1
+
+sources:
+  starter_kit_sha256: "773250cefd3ec8a8dfd86b1f6247f9005dd1f1bda47a0c5171a6f6236722ecc6"
+  welsh_note_sha256: "bad486c48b8477a9ae3c92fae3cd1c40dded1dc6cda483a5f297ddbb6da81df3"
+
+# venture-schema-contract.md §3's artifact-kind table -- Phase 1 rows only. Every other kind
+# (lead-magnet, landing-page-copy, welcome-email, survey, product-outline, price-decision, ...)
+# is # not yet encoded -- see venture-schema-contract.md §3 in full.
+artifact_kinds:
+  substack-post:
+    delivery_mode: manual # ready-to-paste/, Muxin pastes it herself
+    publishable: false
+    min_evidence: url
+    phase: 1
+  text-post-note:
+    delivery_mode: app # the existing Substack Notes browser agent, via the shared scheduler
+    publishable: true
+    min_evidence: agent
+    phase: 1
+  phase_1_research_plan:
+    delivery_mode: none # internal artifact; gates drafting via reviewed_by_muxin
+    publishable: false
+    min_evidence: null
+    phase: 1
+
+# rules.md §5.1 -- the platform-recommendation decision. Single primary platform only; the
+# system MUST NOT recommend a multi-platform launch.
+platform_recommendation:
+  filters: [audience_attention, format_sustainability, burnout_risk]
+  single_primary_platform: true
+
+# rules.md §5.1A -- the research-plan gate that must clear before any idea is drafted.
+research_plan:
+  unknown_dimensions: [emotional_frame, desired_help, audience_segment, other]
+  # confirmed_knowns[] entries need BOTH evidence_refs and confirmed_by_muxin to count -- an
+  # AI-asserted "already known" with no citation and no confirmation never excuses skipping a probe.
+  require_confirmed_by_muxin: true
+
+# rules.md §5.2 -- ten ideas, four factors, three selected.
+idea_ranking:
+  idea_count: 10
+  factors: [personal_stake, specificity, identity_signal, easy_reply]
+  score_scale: { min: 1, max: 5 }
+  select_count: 3
+  bank_remainder: true # the other 7 stay in the decision record, never deleted
+  # distinct-unknown coverage (rules.md §5.2): a decision-record rationale is required when 2+ of
+  # the 3 selected ideas share an unknown_id -- enforced in src/venture/decisions.ts, not just here.
+  require_rationale_on_unknown_overlap: true
+
+# rules.md §5.3 -- draft constraints, checked by src/venture/phase1.ts before a draft is
+# presented for approval. Order to draft in: body, then CTA/reply-bridge, then hook last (§3.1).
+draft:
+  post_max_words: 150
+  require_reply_prompt: true # §1A.1: "no CTA" needs a recorded exception, never a default
+  require_claim_refs: true # every concrete factual claim traces to intake:qN or a confirmed_known
+
+# rules.md §1A.1 -- CTA policy by phase. Phase 1 only; later phases # not yet encoded.
+cta_policy_by_phase:
+  1: reply_prompt
+
+# rules.md §5.4-§5.5 -- publish pace and Checkpoint 1's three-part predicate.
+phase_1_pace:
+  recommended_posts_per_week: 5 # a recommendation, not a hard requirement -- Muxin records her own
+checkpoints:
+  checkpoint-1:
+    required_artifact_count: 3
+    require_all_live: true # Muxin, 2026-08-18 -- no partial pass
+    require_pace_recorded: true
+
+# not yet encoded — see venture/rules.md §6 (Phase 2: Audience), §7 (Phase 3: Offer),
+# §8 (Phase 4: Operations), and venture-schema-contract.md §5.4/§5.6/§5.7/§5.8 (responses,
+# evidence links, funnel events, Signals mapping). None of it is needed until a later slice.
