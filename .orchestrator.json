@@ -30,7 +30,11 @@
       "src/strategy/**",
       "src/video/script.ts",
       "src/video/quote-image-card.ts",
-      "src/fiction/draft.ts"
+      "src/fiction/draft.ts",
+      "src/venture/**",
+      ".claude/skills/venture/**",
+      "venture/rules.yaml",
+      "venture/rules.md"
     ]
   }
 }
