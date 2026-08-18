@@ -48,6 +48,20 @@ peak_hour_thresholds:
                             # card ed23f712's PR notes) and always reads "insufficient data" for
                             # peak-hour, regardless of post volume.
 
+# Strategy lever C follow-through (epic 2ce597d7): threshold for the cadence-override
+# follow-through comparison in src/strategy/cadence-fit.ts (rankCadenceFollow). Unlike the trend/
+# peak-hour thresholds above (which decide what --write PROPOSES), this decides how the report
+# reads posts.cadence_source — 'override' (an active config/schedule-overrides.yaml entry) vs
+# 'default' (config/platforms.yaml) — once Muxin has actually approved an override and posts have
+# accumulated under it. Expect insufficient-data everywhere until then; schedule-overrides.yaml is
+# approved: false / empty as of 2026-08-18, so there is nothing to compare yet.
+cadence_follow_thresholds:
+  win_ratio: 1.2   # override recency-weighted engagement / default's, same platform, above which
+                    # the read is "override-winning". At/below 1/win_ratio reads "override-losing".
+                    # Between reads "even". Either side under min_posts_for_data
+                    # (config/routing.yaml), <4wks of span, or a zero/negative default average,
+                    # always reads "insufficient data" — never a forced read on thin signal.
+
 # Strategy lever D (card a4c5b42b, epic 2ce597d7): spin-frame vs verbatim-baseline threshold for
 # src/strategy/frame-fit.ts. RECOMMENDATION ONLY — like levers A/B this never changes what
 # /atomize drafts; it compares spin-on vs spin-control-run engagement per platform and reports

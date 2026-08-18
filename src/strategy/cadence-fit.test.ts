@@ -12,6 +12,9 @@ import {
   rankTrend,
   rankPeakHour,
   loadRows,
+  loadFollowRows,
+  classifyCadenceFollow,
+  rankCadenceFollow,
   buildOverridesFile,
   type OverridesFile,
 } from "./cadence-fit.js";
@@ -31,6 +34,7 @@ function strategyCfg(overrides: Partial<StrategyConfig> = {}): StrategyConfig {
     thresholds: { lean_in_floor: 1.3 },
     cadence_thresholds: { climb_ratio: 1.2, decline_ratio: 0.8, step: 1, max_posts_per_week: 10 },
     peak_hour_thresholds: { min_distinct_times: 3 },
+    cadence_follow_thresholds: { win_ratio: 1.2 },
     ...overrides,
   };
 }
@@ -46,6 +50,27 @@ function insertPost(db: Database.Database, platform: string, source: string | nu
   const info = db
     .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source) VALUES (?, ?, ?, ?)`)
     .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, source);
+  db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
+    info.lastInsertRowid,
+    postedAt,
+    likes
+  );
+}
+
+// Lever C follow-through (epic 2ce597d7): a variant of insertPost that also stamps
+// cadence_source, with an optional source (defaults to a normal 'atomized' post, never
+// CONTROL_RUN_SOURCE/EXPLORATION_SOURCE, so loadFollowRows's exclusion is exercised separately).
+function insertPostCadence(
+  db: Database.Database,
+  platform: string,
+  cadenceSource: string | null,
+  postedAt: string,
+  likes: number,
+  source: string | null = "atomized"
+): void {
+  const info = db
+    .prepare(`INSERT INTO posts (platform, platform_post_id, posted_at, source, cadence_source) VALUES (?, ?, ?, ?, ?)`)
+    .run(platform, `${platform}-${postedAt}-${Math.random()}`, postedAt, source, cadenceSource);
   db.prepare(`INSERT INTO metrics (post_id, captured_at, likes, replies, reposts) VALUES (?, ?, ?, 0, 0)`).run(
     info.lastInsertRowid,
     postedAt,
@@ -243,6 +268,143 @@ describe("loadRows: excludes deliberate spin-control-run and exploration-probe r
     assert.equal(rows.length, 1);
     assert.equal(rows[0].platform, "x");
     db.close();
+  });
+});
+
+// Lever C follow-through (epic 2ce597d7): posts.cadence_source, whether THIS post's publish slot
+// actually followed an active config/schedule-overrides.yaml entry or the static default.
+function followRows(platform: string, cadenceSource: string, likes: number): ReturnType<typeof loadFollowRows> {
+  return [0, 2, 4].map((weeksAgo) => ({
+    platform,
+    cadence_source: cadenceSource,
+    posted_at: new Date(NOW - weeksAgo * WEEK_MS).toISOString(),
+    likes,
+    replies: 0,
+    reposts: 0,
+  }));
+}
+
+describe("loadFollowRows: only cadence_source-tagged CORE_TEXT rows, excludes control/exploration", () => {
+  test("a row with no cadence_source is excluded", () => {
+    const db = freshDb();
+    insertPostCadence(db, "x", null, "2026-06-01T00:00:00.000Z", 10);
+    insertPostCadence(db, "x", "default", "2026-06-08T00:00:00.000Z", 10);
+    const rows = loadFollowRows(db);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].cadence_source, "default");
+    db.close();
+  });
+
+  test("CONTROL_RUN_SOURCE and EXPLORATION_SOURCE rows are excluded even when cadence-tagged", () => {
+    const db = freshDb();
+    insertPostCadence(db, "x", "default", "2026-06-01T00:00:00.000Z", 10, CONTROL_RUN_SOURCE);
+    insertPostCadence(db, "x", "default", "2026-06-08T00:00:00.000Z", 10, EXPLORATION_SOURCE);
+    insertPostCadence(db, "x", "default", "2026-06-15T00:00:00.000Z", 10, "atomized");
+    const rows = loadFollowRows(db);
+    assert.equal(rows.length, 1);
+    db.close();
+  });
+
+  test("a community-target platform (not CORE_TEXT) never appears", () => {
+    const db = freshDb();
+    insertPostCadence(db, "x", "default", "2026-06-01T00:00:00.000Z", 10);
+    insertPostCadence(db, "community:democratic-resilience", "default", "2026-06-01T00:00:00.000Z", 10);
+    const rows = loadFollowRows(db);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].platform, "x");
+    db.close();
+  });
+});
+
+describe("classifyCadenceFollow: overfitting guard — insufficient data on EITHER side always reads insufficient-data", () => {
+  test("thin override side reads insufficient-data even with an extreme ratio", () => {
+    const rows = [
+      { platform: "x", cadence_source: "override", posted_at: new Date(NOW).toISOString(), likes: 1000, replies: 0, reposts: 0 }, // n=1
+      ...followRows("x", "default", 10), // n=3
+    ];
+    const r = classifyCadenceFollow("x", rows, cfg(), strategyCfg(), NOW);
+    assert.equal(r.label, "insufficient-data");
+  });
+
+  test("thin default side reads insufficient-data even when override looks solid", () => {
+    const rows = [
+      ...followRows("x", "override", 10), // n=3
+      { platform: "x", cadence_source: "default", posted_at: new Date(NOW).toISOString(), likes: 10, replies: 0, reposts: 0 }, // n=1
+    ];
+    const r = classifyCadenceFollow("x", rows, cfg(), strategyCfg(), NOW);
+    assert.equal(r.label, "insufficient-data");
+  });
+
+  test("a zero-engagement default baseline reads insufficient-data rather than dividing by zero", () => {
+    const rows = [...followRows("x", "override", 10), ...followRows("x", "default", 0)];
+    const r = classifyCadenceFollow("x", rows, cfg(), strategyCfg(), NOW);
+    assert.equal(r.label, "insufficient-data");
+    assert.equal(r.ratio, null);
+  });
+
+  test("either side spanning <4wks reads insufficient-data", () => {
+    const rows = [
+      { platform: "x", cadence_source: "override", posted_at: new Date(NOW).toISOString(), likes: 20, replies: 0, reposts: 0 },
+      { platform: "x", cadence_source: "override", posted_at: new Date(NOW - 1000).toISOString(), likes: 20, replies: 0, reposts: 0 },
+      { platform: "x", cadence_source: "override", posted_at: new Date(NOW - 2000).toISOString(), likes: 20, replies: 0, reposts: 0 },
+      ...followRows("x", "default", 10),
+    ];
+    const r = classifyCadenceFollow("x", rows, cfg(), strategyCfg(), NOW);
+    assert.equal(r.label, "insufficient-data");
+  });
+});
+
+describe("classifyCadenceFollow: label thresholds once both sides have sufficient data", () => {
+  test("ratio at/above win_ratio reads override-winning", () => {
+    const rows = [...followRows("x", "override", 20), ...followRows("x", "default", 10)]; // ratio 2.0
+    const r = classifyCadenceFollow("x", rows, cfg(), strategyCfg(), NOW);
+    assert.equal(r.label, "override-winning");
+    assert.equal(r.ratio, 2);
+  });
+
+  test("ratio at/below 1/win_ratio reads override-losing", () => {
+    const rows = [...followRows("x", "override", 5), ...followRows("x", "default", 10)]; // ratio 0.5
+    const r = classifyCadenceFollow("x", rows, cfg(), strategyCfg(), NOW);
+    assert.equal(r.label, "override-losing");
+  });
+
+  test("ratio between the two floors reads even", () => {
+    const rows = [...followRows("x", "override", 10), ...followRows("x", "default", 10)]; // ratio 1.0
+    const r = classifyCadenceFollow("x", rows, cfg(), strategyCfg(), NOW);
+    assert.equal(r.label, "even");
+  });
+});
+
+describe("classifyCadenceFollow: throws a clear error when config/strategy.yaml has no cadence_follow_thresholds", () => {
+  test("missing cadence_follow_thresholds fails loudly instead of silently defaulting", () => {
+    const rows = [...followRows("x", "override", 20), ...followRows("x", "default", 10)];
+    const sc = strategyCfg();
+    delete (sc as Partial<StrategyConfig>).cadence_follow_thresholds;
+    assert.throws(() => classifyCadenceFollow("x", rows, cfg(), sc, NOW), /cadence_follow_thresholds/);
+  });
+});
+
+describe("rankCadenceFollow: only ranks CORE_TEXT platforms with rows, guardrail label order", () => {
+  test("override-winning sorts before even, which sorts before override-losing, which sorts before insufficient-data", () => {
+    const rows = [
+      ...followRows("x", "override", 20),
+      ...followRows("x", "default", 10), // ratio 2.0 -> override-winning
+      ...followRows("linkedin", "override", 10),
+      ...followRows("linkedin", "default", 10), // ratio 1.0 -> even
+      ...followRows("bluesky", "override", 5),
+      ...followRows("bluesky", "default", 10), // ratio 0.5 -> override-losing
+    ];
+    const ranked = rankCadenceFollow(rows, cfg(), strategyCfg(), NOW);
+    assert.deepEqual(
+      ranked.map((r) => r.label),
+      ["override-winning", "even", "override-losing"]
+    );
+  });
+
+  test("a platform with no rows at all does not appear", () => {
+    const rows = followRows("x", "override", 10);
+    const ranked = rankCadenceFollow(rows, cfg(), strategyCfg(), NOW);
+    assert.ok(!ranked.some((r) => r.platform === "linkedin"));
   });
 });
 

@@ -180,6 +180,140 @@ export function classifyPeakHour(
   return { platform, label: "found", hourPst: bestHour, n: group.length, distinctHours };
 }
 
+// ---------- cadence-source follow-through (lever C follow-through, epic 2ce597d7) ----------
+
+export interface FollowRow {
+  platform: string;
+  cadence_source: string | null; // 'override' | 'default' | NULL = published before the marker existed
+  posted_at: string | null;
+  likes: number | null;
+  replies: number | null;
+  reposts: number | null;
+}
+
+// Raw per-post rows carrying a resolved cadence_source, for CORE_TEXT platforms only — the one
+// channel (src/publish/typefully.ts) that ever stamps this column (see queue.ts's comment on
+// appendBetPlacement's cadenceSource param). Excludes BOTH CONTROL_RUN_SOURCE and
+// EXPLORATION_SOURCE, same policy as loadRows() above, so a deliberate control/probe post never
+// skews this comparison.
+export function loadFollowRows(injectedDb?: ReturnType<typeof openDb>): FollowRow[] {
+  const db = injectedDb ?? openDb();
+  const rows = db
+    .prepare(
+      `SELECT p.platform, p.cadence_source, p.posted_at, m.likes, m.replies, m.reposts
+       FROM posts p
+       JOIN (
+         SELECT m.* FROM metrics m
+         JOIN (SELECT post_id, MAX(captured_at) AS mc FROM metrics GROUP BY post_id) lm
+           ON m.post_id = lm.post_id AND m.captured_at = lm.mc
+       ) m ON m.post_id = p.id
+       WHERE p.platform IN (${CORE_TEXT.map(() => "?").join(",")})
+         AND p.cadence_source IS NOT NULL
+         AND (p.source IS NULL OR p.source NOT IN (?, ?))`
+    )
+    .all(...CORE_TEXT, CONTROL_RUN_SOURCE, EXPLORATION_SOURCE) as FollowRow[];
+  if (!injectedDb) db.close();
+  return rows;
+}
+
+function weeksSpan(rows: FollowRow[], now: number): number {
+  const dated = rows.filter((r) => r.posted_at).map((r) => new Date(r.posted_at!).getTime());
+  if (dated.length === 0) return 0;
+  return Math.max(1, Math.round((Math.min(now, Math.max(...dated)) - Math.min(...dated)) / WEEK_MS));
+}
+
+export type CadenceFollowLabel = "override-winning" | "even" | "override-losing" | "insufficient-data";
+
+export interface CadenceFollowFitResult {
+  platform: string;
+  label: CadenceFollowLabel;
+  ratio: number | null; // override / default recency-weighted avg engagement
+  overrideN: number;
+  defaultN: number;
+}
+
+// The overfitting guard (same posture as the trend/peak-hour reads above and every sibling
+// lever): insufficient data on EITHER side, either side spanning <4wks, or a non-positive default
+// baseline, always reads insufficient-data — never a forced winning/losing read on thin signal.
+// Expected to read insufficient-data everywhere until Muxin approves an override AND posts
+// accumulate under it (config/schedule-overrides.yaml is approved: false / empty as of 2026-08-18).
+export function classifyCadenceFollow(
+  platform: string,
+  rows: FollowRow[],
+  cfg: RoutingConfig,
+  strategyCfg: StrategyConfig,
+  now = Date.now()
+): CadenceFollowFitResult {
+  if (!strategyCfg.cadence_follow_thresholds) {
+    throw new Error(
+      "config/strategy.yaml is missing cadence_follow_thresholds (lever C follow-through, epic 2ce597d7) — add a cadence_follow_thresholds block."
+    );
+  }
+  const group = rows.filter((r) => r.platform === platform);
+  const overrideRows = group.filter((r) => r.cadence_source === "override");
+  const defaultRows = group.filter((r) => r.cadence_source === "default");
+
+  const min = cfg.thresholds.min_posts_for_data;
+  const overrideAvg = weightedAvg(overrideRows, now);
+  const defaultAvg = weightedAvg(defaultRows, now);
+
+  if (
+    overrideRows.length < min ||
+    defaultRows.length < min ||
+    weeksSpan(overrideRows, now) < 4 ||
+    weeksSpan(defaultRows, now) < 4 ||
+    !defaultAvg ||
+    defaultAvg <= 0
+  ) {
+    return {
+      platform,
+      label: "insufficient-data",
+      ratio: null,
+      overrideN: overrideRows.length,
+      defaultN: defaultRows.length,
+    };
+  }
+
+  const ratio = (overrideAvg ?? 0) / defaultAvg;
+  const { win_ratio } = strategyCfg.cadence_follow_thresholds;
+  const label: CadenceFollowLabel =
+    ratio >= win_ratio ? "override-winning" : ratio <= 1 / win_ratio ? "override-losing" : "even";
+  return { platform, label, ratio, overrideN: overrideRows.length, defaultN: defaultRows.length };
+}
+
+const CADENCE_FOLLOW_LABEL_ORDER: Record<CadenceFollowLabel, number> = {
+  "override-winning": 0,
+  even: 1,
+  "override-losing": 2,
+  "insufficient-data": 3,
+};
+
+export function rankCadenceFollow(
+  rows: FollowRow[],
+  cfg: RoutingConfig,
+  strategyCfg: StrategyConfig,
+  now = Date.now()
+): CadenceFollowFitResult[] {
+  return CORE_TEXT.filter((p) => rows.some((r) => r.platform === p))
+    .map((p) => classifyCadenceFollow(p, rows, cfg, strategyCfg, now))
+    .sort(
+      (a, b) => CADENCE_FOLLOW_LABEL_ORDER[a.label] - CADENCE_FOLLOW_LABEL_ORDER[b.label] || (b.ratio ?? -1) - (a.ratio ?? -1)
+    );
+}
+
+function followLabelText(r: CadenceFollowFitResult): string {
+  switch (r.label) {
+    case "override-winning":
+      return "override winning — keep it";
+    case "even":
+      return "even";
+    case "override-losing":
+      return "override losing — default cadence outperforms";
+    case "insufficient-data":
+      return "insufficient data";
+  }
+}
+
 // ---------- ranking + report ----------
 
 const TREND_ORDER: Record<TrendLabel, number> = { climbing: 0, steady: 1, declining: 2, "insufficient-data": 3 };
@@ -345,6 +479,40 @@ function main() {
         ` post lands on a synthetic timestamp with no real time-of-day signal:`
     );
     for (const p of hourThin) console.log(`- ${p.platform} (n=${p.n}, ${p.distinctHours} distinct hour(s) seen)`);
+  }
+
+  console.log(`\n## Cadence-override follow-through (posts.cadence_source: override vs default)\n`);
+  console.log(
+    `Whether an approved config/schedule-overrides.yaml entry actually outperforms the static default, ` +
+      `once Muxin has approved one and posts have accumulated under it. Every post published via ` +
+      `src/publish/typefully.ts is stamped 'override' or 'default' at claim time — this compares them.\n`
+  );
+  const followRows = loadFollowRows();
+  const followRanked = rankCadenceFollow(followRows, cfg, strategyCfg);
+  if (followRanked.length === 0) {
+    console.log(
+      "No platform has any cadence_source-tagged posts yet — either no override has been approved, or none " +
+        "have published since. Run npm run tag-source after publishing to stamp posts.cadence_source."
+    );
+  } else {
+    const followData = followRanked.filter((r) => r.label !== "insufficient-data");
+    const followThin = followRanked.filter((r) => r.label === "insufficient-data");
+    if (followData.length > 0) {
+      console.log(`| Platform | Read | Ratio | override n | default n |`);
+      console.log(`|---|---|---|---|---|`);
+      for (const r of followData) {
+        console.log(`| ${r.platform} | ${followLabelText(r)} | ${r.ratio!.toFixed(2)}x | ${r.overrideN} | ${r.defaultN} |`);
+      }
+    } else {
+      console.log("No platform has enough override/default data yet (all read insufficient-data).");
+    }
+    if (followThin.length > 0) {
+      console.log(
+        `\n${followThin.length} platform(s) read insufficient data (either side n<${cfg.thresholds.min_posts_for_data} ` +
+          `or <4wks span):`
+      );
+      for (const r of followThin) console.log(`- ${r.platform} (override n=${r.overrideN}, default n=${r.defaultN})`);
+    }
   }
 
   if (write) {

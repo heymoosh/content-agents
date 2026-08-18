@@ -68,19 +68,22 @@ export interface Placed {
   exploration: boolean;
   outreachMessage: boolean;
   ctaDestination: string | null;
+  cadenceSource: string | null;
 }
 
-// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | control-run | exploration | outreach-message | cta:<dest> | \"<text-prefix>\"" rows.
+// Parse "- placed <ts> [<folder>/<row>] <platform> → <ref> | ... | spin | control-run | exploration | outreach-message | cta:<dest> | cadence:<source> | \"<text-prefix>\"" rows.
 // The optional ` | spin ` segment (written by appendBetPlacement for spin-experiment derivatives)
 // marks an audience-reframed variant; ` | control-run ` (card f444f440) marks a deliberate
 // --no-spin control run; ` | exploration ` (card 92bb2ae6) marks a deliberate off-assignment
 // exploration-budget probe; ` | outreach-message ` (docs/outreach-engine-plan.md §6 Phase 2)
 // marks a derivative atomized from a locked outreach message; ` | cta:<dest> ` (card d80411bc,
 // strategy lever E scaffold) carries the post's resolved primary CTA destination
-// (source/project/work_with_me). Markers are scoped to the segment BEFORE the quoted post-text
-// prefix — the quote can itself contain a coincidental "| spin |"/"| control-run |"/
-// "| exploration |"/"| outreach-message |"/"| cta:... |" substring (Muxin's own post text), and
-// testing the full line would false-positive on that.
+// (source/project/work_with_me); ` | cadence:<source> ` (strategy lever C follow-through, epic
+// 2ce597d7) carries 'override' or 'default' — whether this post's publish slot came from an
+// active config/schedule-overrides.yaml entry. Markers are scoped to the segment BEFORE the
+// quoted post-text prefix — the quote can itself contain a coincidental "| spin |"/
+// "| control-run |"/"| exploration |"/"| outreach-message |"/"| cta:... |"/"| cadence:... |"
+// substring (Muxin's own post text), and testing the full line would false-positive on that.
 export function readPlaced(path: string = BETS_PATH): Placed[] {
   let text = "";
   try {
@@ -102,8 +105,19 @@ export function readPlaced(path: string = BETS_PATH): Placed[] {
     const outreachMessage = /\|\s+outreach-message\s*(\||$)/.test(markerScope);
     const ctaMatch = markerScope.match(/\|\s+cta:(\S+)\s*(\||$)/);
     const ctaDestination = ctaMatch ? ctaMatch[1] : null;
+    const cadenceMatch = markerScope.match(/\|\s+cadence:(\S+)\s*(\||$)/);
+    const cadenceSource = cadenceMatch ? cadenceMatch[1] : null;
     if (prefix.length >= 12)
-      out.push({ platform: plat[1], prefix, spin, controlRun, exploration, outreachMessage, ctaDestination });
+      out.push({
+        platform: plat[1],
+        prefix,
+        spin,
+        controlRun,
+        exploration,
+        outreachMessage,
+        ctaDestination,
+        cadenceSource,
+      });
   }
   return out;
 }
@@ -127,13 +141,16 @@ export function classifyHit(hit: Placed | undefined): { value: string; tag: stri
 function main() {
   const placed = readPlaced();
   const db = openDb();
-  const posts = db.prepare(`SELECT id, platform, content_text, bet_id, source, cta_destination FROM posts`).all() as {
+  const posts = db
+    .prepare(`SELECT id, platform, content_text, bet_id, source, cta_destination, cadence_source FROM posts`)
+    .all() as {
     id: number;
     platform: string;
     content_text: string | null;
     bet_id: string | null;
     source: string | null;
     cta_destination: string | null;
+    cadence_source: string | null;
   }[];
 
   const update = db.prepare("UPDATE posts SET source = ? WHERE id = ?");
@@ -141,6 +158,9 @@ function main() {
   // carries no marker) — same posture as spin/control-run/exploration, which also only ride
   // along on a matched Placed row's markers.
   const updateCta = db.prepare("UPDATE posts SET cta_destination = ? WHERE id = ?");
+  // cadence_source rides along the same way — only from a genuine text-match hit, never a
+  // bet_id-only match (card ed23f712 / lever C follow-through, epic 2ce597d7).
+  const updateCadence = db.prepare("UPDATE posts SET cadence_source = ? WHERE id = ?");
   let atomized = 0;
   let spun = 0;
   let controlled = 0;
@@ -180,6 +200,9 @@ function main() {
       // resolve) leaves the column untouched.
       if (hit?.ctaDestination && hit.ctaDestination !== p.cta_destination) {
         updateCta.run(hit.ctaDestination, p.id);
+      }
+      if (hit?.cadenceSource && hit.cadenceSource !== p.cadence_source) {
+        updateCadence.run(hit.cadenceSource, p.id);
       }
       if (value === "organic") organic++;
       else if (value === "atomized-spin") spun++;

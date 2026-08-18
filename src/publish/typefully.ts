@@ -14,7 +14,7 @@ import {
   resolveCtaLines,
   resolvePrimaryCtaDestination,
 } from "./cta.js";
-import { claimSlots, fmtLa } from "./slots.js";
+import { claimSlots, fmtLa, cadenceSourceFor } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 
@@ -374,6 +374,11 @@ export async function publishText(
   for (const r of approved) (byPlatform[r.platform] ??= []).push(r);
   const slotByRow = new Map<string, string>(); // rowId → ISO publish_at | "next-free-slot"
   const whenByRow = new Map<string, string>(); // rowId → human label for logs
+  // Strategy lever C follow-through (epic 2ce597d7): records, per platform, whether THIS run's
+  // claim actually used an active config/schedule-overrides.yaml entry or the static default —
+  // appendBetPlacement below stamps it onto the Placed-log row so tag-source.ts can persist it to
+  // posts.cadence_source. Only this text-platform path determines it (see queue.ts's comment).
+  const cadenceSourceByRow = new Map<string, "override" | "default">();
   if (noSchedule) {
     console.log("Unscheduled-draft mode (--no-schedule): no slots claimed, drafts saved without a publish time.");
   } else {
@@ -385,9 +390,11 @@ export async function publishText(
         asset: `${basename(folder)}/${platform}`,
         by: "typefully",
       });
+      const cadenceSource = cadenceSourceFor(platform);
       rowsP.forEach((r, i) => {
         slotByRow.set(r.id, times[i] ?? "next-free-slot");
         whenByRow.set(r.id, labels[i] ?? "next-free-slot");
+        cadenceSourceByRow.set(r.id, cadenceSource);
       });
     }
     console.log("Cadence schedule (PT):");
@@ -438,7 +445,16 @@ export async function publishText(
       appendPublishLog(folder, `  ↳ ACTION: add as the first comment on ${row.id} in Typefully → ${manualComment}`);
     }
     const ctaDestination = resolvePrimaryCtaDestination(fm, canonicalUrl, cfg, sourceKind, ctCfg);
-    appendBetPlacement(folder, row.id, row.platform, `typefully draft ${draft.id ?? "?"} @ ${when}`, fm, body, ctaDestination);
+    appendBetPlacement(
+      folder,
+      row.id,
+      row.platform,
+      `typefully draft ${draft.id ?? "?"} @ ${when}`,
+      fm,
+      body,
+      ctaDestination,
+      cadenceSourceByRow.get(row.id) ?? null
+    );
     const verb = noSchedule ? "saved (unscheduled)" : "scheduled";
     console.log(
       `${verb}: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +

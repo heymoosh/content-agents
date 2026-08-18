@@ -340,6 +340,80 @@ describe("appendBetPlacement: ctaDestination marker", () => {
   });
 });
 
+// appendBetPlacement's cadenceSource param (strategy lever C follow-through, epic 2ce597d7): the
+// `| cadence:<source>` marker it writes is what tag-source.ts reads back onto
+// posts.cadence_source. Same isolation mechanism as the cta block above.
+describe("appendBetPlacement: cadenceSource marker", () => {
+  const originalBetsPath = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  let testDir: string;
+  let testBetsPath: string;
+
+  before(() => {
+    testDir = mkdtempSync(join(tmpdir(), "queue-bets-cadence-test-"));
+    testBetsPath = join(testDir, "bets.md");
+    process.env.CONTENT_AGENTS_TEST_BETS_PATH = testBetsPath;
+  });
+
+  after(() => {
+    if (originalBetsPath === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+    else process.env.CONTENT_AGENTS_TEST_BETS_PATH = originalBetsPath;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function lineFor(rowId: string): string {
+    const line = readFileSync(testBetsPath, "utf8").split("\n").find((l) => l.includes(`[essay-01/${rowId}]`));
+    assert.ok(line, `no Placed-log row found for essay-01/${rowId}`);
+    return line!;
+  }
+
+  test("a cadenceSource of 'override' writes a `| cadence:override` marker before the quoted prefix", () => {
+    appendBetPlacement(
+      "essay-01",
+      "x-1",
+      "x",
+      "typefully draft 1",
+      {},
+      "some posted text long enough to match",
+      null,
+      "override"
+    );
+    assert.match(lineFor("x-1"), /\| cadence:override \|/);
+  });
+
+  test("a cadenceSource of 'default' writes a `| cadence:default` marker", () => {
+    appendBetPlacement(
+      "essay-01",
+      "x-2",
+      "x",
+      "typefully draft 2",
+      {},
+      "other posted text long enough to match",
+      null,
+      "default"
+    );
+    assert.match(lineFor("x-2"), /\| cadence:default \|/);
+  });
+
+  test("an unset cadenceSource (default null) writes no cadence marker at all", () => {
+    appendBetPlacement("essay-01", "x-3", "x", "typefully draft 3", {}, "third posted text long enough to match");
+    assert.ok(!/\| cadence:/.test(lineFor("x-3")));
+  });
+
+  test("the cadence marker coexists with the cta marker, cta first then cadence", () => {
+    appendBetPlacement(
+      "essay-01",
+      "x-4",
+      "x",
+      "typefully draft 4",
+      { spin: true },
+      "fourth posted text long enough to match",
+      "work_with_me",
+      "override"
+    );
+    assert.match(lineFor("x-4"), /\| spin \| cta:work_with_me \| cadence:override \|/);
+  });
+});
+
 // Multi-cut row ids (plan i-want-to-add-mellow-mist): a row from a non-default lens self-describes
 // via an id prefix ("short/x-1"), not a heading inserted into the table — a heading line would
 // break review-queue.md's single contiguous GFM table.

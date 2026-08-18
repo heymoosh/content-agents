@@ -20,6 +20,7 @@ import {
   claimSlots,
   fmtLa,
   loadApprovedOverrides,
+  cadenceSourceFor,
   loadSchedule,
   type Claim,
   type PlatformSchedule,
@@ -510,6 +511,44 @@ describe("slots.ts: loadApprovedOverrides — approved/missing/malformed handlin
   test("a malformed file returns no overrides instead of throwing", () => {
     writeFileSync(FIXTURE, `approved: true\n  overrides: [this is not valid yaml`);
     assert.deepEqual(loadApprovedOverrides(), {});
+  });
+});
+
+// Strategy lever C follow-through (epic 2ce597d7): cadenceSourceFor is what
+// src/publish/typefully.ts calls at slot-claim time to decide the 'override' | 'default' marker
+// it stamps onto that platform's Placed-log row (queue.ts's appendBetPlacement cadenceSource
+// param). Reuses the exact same loadApprovedOverrides() source loadSchedule() consults, so it can
+// never disagree with what loadSchedule() actually did for that platform.
+describe("slots.ts: cadenceSourceFor — 'override' only when an approved override exists for that platform", () => {
+  const FIXTURE = join(repoRoot, "data", "test-schedule-overrides.yaml");
+
+  before(() => {
+    process.env.CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES = FIXTURE;
+  });
+
+  after(() => {
+    delete process.env.CONTENT_AGENTS_TEST_SCHEDULE_OVERRIDES;
+    if (existsSync(FIXTURE)) unlinkSync(FIXTURE);
+  });
+
+  test("an approved override listing the platform reads 'override'", () => {
+    writeFileSync(FIXTURE, `approved: true\ngenerated: "2026-08-18"\noverrides:\n  x:\n    posts_per_week: 8\n`);
+    assert.equal(cadenceSourceFor("x"), "override");
+  });
+
+  test("approved: true but the platform isn't listed in overrides reads 'default'", () => {
+    writeFileSync(FIXTURE, `approved: true\ngenerated: "2026-08-18"\noverrides:\n  x:\n    posts_per_week: 8\n`);
+    assert.equal(cadenceSourceFor("linkedin"), "default");
+  });
+
+  test("approved: false reads 'default' even when the platform is listed in overrides", () => {
+    writeFileSync(FIXTURE, `approved: false\ngenerated: "2026-08-18"\noverrides:\n  x:\n    posts_per_week: 8\n`);
+    assert.equal(cadenceSourceFor("x"), "default");
+  });
+
+  test("a missing overrides file reads 'default'", () => {
+    if (existsSync(FIXTURE)) unlinkSync(FIXTURE);
+    assert.equal(cadenceSourceFor("x"), "default");
   });
 });
 
