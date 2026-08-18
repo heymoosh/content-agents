@@ -19,8 +19,8 @@ is narrower than Build 2's:
   just its em-dash ban. There is no separate fictional voice to govern here, so there is no
   `config/fiction/craft.md` analog and there should never be one.
 - **Rule 1's real prohibition survives the exception.** The exemption is from `source_lines`
-  *tracing*, not from truthfulness. `venture/rules.md` §3.9: never invent results, stories,
-  customer language, or experience. Claude may compose a *frame*; it may never assert a fact about
+  *tracing*, not from truthfulness. `venture/rules.md` §3, item 9 ("No invented proof"): never
+  invent results, stories, customer language, or experience. Claude may compose a *frame*; it may never assert a fact about
   Muxin's history, her numbers, or a reader's words that no evidence supports. **`claim_refs`**
   (below) is what replaces `source_lines` tracing here.
 - **Rules 2 and 3 are untouched.** Phase 1 essays (`substack-post`) go out as `ready-to-paste/` for

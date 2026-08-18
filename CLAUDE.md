@@ -31,8 +31,9 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      `source_lines`. Allowed ONLY because every judgment step ends in a decision record Muxin
      selects, every user-facing draft is editorially approved by her, and nothing publishes
      without her explicit action. **The exemption is from tracing, not from truthfulness** —
-     `venture/rules.md` §3.9's no-invented-proof rule keeps rule 1's real prohibition alive inside
-     the exception: never assert a result, customer, number, or experience Muxin did not have.
+     `venture/rules.md` §3, item 9 ("No invented proof") keeps rule 1's real prohibition alive
+     inside the exception: never assert a result, customer, number, or experience Muxin did not
+     have.
      Unlike Build 2, **rule 5 applies in full here** — this copy ships in Muxin's nonfiction voice
      under her own name, so `config/voice.yaml` governs it completely. See `venture/CLAUDE.md`.
      The exception is Venture-composed business copy only; it must never bleed into text/image
@@ -108,6 +109,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 | Venture Phase 1 | `/venture <slug>` | `npm run venture:phase1` | research plan (Muxin-reviewed before drafting), platform pick, 10 ideas + 4-factor rank, 3 selected with distinct-unknown coverage, drafted across `substack-post`/`text-post-note` with `claim_refs` | `venture/<slug>/phase-1-attention/`, `decisions.jsonl`, `artifacts.jsonl` |
 | Venture deliver | `/venture <slug> deliver` | `npm run venture:deliver` | — | `ready-to-paste/` (essay) or a live Substack Note via the shared scheduler |
 | Venture checkpoint | `/venture <slug> checkpoint` | `npm run venture:checkpoint` | verify each required artifact is editorially approved AND delivery-confirmed live, pace recorded | `canon.md` ledger event, next phase unlocked |
+| Venture status | `/venture <slug> status` | `npm run venture:status` | — (read-only) | plain-language phase/checkpoint status |
 
 ## Conductor: reaching into job-search-agent (JSA)
 

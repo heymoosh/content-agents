@@ -34,7 +34,9 @@
       "src/venture/**",
       ".claude/skills/venture/**",
       "venture/rules.yaml",
-      "venture/rules.md"
+      "venture/rules.md",
+      "src/publish/substack.ts",
+      ".orchestrator.json"
     ]
   }
 }
