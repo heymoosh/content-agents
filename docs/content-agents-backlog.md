@@ -645,7 +645,31 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: A strategy-validation report (printed by /strategy or a separate command) shows per-lever engagement deltas: pieces routed via Lever A to platform-fit pillars show X% resonance lift vs. baseline, media-type bias (Lever B) shows Y% engagement lift, etc.; uncertainty/sample-size flags included where data is thin
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- STATUS: To Do
+- SCOPE RECONCILED (build worker, 2026-08-18): the card's literal ask ("pieces routed via Lever A
+  show X% resonance lift vs. baseline") is not honestly computable for Levers A/B/C with today's
+  schema — `posts` persists pillar/media_type/source/cta_destination, but nothing stamps whether a
+  post's routing, media choice, or publish slot actually FOLLOWED that lever's recommendation
+  versus the static defaults that gate generation/scheduling regardless (config/routing.yaml,
+  /atomize's unconditional text+quote-card contract, config/schedule-overrides.yaml's inert
+  `approved: false`). That's an insufficient-TRACKING gap (no attribution field exists, at any
+  sample size), not an insufficient-DATA one, and confirmed by reading each lever's own code before
+  assuming otherwise. Levers D (frame-fit) and E (cta-fit) are different: both already compute a
+  real measured delta against a baseline (spin-on vs. verbatim control; per-platform engagement by
+  CTA destination), gated by the same overfitting guard used across every lever. Built the most
+  honest version the current schema supports: a dedicated report (`src/strategy/
+  lever-effectiveness.ts`) that surfaces D's and E's real reads together, reusing their existing
+  loadRows/rank exports (no math duplicated), plus an explicit, fixed "insufficient tracking, not
+  insufficient data" table for A/B/C naming the specific missing attribution field per lever —
+  never a fabricated lift number. No small honest A/B/C bonus signal was forced in: their existing
+  scripts (`platform-fit`/`media-fit`/`cadence-fit`) already print the current pillar/media/cadence
+  snapshot, and reprinting that here would not be a before/after delta, just noise.
+- SHIP: held (draft PR #<PR_NUMBER> — repo CLAUDE.md Rule 7, content-generation-adjacent strategy
+  logic (src/strategy/), needs Muxin's review; real report output against production
+  data/analytics.db in the PR body — both levers read insufficient-data today, the same honest
+  expected state lever E's own PR (#232) hit; methodology default flagged: no A/B/C bonus signal
+  forced, tracking-gap framing chosen over any approximation; builds on merged Levers A/#220,
+  B/#222, C/#224, D/#226, E/#232)
+- STATUS: Review
 - GROOMED: readiness pass: clear GOAL_CONDITION, lightweight post-publish feedback loop scope is concrete + 2026-07-15
 <!-- card-id: 83166c51-e65f-41cc-92eb-53e5e8cf1ea5 -->
 

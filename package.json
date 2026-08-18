@@ -18,6 +18,7 @@
     "cadence-fit": "tsx src/strategy/cadence-fit.ts",
     "frame-fit": "tsx src/strategy/frame-fit.ts",
     "cta-fit": "tsx src/strategy/cta-fit.ts",
+    "lever-effectiveness": "tsx src/strategy/lever-effectiveness.ts",
     "audience": "tsx src/strategy/audience.ts",
     "origin-compare": "tsx src/strategy/origin-compare.ts",
     "grade-bets": "tsx src/strategy/grade-bets.ts",
