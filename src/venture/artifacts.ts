@@ -39,6 +39,10 @@ export interface VentureArtifact {
   title: string;
   body_path: string | null;
   checkpoint_id: string | null;
+  // Non-null only for structured artifact kinds (phase_1_research_plan): per-field-editable data
+  // (confirmed_knowns[], open_unknowns[], probes[], reviewed_by_muxin, plan_version, ...). null
+  // for the two post kinds, which use title/body_path/claim_refs instead.
+  fields: Record<string, unknown> | null;
 
   delivery_mode: "manual" | "app" | "none";
   publishable: boolean;
@@ -117,6 +121,7 @@ export interface CreateArtifactInput {
   title: string;
   body_path?: string | null;
   checkpoint_id?: string | null;
+  fields?: Record<string, unknown> | null;
   venture_id: string;
   venture_phase: number;
   message_id: string;
@@ -143,6 +148,7 @@ export function createArtifact(
     title: input.title,
     body_path: input.body_path ?? null,
     checkpoint_id: input.checkpoint_id ?? null,
+    fields: input.fields ?? null,
     delivery_mode: kindRule.delivery_mode,
     publishable: kindRule.publishable,
     editorial_status: "draft",
@@ -198,6 +204,26 @@ export function transitionArtifact(
   if (!isValidCombination(next.editorial_status, next.delivery_status)) {
     throw new InvalidTransitionError(current, next.editorial_status, next.delivery_status);
   }
+  appendLine(slug, next);
+  return next;
+}
+
+// Patches keys inside a structured artifact's `fields` bag (e.g. reviewed_by_muxin,
+// confirmed_by_muxin on a confirmed_knowns entry). Separate from transitionArtifact -- fields
+// edits aren't part of the editorial/delivery state machine and need no combination check.
+export function updateArtifactFields(
+  slug: string,
+  artifactId: string,
+  patch: Record<string, unknown>,
+  at: string
+): VentureArtifact {
+  const current = readArtifact(slug, artifactId);
+  if (!current) throw new Error(`no such artifact: ${artifactId}`);
+  const next: VentureArtifact = {
+    ...current,
+    fields: { ...(current.fields ?? {}), ...patch },
+    updated_at: at,
+  };
   appendLine(slug, next);
   return next;
 }
