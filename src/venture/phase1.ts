@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch } from "./rules.js";
 import {
@@ -8,10 +8,22 @@ import {
   readArtifact,
   type ClaimRef,
 } from "./artifacts.js";
-import { writeDecision, selectDecision, readDecision, type Candidate } from "./decisions.js";
+import { writeDecision, selectDecision, selectWithOverride, readDecision, type Candidate } from "./decisions.js";
 import { phase1Dir } from "./paths.js";
 import { hasCanonEvent } from "./canon.js";
-import { fail, now, cmdApprove, cmdDiscard, cmdRestore, cmdList } from "./artifact-lifecycle.js";
+import {
+  fail,
+  now,
+  cmdApprove,
+  cmdDiscard,
+  cmdRestore,
+  cmdList,
+  readStdin,
+  flag,
+  positionalArgs,
+  checkNoEmDash,
+  warnIfNoClaimRefs,
+} from "./artifact-lifecycle.js";
 
 // Phase 1 script: scaffolding and gate checks only. Idea generation, ranking, and post drafting
 // are Claude's own judgment work, done inline while running .claude/skills/venture/SKILL.md --
@@ -19,31 +31,8 @@ import { fail, now, cmdApprove, cmdDiscard, cmdRestore, cmdList } from "./artifa
 // mechanically, and refuses to persist anything that skips a gate.
 //
 // usage: tsx src/venture/phase1.ts <subcommand> <slug> [...args] [--stdin]
-
-function readStdin(): string {
-  return readFileSync(0, "utf8");
-}
-
-function flag(name: string): string | undefined {
-  const i = process.argv.indexOf(name);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
-
-// Strips each named flag AND its following value out of a positional-args array -- naively
-// filtering out only strings starting with "--" leaves a multi-word flag VALUE (e.g.
-// `--rationale "several words"`, which argv splits into separate entries) sitting in the
-// positional list. Caught this the hard way running the real CLI by hand before writing tests.
-function positionalArgs(rest: string[], ...knownFlags: string[]): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < rest.length; i++) {
-    if (knownFlags.includes(rest[i])) {
-      i++; // skip the flag's value too
-      continue;
-    }
-    out.push(rest[i]);
-  }
-  return out;
-}
+//
+// readStdin/flag/positionalArgs are shared with phase2.ts -- see artifact-lifecycle.ts.
 
 // --- plan-init: writes the phase_1_research_plan artifact ------------------------------------
 
@@ -137,20 +126,10 @@ function cmdPlatform(slug: string) {
 
 function cmdPlatformSelect(slug: string, candidateId: string) {
   const overrideReason = flag("--override-reason");
-  const current = readDecision(slug, "p1-platform-01");
-  const isOverride = !!current && !current.recommended_candidate_ids.includes(candidateId);
-  if (isOverride && !overrideReason?.trim()) {
-    fail(
-      `"${candidateId}" is not the recommended platform (recommended: ${current!.recommended_candidate_ids.join(", ")}) -- ` +
-        `overriding the recommendation requires --override-reason "..." so the audit trail records why (rules.md §5.1)`
-    );
-  }
-  const d = selectDecision(slug, "p1-platform-01", {
-    selectedCandidateIds: [candidateId],
-    selectedBy: "muxin",
-    overrideReason: isOverride ? overrideReason : null,
+  const d = selectWithOverride(slug, "p1-platform-01", candidateId, overrideReason, {
     requiredSelectCount: 1,
-    at: now(),
+    ruleCite: "rules.md §5.1",
+    candidateLabel: "platform",
   });
   console.log(`platform selected: ${d.selected_candidate_ids[0]}`);
 }
@@ -230,7 +209,7 @@ function cmdDraft(slug: string, candidateId: string) {
   if (wordCount > rules.draft.post_max_words) {
     fail(`draft is ${wordCount} words, over the ${rules.draft.post_max_words}-word Phase 1 cap`);
   }
-  if (input.body.includes("—")) fail(`draft contains an em dash -- config/voice.yaml bans them, no exceptions`);
+  checkNoEmDash({ body: input.body });
   const hasReplyPrompt = /\?[\s]*$/.test(input.body.trim());
   if (rules.draft.require_reply_prompt && !hasReplyPrompt && !input.no_cta_reason) {
     fail(
@@ -238,12 +217,7 @@ function cmdDraft(slug: string, candidateId: string) {
         `every required Phase 1 post carries a reply prompt unless "no CTA" is a deliberate, recorded exception`
     );
   }
-  if (rules.draft.require_claim_refs && input.claim_refs.length === 0) {
-    console.warn(
-      `warning: no claim_refs on this draft -- if it makes ANY concrete factual claim, that claim ` +
-        `needs a ref to intake:qN or a confirmed_known, or it must be cut/reframed as a hypothesis`
-    );
-  }
+  warnIfNoClaimRefs(rules, input.claim_refs);
 
   mkdirSync(phase1Dir(slug), { recursive: true });
   const bodyPath = `phase-1-attention/${candidateId}.md`;
@@ -511,20 +485,11 @@ function cmdContinuation(slug: string) {
 
 function cmdContinuationSelect(slug: string, candidateId: string) {
   const overrideReason = flag("--override-reason");
-  const current = readDecision(slug, "p1-continuation-01");
-  const isOverride = !!current && !current.recommended_candidate_ids.includes(candidateId);
-  if (isOverride && !overrideReason?.trim()) {
-    fail(
-      `"${candidateId}" is not the recommended continuation candidate (recommended: ${current!.recommended_candidate_ids.join(", ")}) -- ` +
-        `overriding requires --override-reason "..." so the audit trail records why (rules.md §5.6)`
-    );
-  }
-  const d = selectDecision(slug, "p1-continuation-01", {
-    selectedCandidateIds: [candidateId],
-    selectedBy: "muxin",
-    overrideReason: isOverride ? overrideReason : null,
+  const d = selectWithOverride(slug, "p1-continuation-01", candidateId, overrideReason, {
     requiredSelectCount: 1,
-    at: now(),
+    ruleCite: "rules.md §5.6",
+    candidateLabel: "continuation candidate",
+    overridePhrase: "overriding requires",
   });
   console.log(`continuation selected: ${d.selected_candidate_ids[0]}`);
 }

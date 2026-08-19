@@ -167,3 +167,41 @@ export function selectDecision(slug: string, decisionId: string, input: SelectDe
   appendLine(slug, next);
   return next;
 }
+
+export interface SelectWithOverrideOptions {
+  requiredSelectCount: number;
+  ruleCite: string; // e.g. "rules.md §5.1" -- cited in the refusal message
+  candidateLabel: string; // e.g. "platform", "continuation candidate", "concept" -- refusal message noun
+  // Sites differ slightly in phrasing here ("overriding the recommendation requires" vs
+  // "overriding requires") -- preserved as-is rather than homogenized, since callers' existing
+  // messages are what tests/audit trails were written against.
+  overridePhrase?: string;
+}
+
+// Shared by phase1.ts's platform-select/continuation-select and phase2.ts's concept-select: read
+// the current recommendation, refuse a non-recommended selection made without --override-reason,
+// otherwise select. Extracted so the three near-identical copies of this pattern don't drift.
+export function selectWithOverride(
+  slug: string,
+  decisionId: string,
+  candidateId: string,
+  overrideReason: string | undefined,
+  opts: SelectWithOverrideOptions
+): DecisionRecord {
+  const current = readDecision(slug, decisionId);
+  const isOverride = !!current && !current.recommended_candidate_ids.includes(candidateId);
+  if (isOverride && !overrideReason?.trim()) {
+    const phrase = opts.overridePhrase ?? "overriding the recommendation requires";
+    throw new Error(
+      `"${candidateId}" is not the recommended ${opts.candidateLabel} (recommended: ${current!.recommended_candidate_ids.join(", ")}) -- ` +
+        `${phrase} --override-reason "..." so the audit trail records why (${opts.ruleCite})`
+    );
+  }
+  return selectDecision(slug, decisionId, {
+    selectedCandidateIds: [candidateId],
+    selectedBy: "muxin",
+    overrideReason: isOverride ? overrideReason : null,
+    requiredSelectCount: opts.requiredSelectCount,
+    at: new Date().toISOString(),
+  });
+}
