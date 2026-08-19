@@ -1,13 +1,14 @@
 import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
+import { rmSync, existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { ventureDir } from "./paths.js";
+import { ventureDir, readyToPasteDir } from "./paths.js";
 import { appendCanonEvent } from "./canon.js";
 import { readArtifact, transitionArtifact, type Evidence } from "./artifacts.js";
 import { clearCheckpoint } from "./checkpoint.js";
+import { deliverVenture } from "./deliver.js";
 
 // Exercises the real CLI as a subprocess, same discipline as research-gate.test.ts (avoids
 // fighting process.argv/stdin mutation across tests, tests the actual contract).
@@ -465,6 +466,38 @@ describe("magnet-draft", () => {
     const r = runCmd("magnet-draft", [], JSON.stringify(input));
     assert.equal(r.status, 1);
     assert.match(r.stderr, /sections must be a non-empty array/);
+  });
+});
+
+// Regression coverage for the bug this package fixes: deliverManual() used to reconstruct a
+// hardcoded phase1Dir path instead of reading the artifact's own body_path, so it ENOENT-crashed
+// on every Phase 2 manual artifact (magnet-draft/landing-page-draft/welcome-email-draft/
+// survey-review never wrote a body file OR passed body_path to createArtifact at all). This exercises
+// the REAL end-to-end path -- the real CLI drafts the artifact, the real approve command approves
+// it, and the real deliverVenture() delivers it -- unlike the Checkpoint-2 test above, which
+// bypasses deliverVenture entirely via a direct transitionArtifact call.
+describe("deliverVenture -- Phase 2 manual artifact end-to-end (deliver.ts integration)", () => {
+  test("approving and delivering a drafted lead-magnet does not throw and writes real content", async () => {
+    seedMagnetDrafted();
+    const approveResult = runCmd("approve", ["p2-lead-magnet"]);
+    assert.equal(approveResult.status, 0, `approve failed: ${approveResult.stderr}`);
+
+    const results = await deliverVenture(SLUG);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].action, "handed_off");
+
+    const pastedPath = `${readyToPasteDir(SLUG)}/p2-lead-magnet.txt`;
+    assert.equal(existsSync(pastedPath), true);
+    const pasted = readFileSync(pastedPath, "utf8");
+    // Real content from wellFormedMagnetInput()'s fields, not an empty/mocked file.
+    assert.match(pasted, /Fix your first broken workflow/); // title
+    assert.match(pasted, /A short guide to fixing one thing/); // intro
+    assert.match(pasted, /Find the bottleneck/); // sections[0]
+    assert.match(pasted, /Pick one workflow and fix it today\./); // action_step
+    assert.match(pasted, /What did you fix\?/); // feedback_prompt
+
+    const artifact = readArtifact(SLUG, "p2-lead-magnet");
+    assert.equal(artifact?.delivery_status, "handed_off");
   });
 });
 

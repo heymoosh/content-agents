@@ -24,7 +24,8 @@ export function cmdApprove(slug: string, artifactId: string) {
 }
 
 export function cmdDiscard(slug: string, artifactId: string) {
-  const a = readArtifact(slug, artifactId)!;
+  const a = readArtifact(slug, artifactId);
+  if (!a) fail(`no such artifact: ${artifactId}`);
   const delivery = a.delivery_status === "not_applicable" ? "not_applicable" : "cancelled";
   const next = transitionArtifact(slug, artifactId, { editorial_status: "discarded", delivery_status: delivery }, now());
   console.log(`${artifactId} discarded`);
@@ -32,7 +33,8 @@ export function cmdDiscard(slug: string, artifactId: string) {
 }
 
 export function cmdRestore(slug: string, artifactId: string) {
-  const a = readArtifact(slug, artifactId)!;
+  const a = readArtifact(slug, artifactId);
+  if (!a) fail(`no such artifact: ${artifactId}`);
   const delivery = a.delivery_mode === "none" ? "not_applicable" : "awaiting_approval";
   const next = transitionArtifact(slug, artifactId, { editorial_status: "draft", delivery_status: delivery }, now());
   console.log(`${artifactId} restored to draft`);

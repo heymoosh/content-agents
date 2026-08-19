@@ -65,6 +65,19 @@ function warnIfNoClaimRefs(rules: ReturnType<typeof loadRules>, claimRefs: Claim
   }
 }
 
+// Writes a manual-kind Phase 2 artifact's structured `fields` out to a real, human-readable
+// ready-to-paste-shaped .md file under phase-2-audience/, mirroring exactly what cmdAnnouncementDraft
+// already does for its own body file -- and returns the body_path (relative to ventureDir(slug))
+// to stamp onto the artifact at createArtifact time. Without this, deliverManual() has nothing to
+// read: a manual artifact with fields-only content and no body_path ENOENT-crashes on delivery
+// (see deliver.ts). Plain markdown, no invented content beyond what's already in `fields`.
+function writePhase2Body(slug: string, artifactId: string, body: string): string {
+  mkdirSync(phase2Dir(slug), { recursive: true });
+  const relPath = `phase-2-audience/${artifactId}.md`;
+  writeFileSync(`${phase2Dir(slug)}/${artifactId}.md`, body.trim() + "\n");
+  return relPath;
+}
+
 // --- concepts: the five-lead-magnet-concept decision (rules.md §6.2) ----------------------------
 
 interface ConceptCandidateInput {
@@ -252,11 +265,15 @@ function cmdMagnetDraft(slug: string) {
   });
   warnIfNoClaimRefs(rules, input.claim_refs);
 
+  const body = [input.intro, ...input.sections, input.action_step, input.feedback_prompt].join("\n\n");
+  const bodyPath = writePhase2Body(slug, "p2-lead-magnet", body);
+
   const artifact = createArtifact(slug, rules, {
     artifact_id: "p2-lead-magnet",
     phase: 2,
     artifact_kind: "lead-magnet",
     title: input.title,
+    body_path: bodyPath,
     checkpoint_id: "checkpoint-2",
     venture_id: slug,
     venture_phase: 2,
@@ -323,11 +340,28 @@ function cmdLandingPageDraft(slug: string) {
   });
   warnIfNoClaimRefs(rules, input.claim_refs);
 
+  const landingPageLines = [
+    `Headline: ${input.headline}`,
+    input.subheadline ? `Subheadline: ${input.subheadline}` : null,
+    ``,
+    `Benefits:`,
+    `- ${input.benefit_1}`,
+    `- ${input.benefit_2}`,
+    `- ${input.benefit_3}`,
+    ``,
+    `Button: ${input.button_label}`,
+    input.form_intro ? `Form intro: ${input.form_intro}` : null,
+    input.thank_you_message ? `Thank you message: ${input.thank_you_message}` : null,
+    input.privacy_copy ? `Privacy copy: ${input.privacy_copy}` : null,
+  ].filter((l): l is string => l !== null);
+  const bodyPath = writePhase2Body(slug, "p2-landing-page", landingPageLines.join("\n"));
+
   const artifact = createArtifact(slug, rules, {
     artifact_id: "p2-landing-page",
     phase: 2,
     artifact_kind: "landing-page-copy",
     title: input.headline,
+    body_path: bodyPath,
     checkpoint_id: "checkpoint-2",
     venture_id: slug,
     venture_phase: 2,
@@ -402,11 +436,28 @@ function cmdSurveyReview(slug: string) {
     fail(`every fit_assessment entry has fits_chosen_magnet: true -- change_needed must be false`);
   }
 
+  const fitLines = input.fit_assessment
+    .slice()
+    .sort((a, b) => a.question_number - b.question_number)
+    .map((f) => `- Q${f.question_number}: ${f.fits_chosen_magnet ? "fits" : "does not fit"} -- ${f.note}`);
+  const surveyReviewLines = [
+    `Existing survey snapshot:`,
+    input.existing_survey_snapshot,
+    ``,
+    `Fit assessment:`,
+    ...fitLines,
+    ``,
+    `Change needed: ${input.change_needed ? "yes" : "no"}`,
+    ...(input.recommended_changes?.length ? [``, `Recommended changes:`, ...input.recommended_changes.map((c) => `- ${c}`)] : []),
+  ];
+  const bodyPath = writePhase2Body(slug, "p2-survey-review", surveyReviewLines.join("\n"));
+
   const artifact = createArtifact(slug, rules, {
     artifact_id: "p2-survey-review",
     phase: 2,
     artifact_kind: "survey",
     title: "Survey fit review",
+    body_path: bodyPath,
     checkpoint_id: "checkpoint-2",
     venture_id: slug,
     venture_phase: 2,
@@ -485,11 +536,23 @@ function cmdWelcomeEmailDraft(slug: string) {
   });
   warnIfNoClaimRefs(rules, input.claim_refs);
 
+  const welcomeEmailLines = [
+    `Preview text: ${input.preview_text}`,
+    ``,
+    input.body,
+    ``,
+    `${input.lead_magnet_link_text}: ${input.lead_magnet_destination}`,
+    ``,
+    input.survey_question_or_link,
+  ];
+  const bodyPath = writePhase2Body(slug, "p2-welcome-email", welcomeEmailLines.join("\n"));
+
   const artifact = createArtifact(slug, rules, {
     artifact_id: "p2-welcome-email",
     phase: 2,
     artifact_kind: "welcome-email",
     title: input.subject,
+    body_path: bodyPath,
     checkpoint_id: "checkpoint-2",
     venture_id: slug,
     venture_phase: 2,
