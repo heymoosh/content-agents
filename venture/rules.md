@@ -674,17 +674,26 @@ The longer list is implementation support. It does not replace the PDF's minimum
 
 ### 6.5 Survey
 
-The primary research question is:
+**Superseded 2026-08-19 (Muxin).** The rules below describe authoring a new single-question survey
+from scratch. That assumption no longer holds: Muxin already has a real, live 4-question branching
+survey on her own site (checked into `venture/existing-survey-humaninference.md`). Phase 2's
+`survey` artifact now reviews that existing survey for fit against whichever lead magnet gets
+selected, and recommends changes only where fit breaks — it does not author a new question or
+replace the existing survey wholesale. The original text below is kept for its still-relevant
+parts (store the answer privately, preserve it exactly, do not delay the research loop for
+segmentation questions) but its premise — "the survey doesn't exist yet, write it" — is superseded.
 
-`What are you stuck on right now?`
+~~The primary research question is:~~
 
-Rules:
+~~`What are you stuck on right now?`~~
 
-1. Use free text.
-2. Ask immediately after signup.
+~~Rules:~~
+
+1. ~~Use free text.~~
+2. ~~Ask immediately after signup.~~
 3. Store the answer against a privacy-safe respondent record.
 4. Preserve the exact answer privately.
-5. Do not add rating scales or extra required questions to the Starter Kit sprint.
+5. ~~Do not add rating scales or extra required questions to the Starter Kit sprint.~~
 6. Optional segmentation questions from the wider Welsh method MAY be added later. They MUST NOT delay the first research loop.
 
 ### 6.6 Welcome email
@@ -731,6 +740,15 @@ This stronger end-to-end predicate requires Muxin's approval before this rules d
 **OPEN-CAPTURE:** The subscriber store, email provider, and exact survey implementation remain product decisions.
 
 **PROPOSED survey path:** Ask on the confirmation page, link to the same question from the welcome email, and accept email replies as a secondary response source.
+
+**Superseded 2026-08-19 (Muxin), on the survey specifically.** The capture path above (confirmation
+page primary, welcome-email link secondary) still stands for how the survey is *reached* — that part
+was confirmed 2026-08-18 (§12). What is superseded is the assumption that Phase 2 designs the
+question itself: Muxin's existing survey (`venture/existing-survey-humaninference.md`) already
+covers that ground and stores answers against the subscriber. Checkpoint 2's "the post-signup
+survey stores one tested answer against the subscriber" bullet above is satisfied by that existing
+survey continuing to run — Phase 2 in this repo does not build or wire it. The `survey` artifact's
+job is a fit review against the chosen lead magnet (see §6.5's amendment above), not implementation.
 
 ## 7. Phase 3: Offer, days 7-10
 

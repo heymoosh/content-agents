@@ -2,7 +2,11 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { decisionsPath, ventureDir } from "./paths.js";
 
 export type DecisionStatus = "awaiting_user" | "selected" | "superseded";
-export type DecisionKind = "platform-recommendation" | "idea-ranking";
+export type DecisionKind =
+  | "platform-recommendation"
+  | "idea-ranking"
+  | "phase-1-research-continuation"
+  | "lead-magnet-concept";
 
 export interface Candidate {
   candidate_id: string;
@@ -12,6 +16,10 @@ export interface Candidate {
   rationale: string;
   unknown_id?: string | null;
   no_cta_reason?: string | null;
+  // Set on a lead-magnet-concept candidate that rests on a thin-evidence phase_1_research_read
+  // finding (rules.md §6.1) -- mechanically checkable so a build can enforce the concept is
+  // labeled a hypothesis, not a conclusion, rather than relying on a substring match on free text.
+  label_as_hypothesis?: boolean;
 }
 
 export interface DecisionRecord {
