@@ -1,13 +1,15 @@
 ---
 name: venture
-description: Build 3 — run Phase 1 ("Attention") of a solo-business sprint that tests what an audience actually wants, through Muxin's own probe posts. Usage - /venture new <slug>, /venture <slug>.
+description: Build 3 — run Phase 1 ("Attention") and Phase 2 ("Audience") of a solo-business sprint that tests what an audience actually wants, then builds a narrow lead magnet and owned-audience capture around it. Usage - /venture new <slug>, /venture <slug>.
 ---
 
-# /venture — Phase 1: Attention (Build 3)
+# /venture — Phase 1: Attention, Phase 2: Audience (Build 3)
 
 Help Muxin test what an audience wants, needs, and will pay for — starting with Phase 1: pick one
-platform, run public qualitative discovery, publish three probe posts, hit Checkpoint 1. Later
-phases (Audience, Offer, Operations) aren't built yet.
+platform, run public qualitative discovery, publish three probe posts, hit Checkpoint 1. Then
+Phase 2: turn what Phase 1 learned into a narrow lead magnet, a landing page, a welcome email, and
+a fit review of Muxin's existing survey, hitting Checkpoint 2. Offer and Operations (Phases 3-4)
+aren't built yet.
 
 ## This is composed business content — and why that's allowed
 
@@ -20,9 +22,9 @@ Muxin's real name, not a labeled fictional register), and **every concrete claim
 `claim_refs` entry** tracing it to an intake answer or a confirmed fact — never assert a result,
 customer, or number Muxin didn't actually have.
 
-**Every gate below is enforced by `src/venture/phase1.ts`, not by you remembering to stop.** The
-script refuses to move forward if a prior gate hasn't cleared. Treat a refusal as correct
-behavior, not a bug to route around.
+**Every gate below is enforced by `src/venture/phase1.ts` (Phase 1) and `src/venture/phase2.ts`
+(Phase 2), not by you remembering to stop.** Each script refuses to move forward if a prior gate
+hasn't cleared. Treat a refusal as correct behavior, not a bug to route around.
 
 ## Step 1: New venture — intake
 
@@ -174,6 +176,146 @@ Checkpoint 1 needs all three conditions: three required posts approved AND live 
 of the right kind for that post's type, and pace recorded. Approval alone never clears it, and
 there is no partial pass — if it refuses, tell Muxin exactly what's still missing rather than
 re-running it hoping something changed.
+
+## Step 8: Phase 1 research read — the bridge into Phase 2
+
+Checkpoint 1 proves the three posts are live. It doesn't prove anything was learned. Before any
+Phase 2 concept work starts, ingest every available signal (Note replies, essay comments, DMs,
+email replies, metrics, subscriber movement, follow-up questions, Muxin's own observations) and
+synthesize it into a `phase_1_research_read` — per-source collection coverage, each finding
+labeled `planned` or `emergent` with a rubric-backed `signal_quality`, and a measured zero counted
+as a real reading, not skipped (rules.md §5.6).
+
+```
+echo '{"collection_coverage": [...], "findings": [...]}' | tsx src/venture/phase1.ts research-read-init <slug>
+```
+
+**Then stop and show Muxin the read.** Do not select a continuation until she runs
+`tsx src/venture/phase1.ts research-read-review <slug>` herself — same discipline as the Step 2
+plan-review gate. If any finding is `emergent`, she also confirms or rejects it specifically:
+`tsx src/venture/phase1.ts research-read-confirm-emergent <slug> <finding_id> <true|false>`.
+
+## Step 9: Continuation decision
+
+Once the read is reviewed, offer Muxin exactly three outcomes as the
+`phase-1-research-continuation` decision:
+
+```
+echo '{"input_refs": ["p1-research-plan", "p1-research-read"], "candidates": [...], "recommended_candidate_ids": [...]}' | tsx src/venture/phase1.ts continuation <slug>
+tsx src/venture/phase1.ts continuation-select <slug> <more_probes|proceed_with_evidence|proceed_as_hypothesis> [--override-reason "..."]
+```
+
+Explain plainly what each choice does: **`more_probes`** sends the venture back into more Phase 1
+idea generation (Step 4) instead of forward — the evidence on a priority unknown is still too thin
+to act on. **`proceed_with_evidence`** means the read is solid enough to build Phase 2 concepts on
+directly. **`proceed_as_hypothesis`** unlocks Phase 2 too, but every concept resting on a
+thin-evidence finding must be labeled a hypothesis, not a conclusion, until more evidence arrives.
+Nothing in Phase 2 (`src/venture/phase2.ts`) will run until this decision is `selected` with one of
+the last two — the script enforces this itself (`requirePhase2Unlocked`), it isn't just this
+skill's reminder.
+
+## Step 10: Five lead-magnet concepts
+
+Use the formula from rules.md §6.2 — `audience + painful moment + fast win + creator proof` —
+against what Phase 1 actually learned. Generate exactly five distinct concepts, each solving a
+*different* narrow frustration (not five formats for the same broad topic), and score each on the
+six factors: early_problem, narrowness, frustration, fast_win, proof_fit, research_value (1-5
+scale). Where a concept rests on a `phase_1_research_read` finding the read itself called thin,
+label that concept a hypothesis rather than presenting it with the same confidence as a
+moderate/strong-evidence concept — `label_as_hypothesis: true` on that candidate.
+
+```
+echo '{"input_refs": [...], "candidates": [...five...], "recommended_candidate_ids": [...]}' | tsx src/venture/phase2.ts concepts <slug>
+```
+
+**Stop and show Muxin the five ranked concepts.** She selects one:
+
+```
+tsx src/venture/phase2.ts concept-select <slug> <candidate_id> [--override-reason "..."]
+```
+
+If she picks something other than the recommended concept, the script requires
+`--override-reason "..."` — same audit-trail discipline as Step 3's platform pick.
+
+## Step 11: Lead magnet draft
+
+The selected concept becomes the actual lead magnet: usable or readable in under 10 minutes, plain
+language, no filler, connects to Muxin's proof, ends with one useful next step and a feedback
+prompt that feeds the research loop (rules.md §6.3). Minimum fields: `title`, `intro`,
+`sections` (however many the promise actually needs — don't force three), `action_step`,
+`feedback_prompt`. Zero em dashes, and every concrete factual claim carries a `claim_refs` entry,
+same discipline as Phase 1 drafts.
+
+```
+echo '{"title": "...", "intro": "...", "sections": [...], "action_step": "...", "feedback_prompt": "...", "claim_refs": [...]}' | tsx src/venture/phase2.ts magnet-draft <slug>
+```
+
+**Stop and show Muxin the draft.** She approves or asks for a revision:
+`tsx src/venture/phase2.ts approve <slug> p2-lead-magnet`.
+
+## Step 12: Landing page copy draft
+
+The PDF's normative minimum is exactly five fields: `headline`, `benefit_1`, `benefit_2`,
+`benefit_3`, `button_label` (rules.md §6.4). `subheadline`, `form_intro`, `thank_you_message`, and
+`privacy_copy` are the built capture layer's optional support fields — draft them if useful, but
+their absence is never a validation failure, and the longer list never replaces the PDF's minimum.
+
+```
+echo '{"headline": "...", "benefit_1": "...", "benefit_2": "...", "benefit_3": "...", "button_label": "..."}' | tsx src/venture/phase2.ts landing-page-draft <slug>
+```
+
+**Stop and show Muxin the draft** for approval, same as Step 11.
+
+## Step 13: Survey fit review — NOT a new survey
+
+Muxin already has a real, live 4-question branching survey running on her own site. Read
+`venture/existing-survey-humaninference.md` first. This step is a **fit review against the chosen
+lead magnet**, question by question — it does not author a new survey or replace hers wholesale
+(rules.md §6.5, amended 2026-08-19). Assess all 4 questions; recommend edits only where fit
+genuinely breaks, not by default.
+
+```
+echo '{"existing_survey_snapshot": "...", "fit_assessment": [{"question_number": 1, "fits_chosen_magnet": true, "note": "..."}, ...all 4...], "recommended_changes": [...], "change_needed": false}' | tsx src/venture/phase2.ts survey-review <slug>
+```
+
+**Stop and show Muxin the review.** She approves it herself:
+`tsx src/venture/phase2.ts survey-review-approve <slug>`.
+
+## Step 14: Welcome email draft
+
+Requires both the lead magnet and the survey review to already exist — the script refuses and
+names whichever is missing. The email thanks the subscriber, delivers the lead magnet, says what's
+next, and asks or links to the survey question (rules.md §6.6). Minimum fields: `subject`,
+`preview_text`, `body`, `lead_magnet_link_text`, `lead_magnet_destination`,
+`survey_question_or_link`. Zero em dashes, `claim_refs` discipline as above.
+
+```
+echo '{"subject": "...", "preview_text": "...", "body": "...", "lead_magnet_link_text": "...", "lead_magnet_destination": "...", "survey_question_or_link": "...", "claim_refs": [...]}' | tsx src/venture/phase2.ts welcome-email-draft <slug>
+```
+
+**Stop and show Muxin the draft** for approval.
+
+## Step 15: Announcement — optional
+
+One native post announcing the lead magnet, bridging naturally to it (Phase 2's CTA policy),
+making no unproven conversion or outcome claims (rules.md §6.7). This is **not required** for
+Checkpoint 2 — skip it if there's nothing natural to say yet.
+
+```
+echo '{"title": "...", "body": "...", "claim_refs": [...], "bridges_to_lead_magnet": true}' | tsx src/venture/phase2.ts announcement-draft <slug>
+```
+
+## Step 16: Checkpoint 2
+
+```
+tsx src/venture/checkpoint.ts clear <slug> checkpoint-2
+```
+
+Checkpoint 2 needs exactly four artifacts approved AND live: the lead magnet, the landing page,
+the welcome email, and the survey review — no pace requirement, and the announcement never counts
+toward it. The survey's own "live" evidence is simply its already-live URL on humaninference.ai —
+Muxin isn't building anything new for it, this step only confirms the existing survey continues to
+run and the review's fit findings, if any, got acted on.
 
 ## Throughout
 
