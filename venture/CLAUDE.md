@@ -28,7 +28,11 @@ is narrower than Build 2's:
   through the existing constrained Substack browser agent (`src/publish/substack.ts`), claiming a
   slot from the same shared scheduler `/atomize` uses. Venture builds no new publish machinery.
 - **Rule 6 applies.** Phase judgment runs on the Claude Code subscription ($0 marginal), same as
-  `/story` claude-native. Resend is the email provider for Phase 2's capture layer (not built yet).
+  `/story` claude-native. Muxin already has survey and email-capture capabilities live on her own
+  site (amended 2026-08-19, `docs/venture-build-plan.md` §E) -- this repo does not build or wire
+  any email provider or capture mechanism for Phase 2. Phase 2's scope here is copy/concept
+  composition only (lead magnet, landing-page copy, welcome-email copy, a fit review of the
+  existing survey).
 
 ## The gates are state, and Claude never writes them
 
@@ -46,10 +50,10 @@ inference. If a gate field is unset, the correct behavior is to stop and ask, ev
 | `editorial_status: approved` | each Phase 1 post artifact | handoff to `ready-to-paste/` or the Notes agent |
 | `delivery_status: live_confirmed` + `evidence` | each Phase 1 post artifact | counting toward Checkpoint 1 |
 | `reviewed_by_muxin` | `phase_1_research_read` | selecting the `phase-1-research-continuation` decision |
-| `findings[].muxin_confirmed_emergent` | `phase_1_research_read` | marks an emergent finding confirmed/rejected before it counts toward `lead_magnet_implications` (rules.md §5.6; not yet read by a runtime gate in committed code) |
+| `findings[].muxin_confirmed_emergent` | `phase_1_research_read` | gates `research-read-review` (every emergent finding must be confirmed/rejected first) AND excludes a `false`-confirmed finding from informing `concepts` -- both read by runtime gates in `src/venture/phase1.ts`/`phase2.ts` (rules.md §5.6) |
 | decision `status: selected`, `selected_by: "muxin"` | `phase-1-research-continuation` | unlocking Phase 2 concept generation (`proceed_with_evidence`/`proceed_as_hypothesis`) or looping back into more Phase 1 probes (`more_probes`) |
 | decision `status: selected`, `selected_by: "muxin"` | `lead-magnet-concept` | drafting the selected concept into the lead magnet |
-| `reviewed_by_muxin` | `survey` (`p2-survey-review`, via `survey-review-approve`) | marks the fit review reviewed (not yet read by a runtime gate in committed code) |
+| `reviewed_by_muxin` | `survey` (`p2-survey-review`, via `survey-review-approve`) | gates `welcome-email-draft` (refuses until the survey fit review is approved) -- read by a runtime gate in `src/venture/phase2.ts` |
 | `editorial_status: approved` | each Phase 2 artifact | handoff for delivery (manual; Muxin installs/publishes it herself) |
 | `delivery_status: live_confirmed` + `evidence` | each Phase 2 artifact | counting toward Checkpoint 2 |
 

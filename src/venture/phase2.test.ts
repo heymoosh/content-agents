@@ -132,7 +132,7 @@ function seedConceptSelected(): void {
   runCmd(
     "concepts",
     [],
-    JSON.stringify({ input_refs: [], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+    JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
   );
   runCmd("concept-select", ["concept-1"]);
 }
@@ -181,7 +181,7 @@ describe("phase-2-unlock gate", () => {
     const r = runCmd(
       "concepts",
       [],
-      JSON.stringify({ input_refs: [], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
     );
     assert.equal(r.status, 1);
     assert.match(r.stderr, /is not selected yet/);
@@ -218,7 +218,7 @@ describe("phase-2-unlock gate", () => {
     const r = runCmd(
       "concepts",
       [],
-      JSON.stringify({ input_refs: [], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
     );
     assert.equal(r.status, 1);
     assert.match(r.stderr, /selected "more_probes"/);
@@ -231,7 +231,7 @@ describe("concepts validation", () => {
     const r = runCmd(
       "concepts",
       [],
-      JSON.stringify({ input_refs: [], candidates: fiveConcepts().slice(0, 4), recommended_candidate_ids: [] })
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts().slice(0, 4), recommended_candidate_ids: [] })
     );
     assert.equal(r.status, 1);
     assert.match(r.stderr, /expected exactly 5 concept candidates/);
@@ -241,7 +241,7 @@ describe("concepts validation", () => {
     seedPhase2Unlocked();
     const candidates = fiveConcepts();
     delete (candidates[0].scores as Record<string, number>).proof_fit;
-    const r = runCmd("concepts", [], JSON.stringify({ input_refs: [], candidates, recommended_candidate_ids: [] }));
+    const r = runCmd("concepts", [], JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: [] }));
     assert.equal(r.status, 1);
     assert.match(r.stderr, /missing a score for factor "proof_fit"/);
   });
@@ -250,7 +250,7 @@ describe("concepts validation", () => {
     seedPhase2Unlocked();
     const candidates = fiveConcepts();
     (candidates[0].scores as Record<string, number>).fast_win = 9;
-    const r = runCmd("concepts", [], JSON.stringify({ input_refs: [], candidates, recommended_candidate_ids: [] }));
+    const r = runCmd("concepts", [], JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: [] }));
     assert.equal(r.status, 1);
     assert.match(r.stderr, /outside the 1-5 scale/);
   });
@@ -258,7 +258,7 @@ describe("concepts validation", () => {
   test("a thin-evidence-marked concept missing label_as_hypothesis is refused", () => {
     seedPhase2Unlocked();
     const candidates = fiveConcepts([{ candidate_id: "concept-1", thin_evidence: true }]);
-    const r = runCmd("concepts", [], JSON.stringify({ input_refs: [], candidates, recommended_candidate_ids: [] }));
+    const r = runCmd("concepts", [], JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: [] }));
     assert.equal(r.status, 1);
     assert.match(r.stderr, /missing label_as_hypothesis: true/);
   });
@@ -266,9 +266,147 @@ describe("concepts validation", () => {
   test("a thin-evidence-marked concept WITH label_as_hypothesis succeeds", () => {
     seedPhase2Unlocked();
     const candidates = fiveConcepts([{ candidate_id: "concept-1", thin_evidence: true, label_as_hypothesis: true }]);
-    const r = runCmd("concepts", [], JSON.stringify({ input_refs: [], candidates, recommended_candidate_ids: ["concept-1"] }));
+    const r = runCmd("concepts", [], JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: ["concept-1"] }));
     assert.equal(r.status, 0);
     assert.match(r.stdout, /wrote p2-concept-01/);
+  });
+});
+
+describe("concepts input_refs enforcement (finding #3)", () => {
+  test("refused when input_refs is missing p1-research-read", () => {
+    seedPhase2Unlocked();
+    const r = runCmd(
+      "concepts",
+      [],
+      JSON.stringify({ input_refs: ["p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /input_refs must include both "p1-research-read" and "p1-continuation-01"/);
+  });
+
+  test("refused when input_refs is missing p1-continuation-01", () => {
+    seedPhase2Unlocked();
+    const r = runCmd(
+      "concepts",
+      [],
+      JSON.stringify({ input_refs: ["p1-research-read"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /input_refs must include both "p1-research-read" and "p1-continuation-01"/);
+  });
+});
+
+// Same as seedPhase2Unlocked, but lets a test control the research-read's findings (and which
+// emergent findings get confirmed/rejected) directly, so finding #1 (rejected emergent findings
+// excluded from concept generation) and finding #2b (thin-finding cross-check) can be exercised
+// against a specific finding_id and its computed signal_quality.
+function seedPhase2UnlockedWithFindings(
+  findings: Record<string, unknown>[],
+  confirmEmergent: { findingId: string; confirmed: boolean }[] = []
+): void {
+  appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "2026-08-19T00:00:00.000Z");
+  runPhase1(
+    "plan-init",
+    [],
+    JSON.stringify({
+      confirmed_knowns: [],
+      open_unknowns: [{ unknown_id: "u1", dimension: "emotional_frame", description: "d" }],
+      probes: [],
+    })
+  );
+  runPhase1("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings }));
+  for (const c of confirmEmergent) {
+    runPhase1("research-read-confirm-emergent", [c.findingId, String(c.confirmed)]);
+  }
+  runPhase1("research-read-review", []);
+  runPhase1(
+    "continuation",
+    [],
+    JSON.stringify({
+      input_refs: ["p1-research-plan", "p1-research-read"],
+      candidates: [
+        { candidate_id: "more_probes", label: "more_probes", scores: {}, evidence_refs: [], rationale: "r" },
+        { candidate_id: "proceed_with_evidence", label: "proceed_with_evidence", scores: {}, evidence_refs: [], rationale: "r" },
+        { candidate_id: "proceed_as_hypothesis", label: "proceed_as_hypothesis", scores: {}, evidence_refs: [], rationale: "r" },
+      ],
+      recommended_candidate_ids: ["proceed_with_evidence"],
+    })
+  );
+  runPhase1("continuation-select", ["proceed_with_evidence"]);
+}
+
+describe("rejected emergent findings excluded from concept generation (finding #1)", () => {
+  test("a candidate citing a muxin-rejected emergent finding_id in evidence_refs is refused", () => {
+    seedPhase2UnlockedWithFindings(
+      [
+        wellFormedFinding({
+          finding_id: "f-emergent-1",
+          finding_origin: "emergent",
+          unknown_ids: [],
+          emergent_description: "a surprise",
+        }),
+      ],
+      [{ findingId: "f-emergent-1", confirmed: false }]
+    );
+    const candidates = fiveConcepts([{ candidate_id: "concept-1", evidence_refs: ["f-emergent-1"] }]);
+    const r = runCmd(
+      "concepts",
+      [],
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: ["concept-1"] })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /candidate "concept-1" cites rejected emergent finding\(s\) f-emergent-1/);
+  });
+
+  test("a candidate citing a muxin-CONFIRMED emergent finding_id succeeds", () => {
+    seedPhase2UnlockedWithFindings(
+      [
+        wellFormedFinding({
+          finding_id: "f-emergent-1",
+          finding_origin: "emergent",
+          unknown_ids: [],
+          emergent_description: "a surprise",
+        }),
+      ],
+      [{ findingId: "f-emergent-1", confirmed: true }]
+    );
+    const candidates = fiveConcepts([{ candidate_id: "concept-1", evidence_refs: ["f-emergent-1"] }]);
+    const r = runCmd(
+      "concepts",
+      [],
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: ["concept-1"] })
+    );
+    assert.equal(r.status, 0);
+  });
+});
+
+describe("thin-finding cross-check for label_as_hypothesis (finding #2b)", () => {
+  function thinRationale(): { factor: string; status: string; evidence_refs: string[] }[] {
+    return SIGNAL_FACTORS.map((factor) => ({ factor, status: "absent", evidence_refs: ["obs:o-1"] }));
+  }
+
+  test("a candidate citing a thin finding without label_as_hypothesis is refused, even without self-reported thin_evidence", () => {
+    seedPhase2UnlockedWithFindings([wellFormedFinding({ finding_id: "f-thin-1", signal_quality_rationale: thinRationale() })]);
+    const candidates = fiveConcepts([{ candidate_id: "concept-1", evidence_refs: ["f-thin-1"] }]);
+    const r = runCmd(
+      "concepts",
+      [],
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: ["concept-1"] })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /candidate "concept-1" cites thin-evidence finding\(s\) f-thin-1/);
+    assert.match(r.stderr, /missing label_as_hypothesis: true/);
+  });
+
+  test("a candidate citing a thin finding WITH label_as_hypothesis succeeds", () => {
+    seedPhase2UnlockedWithFindings([wellFormedFinding({ finding_id: "f-thin-1", signal_quality_rationale: thinRationale() })]);
+    const candidates = fiveConcepts([{ candidate_id: "concept-1", evidence_refs: ["f-thin-1"], label_as_hypothesis: true }]);
+    const r = runCmd(
+      "concepts",
+      [],
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates, recommended_candidate_ids: ["concept-1"] })
+    );
+    assert.equal(r.status, 0);
   });
 });
 
@@ -278,7 +416,7 @@ describe("concept-select override reason", () => {
     runCmd(
       "concepts",
       [],
-      JSON.stringify({ input_refs: [], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
     );
     const r = runCmd("concept-select", ["concept-2"]);
     assert.equal(r.status, 1);
@@ -290,7 +428,7 @@ describe("concept-select override reason", () => {
     runCmd(
       "concepts",
       [],
-      JSON.stringify({ input_refs: [], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
     );
     const r = runCmd("concept-select", ["concept-1"]);
     assert.equal(r.status, 0);
@@ -359,6 +497,26 @@ describe("landing-page-draft", () => {
     assert.equal(artifact?.fields?.form_intro, null);
     assert.equal(artifact?.fields?.thank_you_message, null);
     assert.equal(artifact?.fields?.privacy_copy, null);
+  });
+
+  // Finding #4: landing-page-draft previously had no claim_refs support at all -- its siblings
+  // magnet-draft and welcome-email-draft both did.
+  test("claim_refs provided is persisted onto the artifact", () => {
+    seedConceptSelected();
+    const input = { ...wellFormedLandingPageInput(), claim_refs: [{ claim: "saves an hour a week", ref: "intake:q3" }] };
+    const r = runCmd("landing-page-draft", [], JSON.stringify(input));
+    assert.equal(r.status, 0);
+    const artifact = readArtifact(SLUG, "p2-landing-page");
+    assert.deepEqual(artifact?.claim_refs, [{ claim: "saves an hour a week", ref: "intake:q3" }]);
+  });
+
+  test("omitting claim_refs warns but still succeeds", () => {
+    seedConceptSelected();
+    const r = runCmd("landing-page-draft", [], JSON.stringify(wellFormedLandingPageInput()));
+    assert.equal(r.status, 0);
+    assert.match(r.stderr, /warning: no claim_refs/);
+    const artifact = readArtifact(SLUG, "p2-landing-page");
+    assert.deepEqual(artifact?.claim_refs, []);
   });
 });
 

@@ -86,13 +86,46 @@ interface ConceptsInput {
   recommended_candidate_ids: string[];
 }
 
+// Shape of a phase_1_research_read finding as persisted by phase1.ts's cmdResearchReadInit --
+// only the fields cmdConcepts needs to cross-check a concept candidate's evidence_refs against.
+interface ResearchReadFindingRecord {
+  finding_id: string;
+  finding_origin: "planned" | "emergent";
+  muxin_confirmed_emergent: boolean | null;
+  signal_quality?: "thin" | "moderate" | "strong";
+}
+
 function cmdConcepts(slug: string) {
   const rules = loadRules();
   const input = JSON.parse(readStdin()) as ConceptsInput;
 
+  // venture-schema-contract.md §2A: the five-concept decision's input_refs MUST include the
+  // research-read artifact id and the continuation decision id it was unlocked by -- same style
+  // check as cmdContinuation (phase1.ts) already does for its own input_refs.
+  if (!input.input_refs.includes("p1-research-read") || !input.input_refs.includes("p1-continuation-01")) {
+    fail(
+      `concepts input_refs must include both "p1-research-read" and "p1-continuation-01" ` +
+        `(venture-schema-contract.md §2A)`
+    );
+  }
+
   if (input.candidates.length !== rules.lead_magnet_concept.concept_count) {
     fail(`expected exactly ${rules.lead_magnet_concept.concept_count} concept candidates, got ${input.candidates.length}`);
   }
+
+  // rules.md §5.6 / venture-schema-contract.md §2C.3: a finding whose muxin_confirmed_emergent is
+  // false stays in the record but MUST be excluded from informing Phase 2. And venture-schema-contract.md
+  // §2A: a candidate resting on a `signal_quality: "thin"` finding MUST be labeled a hypothesis --
+  // cross-checked against the read's own computed label, not just Claude's self-reported
+  // thin_evidence flag. requirePhase2Unlocked (already run in dispatch()) guarantees p1-research-read
+  // exists by this point -- it's a prerequisite of the reviewed research read that unlocks Phase 2.
+  const read = readArtifact(slug, "p1-research-read");
+  const findings = ((read?.fields?.findings as ResearchReadFindingRecord[] | undefined) ?? []);
+  const findingsById = new Map(findings.map((f) => [f.finding_id, f]));
+  const rejectedFindingIds = new Set(
+    findings.filter((f) => f.finding_origin === "emergent" && f.muxin_confirmed_emergent === false).map((f) => f.finding_id)
+  );
+
   for (const c of input.candidates) {
     for (const f of rules.lead_magnet_concept.factors) {
       const score = c.scores?.[f];
@@ -109,6 +142,28 @@ function cmdConcepts(slug: string) {
         `candidate "${c.candidate_id}" is marked thin_evidence but is missing label_as_hypothesis: true -- ` +
           `rules.md §6.1 requires a concept resting on thin evidence to be labeled a hypothesis, not ` +
           `presented with the same confidence as a moderate/strong-evidence concept`
+      );
+    }
+
+    const rejectedRefs = (c.evidence_refs ?? []).filter((ref) => rejectedFindingIds.has(ref));
+    if (rejectedRefs.length) {
+      fail(
+        `candidate "${c.candidate_id}" cites rejected emergent finding(s) ${rejectedRefs.join(", ")} in ` +
+          `evidence_refs -- a finding whose muxin_confirmed_emergent is false is excluded from informing Phase 2 ` +
+          `concept generation (rules.md §5.6, venture-schema-contract.md §2C.3)`
+      );
+    }
+
+    const citedThinFindingIds = (c.evidence_refs ?? [])
+      .map((ref) => findingsById.get(ref))
+      .filter((f): f is ResearchReadFindingRecord => !!f && f.signal_quality === "thin")
+      .map((f) => f.finding_id);
+    if (citedThinFindingIds.length && c.label_as_hypothesis !== true) {
+      fail(
+        `candidate "${c.candidate_id}" cites thin-evidence finding(s) ${citedThinFindingIds.join(", ")} in ` +
+          `evidence_refs but is missing label_as_hypothesis: true -- a candidate resting on a ` +
+          `signal_quality: "thin" finding must be labeled a hypothesis regardless of self-reported ` +
+          `thin_evidence (venture-schema-contract.md §2A)`
       );
     }
   }
@@ -231,6 +286,7 @@ interface LandingPageDraftInput {
   form_intro?: string;
   thank_you_message?: string;
   privacy_copy?: string;
+  claim_refs: ClaimRef[];
 }
 
 function cmdLandingPageDraft(slug: string) {
@@ -265,6 +321,7 @@ function cmdLandingPageDraft(slug: string) {
     thank_you_message: input.thank_you_message,
     privacy_copy: input.privacy_copy,
   });
+  warnIfNoClaimRefs(rules, input.claim_refs);
 
   const artifact = createArtifact(slug, rules, {
     artifact_id: "p2-landing-page",
@@ -286,6 +343,7 @@ function cmdLandingPageDraft(slug: string) {
       thank_you_message: input.thank_you_message ?? null,
       privacy_copy: input.privacy_copy ?? null,
     },
+    claim_refs: input.claim_refs ?? [],
     at: now(),
   });
   console.log(`drafted ${artifact.artifact_id} (landing-page-copy) -- awaiting Muxin's approval`);

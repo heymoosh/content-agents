@@ -411,6 +411,70 @@ describe("research-read-init", () => {
   });
 });
 
+// Finding #2a: signal_quality is now computed and persisted per finding, against the
+// venture-schema-contract.md §2C.4 "Recommended default threshold" -- PROPOSED, not yet
+// Muxin-confirmed as a hard rule. Exercised via the CLI's written artifact, same discipline as
+// the rest of this file.
+describe("signal_quality computation (finding #2a)", () => {
+  function rationaleWith(statuses: Record<string, "present" | "absent" | "unknown">): { factor: string; status: string; evidence_refs: string[] }[] {
+    return SIGNAL_FACTORS.map((factor) => {
+      const status = statuses[factor] ?? "absent";
+      return { factor, status, evidence_refs: status === "unknown" ? [] : ["obs:o-1"] };
+    });
+  }
+
+  function signalQualityFor(rationale: { factor: string; status: string; evidence_refs: string[] }[]): string {
+    seedCheckpoint1();
+    seedActivePlan();
+    const finding = wellFormedFinding({ signal_quality_rationale: rationale });
+    const r = runCmd("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings: [finding] }));
+    assert.equal(r.status, 0, r.stderr);
+    const artifact = readArtifact(SLUG, "p1-research-read");
+    const findings = artifact?.fields?.findings as { signal_quality: string }[];
+    return findings[0].signal_quality;
+  }
+
+  test("audience_fit present + all 7 others present -> strong", () => {
+    const rationale = rationaleWith(Object.fromEntries(SIGNAL_FACTORS.map((f) => [f, "present"])));
+    assert.equal(signalQualityFor(rationale), "strong");
+  });
+
+  test("audience_fit present + exactly 3 others present -> strong", () => {
+    const rationale = rationaleWith({
+      audience_fit: "present",
+      specificity: "present",
+      explicit_stuck_point: "present",
+      requested_help: "present",
+    });
+    assert.equal(signalQualityFor(rationale), "strong");
+  });
+
+  test("audience_fit present + 1 other present -> moderate", () => {
+    const rationale = rationaleWith({ audience_fit: "present", specificity: "present" });
+    assert.equal(signalQualityFor(rationale), "moderate");
+  });
+
+  test("audience_fit unknown + 2 others present -> moderate", () => {
+    const rationale = rationaleWith({ audience_fit: "unknown", specificity: "present", requested_help: "present" });
+    assert.equal(signalQualityFor(rationale), "moderate");
+  });
+
+  test("everything absent -> thin", () => {
+    const rationale = rationaleWith({});
+    assert.equal(signalQualityFor(rationale), "thin");
+  });
+
+  test("audience_fit absent even with 3 others present -> thin", () => {
+    const rationale = rationaleWith({
+      audience_fit: "absent",
+      specificity: "present",
+      explicit_stuck_point: "present",
+      requested_help: "present",
+    });
+    assert.equal(signalQualityFor(rationale), "thin");
+  });
+});
+
 describe("research-read-confirm-emergent", () => {
   function seedResearchRead(): void {
     seedCheckpoint1();
