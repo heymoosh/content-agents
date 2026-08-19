@@ -389,11 +389,18 @@ interface WelcomeEmailDraftInput {
 function requireMagnetAndSurveyExist(slug: string): void {
   const missing: string[] = [];
   if (!readArtifact(slug, "p2-lead-magnet")) missing.push("lead-magnet");
-  if (!readArtifact(slug, "p2-survey-review")) missing.push("survey");
+  const survey = readArtifact(slug, "p2-survey-review");
+  if (!survey) missing.push("survey");
   if (missing.length) {
     fail(
       `refusing: welcome-email-draft requires both a lead-magnet and a survey artifact to exist ` +
         `first -- missing: ${missing.join(", ")} (rules.md §6.6)`
+    );
+  }
+  if (survey && survey.fields?.reviewed_by_muxin !== true) {
+    fail(
+      `refusing: welcome-email-draft requires the survey fit review to be reviewed_by_muxin first -- ` +
+        `p2-survey-review exists but hasn't been approved yet. Run "survey-review-approve" (rules.md §6.6)`
     );
   }
 }

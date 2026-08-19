@@ -446,6 +446,53 @@ describe("research-read-confirm-emergent", () => {
   });
 });
 
+describe("research-read-review", () => {
+  function seedResearchReadWithEmergent(): void {
+    seedCheckpoint1();
+    seedActivePlan();
+    const finding = wellFormedFinding({ finding_origin: "emergent", unknown_ids: [], emergent_description: "a surprise" });
+    runCmd("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings: [finding] }));
+  }
+
+  test("refused when an emergent finding's muxin_confirmed_emergent is still null", () => {
+    seedResearchReadWithEmergent();
+    const r = runCmd("research-read-review", []);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /every emergent finding to be confirmed/);
+    assert.match(r.stderr, /f-001/);
+    assert.match(r.stderr, /research-read-confirm-emergent/);
+    const artifact = readArtifact(SLUG, "p1-research-read");
+    assert.equal(artifact?.fields?.reviewed_by_muxin, false);
+  });
+
+  test("succeeds once the emergent finding is confirmed true", () => {
+    seedResearchReadWithEmergent();
+    runCmd("research-read-confirm-emergent", ["f-001", "true"]);
+    const r = runCmd("research-read-review", []);
+    assert.equal(r.status, 0);
+    const artifact = readArtifact(SLUG, "p1-research-read");
+    assert.equal(artifact?.fields?.reviewed_by_muxin, true);
+  });
+
+  test("succeeds once the emergent finding is confirmed false (an explicit no still counts as confirmed)", () => {
+    seedResearchReadWithEmergent();
+    runCmd("research-read-confirm-emergent", ["f-001", "false"]);
+    const r = runCmd("research-read-review", []);
+    assert.equal(r.status, 0);
+    const artifact = readArtifact(SLUG, "p1-research-read");
+    assert.equal(artifact?.fields?.reviewed_by_muxin, true);
+  });
+
+  test("planned findings never need confirmation -- review succeeds with only a planned finding present", () => {
+    seedCheckpoint1();
+    seedActivePlan();
+    const finding = wellFormedFinding(); // finding_origin: "planned" by default
+    runCmd("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings: [finding] }));
+    const r = runCmd("research-read-review", []);
+    assert.equal(r.status, 0);
+  });
+});
+
 describe("continuation", () => {
   function seedReviewedResearchRead(): void {
     seedCheckpoint1();

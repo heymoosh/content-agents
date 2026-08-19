@@ -418,7 +418,28 @@ function cmdResearchReadConfirmEmergent(slug: string, findingId: string, confirm
 
 // --- research-read-review: Muxin's explicit gate --------------------------------------------------
 
+// An emergent finding needs Muxin's explicit yes/no before it can shape Phase 2 (rules.md §5.6) --
+// refuses the whole-read review if any emergent finding is still sitting at its written-time null.
+// `planned` findings never carry this field's obligation; only "emergent" is checked.
+function requireEmergentFindingsConfirmed(slug: string): void {
+  const read = readArtifact(slug, "p1-research-read");
+  const findings = (read?.fields?.findings as
+    | { finding_id: string; finding_origin: string; muxin_confirmed_emergent?: boolean | null }[]
+    | undefined) ?? [];
+  const unconfirmed = findings
+    .filter((f) => f.finding_origin === "emergent" && f.muxin_confirmed_emergent === null)
+    .map((f) => f.finding_id);
+  if (unconfirmed.length) {
+    fail(
+      `refusing: research-read-review requires every emergent finding to be confirmed first -- ` +
+        `unconfirmed finding_id(s): ${unconfirmed.join(", ")}. Run "research-read-confirm-emergent" ` +
+        `for each (rules.md §5.6)`
+    );
+  }
+}
+
 function cmdResearchReadReview(slug: string) {
+  requireEmergentFindingsConfirmed(slug);
   const updated = updateArtifactFields(slug, "p1-research-read", { reviewed_by_muxin: true, reviewed_at: now() }, now());
   console.log(`p1-research-read reviewed_by_muxin=${updated.fields?.reviewed_by_muxin}`);
 }
