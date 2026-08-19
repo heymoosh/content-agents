@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { readArtifacts, type VentureArtifact } from "./artifacts.js";
 import { hasCanonEvent, findCanonEvent } from "./canon.js";
 import { statePath, ventureDir } from "./paths.js";
+import { loadRules, artifactKindRule } from "./rules.js";
 
 export type PhaseStatus = "drafting" | "awaiting_you" | "checkpoint_ready" | "blocked" | "complete";
 
@@ -29,13 +30,28 @@ export interface VentureState {
 // checkpoint_id is stamped on an artifact at draft time (createArtifact), so "required for
 // Checkpoint 1" is a plain join against artifacts.jsonl -- no separate manifest event needed.
 function checkpoint1State(slug: string, requiredCount: number): Checkpoint1State {
+  const rules = loadRules();
   const required = readArtifacts(slug).filter((a) => a.checkpoint_id === "checkpoint-1");
   const blocking: CheckpointBlocker[] = [];
   let completeCount = 0;
   for (const a of required) {
-    const live = a.editorial_status === "approved" && a.delivery_status === "live_confirmed" && a.evidence;
-    if (live) completeCount++;
-    else blocking.push({ artifact_id: a.artifact_id, reason: `${a.editorial_status}/${a.delivery_status}` });
+    const approvedAndConfirmed = a.editorial_status === "approved" && a.delivery_status === "live_confirmed" && a.evidence;
+    if (!approvedAndConfirmed) {
+      blocking.push({ artifact_id: a.artifact_id, reason: `${a.editorial_status}/${a.delivery_status}` });
+      continue;
+    }
+    // docs/venture-schema-contract.md §3-4: each kind declares a minimum evidence type
+    // (e.g. substack-post requires a real "url", not a bare attestation). A truthy evidence
+    // object alone isn't enough -- it must be at least as strong as that kind's minimum.
+    const minEvidence = artifactKindRule(rules, a.artifact_kind).min_evidence;
+    if (minEvidence && a.evidence!.type !== minEvidence) {
+      blocking.push({
+        artifact_id: a.artifact_id,
+        reason: `evidence type "${a.evidence!.type}" does not meet this kind's minimum ("${minEvidence}")`,
+      });
+      continue;
+    }
+    completeCount++;
   }
   const paceEvent = findCanonEvent(slug, `${slug}/phase-1/pace`);
   const paceRecorded = Boolean(paceEvent);

@@ -45,7 +45,27 @@ export interface VoiceEvidence {
   refused_phrases_tones: string[];
 }
 
-function renderIntakeMd(slug: string, answers: IntakeAnswers, voice: VoiceEvidence): string {
+// venture/rules.md §4.4: "Fix the scorecard before Phase 1... Nothing drafts until intake and
+// the Day 14 scorecard are complete." These are the user-supplied fields; `views_or_clicks_target`
+// and `opt_in_target` may be the literal string "learning_only" when no baseline exists (the
+// system must never invent a number). The other two required fields -- the eligible-response
+// target and the final-decision option set -- are fixed by the rule itself, not elicited per
+// venture; see SCORECARD_FIXED below.
+export interface ScorecardInput {
+  required_live_posts: number;
+  ongoing_pace: string;
+  views_or_clicks_target: string;
+  opt_in_target: string;
+  response_quality_test: string;
+  sustainability_test: string;
+}
+
+export const SCORECARD_FIXED = {
+  eligible_response_target: { minimum: 20, target: 30 },
+  final_decision_options: ["continue", "revise_positioning", "revise_lead_magnet", "collect_more_evidence", "stop"],
+} as const;
+
+function renderIntakeMd(slug: string, answers: IntakeAnswers, voice: VoiceEvidence, scorecard: ScorecardInput): string {
   const lines = [`# Intake — ${slug}`, ``, `Answers are stored verbatim, exactly as given. Nothing here is paraphrased.`, ``];
   let currentBlock = "";
   for (const q of INTAKE_QUESTIONS) {
@@ -66,15 +86,44 @@ function renderIntakeMd(slug: string, answers: IntakeAnswers, voice: VoiceEviden
     `**Natural phrases:** ${voice.natural_phrases.join(", ")}`,
     ``,
     `**Refused phrases/tones:** ${voice.refused_phrases_tones.join(", ")}`,
+    ``,
+    `## Day 14 scorecard`,
+    ``,
+    `Fixed at kickoff, per venture/rules.md §4.4. This is what Day 14 review scores against —`,
+    `it is not revised mid-run.`,
+    ``,
+    `**Required live Phase 1 posts:** ${scorecard.required_live_posts}`,
+    `**Ongoing posting pace:** ${scorecard.ongoing_pace}`,
+    `**Qualified views/clicks target:** ${scorecard.views_or_clicks_target}`,
+    `**Landing-page opt-in target:** ${scorecard.opt_in_target}`,
+    `**Eligible unique response target:** minimum ${SCORECARD_FIXED.eligible_response_target.minimum}, target ${SCORECARD_FIXED.eligible_response_target.target}`,
+    `**Response-quality test:** ${scorecard.response_quality_test}`,
+    `**Sustainability test:** ${scorecard.sustainability_test}`,
+    `**Final decision options:** ${SCORECARD_FIXED.final_decision_options.join(", ")}`,
     ``
   );
   return lines.join("\n") + "\n";
+}
+
+const REQUIRED_SCORECARD_STRING_FIELDS: (keyof Omit<ScorecardInput, "required_live_posts">)[] = [
+  "ongoing_pace",
+  "views_or_clicks_target",
+  "opt_in_target",
+  "response_quality_test",
+  "sustainability_test",
+];
+
+function scorecardIsComplete(scorecard: ScorecardInput | undefined): scorecard is ScorecardInput {
+  if (!scorecard) return false;
+  if (!Number.isFinite(scorecard.required_live_posts) || scorecard.required_live_posts <= 0) return false;
+  return REQUIRED_SCORECARD_STRING_FIELDS.every((f) => scorecard[f]?.trim());
 }
 
 export interface KickoffInput {
   slug: string;
   answers: IntakeAnswers;
   voice: VoiceEvidence;
+  scorecard: ScorecardInput;
   rules: VentureRules;
   at: string;
 }
@@ -86,10 +135,18 @@ export function kickoffVenture(input: KickoffInput): { alreadyKickedOff: boolean
   if (missing.length) {
     throw new Error(`intake incomplete -- missing answers for: ${missing.map((q) => q.id).join(", ")}`);
   }
+  if (!scorecardIsComplete(input.scorecard)) {
+    throw new Error(
+      "intake incomplete -- the Day 14 scorecard is not fully fixed (venture/rules.md §4.4); " +
+        "required_live_posts, ongoing_pace, views_or_clicks_target, opt_in_target, " +
+        "response_quality_test, and sustainability_test must all be set (targets may be the " +
+        'literal "learning_only" when there is no baseline)'
+    );
+  }
   const dir = ventureDir(input.slug);
   mkdirSync(dir, { recursive: true });
   if (!existsSync(intakePath(input.slug))) {
-    writeFileSync(intakePath(input.slug), renderIntakeMd(input.slug, input.answers, input.voice));
+    writeFileSync(intakePath(input.slug), renderIntakeMd(input.slug, input.answers, input.voice, input.scorecard));
   }
   const { alreadyRecorded } = appendCanonEvent(
     input.slug,
@@ -99,6 +156,7 @@ export function kickoffVenture(input: KickoffInput): { alreadyKickedOff: boolean
       rules_version: input.rules.rules_version,
       starter_kit_sha256: input.rules.sources.starter_kit_sha256,
       welsh_note_sha256: input.rules.sources.welsh_note_sha256,
+      scorecard_fixed: "true",
     },
     input.at
   );

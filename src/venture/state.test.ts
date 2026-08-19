@@ -101,6 +101,45 @@ describe("deriveState -- Checkpoint 1", () => {
     assert.equal(state.phase_status, "complete");
   });
 
+  test("live with the wrong evidence type for the kind does not count toward Checkpoint 1", () => {
+    // text-post-note requires "agent" evidence (rules.yaml) -- writing "url" evidence onto one
+    // (e.g. state corrupted outside the normal deliver.ts path) must not silently count as live.
+    seedRequiredArtifact("p1-a");
+    transitionArtifact(SLUG, "p1-a", { editorial_status: "approved", delivery_status: "ready" }, "t1");
+    transitionArtifact(
+      SLUG,
+      "p1-a",
+      { delivery_status: "live_confirmed", evidence: { type: "url", value: "https://example.com", confirmed_by: "muxin" } },
+      "t2"
+    );
+    const state = deriveState(SLUG, 1);
+    assert.equal(state.checkpoint1.complete_count, 0);
+    assert.match(state.checkpoint1.blocking[0].reason, /does not meet this kind's minimum/);
+  });
+
+  test("a substack-post (min_evidence url) with agent evidence does not count either", () => {
+    createArtifact(SLUG, rules, {
+      artifact_id: "p1-essay",
+      phase: 1,
+      artifact_kind: "substack-post",
+      title: "essay",
+      checkpoint_id: "checkpoint-1",
+      venture_id: SLUG,
+      venture_phase: 1,
+      message_id: "msg-p1-essay",
+      at: "t0",
+    });
+    transitionArtifact(SLUG, "p1-essay", { editorial_status: "approved", delivery_status: "ready" }, "t1");
+    transitionArtifact(
+      SLUG,
+      "p1-essay",
+      { delivery_status: "live_confirmed", evidence: { type: "agent", value: "ref", confirmed_by: "agent" } },
+      "t2"
+    );
+    const state = deriveState(SLUG, 1);
+    assert.equal(state.checkpoint1.complete_count, 0);
+  });
+
   test("rerunning deriveState after clearing is idempotent -- still reads complete", () => {
     seedRequiredArtifact("p1-a");
     appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "t0");

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
+import { findCanonEvent } from "./canon.js";
 
 // venture/rules.md is the prose authority and does NOT execute. A phase script loads ONLY
 // venture/rules.yaml, via this module. Never parse rules.md at runtime -- src/venture/rules.test.ts
@@ -77,6 +78,16 @@ export function assertRulesVersion(stampedVersion: string, rules: VentureRules):
   if (stampedVersion !== rules.rules_version) {
     throw new RulesVersionMismatchError(stampedVersion, rules.rules_version);
   }
+}
+
+// venture/rules.yaml can change between when a venture was kicked off and when a later phase
+// script runs against it. Called at the top of every venture CLI's dispatch -- refuses rather
+// than silently applying a revised rubric to an in-flight venture. No-ops before kickoff exists
+// (the command's own not-found error is the right one to surface there).
+export function requireRulesVersionMatch(slug: string, rules: VentureRules): void {
+  const kickoff = findCanonEvent(slug, `${slug}/kickoff`);
+  if (!kickoff?.fields.rules_version) return;
+  assertRulesVersion(kickoff.fields.rules_version, rules);
 }
 
 export function artifactKindRule(rules: VentureRules, kind: ArtifactKind): ArtifactKindRule {

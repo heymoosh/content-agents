@@ -23,6 +23,17 @@ function fullAnswers(): IntakeAnswers {
   return a;
 }
 
+function fullScorecard() {
+  return {
+    required_live_posts: 3,
+    ongoing_pace: "5 posts/week",
+    views_or_clicks_target: "learning_only",
+    opt_in_target: "learning_only",
+    response_quality_test: "at least one specific, on-topic reply per post",
+    sustainability_test: "fits inside the 5 hrs/week declared in q20",
+  };
+}
+
 describe("INTAKE_QUESTIONS", () => {
   test("has exactly 25 questions", () => {
     assert.equal(INTAKE_QUESTIONS.length, 25);
@@ -44,37 +55,87 @@ describe("kickoffVenture", () => {
 
   test("refuses to kick off with missing answers", () => {
     assert.throws(
-      () => kickoffVenture({ slug: SLUG, answers: { q1: "only one answered" }, voice, rules, at: "t0" }),
+      () =>
+        kickoffVenture({
+          slug: SLUG,
+          answers: { q1: "only one answered" },
+          voice,
+          scorecard: fullScorecard(),
+          rules,
+          at: "t0",
+        }),
       /intake incomplete/
     );
     assert.equal(existsSync(intakePath(SLUG)), false);
   });
 
-  test("with all 25 answered, writes intake.md and the kickoff canon event", () => {
-    const r = kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, rules, at: "2026-08-19T00:00:00.000Z" });
+  test("refuses to kick off with an incomplete scorecard", () => {
+    assert.throws(
+      () =>
+        kickoffVenture({
+          slug: SLUG,
+          answers: fullAnswers(),
+          voice,
+          scorecard: { ...fullScorecard(), ongoing_pace: "" },
+          rules,
+          at: "t0",
+        }),
+      /Day 14 scorecard/
+    );
+    assert.equal(existsSync(intakePath(SLUG)), false);
+  });
+
+  test("refuses a scorecard with a non-positive required_live_posts", () => {
+    assert.throws(
+      () =>
+        kickoffVenture({
+          slug: SLUG,
+          answers: fullAnswers(),
+          voice,
+          scorecard: { ...fullScorecard(), required_live_posts: 0 },
+          rules,
+          at: "t0",
+        }),
+      /Day 14 scorecard/
+    );
+  });
+
+  test("with all 25 answered and a complete scorecard, writes intake.md and the kickoff canon event", () => {
+    const r = kickoffVenture({
+      slug: SLUG,
+      answers: fullAnswers(),
+      voice,
+      scorecard: fullScorecard(),
+      rules,
+      at: "2026-08-19T00:00:00.000Z",
+    });
     assert.equal(r.alreadyKickedOff, false);
     assert.equal(existsSync(intakePath(SLUG)), true);
     assert.equal(hasCanonEvent(SLUG, `${SLUG}/kickoff`), true);
   });
 
-  test("intake.md stores answers verbatim", () => {
-    kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, rules, at: "t0" });
+  test("intake.md stores answers verbatim and the fixed scorecard", () => {
+    kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, scorecard: fullScorecard(), rules, at: "t0" });
     const text = readFileSync(intakePath(SLUG), "utf8");
     assert.match(text, /answer to q1/);
     assert.match(text, /answer to q25/);
+    assert.match(text, /Day 14 scorecard/);
+    assert.match(text, /Required live Phase 1 posts:\*\* 3/);
+    assert.match(text, /minimum 20, target 30/);
   });
 
   test("kicking off twice is idempotent on the canon event", () => {
-    kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, rules, at: "t0" });
-    const r2 = kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, rules, at: "t1" });
+    kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, scorecard: fullScorecard(), rules, at: "t0" });
+    const r2 = kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, scorecard: fullScorecard(), rules, at: "t1" });
     assert.equal(r2.alreadyKickedOff, true);
   });
 
-  test("stamps the rules_version and both source hashes on the kickoff canon event", () => {
-    kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, rules, at: "t0" });
+  test("stamps the rules_version, both source hashes, and scorecard_fixed on the kickoff canon event", () => {
+    kickoffVenture({ slug: SLUG, answers: fullAnswers(), voice, scorecard: fullScorecard(), rules, at: "t0" });
     const event = findCanonEvent(SLUG, `${SLUG}/kickoff`);
     assert.equal(event?.fields.rules_version, rules.rules_version);
     assert.equal(event?.fields.starter_kit_sha256, rules.sources.starter_kit_sha256);
     assert.equal(event?.fields.welsh_note_sha256, rules.sources.welsh_note_sha256);
+    assert.equal(event?.fields.scorecard_fixed, "true");
   });
 });
