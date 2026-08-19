@@ -1,11 +1,23 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch } from "./rules.js";
 import { createArtifact, readArtifact, updateArtifactFields, type ClaimRef } from "./artifacts.js";
-import { writeDecision, selectDecision, readDecision, type Candidate, type DecisionRecord } from "./decisions.js";
+import { writeDecision, selectWithOverride, readDecision, type Candidate, type DecisionRecord } from "./decisions.js";
 import { phase2Dir } from "./paths.js";
 import { requirePhase2Unlocked } from "./phase1.js";
-import { fail, now, cmdApprove, cmdDiscard, cmdRestore, cmdList } from "./artifact-lifecycle.js";
+import {
+  fail,
+  now,
+  cmdApprove,
+  cmdDiscard,
+  cmdRestore,
+  cmdList,
+  readStdin,
+  flag,
+  positionalArgs,
+  checkNoEmDash,
+  warnIfNoClaimRefs,
+} from "./artifact-lifecycle.js";
 
 // Phase 2 script: scaffolding and gate checks only, same discipline as phase1.ts. Concept
 // generation, copy drafting, and the survey fit review are Claude's own judgment work, done
@@ -14,30 +26,9 @@ import { fail, now, cmdApprove, cmdDiscard, cmdRestore, cmdList } from "./artifa
 // that skips a gate.
 //
 // usage: tsx src/venture/phase2.ts <subcommand> <slug> [...args] [--stdin]
-
-function readStdin(): string {
-  return readFileSync(0, "utf8");
-}
-
-function flag(name: string): string | undefined {
-  const i = process.argv.indexOf(name);
-  return i >= 0 ? process.argv[i + 1] : undefined;
-}
-
-// Strips each named flag AND its following value out of a positional-args array -- see phase1.ts
-// for why the naive "just filter out strings starting with --" approach breaks on a multi-word
-// flag value.
-function positionalArgs(rest: string[], ...knownFlags: string[]): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < rest.length; i++) {
-    if (knownFlags.includes(rest[i])) {
-      i++;
-      continue;
-    }
-    out.push(rest[i]);
-  }
-  return out;
-}
+//
+// readStdin/flag/positionalArgs/checkNoEmDash/warnIfNoClaimRefs are shared with phase1.ts -- see
+// artifact-lifecycle.ts.
 
 // --- small shared validators -------------------------------------------------------------------
 
@@ -46,23 +37,6 @@ function requireNonEmpty(fields: Record<string, string | undefined | null>): voi
     .filter(([, v]) => !v || !v.trim())
     .map(([k]) => k);
   if (missing.length) fail(`missing required field(s): ${missing.join(", ")}`);
-}
-
-function checkNoEmDash(fields: Record<string, string | string[] | undefined>): void {
-  for (const [key, val] of Object.entries(fields)) {
-    if (!val) continue;
-    const text = Array.isArray(val) ? val.join(" ") : val;
-    if (text.includes("—")) fail(`draft field "${key}" contains an em dash -- config/voice.yaml bans them, no exceptions`);
-  }
-}
-
-function warnIfNoClaimRefs(rules: ReturnType<typeof loadRules>, claimRefs: ClaimRef[] | undefined): void {
-  if (rules.draft.require_claim_refs && (claimRefs?.length ?? 0) === 0) {
-    console.warn(
-      `warning: no claim_refs on this draft -- if it makes ANY concrete factual claim, that claim ` +
-        `needs a ref to intake:qN or a confirmed_known, or it must be cut/reframed as a hypothesis`
-    );
-  }
 }
 
 // Writes a manual-kind Phase 2 artifact's structured `fields` out to a real, human-readable
@@ -139,45 +113,80 @@ function cmdConcepts(slug: string) {
     findings.filter((f) => f.finding_origin === "emergent" && f.muxin_confirmed_emergent === false).map((f) => f.finding_id)
   );
 
-  for (const c of input.candidates) {
-    for (const f of rules.lead_magnet_concept.factors) {
-      const score = c.scores?.[f];
-      if (typeof score !== "number") fail(`candidate "${c.candidate_id}" is missing a score for factor "${f}"`);
-      if (score < rules.lead_magnet_concept.score_scale.min || score > rules.lead_magnet_concept.score_scale.max) {
-        fail(
-          `candidate "${c.candidate_id}" factor "${f}" score ${score} is outside the ` +
-            `${rules.lead_magnet_concept.score_scale.min}-${rules.lead_magnet_concept.score_scale.max} scale`
-        );
-      }
-    }
-    if (c.thin_evidence === true && c.label_as_hypothesis !== true) {
-      fail(
+  // Local, per-candidate validation checks -- a plain list run in a loop below instead of a
+  // hand-stacked pile of if/fail blocks, so a future check slots in as one more list entry. Not a
+  // shared/reusable validator module: this structure is internal to cmdConcepts. Order matches the
+  // original sequential checks exactly (factor scores, in factor order, then the three
+  // whole-candidate checks), since only the first failing check for a candidate ever surfaces.
+  const candidateChecks: { check: (c: ConceptCandidateInput) => boolean; message: (c: ConceptCandidateInput) => string }[] = [
+    ...rules.lead_magnet_concept.factors.flatMap((f) => [
+      {
+        check: (c: ConceptCandidateInput) => typeof c.scores?.[f] !== "number",
+        message: (c: ConceptCandidateInput) => `candidate "${c.candidate_id}" is missing a score for factor "${f}"`,
+      },
+      {
+        check: (c: ConceptCandidateInput) => {
+          const score = c.scores?.[f];
+          return (
+            typeof score === "number" &&
+            (score < rules.lead_magnet_concept.score_scale.min || score > rules.lead_magnet_concept.score_scale.max)
+          );
+        },
+        message: (c: ConceptCandidateInput) =>
+          `candidate "${c.candidate_id}" factor "${f}" score ${c.scores?.[f]} is outside the ` +
+          `${rules.lead_magnet_concept.score_scale.min}-${rules.lead_magnet_concept.score_scale.max} scale`,
+      },
+    ]),
+    {
+      // rules.md §6.1: a concept resting on thin evidence must be labeled a hypothesis, not
+      // presented with the same confidence as a moderate/strong-evidence concept.
+      check: (c) => c.thin_evidence === true && c.label_as_hypothesis !== true,
+      message: (c) =>
         `candidate "${c.candidate_id}" is marked thin_evidence but is missing label_as_hypothesis: true -- ` +
-          `rules.md §6.1 requires a concept resting on thin evidence to be labeled a hypothesis, not ` +
-          `presented with the same confidence as a moderate/strong-evidence concept`
-      );
-    }
-
-    const rejectedRefs = (c.evidence_refs ?? []).filter((ref) => rejectedFindingIds.has(ref));
-    if (rejectedRefs.length) {
-      fail(
-        `candidate "${c.candidate_id}" cites rejected emergent finding(s) ${rejectedRefs.join(", ")} in ` +
+        `rules.md §6.1 requires a concept resting on thin evidence to be labeled a hypothesis, not ` +
+        `presented with the same confidence as a moderate/strong-evidence concept`,
+    },
+    {
+      // rules.md §5.6, venture-schema-contract.md §2C.3: a finding whose muxin_confirmed_emergent
+      // is false is excluded from informing Phase 2 concept generation.
+      check: (c) => (c.evidence_refs ?? []).some((ref) => rejectedFindingIds.has(ref)),
+      message: (c) => {
+        const rejectedRefs = (c.evidence_refs ?? []).filter((ref) => rejectedFindingIds.has(ref));
+        return (
+          `candidate "${c.candidate_id}" cites rejected emergent finding(s) ${rejectedRefs.join(", ")} in ` +
           `evidence_refs -- a finding whose muxin_confirmed_emergent is false is excluded from informing Phase 2 ` +
           `concept generation (rules.md §5.6, venture-schema-contract.md §2C.3)`
-      );
-    }
-
-    const citedThinFindingIds = (c.evidence_refs ?? [])
-      .map((ref) => findingsById.get(ref))
-      .filter((f): f is ResearchReadFindingRecord => !!f && f.signal_quality === "thin")
-      .map((f) => f.finding_id);
-    if (citedThinFindingIds.length && c.label_as_hypothesis !== true) {
-      fail(
-        `candidate "${c.candidate_id}" cites thin-evidence finding(s) ${citedThinFindingIds.join(", ")} in ` +
+        );
+      },
+    },
+    {
+      // venture-schema-contract.md §2A: a candidate resting on a signal_quality: "thin" finding
+      // must be labeled a hypothesis, cross-checked against the read's own computed label, not
+      // just Claude's self-reported thin_evidence flag.
+      check: (c) => {
+        const citedThin = (c.evidence_refs ?? [])
+          .map((ref) => findingsById.get(ref))
+          .some((f) => !!f && f.signal_quality === "thin");
+        return citedThin && c.label_as_hypothesis !== true;
+      },
+      message: (c) => {
+        const citedThinFindingIds = (c.evidence_refs ?? [])
+          .map((ref) => findingsById.get(ref))
+          .filter((f): f is ResearchReadFindingRecord => !!f && f.signal_quality === "thin")
+          .map((f) => f.finding_id);
+        return (
+          `candidate "${c.candidate_id}" cites thin-evidence finding(s) ${citedThinFindingIds.join(", ")} in ` +
           `evidence_refs but is missing label_as_hypothesis: true -- a candidate resting on a ` +
           `signal_quality: "thin" finding must be labeled a hypothesis regardless of self-reported ` +
           `thin_evidence (venture-schema-contract.md §2A)`
-      );
+        );
+      },
+    },
+  ];
+
+  for (const c of input.candidates) {
+    for (const { check, message } of candidateChecks) {
+      if (check(c)) fail(message(c));
     }
   }
 
@@ -205,20 +214,10 @@ function cmdConcepts(slug: string) {
 function cmdConceptSelect(slug: string, candidateId: string) {
   const rules = loadRules();
   const overrideReason = flag("--override-reason");
-  const current = readDecision(slug, "p2-concept-01");
-  const isOverride = !!current && !current.recommended_candidate_ids.includes(candidateId);
-  if (isOverride && !overrideReason?.trim()) {
-    fail(
-      `"${candidateId}" is not the recommended concept (recommended: ${current!.recommended_candidate_ids.join(", ")}) -- ` +
-        `overriding the recommendation requires --override-reason "..." so the audit trail records why (rules.md §6.2)`
-    );
-  }
-  const d = selectDecision(slug, "p2-concept-01", {
-    selectedCandidateIds: [candidateId],
-    selectedBy: "muxin",
-    overrideReason: isOverride ? overrideReason : null,
+  const d = selectWithOverride(slug, "p2-concept-01", candidateId, overrideReason, {
     requiredSelectCount: rules.lead_magnet_concept.select_count,
-    at: now(),
+    ruleCite: "rules.md §6.2",
+    candidateLabel: "concept",
   });
   console.log(`concept selected: ${d.selected_candidate_ids[0]}`);
 }
