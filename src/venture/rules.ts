@@ -8,13 +8,32 @@ import { findCanonEvent } from "./canon.js";
 // venture/rules.yaml, via this module. Never parse rules.md at runtime -- src/venture/rules.test.ts
 // is the parity check that keeps the two from drifting.
 
-export type ArtifactKind = "substack-post" | "text-post-note" | "phase_1_research_plan";
+export type ArtifactKind =
+  | "substack-post"
+  | "text-post-note"
+  | "phase_1_research_plan"
+  | "phase_1_research_read"
+  | "lead-magnet"
+  | "landing-page-copy"
+  | "welcome-email"
+  | "survey"
+  | "text-post-announcement";
 
 export interface ArtifactKindRule {
   delivery_mode: "manual" | "app" | "none";
   publishable: boolean;
-  min_evidence: "url" | "agent" | null;
+  min_evidence: "url" | "agent" | "attestation" | null;
   phase: number;
+}
+
+// checkpoint-1 style: N of any required-checkpoint_id artifact (required_artifact_count).
+// checkpoint-2 style: exactly one live artifact per named kind (required_artifact_kinds).
+// A checkpoint rule uses exactly one of the two count shapes, never both.
+export interface CheckpointRule {
+  required_artifact_count?: number;
+  required_artifact_kinds?: string[];
+  require_all_live: boolean;
+  require_pace_recorded?: boolean;
 }
 
 export interface VentureRules {
@@ -44,12 +63,19 @@ export interface VentureRules {
   };
   cta_policy_by_phase: Record<string, string>;
   phase_1_pace: { recommended_posts_per_week: number };
-  checkpoints: {
-    "checkpoint-1": {
-      required_artifact_count: number;
-      require_all_live: boolean;
-      require_pace_recorded: boolean;
-    };
+  checkpoints: Record<string, CheckpointRule>;
+  lead_magnet_concept: {
+    concept_count: number;
+    factors: string[];
+    score_scale: { min: number; max: number };
+    select_count: number;
+  };
+  research_continuation: {
+    candidates: string[];
+  };
+  research_read: {
+    required_sources: string[];
+    signal_quality_factors: string[];
   };
 }
 

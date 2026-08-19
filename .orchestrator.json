@@ -35,6 +35,8 @@
       ".claude/skills/venture/**",
       "venture/rules.yaml",
       "venture/rules.md",
+      "venture/CLAUDE.md",
+      "venture/existing-survey-humaninference.md",
       "src/publish/substack.ts",
       ".orchestrator.json"
     ]

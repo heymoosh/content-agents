@@ -2,19 +2,20 @@
 # authority and does NOT execute -- a phase script loads ONLY this file. src/venture/rules.ts
 # validates this file's rules_version against what's stamped in a venture's canon.md at kickoff.
 #
-# Phase-1-scoped only. Sections for Phase 2-4 are not yet encoded -- see the `# not yet encoded`
-# markers below, each pointing at the venture/rules.md section that covers it. Partial coverage is
-# deliberate and visible, never silent (see the parity test, src/venture/rules.test.ts).
+# Phase 1 + Phase 2 rubrics are now encoded. Phase 3-4 sections are not yet encoded -- see the
+# `# not yet encoded` markers below, each pointing at the venture/rules.md section that covers it.
+# Partial coverage is deliberate and visible, never silent (see the parity test,
+# src/venture/rules.test.ts).
 
-rules_version: venture-rules-2026-08-07-draft-1
+rules_version: venture-rules-2026-08-19-draft-1
 
 sources:
   starter_kit_sha256: "773250cefd3ec8a8dfd86b1f6247f9005dd1f1bda47a0c5171a6f6236722ecc6"
   welsh_note_sha256: "bad486c48b8477a9ae3c92fae3cd1c40dded1dc6cda483a5f297ddbb6da81df3"
 
-# venture-schema-contract.md §3's artifact-kind table -- Phase 1 rows only. Every other kind
-# (lead-magnet, landing-page-copy, welcome-email, survey, product-outline, price-decision, ...)
-# is # not yet encoded -- see venture-schema-contract.md §3 in full.
+# venture-schema-contract.md §3's artifact-kind table -- Phase 1 and Phase 2 rows now encoded.
+# Remaining kinds (product-outline, price-decision, thank-you-note -- Phase 3/4) are
+# # not yet encoded -- see venture-schema-contract.md §3 in full.
 artifact_kinds:
   substack-post:
     delivery_mode: manual # ready-to-paste/, Muxin pastes it herself
@@ -31,6 +32,44 @@ artifact_kinds:
     publishable: false
     min_evidence: null
     phase: 1
+  phase_1_research_read:
+    delivery_mode: none # internal artifact; required before Phase 2 concept generation (rules.md §5.6)
+    publishable: false
+    min_evidence: null
+    phase: 1
+  lead-magnet:
+    delivery_mode: manual # published/hosted wherever it is downloadable; Muxin installs it herself
+    publishable: false
+    min_evidence: url
+    phase: 2
+  landing-page-copy:
+    delivery_mode: manual # copy/outline only -- Muxin installs it on humaninference.ai herself
+    publishable: false
+    min_evidence: url
+    phase: 2
+  welcome-email:
+    delivery_mode: manual # copy only -- Muxin installs it in her email tool herself
+    publishable: false
+    min_evidence: attestation
+    phase: 2
+  survey:
+    # A fit review of Muxin's existing live survey against the chosen lead magnet, not a new
+    # survey authored from scratch (rules.md §6.5, amended 2026-08-19; see
+    # venture/existing-survey-humaninference.md).
+    delivery_mode: manual
+    publishable: false
+    min_evidence: url
+    phase: 2
+  text-post-announcement:
+    # venture-schema-contract.md §3 actually states delivery_mode as "manual or app, per its
+    # channel" -- the announcement ships as whichever of substack-post/text-post-note the chosen
+    # platform item uses, decided per post. This static table takes the more conservative
+    # "manual" default; per-item delivery-mode selection is phase2.ts's job, a separate work
+    # package from this one.
+    delivery_mode: manual
+    publishable: false
+    min_evidence: url
+    phase: 2
 
 # rules.md §5.1 -- the platform-recommendation decision. Single primary platform only; the
 # system MUST NOT recommend a multi-platform launch.
@@ -63,9 +102,10 @@ draft:
   require_reply_prompt: true # §1A.1: "no CTA" needs a recorded exception, never a default
   require_claim_refs: true # every concrete factual claim traces to intake:qN or a confirmed_known
 
-# rules.md §1A.1 -- CTA policy by phase. Phase 1 only; later phases # not yet encoded.
+# rules.md §1A.1 -- CTA policy by phase. Phase 3-4 # not yet encoded.
 cta_policy_by_phase:
   1: reply_prompt
+  2: lead_magnet_bridge # "Bridge to the relevant active lead magnet."
 
 # rules.md §5.4-§5.5 -- publish pace and Checkpoint 1's three-part predicate.
 phase_1_pace:
@@ -75,7 +115,28 @@ checkpoints:
     required_artifact_count: 3
     require_all_live: true # Muxin, 2026-08-18 -- no partial pass
     require_pace_recorded: true
+  checkpoint-2:
+    required_artifact_kinds: [lead-magnet, landing-page-copy, welcome-email, survey]
+    require_all_live: true # rules.md §6.8 -- the announcement is explicitly NOT required to clear
 
-# not yet encoded — see venture/rules.md §6 (Phase 2: Audience), §7 (Phase 3: Offer),
-# §8 (Phase 4: Operations), and venture-schema-contract.md §5.4/§5.6/§5.7/§5.8 (responses,
-# evidence links, funnel events, Signals mapping). None of it is needed until a later slice.
+# rules.md §6.2 -- five lead-magnet concepts, six factors, Muxin selects (or overrides) one.
+lead_magnet_concept:
+  concept_count: 5
+  factors: [early_problem, narrowness, frustration, fast_win, proof_fit, research_value]
+  score_scale: { min: 1, max: 5 }
+  select_count: 1
+
+# rules.md §5.6 -- the phase-1-research-continuation decision that gates Phase 2 concept
+# generation (venture-schema-contract.md §2A).
+research_continuation:
+  candidates: [more_probes, proceed_with_evidence, proceed_as_hypothesis]
+
+# rules.md §5.6 / venture-schema-contract.md §2C.3-§2C.4 -- phase_1_research_read's required
+# evidence-channel coverage and its per-finding signal-quality rubric.
+research_read:
+  required_sources: [note_reply, essay_comment, metric, subscriber_movement, dm, email, follow_up_question, creator_observation]
+  signal_quality_factors: [audience_fit, specificity, explicit_stuck_point, requested_help, follow_up_question, recurrence, behavioral_action, exposure_context]
+
+# not yet encoded — see venture/rules.md §7 (Phase 3: Offer), §8 (Phase 4: Operations), and
+# venture-schema-contract.md §5.4/§5.6/§5.7/§5.8 (responses, evidence links, funnel events,
+# Signals mapping). None of it is needed until a later slice.
