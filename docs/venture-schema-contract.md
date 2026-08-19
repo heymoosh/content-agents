@@ -1748,10 +1748,16 @@ Checkpoint-3/response-gate conflation (§5.3) are now resolved. What's left:
 2. **Markdown vs. SQLite for venture state** — decides §0.1 only. Field names, enums and transitions
    are unaffected. Recommended default: keep Markdown plus JSONL at the design stage unless
    implementation evidence favors SQLite.
-3. **What backs the humaninference.ai signup form, email capture, and the survey** (confirmation-page
-   primary — §3's `survey` row was corrected 2026-08-07; it is no longer described as embedded in the
-   welcome email) — blocks Phase 2 and Checkpoint 2 outright. The site is live but has no signup form.
-   This is the one open question that is not a design question and cannot be worked around.
+3. **What backs the humaninference.ai signup form, email capture, and the survey.** ~~blocks Phase 2
+   and Checkpoint 2 outright. The site is live but has no signup form. This is the one open question
+   that is not a design question and cannot be worked around.~~ **Superseded 2026-08-19, resolved:**
+   survey and email-capture capabilities already exist live on Muxin's own site (a real 4-question
+   branching survey, checked into `venture/existing-survey-humaninference.md`) — the still-missing
+   piece is only the lead-magnet landing page. This repo's Phase 2 scope is producing copy/concepts
+   (lead magnet, landing-page copy, welcome-email copy, a fit review of the existing survey against
+   whichever magnet gets chosen) for Muxin to install and confirm herself — it does not build or wire
+   any capture mechanism. §3's `survey` row's `fields` shape needs a corresponding edit (fit-review,
+   not new-survey-authoring) as part of the Phase 2 build — tracked there, not restated here.
 4. **Phase 1's format split** — how many `substack-post` vs. `text-post-note` (§3, renamed from
    `text-post-longform`), and whether Checkpoint 1 requires all of them live or a subset. Sets
    `required` in §5.1's manifest and decides `text-post-announcement`'s `delivery_mode` in §3, so the
