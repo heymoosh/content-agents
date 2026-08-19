@@ -1,9 +1,11 @@
-import { test, describe } from "node:test";
+import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { loadRules, assertRulesVersion, artifactKindRule, RulesVersionMismatchError } from "./rules.js";
+import { loadRules, assertRulesVersion, artifactKindRule, requireRulesVersionMatch, RulesVersionMismatchError } from "./rules.js";
+import { appendCanonEvent } from "./canon.js";
+import { ventureDir } from "./paths.js";
 
 // The anti-drift mechanism venture-build-plan.md §F requires: every threshold/enum/predicate
 // venture/rules.yaml encodes must match what venture/rules.md's prose currently states. This
@@ -91,6 +93,31 @@ describe("assertRulesVersion", () => {
         assert.match((err as Error).message, new RegExp(rules.rules_version));
         return true;
       }
+    );
+  });
+});
+
+describe("requireRulesVersionMatch", () => {
+  const SLUG = "zz-test-rules-version-match";
+
+  afterEach(() => {
+    rmSync(ventureDir(SLUG), { recursive: true, force: true });
+  });
+
+  test("no-ops before a kickoff event exists", () => {
+    assert.doesNotThrow(() => requireRulesVersionMatch(SLUG, rules));
+  });
+
+  test("no-ops when the venture's stamped version matches what's loaded", () => {
+    appendCanonEvent(SLUG, "kickoff", `${SLUG}/kickoff`, { rules_version: rules.rules_version }, "t0");
+    assert.doesNotThrow(() => requireRulesVersionMatch(SLUG, rules));
+  });
+
+  test("throws RulesVersionMismatchError when the venture was kicked off under a different version", () => {
+    appendCanonEvent(SLUG, "kickoff", `${SLUG}/kickoff`, { rules_version: "some-old-version" }, "t0");
+    assert.throws(
+      () => requireRulesVersionMatch(SLUG, rules),
+      (err: unknown) => err instanceof RulesVersionMismatchError
     );
   });
 });

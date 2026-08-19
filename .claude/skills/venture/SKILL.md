@@ -35,16 +35,23 @@ at a time (not a form dump). For each question:
   offers.
 - After all 25, collect voice evidence: 1-3 writing samples, a worldview statement, phrases she
   naturally uses, phrases/tones she refuses.
+- Then fix the **Day 14 scorecard** (rules.md §4.4) — this is what Day 14 review scores against
+  later, so it has to be set now, not invented after the fact: required number of live Phase 1
+  posts, ongoing posting pace, a qualified views/clicks target (or the literal `"learning_only"`
+  if there's no baseline — never invent a number), a landing-page opt-in target (same
+  `"learning_only"` rule), a response-quality test, and a sustainability test against her declared
+  time budget (q20). The eligible-response target (min 20, target 30) and the final-decision
+  option set are fixed by the rule itself — you don't ask Muxin for those.
 
-Then write the answers via stdin as JSON matching `IntakeAnswers`/`VoiceEvidence`
+Then write the answers via stdin as JSON matching `IntakeAnswers`/`VoiceEvidence`/`ScorecardInput`
 (`src/venture/intake.ts`):
 
 ```
-echo '{"answers": {...25 keys...}, "voice": {...}}' | tsx src/venture/new-venture.ts <slug>
+echo '{"answers": {...25 keys...}, "voice": {...}, "scorecard": {"required_live_posts": 3, "ongoing_pace": "...", "views_or_clicks_target": "...|learning_only", "opt_in_target": "...|learning_only", "response_quality_test": "...", "sustainability_test": "..."}}' | tsx src/venture/new-venture.ts <slug>
 ```
 
 Confirm the intake is complete before moving to Phase 1 — the script refuses to kick off if any
-of the 25 answers is missing.
+of the 25 answers or any scorecard field is missing.
 
 ## Step 2: Research plan — assemble, then STOP
 
@@ -77,6 +84,9 @@ echo '{"input_refs": [...], "candidates": [...], "recommended_candidate_ids": [.
 ```
 
 Muxin accepts or overrides: `tsx src/venture/phase1.ts platform-select <slug> <candidate_id>`.
+If she picks something other than the recommended platform, the script requires
+`--override-reason "..."` — the audit trail for "why Substack lost" is not optional (rules.md
+§5.1).
 
 ## Step 4: Ten ideas, ranked
 
@@ -132,22 +142,38 @@ tsx src/venture/phase1.ts approve <slug> <candidate_id>
 
 ## Step 6: Deliver and confirm
 
-Delivery mechanics (`src/venture/deliver.ts`) aren't built yet as of this writing — check
-`docs/content-agents-backlog.md` / `git log` before assuming otherwise. Once they exist: an
-approved `substack-post` writes to `ready-to-paste/` for Muxin to paste herself; an approved
-`text-post-note` posts through the existing Substack Notes agent via the shared scheduler.
+Once a post is approved, hand it off:
+
+```
+tsx src/venture/deliver.ts <slug>
+```
+
+An approved `substack-post` writes to `ready-to-paste/<artifact_id>.txt` for Muxin to paste
+herself; once it's live, she confirms the URL:
+
+```
+tsx src/venture/deliver.ts confirm <slug> <artifact_id> --url <live-url>
+```
+
+An approved `text-post-note` claims a slot from the same shared scheduler `/atomize` uses (so it
+can never collide with a same-day `/atomize` Note), then posts through the existing Substack Notes
+agent once that slot is due — re-running `deliver.ts` is what actually fires an already-claimed
+slot, there's no separate cron. Both paths write real delivery evidence
+(`{type: "url", ...}` or `{type: "agent", ...}`) — this is what Checkpoint 1 checks for below.
 
 ## Step 7: Checkpoint 1
 
-Once all three are approved and live, with posting pace recorded:
+Record the ongoing posting pace once, then attempt to clear:
 
 ```
-tsx src/venture/checkpoint.ts checkpoint-1 <slug> --pace "<N>/week"
+tsx src/venture/checkpoint.ts pace <slug> "<N>/week"
+tsx src/venture/checkpoint.ts clear <slug> checkpoint-1
 ```
 
-(Also not built yet as of this writing — same caveat as Step 6.) Checkpoint 1 needs all three
-conditions: three approved, three live with evidence, pace recorded. Approval alone never clears
-it, and there is no partial pass.
+Checkpoint 1 needs all three conditions: three required posts approved AND live with evidence
+of the right kind for that post's type, and pace recorded. Approval alone never clears it, and
+there is no partial pass — if it refuses, tell Muxin exactly what's still missing rather than
+re-running it hoping something changed.
 
 ## Throughout
 

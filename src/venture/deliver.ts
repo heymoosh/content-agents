@@ -6,6 +6,7 @@ import { claimSlots, readLedger, releaseClaims, fmtLa, type Claim } from "../pub
 import { checkReuse } from "../publish/reuse-guard.js";
 import { postNoteToSubstack, type PostContext, type PostFn } from "../publish/substack.js";
 import { PullError } from "../pull/errors.js";
+import { loadRules, requireRulesVersionMatch } from "./rules.js";
 
 // The ONLY place venture content leaves the repo. Two paths, per rules.md §5.4/§5.5 + the
 // artifact-kind table (venture/rules.yaml):
@@ -106,6 +107,7 @@ export interface DeliverOptions {
 // automatically -- there's no cron here yet, matching /atomize's own two-phase claim-then-fire
 // model where a later run is what actually fires a claimed slot.
 export async function deliverVenture(slug: string, opts: DeliverOptions = {}): Promise<DeliverResult[]> {
+  requireRulesVersionMatch(slug, loadRules());
   const now = opts.now ?? new Date();
   // Two populations need visiting, not one: artifacts starting delivery fresh (readyForDelivery),
   // PLUS app-kind artifacts already claimed (handed_off) whose slot might be due now -- claiming
@@ -130,6 +132,7 @@ export async function deliverVenture(slug: string, opts: DeliverOptions = {}): P
 // Muxin's confirmation after pasting a manual (essay) artifact herself. The one place a `url`
 // evidence type gets written for a manual-kind artifact.
 export function confirmManualDelivery(slug: string, artifactId: string, url: string, at: string): void {
+  requireRulesVersionMatch(slug, loadRules());
   const a = readArtifact(slug, artifactId);
   if (!a) throw new Error(`no such artifact: ${artifactId}`);
   if (a.delivery_mode !== "manual") throw new Error(`${artifactId} is not a manual-delivery artifact`);

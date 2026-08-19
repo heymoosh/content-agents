@@ -1,6 +1,6 @@
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { loadRules } from "./rules.js";
+import { loadRules, requireRulesVersionMatch } from "./rules.js";
 import {
   createArtifact,
   transitionArtifact,
@@ -144,9 +144,19 @@ function cmdPlatform(slug: string) {
 }
 
 function cmdPlatformSelect(slug: string, candidateId: string) {
+  const overrideReason = flag("--override-reason");
+  const current = readDecision(slug, "p1-platform-01");
+  const isOverride = !!current && !current.recommended_candidate_ids.includes(candidateId);
+  if (isOverride && !overrideReason?.trim()) {
+    fail(
+      `"${candidateId}" is not the recommended platform (recommended: ${current!.recommended_candidate_ids.join(", ")}) -- ` +
+        `overriding the recommendation requires --override-reason "..." so the audit trail records why (rules.md §5.1)`
+    );
+  }
   const d = selectDecision(slug, "p1-platform-01", {
     selectedCandidateIds: [candidateId],
     selectedBy: "muxin",
+    overrideReason: isOverride ? overrideReason : null,
     requiredSelectCount: 1,
     at: now(),
   });
@@ -299,6 +309,7 @@ function cmdList(slug: string) {
 function dispatch() {
   const [, , sub, slug, ...rest] = process.argv;
   if (!sub || !slug) fail(`usage: tsx src/venture/phase1.ts <plan-init|plan-review|platform|platform-select|ideas|select|draft|approve|discard|restore|list> <slug> [...args]`);
+  requireRulesVersionMatch(slug, loadRules());
   switch (sub) {
     case "plan-init":
       return cmdPlanInit(slug);
@@ -307,7 +318,7 @@ function dispatch() {
     case "platform":
       return cmdPlatform(slug);
     case "platform-select":
-      return cmdPlatformSelect(slug, positionalArgs(rest)[0]);
+      return cmdPlatformSelect(slug, positionalArgs(rest, "--override-reason")[0]);
     case "ideas":
       return cmdIdeas(slug);
     case "select":

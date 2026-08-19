@@ -27,11 +27,29 @@ describe("venture:new CLI", () => {
     assert.equal(existsSync(intakePath(SLUG)), false);
   });
 
-  test("kicks off with all 25 answers and prints the next step", () => {
+  test("refuses with an incomplete scorecard", () => {
     const answers: Record<string, string> = {};
     for (const q of INTAKE_QUESTIONS) answers[q.id] = `a-${q.id}`;
     const voice = { writing_samples: [], worldview_statement: "w", natural_phrases: [], refused_phrases_tones: [] };
-    const r = run(JSON.stringify({ answers, voice }));
+    const r = run(JSON.stringify({ answers, voice, scorecard: { required_live_posts: 3 } }));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /Day 14 scorecard/);
+    assert.equal(existsSync(intakePath(SLUG)), false);
+  });
+
+  test("kicks off with all 25 answers + a complete scorecard, and prints the next step", () => {
+    const answers: Record<string, string> = {};
+    for (const q of INTAKE_QUESTIONS) answers[q.id] = `a-${q.id}`;
+    const voice = { writing_samples: [], worldview_statement: "w", natural_phrases: [], refused_phrases_tones: [] };
+    const scorecard = {
+      required_live_posts: 3,
+      ongoing_pace: "5 posts/week",
+      views_or_clicks_target: "learning_only",
+      opt_in_target: "learning_only",
+      response_quality_test: "at least one specific reply per post",
+      sustainability_test: "fits the declared time budget",
+    };
+    const r = run(JSON.stringify({ answers, voice, scorecard }));
     assert.equal(r.status, 0);
     assert.match(r.stdout, /kicked off/);
     assert.match(r.stdout, /plan-init/);

@@ -82,6 +82,44 @@ describe("plan-init validation", () => {
   });
 });
 
+describe("platform-select override reason", () => {
+  function seedRecommendation() {
+    runCmd(
+      "platform",
+      [],
+      JSON.stringify({
+        input_refs: [],
+        candidates: [
+          { candidate_id: "substack", label: "Substack", scores: {}, evidence_refs: [], rationale: "r" },
+          { candidate_id: "x", label: "X", scores: {}, evidence_refs: [], rationale: "r" },
+        ],
+        recommended_candidate_ids: ["substack"],
+      })
+    );
+  }
+
+  test("selecting the recommended candidate needs no override reason", () => {
+    seedRecommendation();
+    const r = runCmd("platform-select", ["substack"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /platform selected: substack/);
+  });
+
+  test("selecting a non-recommended candidate without --override-reason is refused", () => {
+    seedRecommendation();
+    const r = runCmd("platform-select", ["x"]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /--override-reason/);
+  });
+
+  test("selecting a non-recommended candidate with --override-reason succeeds and records it", () => {
+    seedRecommendation();
+    const r = runCmd("platform-select", ["x", "--override-reason", "audience already lives on X"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /platform selected: x/);
+  });
+});
+
 describe("the G2/G3 gate chain -- drafting is refused until every prior gate clears", () => {
   // Deliberately does NOT call plan-review -- callers opt into that separately so both
   // "unreviewed" and "reviewed" starting states are easy to set up from the same seed.

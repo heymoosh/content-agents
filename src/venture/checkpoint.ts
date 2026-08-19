@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { loadRules } from "./rules.js";
+import { loadRules, requireRulesVersionMatch } from "./rules.js";
 import { deriveState } from "./state.js";
 import { appendCanonEvent } from "./canon.js";
 
@@ -14,11 +14,13 @@ export interface CheckpointResult {
 }
 
 export function recordPace(slug: string, postsPerWeek: string, at: string): { alreadyRecorded: boolean } {
+  requireRulesVersionMatch(slug, loadRules());
   return appendCanonEvent(slug, "pace-recorded", `${slug}/phase-1/pace`, { per_week: postsPerWeek }, at);
 }
 
 export function clearCheckpoint1(slug: string, at: string): CheckpointResult {
   const rules = loadRules();
+  requireRulesVersionMatch(slug, rules);
   const cfg = rules.checkpoints["checkpoint-1"];
   const state = deriveState(slug, cfg.required_artifact_count);
 
