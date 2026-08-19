@@ -5,12 +5,14 @@ import {
   createArtifact,
   transitionArtifact,
   updateArtifactFields,
+  updateResearchReadFinding,
   readArtifact,
   readArtifacts,
   type ClaimRef,
 } from "./artifacts.js";
 import { writeDecision, selectDecision, readDecision, type Candidate } from "./decisions.js";
 import { phase1Dir } from "./paths.js";
+import { hasCanonEvent } from "./canon.js";
 
 // Phase 1 script: scaffolding and gate checks only. Idea generation, ranking, and post drafting
 // are Claude's own judgment work, done inline while running .claude/skills/venture/SKILL.md --
@@ -306,9 +308,252 @@ function cmdList(slug: string) {
   }
 }
 
+// --- research-read-init: writes the phase_1_research_read artifact (rules.md §5.6) -------------
+//
+// Note on shape: this command's stdin payload uses `signal_quality_rationale` as an ARRAY of
+// { factor, status, evidence_refs } entries, not the object-keyed-by-factor-name shape shown in
+// docs/venture-schema-contract.md §2C.4's illustrative JSON. Both express the same information;
+// the array shape is what's validated and persisted here. A future normalization pass (or
+// phase2.ts) can reshape it if the object-keyed form is needed elsewhere.
+
+interface CollectionCoverageInput {
+  source: string;
+  status: "complete" | "partial" | "unavailable" | "not_checked";
+  gap_reason?: string;
+}
+
+interface SignalQualityFactorInput {
+  factor: string;
+  status: "present" | "absent" | "unknown";
+  evidence_refs: string[];
+}
+
+interface ResearchReadFindingInput {
+  finding_id: string;
+  finding_origin: "planned" | "emergent";
+  unknown_ids: string[];
+  emergent_description?: string;
+  evidence_refs: string[];
+  signal_quality_rationale: SignalQualityFactorInput[];
+  lead_magnet_implications?: string;
+  muxin_confirmed_emergent?: boolean | null; // always forced null on write, see below
+}
+
+interface ResearchReadInitInput {
+  collection_coverage: CollectionCoverageInput[];
+  findings: ResearchReadFindingInput[];
+}
+
+function requireCheckpoint1Cleared(slug: string): void {
+  if (!hasCanonEvent(slug, `${slug}/checkpoint-1`)) {
+    fail(
+      `refusing: checkpoint-1 has not cleared for "${slug}" -- the research read can't run until all ` +
+        `three required Phase 1 posts are approved, confirmed live, and pace is recorded (rules.md §5.5)`
+    );
+  }
+}
+
+function cmdResearchReadInit(slug: string) {
+  requireCheckpoint1Cleared(slug);
+  const rules = loadRules();
+  const input = JSON.parse(readStdin()) as ResearchReadInitInput;
+
+  const coverageBySource = new Map(input.collection_coverage.map((c) => [c.source, c]));
+  for (const source of rules.research_read.required_sources) {
+    const entry = coverageBySource.get(source);
+    if (!entry) fail(`collection_coverage is missing required source "${source}" (rules.md §5.6)`);
+    if (entry.status !== "complete" && !entry.gap_reason?.trim()) {
+      fail(
+        `collection_coverage source "${source}" has status "${entry.status}" but no gap_reason -- a ` +
+          `non-complete status must say why (venture-schema-contract.md §2C.3)`
+      );
+    }
+  }
+
+  // Active plan, to validate a `planned` finding's unknown_ids actually exist.
+  const plan = readArtifact(slug, "p1-research-plan");
+  const openUnknownIds = new Set(
+    ((plan?.fields?.open_unknowns as { unknown_id: string }[] | undefined) ?? []).map((u) => u.unknown_id)
+  );
+
+  const seenFindingIds = new Set<string>();
+  for (const f of input.findings) {
+    if (seenFindingIds.has(f.finding_id)) fail(`duplicate finding_id "${f.finding_id}"`);
+    seenFindingIds.add(f.finding_id);
+
+    if (f.finding_origin !== "planned" && f.finding_origin !== "emergent") {
+      fail(`finding "${f.finding_id}" has an invalid finding_origin "${f.finding_origin}" (must be "planned" or "emergent")`);
+    }
+    if (f.finding_origin === "planned") {
+      if (!f.unknown_ids?.length) fail(`planned finding "${f.finding_id}" must name at least one unknown_id`);
+      for (const uid of f.unknown_ids) {
+        if (!openUnknownIds.has(uid)) {
+          fail(
+            `finding "${f.finding_id}" references unknown_id "${uid}" which isn't in the active ` +
+              `phase_1_research_plan's open_unknowns`
+          );
+        }
+      }
+    }
+    if (f.finding_origin === "emergent" && !f.unknown_ids?.length && !f.emergent_description?.trim()) {
+      fail(
+        `emergent finding "${f.finding_id}" has no unknown_ids and no emergent_description -- an emergent ` +
+          `finding must describe what was found (venture-schema-contract.md §2C.3)`
+      );
+    }
+
+    const scoredFactors = new Set((f.signal_quality_rationale ?? []).map((r) => r.factor));
+    for (const factor of rules.research_read.signal_quality_factors) {
+      if (!scoredFactors.has(factor)) {
+        fail(
+          `finding "${f.finding_id}" is missing a signal_quality_rationale entry for factor "${factor}" ` +
+            `(venture-schema-contract.md §2C.4)`
+        );
+      }
+    }
+    for (const r of f.signal_quality_rationale ?? []) {
+      if (r.status !== "present" && r.status !== "absent" && r.status !== "unknown") {
+        fail(`finding "${f.finding_id}" factor "${r.factor}" has invalid status "${r.status}"`);
+      }
+      if (r.status !== "unknown" && !r.evidence_refs?.length) {
+        fail(
+          `finding "${f.finding_id}" factor "${r.factor}" is "${r.status}" but has no evidence_refs -- only ` +
+            `"unknown" may cite nothing (venture-schema-contract.md §2C.4)`
+        );
+      }
+    }
+  }
+
+  // Never trust caller-supplied true/false for a Muxin-only field -- forced null regardless of
+  // what the input JSON says, same discipline as plan-init's confirmed_by_muxin.
+  const findings = input.findings.map((f) => ({ ...f, muxin_confirmed_emergent: null }));
+
+  const artifact = createArtifact(slug, rules, {
+    artifact_id: "p1-research-read",
+    phase: 1,
+    artifact_kind: "phase_1_research_read",
+    title: "Phase 1 research read",
+    venture_id: slug,
+    venture_phase: 1,
+    message_id: "p1-research-read",
+    fields: { collection_coverage: input.collection_coverage, findings, reviewed_by_muxin: false, reviewed_at: null },
+    at: now(),
+  });
+  console.log(`wrote ${artifact.artifact_id} -- STOP: show Muxin this read before selecting a continuation`);
+  console.log(`review with: tsx src/venture/phase1.ts research-read-review ${slug}`);
+}
+
+// --- research-read-confirm-emergent: the ONLY caller of updateResearchReadFinding ----------------
+
+function cmdResearchReadConfirmEmergent(slug: string, findingId: string, confirmedRaw: string) {
+  if (confirmedRaw !== "true" && confirmedRaw !== "false") {
+    fail(`usage: research-read-confirm-emergent <slug> <finding_id> <true|false>`);
+  }
+  updateResearchReadFinding(slug, "p1-research-read", findingId, confirmedRaw === "true", now());
+  console.log(`finding ${findingId} muxin_confirmed_emergent=${confirmedRaw}`);
+}
+
+// --- research-read-review: Muxin's explicit gate --------------------------------------------------
+
+function cmdResearchReadReview(slug: string) {
+  const updated = updateArtifactFields(slug, "p1-research-read", { reviewed_by_muxin: true, reviewed_at: now() }, now());
+  console.log(`p1-research-read reviewed_by_muxin=${updated.fields?.reviewed_by_muxin}`);
+}
+
+function requireResearchReadReviewed(slug: string): void {
+  const read = readArtifact(slug, "p1-research-read");
+  if (!read || read.fields?.reviewed_by_muxin !== true) {
+    fail(
+      `refusing: p1-research-read is not reviewed_by_muxin. Run "research-read-review" (Muxin's explicit ` +
+        `act) before selecting a continuation.`
+    );
+  }
+}
+
+// --- continuation: the phase-1-research-continuation decision (rules.md §5.6) --------------------
+
+function cmdContinuation(slug: string) {
+  requireResearchReadReviewed(slug);
+  const rules = loadRules();
+  const input = JSON.parse(readStdin()) as DecisionInitInput;
+
+  const expected = new Set(rules.research_continuation.candidates);
+  const gotIds = input.candidates.map((c) => c.candidate_id);
+  const got = new Set(gotIds);
+  if (got.size !== gotIds.length) fail(`continuation candidates contain a duplicate candidate_id`);
+  if (got.size !== expected.size || [...expected].some((id) => !got.has(id))) {
+    fail(
+      `continuation candidates must be exactly {${[...expected].join(", ")}}, got {${gotIds.join(", ")}} (rules.md §5.6)`
+    );
+  }
+  if (!input.input_refs.includes("p1-research-plan") || !input.input_refs.includes("p1-research-read")) {
+    fail(`continuation input_refs must include both "p1-research-plan" and "p1-research-read"`);
+  }
+
+  const d = writeDecision(slug, {
+    decision_id: "p1-continuation-01",
+    decision_kind: "phase-1-research-continuation",
+    rules_version: rules.rules_version,
+    input_refs: input.input_refs,
+    candidates: input.candidates,
+    recommended_candidate_ids: input.recommended_candidate_ids,
+    at: now(),
+  });
+  console.log(`wrote ${d.decision_id} -- STOP: Muxin selects more_probes, proceed_with_evidence, or proceed_as_hypothesis`);
+}
+
+function cmdContinuationSelect(slug: string, candidateId: string) {
+  const overrideReason = flag("--override-reason");
+  const current = readDecision(slug, "p1-continuation-01");
+  const isOverride = !!current && !current.recommended_candidate_ids.includes(candidateId);
+  if (isOverride && !overrideReason?.trim()) {
+    fail(
+      `"${candidateId}" is not the recommended continuation candidate (recommended: ${current!.recommended_candidate_ids.join(", ")}) -- ` +
+        `overriding requires --override-reason "..." so the audit trail records why (rules.md §5.6)`
+    );
+  }
+  const d = selectDecision(slug, "p1-continuation-01", {
+    selectedCandidateIds: [candidateId],
+    selectedBy: "muxin",
+    overrideReason: isOverride ? overrideReason : null,
+    requiredSelectCount: 1,
+    at: now(),
+  });
+  console.log(`continuation selected: ${d.selected_candidate_ids[0]}`);
+}
+
+// Exported for phase2.ts (next work package) to call before any Phase 2 concept generation.
+// Refuses via fail() (process.exit(1)) exactly like every other gate in this file -- see the
+// "check-phase2-unlock" CLI smoke command below for how this is exercised as a subprocess test.
+export function requirePhase2Unlocked(slug: string): void {
+  const d = readDecision(slug, "p1-continuation-01");
+  if (!d || d.status !== "selected") {
+    fail(
+      `refusing: phase-1-research-continuation is not selected yet -- Phase 2 concept generation cannot ` +
+        `begin until Muxin selects proceed_with_evidence or proceed_as_hypothesis (rules.md §5.6)`
+    );
+  }
+  const selected = d.selected_candidate_ids[0];
+  if (selected === "more_probes") {
+    fail(
+      `refusing: phase-1-research-continuation selected "more_probes" -- this routes the venture back ` +
+        `into more Phase 1 idea generation instead of unlocking Phase 2 (rules.md §5.6)`
+    );
+  }
+  if (selected !== "proceed_with_evidence" && selected !== "proceed_as_hypothesis") {
+    fail(`refusing: unrecognized phase-1-research-continuation candidate "${selected}"`);
+  }
+}
+
 function dispatch() {
   const [, , sub, slug, ...rest] = process.argv;
-  if (!sub || !slug) fail(`usage: tsx src/venture/phase1.ts <plan-init|plan-review|platform|platform-select|ideas|select|draft|approve|discard|restore|list> <slug> [...args]`);
+  if (!sub || !slug) {
+    fail(
+      `usage: tsx src/venture/phase1.ts <plan-init|plan-review|platform|platform-select|ideas|select|draft|` +
+        `approve|discard|restore|list|research-read-init|research-read-confirm-emergent|research-read-review|` +
+        `continuation|continuation-select|check-phase2-unlock> <slug> [...args]`
+    );
+  }
   requireRulesVersionMatch(slug, loadRules());
   switch (sub) {
     case "plan-init":
@@ -333,6 +578,21 @@ function dispatch() {
       return void cmdRestore(slug, positionalArgs(rest)[0]);
     case "list":
       return cmdList(slug);
+    case "research-read-init":
+      return cmdResearchReadInit(slug);
+    case "research-read-confirm-emergent": {
+      const [findingId, confirmed] = positionalArgs(rest);
+      return cmdResearchReadConfirmEmergent(slug, findingId, confirmed);
+    }
+    case "research-read-review":
+      return cmdResearchReadReview(slug);
+    case "continuation":
+      return cmdContinuation(slug);
+    case "continuation-select":
+      return cmdContinuationSelect(slug, positionalArgs(rest, "--override-reason")[0]);
+    case "check-phase2-unlock":
+      requirePhase2Unlocked(slug);
+      return void console.log(`phase 2 unlocked for ${slug}`);
     default:
       fail(`unknown subcommand: ${sub}`);
   }

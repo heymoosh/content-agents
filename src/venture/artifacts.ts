@@ -228,6 +228,37 @@ export function updateArtifactFields(
   return next;
 }
 
+// Reaches into a `phase_1_research_read` artifact's `fields.findings[]` to set ONE finding's
+// `muxin_confirmed_emergent` by id -- updateArtifactFields only merges shallowly at the top
+// level of `fields`, which can't touch a single array entry. This is the ONLY place in the
+// codebase that may set `muxin_confirmed_emergent` to true/false (see self-stamp.test.ts).
+export function updateResearchReadFinding(
+  slug: string,
+  artifactId: string,
+  findingId: string,
+  confirmed: boolean,
+  at: string
+): VentureArtifact {
+  const current = readArtifact(slug, artifactId);
+  if (!current) throw new Error(`no such artifact: ${artifactId}`);
+  const findings = (current.fields?.findings as { finding_id: string; finding_origin: string }[] | undefined) ?? [];
+  const idx = findings.findIndex((f) => f.finding_id === findingId);
+  if (idx === -1) throw new Error(`no such finding "${findingId}" on artifact ${artifactId}`);
+  if (findings[idx].finding_origin !== "emergent") {
+    throw new Error(
+      `finding "${findingId}" is not emergent -- muxin_confirmed_emergent only applies to emergent findings`
+    );
+  }
+  const nextFindings = findings.map((f, i) => (i === idx ? { ...f, muxin_confirmed_emergent: confirmed } : f));
+  const next: VentureArtifact = {
+    ...current,
+    fields: { ...(current.fields ?? {}), findings: nextFindings },
+    updated_at: at,
+  };
+  appendLine(slug, next);
+  return next;
+}
+
 // The publish gate. `manual`-kind artifacts (substack-post) are never `publishable: true` by
 // design -- publishable means "the app can deliver this itself", which is exactly what a manual
 // hand-off isn't. So the gate branches on delivery_mode:
