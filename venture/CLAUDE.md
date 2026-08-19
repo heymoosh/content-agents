@@ -45,6 +45,13 @@ inference. If a gate field is unset, the correct behavior is to stop and ask, ev
 | decision `status: selected`, `selected_by: "muxin"`, exactly 3 ids | `idea-ranking` | drafting the three selected ideas into posts |
 | `editorial_status: approved` | each Phase 1 post artifact | handoff to `ready-to-paste/` or the Notes agent |
 | `delivery_status: live_confirmed` + `evidence` | each Phase 1 post artifact | counting toward Checkpoint 1 |
+| `reviewed_by_muxin` | `phase_1_research_read` | selecting the `phase-1-research-continuation` decision |
+| `findings[].muxin_confirmed_emergent` | `phase_1_research_read` | marks an emergent finding confirmed/rejected before it counts toward `lead_magnet_implications` (rules.md §5.6; not yet read by a runtime gate in committed code) |
+| decision `status: selected`, `selected_by: "muxin"` | `phase-1-research-continuation` | unlocking Phase 2 concept generation (`proceed_with_evidence`/`proceed_as_hypothesis`) or looping back into more Phase 1 probes (`more_probes`) |
+| decision `status: selected`, `selected_by: "muxin"` | `lead-magnet-concept` | drafting the selected concept into the lead magnet |
+| `reviewed_by_muxin` | `survey` (`p2-survey-review`, via `survey-review-approve`) | marks the fit review reviewed (not yet read by a runtime gate in committed code) |
+| `editorial_status: approved` | each Phase 2 artifact | handoff for delivery (manual; Muxin installs/publishes it herself) |
+| `delivery_status: live_confirmed` + `evidence` | each Phase 2 artifact | counting toward Checkpoint 2 |
 
 **This is Build 2's expensive lesson, built in on day one.** `/story` shipped without a beat-sheet
 approval gate and drafted an inert chapter before the gate was retrofitted (commit `26bf36c`).
@@ -95,8 +102,8 @@ predicates.
 - `venture/<slug>/decisions.jsonl` — one line per judgment step; immutable once `selected`.
 - `venture/<slug>/artifacts.jsonl` — one line per drafted/delivered artifact; both state machines
   live here (editorial: Muxin-only; delivery: script/agent-written).
-- `venture/<slug>/phase-1-attention/` — Phase 1's working drafts. `venture/<slug>/ready-to-paste/`
-  — essays waiting for Muxin to paste.
+- `venture/<slug>/phase-1-attention/` — Phase 1's working drafts. `venture/<slug>/phase-2-audience/`
+  — Phase 2's working drafts. `venture/<slug>/ready-to-paste/` — essays waiting for Muxin to paste.
 - `venture/rules.md` is the authority and does not execute. `venture/rules.yaml` is the only thing
   a phase script loads at runtime; a parity test keeps them from drifting.
 - `venture/examples/civic-tech-worked-example.md` (if present) is a fixture only. It MUST NOT
