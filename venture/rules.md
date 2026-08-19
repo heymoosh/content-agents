@@ -1,10 +1,12 @@
 # Venture rules
 
 **Status:** Confirmed by Muxin (2026-08-18) — all §12 open items resolved. Phase 1 build resumed
-2026-08-18; `venture/rules.yaml` (Phase-1-scoped) is the runtime input phase scripts load — see
-`src/venture/rules.ts`.
+2026-08-18; Phase 2 build started 2026-08-19. `venture/rules.yaml` (Phase 1 + Phase 2 scoped) is
+the runtime input phase scripts load — see `src/venture/rules.ts`. §6.5/§6.8's survey path was
+amended 2026-08-19 (Muxin) — see the superseded-note in each section — which is why the version
+below advanced; nothing else in this revision changes prior behavior.
 
-**Rules version:** `venture-rules-2026-08-07-draft-1`
+**Rules version:** `venture-rules-2026-08-19-draft-1`
 
 **Purpose:** Define the reusable rules that govern every Venture run. Phase scripts and prompts may read this file. They must not read a worked example as if it were a rule.
 
