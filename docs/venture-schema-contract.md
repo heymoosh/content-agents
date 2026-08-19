@@ -140,6 +140,16 @@ and keep working untouched — see §6.
 | `evidence` | object \| null | §4 | whoever confirms delivery | on confirmation |
 | `retraction` | object \| null | §4.2 | Muxin | on a retract, alongside the original `evidence` |
 | `failure` | object \| null | §4.1 | script or agent | on a delivery failure |
+| `claim_refs` | array of `{ claim: string, ref: string }` | `ref` is `intake:qN` or a `confirmed_known`'s evidence pointer | script | at draft time, one entry per concrete factual claim in the body |
+
+**`claim_refs` is a post-artifact field, distinct from `evidence_refs` (§2C).** `evidence_refs`
+traces a research-plan/decision-record claim back to an observation or citation (§2A, §2C.1,
+§2C.3, §2C.4). `claim_refs` is the narrower, outbound-facing counterpart: it traces each concrete
+factual claim inside a **drafted Phase 1 post's own body** back to an `intake.md` answer or a
+`confirmed_known`, so a reviewer can check the post itself without re-deriving the research plan.
+This is the field `venture/CLAUDE.md` describes as "Venture's replacement for `source_lines`
+tracing" — see that doc's "The claim boundary" section. A claim with no ref is cut or reframed as
+an explicit hypothesis before a post reaches `editorial_status: approved`.
 
 **[extends plan]** `delivery_mode`, `retraction` and `failure` are additions. `delivery_mode` exists
 because `publishable` was being asked to mean two different things — "the app can deliver this" and

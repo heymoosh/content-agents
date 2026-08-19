@@ -19,8 +19,8 @@ is narrower than Build 2's:
   just its em-dash ban. There is no separate fictional voice to govern here, so there is no
   `config/fiction/craft.md` analog and there should never be one.
 - **Rule 1's real prohibition survives the exception.** The exemption is from `source_lines`
-  *tracing*, not from truthfulness. `venture/rules.md` §3.9: never invent results, stories,
-  customer language, or experience. Claude may compose a *frame*; it may never assert a fact about
+  *tracing*, not from truthfulness. `venture/rules.md` §3, item 9 ("No invented proof"): never
+  invent results, stories, customer language, or experience. Claude may compose a *frame*; it may never assert a fact about
   Muxin's history, her numbers, or a reader's words that no evidence supports. **`claim_refs`**
   (below) is what replaces `source_lines` tracing here.
 - **Rules 2 and 3 are untouched.** Phase 1 essays (`substack-post`) go out as `ready-to-paste/` for
@@ -112,3 +112,27 @@ platform pick → ten ideas → **stop, Muxin selects three** → draft → per-
 `/venture <slug> checkpoint` (`npm run venture:checkpoint`) — clears Checkpoint 1 once all three
 required posts are approved and live, and posting pace is recorded.
 `/venture <slug> status` (`npm run venture:status`) — read-only, plain-language status.
+
+## Review checklist — for `/code-review` and any human review of a Venture PR
+
+Any PR touching `venture/**`, `src/venture/**`, or `.claude/skills/venture/**` should specifically
+check these, on top of the usual review — a 2026-08-18 review pass found real instances of every
+one of them in the build's first PR:
+
+1. **Citations resolve.** Every `venture/rules.md §X.Y` or `docs/venture-schema-contract.md §X.Y`
+   citation in this file, root `CLAUDE.md`, or a PR body must point at a heading that actually
+   exists in that file — not a numbered list item dressed up as a section number.
+2. **The command list here and root `CLAUDE.md`'s pipeline-map table agree.** They document the
+   same scripts in two places on purpose (this file's prose is the detailed version, root
+   `CLAUDE.md`'s table is the scan-friendly index) — a script added to one and not the other is a
+   drift bug, not a style choice.
+3. **A field named in this doc exists in the schema.** If this file or a PR introduces a new
+   field name (like `claim_refs`), `docs/venture-schema-contract.md` §1's field table must define
+   it — don't let a doc-only field ship without the schema contract knowing about it.
+4. **`.orchestrator.json`'s `guardrail_paths` covers what actually decides what a Venture post
+   says or whether it goes live** — not just `src/venture/**` itself, but any shared file Venture
+   code calls into for drafting or delivery (e.g. `src/publish/substack.ts`). A gate that lives
+   outside the guarded path is not a gate.
+5. **A PR that edits `.orchestrator.json` itself always holds for Muxin's review, full stop** —
+   including this repo's own PRs, regardless of how low-risk the specific diff looks. The guard on
+   the guard is a rule with no self-vet exception.
