@@ -479,8 +479,18 @@ describe("welcome-email-draft", () => {
     assert.match(r.stderr, /missing: survey/);
   });
 
-  test("succeeds once both the magnet and the survey exist", () => {
+  test("refused when the survey exists but hasn't been reviewed_by_muxin yet (survey-review without survey-review-approve)", () => {
     seedSurveyReviewed();
+    const r = runCmd("welcome-email-draft", [], JSON.stringify(wellFormedWelcomeEmailInput()));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /hasn't been approved yet/);
+    assert.match(r.stderr, /survey-review-approve/);
+  });
+
+  test("succeeds once both the magnet exists and the survey has been reviewed_by_muxin (survey-review-approve has run)", () => {
+    seedSurveyReviewed();
+    const approveResult = runCmd("survey-review-approve", []);
+    assert.equal(approveResult.status, 0);
     const r = runCmd("welcome-email-draft", [], JSON.stringify(wellFormedWelcomeEmailInput()));
     assert.equal(r.status, 0);
     assert.match(r.stdout, /drafted p2-welcome-email/);
@@ -521,6 +531,7 @@ describe("announcement-draft", () => {
 describe("Checkpoint 2 clears with all 4 required kinds live even with no announcement drafted", () => {
   test("clears once lead-magnet, landing-page-copy, welcome-email, and survey are all approved+live, with NO announcement drafted at all", () => {
     seedSurveyReviewed();
+    runCmd("survey-review-approve", []);
     runCmd(
       "welcome-email-draft",
       [],
