@@ -284,8 +284,9 @@ echo '{"existing_survey_snapshot": "...", "fit_assessment": [{"question_number":
 ## Step 14: Welcome email draft
 
 Requires both the lead magnet and the survey review to already exist — the script refuses and
-names whichever is missing. The email thanks the subscriber, delivers the lead magnet, says what's
-next, and asks or links to the survey question (rules.md §6.6). Minimum fields: `subject`,
+names whichever is missing. It also refuses if the survey review exists but hasn't been approved
+yet (run `survey-review-approve` first). The email thanks the subscriber, delivers the lead magnet,
+says what's next, and asks or links to the survey question (rules.md §6.6). Minimum fields: `subject`,
 `preview_text`, `body`, `lead_magnet_link_text`, `lead_magnet_destination`,
 `survey_question_or_link`. Zero em dashes, `claim_refs` discipline as above.
 

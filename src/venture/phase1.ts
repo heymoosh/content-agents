@@ -300,11 +300,28 @@ interface ResearchReadFindingInput {
   signal_quality_rationale: SignalQualityFactorInput[];
   lead_magnet_implications?: string;
   muxin_confirmed_emergent?: boolean | null; // always forced null on write, see below
+  signal_quality?: "thin" | "moderate" | "strong"; // ignored on input, always computed on write, see below
 }
 
 interface ResearchReadInitInput {
   collection_coverage: CollectionCoverageInput[];
   findings: ResearchReadFindingInput[];
+}
+
+// venture-schema-contract.md §2C.4's "Recommended default threshold" -- PROPOSED, not yet
+// Muxin-confirmed as a hard rule (same status the doc gives the old Checkpoint-2 predicate and
+// survey-path proposals before she confirmed those separately). Implemented here as the schema's
+// own recommended default so `signal_quality` is at least computed the same way every time,
+// instead of being left for Claude to self-report -- but flag this threshold to Muxin for
+// sign-off; a build package should surface it prominently, not bury it as a settled rule.
+export function computeSignalQuality(rationale: SignalQualityFactorInput[]): "thin" | "moderate" | "strong" {
+  const audienceFit = rationale.find((r) => r.factor === "audience_fit")?.status;
+  const otherPresentCount = rationale.filter((r) => r.factor !== "audience_fit" && r.status === "present").length;
+  if (audienceFit === "present" && otherPresentCount >= 3) return "strong";
+  if ((audienceFit === "present" || audienceFit === "unknown") && otherPresentCount >= 1 && otherPresentCount <= 2) {
+    return "moderate";
+  }
+  return "thin";
 }
 
 function requireCheckpoint1Cleared(slug: string): void {
@@ -388,8 +405,14 @@ function cmdResearchReadInit(slug: string) {
   }
 
   // Never trust caller-supplied true/false for a Muxin-only field -- forced null regardless of
-  // what the input JSON says, same discipline as plan-init's confirmed_by_muxin.
-  const findings = input.findings.map((f) => ({ ...f, muxin_confirmed_emergent: null }));
+  // what the input JSON says, same discipline as plan-init's confirmed_by_muxin. signal_quality is
+  // likewise never trusted from the input (if present at all) -- always recomputed from the
+  // rationale that was just validated above, so the label can never drift from its own evidence.
+  const findings = input.findings.map((f) => ({
+    ...f,
+    muxin_confirmed_emergent: null,
+    signal_quality: computeSignalQuality(f.signal_quality_rationale),
+  }));
 
   const artifact = createArtifact(slug, rules, {
     artifact_id: "p1-research-read",
