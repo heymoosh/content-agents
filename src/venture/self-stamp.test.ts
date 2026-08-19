@@ -48,7 +48,7 @@ describe("self-stamp: Muxin-only fields are set from exactly one place", () => {
   const CONFIRMED_TRUE = /confirmed_by_muxin:\s*true\b/;
   const CONFIRMED_EMERGENT = /muxin_confirmed_emergent:\s*(true|false)\b/;
 
-  test("reviewed_by_muxin: true appears exactly twice across all of src/venture/*.ts (cmdPlanReview and cmdResearchReadReview only)", () => {
+  test("reviewed_by_muxin: true appears exactly three times across all of src/venture/*.ts (cmdPlanReview and cmdResearchReadReview in phase1.ts, cmdSurveyReviewApprove in phase2.ts only)", () => {
     let total = 0;
     const hits: string[] = [];
     for (const file of sourceFiles()) {
@@ -58,13 +58,18 @@ describe("self-stamp: Muxin-only fields are set from exactly one place", () => {
     }
     assert.equal(
       total,
-      2,
-      `expected exactly two legitimate setters (cmdPlanReview, cmdResearchReadReview), found: ${hits.join(", ") || "none"}`
+      3,
+      `expected exactly three legitimate setters (cmdPlanReview, cmdResearchReadReview, cmdSurveyReviewApprove), found: ${hits.join(", ") || "none"}`
     );
     assert.equal(
       countLiteralAssignments(readFileSync(join(VENTURE_DIR, "phase1.ts"), "utf8"), REVIEWED_TRUE),
       2,
-      "both setters must be in phase1.ts, and nowhere else"
+      "both Phase 1 setters must be in phase1.ts, and nowhere else"
+    );
+    assert.equal(
+      countLiteralAssignments(readFileSync(join(VENTURE_DIR, "phase2.ts"), "utf8"), REVIEWED_TRUE),
+      1,
+      "the survey-review-approve setter must be in phase2.ts, and nowhere else"
     );
   });
 

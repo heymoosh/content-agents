@@ -3,16 +3,15 @@ import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch } from "./rules.js";
 import {
   createArtifact,
-  transitionArtifact,
   updateArtifactFields,
   updateResearchReadFinding,
   readArtifact,
-  readArtifacts,
   type ClaimRef,
 } from "./artifacts.js";
 import { writeDecision, selectDecision, readDecision, type Candidate } from "./decisions.js";
 import { phase1Dir } from "./paths.js";
 import { hasCanonEvent } from "./canon.js";
+import { fail, now, cmdApprove, cmdDiscard, cmdRestore, cmdList } from "./artifact-lifecycle.js";
 
 // Phase 1 script: scaffolding and gate checks only. Idea generation, ranking, and post drafting
 // are Claude's own judgment work, done inline while running .claude/skills/venture/SKILL.md --
@@ -44,15 +43,6 @@ function positionalArgs(rest: string[], ...knownFlags: string[]): string[] {
     out.push(rest[i]);
   }
   return out;
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
-
-function fail(message: string): never {
-  console.error(message);
-  process.exit(1);
 }
 
 // --- plan-init: writes the phase_1_research_plan artifact ------------------------------------
@@ -277,36 +267,9 @@ function cmdDraft(slug: string, candidateId: string) {
   console.log(`drafted ${artifact.artifact_id} (${kind}, ${wordCount} words) -- awaiting Muxin's approval`);
 }
 
-// --- approve / discard / restore ------------------------------------------------------------------
-
-function cmdApprove(slug: string, artifactId: string) {
-  const a = readArtifact(slug, artifactId);
-  if (!a) fail(`no such artifact: ${artifactId}`);
-  const next = transitionArtifact(slug, artifactId, { editorial_status: "approved", delivery_status: "ready" }, now());
-  console.log(`${artifactId} approved -- ready for delivery (${next.delivery_mode})`);
-}
-
-function cmdDiscard(slug: string, artifactId: string) {
-  const a = readArtifact(slug, artifactId)!;
-  const delivery = a.delivery_status === "not_applicable" ? "not_applicable" : "cancelled";
-  const next = transitionArtifact(slug, artifactId, { editorial_status: "discarded", delivery_status: delivery }, now());
-  console.log(`${artifactId} discarded`);
-  return next;
-}
-
-function cmdRestore(slug: string, artifactId: string) {
-  const a = readArtifact(slug, artifactId)!;
-  const delivery = a.delivery_mode === "none" ? "not_applicable" : "awaiting_approval";
-  const next = transitionArtifact(slug, artifactId, { editorial_status: "draft", delivery_status: delivery }, now());
-  console.log(`${artifactId} restored to draft`);
-  return next;
-}
-
-function cmdList(slug: string) {
-  for (const a of readArtifacts(slug)) {
-    console.log(`${a.artifact_id}  ${a.artifact_kind}  ${a.editorial_status}/${a.delivery_status}  "${a.title}"`);
-  }
-}
+// --- approve / discard / restore / list -------------------------------------------------------
+// Extracted to artifact-lifecycle.ts (imported above) so phase2.ts can reuse the exact same
+// editorial-state-machine logic without duplicating it. See dispatch() below for the call sites.
 
 // --- research-read-init: writes the phase_1_research_read artifact (rules.md §5.6) -------------
 //

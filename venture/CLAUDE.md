@@ -55,12 +55,12 @@ that text is a *reminder* of the gate, never the gate itself.
 
 ## The claim boundary — Venture's replacement for `source_lines`
 
-Every concrete factual claim in a drafted Phase 1 post carries a `claim_refs` entry pointing at
-the `intake.md` question it came from, or at a `confirmed_known`'s `evidence_refs`. A claim with
-no ref gets cut, or rewritten as an explicitly framed hypothesis — never asserted as fact. A post
-may not claim a result Muxin did not get, a customer she does not have, a number nobody can
-source, or an experience the intake never described. This is the structural reading of "the
-exemption is from tracing, not from truthfulness."
+Every concrete factual claim in a drafted post or Phase 2 copy block carries a `claim_refs` entry
+pointing at the `intake.md` question it came from, or at a `confirmed_known`'s `evidence_refs`. A
+claim with no ref gets cut, or rewritten as an explicitly framed hypothesis — never asserted as
+fact. A post may not claim a result Muxin did not get, a customer she does not have, a number
+nobody can source, or an experience the intake never described. This is the structural reading of
+"the exemption is from tracing, not from truthfulness."
 
 ## The confidence boundary — do not manufacture market signal
 
@@ -102,15 +102,24 @@ predicates.
 - `venture/examples/civic-tech-worked-example.md` (if present) is a fixture only. It MUST NOT
   enter any clean venture's runtime context, and it MUST NOT appear in a PR body.
 
-## Scripts (Phase 1 only — later phases not yet built)
+## Scripts (Phase 1 and Phase 2 — Offer/Operations not yet built)
 
 `/venture new <slug>` (`npm run venture:new`) — 25-question intake, kickoff canon event.
 `/venture <slug>` (`npm run venture:phase1`) — research plan → **stop for Muxin's plan review** →
-platform pick → ten ideas → **stop, Muxin selects three** → draft → per-post approval.
+platform pick → ten ideas → **stop, Muxin selects three** → draft → per-post approval → the Phase
+1-to-2 bridge (research read → **stop for review** → continuation decision, which either sends the
+venture back into more Phase 1 idea generation or unlocks Phase 2).
+`/venture <slug>` continuing into Phase 2 (`npm run venture:phase2`) — five lead-magnet concepts →
+**stop, Muxin selects one** → lead magnet draft → **stop for approval** → landing page draft →
+**stop for approval** → a fit review of Muxin's existing survey (not a new one) → **stop for
+approval** → welcome email draft (requires both the magnet and the survey) → **stop for
+approval** → an optional announcement draft.
 `/venture <slug> deliver` (`npm run venture:deliver`) — hands off an approved post; essay →
 `ready-to-paste/`, Note → the Substack Notes agent via the shared scheduler.
 `/venture <slug> checkpoint` (`npm run venture:checkpoint`) — clears Checkpoint 1 once all three
-required posts are approved and live, and posting pace is recorded.
+required posts are approved and live and posting pace is recorded, and clears Checkpoint 2 once
+the lead magnet, landing page, welcome email, and survey are all approved and live (the
+announcement is never required).
 `/venture <slug> status` (`npm run venture:status`) — read-only, plain-language status.
 
 ## Review checklist — for `/code-review` and any human review of a Venture PR
