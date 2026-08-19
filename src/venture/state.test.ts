@@ -5,7 +5,7 @@ import { deriveState } from "./state.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
 import { appendCanonEvent } from "./canon.js";
 import { ventureDir } from "./paths.js";
-import { loadRules, type VentureRules } from "./rules.js";
+import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
 
 const SLUG = "zz-test-state";
 let rules: VentureRules;
@@ -147,5 +147,112 @@ describe("deriveState -- Checkpoint 1", () => {
     const second = deriveState(SLUG, 1);
     assert.equal(first.phase_status, second.phase_status);
     assert.equal(second.checkpoint1.cleared, true);
+  });
+
+  // Regression: the checkpointArtifactState refactor must not change checkpoint1's own behavior.
+  test("checkpoint1 field shape and semantics are unchanged by the generalization", () => {
+    seedRequiredArtifact("p1-a");
+    seedRequiredArtifact("p1-b");
+    seedRequiredArtifact("p1-c");
+    makeLive("p1-a");
+    makeLive("p1-b");
+    makeLive("p1-c");
+    appendCanonEvent(SLUG, "pace-recorded", `${SLUG}/phase-1/pace`, { per_week: "5" }, "t3");
+    const state = deriveState(SLUG, 3);
+    assert.equal(state.checkpoint1.complete_count, 3);
+    assert.equal(state.checkpoint1.required_count, 3);
+    assert.equal(state.checkpoint1.pace_recorded, true);
+    assert.equal(state.checkpoint1.cleared, false);
+    assert.equal(state.checkpoint1.blocking.length, 0);
+    assert.equal(state.checkpoint1.required.length, 3);
+    assert.equal(state.phase_status, "checkpoint_ready");
+    // checkpoint-2 is unconditionally computed too (rules.yaml now always has it), but that must
+    // not perturb checkpoint1 or phase_status, which stay driven by checkpoint-1 alone.
+    assert.ok(state.checkpoint2);
+  });
+});
+
+describe("deriveState -- Checkpoint 2", () => {
+  const KINDS: ArtifactKind[] = ["lead-magnet", "landing-page-copy", "welcome-email", "survey"];
+
+  function seedCp2Artifact(kind: ArtifactKind, id: string) {
+    createArtifact(SLUG, rules, {
+      artifact_id: id,
+      phase: 2,
+      artifact_kind: kind,
+      title: id,
+      checkpoint_id: "checkpoint-2",
+      venture_id: SLUG,
+      venture_phase: 2,
+      message_id: `msg-${id}`,
+      at: "t0",
+    });
+  }
+
+  function makeLiveWithEvidence(id: string, evidenceType: "url" | "attestation" | "agent") {
+    transitionArtifact(SLUG, id, { editorial_status: "approved", delivery_status: "ready" }, "t1");
+    transitionArtifact(
+      SLUG,
+      id,
+      { delivery_status: "live_confirmed", evidence: { type: evidenceType, value: "ref", confirmed_by: "muxin" } },
+      "t2"
+    );
+  }
+
+  // rules.yaml: lead-magnet, landing-page-copy, survey all want "url"; welcome-email wants
+  // "attestation".
+  function correctEvidenceFor(kind: ArtifactKind): "url" | "attestation" {
+    return kind === "welcome-email" ? "attestation" : "url";
+  }
+
+  test("3 of 4 required kinds live does not clear -- blocking names the missing kind", () => {
+    seedCp2Artifact("lead-magnet", "lm");
+    seedCp2Artifact("landing-page-copy", "lp");
+    seedCp2Artifact("welcome-email", "we");
+    makeLiveWithEvidence("lm", correctEvidenceFor("lead-magnet"));
+    makeLiveWithEvidence("lp", correctEvidenceFor("landing-page-copy"));
+    makeLiveWithEvidence("we", correctEvidenceFor("welcome-email"));
+    // survey is never seeded at all -- "missing" case.
+    const state = deriveState(SLUG);
+    assert.ok(state.checkpoint2);
+    assert.equal(state.checkpoint2!.complete_count, 3);
+    assert.equal(state.checkpoint2!.required_count, 4);
+    assert.equal(state.checkpoint2!.cleared, false);
+    assert.ok(state.checkpoint2!.blocking.some((b) => /missing required artifact kind "survey"/.test(b.reason)));
+  });
+
+  test("all 4 kinds live but one has the wrong evidence type -- blocking names the mismatch", () => {
+    for (const kind of KINDS) seedCp2Artifact(kind, kind);
+    for (const kind of KINDS) {
+      if (kind === "welcome-email") {
+        // wrong evidence: welcome-email wants "attestation", give it "url" instead.
+        makeLiveWithEvidence(kind, "url");
+      } else {
+        makeLiveWithEvidence(kind, correctEvidenceFor(kind));
+      }
+    }
+    const state = deriveState(SLUG);
+    assert.ok(state.checkpoint2);
+    assert.equal(state.checkpoint2!.complete_count, 3);
+    assert.equal(state.checkpoint2!.cleared, false);
+    assert.ok(
+      state.checkpoint2!.blocking.some(
+        (b) => /does not meet this kind's minimum \("attestation"\)/.test(b.reason) && /"welcome-email"/.test(b.reason)
+      )
+    );
+  });
+
+  test("all 4 kinds correctly live reads checkpoint_ready on checkpoint2 with no pace requirement", () => {
+    for (const kind of KINDS) seedCp2Artifact(kind, kind);
+    for (const kind of KINDS) makeLiveWithEvidence(kind, correctEvidenceFor(kind));
+    const state = deriveState(SLUG);
+    assert.ok(state.checkpoint2);
+    assert.equal(state.checkpoint2!.complete_count, 4);
+    assert.equal(state.checkpoint2!.required_count, 4);
+    assert.equal(state.checkpoint2!.blocking.length, 0);
+    // checkpoint-2 has no require_pace_recorded in rules.yaml -- pace_recorded reads trivially
+    // true without any pace ever being recorded, and it must never end up in blocking.
+    assert.equal(state.checkpoint2!.pace_recorded, true);
+    assert.equal(state.checkpoint2!.cleared, false); // not cleared until the canon event fires
   });
 });

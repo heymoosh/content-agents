@@ -1,11 +1,12 @@
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch } from "./rules.js";
-import { deriveState } from "./state.js";
+import { deriveState, type CheckpointState } from "./state.js";
 import { appendCanonEvent } from "./canon.js";
 
-// Checkpoint 1 clears only when ALL THREE of: the required posts are approved, all are
-// live_confirmed with evidence, and the ongoing posting pace is recorded (rules.md §5.5).
-// Approval alone never clears it, and there is no partial pass (Muxin, 2026-08-18).
+// A checkpoint clears only when ALL of: the required artifacts are approved, all are
+// live_confirmed with evidence, and (for checkpoints that declare it) the ongoing posting pace
+// is recorded (rules.md §5.5 for checkpoint-1). Approval alone never clears it, and there is no
+// partial pass (Muxin, 2026-08-18).
 
 export interface CheckpointResult {
   cleared: boolean;
@@ -18,34 +19,58 @@ export function recordPace(slug: string, postsPerWeek: string, at: string): { al
   return appendCanonEvent(slug, "pace-recorded", `${slug}/phase-1/pace`, { per_week: postsPerWeek }, at);
 }
 
-export function clearCheckpoint1(slug: string, at: string): CheckpointResult {
+export function clearCheckpoint(slug: string, checkpointId: string, at: string): CheckpointResult {
   const rules = loadRules();
   requireRulesVersionMatch(slug, rules);
-  const cfg = rules.checkpoints["checkpoint-1"];
-  const state = deriveState(slug, cfg.required_artifact_count);
+  const cfg = rules.checkpoints[checkpointId];
+  if (!cfg) {
+    throw new Error(
+      `no such checkpoint "${checkpointId}" in venture/rules.yaml -- known checkpoints: ${Object.keys(rules.checkpoints).join(", ")}`
+    );
+  }
 
-  if (state.checkpoint1.cleared) {
+  // state.ts only exposes named checkpoint1/checkpoint2 fields (not a generic map), so dispatch
+  // by id here. A future checkpoint-3 needs a matching branch added -- and its own rules.yaml
+  // entry, which is what the guard above already refuses loudly without.
+  let cp: CheckpointState | undefined;
+  if (checkpointId === "checkpoint-1") {
+    cp = deriveState(slug, cfg.required_artifact_count).checkpoint1;
+  } else if (checkpointId === "checkpoint-2") {
+    cp = deriveState(slug).checkpoint2;
+  } else {
+    throw new Error(`clearCheckpoint has no handling wired up for checkpoint id "${checkpointId}" yet`);
+  }
+  if (!cp) {
+    throw new Error(`checkpoint "${checkpointId}" state was not computed`);
+  }
+
+  if (cp.cleared) {
     return { cleared: true, alreadyCleared: true };
   }
-  if (state.checkpoint1.complete_count !== state.checkpoint1.required_count) {
+  if (cp.complete_count !== cp.required_count) {
     return {
       cleared: false,
       alreadyCleared: false,
-      reason: `${state.checkpoint1.complete_count}/${state.checkpoint1.required_count} required posts are approved+live -- no partial pass`,
+      reason: `${cp.complete_count}/${cp.required_count} required artifacts are approved+live -- no partial pass`,
     };
   }
-  if (cfg.require_pace_recorded && !state.checkpoint1.pace_recorded) {
+  if (cfg.require_pace_recorded && !cp.pace_recorded) {
     return { cleared: false, alreadyCleared: false, reason: "posting pace not recorded -- run recordPace first" };
   }
 
   appendCanonEvent(
     slug,
     "checkpoint-cleared",
-    `${slug}/checkpoint-1`,
-    { complete: String(state.checkpoint1.complete_count), required: String(state.checkpoint1.required_count) },
+    `${slug}/${checkpointId}`,
+    { complete: String(cp.complete_count), required: String(cp.required_count) },
     at
   );
   return { cleared: true, alreadyCleared: false };
+}
+
+// Kept so anything still calling the old checkpoint-1-only name doesn't break.
+export function clearCheckpoint1(slug: string, at: string): CheckpointResult {
+  return clearCheckpoint(slug, "checkpoint-1", at);
 }
 
 function main() {
@@ -62,15 +87,21 @@ function main() {
   }
   if (sub === "clear" && slug) {
     const which = rest[0];
-    if (which !== "checkpoint-1") {
-      console.error("usage: tsx src/venture/checkpoint.ts clear <slug> checkpoint-1");
+    if (!which) {
+      console.error("usage: tsx src/venture/checkpoint.ts clear <slug> <checkpoint-1|checkpoint-2>");
       process.exit(1);
     }
-    const r = clearCheckpoint1(slug, new Date().toISOString());
+    let r: CheckpointResult;
+    try {
+      r = clearCheckpoint(slug, which, new Date().toISOString());
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
     if (r.cleared) {
-      console.log(r.alreadyCleared ? "checkpoint-1 was already cleared" : "checkpoint-1 cleared -- Phase 2 unlocked (not yet built)");
+      console.log(r.alreadyCleared ? `${which} was already cleared` : `${which} cleared -- next phase unlocked (not yet built)`);
     } else {
-      console.error(`checkpoint-1 not cleared: ${r.reason}`);
+      console.error(`${which} not cleared: ${r.reason}`);
       process.exit(1);
     }
     return;
