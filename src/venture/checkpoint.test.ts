@@ -1,7 +1,7 @@
 import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { rmSync } from "node:fs";
-import { recordPace, clearCheckpoint1, clearCheckpoint } from "./checkpoint.js";
+import { recordPace, clearCheckpoint } from "./checkpoint.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
 import { ventureDir } from "./paths.js";
 import { hasCanonEvent, readCanonEvents } from "./canon.js";
@@ -32,7 +32,7 @@ function makeLive(id: string) {
   transitionArtifact(SLUG, id, { delivery_status: "live_confirmed", evidence: { type: "agent", value: "r", confirmed_by: "agent" } }, "t2");
 }
 
-describe("clearCheckpoint1", () => {
+describe("clearCheckpoint -- checkpoint-1", () => {
   test("refuses with 2/3 live -- no partial pass", () => {
     const rules = loadRules();
     seedRequired(rules, "a");
@@ -41,7 +41,7 @@ describe("clearCheckpoint1", () => {
     makeLive("a");
     makeLive("b");
     recordPace(SLUG, "5/week", "t3");
-    const r = clearCheckpoint1(SLUG, "t4");
+    const r = clearCheckpoint(SLUG, "checkpoint-1", "t4");
     assert.equal(r.cleared, false);
     assert.match(r.reason ?? "", /2\/3/);
   });
@@ -54,7 +54,7 @@ describe("clearCheckpoint1", () => {
     makeLive("a");
     makeLive("b");
     makeLive("c");
-    const r = clearCheckpoint1(SLUG, "t4");
+    const r = clearCheckpoint(SLUG, "checkpoint-1", "t4");
     assert.equal(r.cleared, false);
     assert.match(r.reason ?? "", /pace not recorded/);
   });
@@ -68,7 +68,7 @@ describe("clearCheckpoint1", () => {
     makeLive("b");
     makeLive("c");
     recordPace(SLUG, "5/week", "t3");
-    const r = clearCheckpoint1(SLUG, "t4");
+    const r = clearCheckpoint(SLUG, "checkpoint-1", "t4");
     assert.equal(r.cleared, true);
     assert.equal(r.alreadyCleared, false);
     assert.equal(hasCanonEvent(SLUG, `${SLUG}/checkpoint-1`), true);
@@ -83,8 +83,8 @@ describe("clearCheckpoint1", () => {
     makeLive("b");
     makeLive("c");
     recordPace(SLUG, "5/week", "t3");
-    clearCheckpoint1(SLUG, "t4");
-    const r2 = clearCheckpoint1(SLUG, "t5");
+    clearCheckpoint(SLUG, "checkpoint-1", "t4");
+    const r2 = clearCheckpoint(SLUG, "checkpoint-1", "t5");
     assert.equal(r2.cleared, true);
     assert.equal(r2.alreadyCleared, true);
   });

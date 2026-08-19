@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { readArtifacts, type VentureArtifact } from "./artifacts.js";
 import { hasCanonEvent, findCanonEvent } from "./canon.js";
 import { statePath, ventureDir } from "./paths.js";
-import { loadRules, artifactKindRule, type CheckpointRule } from "./rules.js";
+import { loadRules, artifactKindRule, type CheckpointRule, type VentureRules } from "./rules.js";
 
 export type PhaseStatus = "drafting" | "awaiting_you" | "checkpoint_ready" | "blocked" | "complete";
 
@@ -20,15 +20,11 @@ export interface CheckpointState {
   blocking: CheckpointBlocker[];
 }
 
-// Kept so anything still importing the old name doesn't break.
-export type Checkpoint1State = CheckpointState;
-
 export interface VentureState {
   slug: string;
   current_phase: 1 | 2;
   phase_status: PhaseStatus;
-  checkpoint1: CheckpointState;
-  checkpoint2?: CheckpointState;
+  checkpoints: Record<string, CheckpointState>;
 }
 
 // checkpoint_id is stamped on an artifact at draft time (createArtifact), so "required for a
@@ -37,9 +33,19 @@ export interface VentureState {
 // A CheckpointRule uses exactly one of two shapes (rules.ts):
 //   - required_artifact_kinds: exactly one live artifact per named kind (checkpoint-2 style)
 //   - required_artifact_count: N of any required-checkpoint_id artifact (checkpoint-1 style)
-function checkpointArtifactState(slug: string, checkpointId: string, cfg: CheckpointRule): CheckpointState {
-  const rules = loadRules();
-  const required = readArtifacts(slug).filter((a) => a.checkpoint_id === checkpointId);
+//
+// `rules` and `artifacts` are loaded ONCE by the caller (deriveState) and threaded through here --
+// this used to reload venture/rules.yaml and re-read artifacts.jsonl itself on every call, which
+// meant a single deriveState() call parsed rules.yaml 3x and artifacts.jsonl 2x (once per
+// checkpoint, plus deriveState's own top-level load).
+function checkpointArtifactState(
+  slug: string,
+  checkpointId: string,
+  cfg: CheckpointRule,
+  rules: VentureRules,
+  artifacts: VentureArtifact[]
+): CheckpointState {
+  const required = artifacts.filter((a) => a.checkpoint_id === checkpointId);
   const blocking: CheckpointBlocker[] = [];
   let completeCount = 0;
   let requiredCount: number;
@@ -102,28 +108,60 @@ function checkpointArtifactState(slug: string, checkpointId: string, cfg: Checkp
   };
 }
 
+// Turns "checkpoint-1" into "Checkpoint 1" for human-readable output; falls back to the raw id
+// for anything that doesn't match the "checkpoint-<n>" shape (e.g. a future "phase_3_completed").
+function checkpointLabel(checkpointId: string): string {
+  const m = /^checkpoint-(\d+)$/.exec(checkpointId);
+  return m ? `Checkpoint ${m[1]}` : checkpointId;
+}
+
 // Derives phase/checkpoint state from canon.md (the authority) on every call -- never trusts a
 // stale cache. Also rewrites state.md as a human-readable snapshot, but that file is disposable:
 // a disagreeing cache is rebuilt here, never repaired by re-running a transition.
-export function deriveState(slug: string, requiredCount = 3): VentureState {
+//
+// `checkpoint1RequiredCount` overrides checkpoint-1's required_artifact_count (rules.yaml already
+// declares 3, same as this function's old hardcoded default) -- kept ONLY because tests seed a
+// single required artifact and need a matching count of 1 to exercise complete/blocked states
+// without seeding three real fixtures. Checkpoint-2 and any future checkpoint always reads its
+// count from rules.yaml directly, with no equivalent override -- this is the one legitimate
+// exception to "don't have two plumbing paths for the same information," not a second general path.
+export function deriveState(slug: string, checkpoint1RequiredCount?: number): VentureState {
   const rules = loadRules();
-  const cp1Cfg: CheckpointRule = { ...rules.checkpoints["checkpoint-1"], required_artifact_count: requiredCount };
-  const cp1 = checkpointArtifactState(slug, "checkpoint-1", cp1Cfg);
+  const artifacts = readArtifacts(slug);
+
+  const checkpoints: Record<string, CheckpointState> = {};
+  for (const [checkpointId, cfg] of Object.entries(rules.checkpoints)) {
+    const effectiveCfg: CheckpointRule =
+      checkpointId === "checkpoint-1" && checkpoint1RequiredCount !== undefined
+        ? { ...cfg, required_artifact_count: checkpoint1RequiredCount }
+        : cfg;
+    checkpoints[checkpointId] = checkpointArtifactState(slug, checkpointId, effectiveCfg, rules, artifacts);
+  }
+
+  // phase_status stays driven by checkpoint-1 alone, same as before the generalization --
+  // checkpoint-2 (and any later checkpoint) is computed but never perturbs it.
+  const cp1 = checkpoints["checkpoint-1"];
   let phaseStatus: PhaseStatus;
-  if (cp1.cleared) phaseStatus = "complete";
+  if (!cp1) phaseStatus = "drafting";
+  else if (cp1.cleared) phaseStatus = "complete";
   else if (cp1.complete_count === cp1.required_count && cp1.pace_recorded) phaseStatus = "checkpoint_ready";
   else if (cp1.required.length > 0) phaseStatus = "awaiting_you";
   else phaseStatus = "drafting";
 
-  const cp2Cfg = rules.checkpoints["checkpoint-2"];
-  const cp2 = cp2Cfg ? checkpointArtifactState(slug, "checkpoint-2", cp2Cfg) : undefined;
+  // No explicit "current_phase" transition rule is written down anywhere in venture/rules.md or
+  // docs/venture-schema-contract.md (the schema contract's `current_phase: 1..4` is the aspirational
+  // full API shape, not a rule for computing it) -- conservatively inferred from checkpoint-1
+  // clearing, since that is the earliest point the ledger records the venture having moved past
+  // Phase 1's own required work (the phase-1-research-continuation decision that actually unlocks
+  // Phase 2 concept generation can only be selected after checkpoint-1 clears, per rules.md §5.6's
+  // requireCheckpoint1Cleared gate in phase1.ts).
+  const currentPhase: 1 | 2 = cp1?.cleared ? 2 : 1;
 
   const state: VentureState = {
     slug,
-    current_phase: 1,
+    current_phase: currentPhase,
     phase_status: phaseStatus,
-    checkpoint1: cp1,
-    ...(cp2 ? { checkpoint2: cp2 } : {}),
+    checkpoints,
   };
   mkdirSync(ventureDir(slug), { recursive: true });
   writeFileSync(statePath(slug), renderStateMd(state));
@@ -134,27 +172,20 @@ function renderStateMd(state: VentureState): string {
   const lines = [
     `# State (derived cache — never authoritative, see canon.md)`,
     ``,
+    `current_phase: ${state.current_phase}`,
     `phase_status: ${state.phase_status}`,
-    `checkpoint-1: ${state.checkpoint1.complete_count}/${state.checkpoint1.required_count} live, pace_recorded=${state.checkpoint1.pace_recorded}, cleared=${state.checkpoint1.cleared}`,
   ];
-  if (state.checkpoint2) {
-    lines.push(
-      `checkpoint-2: ${state.checkpoint2.complete_count}/${state.checkpoint2.required_count} live, pace_recorded=${state.checkpoint2.pace_recorded}, cleared=${state.checkpoint2.cleared}`
-    );
+  for (const [checkpointId, cp] of Object.entries(state.checkpoints)) {
+    lines.push(`${checkpointId}: ${cp.complete_count}/${cp.required_count} live, pace_recorded=${cp.pace_recorded}, cleared=${cp.cleared}`);
   }
   lines.push(``);
-  if (state.checkpoint1.blocking.length) {
-    lines.push(`## What's blocking Checkpoint 1`, ``);
-    for (const b of state.checkpoint1.blocking) {
+  for (const [checkpointId, cp] of Object.entries(state.checkpoints)) {
+    if (!cp.blocking.length) continue;
+    lines.push(`## What's blocking ${checkpointLabel(checkpointId)}`, ``);
+    for (const b of cp.blocking) {
       lines.push(`- ${b.artifact_id ?? "(no artifact)"}: ${b.reason}`);
     }
     lines.push(``);
   }
-  if (state.checkpoint2 && state.checkpoint2.blocking.length) {
-    lines.push(`## What's blocking Checkpoint 2`, ``);
-    for (const b of state.checkpoint2.blocking) {
-      lines.push(`- ${b.artifact_id ?? "(no artifact)"}: ${b.reason}`);
-    }
-  }
-  return lines.join("\n") + "\n";
+  return lines.join("\n").replace(/\n+$/, "\n");
 }

@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readArtifacts, readArtifact, transitionArtifact, readyForDelivery, type VentureArtifact } from "./artifacts.js";
-import { readyToPasteDir, phase1Dir } from "./paths.js";
+import { readyToPasteDir, ventureDir } from "./paths.js";
 import { claimSlots, readLedger, releaseClaims, fmtLa, type Claim } from "../publish/slots.js";
 import { checkReuse } from "../publish/reuse-guard.js";
 import { postNoteToSubstack, type PostContext, type PostFn } from "../publish/substack.js";
@@ -35,9 +36,21 @@ export interface DeliverResult {
   detail: string;
 }
 
+// Every artifact's own body_path -- stamped at draft time (createArtifact) relative to
+// ventureDir(slug) -- is the only source of truth for where its content lives. Reconstructing a
+// hardcoded phase1Dir path here (the bug this replaces) silently assumed every manual/app artifact
+// was a Phase 1 post; Phase 2's manual artifacts live under phase-2-audience/ instead, so that
+// assumption ENOENT-crashed on every one of them.
+function resolveBodyPath(slug: string, a: VentureArtifact): string {
+  if (!a.body_path) {
+    throw new Error(`artifact "${a.artifact_id}" has no body_path -- cannot deliver it, there is no content file to read`);
+  }
+  return join(ventureDir(slug), a.body_path);
+}
+
 function deliverManual(slug: string, a: VentureArtifact, at: string): DeliverResult {
   mkdirSync(readyToPasteDir(slug), { recursive: true });
-  const bodyPath = `${phase1Dir(slug)}/${a.artifact_id}.md`;
+  const bodyPath = resolveBodyPath(slug, a);
   const body = readFileSync(bodyPath, "utf8").trim();
   const heads = a.title ? `${a.title}\n\n` : "";
   const pastePath = `${readyToPasteDir(slug)}/${a.artifact_id}.txt`;
@@ -68,7 +81,7 @@ async function deliverApp(slug: string, a: VentureArtifact, at: string, opts: { 
     return { artifact_id: a.artifact_id, action: "waiting", detail: `slot ${fmtLa(new Date(existing.time))} not yet due` };
   }
 
-  const bodyPath = `${phase1Dir(slug)}/${a.artifact_id}.md`;
+  const bodyPath = resolveBodyPath(slug, a);
   const body = readFileSync(bodyPath, "utf8").trim();
   try {
     const { ref } = await postFn({ headed: opts.headed }, body);

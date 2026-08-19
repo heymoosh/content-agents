@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch } from "./rules.js";
-import { deriveState, type CheckpointState } from "./state.js";
+import { deriveState } from "./state.js";
 import { appendCanonEvent } from "./canon.js";
 
 // A checkpoint clears only when ALL of: the required artifacts are approved, all are
@@ -29,17 +29,11 @@ export function clearCheckpoint(slug: string, checkpointId: string, at: string):
     );
   }
 
-  // state.ts only exposes named checkpoint1/checkpoint2 fields (not a generic map), so dispatch
-  // by id here. A future checkpoint-3 needs a matching branch added -- and its own rules.yaml
-  // entry, which is what the guard above already refuses loudly without.
-  let cp: CheckpointState | undefined;
-  if (checkpointId === "checkpoint-1") {
-    cp = deriveState(slug, cfg.required_artifact_count).checkpoint1;
-  } else if (checkpointId === "checkpoint-2") {
-    cp = deriveState(slug).checkpoint2;
-  } else {
-    throw new Error(`clearCheckpoint has no handling wired up for checkpoint id "${checkpointId}" yet`);
-  }
+  // state.ts now exposes a generic checkpoints map (rules.checkpoints is already
+  // Record<string, CheckpointRule>), so any checkpoint id rules.yaml declares works here with no
+  // per-id branching -- a future checkpoint-3 needs only its own rules.yaml entry, which the guard
+  // above already refuses loudly without.
+  const cp = deriveState(slug).checkpoints[checkpointId];
   if (!cp) {
     throw new Error(`checkpoint "${checkpointId}" state was not computed`);
   }
@@ -66,11 +60,6 @@ export function clearCheckpoint(slug: string, checkpointId: string, at: string):
     at
   );
   return { cleared: true, alreadyCleared: false };
-}
-
-// Kept so anything still calling the old checkpoint-1-only name doesn't break.
-export function clearCheckpoint1(slug: string, at: string): CheckpointResult {
-  return clearCheckpoint(slug, "checkpoint-1", at);
 }
 
 function main() {

@@ -46,7 +46,7 @@ describe("deriveState -- Checkpoint 1", () => {
   test("no required artifacts yet reads drafting", () => {
     const state = deriveState(SLUG);
     assert.equal(state.phase_status, "drafting");
-    assert.equal(state.checkpoint1.cleared, false);
+    assert.equal(state.checkpoints["checkpoint-1"].cleared, false);
   });
 
   test("2 of 3 live does not clear -- no partial pass", () => {
@@ -56,8 +56,8 @@ describe("deriveState -- Checkpoint 1", () => {
     makeLive("p1-a");
     makeLive("p1-b");
     const state = deriveState(SLUG, 3);
-    assert.equal(state.checkpoint1.complete_count, 2);
-    assert.equal(state.checkpoint1.cleared, false);
+    assert.equal(state.checkpoints["checkpoint-1"].complete_count, 2);
+    assert.equal(state.checkpoints["checkpoint-1"].cleared, false);
     assert.equal(state.phase_status, "awaiting_you");
   });
 
@@ -69,7 +69,7 @@ describe("deriveState -- Checkpoint 1", () => {
     makeLive("p1-b");
     makeLive("p1-c");
     const state = deriveState(SLUG, 3);
-    assert.equal(state.checkpoint1.pace_recorded, false);
+    assert.equal(state.checkpoints["checkpoint-1"].pace_recorded, false);
     assert.equal(state.phase_status, "awaiting_you");
   });
 
@@ -82,8 +82,8 @@ describe("deriveState -- Checkpoint 1", () => {
     makeLive("p1-c");
     appendCanonEvent(SLUG, "pace-recorded", `${SLUG}/phase-1/pace`, { per_week: "5" }, "t3");
     const state = deriveState(SLUG, 3);
-    assert.equal(state.checkpoint1.pace_recorded, true);
-    assert.equal(state.checkpoint1.cleared, false);
+    assert.equal(state.checkpoints["checkpoint-1"].pace_recorded, true);
+    assert.equal(state.checkpoints["checkpoint-1"].cleared, false);
     assert.equal(state.phase_status, "checkpoint_ready");
   });
 
@@ -97,7 +97,7 @@ describe("deriveState -- Checkpoint 1", () => {
     appendCanonEvent(SLUG, "pace-recorded", `${SLUG}/phase-1/pace`, { per_week: "5" }, "t3");
     appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, { complete: "3" }, "t4");
     const state = deriveState(SLUG, 3);
-    assert.equal(state.checkpoint1.cleared, true);
+    assert.equal(state.checkpoints["checkpoint-1"].cleared, true);
     assert.equal(state.phase_status, "complete");
   });
 
@@ -113,8 +113,8 @@ describe("deriveState -- Checkpoint 1", () => {
       "t2"
     );
     const state = deriveState(SLUG, 1);
-    assert.equal(state.checkpoint1.complete_count, 0);
-    assert.match(state.checkpoint1.blocking[0].reason, /does not meet this kind's minimum/);
+    assert.equal(state.checkpoints["checkpoint-1"].complete_count, 0);
+    assert.match(state.checkpoints["checkpoint-1"].blocking[0].reason, /does not meet this kind's minimum/);
   });
 
   test("a substack-post (min_evidence url) with agent evidence does not count either", () => {
@@ -137,7 +137,7 @@ describe("deriveState -- Checkpoint 1", () => {
       "t2"
     );
     const state = deriveState(SLUG, 1);
-    assert.equal(state.checkpoint1.complete_count, 0);
+    assert.equal(state.checkpoints["checkpoint-1"].complete_count, 0);
   });
 
   test("rerunning deriveState after clearing is idempotent -- still reads complete", () => {
@@ -146,7 +146,7 @@ describe("deriveState -- Checkpoint 1", () => {
     const first = deriveState(SLUG, 1);
     const second = deriveState(SLUG, 1);
     assert.equal(first.phase_status, second.phase_status);
-    assert.equal(second.checkpoint1.cleared, true);
+    assert.equal(second.checkpoints["checkpoint-1"].cleared, true);
   });
 
   // Regression: the checkpointArtifactState refactor must not change checkpoint1's own behavior.
@@ -159,16 +159,16 @@ describe("deriveState -- Checkpoint 1", () => {
     makeLive("p1-c");
     appendCanonEvent(SLUG, "pace-recorded", `${SLUG}/phase-1/pace`, { per_week: "5" }, "t3");
     const state = deriveState(SLUG, 3);
-    assert.equal(state.checkpoint1.complete_count, 3);
-    assert.equal(state.checkpoint1.required_count, 3);
-    assert.equal(state.checkpoint1.pace_recorded, true);
-    assert.equal(state.checkpoint1.cleared, false);
-    assert.equal(state.checkpoint1.blocking.length, 0);
-    assert.equal(state.checkpoint1.required.length, 3);
+    assert.equal(state.checkpoints["checkpoint-1"].complete_count, 3);
+    assert.equal(state.checkpoints["checkpoint-1"].required_count, 3);
+    assert.equal(state.checkpoints["checkpoint-1"].pace_recorded, true);
+    assert.equal(state.checkpoints["checkpoint-1"].cleared, false);
+    assert.equal(state.checkpoints["checkpoint-1"].blocking.length, 0);
+    assert.equal(state.checkpoints["checkpoint-1"].required.length, 3);
     assert.equal(state.phase_status, "checkpoint_ready");
     // checkpoint-2 is unconditionally computed too (rules.yaml now always has it), but that must
     // not perturb checkpoint1 or phase_status, which stay driven by checkpoint-1 alone.
-    assert.ok(state.checkpoint2);
+    assert.ok(state.checkpoints["checkpoint-2"]);
   });
 });
 
@@ -214,11 +214,11 @@ describe("deriveState -- Checkpoint 2", () => {
     makeLiveWithEvidence("we", correctEvidenceFor("welcome-email"));
     // survey is never seeded at all -- "missing" case.
     const state = deriveState(SLUG);
-    assert.ok(state.checkpoint2);
-    assert.equal(state.checkpoint2!.complete_count, 3);
-    assert.equal(state.checkpoint2!.required_count, 4);
-    assert.equal(state.checkpoint2!.cleared, false);
-    assert.ok(state.checkpoint2!.blocking.some((b) => /missing required artifact kind "survey"/.test(b.reason)));
+    assert.ok(state.checkpoints["checkpoint-2"]);
+    assert.equal(state.checkpoints["checkpoint-2"]!.complete_count, 3);
+    assert.equal(state.checkpoints["checkpoint-2"]!.required_count, 4);
+    assert.equal(state.checkpoints["checkpoint-2"]!.cleared, false);
+    assert.ok(state.checkpoints["checkpoint-2"]!.blocking.some((b) => /missing required artifact kind "survey"/.test(b.reason)));
   });
 
   test("all 4 kinds live but one has the wrong evidence type -- blocking names the mismatch", () => {
@@ -232,11 +232,11 @@ describe("deriveState -- Checkpoint 2", () => {
       }
     }
     const state = deriveState(SLUG);
-    assert.ok(state.checkpoint2);
-    assert.equal(state.checkpoint2!.complete_count, 3);
-    assert.equal(state.checkpoint2!.cleared, false);
+    assert.ok(state.checkpoints["checkpoint-2"]);
+    assert.equal(state.checkpoints["checkpoint-2"]!.complete_count, 3);
+    assert.equal(state.checkpoints["checkpoint-2"]!.cleared, false);
     assert.ok(
-      state.checkpoint2!.blocking.some(
+      state.checkpoints["checkpoint-2"]!.blocking.some(
         (b) => /does not meet this kind's minimum \("attestation"\)/.test(b.reason) && /"welcome-email"/.test(b.reason)
       )
     );
@@ -246,13 +246,13 @@ describe("deriveState -- Checkpoint 2", () => {
     for (const kind of KINDS) seedCp2Artifact(kind, kind);
     for (const kind of KINDS) makeLiveWithEvidence(kind, correctEvidenceFor(kind));
     const state = deriveState(SLUG);
-    assert.ok(state.checkpoint2);
-    assert.equal(state.checkpoint2!.complete_count, 4);
-    assert.equal(state.checkpoint2!.required_count, 4);
-    assert.equal(state.checkpoint2!.blocking.length, 0);
+    assert.ok(state.checkpoints["checkpoint-2"]);
+    assert.equal(state.checkpoints["checkpoint-2"]!.complete_count, 4);
+    assert.equal(state.checkpoints["checkpoint-2"]!.required_count, 4);
+    assert.equal(state.checkpoints["checkpoint-2"]!.blocking.length, 0);
     // checkpoint-2 has no require_pace_recorded in rules.yaml -- pace_recorded reads trivially
     // true without any pace ever being recorded, and it must never end up in blocking.
-    assert.equal(state.checkpoint2!.pace_recorded, true);
-    assert.equal(state.checkpoint2!.cleared, false); // not cleared until the canon event fires
+    assert.equal(state.checkpoints["checkpoint-2"]!.pace_recorded, true);
+    assert.equal(state.checkpoints["checkpoint-2"]!.cleared, false); // not cleared until the canon event fires
   });
 });
