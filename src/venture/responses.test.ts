@@ -122,6 +122,23 @@ describe("ingestResponse", () => {
     assert.equal(countEligibleUnique(readResponses(SLUG)), 1);
   });
 
+  test("an email identifier that only differs by case/whitespace still dedupes to one respondent", () => {
+    // Regression test: respondentHash() hashes stableUserId byte-for-byte with no normalization,
+    // so a human-transcribed email typed once as "Jane@Example.com" and once as
+    // " jane@example.com " used to hash to two different respondents and over-count toward the
+    // response gate. ingestResponse now canonicalizes (trim + lowercase) before hashing.
+    process.env.RESEARCH_HASH_KEY = "test-only-key";
+    const first = ingestResponse(SLUG, baseInput({ rawIdentifier: { platform: "email", stableUserId: "Jane@Example.com" } }), "t0");
+    const second = ingestResponse(
+      SLUG,
+      baseInput({ source: "dm", rawIdentifier: { platform: "email", stableUserId: " jane@example.com " } }),
+      "t1"
+    );
+    assert.equal(second.likelyDuplicate, true);
+    assert.equal(first.record.respondent_hash, second.record.respondent_hash);
+    assert.equal(countEligibleUnique(readResponses(SLUG)), 1);
+  });
+
   test("an explicit exclusion_reason marks the response excluded from the gate", () => {
     const { record } = ingestResponse(SLUG, baseInput({ exclusionReason: "ineligible", targetAudienceEligible: false }), "t0");
     assert.equal(record.included_in_gate, false);

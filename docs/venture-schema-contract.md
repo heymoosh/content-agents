@@ -433,7 +433,7 @@ require a new artifact.
 | `survey` | **Superseded 2026-08-19** (`venture/rules.md` §6.5's amendment): Muxin already has a real, live 4-question branching survey (`venture/existing-survey-humaninference.md`) — this artifact reviews it for fit against the chosen lead magnet rather than authoring a new one. `existing_survey_snapshot: string` (the survey text this review ran against), `fit_assessment: { question_number: 1\|2\|3\|4; fits_chosen_magnet: boolean; note: string }[]`, `recommended_changes: string[]`, `change_needed: boolean`, `reviewed_by_muxin: boolean`, `reviewed_at: string \| null`. ~~`question` (free text, fixed to "What are you stuck on right now?" unless overridden with a recorded reason), `destination` (`confirmation_page` \| `welcome_email` \| `both`), `respondent_field_ref`~~ |
 | `lead-magnet` | `title`, `intro`, `sections: string[]` (count fits the promise, not forced to three), `action_step`, `feedback_prompt` |
 | `product-outline` | `transformation_sentence`, `sections: string[]` (five to seven, §7.8), `format` |
-| `price-decision` | `recommended_price`, `considered_range`, `reasoning`, `pitch_paragraph` |
+| `price-decision` | `recommended_price`, `considered_range`, `reasoning`, `known_uncertainty`, `pitch_paragraph`, `scenario_math` (optional; must carry `illustrative: true` when present, §7.9's illustrative-only rule) |
 | `daily-operating-plan` | `time_budget_minutes`, `chosen_mode` (`canonical` \| `rotated` \| `extended_timeline` \| `revised_scope`), `schedule: object` |
 | `phase_1_research_plan` | see §2C — a pre-post plan, drafted before any idea is written, distinct from the post-hoc read below |
 | `phase_1_research_read` | see §2C — expanded 2026-08-07, corrective pass |

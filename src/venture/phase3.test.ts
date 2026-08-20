@@ -124,7 +124,7 @@ function threeProblemCandidates(overrides: Record<string, unknown>[] = []): Reco
   return base;
 }
 
-function seedProblemSelected(): void {
+function seedProblemScored(): void {
   seedClusterWritten();
   must(
     runCmd(
@@ -134,6 +134,10 @@ function seedProblemSelected(): void {
     ),
     "problem-score"
   );
+}
+
+function seedProblemSelected(): void {
+  seedProblemScored();
   must(runCmd("problem-select", ["cluster-1"]), "problem-select");
 }
 
@@ -341,7 +345,14 @@ describe("cluster validation", () => {
     seedProblemSelected();
     const r = runCmd("cluster", [], JSON.stringify(wellFormedClusterInput()));
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /p3-problem-01 \(problem-selection\) is already selected/);
+    assert.match(r.stderr, /p3-problem-01 \(problem-selection\) already exists \(status: selected\)/);
+  });
+
+  test("cluster refuses to re-run once problem-score has run, even before problem-select (regression: re-clustering would orphan the stale scoring decision's cluster ids)", () => {
+    seedProblemScored();
+    const r = runCmd("cluster", [], JSON.stringify(wellFormedClusterInput()));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /p3-problem-01 \(problem-selection\) already exists \(status: awaiting_user\)/);
   });
 });
 
