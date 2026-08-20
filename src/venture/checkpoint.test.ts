@@ -5,6 +5,7 @@ import { recordPace, clearCheckpoint } from "./checkpoint.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
 import { ventureDir } from "./paths.js";
 import { hasCanonEvent, readCanonEvents } from "./canon.js";
+import { writeDecision, selectDecision, type DecisionKind } from "./decisions.js";
 import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
 
 const SLUG = "zz-test-checkpoint";
@@ -179,13 +180,13 @@ describe("clearCheckpoint -- checkpoint-2", () => {
 // confirm), so "approved" + "not_applicable" must count as live -- and checkpoint-1/checkpoint-2's
 // existing manual/app artifacts (covered above) must keep requiring "live_confirmed" unchanged.
 //
-// NOTE: this exercises today's actual clearCheckpoint, which writes the ledger event as
-// `<slug>/checkpoint-3` uniformly (same as every other checkpoint id). venture-schema-contract.md
-// §5.3 names the real event `<slug>/phase-3-completed` -- whether clearCheckpoint should special-
-// case checkpoint-3 to match is an open question left to whichever work package wires the
-// decision-record check into this function's predicate (see rules.yaml's checkpoint-3 comment).
+// Work Package 3 wired required_decision_kinds into the clearing predicate and resolved the
+// WP0-era open question about the ledger event id: checkpoint-3 clears as `<slug>/phase-3-completed`
+// (venture-schema-contract.md §5.3), not the generic `<slug>/checkpoint-3` checkpoint-1/2 use --
+// rules.yaml's checkpoint-3.ledger_event_id drives this (see CheckpointRule in rules.ts).
 describe("clearCheckpoint -- checkpoint-3 (delivery_mode: none)", () => {
   const KINDS: ArtifactKind[] = ["product-outline", "price-decision"];
+  const DECISION_KINDS: DecisionKind[] = ["problem-selection", "transformation-choice", "product-format-and-price"];
 
   function seedCp3(rules: VentureRules, kind: ArtifactKind, id: string) {
     createArtifact(SLUG, rules, {
@@ -201,24 +202,37 @@ describe("clearCheckpoint -- checkpoint-3 (delivery_mode: none)", () => {
     });
   }
 
+  // Writes and selects a decision of the given kind -- a minimal stand-in for phase3.ts's own
+  // cmdProblemScore/cmdTransformationDraft/cmdPrice, since this file exercises checkpoint.ts's
+  // clearing predicate directly, not the CLI that produces these records in normal use.
+  function selectDecisionOfKind(kind: DecisionKind, id: string) {
+    writeDecision(SLUG, {
+      decision_id: id,
+      decision_kind: kind,
+      rules_version: loadRules().rules_version,
+      input_refs: ["ref"],
+      candidates: [{ candidate_id: "c1", label: "c1", scores: {}, evidence_refs: [], rationale: "r" }],
+      recommended_candidate_ids: ["c1"],
+      at: "t0",
+    });
+    selectDecision(SLUG, id, { selectedCandidateIds: ["c1"], selectedBy: "muxin", requiredSelectCount: 1, at: "t1" });
+  }
+
+  function selectAllCp3Decisions() {
+    DECISION_KINDS.forEach((kind, i) => selectDecisionOfKind(kind, `d-${i}`));
+  }
+
+  function approveCp3Artifacts() {
+    transitionArtifact(SLUG, "po", { editorial_status: "approved" }, "t1");
+    transitionArtifact(SLUG, "pd", { editorial_status: "approved" }, "t1");
+  }
+
   test("a fresh product-outline/price-decision artifact is draft:not_applicable, not live yet", () => {
     const rules = loadRules();
     seedCp3(rules, "product-outline", "po");
     const r = clearCheckpoint(SLUG, "checkpoint-3", "t1");
     assert.equal(r.cleared, false);
     assert.match(r.reason ?? "", /0\/2/);
-  });
-
-  test("approving alone (no delivery step exists) is enough to count as live -- approved:not_applicable", () => {
-    const rules = loadRules();
-    seedCp3(rules, "product-outline", "po");
-    seedCp3(rules, "price-decision", "pd");
-    // No delivery_status patch at all -- mode "none" artifacts have no delivery step to confirm.
-    transitionArtifact(SLUG, "po", { editorial_status: "approved" }, "t1");
-    transitionArtifact(SLUG, "pd", { editorial_status: "approved" }, "t1");
-    const r = clearCheckpoint(SLUG, "checkpoint-3", "t2");
-    assert.equal(r.cleared, true);
-    assert.equal(hasCanonEvent(SLUG, `${SLUG}/checkpoint-3`), true);
   });
 
   test("1 of 2 approved does not clear -- no partial pass, same as checkpoint-1/checkpoint-2", () => {
@@ -230,6 +244,60 @@ describe("clearCheckpoint -- checkpoint-3 (delivery_mode: none)", () => {
     const r = clearCheckpoint(SLUG, "checkpoint-3", "t2");
     assert.equal(r.cleared, false);
     assert.match(r.reason ?? "", /1\/2/);
+  });
+
+  test("both artifacts approved but no decisions selected -- still blocked, naming all 3 missing decisions", () => {
+    const rules = loadRules();
+    seedCp3(rules, "product-outline", "po");
+    seedCp3(rules, "price-decision", "pd");
+    approveCp3Artifacts();
+    const r = clearCheckpoint(SLUG, "checkpoint-3", "t2");
+    assert.equal(r.cleared, false);
+    assert.match(r.reason ?? "", /0\/3/);
+    for (const kind of DECISION_KINDS) assert.match(r.reason ?? "", new RegExp(kind));
+  });
+
+  test("both artifacts approved and 2 of 3 decisions selected -- still blocked, correct missing decision named", () => {
+    const rules = loadRules();
+    seedCp3(rules, "product-outline", "po");
+    seedCp3(rules, "price-decision", "pd");
+    approveCp3Artifacts();
+    selectDecisionOfKind("problem-selection", "d-0");
+    selectDecisionOfKind("transformation-choice", "d-1");
+    // product-format-and-price left unselected.
+    const r = clearCheckpoint(SLUG, "checkpoint-3", "t2");
+    assert.equal(r.cleared, false);
+    assert.match(r.reason ?? "", /2\/3/);
+    assert.match(r.reason ?? "", /product-format-and-price/);
+    assert.doesNotMatch(r.reason ?? "", /problem-selection/);
+    assert.doesNotMatch(r.reason ?? "", /transformation-choice/);
+  });
+
+  test("both artifacts approved+live AND all 3 decisions selected clears, writing <slug>/phase-3-completed (not <slug>/checkpoint-3)", () => {
+    const rules = loadRules();
+    seedCp3(rules, "product-outline", "po");
+    seedCp3(rules, "price-decision", "pd");
+    // No delivery_status patch at all -- mode "none" artifacts have no delivery step to confirm.
+    approveCp3Artifacts();
+    selectAllCp3Decisions();
+    const r = clearCheckpoint(SLUG, "checkpoint-3", "t2");
+    assert.equal(r.cleared, true);
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/phase-3-completed`), true);
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/checkpoint-3`), false);
+  });
+
+  test("rerunning clear on checkpoint-3 after it already cleared is idempotent", () => {
+    const rules = loadRules();
+    seedCp3(rules, "product-outline", "po");
+    seedCp3(rules, "price-decision", "pd");
+    approveCp3Artifacts();
+    selectAllCp3Decisions();
+    clearCheckpoint(SLUG, "checkpoint-3", "t2");
+    const r2 = clearCheckpoint(SLUG, "checkpoint-3", "t3");
+    assert.equal(r2.cleared, true);
+    assert.equal(r2.alreadyCleared, true);
+    const clears = readCanonEvents(SLUG).filter((e) => e.id === `${SLUG}/phase-3-completed`);
+    assert.equal(clears.length, 1);
   });
 
   test("a checkpoint-1 manual/app artifact still requires live_confirmed, not merely not_applicable -- the fix is scoped to delivery_mode: none", () => {

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { findCanonEvent } from "./canon.js";
+import type { DecisionKind } from "./decisions.js";
 
 // venture/rules.md is the prose authority and does NOT execute. A phase script loads ONLY
 // venture/rules.yaml, via this module. Never parse rules.md at runtime -- src/venture/rules.test.ts
@@ -38,10 +39,16 @@ export interface CheckpointRule {
   require_pace_recorded?: boolean;
   // checkpoint-3 only (rules.md §7.10 / venture-schema-contract.md §5.3): the decision_kinds that
   // must be `selected` before this checkpoint clears, alongside required_artifact_kinds' artifacts
-  // being approved+live. Declared here as data only -- src/venture/checkpoint.ts and state.ts do
-  // NOT yet read this field (Work Package 0 scope is the data model, not the gate itself); wiring
-  // it into checkpointArtifactState's predicate is Work Package 3.
-  required_decision_kinds?: string[];
+  // being approved+live. Read by state.ts's checkpointArtifactState (Work Package 3) -- a required
+  // decision kind with no `selected` DecisionRecord for the slug blocks the checkpoint exactly like
+  // a missing required artifact kind does.
+  required_decision_kinds?: DecisionKind[];
+  // Overrides the ledger event id this checkpoint clears/reads as, from the default
+  // `<slug>/<checkpointId>` (checkpoint-1, checkpoint-2) to `<slug>/<ledger_event_id>`. Only
+  // checkpoint-3 sets this (venture-schema-contract.md §5.3 names the real event
+  // `<slug>/phase-3-completed`, distinct from the generic `<slug>/checkpoint-<n>` pattern the other
+  // two checkpoints use) -- resolves the open question WP0 left in this field's earlier comment.
+  ledger_event_id?: string;
 }
 
 export interface VentureRules {

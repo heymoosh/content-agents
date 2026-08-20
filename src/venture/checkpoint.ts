@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch } from "./rules.js";
-import { deriveState } from "./state.js";
+import { deriveState, ledgerEventId } from "./state.js";
 import { appendCanonEvent } from "./canon.js";
 
 // A checkpoint clears only when ALL of: the required artifacts are approved, all are
@@ -48,17 +48,38 @@ export function clearCheckpoint(slug: string, checkpointId: string, at: string):
       reason: `${cp.complete_count}/${cp.required_count} required artifacts are approved+live -- no partial pass`,
     };
   }
+  // Only checkpoint-3 declares required_decision_kinds today (rules.yaml) -- every other checkpoint
+  // reads 0/0 here and this branch never fires, so checkpoint-1/checkpoint-2's clearing predicate is
+  // unchanged. rules.md §7.10 / venture-schema-contract.md §5.3: the problem, transformation, and
+  // price/format decisions must each be `selected`, alongside the two artifacts checked above --
+  // both conditions, no partial pass on either.
+  if (cp.decisions_complete_count !== cp.decisions_required_count) {
+    const missingKinds = cp.blocking
+      .map((b) => /^missing required decision kind "(.+)"$/.exec(b.reason)?.[1])
+      .filter((k): k is string => Boolean(k));
+    return {
+      cleared: false,
+      alreadyCleared: false,
+      reason:
+        `${cp.decisions_complete_count}/${cp.decisions_required_count} required decisions are selected -- ` +
+        `no partial pass (missing: ${missingKinds.join(", ")})`,
+    };
+  }
   if (cfg.require_pace_recorded && !cp.pace_recorded) {
     return { cleared: false, alreadyCleared: false, reason: "posting pace not recorded -- run recordPace first" };
   }
 
-  appendCanonEvent(
-    slug,
-    "checkpoint-cleared",
-    `${slug}/${checkpointId}`,
-    { complete: String(cp.complete_count), required: String(cp.required_count) },
-    at
-  );
+  // Event id defaults to `<slug>/<checkpointId>` (checkpoint-1, checkpoint-2); checkpoint-3
+  // overrides it via rules.yaml's ledger_event_id to `<slug>/phase-3-completed`
+  // (venture-schema-contract.md §5.3) -- see ledgerEventId's comment in state.ts, which computed
+  // `cp.cleared` above using the exact same function, so the read and the write never disagree.
+  const eventId = ledgerEventId(slug, checkpointId, cfg);
+  const fields: Record<string, string> = { complete: String(cp.complete_count), required: String(cp.required_count) };
+  if (cp.decisions_required_count > 0) {
+    fields.decisions_complete = String(cp.decisions_complete_count);
+    fields.decisions_required = String(cp.decisions_required_count);
+  }
+  appendCanonEvent(slug, "checkpoint-cleared", eventId, fields, at);
   return { cleared: true, alreadyCleared: false };
 }
 
