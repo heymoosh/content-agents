@@ -172,3 +172,74 @@ describe("clearCheckpoint -- checkpoint-2", () => {
     assert.throws(() => clearCheckpoint(SLUG, "checkpoint-9", "t0"), /checkpoint-9/);
   });
 });
+
+// Proves the delivery_mode: "none" fix in state.ts's checkArtifact: product-outline and
+// price-decision (rules.yaml, phase 3) never receive a delivery_status other than
+// "not_applicable" (createArtifact stamps it at draft time and there is no delivery step to
+// confirm), so "approved" + "not_applicable" must count as live -- and checkpoint-1/checkpoint-2's
+// existing manual/app artifacts (covered above) must keep requiring "live_confirmed" unchanged.
+//
+// NOTE: this exercises today's actual clearCheckpoint, which writes the ledger event as
+// `<slug>/checkpoint-3` uniformly (same as every other checkpoint id). venture-schema-contract.md
+// §5.3 names the real event `<slug>/phase-3-completed` -- whether clearCheckpoint should special-
+// case checkpoint-3 to match is an open question left to whichever work package wires the
+// decision-record check into this function's predicate (see rules.yaml's checkpoint-3 comment).
+describe("clearCheckpoint -- checkpoint-3 (delivery_mode: none)", () => {
+  const KINDS: ArtifactKind[] = ["product-outline", "price-decision"];
+
+  function seedCp3(rules: VentureRules, kind: ArtifactKind, id: string) {
+    createArtifact(SLUG, rules, {
+      artifact_id: id,
+      phase: 3,
+      artifact_kind: kind,
+      title: id,
+      checkpoint_id: "checkpoint-3",
+      venture_id: SLUG,
+      venture_phase: 3,
+      message_id: `msg-${id}`,
+      at: "t0",
+    });
+  }
+
+  test("a fresh product-outline/price-decision artifact is draft:not_applicable, not live yet", () => {
+    const rules = loadRules();
+    seedCp3(rules, "product-outline", "po");
+    const r = clearCheckpoint(SLUG, "checkpoint-3", "t1");
+    assert.equal(r.cleared, false);
+    assert.match(r.reason ?? "", /0\/2/);
+  });
+
+  test("approving alone (no delivery step exists) is enough to count as live -- approved:not_applicable", () => {
+    const rules = loadRules();
+    seedCp3(rules, "product-outline", "po");
+    seedCp3(rules, "price-decision", "pd");
+    // No delivery_status patch at all -- mode "none" artifacts have no delivery step to confirm.
+    transitionArtifact(SLUG, "po", { editorial_status: "approved" }, "t1");
+    transitionArtifact(SLUG, "pd", { editorial_status: "approved" }, "t1");
+    const r = clearCheckpoint(SLUG, "checkpoint-3", "t2");
+    assert.equal(r.cleared, true);
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/checkpoint-3`), true);
+  });
+
+  test("1 of 2 approved does not clear -- no partial pass, same as checkpoint-1/checkpoint-2", () => {
+    const rules = loadRules();
+    seedCp3(rules, "product-outline", "po");
+    seedCp3(rules, "price-decision", "pd");
+    transitionArtifact(SLUG, "po", { editorial_status: "approved" }, "t1");
+    // pd left in draft:not_applicable.
+    const r = clearCheckpoint(SLUG, "checkpoint-3", "t2");
+    assert.equal(r.cleared, false);
+    assert.match(r.reason ?? "", /1\/2/);
+  });
+
+  test("a checkpoint-1 manual/app artifact still requires live_confirmed, not merely not_applicable -- the fix is scoped to delivery_mode: none", () => {
+    const rules = loadRules();
+    seedRequired(rules, "reg");
+    // Approve only -- delivery never confirmed live. text-post-note is delivery_mode "app", not
+    // "none", so this must NOT count as live under the same fix that lets checkpoint-3 pass above.
+    transitionArtifact(SLUG, "reg", { editorial_status: "approved", delivery_status: "ready" }, "t1");
+    const r = clearCheckpoint(SLUG, "checkpoint-1", "t2");
+    assert.equal(r.cleared, false);
+    assert.match(r.reason ?? "", /0\/3/);
+  });
+});

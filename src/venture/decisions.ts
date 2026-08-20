@@ -6,7 +6,17 @@ export type DecisionKind =
   | "platform-recommendation"
   | "idea-ranking"
   | "phase-1-research-continuation"
-  | "lead-magnet-concept";
+  | "lead-magnet-concept"
+  // Phase 3 (rules.md §7, venture-schema-contract.md §2A). "problem-selection" and
+  // "product-format-and-price" are ranked multi-candidate decisions -- select via
+  // selectWithOverride(), same as the four kinds above. "transformation-choice" is a single
+  // system-proposed sentence Muxin edits and approves (rules.md §7.7), not a ranked pick: model it
+  // as a decision record with exactly one candidate (its `label` holds the sentence) and select it
+  // with plain selectDecision() (requiredSelectCount: 1) -- there is no second candidate to
+  // override, so selectWithOverride's "not the recommendation" refusal never applies to it.
+  | "problem-selection"
+  | "transformation-choice"
+  | "product-format-and-price";
 
 export interface Candidate {
   candidate_id: string;

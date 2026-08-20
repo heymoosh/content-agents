@@ -53,19 +53,30 @@ function checkpointArtifactState(
   // docs/venture-schema-contract.md §3-4: each kind declares a minimum evidence type (e.g.
   // substack-post requires a real "url", not a bare attestation). A truthy evidence object
   // alone isn't enough -- it must exactly match that kind's minimum.
+  //
+  // §5.2's derivation rule: "an artifact is complete when editorial_status === approved AND
+  // delivery_status is live_confirmed (modes app/manual) OR not_applicable (mode none)." A
+  // delivery_mode: "none" artifact (e.g. Phase 3's product-outline/price-decision) is an internal
+  // decision artifact with no external delivery step to confirm -- createArtifact (artifacts.ts)
+  // stamps it "not_applicable" at draft time and it can never reach "live_confirmed", so requiring
+  // live_confirmed unconditionally would block such an artifact's checkpoint forever. This is a
+  // general rule about the artifact kind, not specific to any one checkpoint.
   function checkArtifact(a: VentureArtifact, labelKind?: string): boolean {
-    const approvedAndConfirmed = a.editorial_status === "approved" && a.delivery_status === "live_confirmed" && a.evidence;
-    if (!approvedAndConfirmed) {
+    const kindRule = artifactKindRule(rules, a.artifact_kind);
+    const deliverySatisfied =
+      kindRule.delivery_mode === "none"
+        ? a.delivery_status === "not_applicable"
+        : a.delivery_status === "live_confirmed" && Boolean(a.evidence);
+    if (a.editorial_status !== "approved" || !deliverySatisfied) {
       blocking.push({ artifact_id: a.artifact_id, reason: `${a.editorial_status}/${a.delivery_status}` });
       return false;
     }
-    const minEvidence = artifactKindRule(rules, a.artifact_kind).min_evidence;
-    if (minEvidence && a.evidence!.type !== minEvidence) {
+    if (kindRule.min_evidence && a.evidence!.type !== kindRule.min_evidence) {
       blocking.push({
         artifact_id: a.artifact_id,
         reason: labelKind
-          ? `evidence type "${a.evidence!.type}" does not meet this kind's minimum ("${minEvidence}") for "${labelKind}"`
-          : `evidence type "${a.evidence!.type}" does not meet this kind's minimum ("${minEvidence}")`,
+          ? `evidence type "${a.evidence!.type}" does not meet this kind's minimum ("${kindRule.min_evidence}") for "${labelKind}"`
+          : `evidence type "${a.evidence!.type}" does not meet this kind's minimum ("${kindRule.min_evidence}")`,
       });
       return false;
     }

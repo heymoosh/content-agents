@@ -151,6 +151,70 @@ describe("rules.yaml parity with rules.md prose", () => {
     assert.equal(rules.cta_policy_by_phase["2"], "lead_magnet_bridge");
     assert.match(rulesMd, /Phase 2 — build the owned audience \| Bridge to the relevant active lead magnet\./);
   });
+
+  test("Phase 3 CTA policy is lead_magnet_or_response_request, matching the locked CTA table", () => {
+    assert.equal(rules.cta_policy_by_phase["3"], "lead_magnet_or_response_request");
+    assert.match(
+      rulesMd,
+      /Phase 3 — validate the offer \| Normally the lead magnet or a response request\. Show an offer only after the response gate and the required approvals \(§7\.10\) have cleared\./
+    );
+  });
+
+  test("response gate: 20 minimum, 30 target eligible unique respondents", () => {
+    assert.equal(rules.response_gate.min_eligible_unique, 20);
+    assert.equal(rules.response_gate.target_eligible_unique, 30);
+    assert.match(rulesMd, /- Minimum: 20\./);
+    assert.match(rulesMd, /- Target: 30\./);
+  });
+
+  test("problem score: six named factors, 1-5 scale, matching §7.6's numbered list", () => {
+    assert.equal(rules.problem_score.factors.length, 6);
+    assert.deepEqual(rules.problem_score.factors, [
+      "frequency",
+      "intensity",
+      "time_cost",
+      "money_cost",
+      "stress_cost",
+      "solvability",
+    ]);
+    assert.equal(rules.problem_score.score_scale.min, 1);
+    assert.equal(rules.problem_score.score_scale.max, 5);
+    assert.match(rulesMd, /Score every cluster from 1-5 on:/);
+    assert.match(rulesMd, /\*\*Frequency:\*\* how often does it appear\?/);
+    assert.match(rulesMd, /\*\*Intensity:\*\* how emotional or urgent is the language\?/);
+    assert.match(rulesMd, /\*\*Time cost:\*\* how much time does it waste\?/);
+    assert.match(rulesMd, /\*\*Money cost:\*\* what money, tools, donations, subscriptions, or support does it waste\?/);
+    assert.match(rulesMd, /\*\*Stress cost:\*\* does it create anxiety, cynicism, burnout, or paralysis\?/);
+    assert.match(rulesMd, /\*\*Solvability:\*\* can this creator credibly solve a useful part of it in a small first offer\?/);
+  });
+
+  test("product outline: five-to-seven sections, matching §7.8", () => {
+    assert.equal(rules.product_outline.min_sections, 5);
+    assert.equal(rules.product_outline.max_sections, 7);
+    assert.match(rulesMd, /contain five to seven concise sections/);
+  });
+
+  test("checkpoint-3: product-outline and price-decision required, all live, three decisions required", () => {
+    const cp = rules.checkpoints["checkpoint-3"];
+    assert.deepEqual(cp.required_artifact_kinds, ["product-outline", "price-decision"]);
+    assert.equal(cp.require_all_live, true);
+    assert.equal(cp.require_pace_recorded, undefined);
+    assert.deepEqual(cp.required_decision_kinds, [
+      "problem-selection",
+      "transformation-choice",
+      "product-format-and-price",
+    ]);
+    // rules.md §7.10's completion list, and the schema contract's explicit split of the response
+    // gate (not a checkpoint) from checkpoint-3/phase_3_completed (a real checkpoint).
+    assert.match(rulesMd, /the selected problem is approved/);
+    assert.match(rulesMd, /the transformation is approved/);
+    assert.match(rulesMd, /the five-to-seven-section outline is approved/);
+    assert.match(rulesMd, /the price and pitch are approved/);
+    assert.match(
+      schemaMd,
+      /Clears only when\s*\n\s*the problem, transformation, outline, price, and pitch decision records/
+    );
+  });
 });
 
 describe("assertRulesVersion", () => {
@@ -237,7 +301,19 @@ describe("artifactKindRule", () => {
     assert.equal(r.phase, 2);
   });
 
+  test("product-outline and price-decision are internal, non-publishable, no-evidence artifacts, phase 3", () => {
+    for (const kind of ["product-outline", "price-decision"] as const) {
+      const r = artifactKindRule(rules, kind);
+      assert.equal(r.delivery_mode, "none");
+      assert.equal(r.publishable, false);
+      assert.equal(r.min_evidence, null);
+      assert.equal(r.phase, 3);
+    }
+  });
+
   test("throws on an unknown artifact kind rather than returning undefined", () => {
-    assert.throws(() => artifactKindRule(rules, "product-outline" as never), /no artifact_kinds entry/);
+    // thank-you-note is real (rules.md §8, Phase 4) but deliberately not yet encoded --
+    // artifactKindRule must still refuse it loudly rather than returning undefined.
+    assert.throws(() => artifactKindRule(rules, "thank-you-note" as never), /no artifact_kinds entry/);
   });
 });
