@@ -375,6 +375,22 @@ describe("thank-you-note-draft", () => {
     assert.match(r.stderr, /does not exist/);
   });
 
+  test("refuses a note_id containing a path separator or '..'", () => {
+    seedPhase4Unlocked();
+    seedResponse("r-test-1");
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["../../etc/passwd"],
+      JSON.stringify({
+        response_id: "r-test-1",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much for that.",
+      })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /bad note_id/);
+  });
+
   test("refuses a note containing a raw email address", () => {
     seedPhase4Unlocked();
     seedResponse("r-test-1");

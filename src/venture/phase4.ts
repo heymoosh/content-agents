@@ -451,6 +451,11 @@ interface ThankYouNoteInput {
 
 function cmdThankYouNoteDraft(slug: string, noteId: string) {
   if (!noteId?.trim()) fail(`usage: tsx src/venture/phase4.ts thank-you-note-draft <slug> <note_id>`);
+  // noteId feeds straight into a filesystem path below (writePhase4Body) -- same traversal guard
+  // paths.ts's safeSlug applies to a venture slug, applied here to a caller-supplied note_id.
+  if (noteId.includes("/") || noteId.includes("\\") || noteId.includes("..")) {
+    fail(`bad note_id: ${JSON.stringify(noteId)} -- must be a bare id, no path separators or ".."`);
+  }
   const rules = loadRules();
   const artifactId = `p4-thank-you-${noteId}`;
   refuseIfArtifactApproved(slug, artifactId);
@@ -631,10 +636,14 @@ function cmdDay14ScorecardDraft(slug: string) {
     sustainability_read: input.sustainability_read ?? null,
   };
 
+  // schema-contract §5.6: "a day-14-review ... reading null must render 'not enough data yet,'
+  // never a fabricated zero." Rendering only -- fields.scorecard below keeps the literal null.
+  const renderScorecardValue = (v: unknown): string => (v === null ? "not enough data yet" : JSON.stringify(v));
+
   const body = [
     `Day 14 scorecard (rules.md §8.5, venture-schema-contract.md §5.6):`,
     ``,
-    ...DAY14_SCORECARD_FIELDS.map((f) => `- ${f}: ${JSON.stringify(scorecardFields[f])}`),
+    ...DAY14_SCORECARD_FIELDS.map((f) => `- ${f}: ${renderScorecardValue(scorecardFields[f])}`),
     ``,
     `Other §8.5 facts (read from existing state, not new scorecard fields):`,
     ``,
