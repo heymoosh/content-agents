@@ -38,13 +38,36 @@ platforms:
     min_reuse_days: 60      # professional audience; avoid feeling repetitive
     max_chars: 3000
     derivative_count: [1, 2]
-    best_times_pst: "Tue-Thu, 8-10am. Business hours only; no evenings or weekends."
-    posts_per_week: 5      # bumped 2->5 (Muxin, 2026-07-07); spread across the work week
-    slot_days: [Mon, Tue, Wed, Thu, Fri]
+    best_times_pst: "Tue-Thu, 8-10am (primary). Daily posting now includes evenings and weekends too."
+    posts_per_week: 7      # bumped 5->7 (Muxin, 2026-08-20): daily posting on every platform, explicit override of the prior engagement-protecting cadence
+    slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
     slot_time_pst: "08:30"
     style: >
       Lesson post, left-aligned narrative, practitioner voice. Insight-driven,
       not link-dump. Short paragraphs, line breaks between thoughts.
+  mastodon:
+    min_reuse_days: 21      # matches bluesky, the closest sibling platform (no algorithmic feed either)
+    max_chars: 500
+    derivative_count: [2, 4]
+    best_times_pst: "Daily 9-11am and 6-9pm, similar rhythm to Bluesky."
+    posts_per_week: 7      # daily posting (Muxin, 2026-08-20)
+    slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+    slot_time_pst: "19:00"
+    style: >
+      No algorithmic feed, so discovery leans on hashtags and follows: 2-4 relevant
+      hashtags is normal here, unlike X's near-zero-hashtag rule. Still Muxin's voice,
+      not a hashtag-stuffed post.
+  threads:
+    min_reuse_days: 14      # matches x, the closest sibling platform (fast-moving, similar cadence)
+    max_chars: 500
+    derivative_count: [3, 5]
+    best_times_pst: "Daily 9-11am and 6-9pm, close to X/Bluesky's rhythm."
+    posts_per_week: 7      # daily posting (Muxin, 2026-08-20)
+    slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+    slot_time_pst: "10:00"
+    style: >
+      Casual, conversational voice, close to X/Instagram's tone. Light hashtag use
+      (0-2), image-friendly. Less formal than LinkedIn, less clipped than X.
   bluesky:
     min_reuse_days: 21
     max_chars: 300
@@ -98,12 +121,12 @@ platforms:
     slot_time_pst: "16:00"
   substack:
     min_reuse_days: 7       # Notes only (essays are published directly by Muxin, not this pipeline); short-form, faster reuse window allows topical updates
-    # Substack NOTES cadence for the unified scheduler (publish:substack). Posts Tuesday through
-    # Friday at 9am PST, giving organic readership momentum day-to-day without overwhelming subscribers.
+    # Substack NOTES cadence for the unified scheduler (publish:substack). Daily at 9am PST
+    # (Muxin, 2026-08-20: daily posting on every platform, bumped 4/wk Tue-Fri -> 7/wk).
     # Scope: Substack Notes only, posted via the constrained browser agent in src/publish/substack.ts.
     # Full essays/posts are written and published by Muxin directly on Substack, never through this repo.
-    posts_per_week: 4
-    slot_days: [Tue, Wed, Thu, Fri]
+    posts_per_week: 7
+    slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
     slot_time_pst: "09:00"
 
 communities:

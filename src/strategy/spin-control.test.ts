@@ -47,10 +47,10 @@ describe("assignedPairs: derived live from config/routing.yaml's defaults, never
     assert.deepEqual(assignedPairs(c, ["human-ai", "other"]), [{ pillar: "human-ai", platform: "x" }]);
   });
 
-  test("against the LIVE config/routing.yaml: 14 assigned pairs across 6 pillars, including community targets", () => {
+  test("against the LIVE config/routing.yaml: 26 assigned pairs across 6 pillars, including community targets", () => {
     const live = loadConfig();
     const pairs = assignedPairs(live, PILLARS_FIXTURE);
-    assert.equal(pairs.length, 14);
+    assert.equal(pairs.length, 26);
     assert.ok(pairs.some((p) => p.pillar === "human-ai" && p.platform === "x"));
     assert.ok(pairs.some((p) => p.pillar === "civic-tech" && p.platform === "community:democratic-resilience"));
     assert.ok(pairs.some((p) => p.pillar === "other" && p.platform === "x"));

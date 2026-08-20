@@ -2,7 +2,7 @@
 # Data (resonance) decides which platforms get a piece when there is enough of it;
 # this file fills cold-start gaps and encodes rules the data can't see yet.
 #
-# Routing targets are derivative platforms only: x, linkedin, bluesky, and
+# Routing targets are derivative platforms only: x, linkedin, bluesky, mastodon, threads, and
 # community:<id> (see config/platforms.yaml communities), for full essays/posts. Substack
 # is both a SOURCE channel (analytics pull) and, for Substack Notes specifically, an
 # atomize routing TARGET (via the /atomize notes flow -> src/publish/substack.ts) — full
@@ -10,14 +10,19 @@
 # directly. quote-card is a format asset — see thresholds.always_consider; it is never
 # platform-gated. (Video scripts moved to the /video skill — atomize no longer generates
 # them, so video-script is not routed here.)
+#
+# Mastodon and Threads (Muxin, 2026-08-20): zero data yet, so every pillar defaults to
+# broad inclusion (cold-start convention, see the conventions note in root CLAUDE.md).
+# Narrow this to a pillar fit once posts accumulate and route.ts's data-driven scoring
+# has something to work with.
 
 defaults:                 # platforms to include per pillar while data is INSUFFICIENT (cold start)
-  human-ai:    [x, linkedin, bluesky]
-  claude-code: [x, linkedin, bluesky]
-  civic-tech:  [bluesky, x, community:democratic-resilience]
-  career-work: [linkedin, x]   # LinkedIn-led: it's the top-engaging theme there. X to gather signal.
-  builder:     [x, linkedin]   # build-in-public lands on LinkedIn; PM craft does well on X.
-  other:       [x]
+  human-ai:    [x, linkedin, bluesky, mastodon, threads]
+  claude-code: [x, linkedin, bluesky, mastodon, threads]
+  civic-tech:  [bluesky, x, mastodon, threads, community:democratic-resilience]
+  career-work: [linkedin, x, mastodon, threads]   # LinkedIn-led: it's the top-engaging theme there. X to gather signal.
+  builder:     [x, linkedin, mastodon, threads]   # build-in-public lands on LinkedIn; PM craft does well on X.
+  other:       [x, mastodon, threads]
 
 rules:                    # hard overrides applied AFTER the data decision
   civic-tech:
