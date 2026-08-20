@@ -2,10 +2,13 @@
 # authority and does NOT execute -- a phase script loads ONLY this file. src/venture/rules.ts
 # validates this file's rules_version against what's stamped in a venture's canon.md at kickoff.
 #
-# Phase 1, Phase 2, and Phase 3 rubrics are now encoded. Phase 4 sections are not yet encoded --
-# see the `# not yet encoded` markers below, each pointing at the venture/rules.md section that
-# covers it. Partial coverage is deliberate and visible, never silent (see the parity test,
-# src/venture/rules.test.ts).
+# Phase 1, Phase 2, Phase 3, and Phase 4's data-model sections (daily_operating_plan,
+# day_14_decision, cta_policy_by_phase["4"], phase4_completion) are now encoded. Phase 4's
+# artifact_kinds rows (daily-operating-plan, day-14-review, thank-you-note) are deliberately still
+# NOT encoded here -- that is Work Package 1/2's job, when phase4.ts actually drafts those
+# artifacts; artifactKindRule() refuses them loudly in the meantime rather than returning a made-up
+# rule (see rules.test.ts's "throws on an unknown artifact kind" case). Partial coverage is
+# deliberate and visible, never silent (see the parity test, src/venture/rules.test.ts).
 
 rules_version: venture-rules-2026-08-19-draft-1
 
@@ -112,7 +115,7 @@ draft:
   require_reply_prompt: true # §1A.1: "no CTA" needs a recorded exception, never a default
   require_claim_refs: true # every concrete factual claim traces to intake:qN or a confirmed_known
 
-# rules.md §1A.1 -- CTA policy by phase. Phase 4 # not yet encoded.
+# rules.md §1A.1 -- CTA policy by phase.
 cta_policy_by_phase:
   1: reply_prompt
   2: lead_magnet_bridge # "Bridge to the relevant active lead magnet."
@@ -121,6 +124,11 @@ cta_policy_by_phase:
   # conditional escalation is a phase3.ts CTA-selection concern (a later work package), not a
   # second static value here.
   3: lead_magnet_or_response_request
+  # §1A.1's Phase 4 row is a SET of allowed values, not one default: "the relevant lead magnet, an
+  # approved offer, a project, or no CTA, chosen by the item's actual purpose." Unlike phases 1-3,
+  # a later work package's phase4.ts picks one of these four per item -- this list is the allowed
+  # set, not a recommendation.
+  4: [lead_magnet_bridge, approved_offer, project, no_cta]
 
 # rules.md §5.4-§5.5 -- publish pace and Checkpoint 1's three-part predicate.
 phase_1_pace:
@@ -149,6 +157,17 @@ checkpoints:
     # artifacts above. Read by state.ts's checkpointArtifactState (Work Package 3) -- see
     # CheckpointRule.required_decision_kinds' comment in src/venture/rules.ts.
     required_decision_kinds: [problem-selection, transformation-choice, product-format-and-price]
+
+# rules.md §8.5/§8.6, venture-schema-contract.md §5.3 -- Phase 4 ends with the Day 14 review's
+# human decision, not a fourth checkpoint ("There is no checkpoint-4"). A SIBLING key to
+# `checkpoints`, deliberately never a key inside it -- see Phase4CompletionRule's comment in
+# src/venture/rules.ts. `thank-you-note` is deliberately excluded from
+# required_artifact_kinds: rules.md §8.4 sets no minimum count for thank-you notes, so they never
+# block Phase 4 completion.
+phase4_completion:
+  required_artifact_kinds: [daily-operating-plan, day-14-review]
+  required_decision_kinds: [daily-operating-plan-choice, day-14-decision]
+  ledger_event_id: phase-4-completed
 
 # rules.md §6.2 -- five lead-magnet concepts, six factors, Muxin selects (or overrides) one.
 lead_magnet_concept:
@@ -199,8 +218,31 @@ cluster_analysis:
 transformation:
   banned_verbs: [unlock, elevate, transform]
 
-# not yet encoded — see venture/rules.md §8 (Phase 4: Operations), and
-# venture-schema-contract.md §5.4/§5.6/§5.7/§5.8 (responses, evidence links, funnel events,
-# Signals mapping), plus the Phase 3 response-gate ledger event and checkpoint-3's
-# required_decision_kinds wiring into checkpoint.ts/state.ts (Work Packages 1 and 3). None of it
-# is needed until a later slice.
+# rules.md §8.1 -- the PDF's canonical five-job daily routine (2h15m total) and the four
+# recorded-choice modes offered when the intake time budget doesn't fit it. canonical_total_minutes
+# is checked against the sum of canonical_jobs[].minutes in rules.test.ts, so the two can never
+# silently drift apart.
+daily_operating_plan:
+  canonical_jobs:
+    - { label: "content writing and engagement", minutes: 30 }
+    - { label: "tomorrow's posts", minutes: 30 }
+    - { label: "feedback analysis", minutes: 30 }
+    - { label: "the core offer", minutes: 30 }
+    - { label: "direct customer outreach", minutes: 15 }
+  canonical_total_minutes: 135
+  # venture-schema-contract.md §2B's `daily-operating-plan.fields.chosen_mode` enum, matching
+  # rules.md §8.1's four numbered choices in order: use the canonical routine; rotate the five jobs
+  # across the week; extend the build timeline; revise the posting pace or scope.
+  modes: [canonical, rotated, extended_timeline, revised_scope]
+
+# rules.md §8.5 -- the Day 14 review's final decision. Candidates match
+# src/venture/intake.ts's SCORECARD_FIXED.final_decision_options exactly (parity-tested in
+# rules.test.ts, imported rather than hand-copied); the system never recommends one.
+day_14_decision:
+  candidates: [continue, revise_positioning, revise_lead_magnet, collect_more_evidence, stop]
+
+# not yet encoded -- see venture-schema-contract.md §5.4/§5.6/§5.7/§5.8 (responses, evidence links,
+# funnel events, Signals mapping), plus the Phase 3 response-gate ledger event and checkpoint-3's
+# required_decision_kinds wiring into checkpoint.ts/state.ts (Work Packages 1 and 3), and Phase 4's
+# own artifact-drafting logic (phase4.ts, a later work package). None of it is needed until a later
+# slice.

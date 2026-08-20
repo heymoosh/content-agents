@@ -6,6 +6,7 @@ import { repoRoot } from "../db/db.js";
 import { loadRules, assertRulesVersion, artifactKindRule, requireRulesVersionMatch, RulesVersionMismatchError } from "./rules.js";
 import { appendCanonEvent } from "./canon.js";
 import { ventureDir } from "./paths.js";
+import { SCORECARD_FIXED } from "./intake.js";
 
 // The anti-drift mechanism venture-build-plan.md §F requires: every threshold/enum/predicate
 // venture/rules.yaml encodes must match what venture/rules.md's prose currently states. This
@@ -229,6 +230,56 @@ describe("rules.yaml parity with rules.md prose", () => {
     assert.match(rulesMd, /no vague verbs such as[\s\S]{0,10}unlock/);
     assert.match(rulesMd, /elevate/);
     assert.match(rulesMd, /or[\s\S]{0,10}transform/);
+  });
+
+  test("daily operating plan: five canonical jobs sum to 135 minutes, matching §8.1", () => {
+    const sum = rules.daily_operating_plan.canonical_jobs.reduce((total, job) => total + job.minutes, 0);
+    // The arithmetic guard: canonical_total_minutes must equal the real sum of canonical_jobs, not
+    // a hardcoded number that could silently drift from the job list.
+    assert.equal(sum, rules.daily_operating_plan.canonical_total_minutes);
+    assert.equal(rules.daily_operating_plan.canonical_total_minutes, 135);
+    assert.equal(rules.daily_operating_plan.canonical_jobs.length, 5);
+    assert.match(rulesMd, /30 minutes for content writing and engagement/);
+    assert.match(rulesMd, /30 minutes for tomorrow's posts/);
+    assert.match(rulesMd, /30 minutes for feedback analysis/);
+    assert.match(rulesMd, /30 minutes for the core offer/);
+    assert.match(rulesMd, /15 minutes for direct customer outreach/);
+    assert.match(rulesMd, /Total: 2 hours 15 minutes/);
+  });
+
+  test("daily operating plan: four modes matching §8.1's recorded-choice options", () => {
+    assert.deepEqual(rules.daily_operating_plan.modes, ["canonical", "rotated", "extended_timeline", "revised_scope"]);
+    assert.match(rulesMd, /use the canonical daily routine/);
+    assert.match(rulesMd, /rotate the five jobs across the week within the available budget/);
+    assert.match(rulesMd, /extend the build timeline while preserving the sequence/);
+    assert.match(rulesMd, /revise the posting pace or scope/);
+  });
+
+  test("day 14 decision: candidates match SCORECARD_FIXED.final_decision_options exactly", () => {
+    assert.deepEqual(rules.day_14_decision.candidates, [...SCORECARD_FIXED.final_decision_options]);
+    assert.match(rulesMd, /continue;/);
+    assert.match(rulesMd, /revise positioning;/);
+    assert.match(rulesMd, /revise the lead magnet;/);
+    assert.match(rulesMd, /collect more evidence;/);
+    assert.match(rulesMd, /- stop\./);
+  });
+
+  test("Phase 4 CTA policy is the §1A.1 allowed set, not a single default", () => {
+    assert.deepEqual(rules.cta_policy_by_phase["4"], ["lead_magnet_bridge", "approved_offer", "project", "no_cta"]);
+    assert.match(
+      rulesMd,
+      /Phase 4 and later — grow the business \| The relevant lead magnet, an approved offer, a project, or no CTA, chosen by the item's actual purpose\./
+    );
+  });
+
+  test("phase4_completion is a sibling of checkpoints, not a checkpoint-4 entry", () => {
+    assert.deepEqual(rules.phase4_completion.required_artifact_kinds, ["daily-operating-plan", "day-14-review"]);
+    assert.deepEqual(rules.phase4_completion.required_decision_kinds, ["daily-operating-plan-choice", "day-14-decision"]);
+    assert.equal(rules.phase4_completion.ledger_event_id, "phase-4-completed");
+    // thank-you-note is deliberately excluded -- rules.md §8.4 sets no minimum count for it.
+    assert.ok(!rules.phase4_completion.required_artifact_kinds.includes("thank-you-note" as never));
+    assert.ok(!("checkpoint-4" in rules.checkpoints));
+    assert.match(rulesMd, /There is no fourth checkpoint in this draft/);
   });
 });
 

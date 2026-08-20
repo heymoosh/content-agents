@@ -16,7 +16,20 @@ export type DecisionKind =
   // override, so selectWithOverride's "not the recommendation" refusal never applies to it.
   | "problem-selection"
   | "transformation-choice"
-  | "product-format-and-price";
+  | "product-format-and-price"
+  // Phase 4 (rules.md §8, venture-schema-contract.md §5.3/§5.6). "daily-operating-plan-choice" is a
+  // ranked multi-candidate decision (candidates = rules.daily_operating_plan.modes) -- select via
+  // selectWithOverride(), same as the kinds above. Its recommended set is context-dependent
+  // (["canonical"] when the intake time budget fits it, [] when it doesn't) -- that logic is a later
+  // work package's phase4.ts, not this file; selectWithOverride() already treats an empty
+  // recommended_candidate_ids list as "any selection is an override," so a legitimately-empty
+  // recommendation still requires an --override-reason, same as any other non-recommended pick.
+  // "day-14-decision" is the Day 14 review's final call (candidates =
+  // SCORECARD_FIXED.final_decision_options from intake.ts, rules.md §8.5) -- the system never
+  // recommends one ("Muxin makes one final decision"), so it is selected with plain selectDecision()
+  // (requiredSelectCount: 1), the same no-recommendation pattern "transformation-choice" above uses.
+  | "daily-operating-plan-choice"
+  | "day-14-decision";
 
 export interface Candidate {
   candidate_id: string;

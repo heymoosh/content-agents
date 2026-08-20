@@ -434,7 +434,7 @@ require a new artifact.
 | `lead-magnet` | `title`, `intro`, `sections: string[]` (count fits the promise, not forced to three), `action_step`, `feedback_prompt` |
 | `product-outline` | `transformation_sentence`, `sections: string[]` (five to seven, §7.8), `format` |
 | `price-decision` | `recommended_price`, `considered_range`, `reasoning`, `known_uncertainty`, `pitch_paragraph`, `scenario_math` (optional; must carry `illustrative: true` when present, §7.9's illustrative-only rule) |
-| `daily-operating-plan` | `time_budget_minutes`, `chosen_mode` (`canonical` \| `rotated` \| `extended_timeline` \| `revised_scope`), `schedule: object` |
+| `daily-operating-plan` | `time_budget_minutes`, `chosen_mode` (`canonical` \| `rotated` \| `extended_timeline` \| `revised_scope`), `schedule: object`, `triage: {bucket: "never_build"\|"ignore"\|"automate", item: string, note: string}[]` (rules.md §8.2's recurring-work classification), `automation_order: {step: 1\|2\|3\|4, name: string, status: "planned"\|"configured"\|"skipped_not_needed"}[]` (rules.md §8.3's dependency-ordered configuration list) |
 | `phase_1_research_plan` | see §2C — a pre-post plan, drafted before any idea is written, distinct from the post-hoc read below |
 | `phase_1_research_read` | see §2C — expanded 2026-08-07, corrective pass |
 | `day-14-review` | see §5.1's scorecard read model below |
@@ -715,6 +715,8 @@ script sets them without judgment.
 | `survey` | `manual` | false | **superseded 2026-08-19** — reviews Muxin's existing live survey (`venture/existing-survey-humaninference.md`) for fit against the chosen lead magnet; Phase 2 does not author or install a new survey (`venture/rules.md` §6.5's 2026-08-19 amendment). ~~confirmation page (primary), linked from the welcome email (secondary)~~ | `url` | 2 |
 | `product-outline` | `none` | false | internal artifact | — | 3 |
 | `price-decision` | `none` | false | internal artifact | — | 3 |
+| `daily-operating-plan` | `none` | false | internal artifact | n/a | 4 |
+| `day-14-review` | `none` | false | internal artifact | n/a | 4 |
 | `thank-you-note` | `manual` | false | sent by hand | `attestation` | 4 |
 
 **Renamed from `text-post-longform` (2026-08-07).** A Starter Kit sprint post is capped under 150
