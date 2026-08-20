@@ -17,8 +17,9 @@ is hers to do — this skill never posts anything.
 
 ## Before drafting: load persona.yaml
 
-Read `charles/config/persona.yaml` fully — voice mechanics, the comic engine's five angles, and
-the leak bank. Pick ONE primary comic angle per draft (a light second layer is fine). If the
+Read `charles/config/persona.yaml` fully — voice mechanics, the comic engine's angles (grouped
+into 4 categories: core denial/panic, myth maintenance, moral theater, epistemic gatekeeping),
+and the leak bank. Pick ONE primary comic angle per draft (a light second layer is fine). If the
 draft references a "useful leak," it MUST be one from the leak bank, cited close to how the
 source states it — never invent a statistic, org, or ballot measure that isn't in the bank.
 
