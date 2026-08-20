@@ -128,6 +128,20 @@ describe("ingestResponse", () => {
     assert.equal(record.exclusion_reason, "ineligible");
     assert.equal(countEligibleUnique(readResponses(SLUG)), 0);
   });
+
+  test("re-ingesting an existing response_id folds to one line and does not double-count it toward the gate", () => {
+    for (let i = 0; i < 19; i++) {
+      ingestResponse(SLUG, baseInput({ responseId: `r-dbl-${i}` }), `t${i}`);
+    }
+    assert.equal(getResponseGateState(SLUG).have, 19);
+    // Re-ingest an existing id with no rawIdentifier -- naively appending the unfolded record
+    // onto the pre-read `existing` array would mint a second, distinct no-id- hash for this same
+    // response_id and misread as 20 unique respondents.
+    ingestResponse(SLUG, baseInput({ responseId: "r-dbl-0" }), "t-reingest");
+    const gate = getResponseGateState(SLUG);
+    assert.equal(gate.have, 19, "a re-ingest of an existing response_id must fold, not double-count");
+    assert.equal(gate.state, "closed");
+  });
 });
 
 // ---- response gate state + response_gate_opened ledger event ----

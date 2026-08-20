@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { respondentHash } from "../research/store.js";
 import { appendCanonEvent, findCanonEvent } from "./canon.js";
 import { responsesPath, ventureDir } from "./paths.js";
-import { loadRules } from "./rules.js";
+import { loadRules, requireRulesVersionMatch } from "./rules.js";
 
 // Phase 3's response log (rules.md §7.2-§7.4, venture-schema-contract.md §5.4). This is the
 // gated, 20/30-eligible-unique-respondent problem-selection loop's own private store --
@@ -130,6 +130,10 @@ function maybeOpenGate(slug: string, records: ResponseRecord[], at: string): Res
 
 export interface RawIdentifier {
   platform: string;
+  // respondentHash() lowercases `platform` but hashes `stableUserId` byte-for-byte -- it does NOT
+  // trim or lowercase it. The caller MUST pass a canonical form (e.g. a trimmed, lowercased
+  // email address) or "Foo@Bar.com" and "foo@bar.com" will hash to two different respondents and
+  // never dedupe.
   stableUserId: string | number;
 }
 
@@ -167,6 +171,7 @@ export interface IngestResponseResult {
 }
 
 export function ingestResponse(slug: string, input: IngestResponseInput, at: string): IngestResponseResult {
+  requireRulesVersionMatch(slug, loadRules());
   const existing = readResponses(slug);
   const respondentHashValue = input.rawIdentifier
     ? respondentHash(input.rawIdentifier.platform, input.rawIdentifier.stableUserId)
@@ -189,7 +194,12 @@ export function ingestResponse(slug: string, input: IngestResponseInput, at: str
     exclusion_reason: exclusionReason,
   };
   appendLine(slug, record);
-  const gate = maybeOpenGate(slug, [...existing, record], at);
+  // Re-read (rather than splicing `record` onto `existing`) so a re-ingest that reuses an
+  // existing response_id folds to ONE line before counting -- appending the unfolded array would
+  // double-count that response for this evaluation (two hashes if no rawIdentifier was given,
+  // since each call mints a fresh no-id- placeholder), which could misfire the one-way
+  // response_gate_opened event on a transient miscount. Mirrors correctResponse below.
+  const gate = maybeOpenGate(slug, readResponses(slug), at);
   return { record, likelyDuplicate, gate };
 }
 
@@ -208,6 +218,7 @@ export interface ResponseCorrectionPatch {
 }
 
 export function correctResponse(slug: string, responseId: string, patch: ResponseCorrectionPatch, at: string): ResponseRecord {
+  requireRulesVersionMatch(slug, loadRules());
   const current = readResponse(slug, responseId);
   if (!current) throw new Error(`no such response: ${responseId}`);
 
