@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { intakePath, ventureDir } from "./paths.js";
 import { appendCanonEvent } from "./canon.js";
 import { type VentureRules } from "./rules.js";
@@ -126,6 +126,48 @@ export interface KickoffInput {
   scorecard: ScorecardInput;
   rules: VentureRules;
   at: string;
+}
+
+// Reads back the two Day 14 targets a venture's kickoff fixed (rules.md §4.4) so Phase 4's
+// day-14-scorecard-draft can compare against them without a second, separate store -- intake.md's
+// rendered markdown IS the only durable copy of the scorecard (kickoffVenture never persists it as
+// structured data anywhere else). Parses renderIntakeMd's own fixed "**Label:** value" lines --
+// fragile only in the sense that it depends on that render format staying put, which is already
+// true for every other reader of intake.md in this codebase. Returns undefined if intake.md is
+// missing or a field didn't parse, rather than a partially-filled object a caller could
+// half-trust.
+export function readIntakeScorecard(slug: string): ScorecardInput | undefined {
+  const path = intakePath(slug);
+  if (!existsSync(path)) return undefined;
+  const text = readFileSync(path, "utf8");
+  const field = (label: string): string | undefined => text.match(new RegExp(`\\*\\*${label}:\\*\\* (.+)`))?.[1]?.trim();
+
+  const requiredLivePostsRaw = field("Required live Phase 1 posts");
+  const ongoingPace = field("Ongoing posting pace");
+  const viewsOrClicksTarget = field("Qualified views/clicks target");
+  const optInTarget = field("Landing-page opt-in target");
+  const responseQualityTest = field("Response-quality test");
+  const sustainabilityTest = field("Sustainability test");
+  const requiredLivePosts = requiredLivePostsRaw !== undefined ? Number(requiredLivePostsRaw) : NaN;
+
+  if (
+    !Number.isFinite(requiredLivePosts) ||
+    !ongoingPace ||
+    !viewsOrClicksTarget ||
+    !optInTarget ||
+    !responseQualityTest ||
+    !sustainabilityTest
+  ) {
+    return undefined;
+  }
+  return {
+    required_live_posts: requiredLivePosts,
+    ongoing_pace: ongoingPace,
+    views_or_clicks_target: viewsOrClicksTarget,
+    opt_in_target: optInTarget,
+    response_quality_test: responseQualityTest,
+    sustainability_test: sustainabilityTest,
+  };
 }
 
 // Non-deferrable: everything downstream in Phase 1 cites intake:qN as evidence, and the kickoff

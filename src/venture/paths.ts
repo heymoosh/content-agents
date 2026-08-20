@@ -35,6 +35,10 @@ export function phase3Dir(slug: string): string {
   return join(ventureDir(slug), "phase-3-offer");
 }
 
+export function phase4Dir(slug: string): string {
+  return join(ventureDir(slug), "phase-4-operations");
+}
+
 export function readyToPasteDir(slug: string): string {
   return join(ventureDir(slug), "ready-to-paste");
 }

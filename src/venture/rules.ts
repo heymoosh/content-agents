@@ -20,7 +20,10 @@ export type ArtifactKind =
   | "survey"
   | "text-post-announcement"
   | "product-outline"
-  | "price-decision";
+  | "price-decision"
+  | "daily-operating-plan"
+  | "day-14-review"
+  | "thank-you-note";
 
 export interface ArtifactKindRule {
   delivery_mode: "manual" | "app" | "none";
@@ -51,6 +54,18 @@ export interface CheckpointRule {
   ledger_event_id?: string;
 }
 
+// Phase 4 ends in the Day 14 review, a human decision, not a fourth checkpoint (rules.md §8.5/§8.6,
+// venture-schema-contract.md §5.3: "There is no checkpoint-4"). This is a deliberately DIFFERENT
+// type from CheckpointRule, not a fourth entry under `checkpoints` -- so it can never be passed into
+// checkpoint.ts's clearCheckpoint(), which only knows rules.checkpoints keys and the
+// checkpoint-1/checkpoint-2/checkpoint-3 ledger-event shape. Phase 4 completion is read, never
+// "cleared" the way a checkpoint is.
+export interface Phase4CompletionRule {
+  required_artifact_kinds: ArtifactKind[];
+  required_decision_kinds: DecisionKind[];
+  ledger_event_id: string;
+}
+
 export interface VentureRules {
   rules_version: string;
   sources: { starter_kit_sha256: string; welsh_note_sha256: string };
@@ -76,9 +91,16 @@ export interface VentureRules {
     require_reply_prompt: boolean;
     require_claim_refs: boolean;
   };
-  cta_policy_by_phase: Record<string, string>;
+  // Phases 1-3 each carry one static CTA value. Phase 4 does not (rules.md §1A.1's table): the CTA
+  // is "the relevant lead magnet, an approved offer, a project, or no CTA, chosen by the item's
+  // actual purpose" -- a SET of allowed values, not one default. cta_policy_by_phase["4"] is
+  // therefore the array of allowed values; a later work package's phase4.ts picks one per item.
+  cta_policy_by_phase: Record<string, string | string[]>;
   phase_1_pace: { recommended_posts_per_week: number };
   checkpoints: Record<string, CheckpointRule>;
+  // Phase 4 ends with the Day 14 review's human decision, not a checkpoint -- kept as a sibling of
+  // `checkpoints`, never a key inside it. See Phase4CompletionRule's comment.
+  phase4_completion: Phase4CompletionRule;
   lead_magnet_concept: {
     concept_count: number;
     factors: string[];
@@ -122,6 +144,19 @@ export interface VentureRules {
   // actually names, so they're the only ones a mechanical substring check can cite back to it.
   transformation: {
     banned_verbs: string[];
+  };
+  // rules.md §8.1 -- the PDF's canonical five-job daily routine, and the four recorded-choice
+  // modes offered when the intake time budget doesn't fit it.
+  daily_operating_plan: {
+    canonical_jobs: { label: string; minutes: number }[];
+    canonical_total_minutes: number;
+    modes: string[];
+  };
+  // rules.md §8.5 -- the Day 14 review's final decision. Candidates match
+  // src/venture/intake.ts's SCORECARD_FIXED.final_decision_options exactly (parity-tested in
+  // rules.test.ts); the system never recommends one (rules.md: "Muxin makes one final decision").
+  day_14_decision: {
+    candidates: string[];
   };
 }
 
