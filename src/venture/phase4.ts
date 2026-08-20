@@ -1,10 +1,20 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch, type VentureRules } from "./rules.js";
-import { createArtifact, readArtifact } from "./artifacts.js";
-import { writeDecision, selectWithOverride, readDecision, type Candidate, type DecisionRecord } from "./decisions.js";
+import { createArtifact, readArtifact, readArtifacts, updateArtifactFields, type VentureArtifact } from "./artifacts.js";
+import {
+  writeDecision,
+  selectWithOverride,
+  selectDecision,
+  readDecision,
+  readDecisions,
+  type Candidate,
+  type DecisionRecord,
+} from "./decisions.js";
 import { phase4Dir } from "./paths.js";
-import { hasCanonEvent } from "./canon.js";
+import { hasCanonEvent, appendCanonEvent } from "./canon.js";
+import { readResponse, getResponseGateState } from "./responses.js";
+import { readIntakeScorecard } from "./intake.js";
 import {
   fail,
   now,
@@ -26,10 +36,10 @@ import {
 //
 // usage: tsx src/venture/phase4.ts <subcommand> <slug> [...args] [--stdin]
 //
-// This file owns the FIRST HALF of Phase 4 only: the daily operating plan, triage, and
-// automation-order commands (rules.md §8.1-§8.3). Direct outreach thank-you notes and the Day 14
-// review/phase-completion logic (rules.md §8.4-§8.5) are a later work package's addition to this
-// same file's dispatch() switch -- see requirePhase4Unlocked's export comment below.
+// This file owns all of Phase 4: the daily operating plan, triage, and automation-order commands
+// (rules.md §8.1-§8.3, Work Package 1), plus direct-outreach thank-you notes and the Day 14
+// review/phase-completion logic (rules.md §8.4-§8.5, Work Package 2) -- all in the same
+// dispatch() switch, see requirePhase4Unlocked's export comment below.
 
 // --- the Phase 4 gate (rules.md §11 item 18: "Phase 4 opens only after Phase 3 decisions are
 // approved") ---------------------------------------------------------------------------------
@@ -74,6 +84,16 @@ function refuseIfArtifactApproved(slug: string, artifactId: string): void {
         `genuinely needs to be redrafted.`
     );
   }
+}
+
+// Same shape as phase3.ts's own copy of this helper -- kept as a local duplicate, not a shared
+// export, since the two files' near-identical helpers already aren't unified elsewhere in this
+// codebase (see phase3.ts's refuseIfDecisionSelected/refuseIfArtifactApproved comments).
+function requireNonEmpty(fields: Record<string, string | undefined | null>): void {
+  const missing = Object.entries(fields)
+    .filter(([, v]) => !v || !v.trim())
+    .map(([k]) => k);
+  if (missing.length) fail(`missing required field(s): ${missing.join(", ")}`);
 }
 
 function writePhase4Body(slug: string, artifactId: string, body: string): string {
@@ -368,6 +388,383 @@ function cmdOperatingPlanWrite(slug: string) {
   console.log(`drafted ${artifact.artifact_id} (daily-operating-plan, mode ${chosenMode}) -- awaiting Muxin's approval`);
 }
 
+// --- thank-you-note-draft: the thank-you-note artifact (rules.md §8.4) ----------------------------
+//
+// Multi-instance by design: rules.md sets no minimum or maximum count of thank-you notes (rules.yaml
+// deliberately excludes thank-you-note from phase4_completion.required_artifact_kinds), so this is
+// drafted once per respondent worth thanking, not once per venture. The artifact id therefore takes
+// a caller-supplied note_id, the same "let the caller name the instance" shape phase1.ts's cmdDraft
+// uses for candidateId -- refuseIfArtifactApproved guards a re-run of the SAME note_id only, never
+// blocking a second, different note_id.
+
+// Lightweight, on purpose (this only needs a rough sentence count, not a grammar checker) -- same
+// terminal-punctuation-then-whitespace split phase3.ts's checkSingleSentence uses, but counting
+// segments instead of enforcing exactly one.
+function countSentences(text: string): number {
+  return text
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .filter((p) => p.trim().length > 0).length;
+}
+
+// rules.md §8.4: "make no sales demand." A hard ban risks false positives (e.g. quoting the
+// respondent's own words back at them, which may legitimately include "$" or "buy"), so this is a
+// soft warning Muxin reviews by hand, not a refusal.
+const SALES_ASK_SUBSTRINGS = ["buy", "purchase", "sign up", "$"];
+
+function warnIfSalesAsk(text: string): void {
+  const lower = text.toLowerCase();
+  const hit = SALES_ASK_SUBSTRINGS.find((s) => lower.includes(s));
+  if (hit) {
+    console.warn(
+      `warning: note_text contains "${hit}", which can read as a sales ask -- rules.md §8.4 says ` +
+        `"make no sales demand." This is a soft warning, not a refusal (the respondent's own words may ` +
+        `legitimately include this), so review by hand before approving.`
+    );
+  }
+}
+
+// HARD refusal, not a warning: phase-4-operations/*.md (writePhase4Body's output) is NOT gitignored,
+// unlike responses.jsonl -- a raw email or handle written into a thank-you note's body would commit
+// an identifying detail to git. A simple substring/regex check, not full PII detection.
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+const HANDLE_RE = /(?:^|[^\w@])@[A-Za-z0-9_]{2,}/;
+
+function checkNoRawIdentifier(fields: Record<string, string>): void {
+  for (const [key, text] of Object.entries(fields)) {
+    if (EMAIL_RE.test(text) || HANDLE_RE.test(text)) {
+      fail(
+        `field "${key}" looks like it contains a raw email address or @-handle -- ` +
+          `phase-4-operations/*.md files are NOT gitignored (unlike responses.jsonl), so a raw ` +
+          `identifier here would leak into git (rules.md §9.3 item 1). Redact it before drafting.`
+      );
+    }
+  }
+}
+
+interface ThankYouNoteInput {
+  response_id: string;
+  influenced_idea_or_section: string;
+  note_text: string;
+  muxin_asked_for_more?: boolean;
+}
+
+function cmdThankYouNoteDraft(slug: string, noteId: string) {
+  if (!noteId?.trim()) fail(`usage: tsx src/venture/phase4.ts thank-you-note-draft <slug> <note_id>`);
+  const rules = loadRules();
+  const artifactId = `p4-thank-you-${noteId}`;
+  refuseIfArtifactApproved(slug, artifactId);
+  const input = JSON.parse(readStdin()) as ThankYouNoteInput;
+
+  requireNonEmpty({
+    response_id: input.response_id,
+    influenced_idea_or_section: input.influenced_idea_or_section,
+    note_text: input.note_text,
+  });
+
+  // "link privately to the source response" (rules.md §8.4) means response_id must name a real
+  // response record -- never a free-text pointer the system can't verify.
+  const response = readResponse(slug, input.response_id);
+  if (!response) {
+    fail(
+      `refusing: response_id "${input.response_id}" does not exist -- a thank-you note must link ` +
+        `privately to a real source response (rules.md §8.4)`
+    );
+  }
+
+  const sentenceCount = countSentences(input.note_text);
+  if (sentenceCount > 2 && !input.muxin_asked_for_more) {
+    fail(
+      `note_text is ${sentenceCount} sentence-like segments -- rules.md §8.4 caps a thank-you note ` +
+        `at two short sentences unless the user asked for more (set muxin_asked_for_more: true)`
+    );
+  }
+
+  checkNoRawIdentifier({ note_text: input.note_text, influenced_idea_or_section: input.influenced_idea_or_section });
+  checkNoEmDash({ note_text: input.note_text, influenced_idea_or_section: input.influenced_idea_or_section });
+  warnIfSalesAsk(input.note_text);
+
+  const body = [`Response: ${input.response_id}`, `Influenced: ${input.influenced_idea_or_section}`, ``, input.note_text].join("\n");
+  const bodyPath = writePhase4Body(slug, artifactId, body);
+
+  const artifact = createArtifact(slug, rules, {
+    artifact_id: artifactId,
+    phase: 4,
+    artifact_kind: "thank-you-note",
+    title: `Thank-you note (${input.response_id})`,
+    body_path: bodyPath,
+    checkpoint_id: null,
+    venture_id: slug,
+    venture_phase: 4,
+    message_id: artifactId,
+    fields: {
+      response_id: input.response_id,
+      influenced_idea_or_section: input.influenced_idea_or_section,
+      note_text: input.note_text,
+      muxin_asked_for_more: !!input.muxin_asked_for_more,
+    },
+    at: now(),
+  });
+  console.log(
+    `drafted ${artifact.artifact_id} (thank-you-note, response ${input.response_id}) -- ` +
+      `awaiting Muxin's approval -- stays manual, she sends it herself once approved`
+  );
+}
+
+// --- day-14-scorecard-draft: the day-14-review artifact (rules.md §8.5, schema-contract §5.6) -----
+//
+// A Phase-wide singleton (one Day 14 review per venture), fixed id "p4-day-14-review" -- same
+// shape as p4-operating-plan. refuseIfArtifactApproved (not a broader "already exists" refusal)
+// matches phase3.ts's outline-draft/price-draft precedent: a redraft is allowed while the artifact
+// is still an unapproved draft (nothing downstream depends on this artifact's exact shape the way
+// phase3's cluster-analysis orphaning risk does -- day-14-decide requires this artifact APPROVED
+// first, so an unapproved redraft can't leave anything dangling), refused once Muxin has approved it.
+
+const DAY14_SCORECARD_FIELDS = [
+  "posts_live",
+  "posting_pace_achieved",
+  "qualified_views_or_clicks",
+  "clicks_target_or_learning_only",
+  "landing_page_opt_in_rate",
+  "opt_in_target_or_learning_only",
+  "eligible_unique_responses",
+  "response_quality_read",
+  "sustainability_read",
+] as const;
+
+interface Day14ScorecardInput {
+  clicks_target_or_learning_only?: string;
+  opt_in_target_or_learning_only?: string;
+  qualified_views_or_clicks?: number | null;
+  landing_page_opt_in_rate?: number | null;
+  posting_pace_achieved?: string | null;
+  response_quality_read?: string | null;
+  sustainability_read?: string | null;
+}
+
+function countLivePosts(slug: string): number {
+  return readArtifacts(slug).filter(
+    (a) => (a.artifact_kind === "substack-post" || a.artifact_kind === "text-post-note") && a.delivery_status === "live_confirmed"
+  ).length;
+}
+
+// Renders the §8.5 bullets that are NOT scorecard fields -- read from existing artifact/decision
+// state at review time, never invented. "product build started" has no artifact/decision backing
+// it anywhere in this data model, so it renders as an explicit gap for Muxin to confirm by hand
+// rather than a fabricated status (rules.md §11 item 17: never report a Day 14 pass the fixed
+// scorecard didn't earn).
+function renderDay14NonScorecardLines(slug: string): string[] {
+  const artifactLine = (label: string, artifactId: string): string => {
+    const a = readArtifact(slug, artifactId);
+    return a ? `- ${label}: ${a.editorial_status}/${a.delivery_status} (${artifactId})` : `- ${label}: not drafted yet (${artifactId})`;
+  };
+  const decisionLine = (label: string, decisionId: string): string => {
+    const d = readDecision(slug, decisionId);
+    return d ? `- ${label}: ${d.status} (${decisionId})` : `- ${label}: not made yet (${decisionId})`;
+  };
+  return [
+    artifactLine("Lead magnet live", "p2-lead-magnet"),
+    artifactLine("Landing page capturing emails", "p2-landing-page"),
+    artifactLine("Survey working", "p2-survey-review"),
+    decisionLine("Product problem approved", "p3-problem-01"),
+    decisionLine("Transformation approved", "p3-transformation-01"),
+    artifactLine("Outline approved", "p3-product-outline"),
+    artifactLine("Price and pitch approved", "p3-price-decision"),
+    `- Product build started: not tracked by this data model yet -- confirm with Muxin directly`,
+    artifactLine("Operating plan tested for sustainability", "p4-operating-plan"),
+  ];
+}
+
+function cmdDay14ScorecardDraft(slug: string) {
+  const rules = loadRules();
+  refuseIfArtifactApproved(slug, "p4-day-14-review");
+  const raw = JSON.parse(readStdin()) as Record<string, unknown>;
+
+  // eligible_unique_responses and posts_live are COMPUTED, never accepted on stdin -- refuse the
+  // input outright if a caller tries to supply either, rather than silently ignoring it.
+  if ("eligible_unique_responses" in raw) {
+    fail(`refusing: eligible_unique_responses is computed from real response data, never accepted on stdin`);
+  }
+  if ("posts_live" in raw) {
+    fail(`refusing: posts_live is computed from live artifact records, never accepted on stdin`);
+  }
+  const input = raw as Day14ScorecardInput;
+
+  const scorecard = readIntakeScorecard(slug);
+  if (!scorecard) {
+    fail(`refusing: no intake scorecard found for "${slug}" -- intake must be complete before the Day 14 review (rules.md §4.4)`);
+  }
+
+  // clicks_target_or_learning_only / opt_in_target_or_learning_only are read verbatim from intake
+  // -- a stdin value is only accepted if it AGREES with what was fixed at kickoff, never silently
+  // overwritten (rules.md §4.4, §11 item 15).
+  if (input.clicks_target_or_learning_only !== undefined && input.clicks_target_or_learning_only !== scorecard!.views_or_clicks_target) {
+    fail(
+      `clicks_target_or_learning_only (${JSON.stringify(input.clicks_target_or_learning_only)}) disagrees with the ` +
+        `target fixed at intake (${JSON.stringify(scorecard!.views_or_clicks_target)}) -- Day 14 must not silently ` +
+        `revise the Day 0 scorecard (rules.md §4.4, §11 item 15)`
+    );
+  }
+  if (input.opt_in_target_or_learning_only !== undefined && input.opt_in_target_or_learning_only !== scorecard!.opt_in_target) {
+    fail(
+      `opt_in_target_or_learning_only (${JSON.stringify(input.opt_in_target_or_learning_only)}) disagrees with the ` +
+        `target fixed at intake (${JSON.stringify(scorecard!.opt_in_target)}) -- Day 14 must not silently revise the ` +
+        `Day 0 scorecard (rules.md §4.4, §11 item 15)`
+    );
+  }
+
+  checkNoEmDash({
+    posting_pace_achieved: input.posting_pace_achieved ?? undefined,
+    response_quality_read: input.response_quality_read ?? undefined,
+    sustainability_read: input.sustainability_read ?? undefined,
+  });
+
+  const scorecardFields: Record<(typeof DAY14_SCORECARD_FIELDS)[number], unknown> = {
+    posts_live: countLivePosts(slug),
+    posting_pace_achieved: input.posting_pace_achieved ?? null,
+    qualified_views_or_clicks: input.qualified_views_or_clicks ?? null,
+    clicks_target_or_learning_only: scorecard!.views_or_clicks_target,
+    landing_page_opt_in_rate: input.landing_page_opt_in_rate ?? null,
+    opt_in_target_or_learning_only: scorecard!.opt_in_target,
+    eligible_unique_responses: getResponseGateState(slug).have,
+    response_quality_read: input.response_quality_read ?? null,
+    sustainability_read: input.sustainability_read ?? null,
+  };
+
+  const body = [
+    `Day 14 scorecard (rules.md §8.5, venture-schema-contract.md §5.6):`,
+    ``,
+    ...DAY14_SCORECARD_FIELDS.map((f) => `- ${f}: ${JSON.stringify(scorecardFields[f])}`),
+    ``,
+    `Other §8.5 facts (read from existing state, not new scorecard fields):`,
+    ``,
+    ...renderDay14NonScorecardLines(slug),
+  ].join("\n");
+  const bodyPath = writePhase4Body(slug, "p4-day-14-review", body);
+
+  const artifact = createArtifact(slug, rules, {
+    artifact_id: "p4-day-14-review",
+    phase: 4,
+    artifact_kind: "day-14-review",
+    title: "Day 14 review",
+    body_path: bodyPath,
+    checkpoint_id: null,
+    venture_id: slug,
+    venture_phase: 4,
+    message_id: "p4-day-14-review",
+    fields: {
+      scorecard: scorecardFields,
+      decision: null,
+      decided_by: null,
+      decided_at: null,
+    },
+    at: now(),
+  });
+  console.log(
+    `drafted ${artifact.artifact_id} (day-14-review, ${scorecardFields.eligible_unique_responses} eligible unique ` +
+      `responses, ${scorecardFields.posts_live} posts live) -- STOP: show Muxin the facts before day-14-decide`
+  );
+}
+
+// --- day-14-decide: the day-14-decision decision, and Phase 4 completion (rules.md §8.5) ----------
+
+function requireDay14ReviewApproved(slug: string): VentureArtifact {
+  const a = readArtifact(slug, "p4-day-14-review");
+  if (!a || a.editorial_status !== "approved") {
+    fail(
+      `refusing: p4-day-14-review is not approved yet. Run "day-14-scorecard-draft" then ` +
+        `"approve ${slug} p4-day-14-review" first -- Muxin confirms the facts before deciding (rules.md §8.5).`
+    );
+  }
+  return a!;
+}
+
+// rules.md §8.5's checkpoint-completion check: reads phase4_completion's required kinds
+// GENERICALLY (never a hardcoded pair scattered through this function), same spirit as
+// checkpoint.ts's clearCheckpoint() -- deliberately NOT calling clearCheckpoint() itself, since
+// Phase 4 completion is a distinct concept (rules.ts's Phase4CompletionRule comment) that must
+// never be handed to code that only knows the checkpoint-1/2/3 ledger-event shape.
+function phase4CompletionSatisfied(slug: string, rules: VentureRules): boolean {
+  const artifacts = readArtifacts(slug);
+  const decisions = readDecisions(slug);
+  const artifactsOk = rules.phase4_completion.required_artifact_kinds.every((kind) => {
+    const a = artifacts.find((x) => x.artifact_kind === kind);
+    return !!a && a.editorial_status === "approved" && a.delivery_status === "not_applicable";
+  });
+  const decisionsOk = rules.phase4_completion.required_decision_kinds.every((kind) =>
+    decisions.some((d) => d.decision_kind === kind && d.status === "selected")
+  );
+  return artifactsOk && decisionsOk;
+}
+
+// Ledger first, cache second -- same crash-safety order checkpoints already use
+// (venture-schema-contract.md §5.3): a crash between the two leaves the event recorded and the
+// artifact's fields.decision stale, never the reverse. appendCanonEvent's own hasCanonEvent guard
+// makes the ledger write idempotent on its own, no separate check needed here.
+function maybeCompletePhase4(slug: string, rules: VentureRules, decision: DecisionRecord): void {
+  if (!phase4CompletionSatisfied(slug, rules)) {
+    console.log(`Day 14 decision recorded, but Phase 4 is not yet complete -- other required artifacts/decisions are still outstanding.`);
+    return;
+  }
+  appendCanonEvent(slug, "phase_4_completed", `${slug}/${rules.phase4_completion.ledger_event_id}`, {}, now());
+  updateArtifactFields(
+    slug,
+    "p4-day-14-review",
+    { decision: decision.selected_candidate_ids[0], decided_by: decision.selected_by, decided_at: decision.decided_at },
+    now()
+  );
+  console.log(
+    `Phase 4 complete -- the venture's active build is done. There is no fourth checkpoint; the Day 14 ` +
+      `decision IS the completion (rules.md §8.5/§8.6, venture-schema-contract.md §5.3).`
+  );
+}
+
+function cmdDay14Decide(slug: string, candidateId: string) {
+  const rules = loadRules();
+  requireDay14ReviewApproved(slug);
+  const reason = flag("--reason");
+  if (!candidateId?.trim()) fail(`usage: tsx src/venture/phase4.ts day-14-decide <slug> <candidate_id> --reason "..."`);
+  // decisions.ts's day-14-decision comment: the system never recommends one, so selectDecision()
+  // (unlike selectWithOverride()) never forces an override reason here -- rules.md §8.5's "Record
+  // the decision and reason" still has to be enforced somewhere, so this command requires --reason
+  // itself rather than relying on a mechanism that doesn't apply to this decision kind.
+  if (!reason?.trim()) fail(`refusing: --reason is required -- rules.md §8.5: "Record the decision and reason."`);
+  if (!rules.day_14_decision.candidates.includes(candidateId)) {
+    fail(`"${candidateId}" is not one of the Day 14 decision options (${rules.day_14_decision.candidates.join(", ")})`);
+  }
+
+  if (!readDecision(slug, "p4-day-14-decision")) {
+    writeDecision(slug, {
+      decision_id: "p4-day-14-decision",
+      decision_kind: "day-14-decision",
+      rules_version: rules.rules_version,
+      input_refs: ["p4-day-14-review"],
+      candidates: rules.day_14_decision.candidates.map((c) => ({
+        candidate_id: c,
+        label: c,
+        scores: {},
+        evidence_refs: ["p4-day-14-review"],
+        rationale: "",
+      })),
+      recommended_candidate_ids: [],
+      at: now(),
+    });
+  }
+
+  // selectDecision throws DecisionAlreadySelectedError on a second call -- immutability (rules.md
+  // §11 item 15) comes for free from decisions.ts, no extra guard needed here.
+  const selected = selectDecision(slug, "p4-day-14-decision", {
+    selectedCandidateIds: [candidateId],
+    selectedBy: "muxin",
+    rationale: reason,
+    requiredSelectCount: 1,
+    at: now(),
+  });
+  console.log(`Day 14 decision recorded: ${selected.selected_candidate_ids[0]} -- ${reason}`);
+
+  maybeCompletePhase4(slug, rules, selected);
+}
+
 // --- dispatch ---------------------------------------------------------------------------------
 
 function dispatch() {
@@ -375,7 +772,8 @@ function dispatch() {
   if (!sub || !slug) {
     fail(
       `usage: tsx src/venture/phase4.ts <time-budget-compare|operating-plan-draft|` +
-        `operating-plan-choice-select|operating-plan-write|approve|discard|restore|list> <slug> [...args]`
+        `operating-plan-choice-select|operating-plan-write|thank-you-note-draft|day-14-scorecard-draft|` +
+        `day-14-decide|approve|discard|restore|list> <slug> [...args]`
     );
   }
   const rules = loadRules();
@@ -394,6 +792,12 @@ function dispatch() {
       return cmdOperatingPlanChoiceSelect(slug, positionalArgs(rest, "--override-reason")[0]);
     case "operating-plan-write":
       return cmdOperatingPlanWrite(slug);
+    case "thank-you-note-draft":
+      return cmdThankYouNoteDraft(slug, positionalArgs(rest)[0]);
+    case "day-14-scorecard-draft":
+      return cmdDay14ScorecardDraft(slug);
+    case "day-14-decide":
+      return cmdDay14Decide(slug, positionalArgs(rest, "--reason")[0]);
     case "approve":
       return cmdApprove(slug, positionalArgs(rest)[0]);
     case "discard":

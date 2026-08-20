@@ -393,10 +393,15 @@ describe("artifactKindRule", () => {
     assert.equal(r.phase, 4);
   });
 
+  test("day-14-review is internal, non-publishable, no-evidence, phase 4", () => {
+    const r = artifactKindRule(rules, "day-14-review");
+    assert.equal(r.delivery_mode, "none");
+    assert.equal(r.publishable, false);
+    assert.equal(r.min_evidence, null);
+    assert.equal(r.phase, 4);
+  });
+
   test("throws on an unknown artifact kind rather than returning undefined", () => {
-    // day-14-review is real (rules.md §8.5, Phase 4) but deliberately not yet encoded --
-    // Work Package 2's job, when phase4.ts drafts it. artifactKindRule must still refuse it
-    // loudly rather than returning undefined.
-    assert.throws(() => artifactKindRule(rules, "day-14-review" as never), /no artifact_kinds entry/);
+    assert.throws(() => artifactKindRule(rules, "bogus-kind" as never), /no artifact_kinds entry/);
   });
 });

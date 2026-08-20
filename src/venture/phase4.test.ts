@@ -5,8 +5,12 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { ventureDir } from "./paths.js";
-import { appendCanonEvent } from "./canon.js";
+import { appendCanonEvent, hasCanonEvent } from "./canon.js";
 import { readArtifact } from "./artifacts.js";
+import { readDecision } from "./decisions.js";
+import { ingestResponse } from "./responses.js";
+import { kickoffVenture, INTAKE_QUESTIONS, type IntakeAnswers } from "./intake.js";
+import { loadRules } from "./rules.js";
 
 // Exercises the real CLI as a subprocess, same discipline as phase2.test.ts/phase3.test.ts.
 const SCRIPT = join(repoRoot, "src", "venture", "phase4.ts");
@@ -74,6 +78,59 @@ function wellFormedOperatingPlanWriteInput(overrides: Record<string, unknown> = 
     automation_order: wellFormedAutomationOrder(),
     ...overrides,
   };
+}
+
+function seedIntakeScorecard(overrides: Partial<{ views_or_clicks_target: string; opt_in_target: string }> = {}): void {
+  const rules = loadRules();
+  const answers: IntakeAnswers = {};
+  for (const q of INTAKE_QUESTIONS) answers[q.id] = `answer to ${q.id}`;
+  kickoffVenture({
+    slug: SLUG,
+    answers,
+    voice: {
+      writing_samples: ["https://example.com/sample"],
+      worldview_statement: "test worldview",
+      natural_phrases: ["kind of a big deal"],
+      refused_phrases_tones: ["here's the thing"],
+    },
+    scorecard: {
+      required_live_posts: 3,
+      ongoing_pace: "5 posts/week",
+      views_or_clicks_target: "learning_only",
+      opt_in_target: "learning_only",
+      response_quality_test: "at least one specific, on-topic reply per post",
+      sustainability_test: "fits inside the 5 hrs/week declared in q20",
+      ...overrides,
+    },
+    rules,
+    at: "t0",
+  });
+}
+
+function seedResponse(id: string): void {
+  ingestResponse(
+    SLUG,
+    {
+      source: "survey",
+      receivedAt: "t0",
+      targetAudienceEligible: true,
+      exactQuote: "exact quote text",
+      redactedQuote: "redacted quote text",
+      stuckPoint: "cannot find enough hours in the week",
+      emotionalIntensity: "medium",
+      responseId: id,
+    },
+    "t0"
+  );
+}
+
+function seedDayFourteenReviewApproved(): void {
+  seedOperatingPlanSelected("canonical", 135);
+  must(runCmd("operating-plan-write", [], JSON.stringify(wellFormedOperatingPlanWriteInput())), "operating-plan-write");
+  must(runCmd("approve", ["p4-operating-plan"]), "approve operating-plan");
+  seedIntakeScorecard();
+  must(runCmd("day-14-scorecard-draft", [], JSON.stringify({})), "day-14-scorecard-draft");
+  must(runCmd("approve", ["p4-day-14-review"]), "approve day-14-review");
 }
 
 // ==== gate: requirePhase4Unlocked ====
@@ -297,5 +354,224 @@ describe("approve", () => {
     const a = readArtifact(SLUG, "p4-operating-plan");
     assert.equal(a!.editorial_status, "approved");
     assert.equal(a!.delivery_status, "not_applicable");
+  });
+});
+
+// ==== thank-you-note-draft ====
+
+describe("thank-you-note-draft", () => {
+  test("refuses an unknown response_id", () => {
+    seedPhase4Unlocked();
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["note-1"],
+      JSON.stringify({
+        response_id: "no-such-response",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much for that.",
+      })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /does not exist/);
+  });
+
+  test("refuses a note containing a raw email address", () => {
+    seedPhase4Unlocked();
+    seedResponse("r-test-1");
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["note-1"],
+      JSON.stringify({
+        response_id: "r-test-1",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much, email me at jane@example.com anytime.",
+      })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /raw email address or @-handle/);
+  });
+
+  test("refuses a note containing a raw @-handle", () => {
+    seedPhase4Unlocked();
+    seedResponse("r-test-1");
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["note-1"],
+      JSON.stringify({
+        response_id: "r-test-1",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much, find me @janedoe anytime.",
+      })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /raw email address or @-handle/);
+  });
+
+  test("refuses a 3-sentence note without muxin_asked_for_more", () => {
+    seedPhase4Unlocked();
+    seedResponse("r-test-1");
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["note-1"],
+      JSON.stringify({
+        response_id: "r-test-1",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much. This really shaped the outline. I owe you one.",
+      })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /sentence-like segments/);
+  });
+
+  test("allows a 3-sentence note when muxin_asked_for_more is true", () => {
+    seedPhase4Unlocked();
+    seedResponse("r-test-1");
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["note-1"],
+      JSON.stringify({
+        response_id: "r-test-1",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much. This really shaped the outline. I owe you one.",
+        muxin_asked_for_more: true,
+      })
+    );
+    assert.equal(r.status, 0, r.stderr);
+    const a = readArtifact(SLUG, "p4-thank-you-note-1");
+    assert.ok(a);
+    assert.equal(a!.artifact_kind, "thank-you-note");
+    assert.equal(a!.delivery_mode, "manual");
+  });
+
+  test("a well-formed 2-sentence note succeeds and drafts a thank-you-note artifact", () => {
+    seedPhase4Unlocked();
+    seedResponse("r-test-1");
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["note-1"],
+      JSON.stringify({
+        response_id: "r-test-1",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much for that. It really shaped the outline.",
+      })
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /stays manual, she sends it herself once approved/);
+  });
+});
+
+// ==== day-14-scorecard-draft ====
+
+describe("day-14-scorecard-draft", () => {
+  test("refuses eligible_unique_responses supplied on stdin", () => {
+    seedPhase4Unlocked();
+    seedIntakeScorecard();
+    const r = runCmd("day-14-scorecard-draft", [], JSON.stringify({ eligible_unique_responses: 99 }));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /computed from real response data/);
+  });
+
+  test("refuses posts_live supplied on stdin", () => {
+    seedPhase4Unlocked();
+    seedIntakeScorecard();
+    const r = runCmd("day-14-scorecard-draft", [], JSON.stringify({ posts_live: 5 }));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /computed from live artifact records/);
+  });
+
+  test("computes eligible_unique_responses correctly from seeded response data", () => {
+    seedPhase4Unlocked();
+    seedIntakeScorecard();
+    seedResponse("r-1");
+    seedResponse("r-2");
+    seedResponse("r-3");
+    const r = runCmd("day-14-scorecard-draft", [], JSON.stringify({}));
+    assert.equal(r.status, 0, r.stderr);
+    const a = readArtifact(SLUG, "p4-day-14-review");
+    const scorecard = a!.fields?.scorecard as Record<string, unknown>;
+    assert.equal(scorecard.eligible_unique_responses, 3);
+    assert.equal(scorecard.posts_live, 0);
+  });
+
+  test("refuses a stdin clicks_target_or_learning_only that disagrees with intake's stored target", () => {
+    seedPhase4Unlocked();
+    seedIntakeScorecard({ views_or_clicks_target: "learning_only" });
+    const r = runCmd("day-14-scorecard-draft", [], JSON.stringify({ clicks_target_or_learning_only: "500 clicks" }));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /disagrees with the target fixed at intake/);
+  });
+
+  test("refuses a stdin opt_in_target_or_learning_only that disagrees with intake's stored target", () => {
+    seedPhase4Unlocked();
+    seedIntakeScorecard({ opt_in_target: "learning_only" });
+    const r = runCmd("day-14-scorecard-draft", [], JSON.stringify({ opt_in_target_or_learning_only: "10%" }));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /disagrees with the target fixed at intake/);
+  });
+
+  test("accepts a stdin target that agrees with intake's stored target", () => {
+    seedPhase4Unlocked();
+    seedIntakeScorecard({ views_or_clicks_target: "learning_only" });
+    const r = runCmd("day-14-scorecard-draft", [], JSON.stringify({ clicks_target_or_learning_only: "learning_only" }));
+    assert.equal(r.status, 0, r.stderr);
+  });
+
+  test("refuses to re-draft once the artifact is already approved", () => {
+    seedDayFourteenReviewApproved();
+    const r = runCmd("day-14-scorecard-draft", [], JSON.stringify({}));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /already approved/);
+  });
+});
+
+// ==== day-14-decide + Phase 4 completion ====
+
+describe("day-14-decide", () => {
+  test("refuses before the day-14-review artifact is approved", () => {
+    seedPhase4Unlocked();
+    const r = runCmd("day-14-decide", ["continue", "--reason", "clear signal to keep going"]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /p4-day-14-review is not approved/);
+  });
+
+  test("refuses a missing --reason", () => {
+    seedDayFourteenReviewApproved();
+    const r = runCmd("day-14-decide", ["continue"]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /--reason is required/);
+  });
+
+  test("refuses a candidate outside the fixed 5 options", () => {
+    seedDayFourteenReviewApproved();
+    const r = runCmd("day-14-decide", ["give_up", "--reason", "testing"]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /not one of the Day 14 decision options/);
+  });
+
+  test("once approved and decided, phase-4-completed fires and the artifact's fields match the DecisionRecord", () => {
+    seedDayFourteenReviewApproved();
+    const r = runCmd("day-14-decide", ["continue", "--reason", "clear signal to keep going"]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(r.stdout, /Phase 4 complete/);
+
+    assert.ok(hasCanonEvent(SLUG, `${SLUG}/phase-4-completed`));
+
+    const d = readDecision(SLUG, "p4-day-14-decision");
+    assert.equal(d!.status, "selected");
+    assert.equal(d!.selected_candidate_ids[0], "continue");
+    assert.equal(d!.rationale, "clear signal to keep going");
+
+    const a = readArtifact(SLUG, "p4-day-14-review");
+    assert.equal(a!.fields?.decision, "continue");
+    assert.equal(a!.fields?.decided_by, "muxin");
+    assert.equal(a!.fields?.decided_at, d!.decided_at);
+  });
+
+  test("a second day-14-decide call attempting to change the decision is refused", () => {
+    seedDayFourteenReviewApproved();
+    must(runCmd("day-14-decide", ["continue", "--reason", "first decision"]), "day-14-decide");
+    const r = runCmd("day-14-decide", ["stop", "--reason", "trying to change it"]);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /already selected/);
   });
 });
