@@ -215,6 +215,21 @@ describe("rules.yaml parity with rules.md prose", () => {
       /Clears only when\s*\n\s*the problem, transformation, outline, price, and pitch decision records/
     );
   });
+
+  test("cluster analysis: three-to-five cluster bounds, matching §7.5", () => {
+    assert.equal(rules.cluster_analysis.min_clusters, 3);
+    assert.equal(rules.cluster_analysis.max_clusters, 5);
+    assert.match(rulesMd, /Produce three to five clusters, not a long list of micro-categories\./);
+  });
+
+  test("transformation: banned vague verbs match §7.7's named examples", () => {
+    assert.deepEqual(rules.transformation.banned_verbs, ["unlock", "elevate", "transform"]);
+    // rules.md uses curly quotes around the named verbs -- match loosely on the verbs themselves,
+    // not the quote glyphs, so a straight-quote regex here doesn't silently fail to match.
+    assert.match(rulesMd, /no vague verbs such as[\s\S]{0,10}unlock/);
+    assert.match(rulesMd, /elevate/);
+    assert.match(rulesMd, /or[\s\S]{0,10}transform/);
+  });
 });
 
 describe("assertRulesVersion", () => {

@@ -1,15 +1,19 @@
 ---
 name: venture
-description: Build 3 — run Phase 1 ("Attention") and Phase 2 ("Audience") of a solo-business sprint that tests what an audience actually wants, then builds a narrow lead magnet and owned-audience capture around it. Usage - /venture new <slug>, /venture <slug>.
+description: Build 3 — run Phase 1 ("Attention"), Phase 2 ("Audience"), and Phase 3 ("Offer") of a solo-business sprint that tests what an audience actually wants, builds a narrow lead magnet and owned-audience capture around it, then clusters real responses into one expensive problem with a transformation, outline, and price. Usage - /venture new <slug>, /venture <slug>.
 ---
 
-# /venture — Phase 1: Attention, Phase 2: Audience (Build 3)
+# /venture — Phase 1: Attention, Phase 2: Audience, Phase 3: Offer (Build 3)
 
 Help Muxin test what an audience wants, needs, and will pay for — starting with Phase 1: pick one
 platform, run public qualitative discovery, publish three probe posts, hit Checkpoint 1. Then
 Phase 2: turn what Phase 1 learned into a narrow lead magnet, a landing page, a welcome email, and
-a fit review of Muxin's existing survey, hitting Checkpoint 2. Offer and Operations (Phases 3-4)
-aren't built yet.
+a fit review of Muxin's existing survey, hitting Checkpoint 2. Then Phase 3: once real responses
+clear the 20-eligible-unique-respondent gate, cluster them into three to five problems, score and
+select the one expensive problem worth solving, define and approve a transformation sentence,
+outline a small first product, and recommend a price and pitch, hitting Checkpoint 3 (not yet
+wired to actually clear — that's a later work package; this skill still runs every Phase 3 step).
+Operations (Phase 4) isn't built yet.
 
 ## This is composed business content — and why that's allowed
 
@@ -22,9 +26,10 @@ Muxin's real name, not a labeled fictional register), and **every concrete claim
 `claim_refs` entry** tracing it to an intake answer or a confirmed fact — never assert a result,
 customer, or number Muxin didn't actually have.
 
-**Every gate below is enforced by `src/venture/phase1.ts` (Phase 1) and `src/venture/phase2.ts`
-(Phase 2), not by you remembering to stop.** Each script refuses to move forward if a prior gate
-hasn't cleared. Treat a refusal as correct behavior, not a bug to route around.
+**Every gate below is enforced by `src/venture/phase1.ts` (Phase 1), `src/venture/phase2.ts`
+(Phase 2), and `src/venture/phase3.ts` (Phase 3), not by you remembering to stop.** Each script
+refuses to move forward if a prior gate hasn't cleared. Treat a refusal as correct behavior, not a
+bug to route around.
 
 ## Step 1: New venture — intake
 
@@ -318,10 +323,172 @@ toward it. The survey's own "live" evidence is simply its already-live URL on hu
 Muxin isn't building anything new for it, this step only confirms the existing survey continues to
 run and the review's fit findings, if any, got acted on.
 
+## Step 17: Keep posting, keep collecting responses — the Phase 3 gate
+
+Phase 3 has one gate, and it's the only thing that gates it: **20 eligible unique respondents**
+(target 30), counted by `src/venture/responses.ts`, never by row count or pasted lines. Below 20,
+posting continues, the survey keeps collecting, and every Phase 3 analysis command below refuses —
+`src/venture/phase3.ts` enforces this itself at the top of every subcommand except a
+status/read command, naming exactly how many more are needed. There is no separate
+"Checkpoint-2-must-clear-first" gate here — the response gate is the only prerequisite the rules
+define for Phase 3's own commands.
+
+As responses come in (survey answers, email replies, DM stuck points, comments — whatever Muxin
+forwards or pastes), ingest each one:
+
+```
+echo '{"source": "survey", "received_at": "...", "target_audience_eligible": true, "exact_quote": "...", "redacted_quote": "...", "stuck_point": "...", "desired_outcome": "...", "emotional_intensity": "low|medium|high"}' | tsx src/venture/phase3.ts response-ingest <slug>
+```
+
+Preserve the exact private wording in `exact_quote`; never clean the audience's language into
+generic consulting phrasing (rules.md §7.4). The command's own confirmation never echoes the quote
+back — that's deliberate, not a display bug. Check progress any time:
+
+```
+tsx src/venture/phase3.ts response-gate-status <slug>
+```
+
+If Muxin wants to correct an extraction, an eligibility call, or a cluster assignment on an
+already-ingested response:
+
+```
+echo '{"stuck_point": "...", "target_audience_eligible": false, "exclusion_reason": "..."}' | tsx src/venture/phase3.ts response-correct <slug> <response_id>
+```
+
+## Step 18: Cluster into three to five problems
+
+Once the gate is open, compare responses on their underlying job or struggle, not surface wording,
+and group them into three to five clusters (never a long list of micro-categories, never a fixed
+category count decided in advance). For each cluster, gather its redacted evidence quotes, common
+stuck point, desired outcome, and visible consequences.
+
+```
+echo '{"clusters": [{"cluster_id": "...", "label": "...", "evidence": ["..."], "stuck_point": "...", "desired_outcome": "...", "visible_consequences": "..."}, ...3-5...], "assignments": [{"response_id": "...", "cluster_id": "..."}, ...every included response, exactly once...]}' | tsx src/venture/phase3.ts cluster <slug>
+```
+
+The script computes each cluster's count from the assignments you actually give it — never trust a
+round number, and never invent a count. It refuses an orphaned response (one never assigned), a
+double-assignment, and an assignment naming an undeclared cluster. **Stop and show Muxin the
+clusters** before scoring. She can ask for a different grouping — rerun `cluster` with corrected
+assignments (it's not locked until `problem-select` runs).
+
+## Step 19: Score and select the expensive problem
+
+Score every cluster 1-5 on the six factors from rules.md §7.6: frequency, intensity, time cost,
+money cost, stress cost, solvability. Cite real evidence for each score — never fabricate a cost
+the audience didn't express. The most frequent cluster doesn't automatically win; recommend the
+cluster with the best combination of repeated pain, real cost, urgency, and creator solvability.
+
+```
+echo '{"input_refs": [...], "candidates": [...one per cluster, six factor scores each...], "recommended_candidate_ids": ["..."]}' | tsx src/venture/phase3.ts problem-score <slug>
+```
+
+**Stop and show Muxin the scored problems.** She selects one:
+
+```
+tsx src/venture/phase3.ts problem-select <slug> <cluster_id> [--override-reason "..."]
+```
+
+If she picks something other than the recommended cluster, the script requires
+`--override-reason "..."` — same audit-trail discipline as every other selection in this skill.
+
+## Step 20: Define and approve the transformation
+
+Write one plain sentence: `Go from [current painful state] to [specific useful state] in
+[credible scope or time].` One person or audience, one meaningful change, no promise broader than
+the evidence, and none of rules.md §7.7's named vague verbs ("unlock," "elevate," "transform," or
+anything that reads the same way) anywhere in it.
+
+```
+echo '{"sentence": "...", "rationale": "...", "claim_refs": [...]}' | tsx src/venture/phase3.ts transformation-draft <slug>
+```
+
+The script mechanically rejects a banned verb, an em dash, or more than one sentence — it can't
+judge whether the promise is honestly scoped to the evidence, that's your call to get right.
+**Stop and show Muxin the sentence.** She can ask for edits (rerun `transformation-draft` with the
+revised wording, as many times as needed) before approving:
+
+```
+tsx src/venture/phase3.ts transformation-select <slug>
+```
+
+Once approved, the sentence is frozen — it can't be selected again with different wording. A later
+change means a fresh `transformation-draft` before Phase 3 completes, not a silent edit.
+
+## Step 21: Outline the first product
+
+Build backwards from the approved transformation: five to seven concise sections moving from the
+current pain to the promised useful state, buildable and shippable in about two weeks, one offer —
+not a value ladder. The orientation/diagnosis/core-method/application/tools/action-plan/
+continuation pattern (rules.md §7.8) is guidance, not a mandatory template.
+
+```
+echo '{"transformation_sentence": "<the exact approved sentence>", "sections": [...5-7...], "format": "...", "claim_refs": [...]}' | tsx src/venture/phase3.ts outline-draft <slug>
+```
+
+`transformation_sentence` must match the approved sentence from Step 20 **exactly** — the script
+refuses a mismatch rather than silently drifting from what Muxin actually approved. Requires the
+transformation to be approved first; refuses otherwise, naming what's missing.
+
+**Stop and show Muxin the outline.** She approves or asks for a revision:
+`tsx src/venture/phase3.ts approve <slug> p3-product-outline`.
+
+## Step 22: Recommend a price and pitch
+
+Only after the outline is approved. First, propose the considered range — real price/format
+alternatives, not just one number — weighing format and depth, outcome value, audience economics,
+creator-proof strength, what the offer might replace, quick-win-ability, and whether the price
+actually tests willingness to pay (rules.md §7.9's seven factors):
+
+```
+echo '{"input_refs": [...], "candidates": [{"candidate_id": "...", "label": "$79 self-paced guide", "scores": {}, "evidence_refs": [], "rationale": "..."}, ...at least 2...], "recommended_candidate_ids": ["..."]}' | tsx src/venture/phase3.ts price <slug>
+```
+
+**Stop and show Muxin the considered range.** She selects one:
+
+```
+tsx src/venture/phase3.ts price-select <slug> <candidate_id> [--override-reason "..."]
+```
+
+Then draft the actual price/pitch artifact — one recommended price, the considered range, reasoning
+tied to the seven factors, known uncertainty, and an editable one-paragraph pitch:
+
+```
+echo '{"recommended_price": 79, "considered_range": "...", "reasoning": "...", "known_uncertainty": "...", "pitch_paragraph": "...", "scenario_math": null, "claim_refs": [...]}' | tsx src/venture/phase3.ts price-draft <slug>
+```
+
+**Never seed the price from the Starter Kit's own worked example.** The script refuses a
+recommended price of exactly $49 — the civic-tech worked example's documented figure — as one
+concrete, checkable tripwire, but it cannot catch every way a fixture's judgment could leak in.
+The real discipline is upstream of the script: never read `venture/examples/civic-tech-worked-example.md`
+(if it exists) into context while doing this step, for this venture or any other. The
+recommendation must come from THIS venture's own cluster evidence, transformation, and outline —
+nothing else.
+
+If you include optional scenario math (illustrative-only conversion assumptions, e.g. "~2% for a
+digital product" or "~0.25% for a service at a higher price"), set `scenario_math.illustrative:
+true` — the script refuses scenario math missing that flag — and never present the numbers as a
+forecast or a promise in the pitch itself.
+
+**Stop and show Muxin the price and pitch.** She approves or asks for a revision:
+`tsx src/venture/phase3.ts approve <slug> p3-price-decision`.
+
+## Step 23: Checkpoint 3
+
+Checkpoint 3's actual clearing logic (reading the three required decisions plus the two required
+artifacts) isn't wired yet — that's a later work package. Once it is, it needs: the response gate
+opened, the cluster analysis stored, and the problem, transformation, outline, and price/pitch all
+approved. Until then, treat "every Phase 3 artifact and decision above is approved" as the
+practical signal that Phase 3 is done, and tell Muxin plainly that the checkpoint event itself
+isn't recorded automatically yet.
+
 ## Throughout
 
 - One deliverable or decision at a time — never bundle "here are the ideas AND here's a draft."
 - If a gate refuses, that's the wall working. Explain what's actually missing, don't work around it.
 - Never read `venture/examples/civic-tech-worked-example.md` (if it exists) into context for a
   real venture, and never let its specific categories (e.g. "civically awake but not
-  performative") leak into a clean venture's research plan as if they were universal defaults.
+  performative") leak into a clean venture's research plan as if they were universal defaults. This
+  applies to Phase 3's price step too — see Step 22.
+- If you use optional scenario math in Phase 3 (Step 22), it is illustrative only — label it as
+  such, let Muxin change the assumptions, and never let it read as a forecast or a promise.

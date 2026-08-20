@@ -104,6 +104,18 @@ export interface VentureRules {
     min_sections: number;
     max_sections: number;
   };
+  // rules.md §7.5 -- "three to five clusters, not a long list of micro-categories."
+  cluster_analysis: {
+    min_clusters: number;
+    max_clusters: number;
+  };
+  // rules.md §7.7 -- the vague verbs rules.md names as banned from the transformation sentence's
+  // (and, by the same "user-facing copy" standard, the price pitch's) user-facing copy. rules.md's
+  // own list is illustrative ("such as"), not closed -- these three are the only ones its prose
+  // actually names, so they're the only ones a mechanical substring check can cite back to it.
+  transformation: {
+    banned_verbs: string[];
+  };
 }
 
 export const RULES_PATH = join(repoRoot, "venture", "rules.yaml");

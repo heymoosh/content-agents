@@ -5,6 +5,7 @@ data/research/
 # raw quotes + respondent hashes never reach git -- same privacy treatment as data/analytics.db
 venture/*/responses.jsonl
 venture/*/evidence-links.jsonl
+venture/*/cluster-analysis.json
 data/notes-cache.json
 data/inbox/**
 !data/inbox/**/.gitkeep
