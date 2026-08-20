@@ -454,10 +454,13 @@ describe("thin-finding cross-check for label_as_hypothesis (finding #2b)", () =>
 describe("concept-select override reason", () => {
   test("selecting a non-recommended candidate without --override-reason is refused", () => {
     seedPhase2Unlocked();
-    runCmd(
-      "concepts",
-      [],
-      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+    must(
+      runCmd(
+        "concepts",
+        [],
+        JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+      ),
+      "concepts"
     );
     const r = runCmd("concept-select", ["concept-2"]);
     assert.equal(r.status, 1);
@@ -466,10 +469,13 @@ describe("concept-select override reason", () => {
 
   test("selecting the recommended candidate needs no override reason", () => {
     seedPhase2Unlocked();
-    runCmd(
-      "concepts",
-      [],
-      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+    must(
+      runCmd(
+        "concepts",
+        [],
+        JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+      ),
+      "concepts"
     );
     const r = runCmd("concept-select", ["concept-1"]);
     assert.equal(r.status, 0);

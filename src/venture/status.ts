@@ -75,6 +75,8 @@ export function formatStatus(slug: string): string {
         for (const b of cp3.blocking) {
           lines.push(`- ${plainPhase3Reason(b)}`);
         }
+      } else {
+        lines.push("The problem, the change this creates, the outline, and the price are all approved -- ready to clear Checkpoint 3.");
       }
     }
   }
