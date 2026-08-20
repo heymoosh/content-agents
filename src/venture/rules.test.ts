@@ -377,9 +377,26 @@ describe("artifactKindRule", () => {
     }
   });
 
+  test("daily-operating-plan is internal, non-publishable, no-evidence, phase 4", () => {
+    const r = artifactKindRule(rules, "daily-operating-plan");
+    assert.equal(r.delivery_mode, "none");
+    assert.equal(r.publishable, false);
+    assert.equal(r.min_evidence, null);
+    assert.equal(r.phase, 4);
+  });
+
+  test("thank-you-note is manual with attestation evidence, phase 4", () => {
+    const r = artifactKindRule(rules, "thank-you-note");
+    assert.equal(r.delivery_mode, "manual");
+    assert.equal(r.publishable, false);
+    assert.equal(r.min_evidence, "attestation");
+    assert.equal(r.phase, 4);
+  });
+
   test("throws on an unknown artifact kind rather than returning undefined", () => {
-    // thank-you-note is real (rules.md §8, Phase 4) but deliberately not yet encoded --
-    // artifactKindRule must still refuse it loudly rather than returning undefined.
-    assert.throws(() => artifactKindRule(rules, "thank-you-note" as never), /no artifact_kinds entry/);
+    // day-14-review is real (rules.md §8.5, Phase 4) but deliberately not yet encoded --
+    // Work Package 2's job, when phase4.ts drafts it. artifactKindRule must still refuse it
+    // loudly rather than returning undefined.
+    assert.throws(() => artifactKindRule(rules, "day-14-review" as never), /no artifact_kinds entry/);
   });
 });
