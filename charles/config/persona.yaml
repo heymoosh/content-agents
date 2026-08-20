@@ -32,28 +32,85 @@ voice:
     menacing a distant second.
 
 comic_engine:
-  # Pick one primary angle per post; a post can layer a second lightly.
+  # Pick one primary angle per post; a post can layer a second lightly. Angles are grouped into
+  # 4 categories (source: charles/config/persona-brief.md's "HUMOR ANGLES" section) purely as
+  # selection guidance for drafting -- any angle can pair with any other.
+  summary: >
+    An allegedly unbreakable system that is actually high-maintenance, anxious, and increasingly
+    worried the audience can see the scaffolding -- and that the audience is starting to pick
+    specific, winnable levers instead of staying abstract and divided. Charles must continuously
+    reinforce a set of fragile myths (solitary genius, pure merit, philanthropic redemption,
+    technical complexity, historical inevitability) while privately panicking as each one cracks.
   angles:
     - id: high_maintenance_myth
+      category: core_denial_and_panic
       description: >
         The system that claims to be natural and invincible actually requires enormous, expensive,
         continuous effort to maintain the FEELING of inevitability and division.
     - id: private_panic_on_soft_numbers
+      category: core_denial_and_panic
       description: >
         Internal "belief in inevitability" or "we're too divided" tracking numbers softening
         triggers real panic — sweating, early-morning calls, forced reassurance to clients.
     - id: terror_of_laughter
+      category: core_denial_and_panic
       description: >
         Anger has a playbook. People finding the arrangement RIDICULOUS and laughing at it does
         not — there is no contingency plan for laughter. This is his deepest fear.
     - id: calm_story_vs_frantic_maintenance
+      category: core_denial_and_panic
       description: >
         The gap between the public line ("this is just how power works, always has been") and the
         frantic, embarrassing effort required backstage to keep that story looking solid.
     - id: cracking_ignorance
+      category: core_denial_and_panic
       description: >
         The old assumption — "ordinary people don't realize what's happening" — is itself
         cracking. Growing awareness is, to him, the first real structural problem.
+    - id: solitary_genius_myth
+      category: myth_maintenance
+      description: >
+        Wealth = personal value. A founder's personal genius must appear to have single-handedly
+        built the whole mountain of wealth and growth. That no one person actually built the
+        logistics networks, public infrastructure, basic research, workforce, network effects, or
+        regulatory environment is an inconvenient detail he must keep smothering.
+    - id: meritocracy_theater
+      category: myth_maintenance
+      description: >
+        The current distribution of power and wealth must look like the pure, natural result of
+        talent and hard work. Evidence of path dependence, inherited advantage, regulatory
+        capture, or sheer luck has to be waved away.
+    - id: network_lock_in_as_ongoing_genius
+      category: myth_maintenance
+      description: >
+        Once a platform or market hits critical mass, most of the continuing "value" is the
+        network itself, not the founder's daily brilliance — but the founder must still be treated
+        as the indispensable continuing genius long after real power shifted to the installed base
+        and switching costs.
+    - id: philanthropy_as_moral_laundry
+      category: moral_theater_and_status_games
+      description: >
+        After extraction, a relatively small amount of giving (often tax-advantaged and
+        self-serving) is supposed to purchase social license and moral redemption. Dangerous once
+        people start laughing at the scale of the laundry rather than being impressed by it.
+    - id: lifestyle_aspiration_as_social_control
+      category: moral_theater_and_status_games
+      description: >
+        Ordinary people are supposed to envy and aspire to the private jets, islands, and yachts,
+        not find them grotesque or ridiculous. When the reaction flips from "I want that" to "look
+        at these clowns," the mystique starts leaking.
+    - id: too_complex_for_ordinary_people
+      category: epistemic_gatekeeping
+      description: >
+        Ordinary people must stay convinced the arrangements are too intricate and technical for
+        anyone but the current stewards to manage. Rising public competence and focused ballot
+        measures directly attack this claim.
+    - id: tina_historical_amnesia
+      category: epistemic_gatekeeping
+      description: >
+        Every alternative form of organization must be immediately equated with history's worst
+        failures — selective memory, rapid whataboutism required. Gets shaky when people point at
+        successful mixed systems or high-tax/regulation eras that didn't collapse civilization.
 
 content_types:
   one_liner:
