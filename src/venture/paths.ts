@@ -31,6 +31,10 @@ export function phase2Dir(slug: string): string {
   return join(ventureDir(slug), "phase-2-audience");
 }
 
+export function phase3Dir(slug: string): string {
+  return join(ventureDir(slug), "phase-3-offer");
+}
+
 export function readyToPasteDir(slug: string): string {
   return join(ventureDir(slug), "ready-to-paste");
 }
@@ -59,4 +63,14 @@ export function decisionsPath(slug: string): string {
 // raw quotes and respondent hashes never reach git, same treatment as data/analytics.db.
 export function responsesPath(slug: string): string {
   return join(ventureDir(slug), "responses.jsonl");
+}
+
+// Phase 3 (rules.md §7.5, venture-schema-contract.md §5.4). The durable, re-readable per-cluster
+// analysis output -- count, redacted evidence, common stuck point, desired outcome, and visible
+// consequences per cluster (see src/venture/phase3.ts's ClusterAnalysis). A top-level file, same
+// treatment as responses.jsonl/artifacts.jsonl/decisions.jsonl, not nested under phase-3-offer/
+// (which holds rendered body files, not analysis data). Gitignored -- its `evidence` field carries
+// redacted-but-still-audience-derived quotes, same privacy posture as responses.jsonl.
+export function clusterAnalysisPath(slug: string): string {
+  return join(ventureDir(slug), "cluster-analysis.json");
 }
