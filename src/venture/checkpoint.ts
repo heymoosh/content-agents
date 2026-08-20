@@ -109,7 +109,7 @@ function main() {
       process.exit(1);
     }
     if (r.cleared) {
-      console.log(r.alreadyCleared ? `${which} was already cleared` : `${which} cleared -- next phase unlocked (not yet built)`);
+      console.log(r.alreadyCleared ? `${which} was already cleared` : `${which} cleared -- next phase unlocked`);
     } else {
       console.error(`${which} not cleared: ${r.reason}`);
       process.exit(1);

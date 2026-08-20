@@ -4,7 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { formatStatus } from "./status.js";
 import { clearCheckpoint } from "./checkpoint.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
-import { appendCanonEvent } from "./canon.js";
+import { appendCanonEvent, hasCanonEvent } from "./canon.js";
 import { writeDecision, selectDecision, type DecisionKind } from "./decisions.js";
 import { ventureDir, clusterAnalysisPath } from "./paths.js";
 import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
@@ -182,7 +182,15 @@ describe("formatStatus -- Phase 3, plain language, no internal vocabulary", () =
     assertNoLeak(text);
   });
 
-  test("gate open, cluster stored, everything approved: reports Phase 3 complete, no leak", () => {
+  // CHANGED: this used to assert "Phase 3 is complete" survives forever once checkpoint-3 clears,
+  // because current_phase was capped at 3 (there was no Phase 4 to move into). Work Package 3 gave
+  // current_phase a real 4th value -- clearing checkpoint-3 now genuinely advances into Phase 4, so
+  // formatStatus renders the Phase 4 block (matching Phase 1/2's own precedent: once you move past
+  // a phase, that phase's block -- including any "is complete"/"is cleared" line -- stops
+  // appearing, see renderPhase1/renderPhase2's comments). "Phase 3 is complete" is now stale and
+  // must NOT survive into Phase 4's output; the fresh Phase 4 block (nothing drafted yet, right
+  // after entering it) is what should render instead.
+  test("gate open, cluster stored, everything approved: checkpoint-3 clearing advances into a fresh Phase 4, no stale Phase 3 message, no leak", () => {
     reachPhase3();
     openResponseGate();
     storeClusterAnalysis();
@@ -194,7 +202,94 @@ describe("formatStatus -- Phase 3, plain language, no internal vocabulary", () =
     transitionArtifact(SLUG, "p3-price-decision", { editorial_status: "approved" }, "t5");
     clearCheckpoint(SLUG, "checkpoint-3", "t6");
     const text = formatStatus(SLUG);
-    assert.match(text, /Phase 3 is complete/);
+    assert.match(text, /Phase 4/);
+    assert.doesNotMatch(text, /Phase 3 is complete/);
+    assert.match(text, /daily operating plan hasn't been drafted yet/);
+    assert.match(text, /Day 14 review hasn't been drafted yet/);
+    assertNoLeak(text);
+  });
+});
+
+describe("formatStatus -- Phase 4, plain language, no internal vocabulary", () => {
+  function reachPhase4() {
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "t0");
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-2`, {}, "t1");
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/phase-3-completed`, {}, "t2");
+  }
+
+  function selectDecisionOfKind(rules: VentureRules, kind: DecisionKind, id: string) {
+    writeDecision(SLUG, {
+      decision_id: id,
+      decision_kind: kind,
+      rules_version: rules.rules_version,
+      input_refs: ["ref"],
+      candidates: [{ candidate_id: "c1", label: "c1", scores: {}, evidence_refs: [], rationale: "r" }],
+      recommended_candidate_ids: ["c1"],
+      at: "t3",
+    });
+    selectDecision(SLUG, id, { selectedCandidateIds: ["c1"], selectedBy: "muxin", requiredSelectCount: 1, at: "t4" });
+  }
+
+  function seedPhase4Artifact(rules: VentureRules, kind: ArtifactKind, id: string) {
+    createArtifact(SLUG, rules, {
+      artifact_id: id,
+      phase: 4,
+      artifact_kind: kind,
+      title: id,
+      checkpoint_id: null,
+      venture_id: SLUG,
+      venture_phase: 4,
+      message_id: `msg-${id}`,
+      at: "t3",
+    });
+  }
+
+  test("operating plan approved, day 14 review drafted (awaiting review), decision not made: no leak", () => {
+    reachPhase4();
+    const rules = loadRules();
+    seedPhase4Artifact(rules, "daily-operating-plan", "p4-operating-plan");
+    transitionArtifact(SLUG, "p4-operating-plan", { editorial_status: "approved" }, "t4");
+    seedPhase4Artifact(rules, "day-14-review", "p4-day-14-review");
+    const text = formatStatus(SLUG);
+    assert.match(text, /Phase 4/);
+    assert.match(text, /daily operating plan is drafted and approved/);
+    assert.match(text, /Day 14 review is drafted and waiting on your review/);
+    assert.match(text, /Day 14 decision hasn't been made yet/);
+    assertNoLeak(text);
+  });
+
+  // Reproduces WP2's flagged ordering gap (day-14-decide requires only the day-14-review artifact
+  // approved, not the daily-operating-plan artifact) and confirms the WRITE side self-heals:
+  // formatStatus calls the exported maybeCompletePhase4 opportunistically before every render, so
+  // simply running `venture:status` again after the operating plan is finally approved is what
+  // fires the phase-4-completed canon event -- no separate command needed. state.test.ts's matching
+  // "ordering gap" test covers the READ side (phase_status/phase4.complete reading correctly even
+  // before this event fires).
+  test("ordering gap: Day 14 decided before the operating plan is approved -- running status again after approval fires phase-4-completed", () => {
+    reachPhase4();
+    const rules = loadRules();
+    selectDecisionOfKind(rules, "daily-operating-plan-choice", "d-mode");
+    seedPhase4Artifact(rules, "daily-operating-plan", "p4-operating-plan");
+    seedPhase4Artifact(rules, "day-14-review", "p4-day-14-review");
+    transitionArtifact(SLUG, "p4-day-14-review", { editorial_status: "approved" }, "t4");
+    selectDecisionOfKind(rules, "day-14-decision", "p4-day-14-decision");
+
+    // Before the operating plan is approved: not complete yet, event not written.
+    let text = formatStatus(SLUG);
+    assert.doesNotMatch(text, /Phase 4 is complete/);
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/phase-4-completed`), false);
+
+    // Muxin approves the operating plan -- the missing piece, days later in the real scenario.
+    transitionArtifact(SLUG, "p4-operating-plan", { editorial_status: "approved" }, "t5");
+
+    // Simply running status again is what fires the event -- no separate command needed.
+    text = formatStatus(SLUG);
+    assert.match(text, /Phase 4 is complete/);
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/phase-4-completed`), true);
+    // No stale message from an earlier phase (checkpoint-1 cleared back at reachPhase4()) survives
+    // into Phase 4's completed output -- confirms renderPhase1's block genuinely stops rendering
+    // once current_phase has moved on, not just that it happens not to match by coincidence here.
+    assert.doesNotMatch(text, /Checkpoint 1 is cleared/);
     assertNoLeak(text);
   });
 });

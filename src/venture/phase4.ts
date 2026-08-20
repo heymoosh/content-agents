@@ -693,7 +693,11 @@ function requireDay14ReviewApproved(slug: string): VentureArtifact {
 // checkpoint.ts's clearCheckpoint() -- deliberately NOT calling clearCheckpoint() itself, since
 // Phase 4 completion is a distinct concept (rules.ts's Phase4CompletionRule comment) that must
 // never be handed to code that only knows the checkpoint-1/2/3 ledger-event shape.
-function phase4CompletionSatisfied(slug: string, rules: VentureRules): boolean {
+//
+// Exported so state.ts's read side can recompute this SAME predicate on every deriveState() call,
+// rather than trusting hasCanonEvent(phase-4-completed) to already be written (see
+// maybeCompletePhase4's comment below for why that can lag).
+export function phase4CompletionSatisfied(slug: string, rules: VentureRules): boolean {
   const artifacts = readArtifacts(slug);
   const decisions = readDecisions(slug);
   const artifactsOk = rules.phase4_completion.required_artifact_kinds.every((kind) => {
@@ -710,12 +714,28 @@ function phase4CompletionSatisfied(slug: string, rules: VentureRules): boolean {
 // (venture-schema-contract.md §5.3): a crash between the two leaves the event recorded and the
 // artifact's fields.decision stale, never the reverse. appendCanonEvent's own hasCanonEvent guard
 // makes the ledger write idempotent on its own, no separate check needed here.
-function maybeCompletePhase4(slug: string, rules: VentureRules, decision: DecisionRecord): void {
-  if (!phase4CompletionSatisfied(slug, rules)) {
-    console.log(`Day 14 decision recorded, but Phase 4 is not yet complete -- other required artifacts/decisions are still outstanding.`);
-    return;
-  }
-  appendCanonEvent(slug, "phase_4_completed", `${slug}/${rules.phase4_completion.ledger_event_id}`, {}, now());
+//
+// Exported, and deliberately takes NO decision parameter -- it reads "p4-day-14-decision" itself
+// and no-ops quietly (returns false, logs nothing) if it isn't selected yet. This makes it safe to
+// call from anywhere, not just right after cmdDay14Decide's own selectDecision call: day-14-decide
+// only requires the day-14-review artifact approved, not the daily-operating-plan artifact --
+// nothing enforces that ordering, and because selectDecision() makes "p4-day-14-decision"
+// immutable, cmdDay14Decide can never be called again for a slug once decided. If Muxin decides
+// Day 14 before approving the operating plan, this function would previously run once, find the
+// predicate unsatisfied, and never be asked again -- permanently missing phase-4-completed even
+// after the operating plan is later approved. status.ts's formatStatus now calls this
+// opportunistically before every render (see its own comment), which only works because this
+// function can run standalone, without a fresh decision passed in.
+//
+// Returns true when Phase 4 is complete (whether it fired the event just now or it was already
+// recorded), false otherwise -- callers decide what, if anything, to tell the user.
+export function maybeCompletePhase4(slug: string, rules: VentureRules): boolean {
+  const decision = readDecision(slug, "p4-day-14-decision");
+  if (!decision || decision.status !== "selected") return false;
+  const eventId = `${slug}/${rules.phase4_completion.ledger_event_id}`;
+  if (hasCanonEvent(slug, eventId)) return true;
+  if (!phase4CompletionSatisfied(slug, rules)) return false;
+  appendCanonEvent(slug, "phase_4_completed", eventId, {}, now());
   updateArtifactFields(
     slug,
     "p4-day-14-review",
@@ -726,6 +746,7 @@ function maybeCompletePhase4(slug: string, rules: VentureRules, decision: Decisi
     `Phase 4 complete -- the venture's active build is done. There is no fourth checkpoint; the Day 14 ` +
       `decision IS the completion (rules.md §8.5/§8.6, venture-schema-contract.md §5.3).`
   );
+  return true;
 }
 
 function cmdDay14Decide(slug: string, candidateId: string) {
@@ -771,7 +792,10 @@ function cmdDay14Decide(slug: string, candidateId: string) {
   });
   console.log(`Day 14 decision recorded: ${selected.selected_candidate_ids[0]} -- ${reason}`);
 
-  maybeCompletePhase4(slug, rules, selected);
+  const completed = maybeCompletePhase4(slug, rules);
+  if (!completed) {
+    console.log(`Day 14 decision recorded, but Phase 4 is not yet complete -- other required items are still outstanding.`);
+  }
 }
 
 // --- dispatch ---------------------------------------------------------------------------------

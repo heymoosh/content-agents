@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { rmSync } from "node:fs";
 import { deriveState } from "./state.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
-import { appendCanonEvent } from "./canon.js";
+import { appendCanonEvent, hasCanonEvent } from "./canon.js";
 import { writeDecision, selectDecision, type DecisionKind } from "./decisions.js";
+import { maybeCompletePhase4 } from "./phase4.js";
 import { ventureDir } from "./paths.js";
 import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
 
@@ -88,7 +89,13 @@ describe("deriveState -- Checkpoint 1", () => {
     assert.equal(state.phase_status, "checkpoint_ready");
   });
 
-  test("a checkpoint-cleared canon event flips cleared/phase_status to complete", () => {
+  // CHANGED (was testing the pre-existing bug): this used to assert phase_status reads "complete"
+  // the instant checkpoint-1 clears. Per docs/venture-schema-contract.md §5.2, "complete" means
+  // "the venture finished Phase 4 and its Day 14 review" -- checkpoint-1 clearing only advances
+  // current_phase to 2, it does not finish the venture. phase_status now reads whichever phase is
+  // actually current (see state.ts's deriveState comment on the fix), so it reads "drafting" here:
+  // current_phase is 2, and checkpoint-2 has no required items seeded yet in this test.
+  test("a checkpoint-cleared canon event on checkpoint-1 advances current_phase, not phase_status to complete", () => {
     seedRequiredArtifact("p1-a");
     seedRequiredArtifact("p1-b");
     seedRequiredArtifact("p1-c");
@@ -99,7 +106,8 @@ describe("deriveState -- Checkpoint 1", () => {
     appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, { complete: "3" }, "t4");
     const state = deriveState(SLUG, 3);
     assert.equal(state.checkpoints["checkpoint-1"].cleared, true);
-    assert.equal(state.phase_status, "complete");
+    assert.equal(state.current_phase, 2);
+    assert.equal(state.phase_status, "drafting");
   });
 
   test("live with the wrong evidence type for the kind does not count toward Checkpoint 1", () => {
@@ -141,13 +149,19 @@ describe("deriveState -- Checkpoint 1", () => {
     assert.equal(state.checkpoints["checkpoint-1"].complete_count, 0);
   });
 
-  test("rerunning deriveState after clearing is idempotent -- still reads complete", () => {
+  // CHANGED (was testing the pre-existing bug, same as above): idempotence itself is still the
+  // point of this test, just no longer pinned to the buggy "complete" reading. current_phase 2 /
+  // phase_status "drafting" both stay stable across repeated deriveState() calls.
+  test("rerunning deriveState after clearing is idempotent", () => {
     seedRequiredArtifact("p1-a");
     appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "t0");
     const first = deriveState(SLUG, 1);
     const second = deriveState(SLUG, 1);
     assert.equal(first.phase_status, second.phase_status);
+    assert.equal(first.current_phase, second.current_phase);
     assert.equal(second.checkpoints["checkpoint-1"].cleared, true);
+    assert.equal(second.current_phase, 2);
+    assert.equal(second.phase_status, "drafting");
   });
 
   // Regression: the checkpointArtifactState refactor must not change checkpoint1's own behavior.
@@ -338,5 +352,116 @@ describe("deriveState -- current_phase", () => {
     appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-2`, {}, "t1");
     const state = deriveState(SLUG);
     assert.equal(state.current_phase, 3);
+  });
+
+  // checkpoint-3 clears as the `<slug>/phase-3-completed` ledger event (rules.yaml's
+  // ledger_event_id), not the generic `<slug>/checkpoint-3` -- see ledgerEventId's comment.
+  test("checkpoint-1, checkpoint-2, and checkpoint-3 all cleared reads current_phase 4", () => {
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "t0");
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-2`, {}, "t1");
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/phase-3-completed`, {}, "t2");
+    const state = deriveState(SLUG);
+    assert.equal(state.current_phase, 4);
+  });
+});
+
+describe("deriveState -- Phase 4", () => {
+  const rules = loadRules();
+
+  function reachPhase4() {
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "t0");
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-2`, {}, "t1");
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/phase-3-completed`, {}, "t2");
+  }
+
+  function selectDecisionOfKind(kind: DecisionKind, id: string) {
+    writeDecision(SLUG, {
+      decision_id: id,
+      decision_kind: kind,
+      rules_version: rules.rules_version,
+      input_refs: ["ref"],
+      candidates: [{ candidate_id: "c1", label: "c1", scores: {}, evidence_refs: [], rationale: "r" }],
+      recommended_candidate_ids: ["c1"],
+      at: "t3",
+    });
+    selectDecision(SLUG, id, { selectedCandidateIds: ["c1"], selectedBy: "muxin", requiredSelectCount: 1, at: "t4" });
+  }
+
+  // daily-operating-plan and day-14-review are both delivery_mode "none" (rules.yaml) -- approving
+  // them is enough, there is no delivery step to confirm, same as product-outline/price-decision
+  // in Phase 3 (state.test.ts's Checkpoint 3 fixtures follow the identical shape).
+  function seedPhase4Artifact(kind: ArtifactKind, id: string) {
+    createArtifact(SLUG, rules, {
+      artifact_id: id,
+      phase: 4,
+      artifact_kind: kind,
+      title: id,
+      checkpoint_id: null,
+      venture_id: SLUG,
+      venture_phase: 4,
+      message_id: `msg-${id}`,
+      at: "t3",
+    });
+  }
+
+  function approve(id: string) {
+    transitionArtifact(SLUG, id, { editorial_status: "approved" }, "t4");
+  }
+
+  test("nothing drafted yet reads current_phase 4, phase_status drafting, phase4.complete false", () => {
+    reachPhase4();
+    const state = deriveState(SLUG);
+    assert.equal(state.current_phase, 4);
+    assert.equal(state.phase_status, "drafting");
+    assert.equal(state.phase4.complete, false);
+    assert.equal(state.phase4.operating_plan.drafted, false);
+  });
+
+  test("operating plan drafted but not approved reads phase_status awaiting_you", () => {
+    reachPhase4();
+    seedPhase4Artifact("daily-operating-plan", "p4-operating-plan");
+    const state = deriveState(SLUG);
+    assert.equal(state.phase4.operating_plan.drafted, true);
+    assert.equal(state.phase4.operating_plan.approved, false);
+    assert.equal(state.phase_status, "awaiting_you");
+  });
+
+  // Reproduces WP2's flagged ordering gap: day-14-decide only requires the day-14-review artifact
+  // approved, not the daily-operating-plan artifact -- nothing stops Muxin from deciding Day 14
+  // first. This proves the READ side self-heals: deriveState() recomputes phase4CompletionSatisfied
+  // fresh every call, so phase_status flips to "complete" the moment the operating plan is approved
+  // -- even though nothing has called maybeCompletePhase4 yet, so the phase-4-completed canon event
+  // is still unwritten at that point. status.test.ts covers the matching WRITE-side self-heal
+  // (formatStatus's opportunistic maybeCompletePhase4 call actually firing that event).
+  test("ordering gap: Day 14 decided before the operating plan is approved -- read self-heals once it is", () => {
+    reachPhase4();
+    // Day-14-decide's own prerequisites: both required decisions selected, day-14-review approved.
+    // The operating plan ARTIFACT is drafted but deliberately left unapproved.
+    selectDecisionOfKind("daily-operating-plan-choice", "d-mode");
+    seedPhase4Artifact("daily-operating-plan", "p4-operating-plan");
+    seedPhase4Artifact("day-14-review", "p4-day-14-review");
+    approve("p4-day-14-review");
+    selectDecisionOfKind("day-14-decision", "p4-day-14-decision");
+
+    const before = deriveState(SLUG);
+    assert.equal(before.phase4.complete, false);
+    assert.notEqual(before.phase_status, "complete");
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/phase-4-completed`), false);
+
+    // Muxin now approves the operating plan -- the missing piece.
+    approve("p4-operating-plan");
+
+    const after = deriveState(SLUG);
+    assert.equal(after.phase4.complete, true);
+    assert.equal(after.phase_status, "complete");
+    // The read is correct even though nothing has fired the ledger event yet -- proves this isn't
+    // reading hasCanonEvent(phase-4-completed), it's recomputing the predicate fresh.
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/phase-4-completed`), false);
+
+    // Confirms the predicate really is satisfied, not just read-side optimism: the exported
+    // maybeCompletePhase4 (the lazy WRITE side) can now fire the event from this same state.
+    const completed = maybeCompletePhase4(SLUG, rules);
+    assert.equal(completed, true);
+    assert.equal(hasCanonEvent(SLUG, `${SLUG}/phase-4-completed`), true);
   });
 });

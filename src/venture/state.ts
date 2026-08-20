@@ -1,9 +1,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { readArtifacts, type VentureArtifact } from "./artifacts.js";
+import { readArtifact, readArtifacts, type VentureArtifact } from "./artifacts.js";
 import { hasCanonEvent, findCanonEvent } from "./canon.js";
-import { readDecisions } from "./decisions.js";
+import { readDecision, readDecisions } from "./decisions.js";
 import { statePath, ventureDir } from "./paths.js";
 import { loadRules, artifactKindRule, type CheckpointRule, type VentureRules } from "./rules.js";
+import { phase4CompletionSatisfied } from "./phase4.js";
 
 export type PhaseStatus = "drafting" | "awaiting_you" | "checkpoint_ready" | "blocked" | "complete";
 
@@ -29,11 +30,32 @@ export interface CheckpointState {
   blocking: CheckpointBlocker[];
 }
 
+// Phase 4 has no checkpoint (venture-schema-contract.md §5.3: "There is no checkpoint-4") -- this
+// is the read-side counterpart to CheckpointState, shaped around the daily-operating-plan and
+// day-14-review artifacts and the daily-operating-plan-choice/day-14-decision decisions instead of
+// a required-artifact manifest. `complete` is phase4CompletionSatisfied's own verdict, recomputed
+// fresh here every call rather than trusted from a cached canon event -- see this field's use in
+// derivePhaseStatus below and maybeCompletePhase4's comment in phase4.ts for why.
+export interface Phase4State {
+  operating_plan: { drafted: boolean; approved: boolean };
+  thank_you_notes_count: number;
+  day_14_review: { drafted: boolean; approved: boolean };
+  day_14_decision: { made: boolean; candidate_id: string | null };
+  complete: boolean;
+  // Same reason shape checkpointArtifactState's blocking array already uses ("missing required
+  // artifact kind ...", "missing required decision kind ...", or an editorial/delivery pair) -- a
+  // diagnostic rendering aid for status.ts's plainPhase4Reason, built by walking
+  // rules.phase4_completion's own required kinds. This is separate from `complete`, which is never
+  // derived from this list -- it comes straight from phase4CompletionSatisfied (see below).
+  blocking: CheckpointBlocker[];
+}
+
 export interface VentureState {
   slug: string;
-  current_phase: 1 | 2 | 3;
+  current_phase: 1 | 2 | 3 | 4;
   phase_status: PhaseStatus;
   checkpoints: Record<string, CheckpointState>;
+  phase4: Phase4State;
 }
 
 // checkpoint_id is stamped on an artifact at draft time (createArtifact), so "required for a
@@ -160,6 +182,70 @@ export function ledgerEventId(slug: string, checkpointId: string, cfg: Checkpoin
   return `${slug}/${cfg.ledger_event_id ?? checkpointId}`;
 }
 
+// Reads the daily-operating-plan/day-14-review artifacts and the day-14-decision decision fresh on
+// every call -- never trusts hasCanonEvent(phase-4-completed) alone, since that event can lag the
+// true completion condition (phase4.ts's maybeCompletePhase4 comment explains the exact ordering
+// gap this closes). `complete` reuses phase4CompletionSatisfied directly rather than
+// re-implementing its artifact/decision checks a second time here.
+function derivePhase4State(slug: string, rules: VentureRules): Phase4State {
+  const artifacts = readArtifacts(slug);
+  const decisions = readDecisions(slug);
+  const operatingPlan = readArtifact(slug, "p4-operating-plan");
+  const day14Review = readArtifact(slug, "p4-day-14-review");
+  const day14Decision = readDecision(slug, "p4-day-14-decision");
+  const thankYouNotesCount = artifacts.filter((a) => a.artifact_kind === "thank-you-note").length;
+  const decisionMade = day14Decision?.status === "selected";
+
+  const blocking: CheckpointBlocker[] = [];
+  for (const kind of rules.phase4_completion.required_artifact_kinds) {
+    const a = artifacts.find((x) => x.artifact_kind === kind);
+    if (!a) {
+      blocking.push({ artifact_id: null, reason: `missing required artifact kind "${kind}"` });
+    } else if (a.editorial_status !== "approved" || a.delivery_status !== "not_applicable") {
+      blocking.push({ artifact_id: a.artifact_id, reason: `${a.editorial_status}/${a.delivery_status}` });
+    }
+  }
+  for (const kind of rules.phase4_completion.required_decision_kinds) {
+    const selected = decisions.some((d) => d.decision_kind === kind && d.status === "selected");
+    if (!selected) blocking.push({ artifact_id: null, reason: `missing required decision kind "${kind}"` });
+  }
+
+  return {
+    operating_plan: { drafted: Boolean(operatingPlan), approved: operatingPlan?.editorial_status === "approved" },
+    thank_you_notes_count: thankYouNotesCount,
+    day_14_review: { drafted: Boolean(day14Review), approved: day14Review?.editorial_status === "approved" },
+    day_14_decision: { made: decisionMade, candidate_id: decisionMade ? day14Decision!.selected_candidate_ids[0] : null },
+    complete: phase4CompletionSatisfied(slug, rules),
+    blocking,
+  };
+}
+
+// Same four-way branching order phase-1/2/3's cp-driven phase_status always used (cleared ->
+// complete, complete_count===required_count && pace_recorded -> checkpoint_ready, required.length>0
+// -> awaiting_you, else drafting), parameterized so it can run against whichever checkpoint is
+// currently active rather than being hardcoded to checkpoint-1 -- see deriveState's comment on why
+// this fixes the pre-existing phase_status bug.
+// Exported so status.ts can render Phase 1's block through the same status derivation deriveState
+// itself uses for phase_status, rather than duplicating this four-way branch a second time.
+export function checkpointPhaseStatus(cp: CheckpointState | undefined): PhaseStatus {
+  if (!cp) return "drafting";
+  if (cp.cleared) return "complete";
+  if (cp.complete_count === cp.required_count && cp.pace_recorded) return "checkpoint_ready";
+  if (cp.required.length > 0) return "awaiting_you";
+  return "drafting";
+}
+
+// Phase 4's own phase_status, mirroring the same "first thing that's true wins" shape as
+// checkpointPhaseStatus but over Phase4State's fields instead of a required-artifact manifest --
+// there is no checkpoint to clear, so "complete" comes straight from phase4CompletionSatisfied.
+function phase4PhaseStatus(p4: Phase4State): PhaseStatus {
+  if (p4.complete) return "complete";
+  if (p4.operating_plan.drafted && !p4.operating_plan.approved) return "awaiting_you";
+  if (p4.day_14_review.drafted && !p4.day_14_review.approved) return "awaiting_you";
+  if (p4.day_14_review.approved && !p4.day_14_decision.made) return "awaiting_you";
+  return "drafting";
+}
+
 // Turns "checkpoint-1" into "Checkpoint 1" for human-readable output; falls back to the raw id
 // for anything that doesn't match the "checkpoint-<n>" shape (e.g. a future "phase_3_completed").
 function checkpointLabel(checkpointId: string): string {
@@ -189,16 +275,7 @@ export function deriveState(slug: string, checkpoint1RequiredCount?: number): Ve
         : cfg;
     checkpoints[checkpointId] = checkpointArtifactState(slug, checkpointId, effectiveCfg, rules, artifacts);
   }
-
-  // phase_status stays driven by checkpoint-1 alone, same as before the generalization --
-  // checkpoint-2 (and any later checkpoint) is computed but never perturbs it.
-  const cp1 = checkpoints["checkpoint-1"];
-  let phaseStatus: PhaseStatus;
-  if (!cp1) phaseStatus = "drafting";
-  else if (cp1.cleared) phaseStatus = "complete";
-  else if (cp1.complete_count === cp1.required_count && cp1.pace_recorded) phaseStatus = "checkpoint_ready";
-  else if (cp1.required.length > 0) phaseStatus = "awaiting_you";
-  else phaseStatus = "drafting";
+  const phase4 = derivePhase4State(slug, rules);
 
   // No explicit "current_phase" transition rule is written down anywhere in venture/rules.md or
   // docs/venture-schema-contract.md (the schema contract's `current_phase: 1..4` is the aspirational
@@ -209,18 +286,37 @@ export function deriveState(slug: string, checkpoint1RequiredCount?: number): Ve
   // be selected after checkpoint-1 clears, per rules.md §5.6's requireCheckpoint1Cleared gate in
   // phase1.ts); checkpoint-2 clearing is the same signal for Phase 2 -> Phase 3 (rules.md §7.1's
   // Phase 3 posting/response-gate work only makes sense once the lead magnet/landing page/welcome
-  // email/survey are live). There is no checkpoint-4 (venture-schema-contract.md §5.3: "a finished
-  // venture is phase_status: 'complete', not a fourth cleared checkpoint"), so current_phase stops at
-  // 3 here -- reporting Phase 4 readiness once checkpoint-3 clears is left to whichever work package
-  // wires Phase 4 itself, not decided by this field alone.
+  // email/survey are live); checkpoint-3 clearing (recorded as phase-3-completed) is the same signal
+  // for Phase 3 -> Phase 4 (Phase 4 opens only once Phase 3's decisions are approved -- rules.md §11
+  // item 18, phase4.ts's requirePhase4Unlocked). There is no checkpoint-4, so current_phase stops at
+  // 4 once checkpoint-3 clears -- being IN Phase 4 and being DONE with Phase 4 are different facts,
+  // the latter tracked by phase4.complete / phase_status below, not by current_phase advancing further.
+  const cp1 = checkpoints["checkpoint-1"];
   const cp2 = checkpoints["checkpoint-2"];
-  const currentPhase: 1 | 2 | 3 = cp2?.cleared ? 3 : cp1?.cleared ? 2 : 1;
+  const cp3 = checkpoints["checkpoint-3"];
+  const currentPhase: 1 | 2 | 3 | 4 = cp3?.cleared ? 4 : cp2?.cleared ? 3 : cp1?.cleared ? 2 : 1;
+
+  // FIX (was a pre-existing bug): phase_status used to be driven by checkpoint-1 alone, no matter
+  // which phase the venture had actually reached -- checkpoint-1 clearing made phase_status read
+  // "complete" instantly and permanently, even with Phase 2/3/4 still entirely undone. It now reads
+  // whichever checkpoint (or, in Phase 4, Phase4State) corresponds to currentPhase, so "complete"
+  // only means what docs/venture-schema-contract.md §5.2 says it means: "the venture finished Phase
+  // 4 and its Day 14 review." By construction, whenever currentPhase is 1/2/3, that phase's own
+  // checkpoint has NOT cleared yet (clearing it is what advances currentPhase past it) -- so the
+  // "complete" branch inside checkpointPhaseStatus is effectively unreachable for phases 1-3 here,
+  // exactly as it should be.
+  let phaseStatus: PhaseStatus;
+  if (currentPhase === 1) phaseStatus = checkpointPhaseStatus(cp1);
+  else if (currentPhase === 2) phaseStatus = checkpointPhaseStatus(cp2);
+  else if (currentPhase === 3) phaseStatus = checkpointPhaseStatus(cp3);
+  else phaseStatus = phase4PhaseStatus(phase4);
 
   const state: VentureState = {
     slug,
     current_phase: currentPhase,
     phase_status: phaseStatus,
     checkpoints,
+    phase4,
   };
   mkdirSync(ventureDir(slug), { recursive: true });
   writeFileSync(statePath(slug), renderStateMd(state));
@@ -245,6 +341,13 @@ function renderStateMd(state: VentureState): string {
       `${checkpointId}: ${cp.complete_count}/${cp.required_count} live, pace_recorded=${cp.pace_recorded}, cleared=${cp.cleared}${decisionsSuffix}`
     );
   }
+  lines.push(
+    `phase-4: operating_plan(drafted=${state.phase4.operating_plan.drafted}, approved=${state.phase4.operating_plan.approved}), ` +
+      `thank_you_notes=${state.phase4.thank_you_notes_count}, ` +
+      `day_14_review(drafted=${state.phase4.day_14_review.drafted}, approved=${state.phase4.day_14_review.approved}), ` +
+      `day_14_decision(made=${state.phase4.day_14_decision.made}, candidate=${state.phase4.day_14_decision.candidate_id ?? "none"}), ` +
+      `complete=${state.phase4.complete}`
+  );
   lines.push(``);
   for (const [checkpointId, cp] of Object.entries(state.checkpoints)) {
     if (!cp.blocking.length) continue;
