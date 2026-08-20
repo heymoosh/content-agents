@@ -31,6 +31,7 @@ platforms:
     posts_per_week: 7      # bumped 5->7 (Muxin, 2026-07-07); max under x's current 1-post/PT-day cadence
     slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]   # weekends allowed; weekly cap still limits volume
     slot_time_pst: "09:30"
+    max_slots_per_day: 2   # daily text now claims every day's one slot; a same-day quote-card needs room too (Muxin, 2026-08-20)
     style: >
       Short claims or provocations. Pick the sharpest sentence from the source and
       trim for 280-char energy. No hashtag spam; 0-1 hashtags max.
@@ -42,6 +43,7 @@ platforms:
     posts_per_week: 7      # bumped 5->7 (Muxin, 2026-08-20): daily posting on every platform, explicit override of the prior engagement-protecting cadence
     slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
     slot_time_pst: "08:30"
+    max_slots_per_day: 2   # daily text now claims every day's one slot; a same-day quote-card needs room too (Muxin, 2026-08-20)
     style: >
       Lesson post, left-aligned narrative, practitioner voice. Insight-driven,
       not link-dump. Short paragraphs, line breaks between thoughts.
@@ -53,6 +55,7 @@ platforms:
     posts_per_week: 7      # daily posting (Muxin, 2026-08-20)
     slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
     slot_time_pst: "19:00"
+    max_slots_per_day: 2   # daily text now claims every day's one slot; a same-day quote-card needs room too (Muxin, 2026-08-20)
     style: >
       No algorithmic feed, so discovery leans on hashtags and follows: 2-4 relevant
       hashtags is normal here, unlike X's near-zero-hashtag rule. Still Muxin's voice,
@@ -65,6 +68,7 @@ platforms:
     posts_per_week: 7      # daily posting (Muxin, 2026-08-20)
     slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
     slot_time_pst: "10:00"
+    max_slots_per_day: 2   # daily text now claims every day's one slot; a same-day quote-card needs room too (Muxin, 2026-08-20)
     style: >
       Casual, conversational voice, close to X/Instagram's tone. Light hashtag use
       (0-2), image-friendly. Less formal than LinkedIn, less clipped than X.
@@ -76,6 +80,7 @@ platforms:
     posts_per_week: 7
     slot_days: [Mon, Tue, Wed, Thu, Fri, Sat, Sun]   # tech/AI crowd is active on weekends → true daily
     slot_time_pst: "18:30"
+    max_slots_per_day: 2   # daily text now claims every day's one slot; a same-day quote-card needs room too (Muxin, 2026-08-20)
     style: >
       Like X but slightly more casual and observational. Civic/tech audience,
       less algorithmic pressure.
