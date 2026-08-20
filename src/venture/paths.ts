@@ -54,3 +54,9 @@ export function artifactsPath(slug: string): string {
 export function decisionsPath(slug: string): string {
   return join(ventureDir(slug), "decisions.jsonl");
 }
+
+// Phase 3 (rules.md §7.2, venture-schema-contract.md §5.4). Gitignored (see .gitignore) --
+// raw quotes and respondent hashes never reach git, same treatment as data/analytics.db.
+export function responsesPath(slug: string): string {
+  return join(ventureDir(slug), "responses.jsonl");
+}

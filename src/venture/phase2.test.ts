@@ -36,6 +36,16 @@ function runPhase1(sub: string, rest: string[], stdin = ""): { status: number | 
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
+// Arrange-step subprocess calls (seeding fixture state) are expected to succeed. Without this
+// check, a subprocess that dies for an environmental reason (killed, EPERM on a sandboxed
+// filesystem, etc.) fails silently: the seed step "completes" having written nothing, and the
+// test's own assertion later fails on stale/default state with a confusing, unrelated error
+// message instead of the real "the arrange step itself never ran" cause.
+function must(r: { status: number | null; stdout: string; stderr: string }, label: string): typeof r {
+  assert.equal(r.status, 0, `${label} failed (exit ${r.status}): ${r.stderr}`);
+  return r;
+}
+
 afterEach(() => {
   rmSync(ventureDir(SLUG), { recursive: true, force: true });
 });
@@ -85,32 +95,41 @@ function wellFormedFinding(overrides: Record<string, unknown> = {}): Record<stri
 // selected proceed_with_evidence, i.e. Phase 2 unlocked, via the real phase1.ts CLI chain.
 function seedPhase2Unlocked(): void {
   appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "2026-08-19T00:00:00.000Z");
-  runPhase1(
-    "plan-init",
-    [],
-    JSON.stringify({
-      confirmed_knowns: [],
-      open_unknowns: [{ unknown_id: "u1", dimension: "emotional_frame", description: "d" }],
-      probes: [],
-    })
+  must(
+    runPhase1(
+      "plan-init",
+      [],
+      JSON.stringify({
+        confirmed_knowns: [],
+        open_unknowns: [{ unknown_id: "u1", dimension: "emotional_frame", description: "d" }],
+        probes: [],
+      })
+    ),
+    "plan-init"
   );
   const finding = wellFormedFinding();
-  runPhase1("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings: [finding] }));
-  runPhase1("research-read-review", []);
-  runPhase1(
-    "continuation",
-    [],
-    JSON.stringify({
-      input_refs: ["p1-research-plan", "p1-research-read"],
-      candidates: [
-        { candidate_id: "more_probes", label: "more_probes", scores: {}, evidence_refs: [], rationale: "r" },
-        { candidate_id: "proceed_with_evidence", label: "proceed_with_evidence", scores: {}, evidence_refs: [], rationale: "r" },
-        { candidate_id: "proceed_as_hypothesis", label: "proceed_as_hypothesis", scores: {}, evidence_refs: [], rationale: "r" },
-      ],
-      recommended_candidate_ids: ["proceed_with_evidence"],
-    })
+  must(
+    runPhase1("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings: [finding] })),
+    "research-read-init"
   );
-  runPhase1("continuation-select", ["proceed_with_evidence"]);
+  must(runPhase1("research-read-review", []), "research-read-review");
+  must(
+    runPhase1(
+      "continuation",
+      [],
+      JSON.stringify({
+        input_refs: ["p1-research-plan", "p1-research-read"],
+        candidates: [
+          { candidate_id: "more_probes", label: "more_probes", scores: {}, evidence_refs: [], rationale: "r" },
+          { candidate_id: "proceed_with_evidence", label: "proceed_with_evidence", scores: {}, evidence_refs: [], rationale: "r" },
+          { candidate_id: "proceed_as_hypothesis", label: "proceed_as_hypothesis", scores: {}, evidence_refs: [], rationale: "r" },
+        ],
+        recommended_candidate_ids: ["proceed_with_evidence"],
+      })
+    ),
+    "continuation"
+  );
+  must(runPhase1("continuation-select", ["proceed_with_evidence"]), "continuation-select");
 }
 
 function fiveConcepts(overrides: Record<string, unknown>[] = []): Record<string, unknown>[] {
@@ -130,12 +149,15 @@ function fiveConcepts(overrides: Record<string, unknown>[] = []): Record<string,
 
 function seedConceptSelected(): void {
   seedPhase2Unlocked();
-  runCmd(
-    "concepts",
-    [],
-    JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+  must(
+    runCmd(
+      "concepts",
+      [],
+      JSON.stringify({ input_refs: ["p1-research-read", "p1-continuation-01"], candidates: fiveConcepts(), recommended_candidate_ids: ["concept-1"] })
+    ),
+    "concepts"
   );
-  runCmd("concept-select", ["concept-1"]);
+  must(runCmd("concept-select", ["concept-1"]), "concept-select");
 }
 
 function wellFormedMagnetInput(): Record<string, unknown> {
@@ -151,7 +173,7 @@ function wellFormedMagnetInput(): Record<string, unknown> {
 
 function seedMagnetDrafted(): void {
   seedConceptSelected();
-  runCmd("magnet-draft", [], JSON.stringify(wellFormedMagnetInput()));
+  must(runCmd("magnet-draft", [], JSON.stringify(wellFormedMagnetInput())), "magnet-draft");
 }
 
 function wellFormedFitAssessment(overrides: Partial<Record<number, Partial<{ fits_chosen_magnet: boolean; note: string }>>> = {}): Record<string, unknown>[] {
@@ -165,15 +187,18 @@ function wellFormedFitAssessment(overrides: Partial<Record<number, Partial<{ fit
 
 function seedSurveyReviewed(): void {
   seedMagnetDrafted();
-  runCmd(
-    "survey-review",
-    [],
-    JSON.stringify({
-      existing_survey_snapshot: "the 4-question survey text",
-      fit_assessment: wellFormedFitAssessment(),
-      recommended_changes: [],
-      change_needed: false,
-    })
+  must(
+    runCmd(
+      "survey-review",
+      [],
+      JSON.stringify({
+        existing_survey_snapshot: "the 4-question survey text",
+        fit_assessment: wellFormedFitAssessment(),
+        recommended_changes: [],
+        change_needed: false,
+      })
+    ),
+    "survey-review"
   );
 }
 
@@ -190,32 +215,41 @@ describe("phase-2-unlock gate", () => {
 
   test("concepts refused when continuation selected more_probes", () => {
     appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "2026-08-19T00:00:00.000Z");
-    runPhase1(
-      "plan-init",
-      [],
-      JSON.stringify({
-        confirmed_knowns: [],
-        open_unknowns: [{ unknown_id: "u1", dimension: "emotional_frame", description: "d" }],
-        probes: [],
-      })
+    must(
+      runPhase1(
+        "plan-init",
+        [],
+        JSON.stringify({
+          confirmed_knowns: [],
+          open_unknowns: [{ unknown_id: "u1", dimension: "emotional_frame", description: "d" }],
+          probes: [],
+        })
+      ),
+      "plan-init"
     );
     const finding = wellFormedFinding();
-    runPhase1("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings: [finding] }));
-    runPhase1("research-read-review", []);
-    runPhase1(
-      "continuation",
-      [],
-      JSON.stringify({
-        input_refs: ["p1-research-plan", "p1-research-read"],
-        candidates: [
-          { candidate_id: "more_probes", label: "more_probes", scores: {}, evidence_refs: [], rationale: "r" },
-          { candidate_id: "proceed_with_evidence", label: "proceed_with_evidence", scores: {}, evidence_refs: [], rationale: "r" },
-          { candidate_id: "proceed_as_hypothesis", label: "proceed_as_hypothesis", scores: {}, evidence_refs: [], rationale: "r" },
-        ],
-        recommended_candidate_ids: ["proceed_with_evidence"],
-      })
+    must(
+      runPhase1("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings: [finding] })),
+      "research-read-init"
     );
-    runPhase1("continuation-select", ["more_probes", "--override-reason", "evidence too thin"]);
+    must(runPhase1("research-read-review", []), "research-read-review");
+    must(
+      runPhase1(
+        "continuation",
+        [],
+        JSON.stringify({
+          input_refs: ["p1-research-plan", "p1-research-read"],
+          candidates: [
+            { candidate_id: "more_probes", label: "more_probes", scores: {}, evidence_refs: [], rationale: "r" },
+            { candidate_id: "proceed_with_evidence", label: "proceed_with_evidence", scores: {}, evidence_refs: [], rationale: "r" },
+            { candidate_id: "proceed_as_hypothesis", label: "proceed_as_hypothesis", scores: {}, evidence_refs: [], rationale: "r" },
+          ],
+          recommended_candidate_ids: ["proceed_with_evidence"],
+        })
+      ),
+      "continuation"
+    );
+    must(runPhase1("continuation-select", ["more_probes", "--override-reason", "evidence too thin"]), "continuation-select");
     const r = runCmd(
       "concepts",
       [],
@@ -306,34 +340,40 @@ function seedPhase2UnlockedWithFindings(
   confirmEmergent: { findingId: string; confirmed: boolean }[] = []
 ): void {
   appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "2026-08-19T00:00:00.000Z");
-  runPhase1(
-    "plan-init",
-    [],
-    JSON.stringify({
-      confirmed_knowns: [],
-      open_unknowns: [{ unknown_id: "u1", dimension: "emotional_frame", description: "d" }],
-      probes: [],
-    })
+  must(
+    runPhase1(
+      "plan-init",
+      [],
+      JSON.stringify({
+        confirmed_knowns: [],
+        open_unknowns: [{ unknown_id: "u1", dimension: "emotional_frame", description: "d" }],
+        probes: [],
+      })
+    ),
+    "plan-init"
   );
-  runPhase1("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings }));
+  must(runPhase1("research-read-init", [], JSON.stringify({ collection_coverage: fullCollectionCoverage(), findings })), "research-read-init");
   for (const c of confirmEmergent) {
-    runPhase1("research-read-confirm-emergent", [c.findingId, String(c.confirmed)]);
+    must(runPhase1("research-read-confirm-emergent", [c.findingId, String(c.confirmed)]), "research-read-confirm-emergent");
   }
-  runPhase1("research-read-review", []);
-  runPhase1(
-    "continuation",
-    [],
-    JSON.stringify({
-      input_refs: ["p1-research-plan", "p1-research-read"],
-      candidates: [
-        { candidate_id: "more_probes", label: "more_probes", scores: {}, evidence_refs: [], rationale: "r" },
-        { candidate_id: "proceed_with_evidence", label: "proceed_with_evidence", scores: {}, evidence_refs: [], rationale: "r" },
-        { candidate_id: "proceed_as_hypothesis", label: "proceed_as_hypothesis", scores: {}, evidence_refs: [], rationale: "r" },
-      ],
-      recommended_candidate_ids: ["proceed_with_evidence"],
-    })
+  must(runPhase1("research-read-review", []), "research-read-review");
+  must(
+    runPhase1(
+      "continuation",
+      [],
+      JSON.stringify({
+        input_refs: ["p1-research-plan", "p1-research-read"],
+        candidates: [
+          { candidate_id: "more_probes", label: "more_probes", scores: {}, evidence_refs: [], rationale: "r" },
+          { candidate_id: "proceed_with_evidence", label: "proceed_with_evidence", scores: {}, evidence_refs: [], rationale: "r" },
+          { candidate_id: "proceed_as_hypothesis", label: "proceed_as_hypothesis", scores: {}, evidence_refs: [], rationale: "r" },
+        ],
+        recommended_candidate_ids: ["proceed_with_evidence"],
+      })
+    ),
+    "continuation"
   );
-  runPhase1("continuation-select", ["proceed_with_evidence"]);
+  must(runPhase1("continuation-select", ["proceed_with_evidence"]), "continuation-select");
 }
 
 describe("rejected emergent findings excluded from concept generation (finding #1)", () => {
@@ -722,30 +762,36 @@ describe("announcement-draft", () => {
 describe("Checkpoint 2 clears with all 4 required kinds live even with no announcement drafted", () => {
   test("clears once lead-magnet, landing-page-copy, welcome-email, and survey are all approved+live, with NO announcement drafted at all", () => {
     seedSurveyReviewed();
-    runCmd("survey-review-approve", []);
-    runCmd(
-      "welcome-email-draft",
-      [],
-      JSON.stringify({
-        subject: "Here's your guide",
-        preview_text: "One fix, ten minutes",
-        body: "Thanks for signing up. Here's the guide.",
-        lead_magnet_link_text: "Get the guide",
-        lead_magnet_destination: "https://humaninference.ai/guide",
-        survey_question_or_link: "https://humaninference.ai/survey",
-        claim_refs: [],
-      })
+    must(runCmd("survey-review-approve", []), "survey-review-approve");
+    must(
+      runCmd(
+        "welcome-email-draft",
+        [],
+        JSON.stringify({
+          subject: "Here's your guide",
+          preview_text: "One fix, ten minutes",
+          body: "Thanks for signing up. Here's the guide.",
+          lead_magnet_link_text: "Get the guide",
+          lead_magnet_destination: "https://humaninference.ai/guide",
+          survey_question_or_link: "https://humaninference.ai/survey",
+          claim_refs: [],
+        })
+      ),
+      "welcome-email-draft"
     );
-    runCmd(
-      "landing-page-draft",
-      [],
-      JSON.stringify({
-        headline: "Fix your first broken workflow",
-        benefit_1: "Save an hour a week",
-        benefit_2: "Stop losing track of tasks",
-        benefit_3: "Feel in control again",
-        button_label: "Get the guide",
-      })
+    must(
+      runCmd(
+        "landing-page-draft",
+        [],
+        JSON.stringify({
+          headline: "Fix your first broken workflow",
+          benefit_1: "Save an hour a week",
+          benefit_2: "Stop losing track of tasks",
+          benefit_3: "Feel in control again",
+          button_label: "Get the guide",
+        })
+      ),
+      "landing-page-draft"
     );
 
     // Approve (via phase2.ts's own approve command, exercising the extracted artifact-lifecycle
