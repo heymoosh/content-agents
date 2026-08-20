@@ -9,7 +9,8 @@ which produces strict verbatim extraction exactly like the old default.
 
 **Where the angles live:** `config/platforms.yaml` `spin_angles`, keyed by platform. Each entry
 carries the target `audience` and the approved `angle` statement. Currently: `x` (tech),
-`linkedin` (business/career), `bluesky` (political), and `substack` (society). Substack is the
+`linkedin` (business/career), `bluesky` (political), `substack` (society), `mastodon`
+(decentralized-tech), and `threads` (casual/mainstream). Substack is the
 source channel for ordinary essays (never an atomize output target for those), but IS a
 conditional routing target for Substack Notes specifically — a Note (`source_kind: substack-note`)
 gets reposted back to Substack via `route.ts`'s `applySubstackRepost` hook + `src/publish/
@@ -53,7 +54,7 @@ beat template, not this paragraph.
    `review-queue.md` approval gate are unchanged. Nothing publishes without Muxin's `approve`.
 
 **Which derivatives get spun:** every text derivative whose platform has a `spin_angles` entry,
-so X, LinkedIn, and Bluesky today — INCLUDING a quote card's per-platform context captions
+so X, LinkedIn, Bluesky, Mastodon, and Threads today — INCLUDING a quote card's per-platform context captions
 (`quote-card-N-<target>.md`, whose `platform` is the target channel), since each is a real text
 post for that channel. What stays verbatim: the card's QUOTE itself (the `quote-card-N.md`
 definition that renders onto the image — a verbatim quotable by definition, `platform: quote-card`,

@@ -31,10 +31,19 @@ describe("loadPlatforms: validates the real config/platforms.yaml without behavi
     assert.equal(a, b, "loadPlatforms should return the cached object, not re-read the file");
   });
 
-  test("the real config/platforms.yaml does not set max_slots_per_day on any platform (mechanism-only card)", () => {
+  test("the real config/platforms.yaml only sets max_slots_per_day on daily text platforms that also receive quote-cards", () => {
     const cfg = loadPlatforms();
+    // Raised to 2 on x/linkedin/mastodon/threads/bluesky (Muxin, 2026-08-20): daily text cadence
+    // now claims every day's one slot on these platforms, so a same-day quote-card needs room too.
+    // Every other platform (substack, tiktok, youtube, community, video-script, quote-card itself)
+    // is untouched and should still fall back to the scheduler's default cap of 1.
+    const expectRaised = new Set(["x", "linkedin", "mastodon", "threads", "bluesky"]);
     for (const [name, rule] of Object.entries(cfg.platforms)) {
-      assert.equal(rule.max_slots_per_day, undefined, `${name} should not have max_slots_per_day set yet`);
+      if (expectRaised.has(name)) {
+        assert.equal(rule.max_slots_per_day, 2, `${name} should have max_slots_per_day: 2`);
+      } else {
+        assert.equal(rule.max_slots_per_day, undefined, `${name} should not have max_slots_per_day set`);
+      }
     }
   });
 });

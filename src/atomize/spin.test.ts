@@ -2,11 +2,18 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { loadSpinAngles, resolveAngle, isSpinDefault, appliesRehook } from "./spin.js";
 
-describe("config/platforms.yaml spin_angles: the four Muxin-approved angles (2026-06-30)", () => {
+describe("config/platforms.yaml spin_angles: the Muxin-approved angles (2026-06-30, mastodon/threads added 2026-08-20)", () => {
   const angles = loadSpinAngles();
 
-  test("carries all four channel entries", () => {
-    assert.deepEqual(Object.keys(angles).sort(), ["bluesky", "linkedin", "substack", "x"]);
+  test("carries all six channel entries", () => {
+    assert.deepEqual(Object.keys(angles).sort(), [
+      "bluesky",
+      "linkedin",
+      "mastodon",
+      "substack",
+      "threads",
+      "x",
+    ]);
   });
 
   test("x: non-engineer outside the SV tech bubble, tech audience", () => {
@@ -32,6 +39,18 @@ describe("config/platforms.yaml spin_angles: the four Muxin-approved angles (202
     assert.equal(angles.bluesky.audience, "political");
     assert.match(angles.bluesky.angle, /democracy as broken UX/);
     assert.match(angles.bluesky.angle, /fairness gap unignorable/);
+  });
+
+  test("mastodon: already skeptical of one big system, decentralized-tech", () => {
+    assert.equal(angles.mastodon.audience, "decentralized-tech");
+    assert.match(angles.mastodon.angle, /already made one system-level call/);
+    assert.match(angles.mastodon.angle, /2-4 hashtags/);
+  });
+
+  test("threads: casual, closer to Instagram's crowd than X's", () => {
+    assert.equal(angles.threads.audience, "casual/mainstream");
+    assert.match(angles.threads.angle, /thinking out loud/);
+    assert.match(angles.threads.angle, /0-2/);
   });
 });
 
