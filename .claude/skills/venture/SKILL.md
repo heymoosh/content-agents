@@ -11,8 +11,7 @@ Phase 2: turn what Phase 1 learned into a narrow lead magnet, a landing page, a 
 a fit review of Muxin's existing survey, hitting Checkpoint 2. Then Phase 3: once real responses
 clear the 20-eligible-unique-respondent gate, cluster them into three to five problems, score and
 select the one expensive problem worth solving, define and approve a transformation sentence,
-outline a small first product, and recommend a price and pitch, hitting Checkpoint 3 (not yet
-wired to actually clear — that's a later work package; this skill still runs every Phase 3 step).
+outline a small first product, and recommend a price and pitch, hitting Checkpoint 3.
 Operations (Phase 4) isn't built yet.
 
 ## This is composed business content — and why that's allowed
@@ -475,12 +474,15 @@ forecast or a promise in the pitch itself.
 
 ## Step 23: Checkpoint 3
 
-Checkpoint 3's actual clearing logic (reading the three required decisions plus the two required
-artifacts) isn't wired yet — that's a later work package. Once it is, it needs: the response gate
-opened, the cluster analysis stored, and the problem, transformation, outline, and price/pitch all
-approved. Until then, treat "every Phase 3 artifact and decision above is approved" as the
-practical signal that Phase 3 is done, and tell Muxin plainly that the checkpoint event itself
-isn't recorded automatically yet.
+```
+tsx src/venture/checkpoint.ts clear <slug> checkpoint-3
+```
+
+Checkpoint 3 needs all of: the response gate opened, the cluster analysis stored, and the problem,
+transformation, outline, and price/pitch decisions and artifacts all approved (decisions selected,
+artifacts editorially approved — Phase 3's artifacts are internal, `delivery_mode: "none"`, so
+there's no separate live-delivery step to wait on). Clearing it records `phase_3_completed` and
+unlocks Phase 4.
 
 ## Throughout
 

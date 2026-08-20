@@ -131,10 +131,14 @@ function maybeOpenGate(slug: string, records: ResponseRecord[], at: string): Res
 export interface RawIdentifier {
   platform: string;
   // respondentHash() lowercases `platform` but hashes `stableUserId` byte-for-byte -- it does NOT
-  // trim or lowercase it. The caller MUST pass a canonical form (e.g. a trimmed, lowercased
-  // email address) or "Foo@Bar.com" and "foo@bar.com" will hash to two different respondents and
-  // never dedupe.
+  // trim or lowercase it. canonicalStableUserId() below normalizes it before hashing, so the
+  // caller no longer has to remember to (a trimmed/lowercased number is unchanged, so this is a
+  // no-op for opaque numeric platform ids and only matters for a human-typed email).
   stableUserId: string | number;
+}
+
+function canonicalStableUserId(id: string | number): string | number {
+  return typeof id === "string" ? id.trim().toLowerCase() : id;
 }
 
 export interface IngestResponseInput {
@@ -174,7 +178,7 @@ export function ingestResponse(slug: string, input: IngestResponseInput, at: str
   requireRulesVersionMatch(slug, loadRules());
   const existing = readResponses(slug);
   const respondentHashValue = input.rawIdentifier
-    ? respondentHash(input.rawIdentifier.platform, input.rawIdentifier.stableUserId)
+    ? respondentHash(input.rawIdentifier.platform, canonicalStableUserId(input.rawIdentifier.stableUserId))
     : `no-id-${randomUUID()}`;
   const likelyDuplicate = existing.some((r) => r.respondent_hash === respondentHashValue);
   const exclusionReason = input.exclusionReason ?? null;

@@ -162,6 +162,26 @@ describe("formatStatus -- Phase 3, plain language, no internal vocabulary", () =
     assertNoLeak(text);
   });
 
+  test("gate open, cluster stored, everything approved but checkpoint not yet cleared: reports ready to clear, no leak", () => {
+    // Regression test: formatStatus used to fall silent in exactly this window -- every
+    // requirement met (blocking empty) but cp3.cleared still false because nobody has run
+    // `checkpoint.ts clear` yet. Muxin got no signal she could clear Phase 3.
+    reachPhase3();
+    openResponseGate();
+    storeClusterAnalysis();
+    const rules = loadRules();
+    for (const [i, kind] of DECISION_KINDS.entries()) selectDecisionOfKind(rules, kind, `d-${i}`);
+    seedPhase3Artifact(rules, "product-outline", "p3-product-outline");
+    seedPhase3Artifact(rules, "price-decision", "p3-price-decision");
+    transitionArtifact(SLUG, "p3-product-outline", { editorial_status: "approved" }, "t5");
+    transitionArtifact(SLUG, "p3-price-decision", { editorial_status: "approved" }, "t5");
+    // Deliberately no clearCheckpoint(SLUG, "checkpoint-3", ...) call here.
+    const text = formatStatus(SLUG);
+    assert.match(text, /ready to clear Checkpoint 3/);
+    assert.doesNotMatch(text, /Phase 3 is complete/);
+    assertNoLeak(text);
+  });
+
   test("gate open, cluster stored, everything approved: reports Phase 3 complete, no leak", () => {
     reachPhase3();
     openResponseGate();

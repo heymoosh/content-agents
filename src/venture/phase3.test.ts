@@ -124,7 +124,7 @@ function threeProblemCandidates(overrides: Record<string, unknown>[] = []): Reco
   return base;
 }
 
-function seedProblemSelected(): void {
+function seedProblemScored(): void {
   seedClusterWritten();
   must(
     runCmd(
@@ -134,6 +134,10 @@ function seedProblemSelected(): void {
     ),
     "problem-score"
   );
+}
+
+function seedProblemSelected(): void {
+  seedProblemScored();
   must(runCmd("problem-select", ["cluster-1"]), "problem-select");
 }
 
@@ -341,7 +345,14 @@ describe("cluster validation", () => {
     seedProblemSelected();
     const r = runCmd("cluster", [], JSON.stringify(wellFormedClusterInput()));
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /p3-problem-01 \(problem-selection\) is already selected/);
+    assert.match(r.stderr, /p3-problem-01 \(problem-selection\) already exists \(status: selected\)/);
+  });
+
+  test("cluster refuses to re-run once problem-score has run, even before problem-select (regression: re-clustering would orphan the stale scoring decision's cluster ids)", () => {
+    seedProblemScored();
+    const r = runCmd("cluster", [], JSON.stringify(wellFormedClusterInput()));
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /p3-problem-01 \(problem-selection\) already exists \(status: awaiting_user\)/);
   });
 });
 
@@ -766,6 +777,21 @@ describe("stale rules_version refusal (re-tests requireRulesVersionMatch at this
 // ==== approve/discard/restore/list reuse (artifact-lifecycle.ts, exercised end-to-end here) ====
 
 describe("approve/discard/restore/list reuse", () => {
+  test("approving a delivery_mode:none artifact through the real CLI path lands on not_applicable, not ready", () => {
+    // Regression test: cmdApprove used to hardcode delivery_status:"ready" for every artifact,
+    // including delivery_mode:"none" ones (Phase 3's product-outline/price-decision). Since these
+    // never go through a delivery step, "ready" could never advance to "live_confirmed", so
+    // state.ts's completion check (which requires not_applicable for delivery_mode:"none") saw
+    // them as permanently incomplete -- checkpoint-3 could never clear through the real approve
+    // path. seedOutlineApproved() already calls the real "approve" command; this asserts its
+    // actual delivery_status instead of only checking the command exited 0.
+    seedOutlineApproved();
+    const outline = readArtifact(SLUG, "p3-product-outline");
+    assert.equal(outline?.delivery_mode, "none");
+    assert.equal(outline?.editorial_status, "approved");
+    assert.equal(outline?.delivery_status, "not_applicable");
+  });
+
   test("approve, discard, and restore round-trip a Phase 3 artifact via the shared artifact-lifecycle commands", () => {
     seedOutlineApproved();
     const discardResult = runCmd("discard", ["p3-product-outline"]);

@@ -226,7 +226,20 @@ interface ClusterInput {
 
 function cmdCluster(slug: string) {
   const rules = loadRules();
-  refuseIfDecisionSelected(slug, "p3-problem-01", "problem-selection");
+  // Broader than refuseIfDecisionSelected on purpose: problem-score writes candidates whose
+  // candidate_id IS a cluster_id from THIS cluster-analysis.json. Re-clustering after
+  // problem-score has run -- even before Muxin has selected -- would overwrite the file with new
+  // cluster ids and orphan those candidates, so problem-select could later pick a candidate_id
+  // that no longer names a real cluster. Refuse re-clustering once a problem-selection decision
+  // exists in ANY status, not just "selected".
+  const existingProblemDecision = readDecision(slug, "p3-problem-01");
+  if (existingProblemDecision) {
+    fail(
+      `refusing: p3-problem-01 (problem-selection) already exists (status: ${existingProblemDecision.status}) -- ` +
+        `re-clustering now would leave it pointing at cluster ids that may no longer exist. If the clusters ` +
+        `genuinely need to change, that's a product question for Muxin, not a rerun (rules.md §11 item 15).`
+    );
+  }
   const input = JSON.parse(readStdin()) as ClusterInput;
 
   const { min_clusters, max_clusters } = rules.cluster_analysis;
@@ -554,6 +567,8 @@ function cmdPrice(slug: string) {
   if (!Array.isArray(input.candidates) || input.candidates.length < 2) {
     fail(`product-format-and-price needs meaningful alternatives (the "considered range," rules.md §7.9), not just one candidate`);
   }
+  const priceCandidateIds = input.candidates.map((c) => c.candidate_id);
+  if (new Set(priceCandidateIds).size !== priceCandidateIds.length) fail(`candidates contain a duplicate candidate_id`);
   for (const c of input.candidates) {
     if (!c.label?.trim()) fail(`candidate "${c.candidate_id}" is missing a label`);
     if (!c.rationale?.trim()) fail(`candidate "${c.candidate_id}" is missing a rationale`);

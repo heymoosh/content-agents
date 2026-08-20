@@ -56,6 +56,11 @@ inference. If a gate field is unset, the correct behavior is to stop and ask, ev
 | `reviewed_by_muxin` | `survey` (`p2-survey-review`, via `survey-review-approve`) | gates `welcome-email-draft` (refuses until the survey fit review is approved) -- read by a runtime gate in `src/venture/phase2.ts` |
 | `editorial_status: approved` | each Phase 2 artifact | handoff for delivery (manual; Muxin installs/publishes it herself) |
 | `delivery_status: live_confirmed` + `evidence` | each Phase 2 artifact | counting toward Checkpoint 2 |
+| decision `status: selected`, `selected_by: "muxin"` | `problem-selection` (`p3-problem-01`) | drafting the transformation sentence (`transformation-draft`) |
+| decision `status: selected`, `selected_by: "muxin"` | `transformation-choice` (`p3-transformation-01`) | drafting the product outline (`outline-draft`) |
+| `editorial_status: approved` | `p3-product-outline` artifact | drafting price/format options (`price`) and the price-decision (`price-draft`), and counting toward Checkpoint 3 |
+| decision `status: selected`, `selected_by: "muxin"` | `product-format-and-price` (`p3-price-01`) | drafting the price-decision artifact (`price-draft`) |
+| `editorial_status: approved` | `p3-price-decision` artifact | counting toward Checkpoint 3, alongside `p3-product-outline` and the three decisions above |
 
 **This is Build 2's expensive lesson, built in on day one.** `/story` shipped without a beat-sheet
 approval gate and drafted an inert chapter before the gate was retrofitted (commit `26bf36c`).
@@ -107,13 +112,20 @@ predicates.
 - `venture/<slug>/artifacts.jsonl` — one line per drafted/delivered artifact; both state machines
   live here (editorial: Muxin-only; delivery: script/agent-written).
 - `venture/<slug>/phase-1-attention/` — Phase 1's working drafts. `venture/<slug>/phase-2-audience/`
-  — Phase 2's working drafts. `venture/<slug>/ready-to-paste/` — essays waiting for Muxin to paste.
+  — Phase 2's working drafts. `venture/<slug>/phase-3-offer/` — Phase 3's working drafts (the
+  product outline and price-decision body files). `venture/<slug>/ready-to-paste/` — essays
+  waiting for Muxin to paste.
+- `venture/<slug>/responses.jsonl` — one line per ingested survey response, append-only correction
+  history per record; gitignored (raw and redacted quotes never reach git).
+  `venture/<slug>/cluster-analysis.json` — the current cluster-analysis snapshot `cluster` writes
+  (count, redacted evidence, stuck point, desired outcome, visible consequences per cluster);
+  overwritten wholesale on a re-run, same one-shot-snapshot treatment as `state.md`; gitignored.
 - `venture/rules.md` is the authority and does not execute. `venture/rules.yaml` is the only thing
   a phase script loads at runtime; a parity test keeps them from drifting.
 - `venture/examples/civic-tech-worked-example.md` (if present) is a fixture only. It MUST NOT
   enter any clean venture's runtime context, and it MUST NOT appear in a PR body.
 
-## Scripts (Phase 1 and Phase 2 — Offer/Operations not yet built)
+## Scripts (Phase 1, Phase 2, and Phase 3 — Operations not yet built)
 
 `/venture new <slug>` (`npm run venture:new`) — 25-question intake, kickoff canon event.
 `/venture <slug>` (`npm run venture:phase1`) — research plan → **stop for Muxin's plan review** →
@@ -125,12 +137,28 @@ venture back into more Phase 1 idea generation or unlocks Phase 2).
 **stop for approval** → a fit review of Muxin's existing survey (not a new one) → **stop for
 approval** → welcome email draft (requires both the magnet and the survey) → **stop for
 approval** → an optional announcement draft.
+`/venture <slug>` continuing into Phase 3 (`npm run venture:phase3`) — `response-ingest` /
+`response-correct` collect survey responses (exempt from every gate below, since gating intake on
+the gate it exists to open would be circular); every analysis command refuses until the response
+gate opens (20 min / 30 target eligible unique respondents, `response-gate-status` reports where
+it stands) → `cluster` groups the eligible responses into 3-5 problems → **stop, show Muxin the
+clusters** → `problem-score` ranks each cluster on 6 factors → **stop, Muxin selects the core
+problem** (`problem-select`) → `transformation-draft` writes one plain transformation sentence (no
+vague verbs, no em dashes) → **stop, Muxin edits/approves it** (`transformation-select`) →
+`outline-draft` builds a 5-7 section product outline backward from the approved sentence → **stop
+for approval** (`approve <slug> p3-product-outline`) → `price` ranks price/format options → **stop,
+Muxin selects one** (`price-select`) → `price-draft` writes the price-decision (recommended price,
+considered range, reasoning, known uncertainty, pitch paragraph, optional illustrative-only
+scenario math; refuses the $49 worked-example price outright) → **stop for approval**
+(`approve <slug> p3-price-decision`).
 `/venture <slug> deliver` (`npm run venture:deliver`) — hands off an approved post; essay →
 `ready-to-paste/`, Note → the Substack Notes agent via the shared scheduler.
 `/venture <slug> checkpoint` (`npm run venture:checkpoint`) — clears Checkpoint 1 once all three
-required posts are approved and live and posting pace is recorded, and clears Checkpoint 2 once
-the lead magnet, landing page, welcome email, and survey are all approved and live (the
-announcement is never required).
+required posts are approved and live and posting pace is recorded, clears Checkpoint 2 once the
+lead magnet, landing page, welcome email, and survey are all approved and live (the announcement is
+never required), and clears Checkpoint 3 once the product-outline and price-decision artifacts are
+both approved and live AND the problem-selection, transformation-choice, and
+product-format-and-price decisions are all `selected` (no pace requirement).
 `/venture <slug> status` (`npm run venture:status`) — read-only, plain-language status.
 
 ## Review checklist — for `/code-review` and any human review of a Venture PR
