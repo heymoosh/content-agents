@@ -77,7 +77,7 @@ function main() {
   if (sub === "clear" && slug) {
     const which = rest[0];
     if (!which) {
-      console.error("usage: tsx src/venture/checkpoint.ts clear <slug> <checkpoint-1|checkpoint-2>");
+      console.error("usage: tsx src/venture/checkpoint.ts clear <slug> <checkpoint-1|checkpoint-2|checkpoint-3>");
       process.exit(1);
     }
     let r: CheckpointResult;

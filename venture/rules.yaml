@@ -2,9 +2,9 @@
 # authority and does NOT execute -- a phase script loads ONLY this file. src/venture/rules.ts
 # validates this file's rules_version against what's stamped in a venture's canon.md at kickoff.
 #
-# Phase 1 + Phase 2 rubrics are now encoded. Phase 3-4 sections are not yet encoded -- see the
-# `# not yet encoded` markers below, each pointing at the venture/rules.md section that covers it.
-# Partial coverage is deliberate and visible, never silent (see the parity test,
+# Phase 1, Phase 2, and Phase 3 rubrics are now encoded. Phase 4 sections are not yet encoded --
+# see the `# not yet encoded` markers below, each pointing at the venture/rules.md section that
+# covers it. Partial coverage is deliberate and visible, never silent (see the parity test,
 # src/venture/rules.test.ts).
 
 rules_version: venture-rules-2026-08-19-draft-1
@@ -13,9 +13,9 @@ sources:
   starter_kit_sha256: "773250cefd3ec8a8dfd86b1f6247f9005dd1f1bda47a0c5171a6f6236722ecc6"
   welsh_note_sha256: "bad486c48b8477a9ae3c92fae3cd1c40dded1dc6cda483a5f297ddbb6da81df3"
 
-# venture-schema-contract.md §3's artifact-kind table -- Phase 1 and Phase 2 rows now encoded.
-# Remaining kinds (product-outline, price-decision, thank-you-note -- Phase 3/4) are
-# # not yet encoded -- see venture-schema-contract.md §3 in full.
+# venture-schema-contract.md §3's artifact-kind table -- Phase 1, Phase 2, and Phase 3 rows now
+# encoded. The remaining kind (thank-you-note -- Phase 4) is # not yet encoded -- see
+# venture-schema-contract.md §3 in full.
 artifact_kinds:
   substack-post:
     delivery_mode: manual # ready-to-paste/, Muxin pastes it herself
@@ -70,6 +70,16 @@ artifact_kinds:
     publishable: false
     min_evidence: url
     phase: 2
+  product-outline:
+    delivery_mode: none # internal decision artifact -- no external delivery step to confirm
+    publishable: false
+    min_evidence: null
+    phase: 3
+  price-decision:
+    delivery_mode: none # internal decision artifact -- no external delivery step to confirm
+    publishable: false
+    min_evidence: null
+    phase: 3
 
 # rules.md §5.1 -- the platform-recommendation decision. Single primary platform only; the
 # system MUST NOT recommend a multi-platform launch.
@@ -102,10 +112,15 @@ draft:
   require_reply_prompt: true # §1A.1: "no CTA" needs a recorded exception, never a default
   require_claim_refs: true # every concrete factual claim traces to intake:qN or a confirmed_known
 
-# rules.md §1A.1 -- CTA policy by phase. Phase 3-4 # not yet encoded.
+# rules.md §1A.1 -- CTA policy by phase. Phase 4 # not yet encoded.
 cta_policy_by_phase:
   1: reply_prompt
   2: lead_magnet_bridge # "Bridge to the relevant active lead magnet."
+  # "Normally the lead magnet or a response request." An offer is allowed only after the response
+  # gate opens AND the Phase 3 decisions/artifacts in checkpoint-3 are approved (§7.10) -- that
+  # conditional escalation is a phase3.ts CTA-selection concern (a later work package), not a
+  # second static value here.
+  3: lead_magnet_or_response_request
 
 # rules.md §5.4-§5.5 -- publish pace and Checkpoint 1's three-part predicate.
 phase_1_pace:
@@ -118,6 +133,24 @@ checkpoints:
   checkpoint-2:
     required_artifact_kinds: [lead-magnet, landing-page-copy, welcome-email, survey]
     require_all_live: true # rules.md §6.8 -- the announcement is explicitly NOT required to clear
+  checkpoint-3:
+    # venture-schema-contract.md §5.3 names the ledger event `<slug>/phase-3-completed` (matching
+    # rules.md §7.10's "Record `phase_3_completed`"), while the current generic clearCheckpoint
+    # (src/venture/checkpoint.ts) writes `<slug>/checkpoint-3` for every checkpoint id uniformly,
+    # same as checkpoint-1/checkpoint-2. Whether checkpoint-3's real clear should use the contract's
+    # literal event name instead is an OPEN question for whichever work package actually wires
+    # clearCheckpoint's decision-record check -- not decided here, and not exercised by this
+    # package's tests (no live-clearing call happens outside a test fixture yet). The response gate
+    # opening (§7.3) is explicitly NOT part of this predicate -- it is a separate ledger event that
+    # only unlocks the identify-problem/outline-product/set-price gated actions (§5.3), out of scope
+    # for this work package.
+    required_artifact_kinds: [product-outline, price-decision]
+    require_all_live: true # approved+not_applicable counts as live for delivery_mode: none kinds
+    # The problem, transformation, and price/pitch decisions must each be `selected` (rules.md
+    # §7.10; venture-schema-contract.md §5.3) before this checkpoint clears, alongside the two
+    # artifacts above. Declared here as data only -- see CheckpointRule.required_decision_kinds'
+    # comment in src/venture/rules.ts for why checkpoint.ts/state.ts don't yet enforce it.
+    required_decision_kinds: [problem-selection, transformation-choice, product-format-and-price]
 
 # rules.md §6.2 -- five lead-magnet concepts, six factors, Muxin selects (or overrides) one.
 lead_magnet_concept:
@@ -137,6 +170,26 @@ research_read:
   required_sources: [note_reply, essay_comment, metric, subscriber_movement, dm, email, follow_up_question, creator_observation]
   signal_quality_factors: [audience_fit, specificity, explicit_stuck_point, requested_help, follow_up_question, recurrence, behavioral_action, exposure_context]
 
-# not yet encoded — see venture/rules.md §7 (Phase 3: Offer), §8 (Phase 4: Operations), and
+# rules.md §7.3 -- the response gate's eligible-unique-respondent thresholds. Posting continues
+# and the survey keeps collecting below the minimum; the gate unlocks analysis only, never Phase 4
+# (§7.3, §7.10, venture-schema-contract.md §5.3). The response log itself (respondent hashing,
+# dedup, eligibility) is Work Package 1's src/venture/responses.ts, not this file.
+response_gate:
+  min_eligible_unique: 20
+  target_eligible_unique: 30
+
+# rules.md §7.6 -- score every cluster 1-5 on these six factors to find the expensive problem.
+problem_score:
+  factors: [frequency, intensity, time_cost, money_cost, stress_cost, solvability]
+  score_scale: { min: 1, max: 5 }
+
+# rules.md §7.8 -- the product outline built backwards from the approved transformation.
+product_outline:
+  min_sections: 5
+  max_sections: 7
+
+# not yet encoded — see venture/rules.md §8 (Phase 4: Operations), and
 # venture-schema-contract.md §5.4/§5.6/§5.7/§5.8 (responses, evidence links, funnel events,
-# Signals mapping). None of it is needed until a later slice.
+# Signals mapping), plus the Phase 3 response-gate ledger event and checkpoint-3's
+# required_decision_kinds wiring into checkpoint.ts/state.ts (Work Packages 1 and 3). None of it
+# is needed until a later slice.

@@ -17,7 +17,9 @@ export type ArtifactKind =
   | "landing-page-copy"
   | "welcome-email"
   | "survey"
-  | "text-post-announcement";
+  | "text-post-announcement"
+  | "product-outline"
+  | "price-decision";
 
 export interface ArtifactKindRule {
   delivery_mode: "manual" | "app" | "none";
@@ -27,13 +29,19 @@ export interface ArtifactKindRule {
 }
 
 // checkpoint-1 style: N of any required-checkpoint_id artifact (required_artifact_count).
-// checkpoint-2 style: exactly one live artifact per named kind (required_artifact_kinds).
+// checkpoint-2/checkpoint-3 style: exactly one live artifact per named kind (required_artifact_kinds).
 // A checkpoint rule uses exactly one of the two count shapes, never both.
 export interface CheckpointRule {
   required_artifact_count?: number;
   required_artifact_kinds?: string[];
   require_all_live: boolean;
   require_pace_recorded?: boolean;
+  // checkpoint-3 only (rules.md §7.10 / venture-schema-contract.md §5.3): the decision_kinds that
+  // must be `selected` before this checkpoint clears, alongside required_artifact_kinds' artifacts
+  // being approved+live. Declared here as data only -- src/venture/checkpoint.ts and state.ts do
+  // NOT yet read this field (Work Package 0 scope is the data model, not the gate itself); wiring
+  // it into checkpointArtifactState's predicate is Work Package 3.
+  required_decision_kinds?: string[];
 }
 
 export interface VentureRules {
@@ -76,6 +84,25 @@ export interface VentureRules {
   research_read: {
     required_sources: string[];
     signal_quality_factors: string[];
+  };
+  // rules.md §7.3 -- the response gate's eligible-unique-respondent thresholds. Read-model shape
+  // (`response_gate: { state, have, need, target, opened_at }`, venture-schema-contract.md §5.1)
+  // and the ledger event that fires at `min_eligible_unique` are Work Package 1's job; this is only
+  // the static threshold data.
+  response_gate: {
+    min_eligible_unique: number;
+    target_eligible_unique: number;
+  };
+  // rules.md §7.6 -- the six-factor problem score, each 1-5. Matches a `problem-selection`
+  // decision's kind-specific `candidates[].scores` shape (venture-schema-contract.md §2A).
+  problem_score: {
+    factors: string[];
+    score_scale: { min: number; max: number };
+  };
+  // rules.md §7.8 -- the product outline's section-count bounds.
+  product_outline: {
+    min_sections: number;
+    max_sections: number;
   };
 }
 
