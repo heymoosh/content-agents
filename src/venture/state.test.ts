@@ -4,6 +4,7 @@ import { rmSync } from "node:fs";
 import { deriveState } from "./state.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
 import { appendCanonEvent } from "./canon.js";
+import { writeDecision, selectDecision, type DecisionKind } from "./decisions.js";
 import { ventureDir } from "./paths.js";
 import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
 
@@ -254,5 +255,88 @@ describe("deriveState -- Checkpoint 2", () => {
     // true without any pace ever being recorded, and it must never end up in blocking.
     assert.equal(state.checkpoints["checkpoint-2"]!.pace_recorded, true);
     assert.equal(state.checkpoints["checkpoint-2"]!.cleared, false); // not cleared until the canon event fires
+  });
+});
+
+describe("deriveState -- Checkpoint 3 decisions (required_decision_kinds)", () => {
+  const DECISION_KINDS: DecisionKind[] = ["problem-selection", "transformation-choice", "product-format-and-price"];
+
+  function selectDecisionOfKind(kind: DecisionKind, id: string) {
+    writeDecision(SLUG, {
+      decision_id: id,
+      decision_kind: kind,
+      rules_version: rules.rules_version,
+      input_refs: ["ref"],
+      candidates: [{ candidate_id: "c1", label: "c1", scores: {}, evidence_refs: [], rationale: "r" }],
+      recommended_candidate_ids: ["c1"],
+      at: "t0",
+    });
+    selectDecision(SLUG, id, { selectedCandidateIds: ["c1"], selectedBy: "muxin", requiredSelectCount: 1, at: "t1" });
+  }
+
+  // checkpoint-1/checkpoint-2 declare no required_decision_kinds -- decisions_required_count must
+  // read 0/0 for them, never perturbed by checkpoint-3's field existing in rules.yaml.
+  test("checkpoint-1 and checkpoint-2 read 0/0 decisions, unaffected by checkpoint-3's required_decision_kinds", () => {
+    const state = deriveState(SLUG);
+    assert.equal(state.checkpoints["checkpoint-1"]!.decisions_required_count, 0);
+    assert.equal(state.checkpoints["checkpoint-1"]!.decisions_complete_count, 0);
+    assert.equal(state.checkpoints["checkpoint-2"]!.decisions_required_count, 0);
+    assert.equal(state.checkpoints["checkpoint-2"]!.decisions_complete_count, 0);
+  });
+
+  test("no decisions selected -- checkpoint-3 reads 0/3, blocking names all three missing decision kinds", () => {
+    const state = deriveState(SLUG);
+    const cp3 = state.checkpoints["checkpoint-3"]!;
+    assert.equal(cp3.decisions_required_count, 3);
+    assert.equal(cp3.decisions_complete_count, 0);
+    for (const kind of DECISION_KINDS) {
+      assert.ok(cp3.blocking.some((b) => b.reason === `missing required decision kind "${kind}"`));
+    }
+  });
+
+  test("2 of 3 decisions selected -- checkpoint-3 reads 2/3, blocking names only the unselected kind", () => {
+    selectDecisionOfKind("problem-selection", "d-0");
+    selectDecisionOfKind("transformation-choice", "d-1");
+    const state = deriveState(SLUG);
+    const cp3 = state.checkpoints["checkpoint-3"]!;
+    assert.equal(cp3.decisions_complete_count, 2);
+    assert.equal(cp3.decisions_required_count, 3);
+    // Product-outline/price-decision artifacts are never seeded in this describe block, so
+    // blocking also carries their "missing required artifact kind" entries -- filter to the
+    // decision-shaped reasons this test actually cares about.
+    const decisionBlocking = cp3.blocking.filter((b) => /^missing required decision kind/.test(b.reason));
+    assert.deepEqual(
+      decisionBlocking.map((b) => b.reason),
+      ['missing required decision kind "product-format-and-price"']
+    );
+  });
+
+  test("all 3 decisions selected -- checkpoint-3 reads 3/3 decisions, no decision blocking entries", () => {
+    for (const [i, kind] of DECISION_KINDS.entries()) selectDecisionOfKind(kind, `d-${i}`);
+    const state = deriveState(SLUG);
+    const cp3 = state.checkpoints["checkpoint-3"]!;
+    assert.equal(cp3.decisions_complete_count, 3);
+    assert.equal(cp3.decisions_required_count, 3);
+    assert.equal(cp3.blocking.filter((b) => /missing required decision kind/.test(b.reason)).length, 0);
+  });
+});
+
+describe("deriveState -- current_phase", () => {
+  test("no checkpoints cleared reads current_phase 1", () => {
+    const state = deriveState(SLUG);
+    assert.equal(state.current_phase, 1);
+  });
+
+  test("checkpoint-1 cleared (checkpoint-2 not) reads current_phase 2", () => {
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "t0");
+    const state = deriveState(SLUG);
+    assert.equal(state.current_phase, 2);
+  });
+
+  test("checkpoint-1 and checkpoint-2 both cleared reads current_phase 3", () => {
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-1`, {}, "t0");
+    appendCanonEvent(SLUG, "checkpoint-cleared", `${SLUG}/checkpoint-2`, {}, "t1");
+    const state = deriveState(SLUG);
+    assert.equal(state.current_phase, 3);
   });
 });

@@ -134,22 +134,20 @@ checkpoints:
     required_artifact_kinds: [lead-magnet, landing-page-copy, welcome-email, survey]
     require_all_live: true # rules.md §6.8 -- the announcement is explicitly NOT required to clear
   checkpoint-3:
-    # venture-schema-contract.md §5.3 names the ledger event `<slug>/phase-3-completed` (matching
-    # rules.md §7.10's "Record `phase_3_completed`"), while the current generic clearCheckpoint
-    # (src/venture/checkpoint.ts) writes `<slug>/checkpoint-3` for every checkpoint id uniformly,
-    # same as checkpoint-1/checkpoint-2. Whether checkpoint-3's real clear should use the contract's
-    # literal event name instead is an OPEN question for whichever work package actually wires
-    # clearCheckpoint's decision-record check -- not decided here, and not exercised by this
-    # package's tests (no live-clearing call happens outside a test fixture yet). The response gate
-    # opening (§7.3) is explicitly NOT part of this predicate -- it is a separate ledger event that
-    # only unlocks the identify-problem/outline-product/set-price gated actions (§5.3), out of scope
-    # for this work package.
+    # venture-schema-contract.md §5.3 names the real ledger event `<slug>/phase-3-completed`
+    # (matching rules.md §7.10's "Record `phase_3_completed`"), distinct from the generic
+    # `<slug>/checkpoint-<n>` pattern checkpoint-1/checkpoint-2 use -- resolved (Work Package 3) via
+    # `ledger_event_id` below, which src/venture/checkpoint.ts and state.ts both read instead of
+    # assuming `<slug>/checkpoint-3`. The response gate opening (§7.3) is explicitly NOT part of
+    # this predicate -- it is a separate ledger event that only unlocks the identify-problem/
+    # outline-product/set-price gated actions (§5.3), out of scope for this checkpoint.
     required_artifact_kinds: [product-outline, price-decision]
     require_all_live: true # approved+not_applicable counts as live for delivery_mode: none kinds
+    ledger_event_id: phase-3-completed
     # The problem, transformation, and price/pitch decisions must each be `selected` (rules.md
     # §7.10; venture-schema-contract.md §5.3) before this checkpoint clears, alongside the two
-    # artifacts above. Declared here as data only -- see CheckpointRule.required_decision_kinds'
-    # comment in src/venture/rules.ts for why checkpoint.ts/state.ts don't yet enforce it.
+    # artifacts above. Read by state.ts's checkpointArtifactState (Work Package 3) -- see
+    # CheckpointRule.required_decision_kinds' comment in src/venture/rules.ts.
     required_decision_kinds: [problem-selection, transformation-choice, product-format-and-price]
 
 # rules.md §6.2 -- five lead-magnet concepts, six factors, Muxin selects (or overrides) one.
