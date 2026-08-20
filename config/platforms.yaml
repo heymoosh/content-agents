@@ -216,6 +216,28 @@ spin_angles:
       is the zoom-out, the final one or two sentences only. Never the opener.
       Beat 5 — Close: a soft availability signal, what Muxin would look for in scoping this kind of
       engagement. Explicitly NOT a hard sales ask — no "book a call," no "DM me."
+  mastodon:
+    audience: decentralized-tech
+    angle: >-
+      This audience already made one system-level call: they left platforms built on
+      algorithmic feeds and data lock-in for something they control instead. Draw that
+      same thread. The instinct that made them question one entrenched system is the
+      instinct the piece is asking them to turn on AI and the human systems it is about
+      to automate. Do not flatter them as already right about everything; ground the
+      parallel in the actual claim from the source, never a generic "you already get it"
+      wink. There is no algorithmic feed here, so write for someone deciding whether to
+      follow and reply, not for a viral moment. Use 2-4 hashtags per the platform's style
+      note, plain and direct, no hype.
+  threads:
+    audience: casual/mainstream
+    angle: >-
+      This crowd is scrolling casually, not chasing a news cycle. Keep it conversational
+      and personal, more "thinking out loud" than "hot take." Skip the technical
+      specifics X's angle calls for; lead with the human moment or the relatable feeling
+      behind the claim, then let the point land in plain words. Shorter, warmer sentences
+      than X, less clipped. Light hashtag use (0-2) per the platform's style note, and
+      keep it image-friendly: write toward a line that would still work paired with a
+      photo or graphic.
   substack:
     audience: society
     angle: >-
