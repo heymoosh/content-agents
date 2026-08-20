@@ -766,6 +766,21 @@ describe("stale rules_version refusal (re-tests requireRulesVersionMatch at this
 // ==== approve/discard/restore/list reuse (artifact-lifecycle.ts, exercised end-to-end here) ====
 
 describe("approve/discard/restore/list reuse", () => {
+  test("approving a delivery_mode:none artifact through the real CLI path lands on not_applicable, not ready", () => {
+    // Regression test: cmdApprove used to hardcode delivery_status:"ready" for every artifact,
+    // including delivery_mode:"none" ones (Phase 3's product-outline/price-decision). Since these
+    // never go through a delivery step, "ready" could never advance to "live_confirmed", so
+    // state.ts's completion check (which requires not_applicable for delivery_mode:"none") saw
+    // them as permanently incomplete -- checkpoint-3 could never clear through the real approve
+    // path. seedOutlineApproved() already calls the real "approve" command; this asserts its
+    // actual delivery_status instead of only checking the command exited 0.
+    seedOutlineApproved();
+    const outline = readArtifact(SLUG, "p3-product-outline");
+    assert.equal(outline?.delivery_mode, "none");
+    assert.equal(outline?.editorial_status, "approved");
+    assert.equal(outline?.delivery_status, "not_applicable");
+  });
+
   test("approve, discard, and restore round-trip a Phase 3 artifact via the shared artifact-lifecycle commands", () => {
     seedOutlineApproved();
     const discardResult = runCmd("discard", ["p3-product-outline"]);

@@ -72,8 +72,12 @@ export function warnIfNoClaimRefs(rules: VentureRules, claimRefs: ClaimRef[] | u
 export function cmdApprove(slug: string, artifactId: string) {
   const a = readArtifact(slug, artifactId);
   if (!a) fail(`no such artifact: ${artifactId}`);
-  const next = transitionArtifact(slug, artifactId, { editorial_status: "approved", delivery_status: "ready" }, now());
-  console.log(`${artifactId} approved -- ready for delivery (${next.delivery_mode})`);
+  // delivery_mode "none" artifacts (e.g. Phase 3's product-outline/price-decision) never go
+  // through a delivery step -- they must land on "not_applicable", not "ready", or state.ts's
+  // completion check (which requires not_applicable for these) can never see them as complete.
+  const delivery = a.delivery_mode === "none" ? "not_applicable" : "ready";
+  const next = transitionArtifact(slug, artifactId, { editorial_status: "approved", delivery_status: delivery }, now());
+  console.log(`${artifactId} approved -- ${delivery === "not_applicable" ? "no delivery needed" : "ready for delivery"} (${next.delivery_mode})`);
 }
 
 export function cmdDiscard(slug: string, artifactId: string) {
