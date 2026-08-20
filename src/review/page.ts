@@ -468,6 +468,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <button class="room" data-room="studio">Studio</button>
     <button class="room" data-room="outreach">Outreach</button>
     <button class="room" data-room="fiction">Fiction</button>
+    <button class="room" data-room="charles">Charles</button>
     <button class="room" data-room="signals">Signals</button>
   </nav>
   <span class="grow"></span>
@@ -535,6 +536,32 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="session-grid">
         <div class="session-main" id="fictionMain"><div class="empty">Loading…</div></div>
         <div class="session-margin" id="fictionSide"></div>
+      </div>
+    </div>
+  </section>
+  <section class="view" id="roomCharles" hidden>
+    <div class="sheet capture">
+      <div class="capture-title">Draft a new Charles post</div>
+      <div class="ingest-actions" style="align-items:center">
+        <select id="charlesMode">
+          <option value="oneliner">One-liner</option>
+          <option value="essay">Essay</option>
+          <option value="reply">Reply to a link</option>
+        </select>
+        <input id="charlesInput" style="flex:1;min-width:220px" placeholder="Topic/angle, or a URL to react to (reply) — optional otherwise" />
+        <button class="primary" id="charlesDraftBtn">Draft</button>
+      </div>
+      <div class="hint">Runs the real /charles skill on your subscription ($0 marginal), same as Format directly does for Content. Lands in the queue below as "pending" — nothing posts on its own.</div>
+    </div>
+    <div class="sheet">
+      <div class="sheet-head"><h2>Persona brief</h2><span class="grow"></span><button id="charlesBriefCopyBtn">Copy</button></div>
+      <div class="sheet-sub">Muxin's original brief, verbatim — for pasting into whatever else she's using for meme research (e.g. Grok).</div>
+      <textarea id="charlesBriefText" readonly style="width:100%;min-height:140px;margin-top:10px;font:400 13px/1.6 ui-monospace,monospace;padding:12px 14px;border:1px dashed #e0d6c0;border-radius:8px;background:#fcfbf7;resize:vertical;"></textarea>
+    </div>
+    <div class="sheet session">
+      <div class="session-grid">
+        <div class="session-main" id="charlesMain"><div class="empty">Loading…</div></div>
+        <div class="session-margin" id="charlesSide"></div>
       </div>
     </div>
   </section>
@@ -875,12 +902,12 @@ function render(){
 }
 
 // ── rooms ──
-// Five rooms on the desk (Content Studio Riff): Content, Studio, Outreach, Fiction, Signals.
+// Six rooms on the desk (Content Studio Riff): Content, Studio, Outreach, Fiction, Charles, Signals.
 // Refresh stays room-aware: it only re-reads whatever the CURRENT room shows, labeled per room,
 // with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "content";
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
-function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
+function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
   currentTab = t;
   document.querySelectorAll(".room").forEach(b=>b.classList.toggle("on", b.dataset.room===t));
@@ -888,6 +915,7 @@ function setRoom(t){
   $("#roomStudio").hidden = t!=="studio";
   $("#roomOutreach").hidden = t!=="outreach";
   $("#roomFiction").hidden = t!=="fiction";
+  $("#roomCharles").hidden = t!=="charles";
   $("#roomSignals").hidden = t!=="signals";
   $("#refresh").textContent = refreshLabelFor(t);
   if (t==="content"){ loadContent(); }
@@ -895,6 +923,7 @@ function setRoom(t){
   if (t==="signals"){ loadSignals(); if(!briefLoaded){ loadBrief(); loadRaw(); } }
   if (t==="outreach"){ setOutreachSub(outreachSub); }
   if (t==="fiction"){ loadFiction(); }
+  if (t==="charles"){ loadCharles(); }
 }
 document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
 function setOutreachSub(s){
@@ -922,6 +951,7 @@ async function doRefresh(){
     else if (currentTab === "signals") { await loadSignals(); await loadBrief(); await loadRaw(); }
     else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
     else if (currentTab === "fiction") { await loadFiction(); }
+    else if (currentTab === "charles") { await loadCharles(); }
     else { if(currentTab==="studio") await loadStudio(); await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
@@ -1679,6 +1709,113 @@ function renderFiction(){
     $("#src").value = "Launch note for "+series.title+": ";
     $("#src").focus();
   });
+}
+
+async function draftCharles(){
+  const mode = $("#charlesMode").value;
+  const input = $("#charlesInput").value.trim();
+  if(mode==="reply" && !input){ flash("Paste a URL to reply to first"); return; }
+  const btn = $("#charlesDraftBtn");
+  btn.disabled = true; btn.textContent = "Drafting… (check Studio for progress)";
+  const r = await post("/api/charles/draft", {mode, input});
+  btn.disabled = false; btn.textContent = "Draft";
+  if(r.ok){
+    $("#charlesInput").value = "";
+    charlesId = r.id;
+    flash("Drafted — waiting in the queue below");
+    if(currentTab==="charles") loadCharles();
+  } else flash(r.error || "Could not draft");
+}
+$("#charlesDraftBtn").addEventListener("click", draftCharles);
+
+let charlesBriefLoaded = false;
+async function loadCharlesBrief(){
+  if(charlesBriefLoaded) return;
+  const r = await fetch("/api/charles/persona-brief");
+  const d = await r.json();
+  $("#charlesBriefText").value = d.ok ? d.text : "";
+  if(d.ok) charlesBriefLoaded = true;
+}
+$("#charlesBriefCopyBtn").addEventListener("click", async ()=>{
+  try{ await navigator.clipboard.writeText($("#charlesBriefText").value); flash("Copied"); }
+  catch(e){ $("#charlesBriefText").select(); flash("Select-all + Cmd/Ctrl-C to copy"); }
+});
+
+// ── Charles desk (Build 4) ──
+// charles/review-queue.md + the drafts it points at. Same approve/revise/discard contract as the
+// Content room, against Charles's simpler 5-column table (see charles/CLAUDE.md). Nothing here
+// posts anything — approving just flips the status cell; Muxin pastes it to Substack herself.
+let CHARLES_POSTS = [];
+let charlesId = null;
+function typeLabel(t){ return t==="one-liner" ? "One-liner" : t==="essay" ? "Essay" : t==="reply" ? "Reply" : t; }
+async function loadCharles(){
+  loadCharlesBrief();
+  const r = await fetch("/api/charles");
+  CHARLES_POSTS = (await r.json()).posts || [];
+  if(!CHARLES_POSTS.length){
+    $("#charlesMain").innerHTML = '<div class="empty">Nothing drafted yet. Pick a mode above and hit Draft.</div>';
+    $("#charlesSide").innerHTML = "";
+    return;
+  }
+  if(!charlesId || !CHARLES_POSTS.some(p=>p.id===charlesId)) charlesId = CHARLES_POSTS[0].id;
+  renderCharles();
+}
+function renderCharles(){
+  const post = CHARLES_POSTS.find(p=>p.id===charlesId);
+  $("#charlesMain").innerHTML =
+    '<div class="wb-label">Charles Lord Featherbottom · '+esc(typeLabel(post.type))+'</div>'+
+    '<div style="display:flex;align-items:center;gap:10px;margin:2px 0 14px;">'+
+      '<span class="pill '+pillClass(post.status)+'">'+esc(statusLabel(post.status))+'</span>'+
+      (post.notes ? '<span class="src">'+esc(post.notes)+'</span>' : "")+
+    '</div>'+
+    '<div id="charlesBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:460px;overflow:auto;">'+esc(post.body)+'</div>'+
+    '<div class="actions" style="margin-top:12px">'+
+      '<button class="approve'+(post.status==="approve"?" on":"")+'" data-act="approve">Approve</button>'+
+      '<button class="revise'+(post.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
+      '<button class="discard'+(post.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
+      '<span class="spacer"></span>'+
+      '<button id="charlesEditBtn" data-act="edit">Edit in place</button>'+
+    '</div>'+
+    '<div class="revisebox" id="charlesRevisebox"><input placeholder="what needs changing?" value="'+esc(post.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
+    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything — Charles has no live-posting credentials on purpose (charles/CLAUDE.md). Once approved, paste it to Substack yourself.</div>';
+  $("#charlesSide").innerHTML =
+    '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
+    CHARLES_POSTS.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
+      '<span>'+esc(typeLabel(p.type))+' · '+esc(p.id)+'</span>'+
+      '<span class="pill '+pillClass(p.status)+'" style="font-size:10px">'+esc(statusLabel(p.status))+'</span>'+
+    '</div>').join("");
+  document.querySelectorAll("#charlesSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); }));
+  $("#charlesMain").querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click", (e)=>onCharlesAction(e.target.dataset.act, post)));
+}
+async function onCharlesAction(act, item){
+  if (act === "approve" || act === "discard"){
+    const r = await post("/api/charles/status", {id:item.id, status:act});
+    if (r.ok===false){ flash(r.error||"Failed"); return; }
+    flash(act==="approve" ? "Approved — paste it to Substack when ready" : "Discarded");
+    loadCharles();
+  } else if (act === "revise"){
+    $("#charlesRevisebox").classList.toggle("show");
+  } else if (act === "save-note"){
+    const note = $("#charlesRevisebox input").value;
+    const r = await post("/api/charles/status", {id:item.id, status:"revise", notes:note});
+    if (r.ok===false){ flash(r.error||"Failed"); return; }
+    flash("Marked revise");
+    loadCharles();
+  } else if (act === "edit"){
+    const bodyEl = $("#charlesBody");
+    const btn = $("#charlesEditBtn");
+    if(btn.dataset.mode==="save"){
+      const ta = bodyEl.querySelector("textarea");
+      const r = await post("/api/charles/doc", {id:item.id, body: ta?ta.value:""});
+      if(r.ok){ flash("Saved"); loadCharles(); } else flash(r.error||"Could not save");
+      return;
+    }
+    const ta = document.createElement("textarea");
+    ta.value = item.body;
+    ta.style.cssText = "width:100%;min-height:380px;font:400 15px/1.7 Georgia,serif;border:none;background:transparent;resize:vertical;";
+    bodyEl.innerHTML=""; bodyEl.appendChild(ta);
+    btn.textContent = "Save draft"; btn.dataset.mode = "save";
+  }
 }
 
 // ── Signals room (Content Studio Riff 3e) ──

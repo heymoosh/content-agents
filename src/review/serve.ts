@@ -78,6 +78,7 @@ import {
   addDevelopFolderJob,
   developJobInFlight,
   buildFormatArg,
+  enqueueCharlesDraft,
 } from "./jobs.js";
 import { listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
 import { listCuts } from "../atomize/cuts.js";
@@ -86,6 +87,7 @@ import { buildStudioHome } from "./studio.js";
 import { getAnalyst } from "../providers/registry.js";
 import { readSignals, appendBacklogCard } from "./signals.js";
 import { listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory } from "./fiction.js";
+import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief } from "./charles.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich) or jobs.ts (classifySource,
@@ -964,6 +966,51 @@ const server = createServer(async (req, res) => {
       try {
         saveFictionDoc(String(b.series ?? ""), String(b.path ?? ""), String(b.body ?? ""));
         json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // Charles room (Build 4): charles/review-queue.md + the drafts it points at. Same review
+    // contract as everywhere else — approve/revise/discard just flips a status cell here, nothing
+    // posts (see charles/CLAUDE.md).
+    if (req.method === "GET" && url.pathname === "/api/charles") {
+      json(res, 200, { posts: listCharlesPosts() });
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/charles/persona-brief") {
+      try {
+        json(res, 200, { ok: true, text: readPersonaBrief() });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/charles/status") {
+      const b = await readBody(req);
+      try {
+        setCharlesStatus(String(b.id ?? ""), String(b.status ?? ""), b.notes !== undefined ? String(b.notes) : undefined);
+        json(res, 200, { ok: true, post: readCharlesPost(String(b.id ?? "")) });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/charles/doc") {
+      const b = await readBody(req);
+      try {
+        saveCharlesPost(String(b.id ?? ""), String(b.body ?? ""));
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/charles/draft") {
+      const b = await readBody(req);
+      try {
+        const drafted = await enqueueCharlesDraft(String(b.mode ?? ""), String(b.input ?? ""));
+        json(res, 200, { ok: true, ...drafted });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }

@@ -12,6 +12,11 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
   later a lead magnet, an offer, an operating plan (`venture/`). The second place AI *composes*
   original work, and unlike Build 2 it ships under Muxin's own byline in her own voice.
   Deliberately walled off from Builds 0/1 — see `venture/CLAUDE.md`.
+- **Build 4 — Charles Lord Featherbottom**: a satirical persona, a consultant to oligarchs
+  secretly panicking as belief in "inevitable power" erodes. `/charles` composes his one-liners,
+  essays, and replies from scratch — no source essay, no Muxin byline. Memes are out of scope
+  (Muxin handles those herself elsewhere).
+  Deliberately walled off from Builds 0/1/3 — see `charles/CLAUDE.md`.
 
 ## Non-negotiable rules
 
@@ -41,6 +46,16 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    - `/brand-lens` (`.claude/skills/brand-lens/`) is NOT an exception to this rule: it proposes
      angles and flags branding gaps against `config/brand.yaml`, but never composes or rewrites
      prose that enters the pipeline as content.
+   - **Scoped exception — Build 4 (Charles Lord Featherbottom).** `charles/` composes an entire
+     fictional persona's posts (one-liners, essays, replies) from scratch — there
+     is no source essay, no `source_lines`, and it never claims to be Muxin's voice. Allowed ONLY
+     because every draft is reviewed and approved by Muxin in `charles/review-queue.md` before
+     anything posts, and nothing auto-publishes (`/charles` never posts — delivery is
+     ready-to-paste, Muxin pastes it herself). **The exemption is from tracing, not from
+     truthfulness**: Charles's "useful leaks" (real ballot measures, orgs) must stay factually
+     accurate to the sourced claims in `charles/config/persona.yaml`'s leak bank — see
+     `charles/CLAUDE.md`. The exception is Charles-composed satire only; it must never bleed into
+     text/image derivatives or Muxin's own voice.
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
 3. **Browser automation for posting is allowed only with Muxin's explicit approval.** Prefer
@@ -59,6 +74,10 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    AI-processed `source.md` copy whose dashes were never in his original). Strip them to
    periods, commas, colons, or parentheses. Read it aloud; if it sounds like a brand instead of
    Muxin talking, rewrite it.
+   - **Exemption — Build 4 (Charles Lord Featherbottom).** Charles is not Muxin and is not
+     nonfiction-PM-voiced on purpose — `config/voice.yaml` does not govern him. He is governed
+     instead by `charles/config/persona.yaml`. The em-dash ban still carries over, same as
+     Build 2's fiction. See `charles/CLAUDE.md`.
 6. **Prefer subscription / free model routes; minimize per-token API cost.** Default any model
    call to the cheapest acceptable route: Claude via the Claude Code subscription (harness
    subagents, $0 marginal — e.g. `/story` claude-native) and free-local media (Remotion / SVG /
@@ -72,8 +91,9 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    says* — `src/atomize/` extraction or spin logic, quote-card copy/image-prompt generation logic,
    video script/storyboard drafting logic, `src/strategy/` brief-synthesis logic, Build 2 fiction
    chapter-drafting logic, Build 3 Venture phase logic and gate predicates (`src/venture/**`), its
-   runtime rubric input (`venture/rules.yaml`), and its skill prompts (`.claude/skills/venture/**`).
-   That is judgment-affecting and needs her eyes every time. Everything
+   runtime rubric input (`venture/rules.yaml`), and its skill prompts (`.claude/skills/venture/**`),
+   Build 4 Charles's persona/voice config (`charles/config/persona.yaml`) and its skill prompts
+   (`.claude/skills/charles/**`). That is judgment-affecting and needs her eyes every time. Everything
    else auto-merges on green CI, full stop — including: the generated content itself committed to
    git (derivatives, quote-card text, drafted chapters), review-queue/publish-log/ledger state,
    backlog bookkeeping, docs, scripts, infra, config. Committing already-generated or
@@ -111,6 +131,8 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 | Venture deliver | `/venture <slug> deliver` | `npm run venture:deliver` | — | `ready-to-paste/` (essay) or a live Substack Note via the shared scheduler |
 | Venture checkpoint | `/venture <slug> checkpoint` | `npm run venture:checkpoint` | verify each required artifact is editorially approved AND delivery-confirmed live; Checkpoint 1 also requires pace recorded, Checkpoint 2 does not | `canon.md` ledger event, next phase unlocked |
 | Venture status | `/venture <slug> status` | `npm run venture:status` | — (read-only) | plain-language phase/checkpoint status |
+| Charles draft | `/charles oneliner\|essay\|reply` | — | in-character drafting off `charles/config/persona.yaml`; picks a comic-engine angle; cites leak-bank sources only; a one-click copy of `charles/config/persona-brief.md` (her verbatim brief) sits on the page for meme work she does elsewhere | `charles/posts/<type>/`, `charles/review-queue.md` |
+| Charles review | **Muxin, by hand** | — | — | statuses in `charles/review-queue.md`; she pastes approved drafts to Substack herself |
 
 ## Conductor: reaching into job-search-agent (JSA)
 
