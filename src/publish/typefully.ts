@@ -29,7 +29,7 @@ import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
 const BASE = "https://api.typefully.com/v2";
 // Exported so serve.ts's scheduleKind() routes to publishText using this SAME set, instead of
 // keeping its own independently-maintained copy that could drift out of sync with this one.
-export const TEXT_PLATFORMS = new Set(["x", "linkedin", "bluesky"]);
+export const TEXT_PLATFORMS = new Set(["x", "linkedin", "bluesky", "mastodon", "threads"]);
 
 async function api(path: string, init?: RequestInit, retryOpts?: FetchRetryOptions): Promise<unknown> {
   const key = process.env.TYPEFULLY_API_KEY;
