@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -92,6 +92,30 @@ test("duplicatePrompt scopes to ONE new file, carries the target platform's angl
   const angle = resolveAngle("x");
   assert.ok(angle, "x should have a real configured angle");
   assert.ok(p.includes(angle!.angle), "the real spin_angles text for x is embedded, not re-derived");
+});
+
+test("charlesDraftPrompt scopes to ONE new file + row, points at persona.yaml not voice.yaml, lists existing ids", () => {
+  const p = charlesDraftPrompt("essay", "AI and inevitability", ["dapper", "falcons"]);
+  assert.match(p, /charles\/config\/persona\.yaml/);
+  assert.match(p, /NOT config\/voice\.yaml/);
+  assert.match(p, /posts\/essays\//);
+  assert.match(p, /AI and inevitability/);
+  assert.match(p, /dapper, falcons/);
+  assert.match(p, /always "pending"/);
+  assert.match(p, /leak_bank/);
+  assert.match(p, /em-dash ban/);
+});
+
+test("charlesDraftPrompt's reply mode tells Claude to fetch the real link, not invent it", () => {
+  const p = charlesDraftPrompt("reply", "https://example.com/post", []);
+  assert.match(p, /fetch it first, never invent/);
+  assert.match(p, /https:\/\/example\.com\/post/);
+  assert.match(p, /\(none yet\)/);
+});
+
+test("enqueueCharlesDraft refuses an unknown mode and a reply with no link, before spawning anything", async () => {
+  await assert.rejects(enqueueCharlesDraft("meme", "topic"), /isn't a mode this can draft/); // memes are out of scope here on purpose
+  await assert.rejects(enqueueCharlesDraft("reply", ""), /needs a URL/);
 });
 
 test("duplicatePrompt omits the char-limit line when no max_chars is known", () => {
