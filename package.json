@@ -44,6 +44,7 @@
     "venture:phase1": "tsx src/venture/phase1.ts",
     "venture:phase2": "tsx src/venture/phase2.ts",
     "venture:phase3": "tsx src/venture/phase3.ts",
+    "venture:phase4": "tsx src/venture/phase4.ts",
     "venture:deliver": "tsx src/venture/deliver.ts",
     "venture:checkpoint": "tsx src/venture/checkpoint.ts",
     "venture:status": "tsx src/venture/status.ts",

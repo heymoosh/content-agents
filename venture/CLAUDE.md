@@ -61,6 +61,11 @@ inference. If a gate field is unset, the correct behavior is to stop and ask, ev
 | `editorial_status: approved` | `p3-product-outline` artifact | drafting price/format options (`price`) and the price-decision (`price-draft`), and counting toward Checkpoint 3 |
 | decision `status: selected`, `selected_by: "muxin"` | `product-format-and-price` (`p3-price-01`) | drafting the price-decision artifact (`price-draft`) |
 | `editorial_status: approved` | `p3-price-decision` artifact | counting toward Checkpoint 3, alongside `p3-product-outline` and the three decisions above |
+| decision `status: selected`, `selected_by: "muxin"` | `daily-operating-plan-choice` (`p4-operating-plan-01`) | drafting the daily operating plan artifact (`operating-plan-write`) |
+| `editorial_status: approved` | `p4-operating-plan` artifact | counting toward `phase-4-completed` |
+| `editorial_status: approved` | each `p4-thank-you-<note_id>` artifact | handoff for sending (manual; Muxin sends it herself, never auto-sent) |
+| `editorial_status: approved` | `p4-day-14-review` artifact | making the Day 14 decision (`day-14-decide`) |
+| decision `status: selected`, `selected_by: "muxin"` | `day-14-decision` (`p4-day-14-decision`) | `phase-4-completed` (alongside `p4-operating-plan` and `daily-operating-plan-choice` above) — Phase 4's own completion, not a fourth checkpoint |
 
 **This is Build 2's expensive lesson, built in on day one.** `/story` shipped without a beat-sheet
 approval gate and drafted an inert chapter before the gate was retrofitted (commit `26bf36c`).
@@ -113,8 +118,12 @@ predicates.
   live here (editorial: Muxin-only; delivery: script/agent-written).
 - `venture/<slug>/phase-1-attention/` — Phase 1's working drafts. `venture/<slug>/phase-2-audience/`
   — Phase 2's working drafts. `venture/<slug>/phase-3-offer/` — Phase 3's working drafts (the
-  product outline and price-decision body files). `venture/<slug>/ready-to-paste/` — essays
-  waiting for Muxin to paste.
+  product outline and price-decision body files). `venture/<slug>/phase-4-operations/` — Phase 4's
+  working drafts (the daily operating plan, thank-you notes, and Day 14 review body files;
+  `src/venture/paths.ts`'s `phase4Dir()`, same pattern as `phase1Dir()`/`phase2Dir()`/`phase3Dir()`
+  — NOT gitignored, unlike `responses.jsonl`, so a thank-you note must never carry a raw email or
+  handle, see rules.md §9.3 item 1). `venture/<slug>/ready-to-paste/` — essays waiting for Muxin to
+  paste.
 - `venture/<slug>/responses.jsonl` — one line per ingested survey response, append-only correction
   history per record; gitignored (raw and redacted quotes never reach git).
   `venture/<slug>/cluster-analysis.json` — the current cluster-analysis snapshot `cluster` writes
@@ -125,7 +134,7 @@ predicates.
 - `venture/examples/civic-tech-worked-example.md` (if present) is a fixture only. It MUST NOT
   enter any clean venture's runtime context, and it MUST NOT appear in a PR body.
 
-## Scripts (Phase 1, Phase 2, and Phase 3 — Operations not yet built)
+## Scripts (Phase 1, Phase 2, Phase 3, and Phase 4)
 
 `/venture new <slug>` (`npm run venture:new`) — 25-question intake, kickoff canon event.
 `/venture <slug>` (`npm run venture:phase1`) — research plan → **stop for Muxin's plan review** →
@@ -151,6 +160,25 @@ Muxin selects one** (`price-select`) → `price-draft` writes the price-decision
 considered range, reasoning, known uncertainty, pitch paragraph, optional illustrative-only
 scenario math; refuses the $49 worked-example price outright) → **stop for approval**
 (`approve <slug> p3-price-decision`).
+`/venture <slug>` continuing into Phase 4 (`npm run venture:phase4`, unlocked once
+`phase-3-completed` is recorded) — `time-budget-compare` checks the intake time budget against the
+canonical 2h15m daily routine (read-only) → `operating-plan-draft` offers the four recorded-choice
+modes from rules.md §8.1 (canonical / rotated across the week / extended timeline / revised
+pace-or-scope) → **stop, Muxin selects one** (`operating-plan-choice-select`) → `operating-plan-write`
+records the schedule, the triage of recurring work into never_build/ignore/automate (rules.md §8.2 —
+the script mechanically refuses "automate" bucketing insight, voice, audience empathy, product
+judgment, or final approval), and the automation configuration order (rules.md §8.3, a strict
+dependency sequence) → **stop for approval** (`approve <slug> p4-operating-plan`). Separately,
+`thank-you-note-draft <note_id>` drafts one short (≤2 sentence) note per respondent worth thanking,
+linked to a real response, checked for raw emails/handles and sales language (rules.md §8.4) →
+**stop for approval, one note at a time** (`approve <slug> p4-thank-you-<note_id>`) — always manual,
+Muxin sends it herself, never auto-sent. Then `day-14-scorecard-draft` renders the fixed Day 14
+scorecard (rules.md §8.5) — computed fields only, never invented, `null` renders as "not enough data
+yet" — → **stop, show Muxin the facts** (`approve <slug> p4-day-14-review`) → `day-14-decide` records
+Muxin's one final decision (continue / revise positioning / revise the lead magnet / collect more
+evidence / stop) with a required reason; once every required Phase 4 artifact and decision clears,
+Phase 4 completes automatically (`phase-4-completed`) — there is no fourth checkpoint, Phase 4 ends
+in this human decision, not a cleared gate.
 `/venture <slug> deliver` (`npm run venture:deliver`) — hands off an approved post; essay →
 `ready-to-paste/`, Note → the Substack Notes agent via the shared scheduler.
 `/venture <slug> checkpoint` (`npm run venture:checkpoint`) — clears Checkpoint 1 once all three
@@ -158,7 +186,8 @@ required posts are approved and live and posting pace is recorded, clears Checkp
 lead magnet, landing page, welcome email, and survey are all approved and live (the announcement is
 never required), and clears Checkpoint 3 once the product-outline and price-decision artifacts are
 both approved and live AND the problem-selection, transformation-choice, and
-product-format-and-price decisions are all `selected` (no pace requirement).
+product-format-and-price decisions are all `selected` (no pace requirement). There is no
+`checkpoint-4` — Phase 4 completes on its own via `day-14-decide`, above.
 `/venture <slug> status` (`npm run venture:status`) — read-only, plain-language status.
 
 ## Review checklist — for `/code-review` and any human review of a Venture PR

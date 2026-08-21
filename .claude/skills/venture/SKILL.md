@@ -1,9 +1,9 @@
 ---
 name: venture
-description: Build 3 — run Phase 1 ("Attention"), Phase 2 ("Audience"), and Phase 3 ("Offer") of a solo-business sprint that tests what an audience actually wants, builds a narrow lead magnet and owned-audience capture around it, then clusters real responses into one expensive problem with a transformation, outline, and price. Usage - /venture new <slug>, /venture <slug>.
+description: Build 3 — run Phase 1 ("Attention"), Phase 2 ("Audience"), Phase 3 ("Offer"), and Phase 4 ("Operations") of a solo-business sprint that tests what an audience actually wants, builds a narrow lead magnet and owned-audience capture around it, clusters real responses into one expensive problem with a transformation, outline, and price, then installs a sustainable daily operating routine and runs the Day 14 review. Usage - /venture new <slug>, /venture <slug>.
 ---
 
-# /venture — Phase 1: Attention, Phase 2: Audience, Phase 3: Offer (Build 3)
+# /venture — Phase 1: Attention, Phase 2: Audience, Phase 3: Offer, Phase 4: Operations (Build 3)
 
 Help Muxin test what an audience wants, needs, and will pay for — starting with Phase 1: pick one
 platform, run public qualitative discovery, publish three probe posts, hit Checkpoint 1. Then
@@ -11,8 +11,10 @@ Phase 2: turn what Phase 1 learned into a narrow lead magnet, a landing page, a 
 a fit review of Muxin's existing survey, hitting Checkpoint 2. Then Phase 3: once real responses
 clear the 20-eligible-unique-respondent gate, cluster them into three to five problems, score and
 select the one expensive problem worth solving, define and approve a transformation sentence,
-outline a small first product, and recommend a price and pitch, hitting Checkpoint 3.
-Operations (Phase 4) isn't built yet.
+outline a small first product, and recommend a price and pitch, hitting Checkpoint 3. Then Phase 4:
+install a sustainable daily operating routine, triage recurring work, thank early respondents by
+hand, and run the Day 14 review that ends in Muxin's one final decision — there is no fourth
+checkpoint.
 
 ## This is composed business content — and why that's allowed
 
@@ -26,9 +28,9 @@ Muxin's real name, not a labeled fictional register), and **every concrete claim
 customer, or number Muxin didn't actually have.
 
 **Every gate below is enforced by `src/venture/phase1.ts` (Phase 1), `src/venture/phase2.ts`
-(Phase 2), and `src/venture/phase3.ts` (Phase 3), not by you remembering to stop.** Each script
-refuses to move forward if a prior gate hasn't cleared. Treat a refusal as correct behavior, not a
-bug to route around.
+(Phase 2), `src/venture/phase3.ts` (Phase 3), and `src/venture/phase4.ts` (Phase 4), not by you
+remembering to stop.** Each script refuses to move forward if a prior gate hasn't cleared. Treat a
+refusal as correct behavior, not a bug to route around.
 
 ## Step 1: New venture — intake
 
@@ -484,6 +486,121 @@ artifacts editorially approved — Phase 3's artifacts are internal, `delivery_m
 there's no separate live-delivery step to wait on). Clearing it records `phase_3_completed` and
 unlocks Phase 4.
 
+## Step 24: Compare the time budget, then choose the daily operating plan
+
+Once Phase 4 unlocks (`phase-3-completed` recorded), first check whether the routine even fits.
+The PDF's canonical daily routine is five jobs totaling 2 hours 15 minutes: 30 min content writing
+and engagement, 30 min tomorrow's posts, 30 min feedback analysis, 30 min the core offer, 15 min
+direct customer outreach (rules.md §8.1).
+
+```
+echo '{"time_budget_minutes": 90}' | tsx src/venture/phase4.ts time-budget-compare <slug>
+```
+
+This is read-only — it states plainly whether the intake time budget covers the canonical routine,
+nothing more. Then draft the actual recorded choice. Never demand the canonical routine and call it
+sustainable if the budget doesn't fit it — offer all four options every time, never silently pick
+one:
+
+```
+echo '{"time_budget_minutes": 90}' | tsx src/venture/phase4.ts operating-plan-draft <slug>
+```
+
+**Stop and show Muxin the four operating-plan modes** (use the canonical routine as-is; rotate the
+five jobs across the week within budget; extend the build timeline while preserving the sequence;
+revise the posting pace or scope). She selects one:
+
+```
+tsx src/venture/phase4.ts operating-plan-choice-select <slug> <mode> [--override-reason "..."]
+```
+
+If she picks anything other than the recommended mode, the script requires
+`--override-reason "..."`, same discipline as every other selection in this skill.
+
+## Step 25: Write the operating plan — schedule, triage, and automation order
+
+With a mode selected, record the actual schedule plus two more rules.md requirements in the same
+artifact: triage of recurring work (§8.2) and the automation configuration order (§8.3).
+
+Triage every recurring task into exactly one bucket: `never_build` (needs a team the creator
+doesn't want, or would be miserable to run), `ignore` (a vanity signal, distracting trend, or
+competitor move that doesn't serve the venture), or `automate` (repeats more than once or twice a
+week and needs no creator judgment). **Never bucket "automate" anything that is actually insight,
+voice, audience empathy, product judgment, or final approval** — the script mechanically refuses
+this, but it's your job to never propose it in the first place.
+
+Automation order is a strict dependency sequence (§8.3): lead-magnet delivery and welcome message,
+then post-signup tagging/segmentation, then follow-up sequences, then payments/receipts/scheduling
+(only if the offer needs them, and only after the earlier three are documented — even a
+"skipped, not needed" entry counts, a missing step number doesn't). Never build a complex funnel
+just to complete the sprint.
+
+```
+echo '{"time_budget_minutes": 90, "schedule": {"mon": "...", ...}, "triage": [{"bucket": "automate", "item": "welcome email", "note": "..."}, ...], "automation_order": [{"step": 1, "name": "lead-magnet delivery and welcome message", "status": "configured"}, ...]}' | tsx src/venture/phase4.ts operating-plan-write <slug>
+```
+
+**Stop and show Muxin the full operating plan for approval:**
+`tsx src/venture/phase4.ts approve <slug> p4-operating-plan`.
+
+## Step 26: Direct outreach — thank-you notes, one at a time, always manual
+
+Draft a short personal thank-you note for each early respondent whose answer actually changed the
+product (rules.md §8.4). Each note links privately to its source response, names the idea or
+section it influenced, stays to two short sentences unless Muxin asks for more, and makes no sales
+demand.
+
+```
+echo '{"response_id": "...", "influenced_idea_or_section": "...", "note_text": "..."}' | tsx src/venture/phase4.ts thank-you-note-draft <slug> <note_id>
+```
+
+The script hard-refuses a raw email address or @-handle in the note (these files are not
+gitignored, unlike `responses.jsonl`) and warns — but does not block — on sales-ask language like
+"buy," "purchase," "sign up," or "$", since a respondent's own words may legitimately include them.
+
+**Stop and show Muxin each note individually, one at a time — never batch several for approval in
+one pass:** `tsx src/venture/phase4.ts approve <slug> p4-thank-you-<note_id>`. This stays manual no
+matter what: Muxin sends every approved note herself, this skill never sends anything.
+
+## Step 27: Day 14 review — the facts, not a verdict
+
+Draft the Day 14 scorecard against the fixed fields from rules.md §8.5: posts confirmed live
+(computed, never entered), posting pace achieved, qualified views/clicks, the clicks target fixed
+at intake, landing-page opt-in rate, the opt-in target fixed at intake, eligible unique responses
+(computed), response quality, and sustainability of the operating plan.
+
+```
+echo '{"posting_pace_achieved": "...", "qualified_views_or_clicks": 120, "landing_page_opt_in_rate": 0.08, "response_quality_read": "...", "sustainability_read": "..."}' | tsx src/venture/phase4.ts day-14-scorecard-draft <slug>
+```
+
+`posts_live` and `eligible_unique_responses` are computed straight from artifact/response data, and
+the script refuses stdin input for either. The two intake targets are read verbatim from the Day 0
+scorecard, not re-entered — supplying a value that disagrees with what was fixed at kickoff is a
+hard refusal, not a silent revision. A field the venture genuinely doesn't have enough data for
+renders as "not enough data yet," never a fabricated number. **Never invent a pass condition on Day
+14** — use only these fixed fields, nothing more.
+
+**Stop and show Muxin the facts before deciding anything:**
+`tsx src/venture/phase4.ts approve <slug> p4-day-14-review`.
+
+## Step 28: Day 14 decision — Phase 4 ends here, not at a checkpoint
+
+Once the review is approved, Muxin makes exactly one final call: continue, revise positioning,
+revise the lead magnet, collect more evidence, or stop (rules.md §8.5). The system never
+recommends one of these — there is no "right" answer to default to.
+
+```
+tsx src/venture/phase4.ts day-14-decide <slug> <continue|revise_positioning|revise_lead_magnet|collect_more_evidence|stop> --reason "..."
+```
+
+`--reason` is required — rules.md §8.5: "Record the decision and reason." Once the operating plan
+and the Day 14 review are both approved and this decision is recorded, the script fires
+`phase-4-completed` on its own and prints as much; if something's still outstanding it says exactly
+what. **There is no Checkpoint 4 and no `checkpoint.ts clear <slug> checkpoint-4` command to run** —
+Phase 4 is the one phase that ends in a human decision, not a cleared gate. After the decision,
+show Muxin the source's broader expectation as mindset guidance, never a forecast: months 1-3 may
+feel slow and unclear, months 4-6 should improve content and offers, months 7-12 may show
+compounding, referrals, and repeat buyers (rules.md §8.6).
+
 ## Throughout
 
 - One deliverable or decision at a time — never bundle "here are the ideas AND here's a draft."
@@ -494,3 +611,9 @@ unlocks Phase 4.
   applies to Phase 3's price step too — see Step 22.
 - If you use optional scenario math in Phase 3 (Step 22), it is illustrative only — label it as
   such, let Muxin change the assumptions, and never let it read as a forecast or a promise.
+- Never treat "Day 14" or "days 11-14" as a literal calendar check — it's descriptive framing from
+  the source PDF, not a date gate. Phase 4 opens purely on `phase-3-completed` being recorded
+  (rules.md §13 item 18), whenever that actually happens, and the Day 14 review runs whenever
+  Muxin is ready for it, not on a clock.
+- Never let the Day 14 scorecard invent a pass condition beyond its nine fixed fields (Step 27) —
+  no extra metric, no rounding a "not enough data yet" up into an invented number.
