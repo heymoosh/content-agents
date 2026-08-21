@@ -485,7 +485,11 @@ function cmdThankYouNoteDraft(slug: string, noteId: string) {
     );
   }
 
-  checkNoRawIdentifier({ note_text: input.note_text, influenced_idea_or_section: input.influenced_idea_or_section });
+  checkNoRawIdentifier({
+    response_id: input.response_id,
+    note_text: input.note_text,
+    influenced_idea_or_section: input.influenced_idea_or_section,
+  });
   checkNoEmDash({ note_text: input.note_text, influenced_idea_or_section: input.influenced_idea_or_section });
   warnIfSalesAsk(input.note_text);
 
