@@ -41,7 +41,7 @@ import {
 // review/phase-completion logic (rules.md §8.4-§8.5, Work Package 2) -- all in the same
 // dispatch() switch, see requirePhase4Unlocked's export comment below.
 
-// --- the Phase 4 gate (rules.md §11 item 18: "Phase 4 opens only after Phase 3 decisions are
+// --- the Phase 4 gate (rules.md §13 item 18: "Phase 4 opens only after Phase 3 decisions are
 // approved") ---------------------------------------------------------------------------------
 //
 // Exported so a later work package can import and reuse this exact gate for outreach-notes/
@@ -54,7 +54,7 @@ export function requirePhase4Unlocked(slug: string): void {
   if (!hasCanonEvent(slug, `${slug}/phase-3-completed`)) {
     fail(
       `refusing: phase-3-completed is not recorded yet -- Phase 4 opens only after Phase 3's ` +
-        `decisions are approved (rules.md §11 item 18). Complete Phase 3 (src/venture/phase3.ts) first.`
+        `decisions are approved (rules.md §13 item 18). Complete Phase 3 (src/venture/phase3.ts) first.`
     );
   }
 }
@@ -813,8 +813,8 @@ function dispatch() {
   requireRulesVersionMatch(slug, rules);
   // Every subcommand this file owns is gated -- see requirePhase4Unlocked's comment for why this
   // is a single dispatch-level call (phase2.ts's shape), not an exemption list (phase3.ts's
-  // shape). A later work package adding outreach-notes/Day-14-review cases to this same switch
-  // stays covered by this same call, nothing extra to wire per case.
+  // shape). The outreach-notes/Day-14-review cases below share this same call, nothing extra
+  // wired per case.
   requirePhase4Unlocked(slug);
   switch (sub) {
     case "time-budget-compare":

@@ -438,6 +438,7 @@ require a new artifact.
 | `phase_1_research_plan` | see §2C — a pre-post plan, drafted before any idea is written, distinct from the post-hoc read below |
 | `phase_1_research_read` | see §2C — expanded 2026-08-07, corrective pass |
 | `day-14-review` | see §5.1's scorecard read model below |
+| `thank-you-note` | `response_id` (must name a real record in `responses.jsonl`), `influenced_idea_or_section`, `note_text` (rules.md §8.4 caps it at two short sentences unless `muxin_asked_for_more: true`) |
 
 Two structured kinds — `phase_1_research_plan` and `phase_1_research_read` — get their own subsection
 (§2C) rather than a single table cell, because the 2026-08-07 review found the original one-line
