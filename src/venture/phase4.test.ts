@@ -423,6 +423,22 @@ describe("thank-you-note-draft", () => {
     assert.match(r.stderr, /raw email address or @-handle/);
   });
 
+  test("refuses a note whose response_id itself looks like a raw email address", () => {
+    seedPhase4Unlocked();
+    seedResponse("jane@example.com");
+    const r = runCmd(
+      "thank-you-note-draft",
+      ["note-1"],
+      JSON.stringify({
+        response_id: "jane@example.com",
+        influenced_idea_or_section: "the lead magnet's title",
+        note_text: "Thanks so much for that.",
+      })
+    );
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /raw email address or @-handle/);
+  });
+
   test("refuses a 3-sentence note without muxin_asked_for_more", () => {
     seedPhase4Unlocked();
     seedResponse("r-test-1");
