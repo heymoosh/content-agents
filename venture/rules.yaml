@@ -255,8 +255,5 @@ daily_operating_plan:
 day_14_decision:
   candidates: [continue, revise_positioning, revise_lead_magnet, collect_more_evidence, stop]
 
-# not yet encoded -- see venture-schema-contract.md §5.4/§5.6/§5.7/§5.8 (responses, evidence links,
-# funnel events, Signals mapping), plus the Phase 3 response-gate ledger event and checkpoint-3's
-# required_decision_kinds wiring into checkpoint.ts/state.ts (Work Packages 1 and 3), and Phase 4's
-# own artifact-drafting logic (phase4.ts, a later work package). None of it is needed until a later
-# slice.
+# not yet encoded -- see venture-schema-contract.md §5.7/§5.8 (funnel events, Signals mapping).
+# None of it is needed until a later slice.
