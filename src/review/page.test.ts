@@ -664,6 +664,7 @@ import {
   outreachSegment, OUTREACH_SEGMENTS, groupLeadsBySegment, lastPitchedLabel, threadSegLabel,
   matchmakerRead, contactsLine, isEvidenceSourceValid, evidenceSourceView, NO_SOURCE_RECORDED,
   outreachSendState, outreachSendNote, outreachSendBadge, leadSendLogLine,
+  outreachThreadPhase, firstSentence, outreachOpeningLine,
 } from "./page.js";
 import type { OutreachLeadView } from "./page.js";
 
@@ -890,4 +891,92 @@ test("outreach room markup: the Leads | Follow-ups subnav and the #349 progress 
 test("outreach evidence markup: no fabricated observation date anywhere on the page", () => {
   const html = renderPage({ repoRoot, isDevWorktree: false });
   assert.ok(!/observed /.test(html), "the prototype's 'observed Aug 6' fallback has no data behind it and must not ship");
+});
+
+// ── Outreach room: the conversational half (design v7 §3, live direction) ──
+
+test("outreachThreadPhase: derived from the message and the job, never a stored flag", () => {
+  assert.equal(outreachThreadPhase(null, false), "asking");
+  assert.equal(outreachThreadPhase(undefined, false), "asking");
+  assert.equal(outreachThreadPhase(null, true), "drafting");
+  // A job in flight beats a message already on disk: a re-draft is still drafting.
+  assert.equal(outreachThreadPhase({ file: "messages/message-01.md", body: "hi" }, true), "drafting");
+  assert.equal(outreachThreadPhase({ file: "messages/message-01.md", body: "hi" }, false), "drafted");
+});
+
+test("firstSentence: cuts at the first full stop, and caps a runaway one on a word boundary", () => {
+  assert.equal(firstSentence("They ship in public. Then they write about it.", 200), "They ship in public.");
+  assert.equal(firstSentence("no full stop here", 200), "no full stop here");
+  assert.equal(firstSentence("", 200), "");
+  assert.equal(firstSentence(undefined, 200), "");
+  const long = firstSentence("one two three four five six seven eight nine ten.", 20);
+  assert.ok(long.endsWith("..."));
+  assert.ok(long.length <= 24, long);
+  assert.ok(!/ $/.test(long.replace(/\.\.\.$/, "")), "the cut lands on a word boundary");
+});
+
+test("outreachOpeningLine: built from the matchmaker read, not invented fresh", () => {
+  const line = outreachOpeningLine(lead({
+    name: "Acme Co",
+    whyMutual: "You both think the untested assumption is the expensive one. That is rarer than it sounds.",
+  }));
+  assert.ok(line.includes("Acme Co"));
+  assert.ok(line.includes("You both think the untested assumption is the expensive one."));
+  assert.ok(line.includes("Want to lead with that, or keep it short and just ask for a quick chat?"));
+  // The second sentence of the read is trimmed, so the opening line stays one line.
+  assert.ok(!line.includes("That is rarer than it sounds."));
+});
+
+test("outreachOpeningLine: falls back to the legacy pitch angle rather than inventing a reason", () => {
+  const line = outreachOpeningLine(lead({ name: "Acme Co", pitchAngle: "they just reversed a shipped decision in public." }));
+  assert.ok(line.includes("they just reversed a shipped decision in public."));
+});
+
+test("outreachOpeningLine: a lead with no read on file says so, and still asks the question", () => {
+  const line = outreachOpeningLine(lead({ name: "Acme Co" }));
+  assert.ok(line.includes("there is no research read on file yet"));
+  assert.ok(line.includes("I will write it in your voice"));
+  assert.ok(!line.includes("(no read recorded yet)"), "the internal placeholder never reaches Muxin");
+});
+
+test("outreach thread markup: the direction composer ships with the prototype's authored copy", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  for (const copy of [
+    "Suggested angle",
+    "Say which way to take it, in a line or two.",
+    "Draft it",
+    "Nothing here goes anywhere. It becomes a draft, and only you send it.",
+    "YOU SAID",
+    "Drafting the pitch",
+    "The draft",
+    "Make it shorter, drop the second line, warmer close",
+    "Update it",
+    "Rewriting the same draft, not adding a new one",
+  ]) {
+    assert.ok(html.includes(copy), "authored direction copy missing from the page: " + copy);
+  }
+  // The vision doc's one hard promise, said in place rather than only in the prompt.
+  assert.ok(html.includes("I never invent interest you do not have"));
+});
+
+test("outreach thread markup: iterating reuses the one revise route, and drafting posts the direction", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes('post("/api/outreach/draft"'), "the directed draft has its own route");
+  assert.ok(html.includes('post("/api/outreach/message/revise"'), "iterate still uses the pre-existing revise path");
+  assert.equal(
+    html.split("/api/outreach/message/revise").length - 1, 1,
+    "exactly one revise path, never a second one bolted on",
+  );
+});
+
+test("outreach thread markup: the direction copy Muxin reads carries no em dash and no AI tells", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  for (const copy of [
+    "Nothing here goes anywhere. It becomes a draft, and only you send it. I write it in your voice and I never invent interest you do not have.",
+    "Say which way to take it, in a line or two.",
+    "Rewriting the same draft, not adding a new one",
+  ]) {
+    assert.ok(html.includes(copy));
+    assert.ok(!copy.includes("\u2014"), "no em dash in the copy this PR adds: " + copy);
+  }
 });

@@ -550,6 +550,45 @@ export function leadSendLogLine(lastTouch: string | null | undefined): string {
   return t ? `A send was logged ${t.slice(0, 10)}, by hand. See Follow-ups.` : "";
 }
 
+// ── The thread's three phases, and the line that opens it (v7 §3, conversational half) ──
+// Nothing new is stored to know which phase a thread is in. A lead with no drafted message is
+// waiting on Muxin's direction, a lead with a draft job in flight is drafting, and a lead with a
+// message on disk is drafted. The phase is read off those facts, never off a parallel state flag
+// that could disagree with what is actually on disk.
+export type OutreachThreadPhase = "asking" | "drafting" | "drafted";
+export function outreachThreadPhase(
+  message: OutreachMessageView | null | undefined,
+  drafting: boolean,
+): OutreachThreadPhase {
+  if (drafting) return "drafting";
+  return message ? "drafted" : "asking";
+}
+
+// One sentence, cut at its first full stop and capped, so a paragraph-long matchmaker read does not
+// swallow the opening line. The full read is already rendered above it.
+export function firstSentence(text: string | undefined, cap: number): string {
+  const t = (text ?? "").trim();
+  if (!t) return "";
+  const m = t.match(/^[\s\S]*?[.?!](?=\s|$)/);
+  let s = (m ? m[0] : t).trim();
+  if (s.length > cap) s = `${s.slice(0, cap).replace(/[\s,;:]+\S*$/, "")}...`;
+  return s;
+}
+
+// The AI's opening line, built from whyThem/whyMe/whyMutual (v7 handoff §3's own recommendation:
+// matchmaker.ts already wrote that read, so the line quotes it instead of inventing a fresh reason
+// the system never recorded). A lead with no read on file says so rather than making one up.
+export function outreachOpeningLine(lead: OutreachLeadView): string {
+  const who = (lead.name || lead.dir || "this one").trim();
+  const read = matchmakerRead(lead);
+  const reason = firstSentence(read.headline, 180);
+  if (!reason || reason === "(no read recorded yet)") {
+    return `I put ${who} in front of you, and there is no research read on file yet. Tell me what you want this message to say and I will write it in your voice.`;
+  }
+  const tail = /[.?!]$/.test(reason) ? "" : ".";
+  return `I put ${who} in front of you for this reason: ${reason}${tail} Want to lead with that, or keep it short and just ask for a quick chat?`;
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -705,6 +744,23 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .sent-bar select, .sent-bar input.fu-note { font:inherit; font-size:12.5px; border:1px solid #d8cfbb; background:#fbf9f4;
     border-radius:7px; padding:5px 10px; color:var(--ink); }
   .sent-bar button.go { border:none; background:var(--green); color:#fbf9f4; border-radius:7px; padding:6px 13px; font-weight:600; }
+  /* Outreach thread, the conversational half: the AI's opening line, then Muxin's typed direction.
+     Rule 4 of the handoff, held here: her words are Georgia serif on the blue quote rule, the AI's
+     suggested angle is labelled in purple. The two never look like the same hand wrote them. */
+  .dir-box { margin:16px 0 0; max-width:600px; background:#fffdf8; border:1px solid #d8cfbb; border-radius:8px; padding:16px 18px; }
+  .dir-open { display:flex; flex-direction:column; gap:6px; max-width:600px; margin-top:18px; }
+  .dir-open .cap { font:600 12.5px/1 Georgia,serif; color:#5b46b8; }
+  .dir-open .line { font:400 17px/1.6 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .dir-box textarea { width:100%; box-sizing:border-box; border:none; outline:none; background:transparent;
+    padding:0; resize:vertical; font:400 16px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .dir-go { display:flex; align-items:center; gap:12px; margin-top:12px; padding-top:12px; border-top:1px solid #efe7d6; }
+  .dir-go button { background:var(--ink); color:#fbf9f4; border:none; border-radius:7px; padding:7px 15px;
+    font-size:13.5px; font-weight:600; white-space:nowrap; }
+  .dir-go button[disabled] { opacity:.5; }
+  .dir-go .note { font-size:12.5px; line-height:1.5; color:#8a7f6d; }
+  .dir-said { margin-top:18px; max-width:600px; padding-left:16px; border-left:2px solid #2f5d9a; }
+  .dir-said .cap { font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em; color:#a89a80; margin-bottom:4px; }
+  .dir-said .said { font:400 17px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); white-space:pre-wrap; }
   .ev-quote { font:italic 400 13px/1.55 Georgia,serif; color:#3a352c; }
   .ev-src { font-size:12px; color:#7a7266; border-bottom:1px solid #d8cfbb; width:fit-content; text-decoration:none; }
   .ev-nosrc { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; }
@@ -1739,6 +1795,8 @@ const outError = new Map();
 const msgPending = new Set();
 const msgError = new Map();
 const lockPending = new Set();
+const outDirection = new Map();  // lead dir → what she is typing, so a re-render never eats it
+const outSaid = new Map();       // lead dir → the direction she sent with the draft now on screen
 
 function leadSegment(l){
   if (l.segment) return l.segment;
@@ -1824,6 +1882,28 @@ function leadSendLogLine(lastTouch){
   const t = (lastTouch||"").trim();
   return t ? "A send was logged "+t.slice(0,10)+", by hand. See Follow-ups." : "";
 }
+function outreachThreadPhase(msg, drafting){
+  if(drafting) return "drafting";
+  return msg ? "drafted" : "asking";
+}
+function firstSentence(text, cap){
+  const t = (text||"").trim();
+  if(!t) return "";
+  const m = t.match(/^[\\s\\S]*?[.?!](?=\\s|$)/);
+  let s = (m ? m[0] : t).trim();
+  if(s.length > cap) s = s.slice(0, cap).replace(/[\\s,;:]+\\S*$/, "") + "...";
+  return s;
+}
+function outreachOpeningLine(l){
+  const who = ((l.name || l.dir || "this one")+"").trim();
+  const read = matchmakerRead(l);
+  const reason = firstSentence(read.headline, 180);
+  if(!reason || reason === "(no read recorded yet)"){
+    return "I put "+who+" in front of you, and there is no research read on file yet. Tell me what you want this message to say and I will write it in your voice.";
+  }
+  const tail = /[.?!]$/.test(reason) ? "" : ".";
+  return "I put "+who+" in front of you for this reason: "+reason+tail+" Want to lead with that, or keep it short and just ask for a quick chat?";
+}
 
 // ── Triage: the queue, grouped by why ──
 function triageHtml(){
@@ -1872,10 +1952,38 @@ function outreachMarginHtml(l){
     '<div class="wb-reply"><span class="mono-note">Every claim here carries its source, or says it has none. This page stays tied to the follow-up row. Months from now: the why, what you said, the date, one click.</span></div></div>';
 }
 
+// ── The conversational half: I ask, you say which way to take it, then I draft ──
+// The phase is derived, never stored: no message and no job means asking, a job in flight means
+// drafting, a message on disk means drafted. What she types wins over the stored pitch angle when
+// they disagree, and it only ever describes what SHE wants said. I clean it up in her voice and
+// never invent interest she does not have.
+function directionHtml(l){
+  const phase = outreachThreadPhase(l.latestMessage, outPending.has(l.dir));
+  const said = (outSaid.get(l.dir) || "").trim();
+  const saidBlock = said
+    ? '<div class="dir-said"><div class="cap">YOU SAID</div><div class="said">'+esc(said)+'</div></div>'
+    : "";
+  if(phase === "drafting"){
+    return saidBlock + '<div class="thinking" style="margin-top:14px;">✨ Drafting the pitch… (your subscription, ~30-60s. The Studio room has the progress and the log.)</div>';
+  }
+  if(phase === "drafted") return saidBlock;
+  const typed = outDirection.get(l.dir) || "";
+  const err = outError.get(l.dir);
+  return '<div class="dir-open"><span class="cap">Suggested angle</span>'+
+      '<span class="line">'+esc(outreachOpeningLine(l))+'</span></div>'+
+    '<div class="dir-box">'+
+      '<textarea class="dir-input" rows="2" data-dir="'+esc(l.dir)+'" placeholder="Say which way to take it, in a line or two.">'+esc(typed)+'</textarea>'+
+      '<div class="dir-go"><button class="dir-send" data-dir="'+esc(l.dir)+'"'+(typed.trim()?"":" disabled")+'>Draft it</button>'+
+        '<span class="note">Nothing here goes anywhere. It becomes a draft, and only you send it. I write it in your voice and I never invent interest you do not have.</span></div>'+
+      (err ? '<div class="aierr" style="margin-top:10px;">⚠ '+esc(err)+' (see the Studio room for the job log)</div>' : "")+
+    '</div>';
+}
+
 function outreachMessageBox(l){
   const msg = l.latestMessage;
-  if(!msg) return l.kind==="content-example" ? ""
-    : '<div class="lead-msg"><div class="src">No message drafted yet. "Draft the message" writes one for you to shape.</div></div>';
+  // No message yet is not an empty state here: the direction composer above IS the empty state, and
+  // it is asking her a question rather than showing her a blank box.
+  if(!msg) return "";
   const state = outreachSendState(msg);
   const logged = leadSendLogLine(OUTREACH_TOUCH[l.dir]);
   const recip = msg.recipient ? ' · to '+esc(msg.recipient) : "";
@@ -1886,13 +1994,15 @@ function outreachMessageBox(l){
   }
   const revPending = msgPending.has(l.dir);
   const revErr = msgError.get(l.dir);
-  return '<div class="lead-msg"><div class="nmeta">drafted message · '+esc(msg.file)+recip+' · '+esc(msg.status)+'</div>'+
+  // "Update it" edits THIS message in place, through the revise path that already existed. It never
+  // starts a second numbered draft, and the copy says so.
+  return '<div class="lead-msg"><div class="nmeta">The draft · '+esc(msg.file)+recip+' · '+esc(msg.status)+'</div>'+
     '<textarea class="msg-edit">'+esc(msg.body)+'</textarea>'+
     '<div class="actions"><button class="msg-save" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Save edits</button></div>'+
     '<div class="aibox show">'+
       (revPending
-        ? '<div class="thinking">✨ revising… (your subscription, ~10-30s)</div>'
-        : '<input class="msg-revise-input" placeholder="what should change in the message?" /><button class="send msg-revise" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Revise with AI</button>'+
+        ? '<div class="thinking">✨ Rewriting the same draft, not adding a new one…</div>'
+        : '<input class="msg-revise-input" placeholder="Make it shorter, drop the second line, warmer close…" /><button class="send msg-revise" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Update it</button>'+
           (revErr ? '<div class="aierr">⚠ '+esc(revErr)+'</div>' : ""))+
     '</div></div>';
 }
@@ -1933,7 +2043,6 @@ function threadHtml(l){
   const info = SEG_INFO[seg] || SEG_INFO["content-example"];
   const undecided = !["pursue","passed","locked","drafted"].includes(l.status);
   const pending = outPending.has(l.dir);
-  const err = outError.get(l.dir);
   const fitChip = l.classificationOrFit ? '<span class="fit-chip">'+esc(l.classificationOrFit)+'</span>' : "";
   const provChip = (l.whySource === "gpt-codex" ? '<span class="legacy-chip" style="background:#efeafd;color:#5b46b8">why: analyst, GPT-routed</span>' : l.whySource === "claude-cli" ? '<span class="legacy-chip">why: analyst, Claude</span>' : "")+(l.source === "jsa" ? '<span class="legacy-chip">research: JSA</span>' : "");
   const mmr = matchmakerRead(l);
@@ -1941,13 +2050,13 @@ function threadHtml(l){
   const mm = mmr.rows.length
     ? '<div class="mm-grid">'+mmr.rows.map(r=>'<div class="mm-row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>').join("")+'</div>'
     : "";
-  const status = pending
-    ? '<div class="hint">drafting… (your subscription, ~30-60s — the Studio room has progress + log)</div>'
-    : err ? '<div class="aierr">⚠ '+esc(err)+' — see the Studio room for the job log</div>' : "";
+  // The direction composer replaces the old one-click "Draft the message": drafting now starts from
+  // what she typed, so the thread only offers it once the lead is one she said to pursue.
+  const canDraft = !l.latestMessage && l.kind!=="content-example" && (l.status==="pursue"||l.status==="qualified");
+  const direction = (canDraft || pending || l.latestMessage) && l.kind!=="content-example" ? directionHtml(l) : "";
   const decideBtns = l.kind==="content-example" ? "" :
     '<div class="wb-handoff">'+
       (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Worth pursuing</button><button class="out-pass" data-dir="'+esc(l.dir)+'">Pass</button>' : "")+
-      ((l.status==="pursue"||l.status==="qualified") && !pending ? '<button class="out-draft" data-dir="'+esc(l.dir)+'">Draft the message</button>' : "")+
       '<span class="note">Pursue or pass just marks your call. Drafting writes a message for you to shape; only you ever send it.</span>'+
     '</div>';
   const notes = '<div class="lead-notes">'+
@@ -1961,7 +2070,7 @@ function threadHtml(l){
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="seg-chip '+esc(seg)+'">'+esc(info.label)+'</span>'+fitChip+'<span class="src">'+esc(info.line)+'</span><span class="grow"></span>'+provChip+'</div>'+
     '<div class="wb-label" style="margin:14px 0 0;">Why this matters to you, in plain terms'+legacy+'</div>'+
     '<div class="dossier-why">'+esc(mmr.headline)+'</div>'+
-    mm + whoBoxHtml(l) + status + outreachMessageBox(l) + sendStepsHtml(l) + decideBtns + notes +
+    mm + whoBoxHtml(l) + direction + outreachMessageBox(l) + sendStepsHtml(l) + decideBtns + notes +
     (l.url?'<div class="src" style="margin-top:10px;"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>':"")+
   '</div>'+outreachMarginHtml(l)+'</div>';
 }
@@ -1982,7 +2091,15 @@ function renderOutreachBox(){
   box.innerHTML = active ? threadHtml(active) : triageHtml();
   box.querySelectorAll("button.tri-row").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = b.dataset.dir; renderOutreachBox(); }));
   box.querySelectorAll("button.out-back").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = null; renderOutreachBox(); }));
-  box.querySelectorAll("button.out-draft").forEach(b=>b.addEventListener("click", ()=>outreachDraft(b.dataset.dir)));
+  box.querySelectorAll("button.dir-send").forEach(b=>b.addEventListener("click", ()=>outreachDraft(b.dataset.dir, b)));
+  // Kept out of the render loop on purpose: re-rendering per keystroke would eat the caret. The
+  // typed text is stashed so a refresh mid-thought does not lose it, and the button just enables.
+  box.querySelectorAll("textarea.dir-input").forEach(t=>t.addEventListener("input", ()=>{
+    outDirection.set(t.dataset.dir, t.value);
+    const wrap = t.closest(".dir-box");
+    const btn = wrap ? wrap.querySelector("button.dir-send") : null;
+    if(btn) btn.disabled = !t.value.trim();
+  }));
   box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
   box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
   box.querySelectorAll("button.out-lock").forEach(b=>b.addEventListener("click", ()=>outreachLock(b.dataset.dir, b.dataset.file)));
@@ -2321,21 +2438,39 @@ $("#workbench").addEventListener("click", async (e)=>{
   }
 });
 
-async function outreachDraft(dir){
+// "Draft it": her typed direction rides into THIS run's prompt via POST /api/outreach/draft. It
+// wins over the stored pitch angle where they disagree. Iterating on the result is a different
+// button ("Update it"), and it reuses the revise path that already existed.
+async function outreachDraft(dir, btn){
   if(outPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn
+  const wrap = btn ? btn.closest(".dir-box") : null;
+  const input = wrap ? wrap.querySelector(".dir-input") : null;
+  const direction = input ? input.value.trim() : (outDirection.get(dir) || "").trim();
+  if(!direction){ flash("Say which way to take it first"); return; }
+  outDirection.set(dir, direction);
+  outSaid.set(dir, direction);
   outError.delete(dir);
   outPending.add(dir); renderOutreachBox();
+  // Tracked separately from the try/catch, because a draft that landed and a reload that failed are
+  // two different things. Once the message is written, nothing below may hand her back an empty
+  // composer and an error, which would read as "try again" and write a second numbered draft.
+  let drafted = false;
   try {
     // Recipient defaults to the lead's first contact so the message frontmatter carries the
     // person its follow-up clock will belong to.
     const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
     const recipient = lead && lead.contacts && lead.contacts.length ? lead.contacts[0].name : undefined;
-    const r = await post("/api/followups/draft-follow-up", recipient ? {dir, recipient} : {dir});
-    if(r.ok){ flash("Drafted — shape it here before you ever send it"); await loadOutreach(); }
-    else { outError.set(dir, r.error || "Failed to draft"); }
+    const body = {dir, direction};
+    if(recipient) body.recipient = recipient;
+    const r = await post("/api/outreach/draft", body);
+    if(r.ok){ drafted = true; outDirection.delete(dir); flash("Drafted. Shape it here before you ever send it."); }
+    else outError.set(dir, r.error || "Failed to draft");
+    await loadOutreach();
   } catch (e) {
-    outError.set(dir, e instanceof Error ? e.message : String(e));
+    if(drafted) flash("It drafted, but the page could not reload. Refresh to see it.");
+    else outError.set(dir, e instanceof Error ? e.message : String(e));
   } finally {
+    if(!drafted) outSaid.delete(dir);
     outPending.delete(dir); renderOutreachBox();
   }
 }

@@ -10,6 +10,8 @@ import {
   isSafeRawPath,
   isValidLeadDir,
   isValidMessageFile,
+  outreachDraftGuard,
+  MAX_DIRECTION_CHARS,
   appendLeadNote,
   approveBlockReason,
   replyToMentionBlockReason,
@@ -586,6 +588,44 @@ test("isValidMessageFile accepts only the messages/message-NN.md shape", () => {
   assert.equal(isValidMessageFile("lead.md"), false);
   assert.equal(isValidMessageFile("messages/message-.md"), false);
   assert.equal(isValidMessageFile(""), false);
+});
+
+// ── outreachDraftGuard — the whole guard for POST /api/outreach/draft (v7 handoff §3). Reuses the
+// same lead-folder allowlist every other outreach route uses, and caps a pasted-document direction.
+
+test("outreachDraftGuard refuses anything outside a real outreach/leads/<dir> folder", () => {
+  for (const bad of ["", "outreach/leads/..", "outreach/leads/../../etc/passwd", "/etc/passwd", "content/foo"]) {
+    const g = outreachDraftGuard({ dir: bad, direction: "keep it short" });
+    assert.ok("error" in g, `expected ${bad} to be refused`);
+    assert.match((g as { error: string }).error, /valid outreach lead folder/);
+  }
+  // A missing dir is refused the same way, not treated as an empty-but-fine value.
+  assert.ok("error" in outreachDraftGuard({}));
+});
+
+test("outreachDraftGuard accepts a real lead folder and passes the direction through", () => {
+  const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: "  keep it short  " });
+  assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: "keep it short" });
+});
+
+test("outreachDraftGuard turns a blank direction into undefined, never an empty string", () => {
+  // Load-bearing: `undefined` is what keeps buildDraftPrompt byte-identical for existing callers.
+  for (const blank of ["", "   ", "\n\t "]) {
+    const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: blank });
+    assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: undefined });
+  }
+  assert.deepEqual(outreachDraftGuard({ dir: "outreach/leads/client-acme-co" }), {
+    dir: "outreach/leads/client-acme-co",
+    direction: undefined,
+  });
+});
+
+test("outreachDraftGuard caps a pasted-document direction before it reaches a spawn", () => {
+  const ok = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: "x".repeat(MAX_DIRECTION_CHARS) });
+  assert.ok(!("error" in ok));
+  const tooLong = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: "x".repeat(MAX_DIRECTION_CHARS + 1) });
+  assert.ok("error" in tooLong);
+  assert.match((tooLong as { error: string }).error, /under 2000 characters/);
 });
 
 // ── appendLeadNote — Muxin's per-lead notes ("what stood out, why interested"), appended dated
