@@ -90,15 +90,20 @@ describe("countEligibleUnique", () => {
 // ---- ingestResponse ----
 
 describe("ingestResponse", () => {
+  // The identifier below is deliberately long and non-hex. An earlier version of this test used
+  // "42", and the record it writes carries `response_id: "r-<uuid>"` -- 32 hex characters, which
+  // contain the substring "42" about 15% of the time. That made a privacy assertion fail at random
+  // on correct code, which is the worst kind of flake: the one test you most need to trust.
+  const RAW_ID = "raw-user-must-never-be-persisted";
   test("writes a response record with a hashed respondent when a raw identifier is given, never persisting the raw value", () => {
     process.env.RESEARCH_HASH_KEY = "test-only-key";
-    const { record } = ingestResponse(SLUG, baseInput({ rawIdentifier: { platform: "substack", stableUserId: "42" } }), "t0");
+    const { record } = ingestResponse(SLUG, baseInput({ rawIdentifier: { platform: "substack", stableUserId: RAW_ID } }), "t0");
     assert.equal(record.target_audience_eligible, true);
     assert.equal(record.included_in_gate, true);
     assert.equal(record.exclusion_reason, null);
     assert.ok(/^[0-9a-f]{64}$/.test(record.respondent_hash), "expected a 64-hex-char HMAC-SHA256 digest");
     const raw = JSON.stringify(readResponses(SLUG));
-    assert.ok(!raw.includes("42"), "raw identifier must never be persisted to responses.jsonl");
+    assert.ok(!raw.includes(RAW_ID), "raw identifier must never be persisted to responses.jsonl");
   });
 
   test("with no raw identifier, treats the response as its own unique respondent", () => {
