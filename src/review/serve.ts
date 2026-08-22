@@ -60,6 +60,8 @@ import {
   publicJob,
   jobs,
   clearFinishedJobs,
+  answerJob,
+  retryJob,
   jobLogPath,
   lastNonEmptyLine,
   tailLines,
@@ -1291,6 +1293,36 @@ const server = createServer(async (req, res) => {
       }
       res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
       res.end(text);
+      return;
+    }
+    // A job that stopped to ask Muxin something. She picks one of the options it offered, and the
+    // work is requeued as a NEW job carrying her answer (answerJob — a dead subprocess can't be
+    // resumed). Path-matched by regex like the /log route above, since the job id is in the path.
+    if (req.method === "POST" && /^\/api\/jobs\/[^/]+\/answer$/.test(url.pathname)) {
+      const jobId = url.pathname.split("/")[3];
+      const b = await readBody(req);
+      const answer = String(b.answer ?? "").trim();
+      if (!answer) {
+        json(res, 400, { ok: false, error: "pick one of the options first" });
+        return;
+      }
+      const result = answerJob(jobId, answer);
+      if ("error" in result) {
+        json(res, result.error === "no such job" ? 404 : 400, { ok: false, error: result.error });
+        return;
+      }
+      json(res, 200, { ok: true, job: publicJob(result.job) });
+      return;
+    }
+    // Run a failed job again, same id so its log appends rather than starting a second file.
+    if (req.method === "POST" && /^\/api\/jobs\/[^/]+\/retry$/.test(url.pathname)) {
+      const jobId = url.pathname.split("/")[3];
+      const result = retryJob(jobId);
+      if ("error" in result) {
+        json(res, result.error === "no such job" ? 404 : 400, { ok: false, error: result.error });
+        return;
+      }
+      json(res, 200, { ok: true, job: publicJob(result.job) });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/strategy/brief") {
