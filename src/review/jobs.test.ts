@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, type MarkerTarget } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -644,14 +644,17 @@ test("a clean run that asks ends blocked, keeps no error, and releases the lane 
     // What a real spawn would have left behind: markers read off stdout, and a clean exit.
     ingestMarkerChunk(job, "STEP 1/2 Read the brief\nSTEP 2/2 Weighed the options\nASK Which platform should this probe run on?\nASK-OPTION Substack\nASK-OPTION Bluesky\n");
     job.lastSpawn = { code: 0, timedOut: false, enoent: false };
-    // The artifact check's verdict on a run that deliberately wrote nothing. settleJob must
-    // override it: the job asked, it did not fail.
-    job.error = "the advisor ran but wrote no new round to develop/advice.json";
     order.push("asking end");
+    // The artifact check's verdict on a run that deliberately wrote nothing. A real task job
+    // signals that by THROWING, which is what lands the job in `failed` for settleJob to override:
+    // the job asked, it did not fail. (It used to be enough to set job.error and resolve, which
+    // also read as a clean success, and settleJob then overrode a genuine `done`. See the
+    // "wrote its artifact AND printed an ask" test below for the half that must not be overridden.)
+    throw new Error("the advisor ran but wrote no new round to develop/advice.json");
   });
   // Queued behind it: if a blocked job held `draining`, this would never run.
   const next = runQueued("revise", "queued behind the ask", async () => { order.push("next ran"); });
-  await Promise.all([asking, next]);
+  await Promise.all([assert.rejects(asking, /no new round/), next]);
 
   const blocked = jobs.find((j) => j.label === "asks a question")!;
   assert.equal(blocked.status, "blocked");
@@ -712,4 +715,200 @@ test("a clean run that finishes marks every step done", async () => {
   assert.equal(job.stepTotal, 3);
   assert.equal(job.failedAtStep, null);
   clearFinishedJobs();
+});
+
+// ── Audit fixes: the marker stream, the artifact check, retry, and an answered ask ─────────────
+// Every test below covers a defect that shipped because nothing tested it.
+
+// Finding 1: markers rode a residual buffer SHARED by stdout and stderr, and stderr was parsed.
+function reader(kind = "revise" as const) {
+  const job = { kind, lastStdoutLine: null as string | null, steps: [] as string[], stepTotal: null as number | null, step: 0, ask: null as MarkerTarget["ask"] };
+  return { job, io: createSpawnStreamReader(job) };
+}
+
+test("a stderr write cannot corrupt a stdout marker still waiting for its newline", () => {
+  const { job, io } = reader();
+  io.stdout("STEP 1/3 Read your beats"); // no trailing newline yet
+  io.stderr("warn: something noisy\n"); // used to be glued onto the held-back stdout line
+  io.stdout("\n");
+  assert.equal(job.stepTotal, 3);
+  assert.deepEqual(job.steps, ["Read your beats"], "the label must not carry stderr's text");
+});
+
+test("a stderr line shaped like a step marker cannot forge a step", () => {
+  const { job, io } = reader();
+  io.stderr("STEP 2/5 Pretended to do the work\n");
+  assert.equal(job.stepTotal, null, "markers ride stdout only");
+  assert.equal(job.step, 0);
+  assert.deepEqual(job.steps, []);
+});
+
+test("a stderr line shaped like an ask cannot block a job", () => {
+  const { job, io } = reader();
+  io.stderr("ASK Should I keep going?\nASK-OPTION Yes\nASK-OPTION No\n");
+  assert.equal(job.ask, null);
+});
+
+test("stderr still feeds the free-form heartbeat, which was never a protocol", () => {
+  const { job, io } = reader();
+  io.stderr("still working on it\n");
+  assert.equal(job.lastStdoutLine, "still working on it");
+});
+
+test("a stdout marker split across two chunks is read once its newline lands", () => {
+  const { job, io } = reader();
+  io.stdout("STEP 2/4 Checked them ag");
+  io.stdout("ainst the canon\n");
+  assert.equal(job.step, 1);
+  assert.deepEqual(job.steps[1], "Checked them against the canon");
+});
+
+test("a final stdout marker with no trailing newline is flushed on close", () => {
+  const { job, io } = reader();
+  io.stdout("STEP 3/3 Drafted the scene");
+  assert.equal(io.close(), "STEP 3/3 Drafted the scene");
+  assert.equal(job.stepTotal, 3);
+});
+
+// Finding 4b: a job whose stdout IS the deliverable must not be marker-parsed at all. A drafted
+// outreach message containing an ASK line would otherwise flip a finished job to blocked and, once
+// answered, append a duplicate message file.
+test("a kind whose stdout is the deliverable is parsed for no markers at all", () => {
+  for (const kind of ["draft-follow-up", "ask-insights"] as const) {
+    assert.ok(MARKER_EXEMPT_KINDS.has(kind), `${kind} must be marker-exempt`);
+    const { job, io } = reader(kind as never);
+    io.stdout("ASK Which angle should I take?\nASK-OPTION The hiring one\nASK-OPTION The mission one\n");
+    io.stdout("STEP 1/2 Wrote the opener\n");
+    assert.equal(job.ask, null, `${kind}: a drafted line must not become a real ask`);
+    assert.equal(job.stepTotal, null, `${kind}: a drafted line must not become a real step`);
+    assert.equal(io.close(), "ASK Which angle should I take?\nASK-OPTION The hiring one\nASK-OPTION The mission one\nSTEP 1/2 Wrote the opener\n",
+      "the deliverable text itself must come back untouched");
+  }
+});
+
+test("a kind verified by artifact keeps its markers", () => {
+  assert.equal(MARKER_EXEMPT_KINDS.has("charles-draft"), false);
+  assert.equal(MARKER_EXEMPT_KINDS.has("revise"), false);
+});
+
+// Finding 4a: shouldBlockOnAsk used to override a SUCCESSFUL done, not just a wrong "failed".
+test("a job that wrote its artifact AND printed an ask stays done", async () => {
+  await runQueued("video", "wrote the storyboard, then asked", async (job) => {
+    ingestMarkerChunk(job, "ASK Want a second pass?\nASK-OPTION Yes\nASK-OPTION No\n");
+    job.lastSpawn = { code: 0, timedOut: false, enoent: false };
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  const job = jobs[jobs.length - 1];
+  assert.equal(job.status, "done", "re-running it would overwrite the artifact it already wrote");
+  clearFinishedJobs();
+});
+
+test("a job that wrote NOTHING and printed an ask still blocks", async () => {
+  await assert.rejects(
+    runQueued("video", "asked instead of writing", async (job) => {
+      ingestMarkerChunk(job, "ASK Want a second pass?\nASK-OPTION Yes\nASK-OPTION No\n");
+      job.lastSpawn = { code: 0, timedOut: false, enoent: false };
+      throw new Error("/video ran but produced no video/storyboard.md");
+    }),
+    /storyboard/,
+  );
+  await new Promise((r) => setTimeout(r, 20));
+  const job = jobs.find((j) => j.label === "asked instead of writing")!;
+  assert.equal(job.status, "blocked", "the artifact check's verdict was really about the ask");
+  assert.equal(job.error, null);
+  jobs.length = 0;
+});
+
+// Finding 3: retry left the previous attempt's checklist in place, so a markerless rerun painted a
+// 100% bar and three green step labels it never measured.
+test("retry clears the previous attempt's step checklist, and a markerless rerun invents no progress", async () => {
+  jobs.length = 0;
+  jobs.push({
+    id: buildJobId(Date.now(), 999), kind: "revise", label: "retried markerless", arg: "",
+    status: "failed", slugs: [], error: "it broke", createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: Date.now(), lastStdoutLine: "drafting...",
+    steps: ["Read your beats", "Checked them", "Drafted the scene"], stepTotal: 3, step: 2,
+    failedAtStep: 2, retryable: true, ask: null, answer: null,
+    task: async (j) => { j.lastSpawn = { code: 0, timedOut: false, enoent: false }; },
+  });
+  const job = jobs[0];
+
+  const out = retryJob(job.id);
+  assert.ok("job" in out, "a failed non-ENOENT job is retryable");
+  // Checked the instant the retry is accepted: the first attempt's checklist is gone, so nothing
+  // on screen claims progress this attempt has not emitted.
+  assert.deepEqual(job.steps, [], "a checklist this attempt has not emitted must not be on screen");
+  assert.equal(job.stepTotal, null, "and no progress bar drawn from the last attempt's total");
+  assert.equal(job.step, 0);
+  assert.equal(job.failedAtStep, null);
+  assert.equal(job.error, null);
+  assert.equal(job.lastStdoutLine, null, "nor the last attempt's heartbeat line");
+
+  // The rerun emits no markers at all and finishes clean. settleJob forces `step = stepTotal` on a
+  // clean finish, so a surviving stepTotal of 3 would paint a full bar and three green labels.
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(job.status, "done");
+  assert.equal(job.step, 0, "settleJob must have no stepTotal to force step up to");
+  assert.equal(job.stepTotal, null);
+  assert.deepEqual(job.steps, []);
+  jobs.length = 0;
+});
+
+// Finding 5: an answered ask stuck in the queue forever with no way to dismiss it.
+test("an answered ask becomes sweepable, an unanswered one never does", () => {
+  assert.equal(jobIsSweepable({ status: "blocked", answer: null }), false, "her question must survive Clear queue");
+  assert.equal(jobIsSweepable({ status: "blocked", answer: "Yes" }), true, "she already answered it");
+  assert.equal(jobIsSweepable({ status: "done", answer: null }), true);
+  assert.equal(jobIsSweepable({ status: "failed", answer: null }), true);
+  assert.equal(jobIsSweepable({ status: "running", answer: null }), false);
+  assert.equal(jobIsSweepable({ status: "queued", answer: null }), false);
+});
+
+test("Clear queue sweeps an answered ask and keeps an unanswered one", async () => {
+  jobs.length = 0;
+  const asking = runQueued("revise", "asks a question", async (job) => {
+    ingestMarkerChunk(job, "ASK Which one?\nASK-OPTION A\nASK-OPTION B\n");
+    job.lastSpawn = { code: 0, timedOut: false, enoent: false };
+    throw new Error("wrote nothing");
+  });
+  await assert.rejects(asking, /wrote nothing/);
+  await new Promise((r) => setTimeout(r, 20));
+  const blocked = jobs.find((j) => j.status === "blocked")!;
+  assert.equal(clearFinishedJobs(), 0, "an unanswered question is not finished work");
+  assert.ok(jobs.includes(blocked));
+
+  answerJob(blocked.id, "A");
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(blocked.answer, "A");
+  const swept = clearFinishedJobs();
+  assert.ok(swept >= 1, "the answered original is finished work now");
+  assert.equal(jobs.includes(blocked), false);
+  jobs.length = 0;
+});
+
+// Finding 2: an atomize run that exited 0 and created nothing used to stay green `done` with an
+// error string beside it, so the row read "took 45s" under the landing sentence "A cut, waiting on
+// your yes." for a cut that did not exist, offered no Retry, and got swept by Clear queue.
+test("an atomize run that created no content folder is a failure, not a green done", () => {
+  assert.equal(atomizeArtifactVerdict(null, 1), "done", "it ran and it wrote something");
+  assert.equal(atomizeArtifactVerdict(null, 3), "done");
+  assert.equal(atomizeArtifactVerdict(null, 0), "failed", "exit 0 and nothing written is still nothing written");
+  assert.equal(atomizeArtifactVerdict("the `claude` CLI isn't on this server's PATH", 0), "failed");
+  assert.equal(atomizeArtifactVerdict("atomize timed out after 15 min", 2), "failed", "a broken run beats a stray folder");
+});
+
+test("a clean exit that fails its artifact check is offered a retry", async () => {
+  jobs.length = 0;
+  await assert.rejects(
+    runQueued("url", "ran, wrote nothing", async (job) => {
+      job.lastSpawn = { code: 0, timedOut: false, enoent: false }; // exited 0
+      throw new Error("atomize finished but created no new content folder");
+    }),
+    /no new content folder/,
+  );
+  const job = jobs[jobs.length - 1];
+  assert.equal(job.status, "failed", "it must not sit there green");
+  assert.equal(job.retryable, true, "worth one more attempt, so Retry has to be on offer");
+  assert.equal(jobIsSweepable(job), true, "and Clear queue can take it like any other dead job");
+  jobs.length = 0;
 });

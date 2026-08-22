@@ -295,7 +295,11 @@ export async function reviseOutreachMessage(dir: string, file: string, instructi
   const channel = typeof before.fm.channel === "string" ? before.fm.channel : "";
   const prompt = outreachMessageRevisePrompt(`${dir}/${file}`, channel, instruction.trim());
 
-  return runQueued("revise", `Revise outreach message: ${dir}/${file}`, async (job) => {
+  // Its own kind, not the shared "revise": a job's kind is what picks the room its progress shows
+  // in, and "revise" routes to Content. Clicking "Update it" on an Outreach thread used to leave
+  // the Outreach strip idle and post the Connector's work under Content as the Formatter. Content
+  // derivative revises still use "revise" and still belong in Content.
+  return runQueued("outreach-revise", `Revise outreach message: ${dir}/${file}`, async (job) => {
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude revise",
@@ -328,7 +332,7 @@ type JobStatus = "queued" | "running" | "blocked" | "done" | "failed";
 // "url" | "file" | "text" | "notes" | "continue" | "video" are the atomize-family kinds (dispatch
 // a slash-command against a folder/source, verified by artifact check — see drain() below).
 // "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" |
-// "pull" | "strategy" | "scout" are generic task jobs (run an arbitrary async task via runQueued)
+// "outreach-revise" | "pull" | "strategy" | "scout" are generic task jobs (run an arbitrary async task via runQueued)
 // — the four call sites complaint 2 flagged as spawning unbounded, plus "Duplicate to platform",
 // the Follow-ups tab's "Draft follow-up", the Analytics tab's "Pull fresh now" (runCommandSpawn,
 // not a claude spawn) and "Refresh brief" (a full /strategy run), and the Outreach tab's "Scout
@@ -340,7 +344,18 @@ export type JobKind =
   | "url" | "file" | "text" | "notes" | "continue" | "video"
   | "develop" | "develop-reply"
   | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up"
+  | "outreach-revise"
   | "pull" | "strategy" | "scout" | "charles-draft";
+
+// Kinds whose stdout IS the deliverable, not a progress channel. `runDraft` takes the spawn's
+// stdout as the outreach message body, and `ask-insights` returns it as the answer Muxin reads.
+// Marker parsing is skipped for these entirely, STEP and ASK alike: a drafted message carrying a
+// line that reads like `ASK ...?` plus two `ASK-OPTION` lines would otherwise flip a finished job
+// to blocked and, once answered, append a duplicate message file. `draft-follow-up` already
+// documents the STEP half of this rule in prose; this makes both halves real.
+// Note which kinds are NOT here: `charles-draft` and `revise` both verify by artifact (a new
+// review-queue row, an edited file), so their stdout is free to carry markers.
+export const MARKER_EXEMPT_KINDS: ReadonlySet<JobKind> = new Set<JobKind>(["draft-follow-up", "ask-insights"]);
 interface Job {
   id: string;
   kind: JobKind;
@@ -386,13 +401,20 @@ let jobSeq = 0;
 let draining = false;
 
 // "Clear queue" (GUI) only ever removes finished entries — queued/running jobs stay untouched, and
-// so does `blocked`: a job waiting on Muxin's answer is not finished work, and clearing it would
-// throw away the question. drain() finds work via jobs.find(status==="queued"), not by index, so
-// splicing mid-array here is safe even while a job is actively running.
+// so does an UNANSWERED `blocked` job: it is waiting on Muxin, not finished work, and clearing it
+// would throw away the question. An ANSWERED blocked job is a different thing: answerJob already
+// requeued a fresh job carrying her answer, so the original is a settled record and sweepable like
+// any other. Without that, an answered ask stuck in the list forever with no way to dismiss it.
+// drain() finds work via jobs.find(status==="queued"), not by index, so splicing mid-array here is
+// safe even while a job is actively running.
+export function jobIsSweepable(job: Pick<Job, "status" | "answer">): boolean {
+  if (job.status === "done" || job.status === "failed") return true;
+  return job.status === "blocked" && job.answer !== null;
+}
 export function clearFinishedJobs(): number {
   let removed = 0;
   for (let i = jobs.length - 1; i >= 0; i--) {
-    if (jobs[i].status === "done" || jobs[i].status === "failed") {
+    if (jobIsSweepable(jobs[i])) {
       jobs.splice(i, 1);
       removed++;
     }
@@ -470,6 +492,57 @@ export function isSpawnTimeout(code: number | null, signal: NodeJS.Signals | nul
   return signal === "SIGTERM" || code === 143;
 }
 
+// The stream-reading half of runCommandSpawn, split out so its rules are testable without a real
+// subprocess (the repo's standing "pure helper, injectable seam" convention). Three rules live
+// here, all three of them bugs that shipped:
+//
+// 1. ONLY STDOUT IS MARKER-PARSED. The protocol puts markers on stdout, so a stderr warning that
+//    happens to read `STEP 1/3 ...` can never forge a step Muxin then trusts as measured progress.
+// 2. THE RESIDUAL IS PER STREAM. Markers are parsed per LINE, so a marker split across chunks is
+//    held back until its newline arrives. One residual buffer SHARED between the two streams was
+//    the corruption: stdout wrote `STEP 1/3 Read` with no trailing newline, stderr wrote `warn`
+//    next, the residual became `STEP 1/3 Readwarn`, and the step was lost. stderr keeps no
+//    residual at all now.
+// 3. A MARKER-EXEMPT KIND GETS NO PARSING AT ALL. See MARKER_EXEMPT_KINDS.
+//
+// The heartbeat deliberately still reads BOTH streams, unchanged: it is free-form progress text
+// rather than a protocol, so a skill that logs its progress to stderr should still show a live
+// line.
+export function createSpawnStreamReader(
+  job: Pick<Job, "kind" | "lastStdoutLine"> & MarkerTarget,
+): { stdout(text: string): void; stderr(text: string): void; close(): string } {
+  let tailBuf = "";
+  let stdoutBuf = "";
+  let residual = "";
+  const parseMarkers = !MARKER_EXEMPT_KINDS.has(job.kind);
+  const heartbeat = (text: string) => {
+    tailBuf = (tailBuf + text).slice(-4000); // bounded tail buffer: the heartbeat only needs the last line
+    const line = lastNonEmptyLine(tailBuf);
+    if (line) job.lastStdoutLine = line;
+  };
+  return {
+    stdout(text) {
+      heartbeat(text);
+      stdoutBuf += text;
+      if (!parseMarkers) return;
+      const lines = (residual + text).split("\n");
+      residual = lines.pop() ?? "";
+      if (lines.length) ingestMarkerChunk(job, lines.join("\n"));
+    },
+    stderr(text) {
+      heartbeat(text); // and nothing else, on purpose
+    },
+    close() {
+      // A final stdout line with no trailing newline still counts as a marker.
+      if (residual) {
+        ingestMarkerChunk(job, residual);
+        residual = "";
+      }
+      return stdoutBuf;
+    },
+  };
+}
+
 export function runCommandSpawn(
   job: Job,
   command: string,
@@ -478,21 +551,12 @@ export function runCommandSpawn(
 ): Promise<CommandSpawnResult> {
   mkdirSync(JOB_LOG_DIR, { recursive: true });
   const log = createWriteStream(jobLogPath(job.id), { flags: "a" });
-  let tailBuf = "";
-  let stdoutBuf = "";
-  // Markers are parsed per LINE, so a marker split across two chunks isn't half-read: everything
-  // after the last newline is held back here and prepended to the next chunk (flushed on close).
-  let markerResidual = "";
+  const reader = createSpawnStreamReader(job);
   const onChunk = (isStdout: boolean) => (chunk: Buffer) => {
-    const text = chunk.toString("utf8");
-    if (isStdout) stdoutBuf += text;
     log.write(chunk);
-    tailBuf = (tailBuf + text).slice(-4000); // bounded tail buffer — heartbeat only needs the last line
-    const line = lastNonEmptyLine(tailBuf);
-    if (line) job.lastStdoutLine = line;
-    const lines = (markerResidual + text).split("\n");
-    markerResidual = lines.pop() ?? "";
-    if (lines.length) ingestMarkerChunk(job, lines.join("\n"));
+    const text = chunk.toString("utf8");
+    if (isStdout) reader.stdout(text);
+    else reader.stderr(text);
   };
   return new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -513,11 +577,9 @@ export function runCommandSpawn(
     child.stdout?.on("data", onChunk(true));
     child.stderr?.on("data", onChunk(false));
     child.on("close", (code, signal) => {
-      // A final line with no trailing newline still counts as a marker.
-      if (markerResidual) {
-        ingestMarkerChunk(job, markerResidual);
-        markerResidual = "";
-      }
+      // Flushes the last stdout line even without a trailing newline, and hands back everything
+      // stdout said.
+      const stdoutBuf = reader.close();
       // Wait for the write stream to actually flush before resolving — callers read the log file
       // back synchronously right after this promise settles (for the failure tail), and
       // log.end() alone doesn't guarantee the last chunk has hit disk yet.
@@ -932,7 +994,12 @@ async function runContinueJob(job: Job): Promise<void> {
 //    Holding the lane for a human's answer would stall every job queued behind it.
 // 3. A failure records where it died and whether Retry is worth offering.
 function settleJob(job: Job): void {
-  if (shouldBlockOnAsk(job.ask, job.lastSpawn ?? null)) {
+  // `job.status !== "done"` is the load-bearing half of rule 1. The override exists ONLY to rescue
+  // a job the artifact check just marked failed because the subprocess asked instead of writing.
+  // A skill that wrote its artifact AND printed an ask has already done the work, so flipping it
+  // to blocked would ask Muxin a question about finished work and then, on her answer, re-run the
+  // whole job and overwrite or duplicate what it produced.
+  if (job.status !== "done" && shouldBlockOnAsk(job.ask, job.lastSpawn ?? null)) {
     job.status = "blocked";
     job.error = null; // the artifact check's "wrote nothing" verdict was about the ask, not a fault
   }
@@ -948,6 +1015,16 @@ function settleJob(job: Job): void {
   job.finishedAt = Date.now();
   draining = false;
   void drain(); // next queued job
+}
+
+// The verdict for an atomize-family run. THE ARTIFACT CHECK DECIDES, NOT THE EXIT CODE: a run that
+// exits 0 and creates no content folder wrote nothing, and calling that `done` put a green row, a
+// "Content" rail, a "took 45s" clock and the landing sentence "A cut, waiting on your yes." on
+// screen for a cut that does not exist. `failed` is also what makes settleJob mark it retryable
+// (a clean exit is not ENOENT) and what lets Clear queue sweep it. runVideoJob, runDevelopJob and
+// runContinueJob already worked this way; this is the branch that did not.
+export function atomizeArtifactVerdict(failure: string | null, createdSlugs: number): "done" | "failed" {
+  return !failure && createdSlugs > 0 ? "done" : "failed";
 }
 
 // Process the queue one job at a time — every kind (atomize-family AND task jobs) shares this one
@@ -1000,9 +1077,8 @@ async function drain(): Promise<void> {
     timeoutVerb: "atomize", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
     exitVerb: "atomize", includeTailOnTimeout: true,
   });
-  const ran = !failure;
-  job.status = ran ? "done" : "failed";
-  if (ran && job.slugs.length) {
+  job.status = atomizeArtifactVerdict(failure, job.slugs.length);
+  if (job.status === "done") {
     // Belt-and-suspenders: force the origin tag on every row of every folder this job created,
     // rather than trusting the subprocess's own SKILL.md-driven bookkeeping to have landed it
     // (e.g. if `echo $ATOMIZE_ORIGIN` wasn't an allowlisted Bash command in that run).
@@ -1065,6 +1141,12 @@ export function retryJob(id: string): { error: string } | { job: Job } {
   job.error = null;
   job.failedAtStep = null;
   job.step = 0;
+  // The previous attempt's checklist goes with it. settleJob forces `step = stepTotal` on a clean
+  // finish, so a leftover stepTotal would paint a full progress bar and a row of green step labels
+  // for a checklist THIS attempt never emitted. Never render progress the system did not measure.
+  job.steps = [];
+  job.stepTotal = null;
+  job.lastStdoutLine = null;
   // Both cleared so the clock restarts from the retry rather than showing the first attempt's
   // frozen elapsed while it sits queued.
   job.startedAt = null;

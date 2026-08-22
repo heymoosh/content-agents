@@ -43,21 +43,14 @@ export function storyboardJobDone(jobs: { kind: string; slugs?: string[]; status
   return forSlug.every((j) => j.status === "done" || j.status === "failed");
 }
 
-// Pure, DOM-free mirror of the inline fmtElapsed(ms) helper the client <script> below uses (both
-// for the Jobs queue's live elapsed time and, since card a14693da, the insights follow-up ticker).
+// Pure, DOM-free mirror of the inline fmtElapsed(ms) helper the client <script> below uses. It is
+// the ONE duration formatter every job surface goes through, and its only input is a measured
+// elapsedMs. The click-local tickers that used to call it with a locally-started stopwatch are
+// gone: a room strip and a click-started counter on the same screen disagreed by however long the
+// job sat queued.
 export function formatElapsed(ms: number): string {
   const s = Math.round(ms / 1000);
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-}
-
-// Pure, DOM-free mirror of the inline "thinking" ticker text the client <script> below builds
-// while awaiting a follow-up insights answer (server-side timeout up to 180s) — replaces a fixed
-// "~10-60s" ETA that badly undersold the real wait with a live elapsed-time count instead, so a
-// user can tell it's still working rather than assume it's frozen (card a14693da). Exists here
-// purely so the text format is Node-testable; the client keeps its own inline copy ticked by a
-// setInterval (same cross-runtime duplication convention as the mirrors above).
-export function insightsTickerText(elapsedMs: number): string {
-  return `✨ Claude is looking into it… (may re-run a report) <span class="ticker">${formatElapsed(elapsedMs)} elapsed</span>`;
 }
 
 // Pure, DOM-free mirror of the inline renderInsightsMeta(r) the client <script> below builds for
@@ -135,10 +128,13 @@ export const JOB_COLORS = {
 // Which room a job lands in. Drives the rail label on `done`, the "Watch it in <Room>" link, the
 // landing sentence, the team-rail name and which room's strip shows it.
 export function jobRoom(kind: string): JobRoom {
-  if (kind === "scout" || kind === "draft-follow-up") return "Outreach";
+  // "outreach-revise" is the Outreach thread's "Update it". It is a separate kind from "revise"
+  // precisely so it lands here instead of under Content with the Formatter.
+  if (kind === "scout" || kind === "draft-follow-up" || kind === "outreach-revise") return "Outreach";
   if (kind === "pull" || kind === "strategy" || kind === "insights" || kind === "ask-insights" || kind === "brief-revise") return "Signals";
   if (kind === "charles-draft") return "Charles";
   // url/file/text/notes/continue/video/develop/develop-reply/revise/duplicate — the production crew
+  // ("revise" here is a CONTENT derivative revise, which belongs in Content)
   return "Content";
 }
 
@@ -163,7 +159,11 @@ export function jobElapsedText(elapsedMs: number | null | undefined): string {
 // Studio working panel rail (v5 §5.1). On `done` the rail is the room name, green.
 export function jobRailLabel(job: JobView): { text: string; color: string } {
   if (job.status === "failed") return { text: "Did not work", color: JOB_COLORS.red };
-  if (job.status === "blocked") return { text: "Needs you", color: JOB_COLORS.amber };
+  // Amber "Needs you" only while she actually owes it an answer. Once she has answered, the row is
+  // a record of a settled question, so it must stop flagging itself as urgent.
+  if (job.status === "blocked") return job.answer
+    ? { text: "You answered", color: JOB_COLORS.green }
+    : { text: "Needs you", color: JOB_COLORS.amber };
   if (job.status === "done") return { text: jobRoom(job.kind), color: JOB_COLORS.green };
   if (job.status === "queued") return { text: "Waiting its turn", color: JOB_COLORS.greyFg };
   return { text: "Working", color: JOB_COLORS.ai };
@@ -250,7 +250,7 @@ export function jobFooter(job: JobView): string {
 export function jobLogLine(job: JobView): string {
   const path = job.logPath || "";
   if (job.status === "failed") return `> stopped at ${path}`;
-  if (job.status === "blocked") return "> stopped, waiting on your answer";
+  if (job.status === "blocked") return job.answer ? "> stopped, you answered it" : "> stopped, waiting on your answer";
   if (job.status === "queued") return "> waiting for a slot";
   if (job.status === "done") return `> wrote to ${path}`;
   return `> reading ${path} ...`;
@@ -266,6 +266,50 @@ export function jobOpenLabel(job: JobView): string {
 // what happened; a blocked or failed job holds the strip until it is acted on.
 export const STRIP_LINGER_MS = 9000;
 
+// How often the client re-reads /api/jobs while anything is worth watching.
+export const JOBS_POLL_MS = 3000;
+
+// A blocked job Muxin has ALREADY ANSWERED is settled work, not a demand on her. answerJob
+// requeues a fresh job carrying her answer, so the original hangs around only so the question and
+// what she picked stay readable. It must stop counting toward "waiting on you", stop holding the
+// urgent rail state, stop holding a room strip open, and become sweepable by Clear queue.
+export function jobAwaitingAnswer(job: JobView): boolean {
+  return job.status === "blocked" && !job.answer;
+}
+
+// Finished as far as every surface is concerned: a clean `done`, or an answered ask.
+export function jobSettled(job: JobView): boolean {
+  return job.status === "done" || (job.status === "blocked" && !!job.answer);
+}
+
+// Whether the job poll should fire this beat. Queued or running work obviously needs it, but so
+// does a job that JUST finished: the room strip lingers STRIP_LINGER_MS past finishedAt, and that
+// linger can only expire if something keeps re-rendering until the window closes. Polling one beat
+// past the window guarantees the render that actually clears the strip happens.
+// `armedUntil` covers the other half: from an idle desk, an enqueue leaves nothing in `jobs` to
+// look at yet, so a POST to an enqueueing route arms the poll for a moment until the new job shows
+// up in the read. Without it the first progress surface for that job never appeared at all.
+export function jobsPollDue(jobs: JobView[], now: number, armedUntil = 0): boolean {
+  if (now < armedUntil) return true;
+  if (jobs.some((j) => j.status === "queued" || j.status === "running")) return true;
+  return jobs.some((j) => j.finishedAt != null && now - (j.finishedAt as number) < STRIP_LINGER_MS + JOBS_POLL_MS);
+}
+
+// Every POST route that puts a job on the queue. Some of them (a derivative revise, say) only
+// answer once the whole job is finished, so waiting for the response before looking is too late:
+// arming happens when the request goes out, not when it comes back.
+export const JOB_ENQUEUE_ROUTES: readonly string[] = [
+  "/api/atomize", "/api/notes/pick", "/api/revise", "/api/duplicate", "/api/video/generate",
+  "/api/develop/start", "/api/develop/reply", "/api/develop/format",
+  "/api/strategy/ask", "/api/strategy/refresh-brief", "/api/strategy/insights",
+  "/api/strategy/ask-insights", "/api/strategy/pull",
+  "/api/outreach/scout", "/api/outreach/draft", "/api/outreach/message/revise",
+  "/api/charles/draft", "/api/followups/draft-follow-up",
+];
+export function enqueuesJob(path: string): boolean {
+  return JOB_ENQUEUE_ROUTES.includes(path);
+}
+
 // `roomOf` is injectable only so the Fiction-failure rule below is testable today: no job kind maps
 // to Fiction yet (PR 6 adds the /story draft job). The client always uses the default.
 export function stripJobFor(
@@ -273,18 +317,28 @@ export function stripJobFor(
 ): JobView | null {
   if (room === "Charles") return null; // Charles gets no strip; it keeps its current behavior
   const inRoom = jobs.filter((j) => roomOf(j.kind) === room);
-  // Fiction renders its own localized failure card, so its strip is suppressed on a failure. One
-  // failure card per screen, never two.
-  if (room === "Fiction" && inRoom.some((j) => j.status === "failed")) return null;
-  const live = inRoom.filter((j) => j.status !== "done");
-  if (live.length) return live[live.length - 1];
+  // An answered ask is settled: it drops out of `live` and falls to the linger below, so the
+  // requeued job that carries her answer forward takes the strip instead of the question she is
+  // done with.
+  const live = inRoom.filter((j) => !jobSettled(j));
   const lingering = inRoom.filter((j) => j.finishedAt != null && now - (j.finishedAt as number) < STRIP_LINGER_MS);
-  return lingering.length ? lingering[lingering.length - 1] : null;
+  const candidate = live.length ? live[live.length - 1]
+    : lingering.length ? lingering[lingering.length - 1]
+    : null;
+  if (!candidate) return null;
+  // Fiction renders its own localized failure card, so the strip steps aside when the job it WOULD
+  // show is that failure. One failure card per screen, never two. Judged on the newest job, not on
+  // "any fiction job ever failed": an old failure left sitting in the queue must not blank the
+  // strip for a Fiction job running right now, which would leave that job no progress surface.
+  if (room === "Fiction" && candidate.status === "failed") return null;
+  return candidate;
 }
 
 export function stripRailLabel(job: JobView): { text: string; color: string } {
   if (job.status === "failed") return { text: "Did not work", color: JOB_COLORS.red };
-  if (job.status === "blocked") return { text: "Stopped, needs you", color: JOB_COLORS.amber };
+  if (job.status === "blocked") return job.answer
+    ? { text: "You answered", color: JOB_COLORS.green }
+    : { text: "Stopped, needs you", color: JOB_COLORS.amber };
   if (job.status === "done") return { text: "Just finished", color: JOB_COLORS.green };
   if (job.status === "queued") return { text: "Waiting its turn", color: JOB_COLORS.greyFg };
   return { text: "Working now", color: JOB_COLORS.ai };
@@ -308,7 +362,9 @@ export function stripFooter(job: JobView): string {
 // ── Studio's team rail (v5 §5.2) ──
 
 export function teamRailHeader(jobs: JobView[]): string {
-  if (jobs.some((j) => j.status === "blocked")) return "YOUR TEAM, WAITING ON YOU";
+  // Only an UNANSWERED ask is waiting on her. Once she answers, the header must stop saying she
+  // owes the team something.
+  if (jobs.some(jobAwaitingAnswer)) return "YOUR TEAM, WAITING ON YOU";
   if (jobs.some((j) => j.status === "running")) return "YOUR TEAM, WORKING";
   return "YOUR TEAM, IDLE";
 }
@@ -333,7 +389,7 @@ export interface TeamRow {
 
 export function teamLiveRows(jobs: JobView[]): TeamRow[] {
   return jobs
-    .filter((j) => j.status !== "done")
+    .filter((j) => !jobSettled(j)) // an answered ask is finished; it stops asking "ANSWER IT"
     .map((j) => {
       const steps = j.steps ?? [];
       const inFlight = steps.length ? steps[Math.min(j.step ?? 0, steps.length - 1)].toLowerCase() : j.label;
@@ -1250,7 +1306,11 @@ async function load(){
   const r = await fetch("/api/queue"); DATA = await r.json();
   render();
 }
+// Armed when a POST that enqueues a job goes OUT. Some of those routes only answer once the whole
+// job has finished, so waiting for the response would be too late to ever show its progress.
+let jobsPollArmedUntil = 0;
 async function post(path, body){
+  if(enqueuesJob(path)) jobsPollArmedUntil = Date.now() + JOBS_POLL_MS * 3;
   const r = await fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
   return r.json();
 }
@@ -1374,7 +1434,7 @@ function rowEl(piece, row){
     (row.duplicatable
       ? '<div class="dupbox'+((row.dupError||dupPending.has(row.id))?" show":"")+'">'+
         (dupPending.has(row.id)
-          ? '<div class="thinking">✨ Claude is drafting the '+esc(dupPending.get(row.id))+' version… (~10-60s)</div>'
+          ? '<div class="thinking">✨ Claude is drafting the '+esc(dupPending.get(row.id))+' version. The strip at the top of this room carries the clock.</div>'
           : '<select>'+dupOptions+'</select><button class="send" data-act="dup-send">Duplicate</button>'+
             (row.dupError ? '<div class="duperr">⚠ '+esc(row.dupError)+'</div>' : ""))+
       '</div>'
@@ -1638,10 +1698,10 @@ async function refreshBriefRun(){
   btn.disabled = true;
   const body = $("#briefBody");
   const prevHtml = body.innerHTML;
-  const start = Date.now();
-  const tick = () => { body.innerHTML = '<p class="thinking">✨ Running the full /strategy skill (grades bets, writes a new dated brief — takes minutes; the Studio room has the log) <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span></p>'; };
-  tick();
-  const timer = setInterval(tick, 1000);
+  // No clock here. The progress strip at the top of this room is the ONE measured duration for
+  // this job, and it counts from when the job was queued. A second timer started at the click
+  // disagreed with it on the same screen, which is the exact defect this design was corrected for.
+  body.innerHTML = '<p class="thinking">✨ Running the full /strategy skill. It grades your bets and writes a new dated brief, which takes minutes. The strip at the top of this room carries the clock, and the Studio room has the log.</p>';
   loadJobs(); // make the strategy job visible in the Studio room right away
   try {
     const r = await post("/api/strategy/refresh-brief", {});
@@ -1651,7 +1711,6 @@ async function refreshBriefRun(){
     body.innerHTML = prevHtml;
     flash(e instanceof Error ? e.message : String(e));
   } finally {
-    clearInterval(timer);
     btn.disabled = false;
   }
 }
@@ -1660,7 +1719,7 @@ $("#briefRefreshBtn").addEventListener("click", refreshBriefRun);
 // Insights: a Claude-written synthesis (not a raw report dump), plus a follow-up chat thread that
 // can ask Claude to dig into anything — Claude may re-run the reports itself to answer. fmtDays/
 // renderInsightsMeta mirror this file's Node-side exports of the same name (kept in sync by hand,
-// same convention as insightsTickerText below) — the meta line is built from deterministic
+// same cross-runtime convention as the mirrors above): the meta line is built from deterministic
 // server-side numbers, NOT from Claude's markdown, since mdToHtml has no link syntax and this way
 // the freshness stamp can never be wrong or omitted by an LLM pass.
 function fmtDays(n){ return n+" day"+(n===1?"":"s"); }
@@ -1682,7 +1741,9 @@ async function generateInsights(){
   $("#insightsPanel").hidden = false;
   insightsHistory = [];
   $("#insightsThread").innerHTML = "";
-  $("#insightsOut").innerHTML = '<p class="hint">Running the reports, then asking Claude for a synthesis… (~20-40s)</p>';
+  // No estimate here. Nothing ever measured the guess that used to sit in this line, and the strip
+  // at the top of this room already shows the real elapsed time for this job.
+  $("#insightsOut").innerHTML = '<p class="hint">Running the reports, then asking Claude for a synthesis. The strip at the top of this room carries the clock.</p>';
   const r = await post("/api/strategy/insights", {});
   $("#insightsBtn").disabled = false;
   if(r.ok){ $("#insightsOut").innerHTML = renderInsightsMeta(r) + mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
@@ -1709,19 +1770,12 @@ async function askInsights(){
   renderThread();
   const thinking = document.createElement("div");
   thinking.className = "thinking";
-  // Honest, live feedback instead of a fixed ETA that undersells the real (up to 180s) wait —
-  // may re-run a report, so a ticking elapsed count beats a static guess (card a14693da).
-  const start = Date.now();
-  const tick = () => { thinking.innerHTML = '✨ Claude is looking into it… (may re-run a report) <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span>'; }; // mirrors insightsTickerText() in this file's Node-side export, kept in sync by hand
-  tick();
-  const timer = setInterval(tick, 1000);
+  // No clock here either. Card a14693da replaced a fixed ETA with a click-local ticker, which was
+  // right at the time; the room strip now carries the one measured elapsed count for this job, so
+  // a second timer on the same screen would just disagree with it.
+  thinking.innerHTML = '✨ Claude is looking into it. It may re-run a report first. The strip at the top of this room carries the clock.';
   $("#insightsThread").appendChild(thinking);
-  let r;
-  try {
-    r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory});
-  } finally {
-    clearInterval(timer);
-  }
+  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory});
   $("#insightsAskBtn").disabled = false;
   insightsHistory.push({role:"assistant", content: r.ok ? r.answer : "Failed: "+(r.error||"error")});
   renderThread();
@@ -1763,16 +1817,8 @@ async function pullFresh(){
   btn.disabled = true; $("#rawRefreshBtn").disabled = true;
   const box = $("#rawList");
   const prevHtml = box.innerHTML;
-  const start = Date.now();
-  const tick = () => { box.innerHTML = '<div class="empty">✨ Pulling fresh analytics… real Chrome, can take a few minutes <span class="ticker">'+fmtElapsed(Date.now()-start)+' elapsed</span></div>'; };
-  tick();
-  const timer = setInterval(tick, 1000);
-  let r;
-  try {
-    r = await post("/api/strategy/pull", {});
-  } finally {
-    clearInterval(timer);
-  }
+  box.innerHTML = '<div class="empty">✨ Pulling fresh analytics through real Chrome. It can take a few minutes. The strip at the top of this room carries the clock.</div>';
+  const r = await post("/api/strategy/pull", {});
   btn.disabled = false; $("#rawRefreshBtn").disabled = false;
   if(r.ok){ flash("Pull complete"); await loadRaw(); }
   else { box.innerHTML = prevHtml; flash("Pull failed: "+(r.error||"error")); await loadRaw(); }
@@ -2213,10 +2259,7 @@ async function scoutRun(){
   const banner = document.createElement("div");
   banner.className = "hint";
   banner.style.padding = "10px 4px";
-  const start = Date.now();
-  const tick = () => { banner.textContent = "✨ Scouting for new leads… (bounded searches on your subscription, takes minutes — the Studio room has the log) · "+fmtElapsed(Date.now()-start)+" elapsed"; };
-  tick();
-  const timer = setInterval(tick, 1000);
+  banner.textContent = "✨ Scouting for new leads with bounded searches on your subscription. It takes minutes. The strip at the top of this room carries the clock, and the Studio room has the log.";
   box.prepend(banner);
   loadJobs(); // make the scout job visible in the Studio room right away
   try {
@@ -2226,7 +2269,6 @@ async function scoutRun(){
   } catch (e) {
     flash(e instanceof Error ? e.message : String(e));
   } finally {
-    clearInterval(timer);
     scoutInFlight = false;
     await loadOutreach();
   }
@@ -2893,8 +2935,20 @@ function fmtElapsed(ms){
 // strip's clock in the destination room. Never a frozen literal beside a live counter.
 const JC = { ai:"#5b46b8", amber:"#9a6b12", green:"#2f7d46", red:"#9a2f2f", grey:"#d8d2c6", greyFg:"#a89a80", blue:"#2f5d9a" };
 const STRIP_LINGER_MS = 9000;
+const JOBS_POLL_MS = 3000;
+// Mirrors jobAwaitingAnswer/jobSettled/jobsPollDue/enqueuesJob in this file's Node-side export,
+// kept in sync by hand. An answered ask is settled work: it stops reading as "waiting on you".
+function jobAwaitingAnswer(j){ return j.status==="blocked" && !j.answer; }
+function jobSettled(j){ return j.status==="done" || (j.status==="blocked" && !!j.answer); }
+function jobsPollDue(jobs, now, armedUntil){
+  if(now < (armedUntil||0)) return true;
+  if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
+  return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
+}
+const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/develop/start","/api/develop/reply","/api/develop/format","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up"];
+function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path); }
 function jobRoom(kind){
-  if(kind==="scout"||kind==="draft-follow-up") return "Outreach";
+  if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
   if(kind==="pull"||kind==="strategy"||kind==="insights"||kind==="ask-insights"||kind==="brief-revise") return "Signals";
   if(kind==="charles-draft") return "Charles";
   return "Content";
@@ -2910,7 +2964,7 @@ function jobLanding(room){
 function jobElapsedText(ms){ return ms==null ? "not started" : fmtElapsed(ms); }
 function jobRail(j){
   if(j.status==="failed") return {text:"Did not work", color:JC.red};
-  if(j.status==="blocked") return {text:"Needs you", color:JC.amber};
+  if(j.status==="blocked") return j.answer ? {text:"You answered", color:JC.green} : {text:"Needs you", color:JC.amber};
   if(j.status==="done") return {text:jobRoom(j.kind), color:JC.green};
   if(j.status==="queued") return {text:"Waiting its turn", color:JC.greyFg};
   return {text:"Working", color:JC.ai};
@@ -2953,7 +3007,7 @@ function jobFooter(j){
 function jobLogLine(j){
   const path = j.logPath||"";
   if(j.status==="failed") return "> stopped at "+path;
-  if(j.status==="blocked") return "> stopped, waiting on your answer";
+  if(j.status==="blocked") return j.answer ? "> stopped, you answered it" : "> stopped, waiting on your answer";
   if(j.status==="queued") return "> waiting for a slot";
   if(j.status==="done") return "> wrote to "+path;
   return "> reading "+path+" ...";
@@ -3028,15 +3082,17 @@ function stripJobFor(jobs, room, now, roomOf){
   if(room==="Charles") return null;
   const to = roomOf || jobRoom;
   const inRoom = jobs.filter(j=>to(j.kind)===room);
-  if(room==="Fiction" && inRoom.some(j=>j.status==="failed")) return null;
-  const live = inRoom.filter(j=>j.status!=="done");
-  if(live.length) return live[live.length-1];
+  const live = inRoom.filter(j=>!jobSettled(j));
   const lingering = inRoom.filter(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS);
-  return lingering.length ? lingering[lingering.length-1] : null;
+  const candidate = live.length ? live[live.length-1] : lingering.length ? lingering[lingering.length-1] : null;
+  if(!candidate) return null;
+  // Judged on the newest job, not on "any fiction job ever failed". See the Node-side mirror.
+  if(room==="Fiction" && candidate.status==="failed") return null;
+  return candidate;
 }
 function stripRail(j){
   if(j.status==="failed") return {text:"Did not work", color:JC.red};
-  if(j.status==="blocked") return {text:"Stopped, needs you", color:JC.amber};
+  if(j.status==="blocked") return j.answer ? {text:"You answered", color:JC.green} : {text:"Stopped, needs you", color:JC.amber};
   if(j.status==="done") return {text:"Just finished", color:JC.green};
   if(j.status==="queued") return {text:"Waiting its turn", color:JC.greyFg};
   return {text:"Working now", color:JC.ai};
@@ -3080,7 +3136,7 @@ function renderRoomStrips(){
 // the resting rows come from /api/studio. No clock here on purpose: the working panel on this same
 // screen already carries each job's one duration.
 function teamRailHeader(jobs){
-  if(jobs.some(j=>j.status==="blocked")) return "YOUR TEAM, WAITING ON YOU";
+  if(jobs.some(jobAwaitingAnswer)) return "YOUR TEAM, WAITING ON YOU";
   if(jobs.some(j=>j.status==="running")) return "YOUR TEAM, WORKING";
   return "YOUR TEAM, IDLE";
 }
@@ -3093,7 +3149,7 @@ function teamRoomName(room){
   return "Charles";
 }
 function teamLiveRows(jobs){
-  return jobs.filter(j=>j.status!=="done").map(j=>{
+  return jobs.filter(j=>!jobSettled(j)).map(j=>{
     const steps = j.steps||[];
     const inFlight = steps.length ? steps[Math.min(j.step||0, steps.length-1)].toLowerCase() : j.label;
     return {
@@ -3231,7 +3287,7 @@ $("#notesCloseBtn").addEventListener("click", ()=>{ $("#notesPanel").hidden = tr
 $("#notesShowDrafted").addEventListener("change",(e)=>{ notesShowDrafted = e.target.checked; renderNotes(); });
 $("#notesDraftBtn").addEventListener("click", draftSelectedNotes);
 $("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") devStart(); });
-setInterval(()=>{ if(JOBS.some(j=>j.status==="queued"||j.status==="running")) loadJobs(); }, 3000);
+setInterval(()=>{ if(jobsPollDue(JOBS, Date.now(), jobsPollArmedUntil)) loadJobs(); }, JOBS_POLL_MS);
 
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
 setRoom("content");
