@@ -365,6 +365,184 @@ export function restingTeamRows<T extends { name: string; state: string }>(resti
   return resting.filter((r) => !liveNames.has(r.name) && r.state !== "working" && r.name !== "Queue");
 }
 
+// ── Outreach room: triage + thread (design v7 §3, static half) ──
+// The room reads as two screens off ONE /api/outreach/leads read. Triage groups every lead by the
+// reason it is on the desk; picking one opens its thread. Everything below is a pure mirror of the
+// inline browser copy further down, so node:test can check the judgment without a DOM. Keep the two
+// in sync by hand — the repo's standing convention for this file.
+
+export interface OutreachContactView {
+  name: string;
+  role?: string;
+}
+
+export interface OutreachEvidenceView {
+  id?: string;
+  signal?: string;
+  person?: string;
+  source?: string;
+  quote?: string;
+  description?: string;
+}
+
+export interface OutreachMessageView {
+  file?: string;
+  channel?: string;
+  status?: string;
+  recipient?: string;
+  body?: string;
+}
+
+export interface OutreachLeadView {
+  dir: string;
+  kind?: string;
+  name?: string;
+  source?: string;
+  status?: string;
+  segment?: string;
+  pitchAngle?: string;
+  pitch?: string;
+  whyThem?: string;
+  whyMe?: string;
+  whyMutual?: string;
+  contacts?: OutreachContactView[];
+  evidence?: OutreachEvidenceView[];
+  latestMessage?: OutreachMessageView | null;
+}
+
+// `fm.segment` is read by readLeadDetail() but no producer in this repo writes it, so it is always
+// "" in practice. The real driver is the kind/source derivation below, which has FOUR values, not
+// the prototype's three: content-example leads are real rows on the desk and get their own group
+// rather than being dropped.
+export function outreachSegment(lead: OutreachLeadView): string {
+  if (lead.segment) return lead.segment;
+  if (lead.kind === "platform") return "platform";
+  if (lead.kind === "client") return lead.source === "jsa" ? "org-role" : "org-mission";
+  return "content-example";
+}
+
+// Group names and notes lifted verbatim from the design's own SEGS array. The fourth group's note
+// is the line this page already shipped for content-example leads, kept as written.
+export const OUTREACH_SEGMENTS: { key: string; name: string; note: string }[] = [
+  { key: "platform", name: "PLATFORMS", note: "Where the audience already is. Bring the work, not a pitch." },
+  { key: "org-mission", name: "ORGANIZATIONS · MISSION FIT", note: "They do the thing you write about. Bring the overlap." },
+  { key: "org-role", name: "ORGANIZATIONS · OPEN ROLES", note: "They are hiring for what you already built. Bring the receipt." },
+  { key: "content-example", name: "EXAMPLES", note: "raw material for a writing angle" },
+];
+
+export function groupLeadsBySegment(
+  leads: OutreachLeadView[],
+): { key: string; name: string; note: string; leads: OutreachLeadView[] }[] {
+  return OUTREACH_SEGMENTS.map((s) => ({
+    ...s,
+    leads: leads.filter((l) => outreachSegment(l) === s.key),
+  })).filter((g) => g.leads.length > 0);
+}
+
+// The "when" column on a triage row. Real tracker events only: a lead with no event, or an event
+// with no timestamp, says so plainly instead of showing a measured-looking date it never measured.
+export function lastPitchedLabel(lastTouch: string | null | undefined): string {
+  const t = (lastTouch ?? "").trim();
+  return t ? `pitched ${t.slice(0, 10)}, by hand` : "never pitched";
+}
+
+export function threadSegLabel(segment: string): string {
+  if (segment === "platform") return "PLATFORM · SELECTED";
+  if (segment === "org-mission") return "MISSION FIT · SELECTED";
+  if (segment === "org-role") return "OPEN ROLE · SELECTED";
+  return "EXAMPLE · SELECTED";
+}
+
+// The matchmaker read. `legacy` marks a lead qualified before the why_* fields existed: it falls
+// back to the pitch angle and SAYS it is a legacy read, rather than passing pitch-strategy prose
+// off as the matchmaker's three-way answer.
+export function matchmakerRead(lead: OutreachLeadView): {
+  legacy: boolean;
+  headline: string;
+  rows: { k: string; v: string }[];
+} {
+  const hasMatchmaker = !!(lead.whyMutual || lead.whyThem || lead.whyMe);
+  if (!hasMatchmaker) {
+    return {
+      legacy: true,
+      headline: (lead.pitchAngle || lead.pitch || "").trim() || "(no read recorded yet)",
+      rows: [],
+    };
+  }
+  const rows: { k: string; v: string }[] = [];
+  if (lead.whyThem) rows.push({ k: "Why them, for you", v: lead.whyThem });
+  if (lead.whyMe) rows.push({ k: "Why you, for them", v: lead.whyMe });
+  if (lead.whyMutual) rows.push({ k: "Why the two of you", v: lead.whyMutual });
+  return { legacy: false, headline: (lead.whyMutual || lead.whyThem || lead.whyMe || "").trim(), rows };
+}
+
+// 0, 1 or several people. Zero is the plain zero case, not a flag: a lead with nobody named yet is
+// still a lead you can write to.
+export function contactsLine(contacts: OutreachContactView[] | undefined): string {
+  const n = (contacts ?? []).length;
+  if (n === 0) return "No named contact yet. Add one, or write to the organization.";
+  if (n === 1) {
+    const name = (contacts ?? [])[0].name;
+    return `You are writing to ${name}${/[.!?]$/.test(name) ? "" : "."}`;
+  }
+  return `${n} people here. Each one gets its own message and its own follow-up clock.`;
+}
+
+// Mirror of isValidSourceUrl in src/outreach/qualify.ts, same posture: https?:// with a dotted
+// host, or vault:<path> for evidence cited from Muxin's own vault. Kept here so the rail can say
+// "no source recorded" instead of rendering a claim with nothing behind it.
+const OUTREACH_PLACEHOLDER_SOURCES = new Set(["(none)", "none", "n/a", "na", "tbd", "unknown", ""]);
+export function isEvidenceSourceValid(source: string | undefined): boolean {
+  const trimmed = (source ?? "").trim();
+  if (!trimmed || OUTREACH_PLACEHOLDER_SOURCES.has(trimmed.toLowerCase())) return false;
+  if (/^vault:/i.test(trimmed)) {
+    const path = trimmed.slice("vault:".length).trim();
+    return path.length > 0 && !OUTREACH_PLACEHOLDER_SOURCES.has(path.toLowerCase());
+  }
+  if (!/^https?:\/\//i.test(trimmed)) return false;
+  try {
+    return new URL(trimmed).hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
+export const NO_SOURCE_RECORDED = "no source recorded";
+
+// What the evidence rail shows under a quote. There is no timestamp anywhere in EvidenceItem, so
+// there is no date to fall back on: an item with nothing valid behind it says it has nothing.
+export function evidenceSourceView(source: string | undefined): { kind: "link" | "text" | "none"; text: string } {
+  const trimmed = (source ?? "").trim();
+  if (!isEvidenceSourceValid(trimmed)) return { kind: "none", text: NO_SOURCE_RECORDED };
+  if (/^https?:\/\//i.test(trimmed)) return { kind: "link", text: trimmed };
+  return { kind: "text", text: trimmed };
+}
+
+// Locked and sent are two different states and never collapse into one check. Locking readies the
+// text; only Muxin's own hands send it, and only her own click records that it went.
+export type OutreachSendState = "none" | "draft" | "locked" | "sent";
+export function outreachSendState(
+  message: OutreachMessageView | null | undefined,
+  lastTouch: string | null | undefined,
+): OutreachSendState {
+  if (!message) return "none";
+  if ((message.status ?? "").trim() !== "locked") return "draft";
+  return (lastTouch ?? "").trim() ? "sent" : "locked";
+}
+
+export function outreachSendNote(state: OutreachSendState): string {
+  if (state === "draft") return "Locking readies it. You send it by hand, and nothing here can send it for you.";
+  if (state === "locked") return "Paste it into your mail client and send it there. Tell me once it has gone.";
+  if (state === "sent") return "You sent this one by hand. Its follow-up clock is running.";
+  return "";
+}
+
+export function outreachSendBadge(state: OutreachSendState): string {
+  if (state === "locked") return "LOCKED · NOT EDITABLE, NOT SENT";
+  if (state === "sent") return "LOCKED · SENT BY HAND";
+  return "";
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -522,6 +700,33 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .sent-bar button.go { border:none; background:var(--green); color:#fbf9f4; border-radius:7px; padding:6px 13px; font-weight:600; }
   .ev-quote { font:italic 400 13px/1.55 Georgia,serif; color:#3a352c; }
   .ev-src { font-size:12px; color:#7a7266; border-bottom:1px solid #d8cfbb; width:fit-content; text-decoration:none; }
+  .ev-nosrc { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; }
+  /* Outreach triage: the queue grouped by why, one row per lead, one click into the thread */
+  .tri-cap { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em;
+    color:#a89a80; text-transform:uppercase; margin-bottom:20px; }
+  .tri-group { display:flex; flex-direction:column; gap:9px; margin-bottom:22px; }
+  .tri-head { display:flex; flex-direction:column; gap:2px; }
+  .tri-name { font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em; color:#7a6f5c; }
+  .tri-note { font-size:12.5px; line-height:1.5; color:#8a7f6d; }
+  button.tri-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:baseline;
+    width:100%; text-align:left; border:none; border-top:1px solid #f2ece0; border-radius:0;
+    background:none; padding:9px 12px; margin:0; color:inherit; }
+  button.tri-row:hover { background:#f4efe3; }
+  .tri-who { min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .tri-who .w { font:400 16px/1.4 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .tri-who .y { font-size:12.5px; line-height:1.5; color:#7a7266;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tri-when { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; white-space:nowrap; }
+  .tri-when.on { color:var(--green); }
+  /* Outreach thread: one lead, read end to end */
+  button.out-back { border:none; background:none; padding:0; font-size:13px; color:#7a7266;
+    border-bottom:1px solid #d8cfbb; border-radius:0; margin-bottom:20px; }
+  .thread-head { display:flex; flex-direction:column; gap:4px; margin-bottom:16px; }
+  .thread-seg { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em; color:#a89a80; }
+  .thread-who { font:400 27px/1.3 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .thread-person { font-size:13.5px; line-height:1.5; color:#7a7266; }
+  .send-steps { margin-top:16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .send-note { font-size:13px; line-height:1.5; color:#7a7266; max-width:330px; }
   /* Follow-ups ledger rows */
   .fu-row { padding:18px 0 14px; border-top:1px solid #efe7d6; }
   .fu-head { display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:14px; align-items:baseline; }
@@ -947,8 +1152,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
     <div class="sheet" id="stripOutreach" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet" id="outreachPane">
-      <div class="sheet-head"><h2>Leads</h2></div>
-      <div class="sheet-sub">Dossiers from your scout. Pursue or pass marks the call; a drafted message is yours to edit, and only you ever send it.</div>
+      <div class="sheet-head"><h2 id="outreachHead">Leads</h2></div>
+      <div class="sheet-sub">Everyone your scout found, grouped by the reason they are on the desk. Pick one to read the research and shape a message. Only you ever send it.</div>
       <div id="outreachList" style="margin-top:14px"><div class="empty">Loading…</div></div>
     </div>
     <div class="sheet" id="followupsPane" hidden>
@@ -1511,19 +1716,22 @@ async function pullFresh(){
 }
 $("#rawPullBtn").addEventListener("click", pullFresh);
 
-// ── Outreach room: the dossier on the desk (Content Studio Riff 3d) ──
-// One lead at a time, read like a briefing: the matchmaker read up top (why them / why you /
-// mutual), the people to reach with their own follow-up clocks, the message you shape, and the
-// one honest logistics step — "Mark as sent" — that starts the ledger clock. Legacy leads (no
-// matchmaker fields yet) fall back to their pitch angle with a "legacy read" chip until
-// re-qualified. Nothing here contacts anyone.
+// ── Outreach room: triage, then the thread (design v7 §3) ──
+// Two screens off one /api/outreach/leads read. Triage is the default: every lead grouped by the
+// reason it is on the desk, each row carrying who, why, and when it was last pitched (real tracker
+// events only). Picking a row opens that lead's thread — the matchmaker read, the people, the
+// evidence with its sources, the message, and the two separate steps at the end: lock it, then
+// tell the page you sent it by hand. Nothing here contacts anyone.
+// The helpers below mirror the exported ones in page.ts; keep both sides in step by hand.
 let OUTREACH_LEADS = null;
-let activeLeadDir = null;
+let OUTREACH_TOUCH = {};       // lead dir → newest tracker lastTouch, from /api/followups
+let activeLeadDir = null;      // null = the triage queue; a dir = that lead's thread
 let scoutInFlight = false;
 const outPending = new Set();
 const outError = new Map();
 const msgPending = new Set();
 const msgError = new Map();
+const lockPending = new Set();
 
 function leadSegment(l){
   if (l.segment) return l.segment;
@@ -1537,32 +1745,131 @@ const SEG_INFO = {
   "org-mission":     { label:"Org · mission", dot:"#2f7d46", line:"values-aligned, worth knowing" },
   "content-example": { label:"Example",       dot:"#7a7266", line:"raw material for a writing angle" },
 };
+const OUT_SEGMENTS = [
+  { key:"platform",        name:"PLATFORMS",                   note:"Where the audience already is. Bring the work, not a pitch." },
+  { key:"org-mission",     name:"ORGANIZATIONS · MISSION FIT", note:"They do the thing you write about. Bring the overlap." },
+  { key:"org-role",        name:"ORGANIZATIONS · OPEN ROLES",  note:"They are hiring for what you already built. Bring the receipt." },
+  { key:"content-example", name:"EXAMPLES",                    note:"raw material for a writing angle" },
+];
+function groupLeadsBySegment(leads){
+  return OUT_SEGMENTS.map(s=>({key:s.key, name:s.name, note:s.note, leads:leads.filter(l=>leadSegment(l)===s.key)}))
+    .filter(g=>g.leads.length>0);
+}
+function lastPitchedLabel(lastTouch){
+  const t = (lastTouch || "").trim();
+  return t ? "pitched "+t.slice(0,10)+", by hand" : "never pitched";
+}
+function threadSegLabel(seg){
+  if(seg==="platform") return "PLATFORM · SELECTED";
+  if(seg==="org-mission") return "MISSION FIT · SELECTED";
+  if(seg==="org-role") return "OPEN ROLE · SELECTED";
+  return "EXAMPLE · SELECTED";
+}
+function matchmakerRead(l){
+  const has = !!(l.whyMutual || l.whyThem || l.whyMe);
+  if(!has) return { legacy:true, headline:((l.pitchAngle||l.pitch||"").trim()||"(no read recorded yet)"), rows:[] };
+  const rows = [];
+  if(l.whyThem) rows.push({k:"Why them, for you", v:l.whyThem});
+  if(l.whyMe) rows.push({k:"Why you, for them", v:l.whyMe});
+  if(l.whyMutual) rows.push({k:"Why the two of you", v:l.whyMutual});
+  return { legacy:false, headline:(l.whyMutual||l.whyThem||l.whyMe||"").trim(), rows:rows };
+}
+function contactsLine(contacts){
+  const n = (contacts||[]).length;
+  if(n===0) return "No named contact yet. Add one, or write to the organization.";
+  if(n===1) return "You are writing to "+contacts[0].name+(/[.!?]$/.test(contacts[0].name)?"":".");
+  return n+" people here. Each one gets its own message and its own follow-up clock.";
+}
+const OUT_PLACEHOLDER_SOURCES = ["(none)","none","n/a","na","tbd","unknown",""];
+function isEvidenceSourceValid(source){
+  const t = (source||"").trim();
+  if(!t || OUT_PLACEHOLDER_SOURCES.indexOf(t.toLowerCase())>=0) return false;
+  if(/^vault:/i.test(t)){
+    const path = t.slice("vault:".length).trim();
+    return path.length>0 && OUT_PLACEHOLDER_SOURCES.indexOf(path.toLowerCase())<0;
+  }
+  if(!/^https?:\\/\\//i.test(t)) return false;
+  try { return new URL(t).hostname.indexOf(".")>=0; } catch(e){ return false; }
+}
+const NO_SOURCE_RECORDED = "no source recorded";
+function evidenceSourceView(source){
+  const t = (source||"").trim();
+  if(!isEvidenceSourceValid(t)) return { kind:"none", text:NO_SOURCE_RECORDED };
+  if(/^https?:\\/\\//i.test(t)) return { kind:"link", text:t };
+  return { kind:"text", text:t };
+}
+function outreachSendState(msg, lastTouch){
+  if(!msg) return "none";
+  if((msg.status||"").trim() !== "locked") return "draft";
+  return (lastTouch||"").trim() ? "sent" : "locked";
+}
+function outreachSendNote(state){
+  if(state==="draft") return "Locking readies it. You send it by hand, and nothing here can send it for you.";
+  if(state==="locked") return "Paste it into your mail client and send it there. Tell me once it has gone.";
+  if(state==="sent") return "You sent this one by hand. Its follow-up clock is running.";
+  return "";
+}
+function outreachSendBadge(state){
+  if(state==="locked") return "LOCKED · NOT EDITABLE, NOT SENT";
+  if(state==="sent") return "LOCKED · SENT BY HAND";
+  return "";
+}
 
+// ── Triage: the queue, grouped by why ──
+function triageHtml(){
+  const groups = groupLeadsBySegment(OUTREACH_LEADS);
+  if(!groups.length) return '<div class="empty">No leads yet. Scout new leads (top right) runs the discovery agent; /outreach add seeds one by hand.</div>';
+  const body = groups.map(g=>
+    '<div class="tri-group">'+
+      '<div class="tri-head"><span class="tri-name">'+esc(g.name)+'</span><span class="tri-note">'+esc(g.note)+'</span></div>'+
+      g.leads.map(l=>{
+        const touch = OUTREACH_TOUCH[l.dir];
+        const why = matchmakerRead(l).headline;
+        return '<button class="tri-row" data-dir="'+esc(l.dir)+'">'+
+          '<span class="tri-who"><span class="w">'+esc(l.name||l.dir)+'</span><span class="y">'+esc(why)+'</span></span>'+
+          '<span class="tri-when'+(touch?" on":"")+'">'+esc(lastPitchedLabel(touch))+'</span>'+
+        '</button>';
+      }).join("")+
+    '</div>').join("");
+  const margin = '<div class="session-margin"><div class="wb-margin-cap">WHY THIS IS ON YOUR DESK</div>'+
+    '<div class="src">Pick someone from the queue. The research on them, and every source behind it, opens here.</div></div>';
+  return '<div class="dossier-grid"><div style="min-width:0;">'+
+    '<div class="tri-cap">WHO IS IN FRONT OF YOU, GROUPED BY WHY · PICK ONE TO DRAFT TO</div>'+body+
+  '</div>'+margin+'</div>';
+}
+
+// ── The thread: one lead, read end to end ──
 function outreachMarginHtml(l){
   const evs = [...(l.evidence||[])].sort((a,b)=>(b.signal==="worldview-match"?1:0)-(a.signal==="worldview-match"?1:0));
   const items = evs.slice(0,5).map(e=>{
     const quote = e.quote && e.quote!=="(none)" ? '<div class="ev-quote">"'+esc(e.quote)+'"</div>'
       : (e.description ? '<div class="d">'+esc(e.description)+'</div>' : "");
-    const link = /^https?:\\/\\//i.test(e.source) ? '<a class="ev-src" href="'+esc(e.source)+'" target="_blank" rel="noopener">source ↗</a>' : "";
+    // No date fallback: EvidenceItem carries no timestamp, so an item with nothing valid behind it
+    // says it has no source rather than showing a day nobody recorded.
+    const sv = evidenceSourceView(e.source);
+    const src = sv.kind==="link" ? '<a class="ev-src" href="'+esc(sv.text)+'" target="_blank" rel="noopener">source ↗</a>'
+      : sv.kind==="text" ? '<div class="ev-src">'+esc(sv.text)+'</div>'
+      : '<div class="ev-nosrc">'+esc(sv.text)+'</div>';
     const cls = e.signal==="worldview-match" ? "green" : "sand";
-    return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+link+'</div>';
+    return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+src+'</div>';
   }).join("");
   const stats = (l.jsaStats||[]).slice(0,3).map(s=>'<div class="d" style="font-size:12.5px;color:#5a5346;">'+esc(s.label)+': '+esc(s.value)+'</div>').join("");
   const profile = (l.profileRest||l.profile) ? '<details class="lead-details"><summary>Full profile</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.profileRest||l.profile)+'</div></details>' : "";
   const reasoning = l.classificationNote ? '<details class="lead-details"><summary>Full why-fit reasoning</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.classificationNote)+'</div></details>' : "";
-  return '<div class="session-margin"><div class="wb-margin-cap">WHY THIS IS ON YOUR DESK</div>'+items+
+  return '<div class="session-margin"><div class="wb-margin-cap">WHY THIS IS ON YOUR DESK</div>'+
+    (items || '<div class="src">No evidence recorded on this lead yet.</div>')+
     (stats?'<div>'+stats+'</div>':"")+reasoning+profile+
-    '<div class="wb-reply"><span class="mono-note">This page stays tied to the follow-up row. Months from now: the why, what you said, the date, one click.</span></div></div>';
+    '<div class="wb-reply"><span class="mono-note">Every claim here carries its source, or says it has none. This page stays tied to the follow-up row. Months from now: the why, what you said, the date, one click.</span></div></div>';
 }
 
 function outreachMessageBox(l){
   const msg = l.latestMessage;
-  if(!msg) return "";
+  if(!msg) return '<div class="lead-msg"><div class="src">No message drafted yet. "Draft the message" writes one for you to shape.</div></div>';
+  const state = outreachSendState(msg, OUTREACH_TOUCH[l.dir]);
   const recip = msg.recipient ? ' · to '+esc(msg.recipient) : "";
-  if(msg.status === "locked"){
-    return '<div class="lead-msg"><div class="nmeta">locked message · '+esc(msg.file)+recip+' · '+esc(msg.channel||"?")+'</div>'+
-      '<div class="body">'+esc(msg.body)+'</div>'+
-      '<div class="src">Locked means ready. You send it yourself; log it below so the clock starts.</div></div>';
+  if(state === "locked" || state === "sent"){
+    return '<div class="lead-msg"><div class="nmeta">'+esc(msg.file)+recip+' · '+esc(msg.channel||"?")+' · <b>'+esc(outreachSendBadge(state))+'</b></div>'+
+      '<div class="body">'+esc(msg.body)+'</div></div>';
   }
   const revPending = msgPending.has(l.dir);
   const revErr = msgError.get(l.dir);
@@ -1574,8 +1881,27 @@ function outreachMessageBox(l){
         ? '<div class="thinking">✨ revising… (your subscription, ~10-30s)</div>'
         : '<input class="msg-revise-input" placeholder="what should change in the message?" /><button class="send msg-revise" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Revise with AI</button>'+
           (revErr ? '<div class="aierr">⚠ '+esc(revErr)+'</div>' : ""))+
-    '</div>'+
-    '<div class="src">Approve on this page locks the text. Nothing sends itself.</div></div>';
+    '</div></div>';
+}
+
+// Lock, then copy, then say you sent it. Three separate steps, because readied, copied and
+// actually gone are three different things and only your hands do the last one.
+function sendStepsHtml(l){
+  const msg = l.latestMessage;
+  if(!msg) return "";
+  const state = outreachSendState(msg, OUTREACH_TOUCH[l.dir]);
+  const pending = lockPending.has(l.dir);
+  const note = '<span class="send-note">'+esc(outreachSendNote(state))+'</span>';
+  if(state === "draft"){
+    return '<div class="send-steps"><button class="primary out-lock" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'"'+(pending?" disabled":"")+'>'+(pending?"Locking…":"Lock this message")+'</button>'+note+'</div>';
+  }
+  const channels = ["email","linkedin-dm","contact-form","podcast-pitch"];
+  const chanSel = '<select class="sent-channel">'+channels.map(c=>'<option value="'+c+'"'+(c===(msg.channel||"email")?" selected":"")+'>'+c+'</option>').join("")+'</select>';
+  const people = (l.contacts||[]).map(c=>c.name);
+  const personSel = '<select class="sent-person"><option value="">(no specific person)</option>'+people.map(n=>'<option value="'+esc(n)+'"'+(msg.recipient===n?" selected":"")+'>'+esc(n)+'</option>').join("")+'</select>';
+  const copyBtn = '<button class="primary out-copy" data-dir="'+esc(l.dir)+'">Copy to clipboard</button>';
+  const markBar = '<div class="sent-bar">'+personSel+chanSel+'<button class="go sent-go" data-dir="'+esc(l.dir)+'">'+(state==="sent"?"Log another send":"Mark as manually sent")+'</button></div>';
+  return '<div class="send-steps">'+copyBtn+note+'</div>'+markBar;
 }
 
 function whoBoxHtml(l){
@@ -1583,26 +1909,13 @@ function whoBoxHtml(l){
   const suggested = (l.suggestedContacts||[]).map(n=>'<span class="who-suggest">'+esc(n)+'<button class="who-add" data-dir="'+esc(l.dir)+'" data-name="'+esc(n)+'">+ add</button></span>').join("");
   return '<div class="who-box">'+
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;"><span class="wb-margin-cap">WHO YOU WOULD REACH</span><span class="grow"></span></div>'+
-    '<div>'+chips+suggested+'</div>'+
+    (chips+suggested ? '<div>'+chips+suggested+'</div>' : "")+
     '<div class="aibox show" style="margin-top:8px;"><input class="who-name" placeholder="name" style="max-width:160px;" /><input class="who-role" placeholder="role (optional)" style="max-width:180px;" /><button class="who-save" data-dir="'+esc(l.dir)+'">Add contact</button></div>'+
-    '<div class="src" style="margin-top:8px;">One lead can hold many people. Each gets its own drafted message and its own follow-up clock.</div>'+
+    '<div class="src" style="margin-top:8px;">'+esc(contactsLine(l.contacts))+'</div>'+
   '</div>';
 }
 
-function sentBarHtml(l){
-  const msg = l.latestMessage;
-  if(!msg || msg.status !== "locked") return "";
-  const channels = ["email","linkedin-dm","contact-form","podcast-pitch"];
-  const chanSel = '<select class="sent-channel">'+channels.map(c=>'<option value="'+c+'"'+(c===(msg.channel||"email")?" selected":"")+'>'+c+'</option>').join("")+'</select>';
-  const people = (l.contacts||[]).map(c=>c.name);
-  const personSel = '<select class="sent-person"><option value="">(no specific person)</option>'+people.map(n=>'<option value="'+esc(n)+'"'+(msg.recipient===n?" selected":"")+'>'+esc(n)+'</option>').join("")+'</select>';
-  return '<div class="sent-bar">'+
-    '<div style="display:flex;flex-direction:column;gap:2px;min-width:220px;flex:1;"><span style="font-size:13px;font-weight:600;">Sent it? Log it so the clock starts.</span><span class="src">This is the step that puts them on the follow-ups ledger, with the date, channel, and this message.</span></div>'+
-    personSel+chanSel+'<button class="go sent-go" data-dir="'+esc(l.dir)+'">Mark as sent</button>'+
-  '</div>';
-}
-
-function dossierHtml(l){
+function threadHtml(l){
   const seg = leadSegment(l);
   const info = SEG_INFO[seg] || SEG_INFO["content-example"];
   const undecided = !["pursue","passed","locked","drafted"].includes(l.status);
@@ -1610,14 +1923,10 @@ function dossierHtml(l){
   const err = outError.get(l.dir);
   const fitChip = l.classificationOrFit ? '<span class="fit-chip">'+esc(l.classificationOrFit)+'</span>' : "";
   const provChip = (l.whySource === "gpt-codex" ? '<span class="legacy-chip" style="background:#efeafd;color:#5b46b8">why: analyst, GPT-routed</span>' : l.whySource === "claude-cli" ? '<span class="legacy-chip">why: analyst, Claude</span>' : "")+(l.source === "jsa" ? '<span class="legacy-chip">research: JSA</span>' : "");
-  const hasMatchmaker = l.whyMutual || l.whyThem || l.whyMe;
-  const headline = l.whyMutual || l.pitchAngle || l.pitch || "(no read recorded yet)";
-  const legacy = hasMatchmaker ? "" : ' <span class="legacy-chip">legacy read — re-qualify for the matchmaker version</span>';
-  const mm = hasMatchmaker
-    ? '<div class="mm-grid">'+
-      (l.whyThem?'<div class="mm-row"><span class="k">Why them, for you</span><span class="v">'+esc(l.whyThem)+'</span></div>':"")+
-      (l.whyMe?'<div class="mm-row"><span class="k">Why you, for them</span><span class="v">'+esc(l.whyMe)+'</span></div>':"")+
-      '</div>'
+  const mmr = matchmakerRead(l);
+  const legacy = mmr.legacy ? ' <span class="legacy-chip">legacy read, the pitch angle standing in until this lead is re-qualified</span>' : "";
+  const mm = mmr.rows.length
+    ? '<div class="mm-grid">'+mmr.rows.map(r=>'<div class="mm-row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>').join("")+'</div>'
     : "";
   const status = pending
     ? '<div class="hint">drafting… (your subscription, ~30-60s — the Studio room has progress + log)</div>'
@@ -1632,10 +1941,14 @@ function dossierHtml(l){
     (l.muxinNotes ? '<div class="my-notes">'+esc(l.muxinNotes)+'</div>' : "")+
     '<div class="aibox show"><input class="lead-note-input" placeholder="your note on this lead (what stood out)…" /><button class="lead-note-save" data-dir="'+esc(l.dir)+'">Save note</button></div></div>';
   return '<div class="dossier-grid"><div style="min-width:0;">'+
+    '<button class="out-back">← Back to queue</button>'+
+    '<div class="thread-head"><span class="thread-seg">'+esc(threadSegLabel(seg))+'</span>'+
+      '<span class="thread-who">'+esc(l.name||l.dir)+'</span>'+
+      '<span class="thread-person">'+esc(contactsLine(l.contacts))+'</span></div>'+
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="seg-chip '+esc(seg)+'">'+esc(info.label)+'</span>'+fitChip+'<span class="src">'+esc(info.line)+'</span><span class="grow"></span>'+provChip+'</div>'+
     '<div class="wb-label" style="margin:14px 0 0;">Why this matters to you, in plain terms'+legacy+'</div>'+
-    '<div class="dossier-why">'+esc(headline)+'</div>'+
-    mm + whoBoxHtml(l) + status + outreachMessageBox(l) + sentBarHtml(l) + decideBtns + notes +
+    '<div class="dossier-why">'+esc(mmr.headline)+'</div>'+
+    mm + whoBoxHtml(l) + status + outreachMessageBox(l) + sendStepsHtml(l) + decideBtns + notes +
     (l.url?'<div class="src" style="margin-top:10px;"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>':"")+
   '</div>'+outreachMarginHtml(l)+'</div>';
 }
@@ -1645,21 +1958,22 @@ function renderOutreachBox(){
   const box = $("#outreachList");
   const leads = OUTREACH_LEADS;
   if(!leads.length){
+    activeLeadDir = null;
+    $("#outreachHead").textContent = "Leads";
     box.innerHTML = '<div class="empty">No leads yet. Scout new leads (top right) runs the discovery agent; /outreach add seeds one by hand.</div>';
     return;
   }
-  const undecided = leads.find(l=>!["pursue","passed","locked","drafted"].includes(l.status));
-  if(!activeLeadDir || !leads.some(l=>l.dir===activeLeadDir)) activeLeadDir = (undecided||leads[0]).dir;
-  const rail = leads.map(l=>{
-    const seg = leadSegment(l); const info = SEG_INFO[seg]||SEG_INFO["content-example"];
-    return '<span class="lead-chip'+(l.dir===activeLeadDir?" on":"")+'" data-dir="'+esc(l.dir)+'"><span class="dot" style="background:'+info.dot+'"></span>'+esc(l.name||l.dir)+'<span class="k">'+esc(info.label.toLowerCase())+'</span></span>';
-  }).join("");
-  const active = leads.find(l=>l.dir===activeLeadDir);
-  box.innerHTML = '<div class="lead-rail">'+rail+'</div>'+(active?dossierHtml(active):"");
-  box.querySelectorAll(".lead-chip").forEach(c=>c.addEventListener("click",()=>{ activeLeadDir = c.dataset.dir; renderOutreachBox(); }));
+  if(activeLeadDir && !leads.some(l=>l.dir===activeLeadDir)) activeLeadDir = null;
+  const active = activeLeadDir ? leads.find(l=>l.dir===activeLeadDir) : null;
+  $("#outreachHead").textContent = active ? "The thread" : "Leads";
+  box.innerHTML = active ? threadHtml(active) : triageHtml();
+  box.querySelectorAll("button.tri-row").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = b.dataset.dir; renderOutreachBox(); }));
+  box.querySelectorAll("button.out-back").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = null; renderOutreachBox(); }));
   box.querySelectorAll("button.out-draft").forEach(b=>b.addEventListener("click", ()=>outreachDraft(b.dataset.dir)));
   box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
   box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
+  box.querySelectorAll("button.out-lock").forEach(b=>b.addEventListener("click", ()=>outreachLock(b.dataset.dir, b.dataset.file)));
+  box.querySelectorAll("button.out-copy").forEach(b=>b.addEventListener("click", ()=>outreachCopy(b)));
   box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
   box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
   box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>outreachMsgRevise(b)));
@@ -1681,9 +1995,39 @@ async function outreachAddContact(dir, name, role){
   else flash(r.error || "Could not add the contact");
 }
 
+// The one lock path, and it reuses the review queue's own approve route: an outreach-message row
+// lives in the LEAD folder, so slug = the lead dir name and id = the message id. Locking readies
+// the text and nothing else; sending is still a thing only Muxin does, by hand.
+async function outreachLock(dir, file){
+  if(lockPending.has(dir)) return;
+  const slug = (dir||"").split("/").pop();
+  const id = (file||"").replace(/^messages\\//, "").replace(/\\.md$/, "");
+  if(!slug || !id){ flash("No message to lock yet"); return; }
+  lockPending.add(dir); renderOutreachBox();
+  try {
+    const r = await post("/api/status", {slug, id, status:"approve"});
+    if(r.ok === false) flash(r.error || "Could not lock it");
+    else flash("Locked. Copy it, send it yourself, then tell the page it has gone.");
+  } catch (e) {
+    flash(e instanceof Error ? e.message : String(e));
+  } finally {
+    lockPending.delete(dir);
+    await loadOutreach();
+  }
+}
+
+function outreachCopy(b){
+  const grid = b.closest(".dossier-grid");
+  const body = grid ? grid.querySelector(".lead-msg .body") : null;
+  const text = body ? body.textContent : "";
+  if(!text){ flash("Nothing to copy yet"); return; }
+  try { if(navigator.clipboard) navigator.clipboard.writeText(text); } catch (e) {}
+  flash("Copied. Paste it into your mail client and send it there.");
+}
+
 async function outreachMarkSent(dir, person, channel){
   const r = await post("/api/outreach/mark-sent", {dir, person, channel});
-  if(r.ok){ flash("Logged — the clock starts today. See Follow-ups."); await loadOutreach(); }
+  if(r.ok){ flash("Logged. The clock starts today; see Follow-ups."); await loadOutreach(); }
   else flash(r.error || "Could not log the send");
 }
 
@@ -1753,12 +2097,30 @@ async function scoutRun(){
   }
 }
 
+// Two reads, one render. The leads carry who and why; the follow-ups ledger is the only place a
+// real "when it was last pitched" exists, so the triage rail waits for both rather than guessing.
 async function loadOutreach(){
   const box = $("#outreachList");
   if(!OUTREACH_LEADS) box.innerHTML = '<div class="empty">Loading…</div>';
-  const r = await fetch("/api/outreach/leads");
-  const d = await r.json();
+  const [leadsRes, fuRes] = await Promise.all([
+    fetch("/api/outreach/leads"),
+    fetch("/api/followups").catch(()=>null),
+  ]);
+  const d = await leadsRes.json();
   OUTREACH_LEADS = d.leads || [];
+  OUTREACH_TOUCH = {};
+  if(fuRes && fuRes.ok){
+    try {
+      const fu = await fuRes.json();
+      const b = fu.buckets || {};
+      const rows = [].concat(b.client||[], b.platform||[]);
+      for(const row of rows){
+        if(!row.dir || !row.lastTouch) continue;
+        const prev = OUTREACH_TOUCH[row.dir];
+        if(!prev || row.lastTouch > prev) OUTREACH_TOUCH[row.dir] = row.lastTouch;
+      }
+    } catch (e) { /* no ledger yet: every row reads "never pitched", which is the truth */ }
+  }
   renderOutreachBox();
 }
 

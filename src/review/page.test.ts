@@ -311,11 +311,16 @@ test("client <script> output: the two regexes that shipped broken now emit corre
   );
   assert.ok(!script.includes("/s+/g"), "emitted /s+/g would replace runs of 's' with a space");
 
-  // Outreach evidence link: the regex must still be wired into the ternary that builds the <a>,
-  // not merely present somewhere in the file.
+  // Outreach evidence link: the URL test now lives in evidenceSourceView (the mirror of
+  // qualify.ts's isValidSourceUrl), and its verdict is what guards the <a>. Both halves are
+  // asserted so a mangled backslash can't quietly turn the link into plain text again.
   assert.ok(
-    script.includes('/^https?:\\/\\//i.test(e.source) ? \'<a class="ev-src"'),
-    "the evidence-link test must emit as a live ternary guarding the <a class=\"ev-src\"> tag",
+    script.includes('/^https?:\\/\\//i.test(t)'),
+    "the evidence-source URL test must emit its slashes intact",
+  );
+  assert.ok(
+    script.includes('sv.kind==="link" ? \'<a class="ev-src"'),
+    "the evidence-link verdict must still be wired into the <a class=\"ev-src\"> tag",
   );
   assert.ok(!script.includes("/^https?:///i"), "emitted /^https?:///i turns the rest of the line into a comment");
 });
@@ -651,4 +656,227 @@ test("job surface copy: no em dashes and no 'atomize' in the strings this PR add
     assert.ok(!s.includes("—"), "em dash in job surface copy: " + s);
     assert.ok(!/atomize/i.test(s), '"atomize" must never appear in UI copy: ' + s);
   }
+});
+
+// ── Outreach room: triage + thread (design v7 §3, static half) ──
+
+import {
+  outreachSegment, OUTREACH_SEGMENTS, groupLeadsBySegment, lastPitchedLabel, threadSegLabel,
+  matchmakerRead, contactsLine, isEvidenceSourceValid, evidenceSourceView, NO_SOURCE_RECORDED,
+  outreachSendState, outreachSendNote, outreachSendBadge,
+} from "./page.js";
+import type { OutreachLeadView } from "./page.js";
+
+const lead = (over: Partial<OutreachLeadView> = {}): OutreachLeadView => ({ dir: "outreach/leads/client-acme", ...over });
+
+test("outreachSegment: four values, because content-example leads are real rows on the desk", () => {
+  assert.equal(outreachSegment(lead({ kind: "platform" })), "platform");
+  assert.equal(outreachSegment(lead({ kind: "client", source: "jsa" })), "org-role");
+  assert.equal(outreachSegment(lead({ kind: "client", source: "scout" })), "org-mission");
+  assert.equal(outreachSegment(lead({ kind: "content-example" })), "content-example");
+});
+
+test("outreachSegment: nothing writes fm.segment today, so the kind/source read is the real driver", () => {
+  // A lead whose frontmatter DID carry a segment still wins, but the fallback is what actually runs.
+  assert.equal(outreachSegment(lead({ segment: "org-role", kind: "platform" })), "org-role");
+  assert.equal(outreachSegment(lead({ segment: "", kind: "platform" })), "platform");
+});
+
+test("groupLeadsBySegment: four groups in the design's order, empty ones dropped", () => {
+  const leads = [
+    lead({ dir: "a", kind: "content-example" }),
+    lead({ dir: "b", kind: "client", source: "jsa" }),
+    lead({ dir: "c", kind: "platform" }),
+    lead({ dir: "d", kind: "client", source: "scout" }),
+    lead({ dir: "e", kind: "platform" }),
+  ];
+  const groups = groupLeadsBySegment(leads);
+  assert.deepEqual(groups.map((g) => g.name), [
+    "PLATFORMS", "ORGANIZATIONS · MISSION FIT", "ORGANIZATIONS · OPEN ROLES", "EXAMPLES",
+  ]);
+  assert.deepEqual(groups[0].leads.map((l) => l.dir), ["c", "e"]);
+  assert.deepEqual(groups[3].leads.map((l) => l.dir), ["a"]);
+  assert.equal(groupLeadsBySegment([lead({ kind: "platform" })]).length, 1, "empty groups do not render");
+  assert.equal(groupLeadsBySegment([]).length, 0);
+});
+
+test("groupLeadsBySegment: an Example lead is never dropped on the floor", () => {
+  const groups = groupLeadsBySegment([lead({ dir: "x", kind: "content-example" })]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].key, "content-example");
+  assert.equal(groups[0].note, OUTREACH_SEGMENTS[3].note, "the Example group keeps the line this page already shipped");
+});
+
+test("groupLeadsBySegment: every lead handed in lands in exactly one group", () => {
+  const leads = [
+    lead({ dir: "a", kind: "platform" }), lead({ dir: "b", kind: "client", source: "jsa" }),
+    lead({ dir: "c", kind: "client" }), lead({ dir: "d", kind: "content-example" }),
+    lead({ dir: "e", kind: undefined }),
+  ];
+  const seen = groupLeadsBySegment(leads).flatMap((g) => g.leads.map((l) => l.dir));
+  assert.equal(seen.length, leads.length);
+  assert.equal(new Set(seen).size, leads.length);
+});
+
+test("lastPitchedLabel: a real tracker timestamp, or the plain truth that there is none", () => {
+  assert.equal(lastPitchedLabel("2026-08-06T14:22:00.000Z"), "pitched 2026-08-06, by hand");
+  assert.equal(lastPitchedLabel(null), "never pitched");
+  assert.equal(lastPitchedLabel(undefined), "never pitched");
+  assert.equal(lastPitchedLabel("   "), "never pitched");
+});
+
+test("threadSegLabel: the design's three labels, plus the fourth the repo actually needs", () => {
+  assert.equal(threadSegLabel("platform"), "PLATFORM · SELECTED");
+  assert.equal(threadSegLabel("org-mission"), "MISSION FIT · SELECTED");
+  assert.equal(threadSegLabel("org-role"), "OPEN ROLE · SELECTED");
+  assert.equal(threadSegLabel("content-example"), "EXAMPLE · SELECTED");
+});
+
+test("matchmakerRead: the three-way grid when the matchmaker pass has run", () => {
+  const r = matchmakerRead(lead({ whyThem: "they ship in public", whyMe: "you have the receipts", whyMutual: "one audience, two halves" }));
+  assert.equal(r.legacy, false);
+  assert.deepEqual(r.rows.map((x) => x.k), ["Why them, for you", "Why you, for them", "Why the two of you"]);
+  assert.equal(r.headline, "one audience, two halves");
+});
+
+test("matchmakerRead: a partial matchmaker read renders only the fields that exist", () => {
+  const r = matchmakerRead(lead({ whyThem: "they ship in public" }));
+  assert.equal(r.legacy, false);
+  assert.deepEqual(r.rows.map((x) => x.k), ["Why them, for you"]);
+  assert.equal(r.headline, "they ship in public");
+});
+
+test("matchmakerRead: a legacy lead falls back to pitchAngle and is FLAGGED as legacy, never passed off as the matchmaker read", () => {
+  const r = matchmakerRead(lead({ pitchAngle: "guest essay on hiring signals" }));
+  assert.equal(r.legacy, true);
+  assert.equal(r.headline, "guest essay on hiring signals");
+  assert.deepEqual(r.rows, [], "a legacy lead has no three-way grid to show");
+});
+
+test("matchmakerRead: nothing recorded at all says so rather than showing an empty headline", () => {
+  const r = matchmakerRead(lead({}));
+  assert.equal(r.legacy, true);
+  assert.equal(r.headline, "(no read recorded yet)");
+});
+
+test("contactsLine: zero contacts is the plain zero case, not a special flag", () => {
+  assert.equal(contactsLine([]), "No named contact yet. Add one, or write to the organization.");
+  assert.equal(contactsLine(undefined), "No named contact yet. Add one, or write to the organization.");
+});
+
+test("contactsLine: one contact names them, without doubling a period the name already ends on", () => {
+  assert.equal(contactsLine([{ name: "Rae Okafor", role: "editor" }]), "You are writing to Rae Okafor.");
+  assert.equal(contactsLine([{ name: "Annika L.", role: "editor" }]), "You are writing to Annika L.");
+});
+
+test("contactsLine: several contacts say each one runs its own clock", () => {
+  const line = contactsLine([{ name: "Annika L." }, { name: "James H." }, { name: "Rae O." }]);
+  assert.match(line, /^3 people here\./);
+  assert.match(line, /own follow-up clock/, "several people means several clocks, which is what tracker.ts keys on");
+});
+
+test("isEvidenceSourceValid: a real https URL with a dotted host is valid", () => {
+  assert.equal(isEvidenceSourceValid("https://posthog.com/blog/handbook"), true);
+  assert.equal(isEvidenceSourceValid("http://example.org/a"), true);
+});
+
+test("isEvidenceSourceValid: a vault: path is valid, mirroring qualify.ts", () => {
+  assert.equal(isEvidenceSourceValid("vault:People/Annika L.md"), true);
+  assert.equal(isEvidenceSourceValid("vault:"), false);
+  assert.equal(isEvidenceSourceValid("vault:n/a"), false);
+});
+
+test("isEvidenceSourceValid: placeholders and half-typed sources are not sources", () => {
+  for (const bad of ["", "  ", "(none)", "none", "N/A", "tbd", "unknown", "posthog.com", "https://localhost", "not a url"]) {
+    assert.equal(isEvidenceSourceValid(bad), false, "should be rejected: " + JSON.stringify(bad));
+  }
+  assert.equal(isEvidenceSourceValid(undefined), false);
+});
+
+test("evidenceSourceView: a valid URL is clickable, a vault path is text, anything else says it has no source", () => {
+  assert.deepEqual(evidenceSourceView("https://posthog.com/blog"), { kind: "link", text: "https://posthog.com/blog" });
+  assert.deepEqual(evidenceSourceView("vault:People/Annika L.md"), { kind: "text", text: "vault:People/Annika L.md" });
+  assert.deepEqual(evidenceSourceView("(none)"), { kind: "none", text: NO_SOURCE_RECORDED });
+  assert.deepEqual(evidenceSourceView(undefined), { kind: "none", text: NO_SOURCE_RECORDED });
+});
+
+test("evidenceSourceView: never invents a date, because EvidenceItem carries no timestamp", () => {
+  for (const src of ["https://posthog.com/blog", "vault:People/Annika L.md", "(none)", "", "tbd"]) {
+    const v = evidenceSourceView(src);
+    assert.ok(!/observed/i.test(v.text), "an evidence source must never read as an observation date: " + v.text);
+    assert.ok(!/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(v.text));
+  }
+});
+
+test("outreachSendState: locked and sent are two different states and never collapse into one", () => {
+  assert.equal(outreachSendState(null, null), "none");
+  assert.equal(outreachSendState({ status: "draft" }, null), "draft");
+  assert.equal(outreachSendState({ status: "approved" }, null), "draft");
+  assert.equal(outreachSendState({ status: "locked" }, null), "locked");
+  assert.equal(outreachSendState({ status: "locked" }, "2026-08-06T00:00:00.000Z"), "sent");
+});
+
+test("outreachSendState: a tracker touch on an UNLOCKED message still reads as a draft, never as sent", () => {
+  assert.equal(outreachSendState({ status: "draft" }, "2026-08-06T00:00:00.000Z"), "draft");
+});
+
+test("outreachSendNote: locking and sending carry the two authored notes, verbatim", () => {
+  assert.equal(outreachSendNote("draft"), "Locking readies it. You send it by hand, and nothing here can send it for you.");
+  assert.equal(outreachSendNote("locked"), "Paste it into your mail client and send it there. Tell me once it has gone.");
+  assert.equal(outreachSendNote("none"), "");
+});
+
+test("outreachSendBadge: a locked message says it is not sent, and a sent one says who sent it", () => {
+  assert.equal(outreachSendBadge("locked"), "LOCKED · NOT EDITABLE, NOT SENT");
+  assert.equal(outreachSendBadge("sent"), "LOCKED · SENT BY HAND");
+  assert.equal(outreachSendBadge("draft"), "");
+  assert.ok(!outreachSendBadge("locked").includes("SENT BY HAND"), "locked must never read as sent");
+});
+
+test("outreach copy: no em dashes and no 'atomize' in the strings this PR adds", () => {
+  const strings = [
+    ...OUTREACH_SEGMENTS.flatMap((s) => [s.name, s.note]),
+    lastPitchedLabel(null), lastPitchedLabel("2026-08-06T00:00:00.000Z"),
+    ...["platform", "org-mission", "org-role", "content-example"].map(threadSegLabel),
+    contactsLine([]), contactsLine([{ name: "Annika L." }]), contactsLine([{ name: "A" }, { name: "B" }]),
+    matchmakerRead(lead({})).headline,
+    ...(["none", "draft", "locked", "sent"] as const).map(outreachSendNote),
+    ...(["none", "draft", "locked", "sent"] as const).map(outreachSendBadge),
+    NO_SOURCE_RECORDED,
+  ];
+  for (const s of strings) {
+    assert.ok(!s.includes("—"), "em dash in outreach copy: " + s);
+    assert.ok(!/atomize/i.test(s), '"atomize" must never appear in UI copy: ' + s);
+  }
+});
+
+test("outreach room markup: the triage rail, the thread, and both send steps are on the page", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  for (const copy of [
+    "WHO IS IN FRONT OF YOU, GROUPED BY WHY · PICK ONE TO DRAFT TO",
+    "Where the audience already is. Bring the work, not a pitch.",
+    "They do the thing you write about. Bring the overlap.",
+    "They are hiring for what you already built. Bring the receipt.",
+    "← Back to queue",
+    "Lock this message",
+    "Copy to clipboard",
+    "Mark as manually sent",
+    "Locking readies it. You send it by hand, and nothing here can send it for you.",
+    "Paste it into your mail client and send it there. Tell me once it has gone.",
+    "no source recorded",
+    "never pitched",
+  ]) {
+    assert.ok(html.includes(copy), "authored outreach copy missing from the page: " + copy);
+  }
+});
+
+test("outreach room markup: the Leads | Follow-ups subnav and the #349 progress strip both survive", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes('data-sub="leads"') && html.includes('data-sub="followups"'), "the subnav must keep working");
+  assert.equal(html.split('id="stripOutreach"').length - 1, 1, "exactly one room progress strip, neither removed nor duplicated");
+});
+
+test("outreach evidence markup: no fabricated observation date anywhere on the page", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(!/observed /.test(html), "the prototype's 'observed Aug 6' fallback has no data behind it and must not ship");
 });
