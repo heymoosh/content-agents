@@ -1221,12 +1221,25 @@ export async function duplicateToPlatform(
 // same model (draftModel(), the same resolver draft.ts's own callClaudeDraft uses), same --tools ""
 // lockdown, same prompt, same timeout as draft.ts's own execFile call. Only transport + error
 // wording differ.
+//
+// NO `STEP` MARKERS on this job, deliberately. runDraft takes the spawn's stdout AS THE MESSAGE
+// BODY, so a `STEP 1/3 ...` line would land inside messages/message-NN.md. It is one step anyway;
+// the lastStdoutLine heartbeat is the whole progress story.
 const DRAFT_TIMEOUT_MS = 120_000; // mirrors outreach/draft.ts's own (private) DRAFT_TIMEOUT_MS
-export async function enqueueFollowUpDraft(dir: string, channel?: string, recipient?: string): Promise<DraftResult> {
-  return runQueued("draft-follow-up", `Draft follow-up: ${dir}`, (job) =>
+
+// The ONE queued-draft path, shared by Follow-ups' "Draft follow-up" and the Outreach thread's
+// directed first draft. Only the label and the optional typed direction differ; the transport,
+// model, tools lockdown and timeout stay identical so neither caller can drift from the other.
+function enqueueOutreachDraft(
+  label: string,
+  dir: string,
+  opts: { channel?: string; recipient?: string; direction?: string },
+): Promise<DraftResult> {
+  return runQueued("draft-follow-up", label, (job) =>
     runDraft(dir, {
-      channel,
-      recipient,
+      channel: opts.channel,
+      recipient: opts.recipient,
+      direction: opts.direction,
       callClaude: async (prompt) => {
         const result = await runClaudeSpawn(job, prompt, {
           timeoutMs: DRAFT_TIMEOUT_MS,
@@ -1247,6 +1260,25 @@ export async function enqueueFollowUpDraft(dir: string, channel?: string, recipi
       },
     }),
   );
+}
+
+export async function enqueueFollowUpDraft(dir: string, channel?: string, recipient?: string): Promise<DraftResult> {
+  return enqueueOutreachDraft(`Draft follow-up: ${dir}`, dir, { channel, recipient });
+}
+
+// ── Outreach thread: the directed first draft (v7 handoff §3, the conversational half) ───────
+// Muxin types what she wants said, and that text rides into THIS run's draft prompt (see
+// buildDraftPrompt's direction block). It wins over the stored pitch_angle where they disagree,
+// because pitch_angle is what research.ts concluded upstream and the typed direction is what she
+// wants now. Iterating on the result is NOT here: it reuses the existing reviseOutreachMessage /
+// POST /api/outreach/message/revise path, so there is exactly one revise path in this codebase.
+export async function enqueueDirectedDraft(
+  dir: string,
+  channel?: string,
+  recipient?: string,
+  direction?: string,
+): Promise<DraftResult> {
+  return enqueueOutreachDraft(`Draft message: ${dir}`, dir, { channel, recipient, direction });
 }
 
 // ── Charles room: "Draft" (Build 4) ─────────────────────────────────────────────────────────

@@ -76,6 +76,7 @@ import {
   runCommandSpawn,
   decodeSpawnFailure,
   enqueueFollowUpDraft,
+  enqueueDirectedDraft,
   addDevelopJob,
   addDevelopFolderJob,
   developJobInFlight,
@@ -635,6 +636,26 @@ export function isValidLeadDir(dir: string): boolean {
 // same allowlist posture as isValidLeadDir above (no "..", no absolute paths, no other files).
 export function isValidMessageFile(file: string): boolean {
   return /^messages\/message-\d+\.md$/.test(file);
+}
+
+// A typed direction is a sentence or two about what she wants said, not a pasted document. The cap
+// keeps one runaway paste from dominating the draft prompt the evidence is supposed to anchor.
+export const MAX_DIRECTION_CHARS = 2000;
+
+// The whole guard for POST /api/outreach/draft, pure and exported so the path allowlist and the
+// length cap are unit-testable without booting a server. Returns the cleaned inputs or the one
+// message the route sends back. A blank direction comes back `undefined`, never "": that is what
+// keeps the drafting prompt byte-identical to the one every existing caller already builds.
+export function outreachDraftGuard(
+  body: Record<string, unknown>,
+): { error: string } | { dir: string; direction: string | undefined } {
+  const dir = String(body.dir ?? "");
+  if (!isValidLeadDir(dir)) return { error: "not a valid outreach lead folder" };
+  const direction = String(body.direction ?? "").trim();
+  if (direction.length > MAX_DIRECTION_CHARS) {
+    return { error: `keep the direction under ${MAX_DIRECTION_CHARS} characters` };
+  }
+  return { dir, direction: direction || undefined };
 }
 
 // Pure, exported for unit testing: append one dated note line under a lead.md's `## Muxin notes`
@@ -1565,6 +1586,34 @@ const server = createServer(async (req, res) => {
       try {
         const { body } = await reviseOutreachMessage(dir, file, String(b.instruction ?? ""));
         json(res, 200, { ok: true, body });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // The Outreach thread's directed first draft (Venture Build v7 handoff §3, the conversational
+    // half). Muxin types what she wants said and it rides into THIS run's prompt, winning over the
+    // stored pitch_angle where the two disagree. `direction` is optional: without it the prompt is
+    // byte-identical to the one every existing caller already builds.
+    //
+    // Iterating on the result is NOT here. It reuses POST /api/outreach/message/revise above, so
+    // there stays exactly one revise path. Nothing here sends anything: the draft lands `pending`
+    // in the lead's review-queue.md, Muxin locks it and sends it by hand (CLAUDE.md rule 2 analog).
+    if (req.method === "POST" && url.pathname === "/api/outreach/draft") {
+      const b = await readBody(req);
+      const guard = outreachDraftGuard(b);
+      if ("error" in guard) {
+        json(res, 400, { ok: false, error: guard.error });
+        return;
+      }
+      try {
+        const result = await enqueueDirectedDraft(
+          guard.dir,
+          b.channel ? String(b.channel) : undefined,
+          b.recipient ? String(b.recipient) : undefined,
+          guard.direction,
+        );
+        json(res, 200, { ok: true, result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
