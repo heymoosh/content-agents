@@ -6,10 +6,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, insightsTickerText, fmtDays, renderInsightsMeta,
+  replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, fmtDays, renderInsightsMeta,
   JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
+  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOBS_POLL_MS,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -115,9 +116,10 @@ test("storyboardJobDone: a done job of a non-video kind for the slug is ignored"
   assert.equal(storyboardJobDone(jobs, "my-slug"), false);
 });
 
-// formatElapsed / insightsTickerText — card a14693da: the insights follow-up "thinking" indicator
-// used to show a fixed "~10-60s" ETA while the real server-side bound is 180s. Replaced with a
-// live elapsed-time count so a long wait reads as "still working," not "frozen."
+// formatElapsed, the ONE duration formatter every job surface goes through. Card a14693da once
+// used it for a click-local insights ticker; that ticker is gone (see the "one clock per screen"
+// tests further down), so the only caller left is jobElapsedText, whose input is a measured
+// elapsedMs.
 test("formatElapsed: under a minute renders as whole seconds", () => {
   assert.equal(formatElapsed(0), "0s");
   assert.equal(formatElapsed(42_000), "42s");
@@ -128,22 +130,6 @@ test("formatElapsed: a minute or more renders as Xm Ys", () => {
   assert.equal(formatElapsed(60_000), "1m 0s");
   assert.equal(formatElapsed(90_000), "1m 30s");
   assert.equal(formatElapsed(185_000), "3m 5s");
-});
-
-test("insightsTickerText: no longer claims the old misleading fixed ETA", () => {
-  const html = insightsTickerText(45_000);
-  assert.ok(!html.includes("10-60s"), "must not still show the old undersold ETA");
-});
-
-test("insightsTickerText: renders the live elapsed count so the wait reads as ongoing, not stuck", () => {
-  const html = insightsTickerText(45_000);
-  assert.ok(html.includes("45s elapsed"));
-  assert.ok(html.includes("still looking into it") || html.includes("looking into it"));
-});
-
-test("insightsTickerText: elapsed count keeps ticking past a minute, matching the real ~180s bound", () => {
-  const html = insightsTickerText(125_000);
-  assert.ok(html.includes("2m 5s elapsed"));
 });
 
 // renderInsightsMeta / fmtDays — card (Muxin, 2026-07-16): "Generate insights" already ran live
@@ -964,8 +950,8 @@ test("outreach thread markup: iterating reuses the one revise route, and draftin
   assert.ok(html.includes('post("/api/outreach/draft"'), "the directed draft has its own route");
   assert.ok(html.includes('post("/api/outreach/message/revise"'), "iterate still uses the pre-existing revise path");
   assert.equal(
-    html.split("/api/outreach/message/revise").length - 1, 1,
-    "exactly one revise path, never a second one bolted on",
+    html.split('post("/api/outreach/message/revise"').length - 1, 1,
+    "exactly one revise call site, never a second path bolted on",
   );
 });
 
@@ -978,5 +964,186 @@ test("outreach thread markup: the direction copy Muxin reads carries no em dash 
   ]) {
     assert.ok(html.includes(copy));
     assert.ok(!copy.includes("\u2014"), "no em dash in the copy this PR adds: " + copy);
+  }
+});
+
+// ── Audit fixes: answered asks, the strip's poll and its Fiction rule, one clock per screen ─────
+
+// Finding 5: Muxin answers one ask, the fresh job runs and finishes, and the team header still
+// reads YOUR TEAM, WAITING ON YOU with an ANSWER IT row she can never clear.
+test("an answered ask stops counting as waiting on her", () => {
+  const unanswered = job({ id: "a", status: "blocked", answer: null, finishedAt: 1000 });
+  const answered = job({ id: "b", status: "blocked", answer: "Substack", finishedAt: 1000 });
+  assert.equal(jobAwaitingAnswer(unanswered), true);
+  assert.equal(jobAwaitingAnswer(answered), false);
+  assert.equal(jobSettled(answered), true, "she is done with it, so every surface treats it as finished");
+  assert.equal(jobSettled(unanswered), false);
+  assert.equal(jobSettled(job({ status: "done" })), true);
+  assert.equal(jobSettled(job({ status: "failed" })), false);
+});
+
+test("the team header stops demanding an answer once she has given one", () => {
+  assert.equal(teamRailHeader([job({ status: "blocked", answer: null })]), "YOUR TEAM, WAITING ON YOU");
+  assert.equal(teamRailHeader([job({ status: "blocked", answer: "Substack" })]), "YOUR TEAM, IDLE");
+  assert.equal(
+    teamRailHeader([job({ id: "a", status: "blocked", answer: "Substack" }), job({ id: "b", status: "running" })]),
+    "YOUR TEAM, WORKING",
+    "the fresh job carrying her answer is what the header should be about",
+  );
+});
+
+test("an answered ask leaves the team rail instead of sitting there saying ANSWER IT", () => {
+  const rows = teamLiveRows([
+    job({ id: "a", status: "blocked", answer: "Substack" }),
+    job({ id: "b", status: "blocked", answer: null }),
+  ]);
+  assert.equal(rows.length, 1, "only the question she still owes an answer to");
+  assert.equal(rows[0].action, "ANSWER IT");
+  assert.equal(rows[0].urgent, true);
+});
+
+test("an answered ask reads as answered on the row, not as amber urgency", () => {
+  const answered = job({ status: "blocked", answer: "Substack", elapsedMs: 4000 });
+  assert.equal(jobRailLabel(answered).text, "You answered");
+  assert.equal(jobRailLabel(answered).color, JOB_COLORS.green);
+  assert.equal(stripRailLabel(answered).text, "You answered");
+  assert.notEqual(jobRailLabel(answered).color, JOB_COLORS.amber);
+  // The question and her choice stay readable. That copy is not deleted.
+  assert.equal(jobFooter(answered), ANSWERED_FOOTER);
+  assert.equal(stripFooter(answered), ANSWERED_FOOTER);
+  assert.equal(jobAnswerEcho(answered), "You said: Substack");
+  assert.match(jobLogLine(answered), /you answered it/);
+  // And the unanswered case is untouched.
+  const waiting = job({ status: "blocked", answer: null });
+  assert.equal(jobRailLabel(waiting).text, "Needs you");
+  assert.equal(jobRailLabel(waiting).color, JOB_COLORS.amber);
+  assert.equal(stripRailLabel(waiting).text, "Stopped, needs you");
+});
+
+test("an answered ask releases the room strip; an unanswered one holds it", () => {
+  const answered = job({ id: "a", kind: "url", status: "blocked", answer: "Substack", finishedAt: 1000 });
+  const waiting = job({ id: "b", kind: "url", status: "blocked", answer: null, finishedAt: 1000 });
+  assert.equal(stripJobFor([waiting], "Content", 1000 + STRIP_LINGER_MS * 5)?.id, "b", "it still needs her");
+  assert.equal(stripJobFor([answered], "Content", 1000 + STRIP_LINGER_MS * 5), null, "it lingered, then cleared");
+  assert.equal(
+    stripJobFor([answered, job({ id: "c", kind: "url", status: "running" })], "Content", 2000)?.id, "c",
+    "the fresh job carrying her answer takes the strip",
+  );
+});
+
+// Finding 7: the Fiction rule looked at ALL fiction jobs, so one stale failure hid the strip from
+// every later Fiction job, leaving a running job no progress surface at all.
+const asFiction = () => "Fiction" as const;
+
+test("a stale Fiction failure does not hide the strip from a Fiction job running now", () => {
+  const jobsIn = [
+    job({ id: "old", kind: "fiction-draft", status: "failed", finishedAt: 500 }),
+    job({ id: "new", kind: "fiction-draft", status: "running" }),
+  ];
+  assert.equal(stripJobFor(jobsIn, "Fiction", 1000, asFiction)?.id, "new");
+});
+
+test("Fiction still suppresses the strip when the newest job IS the failure", () => {
+  const jobsIn = [
+    job({ id: "old", kind: "fiction-draft", status: "done", finishedAt: 500 }),
+    job({ id: "new", kind: "fiction-draft", status: "failed", finishedAt: 900 }),
+  ];
+  assert.equal(stripJobFor(jobsIn, "Fiction", 1000, asFiction), null, "one failure card per screen, never two");
+});
+
+test("only Fiction suppresses a failure; every other room still shows one", () => {
+  const failed = job({ id: "f", kind: "url", status: "failed", finishedAt: 900 });
+  assert.equal(stripJobFor([failed], "Content", 1000)?.id, "f");
+});
+
+// Finding 6: the poll only fired while a queued or running job was already in hand, so the 9s
+// linger could never expire (nothing re-rendered to clear it) and an enqueue from an idle desk
+// never armed the poll at all.
+test("the poll keeps firing long enough for the strip linger to actually expire", () => {
+  const finished = [job({ status: "done", finishedAt: 1000 })];
+  assert.equal(jobsPollDue(finished, 1000), true, "it just finished");
+  assert.equal(jobsPollDue(finished, 1000 + STRIP_LINGER_MS - 1), true, "still inside the linger window");
+  assert.equal(
+    jobsPollDue(finished, 1000 + STRIP_LINGER_MS + 1), true,
+    "one beat past the window, so a render actually happens to clear the strip",
+  );
+  assert.equal(jobsPollDue(finished, 1000 + STRIP_LINGER_MS + JOBS_POLL_MS + 1), false, "then it rests");
+});
+
+test("live work always keeps the poll running", () => {
+  assert.equal(jobsPollDue([job({ status: "running", finishedAt: null })], 9_999_999), true);
+  assert.equal(jobsPollDue([job({ status: "queued", finishedAt: null })], 9_999_999), true);
+  assert.equal(jobsPollDue([], 9_999_999), false, "an idle desk with nothing to watch does not poll");
+});
+
+test("an enqueue arms the poll from an idle desk, where there is no job to see yet", () => {
+  assert.equal(jobsPollDue([], 1000), false);
+  assert.equal(jobsPollDue([], 1000, 1500), true, "armed, so the new job gets found on the next beat");
+  assert.equal(jobsPollDue([], 2000, 1500), false, "the arming window is short on purpose");
+});
+
+test("every route that enqueues a job arms the poll", () => {
+  for (const route of [
+    "/api/atomize", "/api/notes/pick", "/api/revise", "/api/duplicate", "/api/video/generate",
+    "/api/develop/start", "/api/develop/format", "/api/strategy/refresh-brief", "/api/strategy/insights",
+    "/api/strategy/ask-insights", "/api/strategy/pull", "/api/outreach/scout", "/api/outreach/draft",
+    "/api/outreach/message/revise", "/api/charles/draft", "/api/followups/draft-follow-up",
+  ]) {
+    assert.equal(enqueuesJob(route), true, route + " queues a job, so it must arm the poll");
+  }
+  assert.equal(enqueuesJob("/api/status"), false, "a status write queues nothing");
+  assert.equal(enqueuesJob("/api/outreach/mark-sent"), false);
+});
+
+// Finding 9: "Update it" on an Outreach thread showed up under Content as the Formatter, because
+// it shared the "revise" kind with content derivative revises.
+test("an outreach message revise belongs to Outreach, and a content revise still belongs to Content", () => {
+  assert.equal(jobRoom("outreach-revise"), "Outreach");
+  assert.equal(teamRoomName(jobRoom("outreach-revise")), "Connector");
+  assert.equal(jobRoom("revise"), "Content", "a derivative revise must not move rooms");
+  assert.equal(teamRoomName(jobRoom("revise")), "Formatter");
+  assert.equal(jobLandingSentence(jobRoom("outreach-revise")), "A message, locked only when you say so.");
+  const running = job({ kind: "outreach-revise", status: "running" });
+  assert.equal(stripJobFor([running], "Outreach", 0)?.id, "j1");
+  assert.equal(stripJobFor([running], "Content", 0), null);
+});
+
+// Finding 8: two durations on one screen. The strip counts from when the job was QUEUED; a timer
+// started at the click does not, so the same screen showed "12s elapsed" beside "3s".
+test("no screen that carries a strip starts its own competing clock", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(
+    !html.includes("fmtElapsed(Date.now()-start)"),
+    "a click-local stopwatch beside the strip's measured clock is the defect this design was corrected for",
+  );
+  assert.ok(!html.includes("elapsed</span>"), "no second elapsed counter anywhere on a strip screen");
+});
+
+test("no screen shows a duration estimate nothing measured", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(!html.includes("~20-40s"), "nothing measured that guess");
+  assert.ok(!html.includes("~10-60s"), "nor the ETA it replaced");
+});
+
+test("the poll and the arming list actually reach the browser", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+  for (const fn of ["function jobsPollDue(", "function enqueuesJob(", "function jobAwaitingAnswer(", "function jobSettled("]) {
+    assert.ok(script.includes(fn), fn + " must reach the browser");
+  }
+  assert.ok(script.includes("jobsPollDue(JOBS, Date.now(), jobsPollArmedUntil)"), "the interval must use the shared gate");
+  assert.ok(script.includes("if(enqueuesJob(path)) jobsPollArmedUntil"), "post() must arm the poll when it enqueues");
+});
+
+test("the copy this fix adds carries no em dash", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  for (const copy of [
+    "The strip at the top of this room carries the clock",
+    "Running the reports, then asking Claude for a synthesis.",
+    "You answered",
+    "> stopped, you answered it",
+  ]) {
+    assert.ok(html.includes(copy), "missing: " + copy);
+    assert.ok(!copy.includes("\u2014"), "no em dash in: " + copy);
   }
 });
