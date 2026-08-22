@@ -5,7 +5,12 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, insightsTickerText, fmtDays, renderInsightsMeta } from "./page.js";
+import {
+  replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, insightsTickerText, fmtDays, renderInsightsMeta,
+  JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
+  dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
+  stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
+} from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
   const row = {
@@ -313,4 +318,337 @@ test("client <script> output: the two regexes that shipped broken now emit corre
     "the evidence-link test must emit as a live ternary guarding the <a class=\"ev-src\"> tag",
   );
   assert.ok(!script.includes("/^https?:///i"), "emitted /^https?:///i turns the rest of the line into a comment");
+});
+
+// ── job UI surfaces (v5 §5) ──────────────────────────────────────────────────────────────────────
+// The three surfaces (Studio working panel, room progress strip, Studio team rail) all read
+// /api/jobs. These cover the pure mirrors; the inline client copies are kept in sync by hand.
+
+function job(over = {}) {
+  return {
+    id: "j1", kind: "url", label: "The Gini essay", status: "running",
+    error: null, elapsedMs: 3000, lastStdoutLine: null,
+    steps: [], stepTotal: null, step: 0, failedAtStep: null, retryable: false,
+    ask: null, answer: null, logPath: "/logs/j1.log", finishedAt: null,
+    ...over,
+  };
+}
+
+test("jobRoom: every job kind lands in exactly one room", () => {
+  assert.equal(jobRoom("url"), "Content");
+  assert.equal(jobRoom("video"), "Content");
+  assert.equal(jobRoom("develop"), "Content");
+  assert.equal(jobRoom("scout"), "Outreach");
+  assert.equal(jobRoom("draft-follow-up"), "Outreach");
+  assert.equal(jobRoom("strategy"), "Signals");
+  assert.equal(jobRoom("insights"), "Signals");
+  assert.equal(jobRoom("pull"), "Signals");
+  assert.equal(jobRoom("charles-draft"), "Charles");
+});
+
+test("jobRailLabel: one label and color per status, and on done the rail is the room name", () => {
+  assert.deepEqual(jobRailLabel(job({ status: "queued" })), { text: "Waiting its turn", color: JOB_COLORS.greyFg });
+  assert.deepEqual(jobRailLabel(job({ status: "running" })), { text: "Working", color: JOB_COLORS.ai });
+  assert.deepEqual(jobRailLabel(job({ status: "blocked" })), { text: "Needs you", color: JOB_COLORS.amber });
+  assert.deepEqual(jobRailLabel(job({ status: "failed" })), { text: "Did not work", color: JOB_COLORS.red });
+  assert.deepEqual(jobRailLabel(job({ status: "done" })), { text: "Content", color: JOB_COLORS.green });
+  assert.deepEqual(jobRailLabel(job({ status: "done", kind: "scout" })), { text: "Outreach", color: JOB_COLORS.green });
+});
+
+test("jobClockText: every duration comes from elapsedMs, never a literal", () => {
+  assert.equal(jobClockText(job({ status: "queued" }), 2), "2 ahead of it");
+  assert.equal(jobClockText(job({ status: "running", elapsedMs: 3000 }), 0), "3s");
+  assert.equal(jobClockText(job({ status: "blocked", elapsedMs: 74000 }), 0), "1m 14s");
+  assert.equal(jobClockText(job({ status: "failed", elapsedMs: 3000 }), 0), "stopped after 3s");
+  assert.equal(jobClockText(job({ status: "done", elapsedMs: 3000 }), 0), "took 3s");
+});
+
+test("jobClockText: a job that never started says so rather than showing a measured-looking zero", () => {
+  assert.equal(jobClockText(job({ status: "running", elapsedMs: null }), 0), "not started");
+  assert.equal(stripClockText(job({ status: "queued", elapsedMs: null })), "not started");
+});
+
+test("jobsAhead: counts the jobs queued before this one, plus the one running now", () => {
+  const jobs = [
+    job({ id: "a", status: "running" }),
+    job({ id: "b", status: "queued" }),
+    job({ id: "c", status: "queued" }),
+  ];
+  assert.equal(jobsAhead(jobs, jobs[1]), 1);
+  assert.equal(jobsAhead(jobs, jobs[2]), 2);
+});
+
+test("jobStepDots: running splits the list into done, current, and pending", () => {
+  const dots = jobStepDots(job({ status: "running", steps: ["Read it", "Cut it", "Checked it"], stepTotal: 3, step: 1 }));
+  assert.deepEqual(dots.map((d) => d.state), ["done", "current", "pending"]);
+  assert.equal(dotColor("done"), JOB_COLORS.green);
+  assert.equal(dotColor("current"), JOB_COLORS.ai);
+  assert.equal(dotColor("pending"), JOB_COLORS.grey);
+});
+
+test("jobStepDots: a failure paints the failing dot red, earlier green, later grey", () => {
+  const dots = jobStepDots(job({
+    status: "failed", steps: ["Read it", "Cut it", "Checked it"], stepTotal: 3, step: 1, failedAtStep: 1,
+  }));
+  assert.deepEqual(dots.map((d) => d.state), ["done", "failed", "pending"]);
+  assert.equal(dotColor("failed"), JOB_COLORS.red);
+});
+
+test("jobStepDots: a failure with no step markers points at no step at all", () => {
+  const dots = jobStepDots(job({ status: "failed", steps: ["Read it", "Cut it"], failedAtStep: null }));
+  assert.deepEqual(dots.map((d) => d.state), ["pending", "pending"]);
+});
+
+test("jobStepDots: blocked marks the step it stopped on amber, and queued and done are uniform", () => {
+  const blocked = jobStepDots(job({ status: "blocked", steps: ["Read it", "Cut it", "Checked it"], stepTotal: 3, step: 1 }));
+  assert.deepEqual(blocked.map((d) => d.state), ["done", "blocked", "pending"]);
+  assert.equal(dotColor("blocked"), JOB_COLORS.amber);
+  // Blocked after every step completed: the ask sits on the last one, not off the end of the list.
+  const atEnd = jobStepDots(job({ status: "blocked", steps: ["Read it", "Cut it"], stepTotal: 2, step: 2 }));
+  assert.deepEqual(atEnd.map((d) => d.state), ["done", "blocked"]);
+  assert.deepEqual(jobStepDots(job({ status: "queued", steps: ["a", "b"] })).map((d) => d.state), ["pending", "pending"]);
+  assert.deepEqual(jobStepDots(job({ status: "done", steps: ["a", "b"], step: 2 })).map((d) => d.state), ["done", "done"]);
+});
+
+test("jobStepDots: no skill emits STEP markers yet, so an empty steps list renders no dots at all", () => {
+  for (const status of ["queued", "running", "blocked", "failed", "done"]) {
+    assert.deepEqual(jobStepDots(job({ status, steps: [] })), [], status + " must not invent a step list");
+  }
+});
+
+test("jobStepDots: a steps array still growing toward stepTotal renders only what has arrived", () => {
+  const dots = jobStepDots(job({ status: "running", steps: ["Read it"], stepTotal: 3, step: 1 }));
+  assert.deepEqual(dots.map((d) => d.state), ["done"]);
+});
+
+test("jobProgressPct: fills step/stepTotal, and draws nothing when stepTotal was never measured", () => {
+  assert.equal(jobProgressPct(job({ step: 1, stepTotal: 4 })), 25);
+  assert.equal(jobProgressPct(job({ step: 3, stepTotal: 3 })), 100);
+  assert.equal(jobProgressPct(job({ step: 0, stepTotal: null })), null);
+});
+
+test("jobLandingSentence: the authored sentence per room, each one stating what waits", () => {
+  assert.equal(jobLandingSentence("Fiction"), "A scene draft, waiting on your read.");
+  assert.equal(jobLandingSentence("Content"), "A cut, waiting on your yes.");
+  assert.equal(jobLandingSentence("Outreach"), "A message, locked only when you say so.");
+  assert.equal(jobLandingSentence("Signals"), "Filed. It writes nothing.");
+  assert.equal(jobLandingSentence("Venture"), "An answer in the build conversation.");
+  // Charles has no authored sentence in the design; inventing one would be composing UI copy.
+  assert.equal(jobLandingSentence("Charles"), "");
+});
+
+test("jobLandingSentence: no landing sentence claims anything published", () => {
+  for (const room of ["Fiction", "Content", "Outreach", "Signals", "Venture"] as const) {
+    const s = jobLandingSentence(room).toLowerCase();
+    assert.ok(!/publish|posted|sent to/.test(s), room + " landing sentence must not claim a send");
+  }
+});
+
+test("jobFooter: the running footer is the heartbeat line, verbatim", () => {
+  assert.equal(jobFooter(job({ status: "running", lastStdoutLine: "reading the source file" })), "reading the source file");
+  assert.equal(jobFooter(job({ status: "running", lastStdoutLine: null })), "Real elapsed time, not an estimate.");
+  assert.equal(jobFooter(job({ status: "queued" })), "One job runs at a time, so this starts when the one above finishes.");
+  assert.equal(jobFooter(job({ status: "blocked" })), "It stops here until you answer. Nothing is written in the meantime.");
+  assert.equal(jobFooter(job({ status: "failed" })), "It stopped where the red dot is. Nothing was written.");
+  assert.equal(jobFooter(job({ status: "done" })), "A cut, waiting on your yes.");
+});
+
+test("an answered job stays blocked with its answer on record, so the footer stops asking", () => {
+  // jobs.ts stamps the answer on the blocked job and queues a FRESH one carrying it; the original
+  // never flips to done, so "It stops here until you answer" would go stale on screen.
+  const answered = job({ status: "blocked", ask: { question: "Which one?", options: ["A", "B"] }, answer: "A" });
+  assert.equal(jobFooter(answered), ANSWERED_FOOTER);
+  assert.equal(stripFooter(answered), ANSWERED_FOOTER);
+  assert.equal(jobAnswerEcho(answered), "You said: A");
+  // Still waiting: the original ask copy holds.
+  const waiting = job({ status: "blocked", ask: { question: "Which one?", options: ["A", "B"] }, answer: null });
+  assert.equal(jobFooter(waiting), "It stops here until you answer. Nothing is written in the meantime.");
+  assert.equal(jobAnswerEcho(waiting), "");
+});
+
+test("jobAnswerEcho: nothing to echo until Muxin has actually picked something", () => {
+  assert.equal(jobAnswerEcho(job({ status: "done", answer: null })), "");
+  assert.equal(jobAnswerEcho(job({ status: "done", answer: "Elias" })), "You said: Elias");
+});
+
+test("jobOpenLabel and jobLogLine name the room and the real log path", () => {
+  assert.equal(jobOpenLabel(job({ status: "running", kind: "scout" })), "Watch it in Outreach");
+  assert.equal(jobOpenLabel(job({ status: "done", kind: "scout" })), "Read it in Outreach");
+  assert.equal(jobLogLine(job({ status: "done" })), "> wrote to /logs/j1.log");
+  assert.equal(jobLogLine(job({ status: "failed" })), "> stopped at /logs/j1.log");
+  assert.equal(jobLogLine(job({ status: "queued" })), "> waiting for a slot");
+});
+
+test("stripJobFor: a finished job lingers 9 seconds in its room, then clears", () => {
+  const done = job({ status: "done", finishedAt: 1_000_000 });
+  assert.equal(stripJobFor([done], "Content", 1_000_000 + 8999)?.id, "j1");
+  assert.equal(stripJobFor([done], "Content", 1_000_000 + 9001), null);
+  assert.equal(STRIP_LINGER_MS, 9000);
+});
+
+test("stripJobFor: blocked and failed jobs hold the strip past the linger window", () => {
+  const late = 1_000_000 + 60_000;
+  assert.equal(stripJobFor([job({ status: "blocked", finishedAt: 1_000_000 })], "Content", late)?.id, "j1");
+  assert.equal(stripJobFor([job({ status: "failed", finishedAt: 1_000_000 })], "Content", late)?.id, "j1");
+});
+
+test("stripJobFor: a job only shows in the room it lands in", () => {
+  const jobs = [job({ id: "a", kind: "scout" }), job({ id: "b", kind: "strategy" })];
+  assert.equal(stripJobFor(jobs, "Outreach", 0)?.id, "a");
+  assert.equal(stripJobFor(jobs, "Signals", 0)?.id, "b");
+  assert.equal(stripJobFor(jobs, "Content", 0), null);
+});
+
+test("stripJobFor: a Fiction failure suppresses the strip, so only Fiction's own failure card shows", () => {
+  // No job kind maps to Fiction yet (PR 6 adds the /story draft job), so the rule is exercised
+  // through the injectable resolver. One failure card per screen, never two.
+  const toFiction = () => "Fiction" as const;
+  const failed = [job({ id: "f", status: "failed", finishedAt: 1_000_000 })];
+  assert.equal(stripJobFor(failed, "Fiction", 1_000_000, toFiction), null);
+  // The same failure in any other room still shows its strip.
+  assert.equal(stripJobFor(failed, "Content", 1_000_000)?.id, "f");
+  // A Fiction failure suppresses the strip for a healthy Fiction job on the same screen too.
+  const mixed = [job({ id: "ok", status: "running" }), job({ id: "f", status: "failed" })];
+  assert.equal(stripJobFor(mixed, "Fiction", 0, toFiction), null);
+  // With no failure, Fiction shows its running job as normal.
+  assert.equal(stripJobFor([job({ id: "ok", status: "running" })], "Fiction", 0, toFiction)?.id, "ok");
+});
+
+test("stripJobFor: Charles gets no strip at all", () => {
+  assert.equal(stripJobFor([job({ kind: "charles-draft", status: "running" })], "Charles", 0), null);
+});
+
+test("strip copy: its own shorter authored strings, distinct from the Studio panel's", () => {
+  assert.equal(stripRailLabel(job({ status: "running" })).text, "Working now");
+  assert.equal(stripRailLabel(job({ status: "blocked" })).text, "Stopped, needs you");
+  assert.equal(stripRailLabel(job({ status: "done" })).text, "Just finished");
+  assert.equal(stripRailLabel(job({ status: "failed" })).text, "Did not work");
+  assert.equal(stripFooter(job({ status: "queued" })), "One job runs at a time. This starts when the current one finishes.");
+  assert.equal(stripFooter(job({ status: "done" })), "A cut, waiting on your yes.");
+  assert.equal(stripClockText(job({ status: "done", elapsedMs: 3000 })), "took 3s");
+});
+
+test("teamRailHeader: blocked wins over running, and idle is the floor", () => {
+  assert.equal(teamRailHeader([job({ status: "running" }), job({ status: "blocked" })]), "YOUR TEAM, WAITING ON YOU");
+  assert.equal(teamRailHeader([job({ status: "running" }), job({ status: "queued" })]), "YOUR TEAM, WORKING");
+  assert.equal(teamRailHeader([job({ status: "done" }), job({ status: "failed" })]), "YOUR TEAM, IDLE");
+  assert.equal(teamRailHeader([]), "YOUR TEAM, IDLE");
+});
+
+test("teamLiveRows: one row per unfinished job, named for the room it lands in, urgent first", () => {
+  const rows = teamLiveRows([
+    job({ id: "a", kind: "url", status: "running", steps: ["Found the line"], stepTotal: 1, step: 0 }),
+    job({ id: "b", kind: "scout", status: "blocked" }),
+    job({ id: "c", kind: "strategy", status: "done" }),
+  ]);
+  assert.deepEqual(rows.map((r) => r.who), ["Connector", "Formatter"], "the blocked row sorts first");
+  assert.equal(rows[0].what, "Stopped: needs your answer");
+  assert.equal(rows[0].action, "ANSWER IT");
+  assert.equal(rows[1].what, "found the line");
+  assert.equal(rows[1].urgent, false);
+});
+
+test("teamLiveRows: with no step markers the row falls back to the job's own label, not invented copy", () => {
+  const rows = teamLiveRows([job({ status: "running", steps: [], label: "The Gini essay" })]);
+  assert.equal(rows[0].what, "The Gini essay");
+});
+
+test("teamRoomName: the design's cast, one name per room", () => {
+  assert.equal(teamRoomName("Fiction"), "Co-writer");
+  assert.equal(teamRoomName("Content"), "Formatter");
+  assert.equal(teamRoomName("Outreach"), "Connector");
+  assert.equal(teamRoomName("Signals"), "Reader");
+  assert.equal(teamRoomName("Venture"), "Build");
+});
+
+test("restingTeamRows: no agent appears twice, and job-derived rows never restate a live one", () => {
+  const live = teamLiveRows([job({ kind: "url", status: "running" })]); // → Formatter
+  const resting = [
+    { name: "Formatter", state: "idle", line: "idle, waiting on a cut" },
+    { name: "Formatter", state: "working", line: "The Gini essay · 0m 03s" },
+    { name: "Queue", state: "recent", line: "2 jobs waiting their turn" },
+    { name: "Scout", state: "recent", line: "last swept 2026-08-18" },
+    { name: "Publisher", state: "recent", line: "holding 2 approved posts for slots" },
+  ];
+  assert.deepEqual(restingTeamRows(resting, live).map((r) => r.name), ["Scout", "Publisher"]);
+});
+
+test("restingTeamRows: with nothing live the resting cast still shows, minus the job-derived rows", () => {
+  const resting = [
+    { name: "Scout", state: "recent", line: "last swept 2026-08-18" },
+    { name: "Publisher", state: "idle", line: "no posts holding" },
+    { name: "Formatter", state: "idle", line: "idle, waiting on a cut" },
+  ];
+  assert.deepEqual(restingTeamRows(resting, []).map((r) => r.name), ["Scout", "Publisher", "Formatter"]);
+});
+
+// ── Signals honesty guard ────────────────────────────────────────────────────────────────────────
+// The v7 prototype ships "Rule added. Applies to next post." — a claim the backend cannot make:
+// sending a recommendation to the backlog files a card, and nothing changes until that card ships.
+// The repo already carries the honest copy. This is a guard so a future port never reintroduces the
+// lie, and so the honest copy keeps naming where the card actually goes.
+test("Signals: the emitted page never claims a filed recommendation already took effect", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(!html.includes("Rule added"), 'the page must never say "Rule added"');
+  assert.ok(!html.includes("Applies to next post"), 'the page must never say "Applies to next post"');
+});
+
+test("Signals: send-to-backlog copy still names the backlog and says nothing changes until it ships", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("Send to backlog"), "the action must still name the backlog");
+  assert.ok(
+    html.includes("Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships."),
+    "the honest explanation of what filing does must stay",
+  );
+  assert.ok(html.includes("filed to the backlog"), "the confirmed state must still name the backlog");
+});
+
+// The three job surfaces must actually reach the browser, not just exist as testable mirrors.
+test("client <script> output: the job working panel, room strips and team rail all emit", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  for (const id of ["stripContent", "stripOutreach", "stripFiction", "stripSignals"]) {
+    assert.ok(html.includes('id="' + id + '"'), id + " container must be in the markup");
+  }
+  assert.ok(!html.includes('id="stripCharles"'), "Charles gets no progress strip");
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+  for (const fn of ["function renderJobs()", "function renderRoomStrips()", "function renderTeamRail()", "function stripJobFor(", "async function answerJob(", "async function retryJob("]) {
+    assert.ok(script.includes(fn), fn + " must reach the browser");
+  }
+  assert.ok(script.includes('"/api/jobs/"+encodeURIComponent(id)+"/answer"'), "the ask box must post to the answer route");
+  assert.ok(script.includes('"/api/jobs/"+encodeURIComponent(id)+"/retry"'), "retry must post to the retry route");
+  // Every authored copy string from §5.1 and §5.3 ships verbatim.
+  for (const copy of [
+    "Waiting its turn", "Did not work", "Needs you", "Working now", "Stopped, needs you", "Just finished",
+    "One job runs at a time, so this starts when the one above finishes.",
+    "It stops here until you answer. Nothing is written in the meantime.",
+    "It stopped where the red dot is. Nothing was written.",
+    "A scene draft, waiting on your read.", "A cut, waiting on your yes.",
+    "A message, locked only when you say so.", "Filed. It writes nothing.",
+    "An answer in the build conversation.",
+    "YOUR TEAM, WAITING ON YOU", "YOUR TEAM, WORKING", "YOUR TEAM, IDLE",
+    "You answered. A fresh job is running it from the start.",
+  ]) {
+    assert.ok(script.includes(copy), "authored copy missing from the page: " + copy);
+  }
+});
+
+test("job surface copy: no em dashes and no 'atomize' in the strings this PR adds", () => {
+  const strings = [
+    jobFooter(job({ status: "queued" })), jobFooter(job({ status: "blocked" })),
+    jobFooter(job({ status: "failed" })), jobFooter(job({ status: "done" })),
+    jobFooter(job({ status: "running", lastStdoutLine: null })), ANSWERED_FOOTER,
+    stripFooter(job({ status: "queued" })), stripFooter(job({ status: "running", lastStdoutLine: null })),
+    jobRailLabel(job({ status: "queued" })).text, jobRailLabel(job({ status: "failed" })).text,
+    stripRailLabel(job({ status: "running" })).text, stripRailLabel(job({ status: "blocked" })).text,
+    stripRailLabel(job({ status: "done" })).text,
+    jobOpenLabel(job({ status: "done" })), jobLogLine(job({ status: "queued" })),
+    teamRailHeader([]), teamRailHeader([job({ status: "blocked" })]),
+    ...(["Fiction", "Content", "Outreach", "Signals", "Venture", "Charles"] as const).map((r) => jobLandingSentence(r)),
+    ...(["Fiction", "Content", "Outreach", "Signals", "Venture", "Charles"] as const).map((r) => teamRoomName(r)),
+    ...teamLiveRows([job({ status: "failed" }), job({ status: "blocked" }), job({ status: "queued" })]).flatMap((r) => [r.what, r.action]),
+  ];
+  for (const s of strings) {
+    assert.ok(!s.includes("—"), "em dash in job surface copy: " + s);
+    assert.ok(!/atomize/i.test(s), '"atomize" must never appear in UI copy: ' + s);
+  }
 });
