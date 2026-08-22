@@ -53,10 +53,10 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
   (2026-07-24): no workflow in `.github/workflows/` uses `pull_request_target`, so this repo isn't
   actually exposed to that behavior change — safe to reapply without the extra caution the
   upstream note would otherwise call for.
-- STATUS: Backlog
-- DECISION: none yet — the 12 PRs themselves are closed (not merged); this card is the follow-up
   decision point for whether/when to manually reapply each of these 5, one at a time, with its own
   test pass.
+- STATUS: Backlog
+- DECISION: none yet — the 12 PRs themselves are closed (not merged); this card is the follow-up
 <!-- card-id: cb08c639-02d5-4b26-9c6b-229a31f87d08 -->
 
 ---
@@ -76,9 +76,9 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
     larger than it looks since atproto is still pre-1.0 and treats minor bumps as its de facto
     major axis; worth a quick smoke test of the Bluesky posting path if reapplied, not a blind bump.
   - `tsx` (dev dependency) 4.22.4 → 4.23.1 (PR #264, closed)
+  individually, but worth reapplying in a single batch PR when someone has a spare CI cycle.
 - STATUS: Backlog
 - DECISION: none yet — closed without merging per Muxin's instruction; low urgency to revisit
-  individually, but worth reapplying in a single batch PR when someone has a spare CI cycle.
 <!-- card-id: e55d201a-2bf0-497b-8141-2a84217b7a3b -->
 
 **Funding + mission-aligned role search for Voter Choice — wire `kind: funding` into the outreach engine**
@@ -130,22 +130,6 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - PARKED: unbuildable headlessly — Draw Things is a native GUI macOS app requiring local GPU + manual model download/run; video-gen capability now confirmed via research, but the actual bakeoff needs Muxin's hands-on session, not a coding agent
 <!-- card-id: 059c24ae-ffd5-4537-9e09-52c8d5682b05 -->
 
-**POSSE essay routing — point the essay CTA fallback at humaninference.ai**
-- ORIGIN: Muxin, 2026-08-18 — confirmed POSSE strategy (publish essays on her own site first,
-  syndicate to platforms, drive traffic back so the audience is owned, not rented). Landing page
-  (87c86b16) is live at humaninference.ai and hosts full essays with their own URLs, not a single
-  static page.
-- WHAT SHIPPED: `config/cta.yaml`'s `source_fallback.url` changed from the Substack home to
-  `https://humaninference.ai`. The per-essay case needed no code change — `cta: source` already
-  resolves generically from each content folder's `source.md canonical_url`, whatever domain that
-  URL is on — so future essays just need their humaninference.ai URL pasted into `canonical_url`
-  the same way a Substack URL was pasted before.
-- NOTE: `work_with_me_url` in `config/content-types.yaml` is unchanged (still the LinkedIn
-  stand-in) — see ae602c84, which now depends on the lead-gen offer card below, not on the landing
-  page being live.
-- STATUS: Done
-<!-- card-id: 504362d7-a6d3-45f8-bcd7-8bf1a1fd8739 -->
-
 **Lead-gen offer for the work-with-me CTA**
 - ORIGIN: Muxin, 2026-08-18 — "we should be creating a leadgen and using THAT leadgen as the CTA.
   Because we have to offer something of value." The landing page alone (humaninference.ai) should
@@ -162,19 +146,6 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 - DEPENDS ON: Muxin's input on what the offer is (even a first guess)
 - DECISION: none yet — needs Muxin's direction on the offer itself before any build starts.
 <!-- card-id: 646e6cb6-ef3e-4f41-a189-e189cb831b5f -->
-
-**Landing page**
-- Landing page for content CTAs (work-with-me / project pages / read-the-essay).
-- Worked on OUTSIDE this repo.
-- LIVE (Muxin, 2026-08-18): humaninference.ai is live and hosts full essays with their own URLs
-  (a real blog, not a single static page). Essay CTA routing already points there — see the
-  `source_fallback` change in config/cta.yaml, same day.
-- CORRECTION (2026-08-18): the landing page going live does NOT unblock the "swap work-with-me to
-  the landing page" card (ae602c84) the way this card originally assumed. Muxin does not want the
-  bare landing page used as a general CTA — only as the essay host. `work-with-me` needs an actual
-  lead-gen offer first (see new card, below). ae602c84's DEPENDS ON is updated accordingly.
-- STATUS: Done
-<!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
 
 **Growth via borrowed audiences (other people's platforms), not just native social**
 - Strategy note to fold into the weekly strategy brief: prioritize getting in front of OTHER people's existing audiences — podcast guest spots, guest essays / features in other newsletters, collabs, interviews, cross-posts — over grinding native social. Typically far more effective for reach and trust. NOT podcast-specific; any borrowed-audience channel counts.
@@ -235,9 +206,9 @@ CARD TYPE: EPIC
 - FOLDER NOTE: 9be7688d's own DECISION named content/2026-07-05-what-i-ve-described-in-my-essay-building-an-inno/ as the target ('most recent /atomize output at time of decision'). At execution time (and still true as of this filing) that folder has only source.md + review-queue.md -- no derivatives/, so it has never been through a full /atomize scoring pass and had no storytelling scores to validate. Used content/2026-07-05-hey-substack-i-m-looking-for-others-who-feel-int/ instead, the only folder in the repo with real populated hook/narrative/resonance scores. Worth checking the originally-named folder too once/if it gets atomized.
 - Recommendation was to keep the rubric/threshold as-is (sample too thin to retune) but re-check once storytelling scores exist across a handful of distinct source pieces.
 - Scope: once npm run validate has real hook/narrative/resonance scores across n>=20 derivatives spanning >=3 different source essays/notes (not just more posts from the same source), re-run the same comparison. Specifically check whether hook/resonance keep showing zero variance across multiple sources -- if so, that is worth a real conversation about narrowing the rubric to the dimension that actually discriminates (narrative) vs keeping all three.
-- GOAL_CONDITION: a findings note (extending or superseding docs/storytelling-rubric-validation.md) reports the hook/narrative/resonance distribution across >=20 real scored derivatives spanning >=3 distinct source pieces, states whether hook/resonance still show zero variance, and gives a concrete keep-as-is-or-change recommendation.
 - CHAIN: 1
 - STATUS: To Do
+- GOAL_CONDITION: a findings note (extending or superseding docs/storytelling-rubric-validation.md) reports the hook/narrative/resonance distribution across >=20 real scored derivatives spanning >=3 distinct source pieces, states whether hook/resonance still show zero variance, and gives a concrete keep-as-is-or-change recommendation.
 - DECISION: defer -- leave parked; data not ready (n=6 scored derivatives, single source; needs n>=20 across >=3 sources). Revisit when /atomize runs accumulate scored derivatives spanning multiple source essays (2026-07-14)
 - GROOMED: explicit GOAL_CONDITION already on card; data-gate (n>=20, >=3 sources) is a natural precondition the task itself checks, not a readiness gap + 2026-07-08
 - PARKED: data not ready: card needs n>=20 scored derivatives across >=3 distinct source pieces; repo currently has only 6, all from one source (2026-07-05-hey-substack) - same state as the original validation. Building now would just reproduce that finding. Re-check once more /atomize runs across different essays accumulate scored derivatives.
@@ -246,8 +217,8 @@ CARD TYPE: EPIC
 **Smarter routing — swap the LinkedIn work-with-me stand-in for the real landing page**
 - Follow-up to 6dcaee98 (Smarter routing), UPDATED 2026-07-08 (again) per Muxin's PR #140 feedback: "work with me" now HAS a real (if provisional) destination — Muxin's LinkedIn profile (`https://www.linkedin.com/in/muxinli`), wired as a `work_with_me` destination in `config/content-types.yaml` (`work_with_me_url`). `product_builder_insight`, `project_demo`, `offer_adjacent_post`, and `case_study` (the 4 work-flavored types) all resolve to "Connect on LinkedIn" today, unconditionally — none of them fall back to the essay link or resolve to zero CTAs. This SUPERSEDES the card's original premise (it previously assumed no real destination existed at all).
 - Remaining scope, once Landing page (87c86b16) ships with a real work-with-me page: flip `work_with_me_url` in `config/content-types.yaml` from the LinkedIn profile to the real landing-page URL — a pure config change, no code/reclassification needed (same pattern as project links). Whether the CTA TEXT should also change at that point (e.g. "Work with me" instead of "Connect on LinkedIn") is Muxin's call when the time comes — flag it, don't decide silently.
-GOAL_CONDITION: with a real lead-gen offer live and a real work-with-me URL configured, `work_with_me_url` in `config/content-types.yaml` points at the offer's own URL instead of LinkedIn; the 4 work-flavored types' CTA text is confirmed with Muxin (unchanged or updated, her call); every other content type is unchanged.
 - STATUS: To Do
+- GOAL_CONDITION: with a real lead-gen offer live and a real work-with-me URL configured, `work_with_me_url` in `config/content-types.yaml` points at the offer's own URL instead of LinkedIn; the 4 work-flavored types' CTA text is confirmed with Muxin (unchanged or updated, her call); every other content type is unchanged.
 - DEPENDS ON: Lead-gen offer for work-with-me CTA (new card, below) — NOT just the landing page. Landing page (87c86b16) is live and Done, but Muxin does not want it used as the work-with-me CTA target on its own (2026-08-18): "we should be creating a leadgen and using THAT leadgen as the CTA. Because we have to offer something of value."
 - DECISION: approved in principle, blocked on the lead-gen offer existing — Muxin confirmed (2026-07-10) the CTA TEXT should change too (e.g. "Work with me") once it points somewhere real; refined (2026-08-18) that "somewhere real" means the lead-gen offer, not the bare landing page.
 - GROOMED: explicit GOAL_CONDITION already on card; pure config swap once the lead-gen offer ships; DEPENDS ON corrected 2026-08-18
@@ -267,9 +238,9 @@ GOAL_CONDITION: with a real lead-gen offer live and a real work-with-me URL conf
 **Inbound listening: X (mentions/replies/DMs)**
 - ORIGIN: follow-up auto-filed while scoping card db22283f (Inbound listening + voice-replies, Build 3) to a Bluesky-only v1.
 - X has ZERO read access today: the existing browser agent (src/pull/platforms/x.ts) only drives X's own Analytics "Download CSV" export button. There is no code path anywhere that reads mentions, replies, or DMs for X. Building this means either a paid X API tier (mentions/DM read access is not on X's free tier) or new browser-agent scraping of the notifications page -- both substantial, separate undertakings, not a small extension of what exists.
-- GOAL_CONDITION: X inbound listening (mentions/replies, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for which access path (paid API vs. browser-agent scraping) was chosen and why, given CLAUDE.md rule 6 (prefer subscription/free routes, minimize per-token/per-service cost).
 - CHAIN: 1
 - STATUS: To Do
+- GOAL_CONDITION: X inbound listening (mentions/replies, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for which access path (paid API vs. browser-agent scraping) was chosen and why, given CLAUDE.md rule 6 (prefer subscription/free routes, minimize per-token/per-service cost).
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer, access-path (paid API vs DM/notification scraping) not chosen, not worth building unattended tonight.
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
@@ -279,9 +250,9 @@ GOAL_CONDITION: with a real lead-gen offer live and a real work-with-me URL conf
 **Inbound listening: LinkedIn (mentions/comments/DMs)**
 - ORIGIN: follow-up auto-filed while scoping card db22283f (Inbound listening + voice-replies, Build 3) to a Bluesky-only v1.
 - LinkedIn has ZERO read access today: the existing browser agent (src/pull/platforms/linkedin.ts) only triggers LinkedIn's own Analytics "Export" button for an xlsx download. There is no code path that reads mentions, comments, or DMs. LinkedIn's official API for this is restricted/partner-gated in practice -- likely means new browser-agent scraping of the notifications/messaging surface, a separate undertaking from what exists today.
-- GOAL_CONDITION: LinkedIn inbound listening (mentions/comments, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for the access approach given LinkedIn's API restrictions.
 - CHAIN: 1
 - STATUS: To Do
+- GOAL_CONDITION: LinkedIn inbound listening (mentions/comments, or DMs if in scope) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, with an explicit decision on record for the access approach given LinkedIn's API restrictions.
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer, same access-path tradeoff as X; LinkedIn scraping of notifications/DMs carries account-risk exposure not yet accepted.
 - GROOMED: readiness pass: clear GOAL_CONDITION, mirrors existing Bluesky v1 pattern (db22283f), points at src/pull/platforms/linkedin.ts + 2026-07-15
@@ -291,9 +262,9 @@ GOAL_CONDITION: with a real lead-gen offer live and a real work-with-me URL conf
 **Inbound listening: Substack (comment replies)**
 - ORIGIN: follow-up auto-filed while scoping card db22283f (Inbound listening + voice-replies, Build 3) to a Bluesky-only v1.
 - Substack's browser-agent auth/session plumbing (src/pull/browser.ts, login.ts) is reusable, but it currently only reads two analytics JSON endpoints (post_management/published, publish-dashboard/summary-v2) -- it never opens a post's comment thread or reads comment/reply text, and never touches any DM/chat surface. Reading actual comment-reply text is genuinely new browser-agent code (different pages/selectors, not yet built). Whether Substack DMs are even a real product surface is unconfirmed -- worth checking before scoping this card further.
-- GOAL_CONDITION: Substack inbound listening (new comment replies on Muxin's posts, at minimum) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, reusing src/pull/browser.ts's session/auth plumbing extended to a comments-reading page.
 - CHAIN: 1
 - STATUS: To Do
+- GOAL_CONDITION: Substack inbound listening (new comment replies on Muxin's posts, at minimum) is detected on a schedule and deduped via a ledger, mirroring the Bluesky v1 pattern from db22283f, reusing src/pull/browser.ts's session/auth plumbing extended to a comments-reading page.
 - DEPENDS ON: Inbound listening + voice-replies (Build 3)
 - DECISION: defer (Muxin, 2026-07-09, pre-flight) -- agreed defer; also still blocked, db22283f (the pattern this mirrors) is In Progress, not Done.
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
@@ -340,22 +311,6 @@ DISCOVERY AMENDMENTS (Muxin, 2026-07-09): (1) Warm start, not cold start: anchor
 - PARKED: not ready: title itself is the unresolved strategy-judgment question (now DECISION: approved, but scope/build approach still unwritten) + 2026-07-15
 <!-- card-id: dc47457f-a6b7-49fe-b48d-838b41fc7657 -->
 
-**Build the actual Substack Notes repost path (route.ts target + skill-doc fix)**
-- ORIGIN: follow-up auto-filed while building card a52927cd (Clarify which flow produces platform:substack rows), found while tracing the routing comment fix.
-- Real gap, not just stale comments: no code path today actually produces a platform: substack review-queue row. src/strategy/route.ts CORE_TEXT (the pillar routers target list) never includes 'substack'. Two project skill docs explicitly say the OPPOSITE of Muxins 2026-07-10 decision: .claude/skills/atomize/references/notes-mode.md step 3 tells Claude 'Substack is already excluded as a routing target, so a note is never reposted back to where it came from'; .claude/skills/atomize/references/spin-mode.md (lines ~12-13) repeats the same stale reserved-not-a-target claim.
-- src/publish/substack.ts (PR #164, already merged) is fully wired and works once a row exists -- this card is the missing producer side, plus fixing the two stale skill docs (writes under .claude/skills/ need an attended/interactive session, same constraint cards ebe652a7 and cccfc43a hit).
-- GOAL_CONDITION: running /atomize notes on a real Substack Note produces a review-queue.md row with platform: substack when appropriate (conditioned on source_kind: substack-note, per the plan), and .claude/skills/atomize/references/notes-mode.md + spin-mode.md no longer say Substack is excluded as a target.
-- RULE 7: this is src/strategy/route.ts routing-decision logic (which platforms a piece is atomized to) -- content-generation-adjacent logic per CLAUDE.md rule 7. This PR should HOLD for Muxins review.
-- CHAIN: 1
-
-SHIP: held (draft PR #208 — repo CLAUDE.md Rule 7, routing-logic change, needs Muxin's review; old-vs-new content sample in PR body)
-- MERGED 2026-08-18: PR #208 is merged.
-- STATUS: Done
-- DECISION: approved -- build the missing Substack Notes repost producer (route.ts) to match Muxin's already-stated 2026-07-10 decision (platform:substack rows should be produced when appropriate); also fix the two stale skill docs. Routing/content-adjacent logic, so PR HOLDS for review per rule 7 regardless of this approval to build. (pre-flight 2026-07-14)
-- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
-- CI NOTE: CI: green (as of 2026-07-15 08:25 UTC) — PR #208 https://github.com/heymoosh/content-agents/pull/208
-<!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
-
 **Wire tracker.ts summarizeFollowups() into the /strategy weekly brief**
 - src/outreach/tracker.ts exports summarizeFollowups() (counts per bucket, due/overdue counts) per card 21a5eb84's scope ("summary for /strategy"), but it is not wired into src/strategy/*'s weekly brief synthesis yet -- that wiring was explicitly out of scope for Phase 4. A future card should decide where/how the weekly brief surfaces follow-up due/overdue counts.
 ORIGIN: follow-up discovered while building card 21a5eb84 (Outreach engine -- Phase 4: Follow-ups tab + tracker).
@@ -390,43 +345,12 @@ OPTIONS TO WEIGH (not yet decided):
     reads like a brand instead of Muxin talking. Catches tone/cadence a regex can't, costs an extra
     subprocess call per derivative.
 (c) both -- deterministic lint as a hard mechanical gate, independent pass for the judgment layer.
-GOAL_CONDITION: not yet defined -- depends on which option(s) Muxin wants; scope this once she
 decides the approach.
 - STATUS: Backlog
+- GOAL_CONDITION: not yet defined -- depends on which option(s) Muxin wants; scope this once she
 - DECISION: defer (build NOT scheduled) -- research done (docs/research/anti-ai-writing-processes.md): de-AI-ing is a PROCESS problem, not a model/prompt one. Primary path stays Muxin's own: Wispr speech-to-text -> light edit that TRIMS TOWARD the spoken roughness (irregular rhythm + concrete specifics), never smoothing to the AI mean. If any tooling is ever built it is a FLAG-ONLY mechanical sweep of structural tells (em dash, tricolon, 'it's not X it's Y', uniform sentence length, delve/underscore/crucial diction, missing concrete detail) -- surfaces them for Muxin to cut, NEVER an AI rewrite (would violate extraction-first + rule 5). No brand-voice-prompt approach (proven to fail). (2026-07-14)
 - PARKED: not ready: GOAL_CONDITION not yet defined, depends on which of 3 options Muxin wants + 2026-07-15
 <!-- card-id: e26f6e12-73d6-4378-8be8-f43265e2f139 -->
-
-**Review tab: video-script/storyboard body clips most content behind an easy-to-miss scroll**
-- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab rendering)
-BUG: The VIDEO-SCRIPT/STORYBOARD row type renders its script body in a box with CSS class `body story` (src/review/page.ts, CSS rule `.body.story { ...; max-height:260px; overflow:auto; }`, ~line 83). For a typical 5-paragraph (~1300-char) drafted script, only the first ~1.5 paragraphs are visible in the 260px window. The scrollbar is a subtle macOS-style overlay scrollbar with no always-visible track, and there is no fade gradient, "more below" cue, or expand affordance. Confirmed the box IS scrollable internally (scrolling down over it reveals the rest of the text), but nothing signals that more content exists below the fold.
-UI LOCATION: Review tab, any VIDEO-SCRIPT / STORYBOARD row (folder: 2026-06-16-building-an-innovation-nation, row VIDEO-SCRIPT, status blocked) — applies to this row type generally, not just this one row.
-REPRO: 1) Open Review tab. 2) Scroll to a VIDEO-SCRIPT/STORYBOARD row. 3) Observe the script body box shows only the first couple paragraphs, cut off mid-word at the box edge, no visible "more content" indicator.
-OBSERVED: Script text truncated at a fixed 260px height with only a faint overlay scrollbar as the sole discoverability cue; a reviewer skimming the queue could easily approve/discard a video script without ever seeing most of its content.
-EXPECTED: Either a visible scroll affordance (persistent thin scrollbar or fade-out gradient at the clipped edge), or a taller default height / expand-to-read control for the video-script kind specifically, since these bodies are read in full before approval (unlike short social post excerpts).
-ROOT CAUSE: src/review/page.ts, CSS rule `.body.story` (~line 83): `max-height:260px; overflow:auto;` with no companion visual affordance signaling clipped content.
-- DECISION (Muxin, 2026-08-06): let it grow -- drop the max-height entirely rather than add a fade or an expand control. The sheet already scrolls, so nothing is hidden and there is no second scroll region to discover.
-- RESOLVED 2026-08-06: removed `max-height:260px; overflow:auto` from `.body.story` (src/review/page.ts). A video script now renders at full height. Verified the emitted page no longer contains `max-height:260px`.
-- STATUS: Done
-- GROOMED: clip-affordance outcome clear; .body.story CSS surface pinned + 2026-07-11
-<!-- card-id: dcb91654-efd0-4992-8820-a9d97c40ac2e -->
-
-**Outreach tab: long status groups clip cards with no scroll affordance**
-- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Outreach tab)
-BUG: A status group's card list (.notelist) has a hardcoded max-height:420px with overflow:auto (src/review/page.ts:140) and no visible scroll indicator, so once a group's content exceeds ~420px it silently clips a card mid-content with zero cue that more content exists below.
-UI LOCATION: Outreach tab, any status group panel with enough leads/pitch-text length to exceed ~420px (repro'd on RESEARCHED (5): Anthropic, Fireflies.ai, Mem, Notion, Superhuman -- Notion has an unusually long pitch_angle paragraph).
-REPRO:
-1. Open Outreach tab, scroll the outer page down until the RESEARCHED panel's bottom edge is in view.
-2. The panel's rounded border appears to close right after the Notion card, with Notion's <b>name</b>/pitch/dir divs and the entire Superhuman card invisible -- no scrollbar is visible on macOS (overlay scrollbars auto-hide) so it reads as "the list ends here."
-3. Verified via DOM inspection (document.querySelectorAll) that all 5 cards ARE present and correctly populated in the DOM at all times -- box.querySelector('.notelist').scrollHeight (668px) > clientHeight (420px) on the RESEARCHED panel confirms it's pure CSS clipping, not a data/render bug.
-OBSERVED: A correctly-fetched, correctly-rendered card (Notion) and an entire correctly-rendered card (Superhuman) are invisible with no affordance telling the user there's more to scroll to. This took direct DOM/network inspection to distinguish from a real data-loss bug -- a normal user has no way to tell the difference and would reasonably conclude the app lost or failed to render their data.
-EXPECTED: Either remove the fixed max-height (let the group grow with the page, since the outer page already scrolls), or add a visible scroll cue (a bottom fade gradient, a persistent thin scrollbar via `scrollbar-gutter`/webkit-scrollbar styling, or a "N more" indicator) so a clipped list is visually distinguishable from a complete one.
-ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:auto; }`. Shared by the Outreach tab's per-status groups and the Follow-ups tab's per-bucket lists (same class), so any bucket with enough rows/text is subject to the same silent clipping.
-- DECISION (Muxin, 2026-08-06): same call as dcb91654 -- remove the cap, no scroll affordance.
-- RESOLVED 2026-08-06: removed `max-height:420px; overflow:auto` from `.notelist` (src/review/page.ts). NOTE: the Outreach half of this card had already been overtaken by the five-room desk redesign: Outreach status groups no longer exist, so `.notelist` was by then used only by the Substack Notes browser, which is what this fix covers. Verified the emitted page no longer contains `max-height:420px`.
-- STATUS: Done
-- GROOMED: clip-affordance outcome clear; .notelist max-height:420px pinned (page.ts:140) + 2026-07-11
-<!-- card-id: 218cb426-115b-4eda-90bd-70fe34408e60 -->
 
 **Close the loop: strategy analysis actively steers the content engine**
 - ORIGIN: Muxin request in the 2026-07-14 groom/preflight session; expands and absorbs closed card 9a7656d9.
@@ -445,130 +369,11 @@ CARD TYPE: EPIC
 - PARKED: needs decision (judgment): deploying strategy levers (A-E) untested against real engagement data carries a risk of degrading content performance; recommended: stage -- build per-lever + validate before wiring live, awaiting Muxin's call, 2026-07-15
 <!-- card-id: 2ce597d7-acdc-4887-af88-1620fbac16f6 -->
 
-**Strategy lever A: gate content by pillar performance per platform (topic-fit routing)**
-- Compute per-platform pillar engagement from analytics each /strategy run
-- Write platform-pillar fit data where route.ts can read it (config/strategy/ or data/strategy/)
-- Route conditionally gates derivative drafting: skip platforms where source pillar underperforms
-- Seed priors: X=engineering thinking, LinkedIn=careers/building, Substack=reflective (per Muxin 2026-07-14)
-- Test: /atomize on a piece strong in Substack pillar but weak in X pillar produces Substack derivatives only, skips X
-- GOAL_CONDITION: route.ts reads strategy-computed pillar-performance signal per platform instead of hardcoded defaults; /atomize skips platforms where source pillar lacks data-backed fit; npm test green.
-- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
-- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- SCOPE RECONCILED (Muxin, 2026-07-15): this card's literal wording ("route.ts auto-skips
-  underperforming platforms") conflicted with the locked card 7e550e48 decision (fit score never
-  overrides config/routing.yaml's defaults -- auto-gating surprised Muxin) and with 9a7656d9's
-  overfitting/algorithmic-risk flag. Raised the conflict; Muxin's call: "inform me, I decide" --
-  given her explicit concern about overfitting to thin/early signal, this builds the
-  measurement + RECOMMENDATION half only. route.ts's decision logic and config/routing.yaml
-  defaults are untouched (7e550e48 stays intact); nothing auto-changes what /atomize drafts. A
-  thin cell (n<3 or <4wks) always reads insufficient-data, never a forced lean-in/ease-off.
-  Auto-acting on well-proven pairs is deferred to a future data-gated card once volume is thick
-  enough to trust.
-- SHIP: held (draft PR #220 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
-  needs Muxin's review; before/after sample + Bluesky seed-prior confirmation ask in PR body)
-- MERGED 2026-08-18: PR #220 is merged.
-- STATUS: Done
-- DECISION: hold -- epic 2ce597d7 already approved this lever's scope 2026-07-14, and seed priors are already stated on this card (X=engineering, LinkedIn=careers/building, Substack=reflective, per Muxin 2026-07-14). Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft with before/after samples per rule 7 (routing/content-gen logic) and per the epic's own 'None auto-merges' statement -- no live-posting risk before her review. (pre-flight 2026-07-14)
-- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-<!-- card-id: c7638362-5149-4b51-b414-17f24a94ccf7 -->
-
-**Strategy lever B: bias media type (text/image/video) by platform resonance trends**
-- Compute per-platform media-type resonance: text engagement vs images vs video from analytics
-- Write media preference to config/strategy/ for /atomize + /video to read
-- Bias derivative generation toward highest-resonating media type per platform
-- Default text-first where data is thin; prefer video/images where they demonstrably outperform
-- Test: /atomize on platform where video outperforms text queues prioritized video derivatives
-- GOAL_CONDITION: /atomize + /video read strategy-computed media-type preference per platform; generation biases toward highest-performing media instead of fixed text-first default; npm test green.
-- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
-- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- SCOPE RECONCILED (Muxin, 2026-07-15): the card's own test ("queues prioritized video
-  derivatives") is structurally impossible without /atomize auto-invoking /video, which is
-  deliberately the separately-invoked, human-gated, real-cost path (storyboard approval,
-  keyframe approval, "offer cost first, never auto-escalate" per CLAUDE.md rule 6). Raised the
-  conflict; Muxin's call: recommend only, never auto-trigger -- same "inform me, I decide"
-  resolution as Lever A (c7638362), extended to this axis. /atomize's generation contract (always
-  text + quote-card per routed platform) and /video's invocation model (always human-invoked) are
-  both untouched. A thin cell on either side of a text-vs-media comparison always reads
-  insufficient-data, never a forced lean/steady read.
-- SHIP: held (draft PR #222 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
-  needs Muxin's review; before/after sample in PR body, builds on merged Lever A/#220)
-- MERGED 2026-08-18: PR #222 is merged.
-- STATUS: Done
-- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14); GOAL_CONDITION and test are explicit. Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft per rule 7 -- no live-posting risk before review. (pre-flight 2026-07-14)
-- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-<!-- card-id: 27dc7d2d-afee-4e20-9552-b8aa58bd6382 -->
-
-**Strategy lever C: adapt posting cadence + time-of-day by engagement trends per platform**
-- Compute per-platform engagement trends (climbing/stable/declining) + daily time-of-day peak hours
-- Write adaptive cadence (posts_per_week per platform) + times (slot_time_pst per platform) to config
-- /publish reads dynamic cadence/time windows per platform instead of fixed defaults
-- Post more frequently where engagement is climbing; respect each platform's peak posting hours
-- Test: platform with trending-up engagement shows increased posts_per_week; Typefully scheduling respects per-platform time windows
-- GOAL_CONDITION: /publish reads per-platform posts_per_week + slot_time_pst from strategy output; posting cadence + timing adapt per platform to engagement trends; npm test green.
-- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
-- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- SCOPE RECONCILED (Muxin, 2026-07-15): unlike Levers A/B, Muxin's call here was NOT recommend-only
-  -- "auto-write a config I approve." src/strategy/cadence-fit.ts -- write proposes per-platform
-  posts_per_week + slot_time_pst into config/schedule-overrides.yaml (seeded/shipped inert,
-  approved: false); src/publish/slots.ts's loadSchedule() only applies it once Muxin sets
-  approved: true herself. Over-posting/rate-limit risk (flagged in the original DECISION) is
-  guarded four ways: approved:false default, a conservative single-step posts_per_week nudge
-  (never a jump), a hard max_posts_per_week ceiling, and review-queue.md still gating every actual
-  publish. Separately: X and LinkedIn's analytics capture only the posting DATE, not the hour --
-  every post lands on a synthetic timestamp with no real time-of-day signal (X: 1 distinct PT hour
-  across 225 posts; LinkedIn: 1 distinct PT hour across 73). Peak-hour reads for both are correctly
-  suppressed as insufficient-data via a distinct-hours-seen guard; only Bluesky has real
-  timestamps today. Filed a follow-up card (below) to capture real X/LinkedIn post times in
-  ingest. A thin trend window (n<3) always reads insufficient-data, same overfitting posture as
-  Levers A/B.
-- SHIP: held (draft PR #224 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic
-  AND a live-scheduler seam, needs Muxin's review; before/after sample + the four over-posting
-  guards + the X/LinkedIn timestamp gap all called out in PR body; builds on merged Levers
-  A/#220 and B/#222)
-- MERGED 2026-08-18: PR #224 is merged.
-- STATUS: Done
-- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). This lever changes live posting cadence/timing, so extra scrutiny is warranted at review -- but building and opening a draft PR carries no live-posting risk by itself (nothing merges/deploys without Muxin's review per rule 7 and the epic's 'None auto-merges' statement). Flag the over-posting/rate-limit risk prominently in the PR description for her review. (pre-flight 2026-07-14)
-- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-<!-- card-id: ed23f712-b34d-442c-9d5d-c07b10924924 -->
-
-**Strategy lever D: weight spin angles by conversion performance per platform**
-- Score which narrative frame (case-first, technical-outsider, etc) drives conversions per platform from publish-log
-- Write angle weight scores to config/strategy/ for spin selection probability
-- Spin logic reads weights; higher-scoring angles selected with higher frequency per platform
-- Builds on existing per-channel angle templates (c42769b1, 1eeb82a4) — this layer weights them by real conversion data
-- Test: /atomize on platform where case-first spin drives conversions preferentially selects case-study angle over other spins
-- GOAL_CONDITION: Spin selection reads strategy-computed angle weights per platform; higher-converting narrative frames selected with higher probability; npm test green.
-- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
-- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
-- SCOPE RECONCILED (Muxin, 2026-07-15): the card's literal ask ("weight spin angles by conversion
-  performance") is not buildable today, confirmed by codebase audit: angle is 1:1 with platform
-  (src/atomize/spin.ts's resolveAngle(platform) is a straight lookup -- no angle A vs angle B to
-  weight within a platform), and no conversion/lead metric exists in the analytics DB (clicks sum
-  to ~40 across 1,229 metric rows, NULL on linkedin/bluesky entirely). Reframed to the one framing
-  contrast the DB actually supports: spin-on vs the verbatim spin-control-run baseline (card
-  f444f440's periodic control run), by engagement, per platform -- src/strategy/frame-fit.ts. This
-  closes the loop on the existing spin-control experiment rather than inventing a fake angle-vs-
-  angle comparison. Recommendation only, same posture as Levers A/B -- src/atomize/spin.ts's
-  per-platform angle stays untouched. Expect mostly insufficient-data today (posts.source untagged
-  on most distributed posts, spin-control coverage accrues one pick/month) -- same overfitting
-  posture as A/B/C, filling in over time. Filed a follow-up card (below) to persist per-post
-  framing tags (angle/case_skeleton/directives_applied) to the DB so a future pass can weight
-  individual angles, not just spin-on/off.
-- SHIP: held (draft PR #226 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
-  needs Muxin's review; real + synthetic before/after samples in PR body, including the reframe
-  rationale; builds on merged Levers A/#220, B/#222, C/#224)
-- MERGED 2026-08-18: PR #226 is merged.
-- STATUS: Done
-- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14), GOAL_CONDITION explicit, builds on existing per-channel angle templates. PR opens as a HELD draft per rule 7 (content-gen logic: spin-angle selection weighting). (pre-flight 2026-07-14)
-- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
-<!-- card-id: a4c5b42b-d3a5-4547-964c-58eb4c4507a4 -->
-
 **Persist per-post framing tags (angle / case_skeleton / directives_applied) to the analytics DB**
 - Currently a derivative's angle, case_skeleton flag, and directives_applied list live only in per-derivative frontmatter (content/<slug>/derivatives/*.md) -- never written to data/analytics.db
 - Design + implement a linkage so posts.angle (and ideally case_skeleton/directives_applied) get persisted when a post is tagged/ingested, joinable to metrics
 - Unblocks a future pass on Lever D (card a4c5b42b) that weights individual angles/directives by measured performance, not just the coarse spin-on/off split frame-fit.ts computes today
 - Test: a newly-ingested post's angle is queryable via SQL joined to its metrics row
-- GOAL_CONDITION: per-post framing tags are persisted to analytics.db at tag time; a query can join angle/case_skeleton/directives_applied to engagement metrics; npm test green.
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: filed by the a4c5b42b (lever D) build worker 2026-07-15 as a data-gap follow-up -- not part of the original epic decomposition.
 - SCOPE NOTE (build worker, 2026-08-18): PR #311 (card 83166c51, lever-effectiveness.ts) loosely
@@ -582,6 +387,7 @@ CARD TYPE: EPIC
   A and B are proposed, pending Muxin's sign-off, as cards 2ed2bc5a and 30257501. This card's own
   scope (angle/case_skeleton persistence) remains open and unbuilt -- unchanged by any of that.
 - STATUS: To Do
+- GOAL_CONDITION: per-post framing tags are persisted to analytics.db at tag time; a query can join angle/case_skeleton/directives_applied to engagement metrics; npm test green.
 - DECISION: hold -- needs the frontmatter-to-DB linkage designed (which file/step writes it, whether it's a new posts column or a side table) before scoping the build; not epic-approved on its own, revisit once Lever D's frame-fit signal is showing real reads and a deeper angle-level cut is actually wanted.
 <!-- card-id: 6b2f9d31-4e7c-4a58-9d0b-1f3a7e2c8b45 -->
 
@@ -667,8 +473,8 @@ CARD TYPE: EPIC
 - NEEDS DECISION: machine-invented candidate; explicit human promotion required
 - EVIDENCE: https://developers.facebook.com/docs/threads/reference/publishing/ (retrieved 2026-07-14)
 - HYPOTHESIS: The Threads API's publishing reference requires a `text` parameter for text-only posts and supports an `auto_publish_text` flag for single-call publishing, with expanded third-party publishing, search, analytics, and reply-management access for external apps. Uncertainty: Exact current rate limits and whether Meta App Review approval is fast/easy for a solo creator's small volume were not independently confirmed from a primary Meta source (the 250/1,000/100-per-day figures came from a third-party pricing blog, not developers.facebook.com directly) -- needs verification during build before committing to cadence assumptions.
-- GOAL_CONDITION: A /publish run for a content folder with an approved text derivative routed to `threads` creates a live Threads post via the official Threads Graph API (returns a real post ID, verifiable on threads.net), with `threads` present as a platform in config/platforms.yaml and covered by the unified slot scheduler (src/publish/slots.ts) like every other channel.
 - STATUS: To Do
+- GOAL_CONDITION: A /publish run for a content folder with an approved text derivative routed to `threads` creates a live Threads post via the official Threads Graph API (returns a real post ID, verifiable on threads.net), with `threads` present as a platform in config/platforms.yaml and covered by the unified slot scheduler (src/publish/slots.ts) like every other channel.
 - GROOMED: readiness pass, no blocking unknowns + 2026-07-14
 - PARKED: needs decision (judgment, idea-scout): new publishing platform; Meta App Review timeline + 250/day rate limit need verification before committing to cadence; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: bad4fb64-135f-4ff5-8e9d-0a622c6491e2 -->
@@ -682,8 +488,8 @@ CARD TYPE: EPIC
 - NEEDS DECISION: machine-invented candidate; explicit human promotion required
 - EVIDENCE: https://www.dynamisllp.com/knowledge/ai-disclosure-in-2026-recent-developments-and-practical-steps-for-brands-and-influencers (retrieved 2026-07-14)
 - HYPOTHESIS: EU AI Act Article 50 (effective 2026-08-02) requires providers of AI systems generating synthetic outputs to mark those outputs in machine-readable form, and deployers must disclose deepfakes/AI-generated content to end users, with the Code of Practice draft favoring prominent user-facing disclosure over metadata-only marking. Uncertainty: Unclear whether a solo US-based creator with an EU-reachable but not EU-targeted audience is squarely in scope of Article 50's deployer obligations, and unclear whether Kokoro-TTS narration alone (without a synthetic on-screen avatar/face) counts as a 'deepfake' or falls under the narrower 'synthetic audio output' marking duty versus the stricter public-interest-content disclosure duty -- needs a real legal read before deciding exact disclosure copy/placement.
-- GOAL_CONDITION: Every video short produced by /video and pushed live by /publish carries a verifiable AI-voice disclosure (on-screen caption/overlay in the rendered .mp4, or the platform's native AI-generated-content upload toggle set to on) before its review-queue row can be set to `approve`; a storyboard missing this field fails a precheck rather than silently publishing undisclosed synthetic narration.
 - STATUS: To Do
+- GOAL_CONDITION: Every video short produced by /video and pushed live by /publish carries a verifiable AI-voice disclosure (on-screen caption/overlay in the rendered .mp4, or the platform's native AI-generated-content upload toggle set to on) before its review-queue row can be set to `approve`; a storyboard missing this field fails a precheck rather than silently publishing undisclosed synthetic narration.
 - GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
 - PARKED: needs decision (judgment, idea-scout): EU AI Act Article 50 effective 2026-08-02 (18 days out); scope applicability + disclosure copy/placement undecided; recommended: stage — awaiting Muxin's call, 2026-07-14
 <!-- card-id: 2775170f-14df-4cc0-a045-6d51ebcd9dec -->
@@ -703,7 +509,6 @@ CARD TYPE: EPIC
 - send-follow-up action needs to draft a follow-up message (reusing src/atomize/reply-draft.ts pattern for voice.yaml compliance) and surface it in review-queue for approval
 - Message context: locked core-message from the lead's lead.md + time-since-contact + prior message history from tracker.jsonl, draft to review-queue.md as a new row type (follow-up-draft)
 - No auto-send — mirrors the review → approve posture of db22283f (voice replies draft-only)
-- GOAL_CONDITION: Clicking 'send-follow-up' on a Follow-ups tab row (any bucket) generates a voice.yaml-compliant draft message in review-queue.md as row type follow-up-draft with source_lines tracing to lead.md + prior touch history; npm test covers draft+approve flow with no network calls in dry-run
 - PARENT: 659b50f0-6bc7-473b-8673-b901e9c93d11
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Unified follow-up tracking ("Follow-ups" tab) across client, platform, inbound, and job-search outreach (659b50f0-6bc7-473b-8673-b901e9c93d11)
 - SHIP: verified already shipped, no build needed -- enqueueFollowUpDraft (src/review/jobs.ts) ->
@@ -717,6 +522,7 @@ CARD TYPE: EPIC
   button there yet -- a real but minor residual, flagged for Muxin's call, not auto-filed as a new
   card). (verified 2026-07-15)
 - STATUS: To Do
+- GOAL_CONDITION: Clicking 'send-follow-up' on a Follow-ups tab row (any bucket) generates a voice.yaml-compliant draft message in review-queue.md as row type follow-up-draft with source_lines tracing to lead.md + prior touch history; npm test covers draft+approve flow with no network calls in dry-run
 - DECISION: hold -- epic 659b50f0 already approved this row-shape/action ('send-follow-up', draft-only, no auto-send). Scope is clear (reuses src/atomize/reply-draft.ts pattern for voice.yaml compliance). Message-drafting is content-generation-adjacent logic in spirit of rule 7 (produces text Muxin will read/send), so PR HOLDS for review with a real before/after sample rather than auto-merging. (pre-flight 2026-07-14)
 - GROOMED: readiness pass: clear GOAL_CONDITION, reuses src/atomize/reply-draft.ts pattern, draft-only mirrors db22283f + 2026-07-15
 <!-- card-id: 60743d7a-4919-4776-8c33-596b526c9455 -->
@@ -725,7 +531,6 @@ CARD TYPE: EPIC
 - Epic 2ce597d7 builds 5 levers that steer content generation, but once deployed they need validation: do they actually improve performance vs. the hardcoded defaults they replace?
 - Each lever card includes a test (e.g. 'Test: /atomize on a piece strong in Substack pillar but weak in X pillar produces Substack derivatives only') but these are unit tests, not outcome measurement
 - Need a lightweight post-publish feedback loop: track which strategy lever was active for each published piece, measure engagement delta (pillar fit → resonance lift, media-type bias → click lift, CTA choice → conversion lift), and surface findings in /strategy brief or a dedicated signals-effectiveness report
-- GOAL_CONDITION: A strategy-validation report (printed by /strategy or a separate command) shows per-lever engagement deltas: pieces routed via Lever A to platform-fit pillars show X% resonance lift vs. baseline, media-type bias (Lever B) shows Y% engagement lift, etc.; uncertainty/sample-size flags included where data is thin
 - PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
 - ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
 - SCOPE RECONCILED (build worker, 2026-08-18): the card's literal ask ("pieces routed via Lever A
@@ -753,6 +558,7 @@ CARD TYPE: EPIC
   forced, tracking-gap framing chosen over any approximation; builds on merged Levers A/#220,
   B/#222, C/#224, D/#226, E/#232)
 - STATUS: Review
+- GOAL_CONDITION: A strategy-validation report (printed by /strategy or a separate command) shows per-lever engagement deltas: pieces routed via Lever A to platform-fit pillars show X% resonance lift vs. baseline, media-type bias (Lever B) shows Y% engagement lift, etc.; uncertainty/sample-size flags included where data is thin
 - GROOMED: readiness pass: clear GOAL_CONDITION, lightweight post-publish feedback loop scope is concrete + 2026-07-15
 <!-- card-id: 83166c51-e65f-41cc-92eb-53e5e8cf1ea5 -->
 
@@ -777,27 +583,241 @@ CARD TYPE: EPIC
 - ORIGIN: maintenance-audit 2026-07-20 -- from PR #260's Class A profile: the loop-table row "Deep security review (agent)" is event-only for this class (fires when a PR touches auth/secrets/data handling), but nothing currently detects that condition and routes such a PR to a security-review pass before merge.
 - GAP: no wiring exists (in CI, in the conductor, or as a repo convention) that flags a PR touching .env-adjacent config, src/pull/login.ts (browser-login credential handling), src/publish/*.ts (third-party publish adapters with API keys), or similar credential/data-handling paths for a mandatory security-review HOLD before merge.
 - SCOPE (needs grooming): likely a lightweight path-filter check (e.g. a paths-filter-based CI job) that flags matching PRs, paired with a conductor-side rule treating a PR touching those paths as HOLD-tier (mandatory security review) rather than self-vet auto-merge -- mirrors the maturity ladder's Stage 3 security-cadence rule, wired earlier since this repo already holds real third-party credentials.
-- GOAL_CONDITION: a PR touching any of {.env*, src/pull/**, src/publish/**, config/providers.yaml, or other credential/auth-adjacent paths} is automatically flagged (CI check or conductor-side rule) as requiring a security review before merge, instead of relying on a human/agent noticing.
 - STATUS: Backlog
+- GOAL_CONDITION: a PR touching any of {.env*, src/pull/**, src/publish/**, config/providers.yaml, or other credential/auth-adjacent paths} is automatically flagged (CI check or conductor-side rule) as requiring a security review before merge, instead of relying on a human/agent noticing.
 <!-- card-id: 9cff827f-2d3d-471b-a3d2-813a7752ebc7 -->
 
 **Monthly codebase-health-report loop -> refactor cards**
 - ORIGIN: maintenance-audit 2026-07-20 -- loop-table row "Codebase health report -> refactor cards" targets monthly for Class A; no such loop exists for content-agents today.
 - GAP: nothing currently produces a periodic report surfacing hotspots (modules absorbing repeated bug fixes, complexity spikes, dead code) that files refactor cards. Per the rubric this is a report that FILES cards for hotspots -- never a loop that refactors directly (calendar-driven refactoring without a signal is an explicit anti-pattern).
 - SCOPE (needs grooming): a monthly job (Claude cloud Routine or a scheduled conductor pass) that inspects git-log churn plus file size/complexity over src/** and files up to N Backlog cards for genuine hotspots, same noise-guardrail (dedup, cap) as propose-cards/idea-scout.
-- GOAL_CONDITION: a monthly health-report run produces zero-to-few Backlog cards naming specific hotspot files/modules and the evidence (churn count, size, or duplicated logic) behind each, capped and deduped like the other loops.
 - STATUS: Backlog
+- GOAL_CONDITION: a monthly health-report run produces zero-to-few Backlog cards naming specific hotspot files/modules and the evidence (churn count, size, or duplicated logic) behind each, capped and deduped like the other loops.
 <!-- card-id: 64e433e3-122b-48e2-bbb9-7edfa20736e9 -->
+
+**Pattern mining Phase 2 -- automated collection and video transcripts**
+- ORIGIN: Muxin, 2026-08-22 -- the second phase of the pattern-mining build (`docs/pattern-mining-plan.md` section 10). Phase 1 shipped on branch `feat/pattern-mining` and works off entries staged by hand; this card is the stop-staging-by-hand half she deliberately deferred.
+- CONTEXT: this EXTENDS existing work, it is not a from-scratch build. `.claude/skills/atomize/references/hook-patterns.md` (23 cited hook patterns, shipped 2026-08-18) and `appliesRehook()` in `src/atomize/spin.ts` are the library and the drafting gate this feeds. Phase 1 already added the corpus store (`src/patterns/corpus.ts`), the collect step (`src/patterns/collect.ts`), outlier scoring (`src/patterns/outliers.ts`), and `config/pattern-mining.yaml`. Phase 2 only changes where entries come from.
+- SCOPE: per-platform automated collection reusing `src/pull`'s logged-in Chrome session, plus Typefully for X (already an integration here, `src/publish/typefully.ts`); automatic video transcript pull so a TikTok, Reels or YouTube entry does not need a pasted transcript. The corpus record shape and the outlier math do not change, see plan doc sections 8 and 9.
+- WHY IT WAITS: reading other people's posts at scale is a product-direction call and possibly a legal one. Terms of service differ per platform, and transcript sourcing differs again per platform. Phase 1 works on hand-staged entries, so nothing is blocked by waiting.
+- STATUS: Backlog
+- GOAL_CONDITION: a collection run for a named account and platform appends validated, deduped corpus entries to `data/patterns/corpus.jsonl` with no manual staging, and a video entry arrives with its transcript already filled in, with the source recorded in `transcript_source`.
+- DECISION: none yet -- needs Muxin's explicit call on scraping other people's public posts and on how transcripts get sourced per platform, before any build starts. Not for the conductor to auto-pick.
+<!-- card-id: 82cc2066-9db0-4110-87d8-857bc03af115 -->
+
+**Pattern mining Phase 3 -- pattern-library GUI surface in the review page**
+- ORIGIN: Muxin, 2026-08-22 -- the third phase of the pattern-mining build (`docs/pattern-mining-plan.md` section 10), deferred out of Phase 1 because of a file collision, not because the idea is unsettled.
+- CONTEXT: this EXTENDS existing work, it is not a from-scratch build. It renders what Phase 1 already produces: the corpus (`src/patterns/corpus.ts` over the gitignored `data/patterns/corpus.jsonl`), the outlier verdicts from `src/patterns/outliers.ts`, and the distilled patterns in `.claude/skills/atomize/references/post-patterns.md` alongside `hook-patterns.md`. Those libraries are read by the atomize skill's drafting step; `appliesRehook()` in `src/atomize/spin.ts` is the boolean gate on whether that step runs, it does not itself read the libraries.
+- SCOPE: a room in the review app where Muxin can browse collected entries, see which cleared the outlier bar and which rule fired (`view_follower_ratio` or `baseline_multiple`), and read the synthesized full-post patterns. Read-first, no collection controls in v1.
+- BLOCKED ON: the in-flight Content Studio batch. This needs `src/review/page.ts`, which that batch owns (along with `serve.ts`, `jobs.ts`, `fiction.ts`). Two sessions editing that file would collide, so this waits until the batch lands.
+- PRIVACY NOTE: other creators' full post text and transcripts stay out of git by design (plan doc section 5, decision 2). A GUI that reads them locally is fine; nothing it renders may be committed or exported.
+- STATUS: Backlog
+- GOAL_CONDITION: `npm run review` shows a pattern-library surface listing the collected corpus with its outlier flags and the current synthesized patterns, reading straight from `data/patterns/` with no new copy of that data committed to git.
+<!-- card-id: 92d4d11b-a112-40d4-b1d5-5ac7d611e7bf -->
+
+**POSSE essay routing — point the essay CTA fallback at humaninference.ai**
+- ORIGIN: Muxin, 2026-08-18 — confirmed POSSE strategy (publish essays on her own site first,
+  syndicate to platforms, drive traffic back so the audience is owned, not rented). Landing page
+  (87c86b16) is live at humaninference.ai and hosts full essays with their own URLs, not a single
+  static page.
+- WHAT SHIPPED: `config/cta.yaml`'s `source_fallback.url` changed from the Substack home to
+  `https://humaninference.ai`. The per-essay case needed no code change — `cta: source` already
+  resolves generically from each content folder's `source.md canonical_url`, whatever domain that
+  URL is on — so future essays just need their humaninference.ai URL pasted into `canonical_url`
+  the same way a Substack URL was pasted before.
+- NOTE: `work_with_me_url` in `config/content-types.yaml` is unchanged (still the LinkedIn
+  stand-in) — see ae602c84, which now depends on the lead-gen offer card below, not on the landing
+  page being live.
+- STATUS: Done
+<!-- card-id: 504362d7-a6d3-45f8-bcd7-8bf1a1fd8739 -->
+
+**Landing page**
+- Landing page for content CTAs (work-with-me / project pages / read-the-essay).
+- Worked on OUTSIDE this repo.
+- LIVE (Muxin, 2026-08-18): humaninference.ai is live and hosts full essays with their own URLs
+  (a real blog, not a single static page). Essay CTA routing already points there — see the
+  `source_fallback` change in config/cta.yaml, same day.
+- CORRECTION (2026-08-18): the landing page going live does NOT unblock the "swap work-with-me to
+  the landing page" card (ae602c84) the way this card originally assumed. Muxin does not want the
+  bare landing page used as a general CTA — only as the essay host. `work-with-me` needs an actual
+  lead-gen offer first (see new card, below). ae602c84's DEPENDS ON is updated accordingly.
+- STATUS: Done
+<!-- card-id: 87c86b16-e30f-455b-9c3f-bd3b0e3f2648 -->
+
+**Build the actual Substack Notes repost path (route.ts target + skill-doc fix)**
+- ORIGIN: follow-up auto-filed while building card a52927cd (Clarify which flow produces platform:substack rows), found while tracing the routing comment fix.
+- Real gap, not just stale comments: no code path today actually produces a platform: substack review-queue row. src/strategy/route.ts CORE_TEXT (the pillar routers target list) never includes 'substack'. Two project skill docs explicitly say the OPPOSITE of Muxins 2026-07-10 decision: .claude/skills/atomize/references/notes-mode.md step 3 tells Claude 'Substack is already excluded as a routing target, so a note is never reposted back to where it came from'; .claude/skills/atomize/references/spin-mode.md (lines ~12-13) repeats the same stale reserved-not-a-target claim.
+- src/publish/substack.ts (PR #164, already merged) is fully wired and works once a row exists -- this card is the missing producer side, plus fixing the two stale skill docs (writes under .claude/skills/ need an attended/interactive session, same constraint cards ebe652a7 and cccfc43a hit).
+- RULE 7: this is src/strategy/route.ts routing-decision logic (which platforms a piece is atomized to) -- content-generation-adjacent logic per CLAUDE.md rule 7. This PR should HOLD for Muxins review.
+- CHAIN: 1
+
+SHIP: held (draft PR #208 — repo CLAUDE.md Rule 7, routing-logic change, needs Muxin's review; old-vs-new content sample in PR body)
+- MERGED 2026-08-18: PR #208 is merged.
+- STATUS: Done
+- GOAL_CONDITION: running /atomize notes on a real Substack Note produces a review-queue.md row with platform: substack when appropriate (conditioned on source_kind: substack-note, per the plan), and .claude/skills/atomize/references/notes-mode.md + spin-mode.md no longer say Substack is excluded as a target.
+- DECISION: approved -- build the missing Substack Notes repost producer (route.ts) to match Muxin's already-stated 2026-07-10 decision (platform:substack rows should be produced when appropriate); also fix the two stale skill docs. Routing/content-adjacent logic, so PR HOLDS for review per rule 7 regardless of this approval to build. (pre-flight 2026-07-14)
+- GROOMED: readiness pass: clear scope, no blocking unknown + 2026-07-14
+- CI NOTE: CI: green (as of 2026-07-15 08:25 UTC) — PR #208 https://github.com/heymoosh/content-agents/pull/208
+<!-- card-id: df11d0db-c6eb-4f00-bf31-d2d9f0328265 -->
+
+**Review tab: video-script/storyboard body clips most content behind an easy-to-miss scroll**
+- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Review tab rendering)
+BUG: The VIDEO-SCRIPT/STORYBOARD row type renders its script body in a box with CSS class `body story` (src/review/page.ts, CSS rule `.body.story { ...; max-height:260px; overflow:auto; }`, ~line 83). For a typical 5-paragraph (~1300-char) drafted script, only the first ~1.5 paragraphs are visible in the 260px window. The scrollbar is a subtle macOS-style overlay scrollbar with no always-visible track, and there is no fade gradient, "more below" cue, or expand affordance. Confirmed the box IS scrollable internally (scrolling down over it reveals the rest of the text), but nothing signals that more content exists below the fold.
+UI LOCATION: Review tab, any VIDEO-SCRIPT / STORYBOARD row (folder: 2026-06-16-building-an-innovation-nation, row VIDEO-SCRIPT, status blocked) — applies to this row type generally, not just this one row.
+REPRO: 1) Open Review tab. 2) Scroll to a VIDEO-SCRIPT/STORYBOARD row. 3) Observe the script body box shows only the first couple paragraphs, cut off mid-word at the box edge, no visible "more content" indicator.
+OBSERVED: Script text truncated at a fixed 260px height with only a faint overlay scrollbar as the sole discoverability cue; a reviewer skimming the queue could easily approve/discard a video script without ever seeing most of its content.
+EXPECTED: Either a visible scroll affordance (persistent thin scrollbar or fade-out gradient at the clipped edge), or a taller default height / expand-to-read control for the video-script kind specifically, since these bodies are read in full before approval (unlike short social post excerpts).
+ROOT CAUSE: src/review/page.ts, CSS rule `.body.story` (~line 83): `max-height:260px; overflow:auto;` with no companion visual affordance signaling clipped content.
+- DECISION (Muxin, 2026-08-06): let it grow -- drop the max-height entirely rather than add a fade or an expand control. The sheet already scrolls, so nothing is hidden and there is no second scroll region to discover.
+- RESOLVED 2026-08-06: removed `max-height:260px; overflow:auto` from `.body.story` (src/review/page.ts). A video script now renders at full height. Verified the emitted page no longer contains `max-height:260px`.
+- STATUS: Done
+- GROOMED: clip-affordance outcome clear; .body.story CSS surface pinned + 2026-07-11
+<!-- card-id: dcb91654-efd0-4992-8820-a9d97c40ac2e -->
+
+**Outreach tab: long status groups clip cards with no scroll affordance**
+- ORIGIN: Muxin-requested GUI sweep, 2026-07-11 (Outreach tab)
+BUG: A status group's card list (.notelist) has a hardcoded max-height:420px with overflow:auto (src/review/page.ts:140) and no visible scroll indicator, so once a group's content exceeds ~420px it silently clips a card mid-content with zero cue that more content exists below.
+UI LOCATION: Outreach tab, any status group panel with enough leads/pitch-text length to exceed ~420px (repro'd on RESEARCHED (5): Anthropic, Fireflies.ai, Mem, Notion, Superhuman -- Notion has an unusually long pitch_angle paragraph).
+REPRO:
+1. Open Outreach tab, scroll the outer page down until the RESEARCHED panel's bottom edge is in view.
+2. The panel's rounded border appears to close right after the Notion card, with Notion's <b>name</b>/pitch/dir divs and the entire Superhuman card invisible -- no scrollbar is visible on macOS (overlay scrollbars auto-hide) so it reads as "the list ends here."
+3. Verified via DOM inspection (document.querySelectorAll) that all 5 cards ARE present and correctly populated in the DOM at all times -- box.querySelector('.notelist').scrollHeight (668px) > clientHeight (420px) on the RESEARCHED panel confirms it's pure CSS clipping, not a data/render bug.
+OBSERVED: A correctly-fetched, correctly-rendered card (Notion) and an entire correctly-rendered card (Superhuman) are invisible with no affordance telling the user there's more to scroll to. This took direct DOM/network inspection to distinguish from a real data-loss bug -- a normal user has no way to tell the difference and would reasonably conclude the app lost or failed to render their data.
+EXPECTED: Either remove the fixed max-height (let the group grow with the page, since the outer page already scrolls), or add a visible scroll cue (a bottom fade gradient, a persistent thin scrollbar via `scrollbar-gutter`/webkit-scrollbar styling, or a "N more" indicator) so a clipped list is visually distinguishable from a complete one.
+ROOT CAUSE: src/review/page.ts:140 -- `.notelist { max-height:420px; overflow:auto; }`. Shared by the Outreach tab's per-status groups and the Follow-ups tab's per-bucket lists (same class), so any bucket with enough rows/text is subject to the same silent clipping.
+- DECISION (Muxin, 2026-08-06): same call as dcb91654 -- remove the cap, no scroll affordance.
+- RESOLVED 2026-08-06: removed `max-height:420px; overflow:auto` from `.notelist` (src/review/page.ts). NOTE: the Outreach half of this card had already been overtaken by the five-room desk redesign: Outreach status groups no longer exist, so `.notelist` was by then used only by the Substack Notes browser, which is what this fix covers. Verified the emitted page no longer contains `max-height:420px`.
+- STATUS: Done
+- GROOMED: clip-affordance outcome clear; .notelist max-height:420px pinned (page.ts:140) + 2026-07-11
+<!-- card-id: 218cb426-115b-4eda-90bd-70fe34408e60 -->
+
+**Strategy lever A: gate content by pillar performance per platform (topic-fit routing)**
+- Compute per-platform pillar engagement from analytics each /strategy run
+- Write platform-pillar fit data where route.ts can read it (config/strategy/ or data/strategy/)
+- Route conditionally gates derivative drafting: skip platforms where source pillar underperforms
+- Seed priors: X=engineering thinking, LinkedIn=careers/building, Substack=reflective (per Muxin 2026-07-14)
+- Test: /atomize on a piece strong in Substack pillar but weak in X pillar produces Substack derivatives only, skips X
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- SCOPE RECONCILED (Muxin, 2026-07-15): this card's literal wording ("route.ts auto-skips
+  underperforming platforms") conflicted with the locked card 7e550e48 decision (fit score never
+  overrides config/routing.yaml's defaults -- auto-gating surprised Muxin) and with 9a7656d9's
+  overfitting/algorithmic-risk flag. Raised the conflict; Muxin's call: "inform me, I decide" --
+  given her explicit concern about overfitting to thin/early signal, this builds the
+  measurement + RECOMMENDATION half only. route.ts's decision logic and config/routing.yaml
+  defaults are untouched (7e550e48 stays intact); nothing auto-changes what /atomize drafts. A
+  thin cell (n<3 or <4wks) always reads insufficient-data, never a forced lean-in/ease-off.
+  Auto-acting on well-proven pairs is deferred to a future data-gated card once volume is thick
+  enough to trust.
+- SHIP: held (draft PR #220 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
+  needs Muxin's review; before/after sample + Bluesky seed-prior confirmation ask in PR body)
+- MERGED 2026-08-18: PR #220 is merged.
+- STATUS: Done
+- GOAL_CONDITION: route.ts reads strategy-computed pillar-performance signal per platform instead of hardcoded defaults; /atomize skips platforms where source pillar lacks data-backed fit; npm test green.
+- DECISION: hold -- epic 2ce597d7 already approved this lever's scope 2026-07-14, and seed priors are already stated on this card (X=engineering, LinkedIn=careers/building, Substack=reflective, per Muxin 2026-07-14). Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft with before/after samples per rule 7 (routing/content-gen logic) and per the epic's own 'None auto-merges' statement -- no live-posting risk before her review. (pre-flight 2026-07-14)
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: c7638362-5149-4b51-b414-17f24a94ccf7 -->
+
+**Strategy lever B: bias media type (text/image/video) by platform resonance trends**
+- Compute per-platform media-type resonance: text engagement vs images vs video from analytics
+- Write media preference to config/strategy/ for /atomize + /video to read
+- Bias derivative generation toward highest-resonating media type per platform
+- Default text-first where data is thin; prefer video/images where they demonstrably outperform
+- Test: /atomize on platform where video outperforms text queues prioritized video derivatives
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- SCOPE RECONCILED (Muxin, 2026-07-15): the card's own test ("queues prioritized video
+  derivatives") is structurally impossible without /atomize auto-invoking /video, which is
+  deliberately the separately-invoked, human-gated, real-cost path (storyboard approval,
+  keyframe approval, "offer cost first, never auto-escalate" per CLAUDE.md rule 6). Raised the
+  conflict; Muxin's call: recommend only, never auto-trigger -- same "inform me, I decide"
+  resolution as Lever A (c7638362), extended to this axis. /atomize's generation contract (always
+  text + quote-card per routed platform) and /video's invocation model (always human-invoked) are
+  both untouched. A thin cell on either side of a text-vs-media comparison always reads
+  insufficient-data, never a forced lean/steady read.
+- SHIP: held (draft PR #222 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
+  needs Muxin's review; before/after sample in PR body, builds on merged Lever A/#220)
+- MERGED 2026-08-18: PR #222 is merged.
+- STATUS: Done
+- GOAL_CONDITION: /atomize + /video read strategy-computed media-type preference per platform; generation biases toward highest-performing media instead of fixed text-first default; npm test green.
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14); GOAL_CONDITION and test are explicit. Built as a RECOMMENDATION-only layer per the 2026-07-15 reconciliation above; PR opens as a HELD draft per rule 7 -- no live-posting risk before review. (pre-flight 2026-07-14)
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: 27dc7d2d-afee-4e20-9552-b8aa58bd6382 -->
+
+**Strategy lever C: adapt posting cadence + time-of-day by engagement trends per platform**
+- Compute per-platform engagement trends (climbing/stable/declining) + daily time-of-day peak hours
+- Write adaptive cadence (posts_per_week per platform) + times (slot_time_pst per platform) to config
+- /publish reads dynamic cadence/time windows per platform instead of fixed defaults
+- Post more frequently where engagement is climbing; respect each platform's peak posting hours
+- Test: platform with trending-up engagement shows increased posts_per_week; Typefully scheduling respects per-platform time windows
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- SCOPE RECONCILED (Muxin, 2026-07-15): unlike Levers A/B, Muxin's call here was NOT recommend-only
+  -- "auto-write a config I approve." src/strategy/cadence-fit.ts -- write proposes per-platform
+  posts_per_week + slot_time_pst into config/schedule-overrides.yaml (seeded/shipped inert,
+  approved: false); src/publish/slots.ts's loadSchedule() only applies it once Muxin sets
+  approved: true herself. Over-posting/rate-limit risk (flagged in the original DECISION) is
+  guarded four ways: approved:false default, a conservative single-step posts_per_week nudge
+  (never a jump), a hard max_posts_per_week ceiling, and review-queue.md still gating every actual
+  publish. Separately: X and LinkedIn's analytics capture only the posting DATE, not the hour --
+  every post lands on a synthetic timestamp with no real time-of-day signal (X: 1 distinct PT hour
+  across 225 posts; LinkedIn: 1 distinct PT hour across 73). Peak-hour reads for both are correctly
+  suppressed as insufficient-data via a distinct-hours-seen guard; only Bluesky has real
+  timestamps today. Filed a follow-up card (below) to capture real X/LinkedIn post times in
+  ingest. A thin trend window (n<3) always reads insufficient-data, same overfitting posture as
+  Levers A/B.
+- SHIP: held (draft PR #224 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic
+  AND a live-scheduler seam, needs Muxin's review; before/after sample + the four over-posting
+  guards + the X/LinkedIn timestamp gap all called out in PR body; builds on merged Levers
+  A/#220 and B/#222)
+- MERGED 2026-08-18: PR #224 is merged.
+- STATUS: Done
+- GOAL_CONDITION: /publish reads per-platform posts_per_week + slot_time_pst from strategy output; posting cadence + timing adapt per platform to engagement trends; npm test green.
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14). This lever changes live posting cadence/timing, so extra scrutiny is warranted at review -- but building and opening a draft PR carries no live-posting risk by itself (nothing merges/deploys without Muxin's review per rule 7 and the epic's 'None auto-merges' statement). Flag the over-posting/rate-limit risk prominently in the PR description for her review. (pre-flight 2026-07-14)
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: ed23f712-b34d-442c-9d5d-c07b10924924 -->
+
+**Strategy lever D: weight spin angles by conversion performance per platform**
+- Score which narrative frame (case-first, technical-outsider, etc) drives conversions per platform from publish-log
+- Write angle weight scores to config/strategy/ for spin selection probability
+- Spin logic reads weights; higher-scoring angles selected with higher frequency per platform
+- Builds on existing per-channel angle templates (c42769b1, 1eeb82a4) — this layer weights them by real conversion data
+- Test: /atomize on platform where case-first spin drives conversions preferentially selects case-study angle over other spins
+- PARENT: 2ce597d7-acdc-4887-af88-1620fbac16f6
+- ORIGIN: proposed by propose-cards 2026-07-14 from epic Close the loop: strategy analysis actively steers the content engine (2ce597d7-acdc-4887-af88-1620fbac16f6)
+- SCOPE RECONCILED (Muxin, 2026-07-15): the card's literal ask ("weight spin angles by conversion
+  performance") is not buildable today, confirmed by codebase audit: angle is 1:1 with platform
+  (src/atomize/spin.ts's resolveAngle(platform) is a straight lookup -- no angle A vs angle B to
+  weight within a platform), and no conversion/lead metric exists in the analytics DB (clicks sum
+  to ~40 across 1,229 metric rows, NULL on linkedin/bluesky entirely). Reframed to the one framing
+  contrast the DB actually supports: spin-on vs the verbatim spin-control-run baseline (card
+  f444f440's periodic control run), by engagement, per platform -- src/strategy/frame-fit.ts. This
+  closes the loop on the existing spin-control experiment rather than inventing a fake angle-vs-
+  angle comparison. Recommendation only, same posture as Levers A/B -- src/atomize/spin.ts's
+  per-platform angle stays untouched. Expect mostly insufficient-data today (posts.source untagged
+  on most distributed posts, spin-control coverage accrues one pick/month) -- same overfitting
+  posture as A/B/C, filling in over time. Filed a follow-up card (below) to persist per-post
+  framing tags (angle/case_skeleton/directives_applied) to the DB so a future pass can weight
+  individual angles, not just spin-on/off.
+- SHIP: held (draft PR #226 -- repo CLAUDE.md Rule 7, content-generation-adjacent strategy logic,
+  needs Muxin's review; real + synthetic before/after samples in PR body, including the reframe
+  rationale; builds on merged Levers A/#220, B/#222, C/#224)
+- MERGED 2026-08-18: PR #226 is merged.
+- STATUS: Done
+- GOAL_CONDITION: Spin selection reads strategy-computed angle weights per platform; higher-converting narrative frames selected with higher probability; npm test green.
+- DECISION: hold -- epic-approved scope (2ce597d7, 2026-07-14), GOAL_CONDITION explicit, builds on existing per-channel angle templates. PR opens as a HELD draft per rule 7 (content-gen logic: spin-angle selection weighting). (pre-flight 2026-07-14)
+- GROOMED: readiness pass, no blocking unknowns + 2026-07-14
+<!-- card-id: a4c5b42b-d3a5-4547-964c-58eb4c4507a4 -->
 
 **Local review server binds all interfaces, not localhost-only (src/review/serve.ts)**
 - ORIGIN: maintenance-audit 2026-07-20 -- concrete finding from this pass's security-relevant review of the audit surface, not a hypothetical gap.
 - FINDING: src/review/serve.ts calls server.listen(PORT, ...) with no host argument. Node defaults to binding 0.0.0.0 (all interfaces) in that case, so despite the console log printing "http://localhost:${PORT}", the review server is actually reachable from the local network, not just localhost.
 - WHY IT MATTERS: this server has no authentication and both reads and writes real state -- approve/revise/discard on the review queue, and per the file's own imports it triggers real publish calls (publishText, publishCards, publishTikTok, publishShorts, publishSubstack) and some routes shell out via execFile. Anyone on the same LAN/Wi-Fi network could reach it while npm run review is active.
 - SCOPE (needs grooming): pass an explicit host of '127.0.0.1' to server.listen so it only binds the loopback interface; confirm no existing workflow (e.g. deliberately reaching the review GUI from another device) depends on LAN reachability before changing it -- if one does, gate LAN access behind an explicit opt-in/env var instead of the current unintentional default.
-- GOAL_CONDITION: npm run review's server only accepts connections from 127.0.0.1 by default; a request from another machine on the same network is refused, unless an explicit opt-in is set.
 - DECISION (Muxin, 2026-08-06): lock it to loopback. He never opens the studio from another device, so no opt-in env flag was added; if that changes, add one explicitly rather than widening the default.
 - RESOLVED 2026-08-06: `server.listen(PORT, "127.0.0.1", ...)` in src/review/serve.ts. Verified live: the listening socket is `TCP 127.0.0.1:4713 (LISTEN)`, localhost returns 200, and the machine's own LAN address is refused.
 - STATUS: Done
+- GOAL_CONDITION: npm run review's server only accepts connections from 127.0.0.1 by default; a request from another machine on the same network is refused, unless an explicit opt-in is set.
 <!-- card-id: fb7a55d2-8c48-405e-aa4a-8b410b67e874 -->
 
 **Outreach evidence links render the literal string `/^https?:/` instead of a link (src/review/page.ts:1186)**
@@ -806,7 +826,7 @@ CARD TYPE: EPIC
 - WHY IT MATTERS: every cited piece of evidence in the "WHY THIS IS ON YOUR DESK" rail loses its link. The citation is the whole point of a dossier -- Muxin cannot click through to check a quote, and instead sees regex source in the middle of a reading surface.
 - WHY CI MISSED IT: page.test.ts's wiring guard only asserts every emitted `<script>` parses (`new Function`). The mangled form is still syntactically valid JavaScript, just semantically wrong, so it passes.
 - FIX (small, known): double the backslashes on page.ts:1186 to match the surrounding convention. Worth also scanning the emitted script for any other single-backslash regex with the same bug, and considering a test that asserts a lead with an `https://` source renders an `<a class="ev-src">`.
-- GOAL_CONDITION: an evidence item whose source is an http(s) URL renders a clickable "source ↗" link, and no rendered room contains the substring `/^https?:` anywhere in its markup.
 - RESOLVED 2026-08-06 (PR #288): doubled the backslashes at page.ts:1186. Found and fixed a second instance of the same bug class at page.ts:658 (`/\s+/g` emitted as `/s+/g`, so the "replying to" preview replaced runs of the letter "s" with a space). Added two mutation-tested guards: a source-level even-backslash invariant over the client script body, and a regression test asserting on the emitted output.
 - STATUS: Done
+- GOAL_CONDITION: an evidence item whose source is an http(s) URL renders a clickable "source ↗" link, and no rendered room contains the substring `/^https?:` anywhere in its markup.
 <!-- card-id: ed1ea25f-0807-4332-a550-92a6ab252d8b -->
