@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, type MarkerTarget } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -365,4 +365,351 @@ test("buildJobId: a session-collision id maps to a DIFFERENT persisted log file,
   const oldJobFive = buildJobId(lastWeeksRun, 5);
   const newJobFive = buildJobId(todaysRun, 5);
   assert.notEqual(jobLogPath(oldJobFive), jobLogPath(newJobFive));
+});
+
+// ── Ordered steps + a job that stops and asks (v5 handoff §1-§4) ────────────────────────────────
+// Nothing in the repo emits these markers yet, so these tests are the whole consumer: they pin the
+// protocol, the lane rule, and the non-breaking guarantee before any skill is instrumented.
+
+function markerTarget(): MarkerTarget {
+  return { steps: [], stepTotal: null, step: 0, ask: null };
+}
+
+test("parseStepMarker reads a well-formed marker", () => {
+  assert.deepEqual(parseStepMarker("STEP 1/3 Read your beats"), { n: 1, total: 3, label: "Read your beats" });
+  assert.deepEqual(parseStepMarker("STEP 12/12 Drafted the scene"), { n: 12, total: 12, label: "Drafted the scene" });
+});
+
+test("parseStepMarker tolerates the surrounding whitespace a real stdout line carries", () => {
+  assert.deepEqual(parseStepMarker("  STEP 2/3  Checked them against the canon  "), {
+    n: 2, total: 3, label: "Checked them against the canon",
+  });
+});
+
+test("parseStepMarker returns null for malformed markers", () => {
+  assert.equal(parseStepMarker("STEP 1/3"), null, "a marker with no label is not a step");
+  assert.equal(parseStepMarker("STEP 1 of 3 Read your beats"), null);
+  assert.equal(parseStepMarker("STEP x/3 Read your beats"), null);
+  assert.equal(parseStepMarker("STEP 0/3 Read your beats"), null, "steps are 1-indexed");
+  assert.equal(parseStepMarker("STEP 4/3 Read your beats"), null, "n can never exceed the declared total");
+});
+
+test("parseStepMarker returns null for ordinary output lines", () => {
+  assert.equal(parseStepMarker("Reading content/2026-06-16-foo/source.md"), null);
+  assert.equal(parseStepMarker(""), null);
+  assert.equal(parseStepMarker("REFUSED: out of scope"), null);
+  assert.equal(parseStepMarker("the next STEP 1/3 is to read the beats"), null, "a marker is the whole line or nothing");
+});
+
+test("a chunk carrying several step markers advances to the LAST one", () => {
+  const t = markerTarget();
+  ingestMarkerChunk(t, "STEP 1/3 Read your beats\nsome noise\nSTEP 2/3 Checked them against the canon\n");
+  assert.equal(t.stepTotal, 3);
+  assert.equal(t.step, 1, "marker 2 means step 1 finished and step 2 is in flight");
+  assert.deepEqual(t.steps, ["Read your beats", "Checked them against the canon"]);
+});
+
+test("step counts COMPLETED steps, so it is 0 until the first marker arrives", () => {
+  const t = markerTarget();
+  assert.equal(t.step, 0);
+  ingestMarkerChunk(t, "STEP 1/3 Read your beats\n");
+  assert.equal(t.step, 0, "step 1 is in flight, nothing is finished yet");
+  ingestMarkerChunk(t, "STEP 3/3 Drafted the scene\n");
+  assert.equal(t.step, 2);
+  assert.deepEqual(t.steps, ["Read your beats", "", "Drafted the scene"], "a skipped label leaves a hole, not a shifted list");
+});
+
+test("a job whose skill emits no markers keeps steps empty and stepTotal null", () => {
+  const t = markerTarget();
+  ingestMarkerChunk(t, "Reading the source\nWrote 4 derivatives\nDone.\n");
+  assert.deepEqual(t.steps, []);
+  assert.equal(t.stepTotal, null);
+  assert.equal(t.step, 0);
+  assert.equal(t.ask, null);
+});
+
+test("parseAskMarker reads a question, and only a question", () => {
+  assert.equal(parseAskMarker("ASK Which platform should this probe run on?"), "Which platform should this probe run on?");
+  assert.equal(parseAskMarker("ASK no question mark here"), null);
+  assert.equal(parseAskMarker("ASK"), null);
+  assert.equal(parseAskMarker("ASK-OPTION Substack"), null);
+  assert.equal(parseAskMarker("I need to ask you something?"), null);
+});
+
+test("parseAskOptionMarker reads one option label", () => {
+  assert.equal(parseAskOptionMarker("ASK-OPTION Substack"), "Substack");
+  assert.equal(parseAskOptionMarker("  ASK-OPTION  Bluesky  "), "Bluesky");
+  assert.equal(parseAskOptionMarker("ASK-OPTION"), null);
+  assert.equal(parseAskOptionMarker("ASK something?"), null);
+});
+
+test("an ask chunk collects the question and every option under it", () => {
+  const t = markerTarget();
+  ingestMarkerChunk(t, "STEP 1/2 Read the brief\nASK Which platform should this probe run on?\nASK-OPTION Substack\nASK-OPTION Bluesky\n", 1234);
+  assert.deepEqual(t.ask, {
+    question: "Which platform should this probe run on?",
+    options: ["Substack", "Bluesky"],
+    askedAt: 1234,
+  });
+});
+
+test("an ASK-OPTION with no ASK before it is ignored", () => {
+  const t = markerTarget();
+  ingestMarkerChunk(t, "ASK-OPTION Substack\nASK-OPTION Bluesky\n");
+  assert.equal(t.ask, null);
+});
+
+// The lane rule: a blocked job froze the moment it asked, so its clock must read like a finished
+// job's, not a running one's. Muxin's thinking time is not time the job spent working.
+test("jobElapsedMs freezes on blocked exactly like it does on done", () => {
+  const frozen = jobElapsedMs({ status: "blocked", startedAt: 1000, finishedAt: 6000 }, 999_999);
+  assert.equal(frozen, 5000);
+  assert.equal(frozen, jobElapsedMs({ status: "done", startedAt: 1000, finishedAt: 6000 }, 999_999));
+});
+
+test("clearFinishedJobs never removes a blocked job — an unanswered question is not finished work", async () => {
+  await assert.rejects(runQueued("revise", "will fail", async () => { throw new Error("boom"); }), /boom/);
+  const failed = jobs[jobs.length - 1];
+  // Stand a blocked job up directly: nothing emits ASK yet, so there is no live path to one.
+  const blocked = { ...failed, id: "job-blocked-test", status: "blocked" as const, error: null };
+  jobs.push(blocked);
+  try {
+    clearFinishedJobs();
+    assert.ok(!jobs.includes(failed), "the failed job is swept");
+    assert.ok(jobs.includes(blocked), "the blocked job survives");
+  } finally {
+    jobs.splice(jobs.indexOf(blocked), 1);
+  }
+});
+
+// A deliberate ask beats the artifact check (which sees a run that wrote nothing), but a broken
+// run beats a stray ask.
+test("shouldBlockOnAsk: a real ask on a clean spawn blocks", () => {
+  assert.equal(
+    shouldBlockOnAsk({ question: "Which one?", options: ["A", "B"] }, { code: 0, timedOut: false, enoent: false }),
+    true,
+  );
+});
+
+test("shouldBlockOnAsk: a broken spawn never blocks, however it printed the ask", () => {
+  const ask = { question: "Which one?", options: ["A", "B"] };
+  assert.equal(shouldBlockOnAsk(ask, { code: 1, timedOut: false, enoent: false }), false);
+  assert.equal(shouldBlockOnAsk(ask, { code: 143, timedOut: true, enoent: false }), false);
+  assert.equal(shouldBlockOnAsk(ask, { code: null, timedOut: false, enoent: true }), false);
+  assert.equal(shouldBlockOnAsk(ask, null), false, "a job that never spawned cannot have asked");
+});
+
+test("shouldBlockOnAsk: an ask with fewer than two options falls through instead of stranding the job", () => {
+  const clean = { code: 0, timedOut: false, enoent: false };
+  assert.equal(shouldBlockOnAsk({ question: "Which one?", options: [] }, clean), false);
+  assert.equal(shouldBlockOnAsk({ question: "Which one?", options: ["A"] }, clean), false);
+  assert.equal(shouldBlockOnAsk(null, clean), false);
+});
+
+test("isRetryableFailure: only a missing binary is a dead end", () => {
+  assert.equal(isRetryableFailure({ code: null, timedOut: false, enoent: true }), false, "ENOENT: retrying can't put claude on the PATH");
+  assert.equal(isRetryableFailure({ code: 143, timedOut: true, enoent: false }), true, "timeout: may clear on a quieter machine");
+  assert.equal(isRetryableFailure({ code: 1, timedOut: false, enoent: false }), true, "non-zero exit: usually transient");
+  assert.equal(isRetryableFailure({ code: 0, timedOut: false, enoent: false }), true, "clean exit reaching the failure path = the artifact check caught it");
+});
+
+test("answerPromptSuffix carries the answer forward and tells the next run not to ask again", () => {
+  const suffix = answerPromptSuffix("Substack");
+  assert.match(suffix, /Substack/);
+  assert.match(suffix, /do not ask it again/);
+  assert.equal(suffix.includes("\u2014"), false, "no em dashes in anything Muxin's tools emit");
+});
+
+// publicJob is an explicit allowlist. The new fields are additive: every field a screen already
+// reads must still be there, byte-identical.
+test("publicJob exposes the new step/ask/retry fields plus logPath, and keeps every pre-existing field", async () => {
+  await assert.rejects(runQueued("revise", "will fail", async () => { throw new Error("boom"); }), /boom/);
+  const job = jobs[jobs.length - 1];
+  const pub = publicJob(job);
+  for (const field of ["id", "kind", "label", "status", "slugs", "error", "createdAt", "startedAt", "finishedAt", "elapsedMs", "lastStdoutLine"]) {
+    assert.ok(field in pub, `publicJob must still expose the pre-existing field "${field}"`);
+  }
+  for (const field of ["steps", "stepTotal", "step", "failedAtStep", "retryable", "ask", "answer", "logPath"]) {
+    assert.ok(field in pub, `publicJob must expose the new field "${field}"`);
+  }
+  assert.equal(pub.logPath, jobLogPath(job.id), "the log link needs a real href, not a placeholder");
+  assert.deepEqual(pub.steps, []);
+  assert.equal(pub.stepTotal, null);
+  assert.equal(pub.ask, null);
+  assert.equal(pub.answer, null);
+  assert.ok(!("task" in pub), "publicJob must never expose the internal task closure");
+  assert.ok(!("lastSpawn" in pub), "publicJob must never expose the internal spawn result");
+  clearFinishedJobs();
+});
+
+test("a failed job that emitted no markers records no failedAtStep, and is retryable", async () => {
+  await assert.rejects(runQueued("revise", "will fail", async () => { throw new Error("boom"); }), /boom/);
+  const job = jobs[jobs.length - 1];
+  assert.equal(job.status, "failed");
+  assert.equal(job.failedAtStep, null, "no steps means there is no step to point at");
+  assert.equal(job.retryable, true);
+  clearFinishedJobs();
+});
+
+// ── The two new routes' logic (POST /api/jobs/:id/answer, /retry) ───────────────────────────────
+// Stood up against synthetic blocked/failed jobs, since nothing emits ASK yet.
+
+function pushBlockedJob(id: string, ran: string[]): void {
+  jobs.push({
+    id, kind: "revise", label: "asked a question", arg: "",
+    status: "blocked", slugs: [], error: null,
+    createdAt: Date.now(), startedAt: 1000, finishedAt: 6000, lastStdoutLine: null,
+    steps: ["Read the brief"], stepTotal: 2, step: 1, failedAtStep: null, retryable: false,
+    ask: { question: "Which platform should this probe run on?", options: ["Substack", "Bluesky"], askedAt: 500 },
+    answer: null,
+    task: async (j) => { ran.push(j.answer ?? ""); },
+  });
+}
+
+test("answerJob requeues a NEW job carrying the answer, and leaves the original blocked with the answer recorded", async () => {
+  const ran: string[] = [];
+  pushBlockedJob("job-answer-test", ran);
+  const original = jobs[jobs.length - 1];
+  const result = answerJob("job-answer-test", "Bluesky");
+  assert.ok("job" in result, "a valid answer requeues");
+  const requeued = (result as { job: typeof original }).job;
+  assert.notEqual(requeued.id, original.id, "a dead subprocess can't be resumed, so this is a new job");
+  assert.equal(requeued.answer, "Bluesky");
+  assert.equal(requeued.kind, original.kind);
+  // Enqueued at startedAt: null; drain() picks it up synchronously when the lane is free, so what
+  // matters here is that it did NOT inherit the original's frozen clock.
+  assert.notEqual(requeued.startedAt, original.startedAt);
+  assert.equal(requeued.finishedAt, null);
+  assert.deepEqual(requeued.steps, [], "the requeued job starts its checklist over");
+  assert.equal(original.status, "blocked", "the original keeps the question readable");
+  assert.equal(original.answer, "Bluesky");
+  await new Promise((r) => setTimeout(r, 30));
+  assert.deepEqual(ran, ["Bluesky"], "the requeued job actually ran, with the answer on it");
+  jobs.splice(jobs.indexOf(original), 1);
+  clearFinishedJobs();
+});
+
+test("answerJob refuses an answer that wasn't one of the offered options, and a job that isn't blocked", () => {
+  const ran: string[] = [];
+  pushBlockedJob("job-answer-guard-test", ran);
+  const blocked = jobs[jobs.length - 1];
+  assert.deepEqual(answerJob("job-answer-guard-test", "LinkedIn"), { error: "pick one of the options that job offered" });
+  assert.deepEqual(answerJob("job-does-not-exist", "Bluesky"), { error: "no such job" });
+  blocked.status = "failed";
+  assert.deepEqual(answerJob("job-answer-guard-test", "Bluesky"), { error: "that job isn't waiting on an answer" });
+  assert.deepEqual(ran, [], "a refused answer starts nothing");
+  jobs.splice(jobs.indexOf(blocked), 1);
+});
+
+test("retryJob reuses the same job id so the log appends, and clears the failed attempt's state", async () => {
+  await assert.rejects(runQueued("revise", "will fail", async () => { throw new Error("boom"); }), /boom/);
+  const job = jobs[jobs.length - 1];
+  job.retryable = true;
+  job.stepTotal = 3;
+  job.step = 2;
+  job.failedAtStep = 2;
+  const id = job.id;
+  const result = retryJob(id);
+  assert.ok("job" in result);
+  assert.equal((result as { job: typeof job }).job.id, id, "same id keeps one readable log per job");
+  assert.equal(job.status === "queued" || job.status === "running" || job.status === "failed", true);
+  assert.equal(job.failedAtStep, null);
+  assert.equal(job.error, null);
+  await new Promise((r) => setTimeout(r, 30));
+  clearFinishedJobs();
+});
+
+test("retryJob refuses a job that isn't failed, and one a retry can't fix", async () => {
+  await assert.rejects(runQueued("revise", "will fail", async () => { throw new Error("boom"); }), /boom/);
+  const job = jobs[jobs.length - 1];
+  job.retryable = false;
+  assert.deepEqual(retryJob(job.id), { error: "running that again can't fix it" });
+  job.status = "done";
+  job.retryable = true;
+  assert.deepEqual(retryJob(job.id), { error: "only a failed job can be run again" });
+  assert.deepEqual(retryJob("job-does-not-exist"), { error: "no such job" });
+  clearFinishedJobs();
+});
+
+// ── The lane rule, through the real drain() path ────────────────────────────────────────────────
+// settleJob is where a job stops running, so these drive it through runQueued/drain rather than
+// calling it directly. No subprocess: runCommandSpawn writes a log under ~/.content-agents, and
+// nothing else in this suite depends on that being writable. The live-stream half (markers read off
+// real stdout, including a marker split across two chunks) is covered by ingestMarkerChunk above.
+
+test("a clean run that asks ends blocked, keeps no error, and releases the lane for the next job", async () => {
+  const order: string[] = [];
+  const asking = runQueued("revise", "asks a question", async (job) => {
+    order.push("asking start");
+    // What a real spawn would have left behind: markers read off stdout, and a clean exit.
+    ingestMarkerChunk(job, "STEP 1/2 Read the brief\nSTEP 2/2 Weighed the options\nASK Which platform should this probe run on?\nASK-OPTION Substack\nASK-OPTION Bluesky\n");
+    job.lastSpawn = { code: 0, timedOut: false, enoent: false };
+    // The artifact check's verdict on a run that deliberately wrote nothing. settleJob must
+    // override it: the job asked, it did not fail.
+    job.error = "the advisor ran but wrote no new round to develop/advice.json";
+    order.push("asking end");
+  });
+  // Queued behind it: if a blocked job held `draining`, this would never run.
+  const next = runQueued("revise", "queued behind the ask", async () => { order.push("next ran"); });
+  await Promise.all([asking, next]);
+
+  const blocked = jobs.find((j) => j.label === "asks a question")!;
+  assert.equal(blocked.status, "blocked");
+  assert.deepEqual(blocked.steps, ["Read the brief", "Weighed the options"]);
+  assert.equal(blocked.stepTotal, 2);
+  assert.equal(blocked.step, 1, "marker 2 arrived, so step 1 is done and step 2 was in flight when it asked");
+  assert.deepEqual(blocked.ask?.options, ["Substack", "Bluesky"]);
+  assert.equal(blocked.error, null, "a question is not a fault, so the artifact check's message does not survive");
+  assert.ok(blocked.finishedAt, "a blocked job records finishedAt so its clock freezes");
+  assert.equal(jobElapsedMs(blocked, 999_999_999_999), blocked.finishedAt! - blocked.startedAt!);
+  assert.deepEqual(order, ["asking start", "asking end", "next ran"], "the lane was released for the next job");
+
+  jobs.splice(jobs.indexOf(blocked), 1); // blocked jobs are never swept, so clean up by hand
+  clearFinishedJobs();
+});
+
+test("a broken run is not blocked by a stray ask line, and records where it died", async () => {
+  await assert.rejects(
+    runQueued("revise", "asks then dies", async (job) => {
+      ingestMarkerChunk(job, "STEP 1/2 Read the brief\nASK Which one?\nASK-OPTION A\nASK-OPTION B\n");
+      job.lastSpawn = { code: 3, timedOut: false, enoent: false };
+      throw new Error("the run broke");
+    }),
+    /the run broke/,
+  );
+  const job = jobs[jobs.length - 1];
+  assert.equal(job.status, "failed", "a broken run beats a question it printed on the way down");
+  assert.equal(job.error, "the run broke");
+  assert.equal(job.failedAtStep, 0, "it died on step 1, with nothing completed");
+  assert.equal(job.retryable, true, "a non-zero exit is worth another attempt");
+  clearFinishedJobs();
+});
+
+test("a job killed by a missing binary is not offered a retry", async () => {
+  await assert.rejects(
+    runQueued("revise", "no claude on PATH", async (job) => {
+      job.lastSpawn = { code: null, timedOut: false, enoent: true };
+      throw new Error("the `claude` CLI isn't on this server's PATH");
+    }),
+    /PATH/,
+  );
+  const job = jobs[jobs.length - 1];
+  assert.equal(job.status, "failed");
+  assert.equal(job.retryable, false, "retrying can't put a missing binary back on the PATH");
+  clearFinishedJobs();
+});
+
+test("a clean run that finishes marks every step done", async () => {
+  await runQueued("revise", "finishes cleanly", async (job) => {
+    ingestMarkerChunk(job, "STEP 1/3 Read your beats\nSTEP 2/3 Checked them against the canon\nSTEP 3/3 Drafted the scene\n");
+    job.lastSpawn = { code: 0, timedOut: false, enoent: false };
+  });
+  // runQueued resolves its caller from inside the task, a tick before drain() settles the job.
+  await new Promise((r) => setTimeout(r, 20));
+  const job = jobs[jobs.length - 1];
+  assert.equal(job.status, "done");
+  assert.equal(job.step, 3, "a clean finish means the last step completed too");
+  assert.equal(job.stepTotal, 3);
+  assert.equal(job.failedAtStep, null);
+  clearFinishedJobs();
 });

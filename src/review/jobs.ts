@@ -103,6 +103,106 @@ export function parseReviseRefusal(stdout: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+// ── Stdout markers: ordered steps, and a job that stops and asks ─────────────────────────────────
+// Same marker-on-stdout pattern parseReviseRefusal already established, extended to two more
+// protocols a skill can opt into. Both are OPTIONAL: a skill that emits neither keeps behaving
+// exactly as it does today (steps stays empty, stepTotal null, and the UI falls back to the
+// lastStdoutLine heartbeat). Nothing in the repo emits these yet — the parsers ship with their
+// tests as the only consumer, and skills get instrumented separately.
+//
+//   STEP <n>/<total> <label>     one line, before the step's work begins, n 1-indexed
+//   ASK <question>?              one sentence, ending in a question mark
+//   ASK-OPTION <label>           2 or 3 of them; the subprocess prints them and EXITS 0
+//
+// A skill never waits on an answer: it prints the ask and stops, so a human's think time can't
+// occupy the one job lane or burn the spawn timeout.
+
+// Pure: reads one line as a step marker, or null if it isn't one. Exported for direct unit tests.
+export function parseStepMarker(line: string): { n: number; total: number; label: string } | null {
+  const m = /^STEP\s+(\d+)\/(\d+)\s+(\S.*)$/.exec(line.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  const total = Number(m[2]);
+  // A 0th step, or one past the declared total, is a malformed marker rather than a step.
+  if (n < 1 || total < 1 || n > total) return null;
+  return { n, total, label: m[3].trim() };
+}
+
+// Pure: reads one line as the question half of an ask, or null.
+export function parseAskMarker(line: string): string | null {
+  const m = /^ASK\s+(\S.*\?)$/.exec(line.trim());
+  return m ? m[1].trim() : null;
+}
+
+// Pure: reads one line as one ask option, or null.
+export function parseAskOptionMarker(line: string): string | null {
+  const m = /^ASK-OPTION\s+(\S.*)$/.exec(line.trim());
+  return m ? m[1].trim() : null;
+}
+
+// The mutable slice of a Job the marker protocols write to — narrowed so the ingest below is
+// testable against a plain object, no spawn and no full Job needed.
+export type MarkerTarget = Pick<Job, "steps" | "stepTotal" | "step" | "ask">;
+
+// Apply every marker in a chunk of already-line-complete stdout. A chunk carrying several STEP
+// markers advances to the LAST one (a fast skill can emit two before we ever see the output), and
+// ASK-OPTION lines accumulate onto the ask the preceding ASK line opened.
+export function ingestMarkerChunk(target: MarkerTarget, text: string, now: number = Date.now()): void {
+  for (const line of text.split("\n")) {
+    const step = parseStepMarker(line);
+    if (step) {
+      target.stepTotal = step.total;
+      // `step` counts COMPLETED steps: marker n means 1..n-1 finished and n is in flight.
+      target.step = step.n - 1;
+      while (target.steps.length < step.n - 1) target.steps.push("");
+      target.steps[step.n - 1] = step.label;
+      continue;
+    }
+    const question = parseAskMarker(line);
+    if (question) {
+      target.ask = { question, options: [], askedAt: now };
+      continue;
+    }
+    const option = parseAskOptionMarker(line);
+    if (option && target.ask) target.ask.options.push(option);
+  }
+}
+
+// Whether a failed spawn is worth another attempt. Sibling to decodeSpawnFailure rather than a
+// change to it: serve.test.ts imports that function's `string | null` shape, and the UI needs a
+// separate boolean to decide whether to offer Retry at all.
+//
+// Everything except a missing binary is retryable. A timeout may clear on a quieter machine, a
+// non-zero exit is usually transient, and a clean exit that reached the failure path means the
+// artifact check caught a run that finished without writing anything — worth one more attempt.
+// ENOENT is the one no: retrying cannot put `claude` back on the PATH.
+export function isRetryableFailure(result: { code: number | null; timedOut: boolean; enoent: boolean }): boolean {
+  return !result.enoent;
+}
+
+// A job goes `blocked` only when the subprocess asked a real, answerable question AND the spawn
+// itself was clean. Two guards, both load-bearing:
+// - A spawn failure (non-zero exit, timeout, missing binary) beats a stray ASK line: the run broke,
+//   and a question it printed on the way down is not a decision point Muxin should be handed.
+// - An ask needs at least 2 options. The answer route validates against the recorded options and
+//   clearFinishedJobs never sweeps `blocked`, so a 0-or-1-option ask would strand a job that can
+//   neither be answered nor cleared. A malformed ask falls through to the normal done/failed path.
+export function shouldBlockOnAsk(
+  ask: { question: string; options: string[] } | null,
+  spawn: { code: number | null; timedOut: boolean; enoent: boolean } | null,
+): boolean {
+  if (!ask || ask.options.length < 2) return false;
+  if (!spawn) return false;
+  return !spawn.enoent && !spawn.timedOut && spawn.code === 0;
+}
+
+// The answer Muxin picked, handed to the fresh spawn of the requeued job. A dead subprocess cannot
+// be resumed, so the answer rides into the next run's prompt instead (v5 handoff §8.1) — the job
+// re-runs its early steps, which is the accepted tradeoff.
+export function answerPromptSuffix(answer: string): string {
+  return `\n\nYou asked Muxin a question on a previous run and stopped. Her answer: "${answer}". Take that as decided, do not ask it again, and carry on.`;
+}
+
 // Run the revision through headless Claude Code (subscription, no per-token API cost), then return
 // the edited body. Failures (missing CLI, timeout, non-zero exit, refusal, no-op) surface as
 // thrown messages the GUI shows durably on the row instead of a silent no-op or a crash. Routed
@@ -221,7 +321,10 @@ const ATOMIZE_TIMEOUT_MS = 15 * 60_000;
 // all atomize shells out to. Overridable for a setup that needs a different mode.
 const ATOMIZE_PERMISSION_MODE = process.env.ATOMIZE_PERMISSION_MODE ?? "acceptEdits";
 
-type JobStatus = "queued" | "running" | "done" | "failed";
+// "blocked" is a job that printed an ASK and stopped: it is waiting on Muxin, not on the machine.
+// It does NOT hold the job lane (see settleJob below) and it is never swept by clearFinishedJobs —
+// an unanswered question is not finished work.
+type JobStatus = "queued" | "running" | "blocked" | "done" | "failed";
 // "url" | "file" | "text" | "notes" | "continue" | "video" are the atomize-family kinds (dispatch
 // a slash-command against a folder/source, verified by artifact check — see drain() below).
 // "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" |
@@ -250,18 +353,42 @@ interface Job {
   startedAt: number | null;
   finishedAt: number | null;
   lastStdoutLine: string | null; // heartbeat — last non-empty line seen so far, updated as output streams in
+  // Ordered steps, from the STEP markers a skill opts into emitting. Empty/null for every skill
+  // that emits none, which is all of them today — the UI falls back to lastStdoutLine there.
+  steps: string[]; // labels in order, growing toward stepTotal
+  stepTotal: number | null;
+  step: number; // COMPLETED steps — 0 before the first marker, stepTotal on a clean finish
+  failedAtStep: number | null; // which step died, or null when the job ran without steps
+  retryable: boolean; // whether Retry is worth offering — see isRetryableFailure
+  ask: { question: string; options: string[]; askedAt: number } | null;
+  answer: string | null; // what Muxin picked, on the requeued job that carries it forward
   // Task jobs only (revise/brief-revise/insights/ask-insights/duplicate) — the actual work this job
   // runs once it's its turn. Never serialized: publicJob() below is an explicit allowlist that omits
   // it, so this stays an internal queue-execution detail, not part of the polled /api/jobs shape.
   task?: (job: Job) => Promise<void>;
+  // Last runCommandSpawn result on this job, kept so the ONE settle point can classify a failure
+  // (retryable?) and tell a deliberate ask apart from a broken run, without threading the result
+  // back out of five different run functions. Internal, omitted from publicJob like `task`.
+  lastSpawn?: { code: number | null; timedOut: boolean; enoent: boolean };
+}
+
+// The fields every enqueue site initializes identically. Kept in one place so a new job kind can't
+// quietly ship without steps/ask bookkeeping.
+function freshJobFields(): Pick<Job, "status" | "slugs" | "error" | "createdAt" | "startedAt" | "finishedAt" | "lastStdoutLine" | "steps" | "stepTotal" | "step" | "failedAtStep" | "retryable" | "ask" | "answer"> {
+  return {
+    status: "queued", slugs: [], error: null,
+    createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
+    steps: [], stepTotal: null, step: 0, failedAtStep: null, retryable: false, ask: null, answer: null,
+  };
 }
 export const jobs: Job[] = [];
 let jobSeq = 0;
 let draining = false;
 
-// "Clear queue" (GUI) only ever removes finished entries — queued/running jobs stay untouched.
-// drain() finds work via jobs.find(status==="queued"), not by index, so splicing mid-array here is
-// safe even while a job is actively running.
+// "Clear queue" (GUI) only ever removes finished entries — queued/running jobs stay untouched, and
+// so does `blocked`: a job waiting on Muxin's answer is not finished work, and clearing it would
+// throw away the question. drain() finds work via jobs.find(status==="queued"), not by index, so
+// splicing mid-array here is safe even while a job is actively running.
 export function clearFinishedJobs(): number {
   let removed = 0;
   for (let i = jobs.length - 1; i >= 0; i--) {
@@ -301,13 +428,15 @@ export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => P
   return new Promise<T>((resolve, reject) => {
     const id = nextJobId();
     const job: Job = {
-      id, kind, label, arg: "", status: "queued", slugs: [], error: null,
-      createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
+      id, kind, label, arg: "", ...freshJobFields(),
+      // Writes to `j`, the job actually running, NOT the captured `job`: an answered job is
+      // requeued as a CLONE that reuses this same closure, and a rerun failure must land its error
+      // on the clone, not back on the original blocked job.
       task: async (j) => {
         try {
           resolve(await task(j));
         } catch (e) {
-          job.error = e instanceof Error ? e.message : String(e);
+          j.error = e instanceof Error ? e.message : String(e);
           reject(e);
           throw e; // rethrow so drain()'s own try/catch also marks the job "failed", not "done"
         }
@@ -351,6 +480,9 @@ export function runCommandSpawn(
   const log = createWriteStream(jobLogPath(job.id), { flags: "a" });
   let tailBuf = "";
   let stdoutBuf = "";
+  // Markers are parsed per LINE, so a marker split across two chunks isn't half-read: everything
+  // after the last newline is held back here and prepended to the next chunk (flushed on close).
+  let markerResidual = "";
   const onChunk = (isStdout: boolean) => (chunk: Buffer) => {
     const text = chunk.toString("utf8");
     if (isStdout) stdoutBuf += text;
@@ -358,6 +490,9 @@ export function runCommandSpawn(
     tailBuf = (tailBuf + text).slice(-4000); // bounded tail buffer — heartbeat only needs the last line
     const line = lastNonEmptyLine(tailBuf);
     if (line) job.lastStdoutLine = line;
+    const lines = (markerResidual + text).split("\n");
+    markerResidual = lines.pop() ?? "";
+    if (lines.length) ingestMarkerChunk(job, lines.join("\n"));
   };
   return new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -378,11 +513,19 @@ export function runCommandSpawn(
     child.stdout?.on("data", onChunk(true));
     child.stderr?.on("data", onChunk(false));
     child.on("close", (code, signal) => {
+      // A final line with no trailing newline still counts as a marker.
+      if (markerResidual) {
+        ingestMarkerChunk(job, markerResidual);
+        markerResidual = "";
+      }
       // Wait for the write stream to actually flush before resolving — callers read the log file
       // back synchronously right after this promise settles (for the failure tail), and
       // log.end() alone doesn't guarantee the last chunk has hit disk yet.
       log.end(() => {
-        resolve({ code, timedOut: isSpawnTimeout(code, signal), enoent, stdout: stdoutBuf });
+        const result = { code, timedOut: isSpawnTimeout(code, signal), enoent, stdout: stdoutBuf };
+        // Remembered so settleJob can classify the outcome once, in one place.
+        job.lastSpawn = { code: result.code, timedOut: result.timedOut, enoent: result.enoent };
+        resolve(result);
       });
     });
   });
@@ -410,7 +553,11 @@ export function runClaudeSpawn(
   prompt: string,
   opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
 ): Promise<CommandSpawnResult> {
-  return runCommandSpawn(job, "claude", buildClaudeSpawnArgs(prompt, opts), opts);
+  // One choke point for the answer hand-off: every Claude spawn in the GUI runs through here, so a
+  // requeued job carries Muxin's answer into whatever prompt its kind builds, without each run
+  // function having to thread it. `answer` is null on every job that never asked.
+  const withAnswer = job.answer ? prompt + answerPromptSuffix(job.answer) : prompt;
+  return runCommandSpawn(job, "claude", buildClaudeSpawnArgs(withAnswer, opts), opts);
 }
 
 // Last ~30 lines of a job's persisted log, formatted as a "\n---\n<tail>" suffix to append to an
@@ -508,16 +655,25 @@ export function sourceDispatch(
 }
 
 // Wall-clock time the job has taken so far — still ticking while running, frozen once it lands.
+// A `blocked` job freezes exactly like `done`: it stopped at the moment it asked, and the time
+// Muxin takes to answer is not time the job spent working.
 export function jobElapsedMs(j: Pick<Job, "status" | "startedAt" | "finishedAt">, now: number = Date.now()): number | null {
   if (!j.startedAt) return null;
   return (j.status === "running" ? now : j.finishedAt ?? now) - j.startedAt;
 }
 
+// The polled read shape — an explicit allowlist, so internals (`task`, `lastSpawn`, the requeue
+// recipe) can never leak into /api/jobs. The additions below are additive: every pre-existing
+// field keeps its exact name and value.
 export function publicJob(j: Job) {
   return {
     id: j.id, kind: j.kind, label: j.label, status: j.status, slugs: j.slugs,
     error: j.error, createdAt: j.createdAt, startedAt: j.startedAt, finishedAt: j.finishedAt,
     elapsedMs: jobElapsedMs(j), lastStdoutLine: j.lastStdoutLine,
+    steps: j.steps, stepTotal: j.stepTotal, step: j.step, failedAtStep: j.failedAtStep,
+    retryable: j.retryable, ask: j.ask, answer: j.answer,
+    // The UI pairs elapsed time with a link to the run's log; without this the link has no href.
+    logPath: jobLogPath(j.id),
   };
 }
 
@@ -562,10 +718,7 @@ function materializeInboxArg(kind: "text" | "file", rawArg: string, id: string, 
 export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, rawText?: string): Job {
   const id = nextJobId();
   const arg = kind === "text" || kind === "file" ? materializeInboxArg(kind, rawArg, id, rawText) : rawArg;
-  const job: Job = {
-    id, kind, label, arg, status: "queued", slugs: [], error: null,
-    createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
-  };
+  const job: Job = { id, kind, label, arg, ...freshJobFields() };
   jobs.push(job);
   void drain();
   return job;
@@ -605,10 +758,7 @@ export function developJobInFlight(slug: string): boolean {
 export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, rawText?: string): Job {
   const id = nextJobId();
   const arg = kind === "url" ? rawArg : materializeInboxArg(kind, rawArg, id, rawText);
-  const job: Job = {
-    id, kind: "develop", label: `Develop: ${label}`, arg, status: "queued", slugs: [], error: null,
-    createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
-  };
+  const job: Job = { id, kind: "develop", label: `Develop: ${label}`, arg, ...freshJobFields() };
   jobs.push(job);
   void drain();
   return job;
@@ -622,10 +772,7 @@ export function addDevelopFolderJob(slug: string, kind: "develop" | "develop-rep
   );
   if (existing) return existing; // idempotent against a double-click, like addVideoJob
   const label = kind === "develop-reply" ? `Advisor reply: ${slug}` : `Develop: ${slug}`;
-  const job: Job = {
-    id: nextJobId(), kind, label, arg, status: "queued", slugs: [], error: null,
-    createdAt: Date.now(), startedAt: null, finishedAt: null, lastStdoutLine: null,
-  };
+  const job: Job = { id: nextJobId(), kind, label, arg, ...freshJobFields() };
   jobs.push(job);
   void drain();
   return job;
@@ -774,6 +921,35 @@ async function runContinueJob(job: Job): Promise<void> {
     `formatting ran but added no new rows or derivatives in ${parsed?.folder ?? job.arg} — check the view-log link${logTailSuffix(job.id)}`;
 }
 
+// The ONE place a job stops running. Every branch of drain() below routes through this instead of
+// repeating the finishedAt/draining/drain() dance, so the three cross-cutting rules hold everywhere:
+//
+// 1. A deliberate ask wins over the artifact check. A subprocess that asks a question stops before
+//    writing anything, so `runVideoJob`/`runDevelopJob`/`runContinueJob`/the atomize branch will all
+//    have just marked it "failed" for producing no artifact. That verdict is wrong and its error
+//    message is misleading, so a clean spawn carrying a real ask overrides both.
+// 2. A blocked job RELEASES THE LANE. It sets finishedAt, drops `draining`, and kicks the next job.
+//    Holding the lane for a human's answer would stall every job queued behind it.
+// 3. A failure records where it died and whether Retry is worth offering.
+function settleJob(job: Job): void {
+  if (shouldBlockOnAsk(job.ask, job.lastSpawn ?? null)) {
+    job.status = "blocked";
+    job.error = null; // the artifact check's "wrote nothing" verdict was about the ask, not a fault
+  }
+  if (job.status === "done" && job.stepTotal !== null) job.step = job.stepTotal;
+  if (job.status === "failed") {
+    // Null when the skill emitted no step markers: there is no step to point at, and a hard 0
+    // would invent one.
+    job.failedAtStep = job.stepTotal === null ? null : job.step;
+    // No spawn result means the task threw before it ever spawned (a validation error, say) —
+    // default to offering Retry rather than dead-ending a job we can't classify.
+    job.retryable = job.lastSpawn ? isRetryableFailure(job.lastSpawn) : true;
+  }
+  job.finishedAt = Date.now();
+  draining = false;
+  void drain(); // next queued job
+}
+
 // Process the queue one job at a time — every kind (atomize-family AND task jobs) shares this one
 // `draining` mutex, so GUI-wide Claude concurrency is bounded no matter which button fired it.
 async function drain(): Promise<void> {
@@ -793,33 +969,25 @@ async function drain(): Promise<void> {
     } catch {
       job.status = "failed"; // job.error was already set inside runQueued()'s wrapper
     }
-    job.finishedAt = Date.now();
-    draining = false;
-    void drain();
+    settleJob(job);
     return;
   }
 
   if (job.kind === "video") {
     await runVideoJob(job);
-    job.finishedAt = Date.now();
-    draining = false;
-    void drain();
+    settleJob(job);
     return;
   }
 
   if (job.kind === "develop" || job.kind === "develop-reply") {
     await runDevelopJob(job);
-    job.finishedAt = Date.now();
-    draining = false;
-    void drain();
+    settleJob(job);
     return;
   }
 
   if (job.kind === "continue") {
     await runContinueJob(job);
-    job.finishedAt = Date.now();
-    draining = false;
-    void drain();
+    settleJob(job);
     return;
   }
 
@@ -848,9 +1016,64 @@ async function drain(): Promise<void> {
   } else {
     job.error = failure ?? `atomize finished but created no new content folder — check the view-log link${logTailSuffix(job.id)}`;
   }
-  job.finishedAt = Date.now();
-  draining = false;
-  void drain(); // next queued job
+  settleJob(job);
+}
+
+// ── Answering a blocked job, and retrying a failed one ──────────────────────────────────────────
+// Both entry points live here rather than in serve.ts so the queue's invariants (what a job may be
+// answered from, what a retry resets) stay next to drain(). The routes are thin wrappers.
+
+// Muxin picked one of the options a blocked job offered. A dead subprocess cannot be resumed, so
+// this REQUEUES A NEW JOB carrying her answer forward rather than faking a resume: same kind, same
+// arg, same task closure, fresh id and fresh log. The answer reaches the new run's prompt through
+// runClaudeSpawn (answerPromptSuffix). The job re-runs its early steps, which is the accepted
+// tradeoff (v5 handoff §8.1).
+//
+// The original job stays `blocked` with `answer` recorded, so the question and what she chose are
+// still readable. That also means it is never swept by clearFinishedJobs.
+export function answerJob(id: string, answer: string): { error: string } | { job: Job } {
+  const original = jobs.find((j) => j.id === id);
+  if (!original) return { error: "no such job" };
+  if (original.status !== "blocked" || !original.ask) return { error: "that job isn't waiting on an answer" };
+  if (original.answer) return { error: "you already answered that one" };
+  if (!original.ask.options.includes(answer)) return { error: "pick one of the options that job offered" };
+
+  original.answer = answer;
+  const job: Job = {
+    ...freshJobFields(),
+    id: nextJobId(),
+    kind: original.kind,
+    label: original.label,
+    arg: original.arg,
+    task: original.task,
+    answer,
+  };
+  jobs.push(job);
+  void drain();
+  return { job };
+}
+
+// Run a failed job again. Same job id on purpose: the log file opens in append mode, so the second
+// attempt lands under the first in one readable history.
+export function retryJob(id: string): { error: string } | { job: Job } {
+  const job = jobs.find((j) => j.id === id);
+  if (!job) return { error: "no such job" };
+  if (job.status !== "failed") return { error: "only a failed job can be run again" };
+  if (!job.retryable) return { error: "running that again can't fix it" };
+
+  job.status = "queued";
+  job.error = null;
+  job.failedAtStep = null;
+  job.step = 0;
+  // Both cleared so the clock restarts from the retry rather than showing the first attempt's
+  // frozen elapsed while it sits queued.
+  job.startedAt = null;
+  job.finishedAt = null;
+  // Stale state from the failed attempt would otherwise leak into settleJob's next verdict.
+  job.ask = null;
+  job.lastSpawn = undefined;
+  void drain();
+  return { job };
 }
 
 // ── Duplicate to platform ────────────────────────────────────────────────────────────────────
