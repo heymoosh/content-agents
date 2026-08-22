@@ -91,6 +91,280 @@ export function renderInsightsMeta(r: {
   return parts.length ? `<div class="insights-meta">${parts.join(" · ")}</div>` : "";
 }
 
+// ── job UI surfaces (Venture Build v5 §5) ────────────────────────────────────────────────────────
+// Three surfaces read one source, /api/jobs (publicJob in jobs.ts): the Studio working panel, the
+// per-room progress strip, and Studio's team rail. Everything below is a pure, DOM-free mirror of
+// the inline client copies further down this file, same hand-synced convention as the mirrors above.
+//
+// The one rule this design was corrected for four times: never render a duration the system did not
+// measure. Every duration comes from `elapsedMs`, and there is exactly ONE place per job per screen
+// where one appears — the panel row's clock on Studio (the team rail deliberately carries no clock,
+// it shares that screen), and the strip's clock in the destination room.
+
+export interface JobView {
+  id: string;
+  kind: string;
+  label: string;
+  status: string; // "queued" | "running" | "blocked" | "done" | "failed"
+  error?: string | null;
+  elapsedMs?: number | null;
+  lastStdoutLine?: string | null;
+  steps?: string[];
+  stepTotal?: number | null;
+  step?: number;
+  failedAtStep?: number | null;
+  retryable?: boolean;
+  ask?: { question: string; options: string[]; askedAt?: number } | null;
+  answer?: string | null;
+  logPath?: string;
+  finishedAt?: number | null;
+}
+
+export type JobRoom = "Content" | "Outreach" | "Fiction" | "Signals" | "Venture" | "Charles";
+
+export const JOB_COLORS = {
+  ai: "#5b46b8", // purple: an AI is doing it
+  amber: "#9a6b12",
+  green: "#2f7d46",
+  red: "#9a2f2f",
+  grey: "#d8d2c6", // dot grey
+  greyFg: "#a89a80", // the muted text that goes with it
+  blue: "#2f5d9a", // Muxin's own words (the "You said:" line)
+} as const;
+
+// Which room a job lands in. Drives the rail label on `done`, the "Watch it in <Room>" link, the
+// landing sentence, the team-rail name and which room's strip shows it.
+export function jobRoom(kind: string): JobRoom {
+  if (kind === "scout" || kind === "draft-follow-up") return "Outreach";
+  if (kind === "pull" || kind === "strategy" || kind === "insights" || kind === "ask-insights" || kind === "brief-revise") return "Signals";
+  if (kind === "charles-draft") return "Charles";
+  // url/file/text/notes/continue/video/develop/develop-reply/revise/duplicate — the production crew
+  return "Content";
+}
+
+// Landing sentences (v5 §5.3), shown on `done`. They state what is WAITING, never that something
+// published. Charles has no authored sentence in the design, and inventing one would be composing
+// UI copy the design never wrote, so its footer stays empty.
+export function jobLandingSentence(room: JobRoom): string {
+  if (room === "Fiction") return "A scene draft, waiting on your read.";
+  if (room === "Content") return "A cut, waiting on your yes.";
+  if (room === "Outreach") return "A message, locked only when you say so.";
+  if (room === "Signals") return "Filed. It writes nothing.";
+  if (room === "Venture") return "An answer in the build conversation.";
+  return "";
+}
+
+// The single duration formatter for every job surface. `null` elapsed means the job never started,
+// so there is nothing measured to show.
+export function jobElapsedText(elapsedMs: number | null | undefined): string {
+  return elapsedMs == null ? "not started" : formatElapsed(elapsedMs);
+}
+
+// Studio working panel rail (v5 §5.1). On `done` the rail is the room name, green.
+export function jobRailLabel(job: JobView): { text: string; color: string } {
+  if (job.status === "failed") return { text: "Did not work", color: JOB_COLORS.red };
+  if (job.status === "blocked") return { text: "Needs you", color: JOB_COLORS.amber };
+  if (job.status === "done") return { text: jobRoom(job.kind), color: JOB_COLORS.green };
+  if (job.status === "queued") return { text: "Waiting its turn", color: JOB_COLORS.greyFg };
+  return { text: "Working", color: JOB_COLORS.ai };
+}
+
+// Studio working panel clock. `ahead` is how many jobs run before this one (queued only).
+export function jobClockText(job: JobView, ahead: number): string {
+  if (job.status === "queued") return `${ahead} ahead of it`;
+  if (job.status === "failed") return `stopped after ${jobElapsedText(job.elapsedMs)}`;
+  if (job.status === "done") return `took ${jobElapsedText(job.elapsedMs)}`;
+  return jobElapsedText(job.elapsedMs); // running ticks, blocked is frozen by jobElapsedMs itself
+}
+
+// How many jobs run before a queued one: every job queued ahead of it, plus the one running now.
+export function jobsAhead(jobs: JobView[], job: JobView): number {
+  const idx = jobs.findIndex((j) => j.id === job.id);
+  const queuedAhead = jobs.filter((j, i) => j.status === "queued" && i < idx).length;
+  return queuedAhead + (jobs.some((j) => j.status === "running") ? 1 : 0);
+}
+
+export type DotState = "done" | "current" | "pending" | "blocked" | "failed";
+
+// The ordered step list. `step` counts COMPLETED steps, so the step in flight is index `step`, and
+// `failedAtStep` is that same 0-based index (jobs.ts sets it to `job.step` on failure).
+// Production reality: no skill emits STEP markers yet, so `steps` is [] on every real job today and
+// grows toward `stepTotal` mid-run. Both are normal, not edge cases.
+export function jobStepDots(job: JobView): { text: string; state: DotState }[] {
+  const steps = job.steps ?? [];
+  const step = job.step ?? 0;
+  if (job.status === "queued") return steps.map((text) => ({ text, state: "pending" as DotState }));
+  if (job.status === "done") return steps.map((text) => ({ text, state: "done" as DotState }));
+  if (job.status === "failed") {
+    const at = job.failedAtStep;
+    return steps.map((text, i) => ({
+      text,
+      state: at == null ? "pending" : i === at ? "failed" : i < at ? "done" : "pending",
+    }));
+  }
+  if (job.status === "blocked") {
+    // It stopped where it asked. If every step already completed, the ask sits on the last one.
+    const at = Math.min(step, steps.length - 1);
+    return steps.map((text, i) => ({ text, state: i === at ? "blocked" : i < at ? "done" : "pending" }));
+  }
+  return steps.map((text, i) => ({ text, state: i < step ? "done" : i === step ? "current" : "pending" }));
+}
+
+export function dotColor(state: DotState): string {
+  if (state === "done") return JOB_COLORS.green;
+  if (state === "current") return JOB_COLORS.ai;
+  if (state === "blocked") return JOB_COLORS.amber;
+  if (state === "failed") return JOB_COLORS.red;
+  return JOB_COLORS.grey;
+}
+
+// Progress bar fill = step / stepTotal. Guarded: stepTotal is null on every job that emits no
+// markers, and a bar drawn from nothing would be a number the system did not measure.
+export function jobProgressPct(job: JobView): number | null {
+  if (!job.stepTotal) return null;
+  return Math.round((Math.min(job.step ?? 0, job.stepTotal) / job.stepTotal) * 100);
+}
+
+// Studio working panel footer (v5 §5.1). While running it is the heartbeat line, verbatim.
+// Answering does not resume a dead subprocess: jobs.ts stamps the answer on the blocked job and
+// queues a FRESH one carrying it, which runs its early steps again (v5 §8.1). So an answered job
+// stays `blocked` with `answer` set, and saying "it stops here until you answer" would then be
+// stale. This is the one string with no authored original, because the design modelled answering as
+// flipping the same job to done.
+export const ANSWERED_FOOTER = "You answered. A fresh job is running it from the start.";
+
+// The echo of Muxin's own choice, set in her blue rather than the AI purple.
+export function jobAnswerEcho(job: JobView): string {
+  return job.answer ? `You said: ${job.answer}` : "";
+}
+
+export function jobFooter(job: JobView): string {
+  if (job.status === "failed") return "It stopped where the red dot is. Nothing was written.";
+  if (job.status === "blocked") return job.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
+  if (job.status === "done") return jobLandingSentence(jobRoom(job.kind));
+  if (job.status === "queued") return "One job runs at a time, so this starts when the one above finishes.";
+  return job.lastStdoutLine || "Real elapsed time, not an estimate.";
+}
+
+// The mono log line under each panel row.
+export function jobLogLine(job: JobView): string {
+  const path = job.logPath || "";
+  if (job.status === "failed") return `> stopped at ${path}`;
+  if (job.status === "blocked") return "> stopped, waiting on your answer";
+  if (job.status === "queued") return "> waiting for a slot";
+  if (job.status === "done") return `> wrote to ${path}`;
+  return `> reading ${path} ...`;
+}
+
+export function jobOpenLabel(job: JobView): string {
+  return `${job.status === "done" ? "Read it in" : "Watch it in"} ${jobRoom(job.kind)}`;
+}
+
+// ── the destination room's progress strip (v5 §5.2) ──
+// Same source, its own authored strings (roomJobVals in the prototype writes shorter variants than
+// the Studio panel does). It lingers 9 seconds after a job FINISHES so arriving late still shows
+// what happened; a blocked or failed job holds the strip until it is acted on.
+export const STRIP_LINGER_MS = 9000;
+
+// `roomOf` is injectable only so the Fiction-failure rule below is testable today: no job kind maps
+// to Fiction yet (PR 6 adds the /story draft job). The client always uses the default.
+export function stripJobFor(
+  jobs: JobView[], room: JobRoom, now: number, roomOf: (kind: string) => JobRoom = jobRoom,
+): JobView | null {
+  if (room === "Charles") return null; // Charles gets no strip; it keeps its current behavior
+  const inRoom = jobs.filter((j) => roomOf(j.kind) === room);
+  // Fiction renders its own localized failure card, so its strip is suppressed on a failure. One
+  // failure card per screen, never two.
+  if (room === "Fiction" && inRoom.some((j) => j.status === "failed")) return null;
+  const live = inRoom.filter((j) => j.status !== "done");
+  if (live.length) return live[live.length - 1];
+  const lingering = inRoom.filter((j) => j.finishedAt != null && now - (j.finishedAt as number) < STRIP_LINGER_MS);
+  return lingering.length ? lingering[lingering.length - 1] : null;
+}
+
+export function stripRailLabel(job: JobView): { text: string; color: string } {
+  if (job.status === "failed") return { text: "Did not work", color: JOB_COLORS.red };
+  if (job.status === "blocked") return { text: "Stopped, needs you", color: JOB_COLORS.amber };
+  if (job.status === "done") return { text: "Just finished", color: JOB_COLORS.green };
+  if (job.status === "queued") return { text: "Waiting its turn", color: JOB_COLORS.greyFg };
+  return { text: "Working now", color: JOB_COLORS.ai };
+}
+
+export function stripClockText(job: JobView): string {
+  if (job.status === "queued") return "not started";
+  if (job.status === "failed") return `stopped after ${jobElapsedText(job.elapsedMs)}`;
+  if (job.status === "done") return `took ${jobElapsedText(job.elapsedMs)}`;
+  return jobElapsedText(job.elapsedMs);
+}
+
+export function stripFooter(job: JobView): string {
+  if (job.status === "failed") return "It stopped where the red dot is. Nothing was written.";
+  if (job.status === "blocked") return job.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
+  if (job.status === "done") return jobLandingSentence(jobRoom(job.kind));
+  if (job.status === "queued") return "One job runs at a time. This starts when the current one finishes.";
+  return job.lastStdoutLine || "Real elapsed time, not an estimate.";
+}
+
+// ── Studio's team rail (v5 §5.2) ──
+
+export function teamRailHeader(jobs: JobView[]): string {
+  if (jobs.some((j) => j.status === "blocked")) return "YOUR TEAM, WAITING ON YOU";
+  if (jobs.some((j) => j.status === "running")) return "YOUR TEAM, WORKING";
+  return "YOUR TEAM, IDLE";
+}
+
+// One live row per unfinished job, named for the room it lands in.
+export function teamRoomName(room: JobRoom): string {
+  if (room === "Fiction") return "Co-writer";
+  if (room === "Content") return "Formatter";
+  if (room === "Outreach") return "Connector";
+  if (room === "Signals") return "Reader";
+  if (room === "Venture") return "Build";
+  return "Charles";
+}
+
+export interface TeamRow {
+  who: string;
+  what: string;
+  color: string;
+  urgent: boolean;
+  action: string;
+}
+
+export function teamLiveRows(jobs: JobView[]): TeamRow[] {
+  return jobs
+    .filter((j) => j.status !== "done")
+    .map((j) => {
+      const steps = j.steps ?? [];
+      const inFlight = steps.length ? steps[Math.min(j.step ?? 0, steps.length - 1)].toLowerCase() : j.label;
+      return {
+        who: teamRoomName(jobRoom(j.kind)),
+        what:
+          j.status === "failed" ? "Stopped: it did not work"
+            : j.status === "blocked" ? "Stopped: needs your answer"
+            : j.status === "queued" ? "queued behind another job"
+            : inFlight,
+        color:
+          j.status === "failed" ? JOB_COLORS.red
+            : j.status === "blocked" ? JOB_COLORS.amber
+            : j.status === "queued" ? JOB_COLORS.grey
+            : JOB_COLORS.ai,
+        urgent: j.status === "failed" || j.status === "blocked",
+        action: j.status === "failed" ? "SEE WHAT STOPPED IT" : j.status === "blocked" ? "ANSWER IT" : "",
+      };
+    })
+    .sort((a, b) => Number(b.urgent) - Number(a.urgent));
+}
+
+// Reconcile with the resting rows /api/studio already builds (buildStudioHome in studio.ts) so no
+// agent ever appears twice. Two rows get dropped: any whose NAME already appears live, and any that
+// studio.ts derived from the very same jobs (its `working` row, and its "Queue" row) — those would
+// otherwise restate a live row under a different name and carry a second duration for one job.
+export function restingTeamRows<T extends { name: string; state: string }>(resting: T[], live: TeamRow[]): T[] {
+  const liveNames = new Set(live.map((r) => r.who));
+  return resting.filter((r) => !liveNames.has(r.name) && r.state !== "working" && r.name !== "Queue");
+}
+
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
 // renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
@@ -427,6 +701,53 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
   .spin-dot { width:9px; height:9px; border-radius:50%; background:var(--amber); flex:0 0 auto;
     animation:pulse 1s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+  /* Job working panel (v5 §5.1): one row per job, rail + clock + ordered steps + ask/failure box.
+     Exactly one duration per row: the clock, top right. The team rail carries none on purpose. */
+  .jrow { border:1px solid #dfd4bb; border-radius:8px; background:var(--card); padding:16px 18px; margin:14px 0; }
+  .jrow.asking { border-color:#e8d5a8; }
+  .jrow.bad { border-color:#ecc9c0; }
+  .jrow-head { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:baseline; }
+  .jrow-rail { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.05em; display:block; }
+  .jrow-text { font:400 16px/1.45 Georgia,"Times New Roman",serif; color:var(--ink); display:block; margin-top:4px;
+    overflow-wrap:anywhere; }
+  .jrow-clock { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
+    color:#a89a80; white-space:nowrap; }
+  .jrow-bar { height:3px; background:#eae2ce; border-radius:2px; margin-top:13px; overflow:hidden; }
+  .jrow-bar span { display:block; height:3px; transition:width .4s ease; }
+  .jsteps { margin-top:13px; display:flex; flex-direction:column; gap:7px; }
+  .jstep { display:grid; grid-template-columns:9px minmax(0,1fr); gap:12px; align-items:baseline; font-size:13px; line-height:1.5; }
+  .jstep i { width:7px; height:7px; border-radius:50%; margin-top:6px; display:block; }
+  .jstep.pending { color:#a89a80; }
+  .jstep.done { color:#3a352c; }
+  .jstep.current { color:var(--ink); }
+  .jstep.current i { animation:pulse 1.1s ease-in-out infinite; }
+  .jstep.failed { color:var(--red); }
+  .jbox { margin-top:14px; padding:13px 15px; border-radius:8px; max-width:560px;
+    background:#fdf8ec; border:1px solid #e8d5a8; }
+  .jbox.bad { background:#fdf1ef; border-color:#ecc9c0; }
+  .jbox .q { font-size:14px; line-height:1.55; color:var(--ink); }
+  .jbox .opts { display:flex; gap:8px; margin-top:11px; flex-wrap:wrap; }
+  .jbox button { border:1px solid var(--ink); background:var(--card); color:var(--ink); border-radius:7px;
+    padding:6px 13px; font-size:13px; }
+  .jfoot { font-size:12.5px; color:#8a7f6d; line-height:1.5; margin-top:12px; }
+  .jrow-tail { margin-top:13px; padding-top:12px; border-top:1px solid #f2ece0; display:flex; gap:16px;
+    align-items:baseline; flex-wrap:wrap; }
+  .jrow-tail .jpath { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; min-width:0;
+    overflow-wrap:anywhere; }
+  .jrow-tail .grow { flex:1; }
+  .jrow-tail a { font-size:12.5px; color:#7a7266; border-bottom:1px solid #d8cfbb; text-decoration:none; white-space:nowrap; }
+  /* The destination room's progress strip: same data, its own shorter strings. */
+  .room-strip { border-top:1px solid #dfd4bb; border-bottom:1px solid #efe7d6; padding:15px 0 17px;
+    margin-bottom:28px; max-width:600px; }
+  .room-strip .sh { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:baseline; }
+  .room-strip .sh .rail { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase; letter-spacing:.06em; }
+  .room-strip .sh .clock { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#8a7f6d; white-space:nowrap; }
+  .room-strip .stext { font:400 17px/1.5 Georgia,"Times New Roman",serif; color:var(--ink); margin-top:7px; overflow-wrap:anywhere; }
+  .room-strip .jsteps { margin-top:11px; gap:6px; }
+  .team-action { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
+    color:var(--amber); border-bottom:1px solid #e0cfa4; width:fit-content; margin-top:2px; }
+  .team-row.urgent .team-line { color:var(--amber); font-weight:600; }
   .flash { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--accent);
     color:var(--paper); padding:9px 16px; border-radius:8px; font-size:13px; opacity:0;
     transition:.2s; pointer-events:none; }
@@ -478,6 +799,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 </header>
 <main>
   <section class="view" id="roomContent">
+    <div class="sheet" id="stripContent" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet capture">
       <div class="capture-title" id="captureTitle">What's on your mind today?</div>
       <textarea id="src" placeholder="Start typing. Paste a link, a file path, or half a sentence. Nothing is a form. (⌘/Ctrl+Enter hands it over)"></textarea>
@@ -532,6 +854,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomFiction" hidden>
+    <div class="sheet" id="stripFiction" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet session">
       <div class="session-grid">
         <div class="session-main" id="fictionMain"><div class="empty">Loading…</div></div>
@@ -566,6 +889,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomSignals" hidden>
+    <div class="sheet" id="stripSignals" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
@@ -621,6 +945,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <button class="subtab on" data-sub="leads">Leads</button>
       <button class="subtab" data-sub="followups">Follow-ups</button>
     </div>
+    <div class="sheet" id="stripOutreach" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet" id="outreachPane">
       <div class="sheet-head"><h2>Leads</h2></div>
       <div class="sheet-sub">Dossiers from your scout. Pursue or pass marks the call; a drafted message is yours to edit, and only you ever send it.</div>
@@ -1903,10 +2228,7 @@ function renderStudio(){
     '<div class="stat-tiles">'+tiles+'</div>'+
     '<div style="margin-top:30px;"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Needs you today</div>'+
     (rows || '<div class="empty" style="padding:20px">Nothing needs you right now. 🎉</div>')+'</div>';
-  const dot = (state)=> state==="working" ? "#5b46b8" : state==="recent" ? "#2f7d46" : "#d8d2c6";
-  $("#studioTeam").innerHTML = '<div class="wb-margin-cap">YOUR TEAM, WORKING</div>'+
-    (STUDIO.team||[]).map(m=>'<div class="team-row"><span class="team-dot" style="background:'+dot(m.state)+'"></span><div><div class="team-name">'+esc(m.name)+'</div><div class="team-line">'+esc(m.line)+'</div></div></div>').join("")+
-    '<div class="wb-reply"><span class="mono-note">You bring the yes. They handle the brand phrase, the CTA, the spin, the visuals, the posting. Nothing goes out until you say so.</span></div>';
+  renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
     const room = a.dataset.room;
     if(room==="content"){ setRoom("content"); $("#reviewSheet").scrollIntoView(); }
@@ -2043,47 +2365,260 @@ async function followupDraft(dir, person){
 
 // ── ingest + job queue ──
 let JOBS = [];
-function jobPill(s){ return s==="done"?"published":s==="failed"?"blocked":s==="running"?"revise":"needs"; }
-function jobStatusText(s){ return s==="running"?"working…":s; }
 function fmtElapsed(ms){
   if(ms==null) return "";
   const s = Math.round(ms/1000);
   return s<60 ? s+"s" : Math.floor(s/60)+"m "+(s%60)+"s";
 }
+// ── job UI surfaces (v5 §5): three screens, one source (/api/jobs) ──
+// Inline duplicates of the exported mirrors at the top of this file (jobRoom, jobRailLabel,
+// jobClockText, jobStepDots, jobFooter, stripJobFor, teamRailHeader, ...). The client script cannot
+// import them, so they are kept in sync by hand, same convention as the mirrors above.
+// One duration per job per screen, always from elapsedMs: the panel row's clock on Studio, the
+// strip's clock in the destination room. Never a frozen literal beside a live counter.
+const JC = { ai:"#5b46b8", amber:"#9a6b12", green:"#2f7d46", red:"#9a2f2f", grey:"#d8d2c6", greyFg:"#a89a80", blue:"#2f5d9a" };
+const STRIP_LINGER_MS = 9000;
+function jobRoom(kind){
+  if(kind==="scout"||kind==="draft-follow-up") return "Outreach";
+  if(kind==="pull"||kind==="strategy"||kind==="insights"||kind==="ask-insights"||kind==="brief-revise") return "Signals";
+  if(kind==="charles-draft") return "Charles";
+  return "Content";
+}
+function jobLanding(room){
+  if(room==="Fiction") return "A scene draft, waiting on your read.";
+  if(room==="Content") return "A cut, waiting on your yes.";
+  if(room==="Outreach") return "A message, locked only when you say so.";
+  if(room==="Signals") return "Filed. It writes nothing.";
+  if(room==="Venture") return "An answer in the build conversation.";
+  return "";
+}
+function jobElapsedText(ms){ return ms==null ? "not started" : fmtElapsed(ms); }
+function jobRail(j){
+  if(j.status==="failed") return {text:"Did not work", color:JC.red};
+  if(j.status==="blocked") return {text:"Needs you", color:JC.amber};
+  if(j.status==="done") return {text:jobRoom(j.kind), color:JC.green};
+  if(j.status==="queued") return {text:"Waiting its turn", color:JC.greyFg};
+  return {text:"Working", color:JC.ai};
+}
+function jobsAhead(jobs, j){
+  const idx = jobs.findIndex(x=>x.id===j.id);
+  return jobs.filter((x,i)=>x.status==="queued" && i<idx).length + (jobs.some(x=>x.status==="running")?1:0);
+}
+function jobClock(j, ahead){
+  if(j.status==="queued") return ahead+" ahead of it";
+  if(j.status==="failed") return "stopped after "+jobElapsedText(j.elapsedMs);
+  if(j.status==="done") return "took "+jobElapsedText(j.elapsedMs);
+  return jobElapsedText(j.elapsedMs);
+}
+// step counts COMPLETED steps, so the one in flight is index step; failedAtStep is that same
+// 0-based index. steps is [] on every real job today (no skill emits STEP markers yet).
+function jobStepDots(j){
+  const steps = j.steps||[], step = j.step||0;
+  if(j.status==="queued") return steps.map(t=>({text:t,state:"pending"}));
+  if(j.status==="done") return steps.map(t=>({text:t,state:"done"}));
+  if(j.status==="failed"){ const at=j.failedAtStep;
+    return steps.map((t,i)=>({text:t,state: at==null?"pending" : i===at?"failed" : i<at?"done":"pending"})); }
+  if(j.status==="blocked"){ const at=Math.min(step, steps.length-1);
+    return steps.map((t,i)=>({text:t,state: i===at?"blocked" : i<at?"done":"pending"})); }
+  return steps.map((t,i)=>({text:t,state: i<step?"done" : i===step?"current":"pending"}));
+}
+function dotColor(state){
+  return state==="done"?JC.green : state==="current"?JC.ai : state==="blocked"?JC.amber : state==="failed"?JC.red : JC.grey;
+}
+function jobProgressPct(j){ return !j.stepTotal ? null : Math.round((Math.min(j.step||0, j.stepTotal)/j.stepTotal)*100); }
+const ANSWERED_FOOTER = "You answered. A fresh job is running it from the start.";
+function jobAnswerEcho(j){ return j.answer ? "You said: "+j.answer : ""; }
+function jobFooter(j){
+  if(j.status==="failed") return "It stopped where the red dot is. Nothing was written.";
+  if(j.status==="blocked") return j.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
+  if(j.status==="done") return jobLanding(jobRoom(j.kind));
+  if(j.status==="queued") return "One job runs at a time, so this starts when the one above finishes.";
+  return j.lastStdoutLine || "Real elapsed time, not an estimate.";
+}
+function jobLogLine(j){
+  const path = j.logPath||"";
+  if(j.status==="failed") return "> stopped at "+path;
+  if(j.status==="blocked") return "> stopped, waiting on your answer";
+  if(j.status==="queued") return "> waiting for a slot";
+  if(j.status==="done") return "> wrote to "+path;
+  return "> reading "+path+" ...";
+}
+function jobOpenLabel(j){ return (j.status==="done" ? "Read it in " : "Watch it in ") + jobRoom(j.kind); }
+function stepsHtml(dots){
+  return dots.map(d=>'<div class="jstep '+d.state+'"><i style="background:'+dotColor(d.state)+'"></i><span>'+esc(d.text)+'</span></div>').join("");
+}
+function askBoxHtml(j){
+  if(j.status==="blocked" && j.ask){
+    return '<div class="jbox"><div class="q">'+esc(j.ask.question)+'</div>'+
+      (j.answer ? "" : '<div class="opts">'+
+        (j.ask.options||[]).map(o=>'<button class="jans" data-id="'+esc(j.id)+'" data-opt="'+esc(o)+'">'+esc(o)+'</button>').join("")+'</div>')+
+      '</div>';
+  }
+  if(j.status==="failed"){
+    return '<div class="jbox bad"><div class="q">'+esc(j.error||"It stopped without saying why.")+'</div>'+
+      (j.retryable ? '<div class="opts"><button class="jretry" data-id="'+esc(j.id)+'">Try it again</button></div>' : "")+'</div>';
+  }
+  return "";
+}
 function renderJobs(){
   const box = $("#jobs"); box.innerHTML = "";
   if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above. 🌱</div>'; return; }
   const clearable = JOBS.some(j=>j.status==="done"||j.status==="failed");
-  box.innerHTML = '<div class="jobs-head"><h3>Queue</h3>'+(clearable?'<button id="clearJobsBtn">Clear queue</button>':'')+'</div>';
+  let html = '<div class="jobs-head"><h3>Queue</h3>'+(clearable?'<button id="clearJobsBtn">Clear queue</button>':'')+'</div>';
   for(const j of [...JOBS].reverse()){
-    const el = document.createElement("div"); el.className = "job";
-    const dot = j.status==="running" ? '<span class="spin-dot"></span>' : "";
-    const err = j.error ? '<div class="jerr">'+esc(j.error)+'</div>' : "";
-    // Heartbeat: last line of real output, shown only while running, so a long /atomize pass never
-    // reads as a silent black box — the whole point of persisting + streaming the job log.
-    const heartbeat = (j.status==="running" && j.lastStdoutLine) ? '<div class="jheartbeat">'+esc(j.lastStdoutLine)+'</div>' : "";
-    const elapsed = j.elapsedMs!=null ? '<span class="jelapsed">'+fmtElapsed(j.elapsedMs)+'</span>' : "";
-    const viewLog = j.startedAt ? '<a class="jlog" href="/api/jobs/'+encodeURIComponent(j.id)+'/log" target="_blank">log</a>' : "";
-    let right = elapsed + '<span class="pill '+jobPill(j.status)+'">'+esc(jobStatusText(j.status))+'</span>' + viewLog;
-    if(j.status==="done" && j.slugs && j.slugs.length){
-      right = '<a class="jump" href="#" data-slug="'+esc(j.slugs[0])+'">→ review'+(j.slugs.length>1?" "+j.slugs.length+" pieces":"")+'</a>' + right;
-    }
-    el.innerHTML = dot + '<div class="jlabel"><span class="txt"><span class="jkind">'+esc(j.kind)+'</span> · '+esc(j.label)+'</span>'+heartbeat+err+'</div>' + right;
-    box.appendChild(el);
+    const rail = jobRail(j), pct = jobProgressPct(j), dots = jobStepDots(j);
+    const cls = j.status==="failed" ? " bad" : j.status==="blocked" ? " asking" : "";
+    html += '<div class="jrow'+cls+'">'+
+      '<div class="jrow-head"><span style="min-width:0">'+
+        '<span class="jrow-rail" style="color:'+rail.color+'">'+esc(rail.text)+'</span>'+
+        '<span class="jrow-text">'+esc(j.label)+'</span></span>'+
+      '<span class="jrow-clock">'+esc(jobClock(j, jobsAhead(JOBS, j)))+'</span></div>'+
+      (pct!=null ? '<div class="jrow-bar"><span style="width:'+pct+'%;background:'+rail.color+'"></span></div>' : "")+
+      (dots.length ? '<div class="jsteps">'+stepsHtml(dots)+
+        (j.answer ? '<div class="jstep done"><i style="background:'+JC.blue+'"></i><span style="font-family:Georgia,serif">'+esc(jobAnswerEcho(j))+'</span></div>' : "")+
+        '</div>' : "")+
+      askBoxHtml(j)+
+      '<div class="jfoot">'+esc(jobFooter(j))+'</div>'+
+      '<div class="jrow-tail">'+
+        (j.status!=="queued" ? '<span class="jpath">'+esc(jobLogLine(j))+'</span>' : "")+
+        '<span class="grow"></span>'+
+        (j.startedAt ? '<a href="/api/jobs/'+encodeURIComponent(j.id)+'/log" target="_blank">Open the log</a>' : "")+
+        '<a href="#" class="jopen" data-room="'+esc(jobRoom(j.kind).toLowerCase())+'"'+(j.slugs&&j.slugs.length?' data-slug="'+esc(j.slugs[0])+'"':'')+'>'+esc(jobOpenLabel(j))+'</a>'+
+      '</div></div>';
   }
-  box.querySelectorAll("a.jump").forEach(a=>a.addEventListener("click",(e)=>{
-    e.preventDefault(); setRoom("content");
-    load().then(()=>{
+  box.innerHTML = html;
+  box.querySelectorAll("a.jopen").forEach(a=>a.addEventListener("click",(e)=>{
+    e.preventDefault(); setRoom(a.dataset.room);
+    if(a.dataset.slug) load().then(()=>{
       const d = [...document.querySelectorAll(".piece .slug")].find(x=>x.textContent===a.dataset.slug);
       if(d) d.scrollIntoView({behavior:"smooth", block:"start"});
     });
   }));
+  box.querySelectorAll("button.jans").forEach(b=>b.addEventListener("click",()=>answerJob(b.dataset.id, b.dataset.opt)));
+  box.querySelectorAll("button.jretry").forEach(b=>b.addEventListener("click",()=>retryJob(b.dataset.id)));
 }
+async function answerJob(id, answer){
+  const r = await post("/api/jobs/"+encodeURIComponent(id)+"/answer",{answer});
+  if(r.ok) loadJobs(); else flash(r.error || "Could not send that answer");
+}
+async function retryJob(id){
+  const r = await post("/api/jobs/"+encodeURIComponent(id)+"/retry",{});
+  if(r.ok) loadJobs(); else flash(r.error || "Could not run it again");
+}
+// The destination room's progress strip. Lingers STRIP_LINGER_MS after a job finishes so arriving
+// late still shows what happened; a blocked or failed job holds it until it is acted on. Fiction
+// suppresses it on a failure (Fiction shows its own failure card: one per screen, never two), and
+// Charles has no strip at all.
+function stripJobFor(jobs, room, now, roomOf){
+  if(room==="Charles") return null;
+  const to = roomOf || jobRoom;
+  const inRoom = jobs.filter(j=>to(j.kind)===room);
+  if(room==="Fiction" && inRoom.some(j=>j.status==="failed")) return null;
+  const live = inRoom.filter(j=>j.status!=="done");
+  if(live.length) return live[live.length-1];
+  const lingering = inRoom.filter(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS);
+  return lingering.length ? lingering[lingering.length-1] : null;
+}
+function stripRail(j){
+  if(j.status==="failed") return {text:"Did not work", color:JC.red};
+  if(j.status==="blocked") return {text:"Stopped, needs you", color:JC.amber};
+  if(j.status==="done") return {text:"Just finished", color:JC.green};
+  if(j.status==="queued") return {text:"Waiting its turn", color:JC.greyFg};
+  return {text:"Working now", color:JC.ai};
+}
+function stripClock(j){
+  if(j.status==="queued") return "not started";
+  if(j.status==="failed") return "stopped after "+jobElapsedText(j.elapsedMs);
+  if(j.status==="done") return "took "+jobElapsedText(j.elapsedMs);
+  return jobElapsedText(j.elapsedMs);
+}
+function stripFooter(j){
+  if(j.status==="failed") return "It stopped where the red dot is. Nothing was written.";
+  if(j.status==="blocked") return j.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
+  if(j.status==="done") return jobLanding(jobRoom(j.kind));
+  if(j.status==="queued") return "One job runs at a time. This starts when the current one finishes.";
+  return j.lastStdoutLine || "Real elapsed time, not an estimate.";
+}
+function renderRoomStrips(){
+  const now = Date.now();
+  for(const room of ["Content","Outreach","Fiction","Signals"]){
+    const box = $("#strip"+room); if(!box) continue;
+    const j = stripJobFor(JOBS, room, now);
+    if(!j){ box.hidden = true; box.innerHTML = ""; continue; }
+    const rail = stripRail(j), pct = jobProgressPct(j), dots = jobStepDots(j);
+    box.hidden = false;
+    box.innerHTML = '<div class="room-strip">'+
+      '<div class="sh"><span class="rail" style="color:'+rail.color+'">'+esc(rail.text)+'</span>'+
+      '<span class="clock">'+esc(stripClock(j))+'</span></div>'+
+      '<div class="stext">'+esc(j.label)+'</div>'+
+      (pct!=null ? '<div class="jrow-bar"><span style="width:'+pct+'%;background:'+rail.color+'"></span></div>' : "")+
+      (dots.length ? '<div class="jsteps">'+stepsHtml(dots)+
+        (j.answer ? '<div class="jstep done"><i style="background:'+JC.blue+'"></i><span style="font-family:Georgia,serif">'+esc(jobAnswerEcho(j))+'</span></div>' : "")+
+        '</div>' : "")+
+      askBoxHtml(j)+
+      '<div class="jfoot">'+esc(stripFooter(j))+'</div></div>';
+    box.querySelectorAll("button.jans").forEach(b=>b.addEventListener("click",()=>answerJob(b.dataset.id, b.dataset.opt)));
+    box.querySelectorAll("button.jretry").forEach(b=>b.addEventListener("click",()=>retryJob(b.dataset.id)));
+  }
+}
+// Studio's team rail. Live rows come from the jobs themselves, named for the room each lands in;
+// the resting rows come from /api/studio. No clock here on purpose: the working panel on this same
+// screen already carries each job's one duration.
+function teamRailHeader(jobs){
+  if(jobs.some(j=>j.status==="blocked")) return "YOUR TEAM, WAITING ON YOU";
+  if(jobs.some(j=>j.status==="running")) return "YOUR TEAM, WORKING";
+  return "YOUR TEAM, IDLE";
+}
+function teamRoomName(room){
+  if(room==="Fiction") return "Co-writer";
+  if(room==="Content") return "Formatter";
+  if(room==="Outreach") return "Connector";
+  if(room==="Signals") return "Reader";
+  if(room==="Venture") return "Build";
+  return "Charles";
+}
+function teamLiveRows(jobs){
+  return jobs.filter(j=>j.status!=="done").map(j=>{
+    const steps = j.steps||[];
+    const inFlight = steps.length ? steps[Math.min(j.step||0, steps.length-1)].toLowerCase() : j.label;
+    return {
+      who: teamRoomName(jobRoom(j.kind)),
+      what: j.status==="failed" ? "Stopped: it did not work"
+        : j.status==="blocked" ? "Stopped: needs your answer"
+        : j.status==="queued" ? "queued behind another job" : inFlight,
+      color: j.status==="failed" ? JC.red : j.status==="blocked" ? JC.amber : j.status==="queued" ? JC.grey : JC.ai,
+      urgent: j.status==="failed" || j.status==="blocked",
+      action: j.status==="failed" ? "SEE WHAT STOPPED IT" : j.status==="blocked" ? "ANSWER IT" : ""
+    };
+  }).sort((a,b)=>Number(b.urgent)-Number(a.urgent));
+}
+// Drop a resting row whose NAME is already live, and any row /api/studio derived from these same
+// jobs (its "working" row, its "Queue" row) so no agent ever appears twice.
+function restingTeamRows(resting, live){
+  const names = new Set(live.map(r=>r.who));
+  return resting.filter(r=>!names.has(r.name) && r.state!=="working" && r.name!=="Queue");
+}
+function renderTeamRail(){
+  const box = $("#studioTeam"); if(!box) return;
+  const live = teamLiveRows(JOBS);
+  const resting = restingTeamRows((STUDIO && STUDIO.team) || [], live);
+  const restDot = (state)=> state==="recent" ? JC.green : JC.grey;
+  box.innerHTML = '<div class="wb-margin-cap">'+teamRailHeader(JOBS)+'</div>'+
+    live.map(r=>'<div class="team-row'+(r.urgent?" urgent":"")+'"><span class="team-dot" style="background:'+r.color+'"></span>'+
+      '<div><div class="team-name">'+esc(r.who)+'</div><div class="team-line">'+esc(r.what)+'</div>'+
+      (r.urgent?'<div class="team-action">'+esc(r.action)+'</div>':"")+'</div></div>').join("")+
+    resting.map(m=>'<div class="team-row"><span class="team-dot" style="background:'+restDot(m.state)+'"></span>'+
+      '<div><div class="team-name">'+esc(m.name)+'</div><div class="team-line">'+esc(m.line)+'</div></div></div>').join("")+
+    '<div class="wb-reply"><span class="mono-note">You bring the yes. They handle the brand phrase, the CTA, the spin, the visuals, the posting. Nothing goes out until you say so.</span></div>';
+}
+
 async function loadJobs(){
   try{
     const before = JSON.stringify(JOBS.map(j=>[j.id,j.status]));
     const r = await fetch("/api/jobs"); JOBS = (await r.json()).jobs || [];
     renderJobs();
+    renderRoomStrips();
+    renderTeamRail();
     // Clear a slug's "generating storyboard…" hint once its real video job actually resolves (done
     // or failed) — inline mirror of storyboardJobDone() in this file's exported section (client
     // script can't import it; kept in sync by hand, card fbfea28b). Runs before load() below so the
