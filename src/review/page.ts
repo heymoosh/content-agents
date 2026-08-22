@@ -2451,6 +2451,10 @@ async function outreachDraft(dir, btn){
   outSaid.set(dir, direction);
   outError.delete(dir);
   outPending.add(dir); renderOutreachBox();
+  // Tracked separately from the try/catch, because a draft that landed and a reload that failed are
+  // two different things. Once the message is written, nothing below may hand her back an empty
+  // composer and an error, which would read as "try again" and write a second numbered draft.
+  let drafted = false;
   try {
     // Recipient defaults to the lead's first contact so the message frontmatter carries the
     // person its follow-up clock will belong to.
@@ -2459,12 +2463,14 @@ async function outreachDraft(dir, btn){
     const body = {dir, direction};
     if(recipient) body.recipient = recipient;
     const r = await post("/api/outreach/draft", body);
-    if(r.ok){ outDirection.delete(dir); flash("Drafted. Shape it here before you ever send it."); await loadOutreach(); }
-    else { outError.set(dir, r.error || "Failed to draft"); outSaid.delete(dir); }
+    if(r.ok){ drafted = true; outDirection.delete(dir); flash("Drafted. Shape it here before you ever send it."); }
+    else outError.set(dir, r.error || "Failed to draft");
+    await loadOutreach();
   } catch (e) {
-    outError.set(dir, e instanceof Error ? e.message : String(e));
-    outSaid.delete(dir);
+    if(drafted) flash("It drafted, but the page could not reload. Refresh to see it.");
+    else outError.set(dir, e instanceof Error ? e.message : String(e));
   } finally {
+    if(!drafted) outSaid.delete(dir);
     outPending.delete(dir); renderOutreachBox();
   }
 }
