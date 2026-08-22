@@ -1,0 +1,620 @@
+# Pattern mining, phase 1 config.
+#
+# Muxin edits this file freely. It is the editable list of who and what the corpus collects, and
+# the bars a post has to clear before it counts as an outlier worth studying.
+#
+# The collected corpus itself (data/patterns/) is gitignored. Other creators' full post text and
+# transcripts never reach git. Only the distilled patterns get committed.
+
+# The three niches already covered by .claude/skills/atomize/references/hook-patterns.md.
+niches:
+  - building-solopreneur
+  - inner-journey
+  - civic-democracy
+
+# Seeded from the creators cited in hook-patterns.md, on the platforms that file actually cites
+# them on. A handle left null means it was not verifiable at seed time. Fill it in before
+# collecting from that account, and never guess: a wrong handle collects the wrong person's posts.
+#
+# hook-patterns.md also cites LaTosha Brown, Deepa Iyer, adrienne maree brown, and Eric Liu. All
+# four were added on 2026-08-22 and are verified below.
+accounts:
+  - handle: "@justinwelsh"
+    creator: Justin Welsh
+    platform: linkedin
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@SahilBloom"
+    creator: Sahil Bloom
+    platform: x
+    niche: inner-journey
+    followers: null
+
+  - handle: "@nathanbarry"
+    creator: Nathan Barry
+    platform: x
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@levelsio"
+    creator: Pieter Levels
+    platform: x
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@dickiebush"
+    creator: Dickie Bush
+    platform: x
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@arvidkahl"
+    creator: Arvid Kahl
+    platform: x
+    niche: building-solopreneur
+    followers: null
+
+  # Handle convention for substack entries, set 2026-08-22 while filling the nulls below: the
+  # handle is the creator's Substack PROFILE handle, so substack.com/<handle> resolves. The
+  # publication name and its host go in the trailing comment. A followers figure on a substack
+  # row is the subscriber count shown on that profile page on the date noted.
+  - handle: "@neuranne"   # verified: substack.com/@neuranne, retrieved 2026-08-22
+    creator: Anne-Laure Le Cunff
+    # Platform confirmed as substack. hook-patterns.md cites her Ness Labs newsletter
+    # (newsletter.nesslabs.com), which is a separate property. Her Substack publication is
+    # "Hypercurious".
+    platform: substack
+    niche: inner-journey
+    followers: 125000   # profile shows "125K+ subscribers", retrieved 2026-08-22
+
+  - handle: "@anandwrites"   # verified: substack.com/@anandwrites and the.ink, both retrieved 2026-08-22
+    creator: Anand Giridharadas
+    platform: substack   # The.Ink, cited by hook pattern 8; publication host is the.ink
+    niche: civic-democracy
+    # The profile page rendered "1K+ subscribers", which is a bad scrape for a publication this
+    # size. Left null on purpose. Do not re-add that number.
+    followers: null
+
+  - handle: "@AnandWrites"
+    creator: Anand Giridharadas
+    # Verified indirectly: x.com blocks direct fetch (HTTP 402), so this was confirmed from the
+    # search-indexed profile x.com/AnandWrites, whose display name is "The.Ink, from Anand
+    # Giridharadas", plus the exact hook pattern 8 quote sitting at
+    # x.com/AnandWrites/status/1763575873687724519. Checked 2026-08-22.
+    platform: x   # cited separately by hook pattern 9
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@heathercoxrichardson"   # verified: substack.com/@heathercoxrichardson, retrieved 2026-08-22
+    creator: Heather Cox Richardson
+    platform: substack   # Letters from an American, host heathercoxrichardson.substack.com
+    niche: civic-democracy
+    followers: 3000000   # profile shows "3M+ subscribers", retrieved 2026-08-22
+
+  - handle: "@davidpepper"   # verified: substack.com/@davidpepper, retrieved 2026-08-22
+    creator: David Pepper
+    platform: substack   # Pepperspectives, host davidpepper.substack.com
+    niche: civic-democracy
+    followers: 27000   # profile shows "27K+ subscribers", retrieved 2026-08-22
+
+  - handle: null   # TODO: confirm handle
+    creator: Josh Silver
+    # TODO: confirm platform. hook-patterns.md quotes him through RepresentUs, not a named account.
+    # Searched 2026-08-22 and found no personal creator account on any platform. The only nearby
+    # account is the RepresentUs org itself, which is not him. Still null on purpose.
+    platform: substack
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@valariekaur"   # verified: instagram.com/valariekaur, retrieved 2026-08-22
+    creator: Valarie Kaur
+    # Platform corrected 2026-08-22 from youtube to instagram. The youtube guess came from a
+    # recorded Bioneers talk, not an account she runs. Instagram is her own active account.
+    # The Revolutionary Love Project org accounts are separate and are not seeded here.
+    platform: instagram
+    niche: civic-democracy
+    followers: 121000   # profile shows "121K followers", retrieved 2026-08-22
+
+  - handle: "@favianna1"   # verified: instagram.com/favianna1, retrieved 2026-08-22
+    creator: Favianna Rodriguez
+    platform: instagram   # platform guess confirmed correct
+    niche: civic-democracy
+    followers: 58600   # profile shows "58.6K followers", retrieved 2026-08-22
+
+  - handle: "@baratunde"
+    creator: Baratunde Thurston
+    # Platform guess confirmed correct. Verified from his own site baratunde.com, which links
+    # youtube.com/@baratunde, retrieved 2026-08-22.
+    platform: youtube
+    niche: civic-democracy
+    followers: null
+
+  # The four creators hook-patterns.md cites but never seeded. Added 2026-08-22, same rule as
+  # above: verified against a retrieved source or left null.
+  - handle: "@mslatoshabrown"   # verified: instagram.com/mslatoshabrown, retrieved 2026-08-22
+    creator: LaTosha Brown
+    platform: instagram
+    niche: civic-democracy
+    followers: 76000   # profile shows "76K followers", retrieved 2026-08-22
+
+  - handle: "@deepaiyer"   # verified: substack.com/@deepaiyer, retrieved 2026-08-22
+    creator: Deepa Iyer
+    platform: substack   # Throughlines with Deepa Iyer, host deepaiyer.substack.com
+    niche: civic-democracy
+    followers: 4200   # profile shows "4.2K+ subscribers", retrieved 2026-08-22
+
+  - handle: "@adriennemareebrown"
+    creator: adrienne maree brown
+    # Verified twice: her own site adriennemareebrown.net links instagram.com/adriennemareebrown,
+    # and the profile itself was retrieved 2026-08-22. She has no Substack.
+    platform: instagram
+    niche: civic-democracy
+    followers: 445000   # profile shows "445K followers", retrieved 2026-08-22
+
+  - handle: "@ericpliu"
+    creator: Eric Liu
+    # Verified indirectly: x.com blocks direct fetch (HTTP 402), so this was confirmed from the
+    # search-indexed profile x.com/ericpliu, whose bio names him CEO of Citizen University,
+    # founding ED of the Aspen Citizen, and author of "Become America". That combination is
+    # unique to him. Checked 2026-08-22. His Citizen University bio page links only the org
+    # account @CitizenUniv, which is not him.
+    platform: x
+    niche: civic-democracy
+    followers: null
+
+  # ---------------------------------------------------------------------------------------------
+  # VIDEO ACCOUNTS, added 2026-08-22 to close the video-platform gap.
+  #
+  # The seeded list above is almost all text platforms, and tiktok, youtube and instagram are the
+  # platforms Muxin cares most about, because video reaches past the follower graph. These are
+  # CANDIDATES, not a decided list. Prune them. Anyone here who does not actually fit the niche or
+  # the register should be deleted rather than collected from.
+  #
+  # Follower counts here are a SNAPSHOT taken on 2026-08-22, not a fact to rely on. They drift
+  # constantly. Treat a stale count as unknown and re-read it before using it in a ratio.
+  #
+  # Handle convention on youtube: an @handle where the creator's own site links one, otherwise the
+  # exact vanity path their site links (for example "okdork" means youtube.com/okdork). Both
+  # resolve; neither was guessed.
+  # ---------------------------------------------------------------------------------------------
+
+  # building-solopreneur, video
+  - handle: "@aliabdaal"
+    creator: Ali Abdaal
+    # Handle confirmed by fetching youtube.com/@aliabdaal, which resolved to a channel page titled
+    # "Ali Abdaal - YouTube" on 2026-08-22. Subscriber count was not readable off that page, so it
+    # stays null.
+    platform: youtube
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@aliabdaal"   # verified: instagram.com/aliabdaal, retrieved 2026-08-22
+    creator: Ali Abdaal
+    platform: instagram
+    niche: building-solopreneur
+    followers: 1100000   # profile shows "1.1M followers", retrieved 2026-08-22
+
+  - handle: "DanKoeTalks"
+    creator: Dan Koe
+    # Verified from his own site thedankoe.com, which links youtube.com/c/DanKoeTalks,
+    # retrieved 2026-08-22.
+    platform: youtube
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@thedankoe"   # verified: instagram.com/thedankoe, retrieved 2026-08-22
+    creator: Dan Koe
+    platform: instagram
+    niche: building-solopreneur
+    followers: 1700000   # profile shows "1.7M followers", retrieved 2026-08-22
+
+  - handle: "okdork"
+    creator: Noah Kagan
+    # Verified from his own site noahkagan.com, which links youtube.com/okdork and states
+    # 1.3M subscribers, retrieved 2026-08-22.
+    platform: youtube
+    niche: building-solopreneur
+    followers: 1300000   # stated on noahkagan.com, retrieved 2026-08-22
+
+  - handle: "@realmattgray"
+    creator: Matt Gray
+    # Verified from his own site founderos.com, which links youtube.com/@realmattgray,
+    # retrieved 2026-08-22.
+    platform: youtube
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@realmattgray"
+    creator: Matt Gray
+    # Verified from his own site founderos.com, which links tiktok.com/@realmattgray,
+    # retrieved 2026-08-22. This is the only verified tiktok account in this niche.
+    platform: tiktok
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@matthgray"   # verified: instagram.com/matthgray, retrieved 2026-08-22
+    creator: Matt Gray
+    platform: instagram
+    niche: building-solopreneur
+    followers: 963000   # profile shows "963K followers", retrieved 2026-08-22
+
+  # inner-journey, video
+  - handle: "@TheHolisticPsychologist"
+    creator: Nicole LePera
+    # Verified from her own site theholisticpsychologist.com, which links
+    # youtube.com/@TheHolisticPsychologist, retrieved 2026-08-22.
+    platform: youtube
+    niche: inner-journey
+    followers: null
+
+  - handle: "@theholisticpsychologist"
+    creator: Nicole LePera
+    # Verified from her own site theholisticpsychologist.com, which links
+    # tiktok.com/@theholisticpsychologist, retrieved 2026-08-22. This is the only verified tiktok
+    # account in this niche.
+    platform: tiktok
+    niche: inner-journey
+    followers: null
+
+  - handle: "@the.holistic.psychologist"   # verified: instagram.com/the.holistic.psychologist, retrieved 2026-08-22
+    creator: Nicole LePera
+    platform: instagram
+    niche: inner-journey
+    followers: 8900000   # profile shows "8.9M followers", retrieved 2026-08-22
+
+  - handle: "@jayshetty"
+    creator: Jay Shetty
+    # Verified twice: his own site jayshetty.me links instagram.com/jayshetty, and the profile was
+    # retrieved 2026-08-22. His site links youtube by channel ID rather than a handle, so no
+    # youtube row was added for him.
+    platform: instagram
+    niche: inner-journey
+    followers: 18700000   # profile shows "18.7M followers", retrieved 2026-08-22
+
+  - handle: "@yung_pueblo"
+    creator: Diego Perez (Yung Pueblo)
+    # Verified twice: his own site yungpueblo.com links instagram.com/yung_pueblo, and the profile
+    # was retrieved 2026-08-22. Follower count was not readable off the profile page.
+    platform: instagram
+    niche: inner-journey
+    followers: null
+
+  - handle: "@sahilbloom"   # verified: instagram.com/sahilbloom, retrieved 2026-08-22
+    creator: Sahil Bloom
+    # Already seeded above on x. This is the same person on a video platform, kept as a separate
+    # row because the collector is keyed on platform.
+    platform: instagram
+    niche: inner-journey
+    followers: 1000000   # profile shows "1M followers", retrieved 2026-08-22
+
+  # civic-democracy, video.
+  #
+  # Register warning before collecting: V Spehar, Carlos Eduardo Espina and Aaron Parnas are
+  # news-explainer and advocacy creators, not the joyful-activism register hook-patterns.md sets
+  # as the civic default (patterns 16 to 23). They are here because they are the verified,
+  # genuinely high-reach short-form video accounts in this niche, and their HOOK mechanics are
+  # worth studying. If the corpus starts pulling Muxin's civic voice toward grievance, cut them.
+  - handle: "@underthedesknews"
+    creator: V Spehar
+    # Verified from their own site underthedesknews.com/about, which links
+    # tiktok.com/@underthedesknews, retrieved 2026-08-22.
+    platform: tiktok
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@underthedesknews"
+    creator: V Spehar
+    # Verified from their own site underthedesknews.com/about, which links
+    # youtube.com/@underthedesknews, retrieved 2026-08-22.
+    platform: youtube
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@underthedesknews"   # verified: instagram.com/underthedesknews, retrieved 2026-08-22
+    creator: V Spehar
+    platform: instagram
+    niche: civic-democracy
+    followers: 1200000   # profile shows "1.2M followers", retrieved 2026-08-22
+
+  - handle: "@carlos_eduardo_espina"
+    creator: Carlos Eduardo Espina
+    # Verified: en.wikipedia.org/wiki/Carlos_Eduardo_Espina names this tiktok handle and count,
+    # retrieved 2026-08-22.
+    platform: tiktok
+    niche: civic-democracy
+    followers: 13800000   # per Wikipedia, retrieved 2026-08-22
+
+  - handle: "@carlos_eduardo_espina"
+    creator: Carlos Eduardo Espina
+    # Verified: en.wikipedia.org/wiki/Carlos_Eduardo_Espina names this instagram handle and count,
+    # retrieved 2026-08-22.
+    platform: instagram
+    niche: civic-democracy
+    followers: 1950000   # per Wikipedia, retrieved 2026-08-22
+
+  - handle: "@aaronparnas1"
+    creator: Aaron Parnas
+    # Verified: en.wikipedia.org/wiki/Aaron_Parnas names this tiktok handle and count,
+    # retrieved 2026-08-22.
+    platform: tiktok
+    niche: civic-democracy
+    followers: 5400000   # per Wikipedia, retrieved 2026-08-22
+
+  - handle: "@aaronparnas"
+    creator: Aaron Parnas
+    # Verified: en.wikipedia.org/wiki/Aaron_Parnas names this instagram handle and count,
+    # retrieved 2026-08-22. His youtube channel is named there too, but by channel name only and
+    # not by handle, so no youtube row was added.
+    platform: instagram
+    niche: civic-democracy
+    followers: 3200000   # per Wikipedia, retrieved 2026-08-22
+
+  - handle: "@sharonsaysso"
+    creator: Sharon McMahon
+    # Verified: instagram.com/sharonsaysso, retrieved 2026-08-22. Note for anyone tempted to
+    # "fix" this later: instagram.com/sharonmcmahon is a different, private account with no
+    # followers. @sharonsaysso is the real one.
+    platform: instagram
+    niche: civic-democracy
+    followers: 1400000   # profile shows "1.4M followers", retrieved 2026-08-22
+
+  # ---------------------------------------------------------------------------------------------
+  # LINKEDIN ACCOUNTS, added 2026-08-22 (round 2) to close the LinkedIn gap.
+  #
+  # The file had exactly one LinkedIn account (Justin Welsh), which cannot show what repeats.
+  # LinkedIn is one of the two platforms Muxin already drafts for, and sorting a profile by
+  # engagement is the easiest reverse-engineering surface there is.
+  #
+  # Handle convention on linkedin: the handle is the linkedin.com/in/ slug with an "@" prefix, the
+  # same shape the existing "@justinwelsh" entry already uses. Some slugs carry a numeric suffix
+  # (LinkedIn assigns those). Those are correct as written, not typos.
+  #
+  # Same caveats as the video block: CANDIDATES to prune, and follower figures are a snapshot.
+  # ---------------------------------------------------------------------------------------------
+
+  # building-solopreneur, linkedin
+  - handle: "@thedankoe"
+    creator: Dan Koe
+    # Verified from his own site thedankoe.com, which links linkedin.com/in/thedankoe,
+    # retrieved 2026-08-22.
+    platform: linkedin
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@mattgray1"
+    creator: Matt Gray
+    # Verified from his own site founderos.com, which links linkedin.com/in/mattgray1,
+    # retrieved 2026-08-22.
+    platform: linkedin
+    niche: building-solopreneur
+    followers: null
+
+  - handle: "@codiesanchez"
+    creator: Codie Sanchez
+    # Verified from her own site codiesanchez.com, which links linkedin.com/in/codiesanchez and
+    # states 520k followers, retrieved 2026-08-22.
+    platform: linkedin
+    niche: building-solopreneur
+    followers: 520000   # stated on codiesanchez.com, retrieved 2026-08-22
+
+  - handle: "@garyvaynerchuk"
+    creator: Gary Vaynerchuk
+    # Verified from his own site garyvaynerchuk.com, which links linkedin.com/in/garyvaynerchuk,
+    # retrieved 2026-08-22. Prune candidate: he runs a large agency, not a solo business, so his
+    # SUBJECT matter is off-niche. He is here for hook mechanics at scale only.
+    platform: linkedin
+    niche: building-solopreneur
+    followers: null
+
+  # inner-journey, linkedin
+  - handle: "@AdamMGrant"
+    creator: Adam Grant
+    # Verified from his own site adamgrant.net, which links linkedin.com/in/AdamMGrant,
+    # retrieved 2026-08-22.
+    platform: linkedin
+    niche: inner-journey
+    followers: null
+
+  - handle: "@simonsinek"
+    creator: Simon Sinek
+    # Verified from his own site simonsinek.com, which links linkedin.com/in/simonsinek,
+    # retrieved 2026-08-22.
+    platform: linkedin
+    niche: inner-journey
+    followers: null
+
+  - handle: "@melrobbins"
+    creator: Mel Robbins
+    # Verified from her own site melrobbins.com, which links linkedin.com/in/melrobbins,
+    # retrieved 2026-08-22.
+    platform: linkedin
+    niche: inner-journey
+    followers: null
+
+  - handle: "@shettyjay"
+    creator: Jay Shetty
+    # Verified from his own site jayshetty.me, which links linkedin.com/in/shettyjay,
+    # retrieved 2026-08-22.
+    platform: linkedin
+    niche: inner-journey
+    followers: null
+
+  - handle: "@dr-nicole-lepera-454b558"
+    creator: Nicole LePera
+    # Verified from her own site theholisticpsychologist.com, which links
+    # linkedin.com/in/dr-nicole-lepera-454b558, retrieved 2026-08-22. The numeric suffix is part
+    # of the real slug.
+    platform: linkedin
+    niche: inner-journey
+    followers: null
+
+  # civic-democracy, linkedin.
+  #
+  # Register warning: civic LinkedIn skews institutional and thought-leader, not the
+  # joyful-activism register hook-patterns.md sets as the civic default. That is a property of
+  # the platform, not a shortfall in the search. Four is what genuinely verified.
+  - handle: "@baratunde"
+    creator: Baratunde Thurston
+    # Verified from his own site baratunde.com, which links linkedin.com/in/baratunde,
+    # retrieved 2026-08-22.
+    platform: linkedin
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@eric-liu-182655"
+    creator: Eric Liu
+    # Verified from his Citizen University bio page citizenuniversity.us/eric-liu/, which says
+    # "Find me on LinkedIn" and links linkedin.com/in/eric-liu-182655, retrieved 2026-08-22.
+    # The numeric suffix is part of the real slug.
+    platform: linkedin
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@deepa-iyer-3575ba6"
+    creator: Deepa Iyer
+    # Verified from her own site deepaiyer.com, which links linkedin.com/in/deepa-iyer-3575ba6,
+    # retrieved 2026-08-22. The suffix is part of the real slug.
+    platform: linkedin
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@kahlil-greene"
+    creator: Kahlil Greene
+    # Verified from his own site kahlilgreene.com, which links linkedin.com/in/kahlil-greene and
+    # states LinkedIn Top Voice with 15,000+ followers, retrieved 2026-08-22.
+    platform: linkedin
+    niche: civic-democracy
+    followers: 15000   # stated on kahlilgreene.com, retrieved 2026-08-22
+
+  # ---------------------------------------------------------------------------------------------
+  # VIDEO ACCOUNTS, round 2, added 2026-08-22.
+  #
+  # Round 1 left tiktok at 5 accounts, the fewest of the three video platforms, on the platform
+  # Muxin cares most about. These rows bring tiktok to 3 per niche and also close the
+  # civic youtube thinness flagged after round 1. Same caveats: CANDIDATES to prune, and follower
+  # figures are a snapshot, not a fact to rely on.
+  # ---------------------------------------------------------------------------------------------
+
+  # building-solopreneur, tiktok
+  - handle: "@realcodiesanchez"
+    creator: Codie Sanchez
+    # Verified from her own site codiesanchez.com, which links tiktok.com/@realcodiesanchez and
+    # states 2M followers, retrieved 2026-08-22.
+    platform: tiktok
+    niche: building-solopreneur
+    followers: 2000000   # stated on codiesanchez.com, retrieved 2026-08-22
+
+  - handle: "@garyvee"
+    creator: Gary Vaynerchuk
+    # Verified from his own site garyvaynerchuk.com, which links tiktok.com/@garyvee,
+    # retrieved 2026-08-22. Same prune caveat as his linkedin row: agency owner, not a solo
+    # business. Hook mechanics only.
+    platform: tiktok
+    niche: building-solopreneur
+    followers: null
+
+  # inner-journey, tiktok
+  - handle: "@melrobbins"
+    creator: Mel Robbins
+    # Verified from her own site melrobbins.com, which links tiktok.com/@melrobbins,
+    # retrieved 2026-08-22.
+    platform: tiktok
+    niche: inner-journey
+    followers: null
+
+  - handle: "@simonsinek"
+    creator: Simon Sinek
+    # Verified from his own site simonsinek.com, which links tiktok.com/@simonsinek,
+    # retrieved 2026-08-22.
+    platform: tiktok
+    niche: inner-journey
+    followers: null
+
+  # civic-democracy, tiktok
+  - handle: "@kahlilgreene"
+    creator: Kahlil Greene
+    # Verified from his own site kahlilgreene.com, which links tiktok.com/@kahlilgreene and
+    # states 650,000+ followers, retrieved 2026-08-22. Hidden-history explainer register, closer
+    # to teaching than to grievance.
+    platform: tiktok
+    niche: civic-democracy
+    followers: 650000   # stated on kahlilgreene.com, retrieved 2026-08-22
+
+  - handle: "@mosheh"
+    creator: Mosheh Oinounou (Mo News)
+    # Verified from the Mo News site mo.news, which links tiktok.com/@mosheh, retrieved
+    # 2026-08-22. The page self-identifies as Mo News and does not spell out the creator name, so
+    # the handle is verified and the person behind it is inferred from the brand.
+    platform: tiktok
+    niche: civic-democracy
+    followers: null
+
+  # civic-democracy, youtube. Beyond the two gaps this round targeted, these three close the
+  # civic youtube thinness reported after round 1 (it was 2 accounts).
+  - handle: "@valariekaurofficial"
+    creator: Valarie Kaur
+    # Verified from her own site valariekaur.com, which links youtube.com/@valariekaurofficial,
+    # retrieved 2026-08-22. She is already seeded above on instagram; this is the same person on
+    # a second platform, kept separate because the collector is keyed on platform.
+    platform: youtube
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@deepaviyer"
+    creator: Deepa Iyer
+    # Verified from her own site deepaiyer.com, which links youtube.com/@deepaviyer,
+    # retrieved 2026-08-22.
+    platform: youtube
+    niche: civic-democracy
+    followers: null
+
+  - handle: "@moshehnews"
+    creator: Mosheh Oinounou (Mo News)
+    # Verified from the Mo News site mo.news, which links youtube.com/moshehnews, retrieved
+    # 2026-08-22.
+    platform: youtube
+    niche: civic-democracy
+    followers: null
+
+# Either bar clearing marks a post as an outlier worth studying.
+#
+# view_follower_ratio: views divided by the account's follower count.
+# baseline_multiple: views divided by the median views of that account's other collected posts.
+#
+# Every number below is a starting guess. Tune each one once real collected data lands and the
+# ordinary spread per platform is visible. Video platforms carry a higher ratio bar than text
+# platforms because video reach is not capped by follower count.
+outlier_thresholds:
+  x:
+    view_follower_ratio: 5.0    # starting guess, tune once real data lands
+    baseline_multiple: 3.0      # starting guess, tune once real data lands
+  linkedin:
+    view_follower_ratio: 3.0    # starting guess, tune once real data lands
+    baseline_multiple: 3.0      # starting guess, tune once real data lands
+  bluesky:
+    view_follower_ratio: 3.0    # starting guess, tune once real data lands
+    baseline_multiple: 3.0      # starting guess, tune once real data lands
+  mastodon:
+    view_follower_ratio: 3.0    # starting guess, tune once real data lands
+    baseline_multiple: 3.0      # starting guess, tune once real data lands
+  threads:
+    view_follower_ratio: 4.0    # starting guess, tune once real data lands
+    baseline_multiple: 3.0      # starting guess, tune once real data lands
+  substack:
+    view_follower_ratio: 1.5    # starting guess, tune once real data lands; reach here is mostly subscribers
+    baseline_multiple: 2.5      # starting guess, tune once real data lands
+  tiktok:
+    view_follower_ratio: 20.0   # starting guess, tune once real data lands; feed reach ignores follower count
+    baseline_multiple: 5.0      # starting guess, tune once real data lands
+  youtube:
+    view_follower_ratio: 15.0   # starting guess, tune once real data lands; shorts reach ignores subscriber count
+    baseline_multiple: 5.0      # starting guess, tune once real data lands
+  instagram:
+    view_follower_ratio: 12.0   # starting guess, tune once real data lands; reels reach ignores follower count
+    baseline_multiple: 4.0      # starting guess, tune once real data lands
+
+# How big a corpus is worth analyzing. Muxin's stated range.
+targets:
+  corpus_size_min: 20
+  corpus_size_max: 50

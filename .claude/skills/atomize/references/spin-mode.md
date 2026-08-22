@@ -93,12 +93,18 @@ extends it, concretely, on the two platforms Muxin asked for:
   IS the resonance; keep it even when reordering around it.
 - Still bound by every spin guardrail above: reframe, never invent.
 
-**Scoped to X and LinkedIn only.** `appliesRehook(platform, sourceKind)` in `src/atomize/spin.ts`
-is the gate: true only for `platform` in `{x, linkedin}` AND `sourceKind !== "substack-note"`.
-Bluesky derivatives don't get this pass — Bluesky already works close to verbatim (`docs/spin-experiment.md`).
-Neither does any derivative from a Notes-sourced folder (`source_kind: substack-note`), on ANY
-platform including x/linkedin — a note is already "the whole note is the extract" and near-verbatim
-by design (`references/notes-mode.md`); re-hooking it would fight that.
+**Scoped to every platform (Muxin widened this 2026-08-22).**
+`appliesRehook(platform, sourceKind)` in `src/atomize/spin.ts` is the gate, and it now has two
+independent halves. The PLATFORM half is config-driven: `rehook: false` in
+`config/platforms.yaml` opts a channel out, and an absent key means true, so a platform gets the
+pass unless it says otherwise. Only `quote-card` opts out today, because a card's own style rule is
+"pulled verbatim from the source." It was originally X and LinkedIn only, on the reasoning that
+Bluesky already worked close to verbatim (`docs/spin-experiment.md`); Muxin replaced that scope
+with all platforms.
+The SOURCE half is unchanged and still absolute: no derivative from a Notes-sourced folder
+(`source_kind: substack-note`) gets the pass, on ANY platform including x/linkedin. A note is
+already "the whole note is the extract" and near-verbatim by design (`references/notes-mode.md`);
+re-hooking it would fight that. Widening the platform side did not loosen this.
 
 **Before/after, concrete.** Say the source essay reads (in order): "What I described in my essay
 was a hiring process that looks fair on paper. Then last quarter I watched a manager reject a
@@ -116,10 +122,19 @@ invented.
 review-queue.md `notes` cell — a suggestion to run this pass, never a block. Muxin's `approve` in
 review-queue.md is still the only real gate.
 
-**Pattern options for the reorder/lead-line decision.** `references/hook-patterns.md` catalogs
-proven sentence SHAPES (not text) for how to open — pulled from real creators in Muxin's adjacent
-niches. When re-hooking, it's fine to pick a shape that fits the source material's actual content
-and lead-line specifics into it. Read that file's "How to use this" section first: fill every shape
+**Pattern options for the reorder/lead-line decision.** Three reference files work together here.
+`references/hook-patterns.md` catalogs proven sentence SHAPES (not text) for how to OPEN, pulled
+from real creators in Muxin's adjacent niches. `references/post-patterns.md` is its full-post
+sibling, covering the arc after the hook, the emotional trigger, the CTA and the length; it is
+written by the `/patterns` skill and is empty until the first mining pass runs, so fall back to
+hook-patterns.md while it is.
+`references/civic-adaptation.md` is Muxin's own decided rubric for civic and social-issues material
+(what a piece must deliver, plus the micro-action bar every civic CTA has to clear); `/patterns`
+never rewrites that one. The first two say what shape to reach for, the third says what a civic
+piece owes the reader, and the joyful-activism note below says in which register. They stack.
+
+When re-hooking, it's fine to pick a shape that fits the source material's actual content and
+lead-line specifics into it. Read hook-patterns.md's "How to use this" section first: fill every shape
 using only facts already in the source, never the file's own attributed examples' wording — the
 same reframe-never-invent rule as everywhere else in this pass. For civic/social-issues source
 material specifically, prefer the joyful-activism register in that file over the outrage register

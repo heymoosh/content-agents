@@ -26,6 +26,12 @@ export const platformRuleSchema = z
     // 0/negative would silently block every future claim, and a fraction would let the day's
     // uniqueness check round up instead of down.
     max_slots_per_day: z.number().int().positive().optional(),
+    // Whether this platform gets the storytelling re-hook/re-order pass (src/atomize/spin.ts's
+    // appliesRehook). Absent means true, the behavior Muxin widened to every platform on
+    // 2026-08-22. Typed as a boolean rather than left to `.passthrough()` because the failure is
+    // silent and points the wrong way: a string `rehook: "false"` is truthy against the `!== false`
+    // check, so a config typo would quietly leave the pass ON for a channel meant to opt out.
+    rehook: z.boolean().optional(),
     style: z.string().optional(),
   })
   .passthrough();
