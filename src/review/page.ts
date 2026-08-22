@@ -520,27 +520,34 @@ export function evidenceSourceView(source: string | undefined): { kind: "link" |
 
 // Locked and sent are two different states and never collapse into one check. Locking readies the
 // text; only Muxin's own hands send it, and only her own click records that it went.
-export type OutreachSendState = "none" | "draft" | "locked" | "sent";
-export function outreachSendState(
-  message: OutreachMessageView | null | undefined,
-  lastTouch: string | null | undefined,
-): OutreachSendState {
+//
+// This reads ONLY the message's own status, because that is the only per-message fact the repo
+// measures. The tracker's lastTouch is keyed lead:person, not message, so a lead whose message-01
+// went out months ago would otherwise stamp "sent" on a message-02 nobody has touched. The logged
+// send is reported separately, as the lead-level fact it actually is.
+export type OutreachSendState = "none" | "draft" | "locked";
+export function outreachSendState(message: OutreachMessageView | null | undefined): OutreachSendState {
   if (!message) return "none";
-  if ((message.status ?? "").trim() !== "locked") return "draft";
-  return (lastTouch ?? "").trim() ? "sent" : "locked";
+  return (message.status ?? "").trim() === "locked" ? "locked" : "draft";
 }
 
 export function outreachSendNote(state: OutreachSendState): string {
   if (state === "draft") return "Locking readies it. You send it by hand, and nothing here can send it for you.";
   if (state === "locked") return "Paste it into your mail client and send it there. Tell me once it has gone.";
-  if (state === "sent") return "You sent this one by hand. Its follow-up clock is running.";
   return "";
 }
 
-export function outreachSendBadge(state: OutreachSendState): string {
-  if (state === "locked") return "LOCKED · NOT EDITABLE, NOT SENT";
-  if (state === "sent") return "LOCKED · SENT BY HAND";
-  return "";
+// "NOT SENT" is dropped once a send is on the ledger for this lead, so the badge never argues with
+// the line below it. It never claims THIS message is the one that went: nothing records that.
+export function outreachSendBadge(state: OutreachSendState, hasLoggedSend: boolean): string {
+  if (state !== "locked") return "";
+  return hasLoggedSend ? "LOCKED · NOT EDITABLE" : "LOCKED · NOT EDITABLE, NOT SENT";
+}
+
+// The lead-level send fact, straight off the tracker event that recorded it.
+export function leadSendLogLine(lastTouch: string | null | undefined): string {
+  const t = (lastTouch ?? "").trim();
+  return t ? `A send was logged ${t.slice(0, 10)}, by hand. See Follow-ups.` : "";
 }
 
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
@@ -1798,21 +1805,24 @@ function evidenceSourceView(source){
   if(/^https?:\\/\\//i.test(t)) return { kind:"link", text:t };
   return { kind:"text", text:t };
 }
-function outreachSendState(msg, lastTouch){
+// Message status only: the tracker's lastTouch is keyed lead:person, never message, so it can
+// never say WHICH message went. The logged send is reported below as the lead-level fact it is.
+function outreachSendState(msg){
   if(!msg) return "none";
-  if((msg.status||"").trim() !== "locked") return "draft";
-  return (lastTouch||"").trim() ? "sent" : "locked";
+  return (msg.status||"").trim() === "locked" ? "locked" : "draft";
 }
 function outreachSendNote(state){
   if(state==="draft") return "Locking readies it. You send it by hand, and nothing here can send it for you.";
   if(state==="locked") return "Paste it into your mail client and send it there. Tell me once it has gone.";
-  if(state==="sent") return "You sent this one by hand. Its follow-up clock is running.";
   return "";
 }
-function outreachSendBadge(state){
-  if(state==="locked") return "LOCKED · NOT EDITABLE, NOT SENT";
-  if(state==="sent") return "LOCKED · SENT BY HAND";
-  return "";
+function outreachSendBadge(state, hasLoggedSend){
+  if(state!=="locked") return "";
+  return hasLoggedSend ? "LOCKED · NOT EDITABLE" : "LOCKED · NOT EDITABLE, NOT SENT";
+}
+function leadSendLogLine(lastTouch){
+  const t = (lastTouch||"").trim();
+  return t ? "A send was logged "+t.slice(0,10)+", by hand. See Follow-ups." : "";
 }
 
 // ── Triage: the queue, grouped by why ──
@@ -1864,12 +1874,15 @@ function outreachMarginHtml(l){
 
 function outreachMessageBox(l){
   const msg = l.latestMessage;
-  if(!msg) return '<div class="lead-msg"><div class="src">No message drafted yet. "Draft the message" writes one for you to shape.</div></div>';
-  const state = outreachSendState(msg, OUTREACH_TOUCH[l.dir]);
+  if(!msg) return l.kind==="content-example" ? ""
+    : '<div class="lead-msg"><div class="src">No message drafted yet. "Draft the message" writes one for you to shape.</div></div>';
+  const state = outreachSendState(msg);
+  const logged = leadSendLogLine(OUTREACH_TOUCH[l.dir]);
   const recip = msg.recipient ? ' · to '+esc(msg.recipient) : "";
-  if(state === "locked" || state === "sent"){
-    return '<div class="lead-msg"><div class="nmeta">'+esc(msg.file)+recip+' · '+esc(msg.channel||"?")+' · <b>'+esc(outreachSendBadge(state))+'</b></div>'+
-      '<div class="body">'+esc(msg.body)+'</div></div>';
+  if(state === "locked"){
+    return '<div class="lead-msg"><div class="nmeta">'+esc(msg.file)+recip+' · '+esc(msg.channel||"?")+' · <b>'+esc(outreachSendBadge(state, !!logged))+'</b></div>'+
+      '<div class="body">'+esc(msg.body)+'</div>'+
+      (logged ? '<div class="src">'+esc(logged)+'</div>' : "")+'</div>';
   }
   const revPending = msgPending.has(l.dir);
   const revErr = msgError.get(l.dir);
@@ -1889,7 +1902,7 @@ function outreachMessageBox(l){
 function sendStepsHtml(l){
   const msg = l.latestMessage;
   if(!msg) return "";
-  const state = outreachSendState(msg, OUTREACH_TOUCH[l.dir]);
+  const state = outreachSendState(msg);
   const pending = lockPending.has(l.dir);
   const note = '<span class="send-note">'+esc(outreachSendNote(state))+'</span>';
   if(state === "draft"){
@@ -1900,7 +1913,7 @@ function sendStepsHtml(l){
   const people = (l.contacts||[]).map(c=>c.name);
   const personSel = '<select class="sent-person"><option value="">(no specific person)</option>'+people.map(n=>'<option value="'+esc(n)+'"'+(msg.recipient===n?" selected":"")+'>'+esc(n)+'</option>').join("")+'</select>';
   const copyBtn = '<button class="primary out-copy" data-dir="'+esc(l.dir)+'">Copy to clipboard</button>';
-  const markBar = '<div class="sent-bar">'+personSel+chanSel+'<button class="go sent-go" data-dir="'+esc(l.dir)+'">'+(state==="sent"?"Log another send":"Mark as manually sent")+'</button></div>';
+  const markBar = '<div class="sent-bar">'+personSel+chanSel+'<button class="go sent-go" data-dir="'+esc(l.dir)+'">Mark as manually sent</button></div>';
   return '<div class="send-steps">'+copyBtn+note+'</div>'+markBar;
 }
 
@@ -2006,7 +2019,10 @@ async function outreachLock(dir, file){
   lockPending.add(dir); renderOutreachBox();
   try {
     const r = await post("/api/status", {slug, id, status:"approve"});
+    // /api/status answers ok:true with a scheduleError when the lock itself failed (or when the
+    // in-flight guard tripped) — the row is still a draft, so never flash "Locked" over that.
     if(r.ok === false) flash(r.error || "Could not lock it");
+    else if(r.scheduleError) flash(r.scheduleError);
     else flash("Locked. Copy it, send it yourself, then tell the page it has gone.");
   } catch (e) {
     flash(e instanceof Error ? e.message : String(e));
@@ -2025,9 +2041,11 @@ function outreachCopy(b){
   flash("Copied. Paste it into your mail client and send it there.");
 }
 
+// Logging a send hands the lead back to the queue, where the row now reads its real
+// "pitched <date>, by hand" off the tracker event this just wrote.
 async function outreachMarkSent(dir, person, channel){
   const r = await post("/api/outreach/mark-sent", {dir, person, channel});
-  if(r.ok){ flash("Logged. The clock starts today; see Follow-ups."); await loadOutreach(); }
+  if(r.ok){ flash("Logged. The clock starts today; see Follow-ups."); activeLeadDir = null; await loadOutreach(); }
   else flash(r.error || "Could not log the send");
 }
 

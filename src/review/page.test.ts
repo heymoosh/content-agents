@@ -663,7 +663,7 @@ test("job surface copy: no em dashes and no 'atomize' in the strings this PR add
 import {
   outreachSegment, OUTREACH_SEGMENTS, groupLeadsBySegment, lastPitchedLabel, threadSegLabel,
   matchmakerRead, contactsLine, isEvidenceSourceValid, evidenceSourceView, NO_SOURCE_RECORDED,
-  outreachSendState, outreachSendNote, outreachSendBadge,
+  outreachSendState, outreachSendNote, outreachSendBadge, leadSendLogLine,
 } from "./page.js";
 import type { OutreachLeadView } from "./page.js";
 
@@ -808,16 +808,20 @@ test("evidenceSourceView: never invents a date, because EvidenceItem carries no 
   }
 });
 
-test("outreachSendState: locked and sent are two different states and never collapse into one", () => {
-  assert.equal(outreachSendState(null, null), "none");
-  assert.equal(outreachSendState({ status: "draft" }, null), "draft");
-  assert.equal(outreachSendState({ status: "approved" }, null), "draft");
-  assert.equal(outreachSendState({ status: "locked" }, null), "locked");
-  assert.equal(outreachSendState({ status: "locked" }, "2026-08-06T00:00:00.000Z"), "sent");
+test("outreachSendState: locking is the only per-message fact the repo measures", () => {
+  assert.equal(outreachSendState(null), "none");
+  assert.equal(outreachSendState(undefined), "none");
+  assert.equal(outreachSendState({ status: "draft" }), "draft");
+  assert.equal(outreachSendState({ status: "approved" }), "draft");
+  assert.equal(outreachSendState({ status: "locked" }), "locked");
 });
 
-test("outreachSendState: a tracker touch on an UNLOCKED message still reads as a draft, never as sent", () => {
-  assert.equal(outreachSendState({ status: "draft" }, "2026-08-06T00:00:00.000Z"), "draft");
+test("outreachSendState: locked never reads as sent, because nothing records which message went", () => {
+  // The tracker keys lead:person, not message. A lead whose message-01 went out months ago would
+  // otherwise stamp "sent" on a freshly locked message-02 nobody has touched.
+  const state = outreachSendState({ status: "locked" });
+  assert.equal(state, "locked");
+  assert.ok(outreachSendBadge(state, false).endsWith("NOT SENT"), "a locked message says plainly that it has not been sent");
 });
 
 test("outreachSendNote: locking and sending carry the two authored notes, verbatim", () => {
@@ -826,11 +830,17 @@ test("outreachSendNote: locking and sending carry the two authored notes, verbat
   assert.equal(outreachSendNote("none"), "");
 });
 
-test("outreachSendBadge: a locked message says it is not sent, and a sent one says who sent it", () => {
-  assert.equal(outreachSendBadge("locked"), "LOCKED · NOT EDITABLE, NOT SENT");
-  assert.equal(outreachSendBadge("sent"), "LOCKED · SENT BY HAND");
-  assert.equal(outreachSendBadge("draft"), "");
-  assert.ok(!outreachSendBadge("locked").includes("SENT BY HAND"), "locked must never read as sent");
+test("outreachSendBadge: locked says NOT SENT until a send is on the ledger, and never argues with it", () => {
+  assert.equal(outreachSendBadge("locked", false), "LOCKED · NOT EDITABLE, NOT SENT");
+  assert.equal(outreachSendBadge("locked", true), "LOCKED · NOT EDITABLE");
+  assert.equal(outreachSendBadge("draft", true), "");
+  assert.equal(outreachSendBadge("none", false), "");
+});
+
+test("leadSendLogLine: the logged send is reported as the lead-level fact the tracker measured", () => {
+  assert.equal(leadSendLogLine("2026-08-06T14:22:00.000Z"), "A send was logged 2026-08-06, by hand. See Follow-ups.");
+  assert.equal(leadSendLogLine(null), "");
+  assert.equal(leadSendLogLine("  "), "");
 });
 
 test("outreach copy: no em dashes and no 'atomize' in the strings this PR adds", () => {
@@ -840,8 +850,9 @@ test("outreach copy: no em dashes and no 'atomize' in the strings this PR adds",
     ...["platform", "org-mission", "org-role", "content-example"].map(threadSegLabel),
     contactsLine([]), contactsLine([{ name: "Annika L." }]), contactsLine([{ name: "A" }, { name: "B" }]),
     matchmakerRead(lead({})).headline,
-    ...(["none", "draft", "locked", "sent"] as const).map(outreachSendNote),
-    ...(["none", "draft", "locked", "sent"] as const).map(outreachSendBadge),
+    ...(["none", "draft", "locked"] as const).map(outreachSendNote),
+    outreachSendBadge("locked", false), outreachSendBadge("locked", true),
+    leadSendLogLine("2026-08-06T00:00:00.000Z"),
     NO_SOURCE_RECORDED,
   ];
   for (const s of strings) {
