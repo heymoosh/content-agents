@@ -11,6 +11,7 @@ import {
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
   jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOBS_POLL_MS,
+  fictionStatusWord, fictionStatusTone, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -1146,4 +1147,69 @@ test("the copy this fix adds carries no em dash", () => {
     assert.ok(html.includes(copy), "missing: " + copy);
     assert.ok(!copy.includes("\u2014"), "no em dash in: " + copy);
   }
+});
+
+// ── Fiction room (v7 §2) ─────────────────────────────────────────────────────────────────────────
+
+const fjob = (over: Record<string, unknown> = {}) =>
+  ({ id: "j1", kind: "fiction-draft", label: "Draft a scene", status: "running", ...over }) as never;
+
+test("the fiction job kinds land in the Fiction room, so its strip and Co-writer rail come alive", () => {
+  assert.equal(jobRoom("fiction-draft"), "Fiction");
+  assert.equal(jobRoom("fiction-continuity"), "Fiction");
+  assert.equal(teamRoomName(jobRoom("fiction-draft")), "Co-writer");
+  // Unchanged for every other kind.
+  assert.equal(jobRoom("charles-draft"), "Charles");
+  assert.equal(jobRoom("video"), "Content");
+});
+
+test("the header tracks unwritten, drafting, waiting, and scene waiting on you", () => {
+  assert.equal(fictionStatusWord([], false), "unwritten");
+  assert.equal(fictionStatusWord([fjob({ status: "queued" })], false), "drafting");
+  assert.equal(fictionStatusWord([fjob({ status: "running" })], false), "drafting");
+  assert.equal(fictionStatusWord([fjob({ status: "blocked" })], false), "waiting on your answer");
+  assert.equal(fictionStatusWord([fjob({ status: "done" })], true), "scene waiting on you");
+  // A job in another room never moves Fiction's header.
+  assert.equal(fictionStatusWord([{ id: "x", kind: "video", label: "v", status: "running" } as never], false), "unwritten");
+});
+
+test("a failure reads as nothing written only when nothing was in fact written", () => {
+  assert.equal(fictionStatusWord([fjob({ status: "failed" })], false), "nothing written");
+  // A failed SECOND pass leaves the first pass on disk and on screen, so the header must not
+  // claim nothing was written while the scene is right there.
+  assert.equal(fictionStatusWord([fjob({ status: "done" }), fjob({ id: "j2", status: "failed" })], true), "scene waiting on you");
+  assert.equal(fictionStatusTone("nothing written").fg, JOB_COLORS.red);
+  assert.equal(fictionStatusTone("drafting").fg, JOB_COLORS.ai);
+});
+
+test("Fix the line is offered only on a conflict the check can actually patch", () => {
+  const base = { kind: "conflict", rule: "Eli's left hand", note: "The draft sweeps a whole hand.", span: "his gloved hand", replacement: "his two remaining fingers", fixable: true };
+  assert.equal(fictionCheckRow(base, false).canFix, true);
+  assert.equal(fictionCheckRow(base, false).word, "conflict");
+  assert.equal(fictionCheckRow({ ...base, fixable: false }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, span: "" }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, replacement: "" }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, kind: "hold" }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, kind: "hold" }, false).word, "holds");
+  const fixed = fictionCheckRow(base, true);
+  assert.equal(fixed.word, "fixed");
+  assert.equal(fixed.canFix, false);
+  assert.match(fixed.text, /his two remaining fingers/);
+});
+
+test("the canon stamp only counts what came back, and shows nothing before a check", () => {
+  assert.equal(fictionCanonStamp(null), "");
+  assert.equal(
+    fictionCanonStamp({ checkedAt: "2026-08-22T10:00:00.000Z", holds: [1, 2], conflicts: [1] } as never),
+    "checked 2026-08-22 · 2 holding · 1 breaking",
+  );
+});
+
+test("the scene renders as paragraphs, while the file keeps one sentence per line", () => {
+  const body = "The airlock was quiet.\nNo klaxons, no amber strobe.\n\nHe did not speak into the comms.";
+  assert.deepEqual(fictionSceneParagraphs(body), [
+    "The airlock was quiet. No klaxons, no amber strobe.",
+    "He did not speak into the comms.",
+  ]);
+  assert.deepEqual(fictionSceneParagraphs(""), []);
 });

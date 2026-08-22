@@ -80,6 +80,9 @@ import {
   addDevelopJob,
   addDevelopFolderJob,
   developJobInFlight,
+  addFictionDraftJob,
+  addFictionRepassJob,
+  addFictionCheckJob,
   buildFormatArg,
   enqueueCharlesDraft,
 } from "./jobs.js";
@@ -89,7 +92,12 @@ import { renderPage } from "./page.js";
 import { buildStudioHome } from "./studio.js";
 import { getAnalyst } from "../providers/registry.js";
 import { readSignals, appendBacklogCard } from "./signals.js";
-import { listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory } from "./fiction.js";
+import {
+  listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory,
+  readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats, chapterDocs,
+} from "./fiction.js";
+import { patchChapterSpan } from "../fiction/patch.js";
+import { readContinuityReport } from "../fiction/continuity.js";
 import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief } from "./charles.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts } from "./intake-draft.js";
 
@@ -989,6 +997,93 @@ const server = createServer(async (req, res) => {
       const b = await readBody(req);
       try {
         saveFictionDoc(String(b.series ?? ""), String(b.path ?? ""), String(b.body ?? ""));
+        json(res, 200, { ok: true });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // ── The Fiction room's scene (v7 §2) ───────────────────────────────────────────────────────
+    // One read for the whole room: her beats (the anchor), the drafted scene, and what the canon
+    // check found. Nothing here approves, locks or publishes a chapter — every one still waits on
+    // Muxin, and the GitHub /story flow stays where line editing and the commit history live.
+    if (req.method === "GET" && url.pathname === "/api/fiction/scene") {
+      try {
+        const slug = url.searchParams.get("series") ?? "";
+        const chapters = chapterDocs(join(repoRoot, "stories", slug));
+        const beats = readSceneBeats(slug);
+        const asked = Number(url.searchParams.get("chapter") ?? "");
+        const latest = chapters.length ? (chapters[chapters.length - 1].chapter as number) : null;
+        const n = Number.isInteger(asked) && asked > 0 ? asked : beats?.chapter ?? latest;
+        const chapter = n ? readFictionChapter(slug, n) : null;
+        json(res, 200, {
+          ok: true,
+          beats: beats?.beats ?? "",
+          chapter,
+          continuity: n ? readContinuityReport(slug, n) : null,
+        });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Draft it" — her beats become a queued /story run. See jobs.ts's fictionDraftPrompt for why
+    // this dispatches the SKILL rather than `story:draft` (draft.ts is inert for claude-native
+    // series and is a guardrail path).
+    if (req.method === "POST" && url.pathname === "/api/fiction/draft") {
+      const b = await readBody(req);
+      try {
+        const slug = String(b.series ?? "");
+        const beats = String(b.beats ?? "");
+        saveSceneBeats(slug, beats); // the anchor survives a reload, before the job even starts
+        json(res, 200, { ok: true, job: publicJob(addFictionDraftJob(slug, beats)) });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // The second pass ("More tension, less explaining"): its OWN measured job, never an instant
+    // rewrite. The draft on screen does not move until the new one lands.
+    if (req.method === "POST" && url.pathname === "/api/fiction/repass") {
+      const b = await readBody(req);
+      try {
+        json(res, 200, {
+          ok: true,
+          job: publicJob(addFictionRepassJob(String(b.series ?? ""), Number(b.chapter ?? 0), String(b.note ?? ""))),
+        });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/fiction/check") {
+      const b = await readBody(req);
+      try {
+        json(res, 200, { ok: true, job: publicJob(addFictionCheckJob(String(b.series ?? ""), Number(b.chapter ?? 0))) });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Fix the line": replace ONE flagged span in the chapter and re-save. Refuses when that exact
+    // wording is missing or appears more than once, because then there is no single line to fix.
+    if (req.method === "POST" && url.pathname === "/api/fiction/fix") {
+      const b = await readBody(req);
+      try {
+        const result = patchChapterSpan(
+          String(b.series ?? ""), Number(b.chapter ?? 0), String(b.span ?? ""), String(b.replacement ?? ""),
+        );
+        json(res, 200, { ok: true, body: result.body });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // "Start a different scene": drops the anchor only. It never touches a chapter file.
+    if (req.method === "POST" && url.pathname === "/api/fiction/beats/clear") {
+      const b = await readBody(req);
+      try {
+        clearSceneBeats(String(b.series ?? ""));
         json(res, 200, { ok: true });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });

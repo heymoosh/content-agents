@@ -133,6 +133,7 @@ export function jobRoom(kind: string): JobRoom {
   if (kind === "scout" || kind === "draft-follow-up" || kind === "outreach-revise") return "Outreach";
   if (kind === "pull" || kind === "strategy" || kind === "insights" || kind === "ask-insights" || kind === "brief-revise") return "Signals";
   if (kind === "charles-draft") return "Charles";
+  if (kind === "fiction-draft" || kind === "fiction-continuity") return "Fiction";
   // url/file/text/notes/continue/video/develop/develop-reply/revise/duplicate — the production crew
   // ("revise" here is a CONTENT derivative revise, which belongs in Content)
   return "Content";
@@ -258,6 +259,83 @@ export function jobLogLine(job: JobView): string {
 
 export function jobOpenLabel(job: JobView): string {
   return `${job.status === "done" ? "Read it in" : "Watch it in"} ${jobRoom(job.kind)}`;
+}
+
+
+// ── Fiction room (v7 §2) ──
+// The header word, the canon rail rows and the stamp, as pure functions so they are testable
+// without a browser. Duplicated by hand into the client script below, same convention as the job
+// mirrors above.
+
+export type FictionStatus = "unwritten" | "drafting" | "waiting on your answer" | "scene waiting on you" | "nothing written";
+
+// unwritten -> drafting -> scene waiting on you, and "nothing written" on a failure.
+//
+// One deliberate departure from the prototype: it hides the draft whenever the newest Fiction job
+// failed, so a failed SECOND pass would show "nothing written" with the first pass still on screen
+// and still on disk. A scene that exists is a scene, so a failure only reads as "nothing written"
+// when nothing was in fact written. The localized failure card renders either way.
+export function fictionStatusWord(jobs: JobView[], hasScene: boolean): FictionStatus {
+  const mine = jobs.filter((j) => jobRoom(j.kind) === "Fiction");
+  const newest = mine.length ? mine[mine.length - 1] : null;
+  if (mine.some((j) => j.status === "blocked")) return "waiting on your answer";
+  if (newest?.status === "failed" && !hasScene) return "nothing written";
+  if (mine.some((j) => j.status === "queued" || j.status === "running") && !hasScene) return "drafting";
+  return hasScene ? "scene waiting on you" : "unwritten";
+}
+
+export function fictionStatusTone(word: FictionStatus): { fg: string; bg: string; bd: string } {
+  if (word === "nothing written") return { fg: JOB_COLORS.red, bg: "#fdf1ef", bd: "#ecc9c0" };
+  if (word === "drafting") return { fg: JOB_COLORS.ai, bg: "#efeafd", bd: "#ded5e9" };
+  if (word === "unwritten") return { fg: "#8a7f6d", bg: "#f4efe3", bd: "#e6dcc4" };
+  return { fg: JOB_COLORS.amber, bg: "#fdf8ec", bd: "#e8d5a8" };
+}
+
+export interface CanonCheckRow {
+  word: string; // "holds" | "conflict" | "fixed"
+  color: string;
+  border: string;
+  rule: string;
+  text: string;
+  canFix: boolean;
+}
+
+// One rail row per finding. A conflict only offers Fix the line when the check found its exact
+// wording once and proposed something to put there: anything else has no single line to fix, and a
+// button that cannot work is worse than no button.
+export function fictionCheckRow(
+  item: { kind: string; rule: string; note: string; span: string; replacement: string; fixable?: boolean },
+  fixed: boolean,
+): CanonCheckRow {
+  if (fixed) {
+    return { word: "fixed", color: JOB_COLORS.green, border: "#cbe0d1", rule: item.rule, text: `Reads "${item.replacement}" now. Changed in the draft.`, canFix: false };
+  }
+  if (item.kind === "conflict") {
+    return { word: "conflict", color: JOB_COLORS.amber, border: "#e8d5a8", rule: item.rule, text: item.note, canFix: Boolean(item.fixable && item.span && item.replacement) };
+  }
+  return { word: "holds", color: JOB_COLORS.green, border: "#cbe0d1", rule: item.rule, text: item.note, canFix: false };
+}
+
+// Counted, never claimed: the stamp says how many findings came back and how many of them break
+// canon. The model's own "how many rules I read" number is kept in the report file and not shown,
+// because nothing here measured it.
+export function fictionCanonStamp(report: { checkedAt?: string; holds?: unknown[]; conflicts?: unknown[] } | null): string {
+  if (!report) return "";
+  const holds = report.holds?.length ?? 0;
+  const conflicts = report.conflicts?.length ?? 0;
+  const when = report.checkedAt ? report.checkedAt.slice(0, 10) : "";
+  return `checked ${when} · ${holds} holding · ${conflicts} breaking`;
+}
+
+// The scene body arrives one sentence per line (stories/CLAUDE.md), which is right for GitHub line
+// comments and wrong for reading. Rejoin each paragraph for the page; the file is untouched.
+export function fictionSceneParagraphs(body: string): string[] {
+  return body
+    .replace(/\r\n/g, "\n")
+    .trim()
+    .split(/\n\s*\n/)
+    .map((p) => p.split("\n").map((l) => l.trim()).filter(Boolean).join(" "))
+    .filter(Boolean);
 }
 
 // ── the destination room's progress strip (v5 §5.2) ──
@@ -2523,15 +2601,20 @@ async function outreachDecide(dir, decision){
   else flash(r.error || "Failed");
 }
 
-// ── Fiction desk (Content Studio Riff 3f) ──
-// The canon underneath the series, editable in place: world bible, plot line, character sheets.
-// canon.md is append-only (story:lock owns it) and renders read-only. Chapter drafting and
-// line-by-line review stay in the GitHub /story flow; the promo shortcuts in the margin are the
-// only bridge to the rest of the studio, and they just seed the Content capture for Muxin.
+// ── Fiction room (Content Studio Riff 3f, rebuilt for v7 §2) ──
+// The composer, her beats kept as the anchor, the drafted scene, and the canon rail that says what
+// holds and what breaks. Her words are Georgia in the ink colour; the drafted prose is AI-written
+// and carries the purple. canon.md is still append-only (story:lock owns it) and renders read-only,
+// and a chapter is never editable here: the only write into one is the scoped span patch behind
+// "Fix the line". Nothing in this room approves, locks or publishes a chapter. Line editing and the
+// commit history stay in the GitHub /story flow.
 let FICTION = null;
 let ficSeries = null;
 let ficDocPath = null;
 let ficDocData = null;
+let ficScene = null;      // { beats, chapter, continuity } from /api/fiction/scene
+let ficPassNote = "";
+let ficFixed = {};        // spans fixed in this session, so the rail says "fixed" until the next check
 async function loadFiction(){
   const r = await fetch("/api/fiction");
   FICTION = (await r.json()).series || [];
@@ -2545,15 +2628,124 @@ async function loadFiction(){
   if(!ficDocPath || !series.docs.some(d=>d.path===ficDocPath)) ficDocPath = series.docs[0].path;
   const dr = await fetch("/api/fiction/doc?series="+encodeURIComponent(ficSeries)+"&path="+encodeURIComponent(ficDocPath));
   ficDocData = await dr.json();
+  const sr = await fetch("/api/fiction/scene?series="+encodeURIComponent(ficSeries));
+  ficScene = await sr.json();
   renderFiction();
+}
+function ficStatusWord(hasScene){
+  const mine = (JOBS||[]).filter(j=>jobRoom(j.kind)==="Fiction");
+  const newest = mine.length ? mine[mine.length-1] : null;
+  if(mine.some(j=>j.status==="blocked")) return "waiting on your answer";
+  if(newest && newest.status==="failed" && !hasScene) return "nothing written";
+  if(mine.some(j=>j.status==="queued"||j.status==="running") && !hasScene) return "drafting";
+  return hasScene ? "scene waiting on you" : "unwritten";
+}
+function ficStatusTone(w){
+  if(w==="nothing written") return {fg:JC.red, bg:"#fdf1ef", bd:"#ecc9c0"};
+  if(w==="drafting") return {fg:JC.ai, bg:"#efeafd", bd:"#ded5e9"};
+  if(w==="unwritten") return {fg:"#8a7f6d", bg:"#f4efe3", bd:"#e6dcc4"};
+  return {fg:JC.amber, bg:"#fdf8ec", bd:"#e8d5a8"};
+}
+function ficCheckRow(item, fixed){
+  if(fixed) return {word:"fixed", color:JC.green, border:"#cbe0d1", rule:item.rule, text:'Reads "'+item.replacement+'" now. Changed in the draft.', canFix:false};
+  if(item.kind==="conflict") return {word:"conflict", color:JC.amber, border:"#e8d5a8", rule:item.rule, text:item.note, canFix:!!(item.fixable && item.span && item.replacement)};
+  return {word:"holds", color:JC.green, border:"#cbe0d1", rule:item.rule, text:item.note, canFix:false};
+}
+function ficCanonStamp(rep){
+  if(!rep) return "";
+  const holds = (rep.holds||[]).length, conflicts = (rep.conflicts||[]).length;
+  return "checked "+(rep.checkedAt||"").slice(0,10)+" · "+holds+" holding · "+conflicts+" breaking";
+}
+function ficParagraphs(body){
+  return String(body||"").replace(/\\r\\n/g,"\\n").trim().split(/\\n\\s*\\n/)
+    .map(p=>p.split("\\n").map(l=>l.trim()).filter(Boolean).join(" ")).filter(Boolean);
+}
+function ficPassJob(){
+  const mine = (JOBS||[]).filter(j=>j.kind==="fiction-draft"&&(j.status==="queued"||j.status==="running"));
+  return mine.length ? mine[mine.length-1] : null;
+}
+function ficFailedJob(){
+  const mine = (JOBS||[]).filter(j=>jobRoom(j.kind)==="Fiction");
+  const newest = mine.length ? mine[mine.length-1] : null;
+  return newest && newest.status==="failed" ? newest : null;
 }
 function renderFiction(){
   const series = FICTION.find(s=>s.slug===ficSeries);
   const d = ficDocData;
   const doc = series.docs.find(x=>x.path===ficDocPath);
+  const sc = ficScene || {};
+  const chapter = sc.chapter || null;
+  const beats = (sc.beats||"").trim();
+  const rep = sc.continuity || null;
+  const hasScene = !!(chapter && (chapter.body||"").trim());
+  const word = ficStatusWord(hasScene);
+  const tone = ficStatusTone(word);
+  const passJob = ficPassJob();
+  const failed = ficFailedJob();
   const history = (d.history||[]).length ? '<details class="lead-details" style="margin-top:10px"><summary>Version history</summary><div class="ntext" style="font-size:12px">'+d.history.map(esc).join("<br>")+'</div></details>' : "";
+
+  const head =
+    '<div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">'+
+      '<span class="wb-label" style="margin:0">'+esc(series.title)+'</span>'+
+      '<span style="font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:'+tone.fg+';background:'+tone.bg+';border:1px solid '+tone.bd+';border-radius:4px;padding:2px 7px">'+esc(word)+'</span>'+
+    '</div>';
+
+  const composer = beats ? '' :
+    '<div style="font:400 27px/1.35 Georgia,serif;margin:6px 0 18px;max-width:520px">What happens next?</div>'+
+    '<div style="background:#fffdf8;border:1px solid #d8cfbb;border-radius:8px;padding:20px 22px;max-width:600px">'+
+      '<textarea id="ficBeats" rows="3" placeholder="Say the beats. Who is in it, what turns, what you want it to feel like." style="width:100%;box-sizing:border-box;border:none;outline:none;background:transparent;padding:0;resize:vertical;font:400 18px/1.6 Georgia,serif;color:var(--ink)"></textarea>'+
+      '<div style="display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid #efe7d6">'+
+        '<button class="primary" id="ficDraftBtn" style="flex:none;white-space:nowrap">Draft it</button>'+
+        '<span class="src">It writes a first pass and checks the canon while it goes. You read it before anything is kept.</span>'+
+      '</div>'+
+    '</div>';
+
+  const anchor = !beats ? '' :
+    '<div style="max-width:600px;margin-top:14px">'+
+      '<div class="wb-margin-cap">YOUR BEATS · KEPT AS THE ANCHOR FOR THIS SCENE</div>'+
+      '<div style="margin-top:9px;border-left:2px solid '+JC.blue+';padding-left:18px;font:400 18px/1.6 Georgia,serif;color:var(--ink);white-space:pre-wrap">'+esc(beats)+'</div>'+
+      '<button id="ficStartOver" style="margin-top:12px;border:none;background:none;padding:0;font-size:12.5px;color:#7a7266;border-bottom:1px solid #d8cfbb;cursor:pointer">Start a different scene</button>'+
+    '</div>';
+
+  const failCard = !failed ? '' :
+    '<div style="margin-top:22px;max-width:600px;border:1px solid #ecc9c0;background:#fdf1ef;border-radius:9px;padding:15px 17px">'+
+      '<div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">'+
+        '<span style="font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;color:'+JC.red+'">NOTHING WRITTEN · WHERE IT STOPPED</span>'+
+        '<span style="flex:1"></span>'+
+        '<span class="mono-note">'+esc(jobClock(failed, 0))+'</span>'+
+      '</div>'+
+      jobStepDots(failed).map(sd=>'<div style="display:grid;grid-template-columns:7px minmax(0,1fr);gap:11px;align-items:baseline;margin-top:7px"><span style="width:6px;height:6px;border-radius:50%;background:'+dotColor(sd.state)+';margin-top:6px"></span><span style="font-size:13px;line-height:1.5">'+esc(sd.text)+'</span></div>').join("")+
+      '<div style="font-size:13px;line-height:1.55;margin-top:11px">'+esc(failed.error||"It stopped where the red dot is.")+'</div>'+
+      (failed.retryable ? '<div class="actions" style="margin-top:13px"><button data-retry="'+esc(failed.id)+'">Run it again</button></div>' : '')+
+    '</div>';
+
+  const scene = !hasScene ? '' :
+    '<div style="display:flex;align-items:baseline;gap:10px;margin:32px 0 11px">'+
+      '<span style="font:600 13px/1 Georgia,serif;color:'+JC.ai+'">The scene, from your beats</span>'+
+      '<span class="src" style="font-style:italic">chapter '+chapter.number+(chapter.title?' · '+esc(chapter.title):'')+' · your beats, its prose</span>'+
+    '</div>'+
+    '<div style="max-width:600px;display:flex;flex-direction:column;gap:15px;padding-left:18px;border-left:2px solid '+JC.ai+'">'+
+      ficParagraphs(chapter.body).map(t=>'<span style="font:400 18px/1.8 Georgia,serif;color:'+JC.ai+'">'+esc(t)+'</span>').join("")+
+    '</div>'+
+    '<div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
+      '<button id="ficRecheck">Check the canon again</button>'+
+      '<span class="src" style="max-width:340px">It is written to stories/'+esc(ficSeries)+'/'+esc(chapter.path)+'. Nothing is approved, locked or published, and no branch or pull request was made.</span>'+
+    '</div>'+
+    '<div style="margin-top:26px;max-width:600px">'+
+      '<div class="wb-margin-cap">SECOND PASS · SAY WHAT TO CHANGE</div>'+
+      '<div style="display:flex;gap:10px;align-items:center;border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:9px 13px;margin-top:8px">'+
+        '<input id="ficPass" value="'+esc(ficPassNote)+'" placeholder="More tension, less explaining" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:400 16px/1.5 Georgia,serif;color:var(--ink)" />'+
+        '<button class="primary" id="ficPassBtn"'+(passJob?' disabled':'')+' style="white-space:nowrap">Run it again</button>'+
+      '</div>'+
+      '<div class="src" style="margin-top:8px">'+(passJob
+        ? 'It is running now. The draft above does not move until the new one lands.'
+        : 'It runs as its own job, with the real time on it. Nothing overwrites the draft above until you read the new one.')+'</div>'+
+    '</div>'+
+    '<div style="margin:38px 0 0;display:flex;align-items:center;gap:12px"><span style="height:1px;flex:1;background:#efe7d6"></span><span style="font:italic 400 14px/1 Georgia,serif;color:#a89a80">the canon underneath it</span><span style="height:1px;flex:1;background:#efe7d6"></span></div>';
+
   $("#fictionMain").innerHTML =
-    '<div class="wb-label">'+esc(series.title)+' · your canon</div>'+
+    head + composer + anchor + failCard + scene +
+    '<div class="wb-label" style="margin-top:34px">The philosophy · your canon</div>'+
     '<div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 14px;">'+esc(doc.label)+'</div>'+
     '<div id="ficBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:520px;overflow:auto;">'+esc(d.body)+'</div>'+
     '<div class="actions" style="margin-top:12px">'+
@@ -2561,14 +2753,76 @@ function renderFiction(){
         ? '<button class="primary" id="ficEditBtn">Edit in place</button><span class="src">Saves straight to your canon. What you save here is what the drafts build from.</span>'
         : '<span class="src">Append-only: /story lock writes this ledger; the desk only reads it.</span>')+
     '</div>'+history+
-    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Chapter drafting and line-by-line review stay in your GitHub flow (/story), where you already work sentence by sentence. This desk holds the canon underneath it.</div>';
+    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">First passes happen here, checked against this canon as they are written. Line editing and the commit history stay in your GitHub flow (/story), where you already work sentence by sentence.</div>';
+
+  const rows = [].concat(rep?rep.conflicts||[]:[], rep?rep.holds||[]:[]);
+  const checks = rows.length
+    ? rows.map((it,i)=>{
+        const r = ficCheckRow(it, !!ficFixed[it.span]);
+        return '<div style="display:flex;flex-direction:column;gap:6px;padding-left:12px;border-left:2px solid '+r.border+'">'+
+          '<span style="font-size:12.5px;font-weight:600"><span style="color:'+r.color+'">'+esc(r.word)+'</span> · '+esc(r.rule)+'</span>'+
+          '<span style="font-size:12.5px;line-height:1.5;color:#5a5346">'+esc(r.text)+'</span>'+
+          (r.canFix ? '<button data-fix="'+i+'" style="width:fit-content;margin-top:2px;font-size:11.5px;background:none;border:1px solid '+JC.amber+';color:'+JC.amber+';border-radius:5px;padding:3px 8px;cursor:pointer">Fix the line</button>' : '')+
+        '</div>';
+      }).join("")
+    : '<div class="src">'+(hasScene
+        ? 'Nothing came back from the last check. Run it again after an edit.'
+        : 'Nothing to check yet. This fills in when a draft exists, one line per rule it read, and it says which ones broke.')+'</div>';
+
   $("#fictionSide").innerHTML =
+    '<div class="wb-margin-cap">CHECKED AGAINST YOUR CANON</div>'+
+    '<div style="display:flex;flex-direction:column;gap:14px;margin:10px 0 4px">'+checks+'</div>'+
+    (rep ? '<div class="mono-note">'+esc(ficCanonStamp(rep))+'</div>' : '')+
+    '<div style="height:1px;background:#efe7d6;margin:14px 0"></div>'+
     '<div class="wb-margin-cap">YOUR CANON · CLICK TO OPEN</div>'+
     series.docs.map(x=>'<div class="lead-chip'+(x.path===ficDocPath?" on":"")+'" style="display:flex" data-path="'+esc(x.path)+'">'+esc(x.label)+'</div>').join("")+
     '<div class="wb-reply"><div class="wb-margin-cap">PROMOTE THE SERIES</div>'+
     '<span class="wb-link" id="ficPromoNote">Start a launch note in Content</span>'+
     '<span class="mono-note">Promo is the only bridge to the rest of the studio: teasers quote LOCKED chapters verbatim. Character art: /illustrate '+esc(ficSeries)+' character &lt;name&gt; in a terminal.</span></div>';
+
   document.querySelectorAll("#fictionSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ ficDocPath=c.dataset.path; loadFiction(); }));
+  const draftBtn = $("#ficDraftBtn");
+  if(draftBtn) draftBtn.addEventListener("click", ()=>{
+    const t = ($("#ficBeats").value||"").trim();
+    if(!t){ flash("Say the beats first"); return; }
+    post("/api/fiction/draft",{series:ficSeries, beats:t}).then(r=>{
+      if(r.ok){ flash("Drafting. It checks the canon while it goes."); loadFiction(); }
+      else flash(r.error||"Could not start it");
+    });
+  });
+  const startOver = $("#ficStartOver");
+  if(startOver) startOver.addEventListener("click", ()=>{
+    post("/api/fiction/beats/clear",{series:ficSeries}).then(()=>{ ficFixed={}; ficPassNote=""; loadFiction(); });
+  });
+  const passInput = $("#ficPass");
+  if(passInput) passInput.addEventListener("input", e=>{ ficPassNote = e.target.value; });
+  const passBtn = $("#ficPassBtn");
+  if(passBtn) passBtn.addEventListener("click", ()=>{
+    const note = (ficPassNote||"").trim();
+    if(!note){ flash("Say what to change first"); return; }
+    post("/api/fiction/repass",{series:ficSeries, chapter:chapter.number, note:note}).then(r=>{
+      if(r.ok){ ficPassNote=""; flash("Second pass queued. The draft above stays until it lands."); loadFiction(); }
+      else flash(r.error||"Could not start it");
+    });
+  });
+  const recheck = $("#ficRecheck");
+  if(recheck) recheck.addEventListener("click", ()=>{
+    post("/api/fiction/check",{series:ficSeries, chapter:chapter.number}).then(r=>{
+      if(r.ok){ flash("Reading it against your canon"); loadFiction(); } else flash(r.error||"Could not start it");
+    });
+  });
+  document.querySelectorAll("#fictionSide [data-fix]").forEach(b=>b.addEventListener("click", ()=>{
+    const it = rows[Number(b.dataset.fix)];
+    post("/api/fiction/fix",{series:ficSeries, chapter:chapter.number, span:it.span, replacement:it.replacement}).then(r=>{
+      if(r.ok){ ficFixed[it.span]=true; flash("Line fixed in the draft"); loadFiction(); }
+      else flash(r.error||"Could not fix that line");
+    });
+  }));
+  document.querySelectorAll("#fictionMain [data-retry]").forEach(b=>b.addEventListener("click", ()=>{
+    post("/api/jobs/"+encodeURIComponent(b.dataset.retry)+"/retry",{}).then(r=>{
+      if(r.ok){ flash("Running it again"); loadFiction(); } else flash(r.error||"Could not run it again");
+    });
+  }));
   const editBtn = $("#ficEditBtn");
   if(editBtn) editBtn.addEventListener("click", ()=>{
     const bodyEl = $("#ficBody");
@@ -2951,6 +3205,7 @@ function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
   if(kind==="pull"||kind==="strategy"||kind==="insights"||kind==="ask-insights"||kind==="brief-revise") return "Signals";
   if(kind==="charles-draft") return "Charles";
+  if(kind==="fiction-draft"||kind==="fiction-continuity") return "Fiction";
   return "Content";
 }
 function jobLanding(room){
@@ -3202,6 +3457,7 @@ async function loadJobs(){
       load(); // a job moved → refresh review rows
       if(currentTab==="content") loadContent(); // a finished advisor round renders its new sheets
       if(currentTab==="studio") loadStudio(); // counts and the team panel just changed
+      if(currentTab==="fiction") loadFiction(); // a landed scene or canon check is what she is waiting on
     }
   }catch(e){}
 }

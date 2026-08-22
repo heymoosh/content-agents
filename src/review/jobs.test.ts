@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -911,4 +911,73 @@ test("a clean exit that fails its artifact check is offered a retry", async () =
   assert.equal(job.retryable, true, "worth one more attempt, so Retry has to be on offer");
   assert.equal(jobIsSweepable(job), true, "and Clear queue can take it like any other dead job");
   jobs.length = 0;
+});
+
+// ── Fiction jobs (v7 §2) ─────────────────────────────────────────────────────────────────────────
+// "Draft it" routes through the /story SKILL, not `story:draft`: src/fiction/draft.ts exits 1 for
+// any `prose: claude-native` series (the default, and what the only series here uses) and is a
+// guardrail path, so it is left alone.
+
+test("the draft prompt dispatches the /story skill, not story:draft", () => {
+  const p = fictionDraftPrompt("the-least-of-us", "Eli finds the cut hydro line.");
+  assert.match(p, /^\/story the-least-of-us/);
+  assert.doesNotMatch(p, /story:draft/);
+  assert.match(p, /Eli finds the cut hydro line\./);
+});
+
+test("the draft prompt carries the two headless constraints: no waiting beat sheet, no git", () => {
+  const p = fictionDraftPrompt("a-series", "beats");
+  assert.match(p, /do not post a beat sheet and wait/i);
+  assert.match(p, /Do NOT commit, branch, push or open a pull request/);
+  assert.match(p, /do not lock or publish anything/i);
+  assert.match(p, /story:validate/);
+});
+
+test("the second-pass prompt hands the note over as the one review comment, since there is no PR", () => {
+  const p = fictionRepassPrompt("a-series", 3, "More tension, less explaining");
+  assert.match(p, /^\/story --revise a-series 3/);
+  assert.match(p, /no GitHub pull request/i);
+  assert.match(p, /More tension, less explaining/);
+  assert.match(p, /Do NOT commit, branch, push, open a pull request or reply on any thread/);
+});
+
+test("no fiction prompt smuggles in an em dash", () => {
+  for (const p of [fictionDraftPrompt("s", "b"), fictionRepassPrompt("s", 1, "n")]) {
+    assert.ok(!/[—–]/.test(p), `em dash in: ${p}`);
+  }
+});
+
+test("the fiction artifact check: a draft counts only when a new chapter file actually landed", () => {
+  const before = new Map([[1, "one"]]);
+  assert.equal(fictionRunProduced(before, new Map([[1, "one"], [2, "two"]]), "draft"), 2);
+  // Finished is not the same as worked: a clean exit that wrote nothing fails the check.
+  assert.equal(fictionRunProduced(before, new Map([[1, "one"]]), "draft"), null);
+  // A run that only rewrote an existing chapter is not a new scene either.
+  assert.equal(fictionRunProduced(before, new Map([[1, "rewritten"]]), "draft"), null);
+  // Several new chapters: the last one is the scene she asked for.
+  assert.equal(fictionRunProduced(before, new Map([[1, "one"], [2, "two"], [3, "three"]]), "draft"), 3);
+});
+
+test("the fiction artifact check: a second pass counts only when that chapter's prose changed", () => {
+  const before = new Map([[1, "one"], [2, "two"]]);
+  assert.equal(fictionRunProduced(before, new Map([[1, "one"], [2, "revised"]]), "repass", 2), 2);
+  assert.equal(fictionRunProduced(before, new Map([[1, "one"], [2, "two"]]), "repass", 2), null);
+  assert.equal(fictionRunProduced(before, new Map([[1, "one"]]), "repass", 2), null);
+  assert.equal(fictionRunProduced(before, new Map([[1, "one"], [2, "revised"]]), "repass"), null);
+});
+
+test("chapterSnapshot reads every chapter's prose, and an empty series is an empty map", () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-jobs-"));
+  try {
+    const dir = join(root, "a-series");
+    mkdirSync(join(dir, "chapters"), { recursive: true });
+    writeFileSync(join(dir, "series.yaml"), "slug: a-series\n");
+    assert.equal(chapterSnapshot(dir).size, 0);
+    writeFileSync(join(dir, "chapters", "chapter-01.md"), "---\nchapter: 1\n---\n\nThe airlock was quiet.\n");
+    const snap = chapterSnapshot(dir);
+    assert.equal(snap.size, 1);
+    assert.equal(snap.get(1), "The airlock was quiet.");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
