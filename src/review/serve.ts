@@ -90,6 +90,7 @@ import { getAnalyst } from "../providers/registry.js";
 import { readSignals, appendBacklogCard } from "./signals.js";
 import { listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory } from "./fiction.js";
 import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief } from "./charles.js";
+import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts } from "./intake-draft.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich) or jobs.ts (classifySource,
@@ -1633,6 +1634,38 @@ const server = createServer(async (req, res) => {
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
+      return;
+    }
+    // Venture intake autosave (Venture Build v7 handoff §1). The intake interview is 25 questions
+    // long, so the room debounces each keystroke to a scratch buffer and a half-typed answer
+    // survives a reload. These are SEPARATE from the final write: kickoffVenture() in
+    // src/venture/intake.ts still owns the real answers and is untouched by any of this. The slug
+    // and question number ride in the path, so they are matched by regex like /api/jobs/:id/log
+    // above. All three validate in intake-draft.ts, which is the only thing that touches the file.
+    if (req.method === "POST" && /^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/.test(url.pathname)) {
+      const parts = url.pathname.split("/");
+      const b = await readBody(req);
+      if (typeof b.text !== "string") {
+        json(res, 400, { ok: false, error: "send the draft as text" });
+        return;
+      }
+      const result = saveIntakeDraft(parts[3], Number(parts[5]), b.text);
+      json(res, result.ok ? 200 : 400, result);
+      return;
+    }
+    // Restore every in-progress answer at once, for a reopened interview. Matched before the
+    // per-question GET below; the two patterns cannot collide (this one ends at "drafts").
+    if (req.method === "GET" && /^\/api\/venture\/[^/]+\/intake\/drafts$/.test(url.pathname)) {
+      const result = readIntakeDrafts(url.pathname.split("/")[3]);
+      json(res, result.ok ? 200 : 400, result);
+      return;
+    }
+    // Restore one question. No draft yet is normal on a fresh question, so it answers 200 with a
+    // null draft rather than a 404.
+    if (req.method === "GET" && /^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/.test(url.pathname)) {
+      const parts = url.pathname.split("/");
+      const result = readIntakeDraft(parts[3], Number(parts[5]));
+      json(res, result.ok ? 200 : 400, result);
       return;
     }
     res.writeHead(404).end("not found");
