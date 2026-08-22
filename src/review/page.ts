@@ -300,18 +300,34 @@ export interface CanonCheckRow {
   canFix: boolean;
 }
 
+// Said in place, on the row, when a conflict cannot be patched. A conflict the tool cannot fix is
+// still a conflict: it keeps the conflict word, it keeps counting as breaking in the stamp, and it
+// loses only the button. It used to be rewritten into a green "holds", which let a chapter that
+// still broke canon read as cleared.
+export function unfixableLine(reason: string, occurrences?: number): string {
+  if (reason === "span-missing") return "I cannot fix this one for you: I could not find that exact wording in the chapter, so change the line yourself.";
+  if (reason === "span-repeats") {
+    const n = typeof occurrences === "number" && occurrences > 1 ? `${occurrences} times` : "more than once";
+    return `I cannot fix this one for you: that wording appears ${n} in the chapter, so there is no single line to change.`;
+  }
+  if (reason === "no-replacement") return "I cannot fix this one for you: I have nothing safe to put in its place, so write the new line yourself.";
+  return "";
+}
+
 // One rail row per finding. A conflict only offers Fix the line when the check found its exact
-// wording once and proposed something to put there: anything else has no single line to fix, and a
-// button that cannot work is worse than no button.
+// wording once and proposed something to put there. Anything else keeps the conflict and drops the
+// button, and says which of the three reasons it was.
 export function fictionCheckRow(
-  item: { kind: string; rule: string; note: string; span: string; replacement: string; fixable?: boolean },
+  item: { kind: string; rule: string; note: string; span: string; replacement: string; fixable?: boolean; unfixableReason?: string; occurrences?: number },
   fixed: boolean,
 ): CanonCheckRow {
   if (fixed) {
     return { word: "fixed", color: JOB_COLORS.green, border: "#cbe0d1", rule: item.rule, text: `Reads "${item.replacement}" now. Changed in the draft.`, canFix: false };
   }
   if (item.kind === "conflict") {
-    return { word: "conflict", color: JOB_COLORS.amber, border: "#e8d5a8", rule: item.rule, text: item.note, canFix: Boolean(item.fixable && item.span && item.replacement) };
+    const canFix = Boolean(item.fixable && item.span && item.replacement);
+    const why = canFix ? "" : unfixableLine(item.unfixableReason ?? "", item.occurrences);
+    return { word: "conflict", color: JOB_COLORS.amber, border: "#e8d5a8", rule: item.rule, text: why ? `${item.note} ${why}`.trim() : item.note, canFix };
   }
   return { word: "holds", color: JOB_COLORS.green, border: "#cbe0d1", rule: item.rule, text: item.note, canFix: false };
 }
@@ -2646,9 +2662,19 @@ function ficStatusTone(w){
   if(w==="unwritten") return {fg:"#8a7f6d", bg:"#f4efe3", bd:"#e6dcc4"};
   return {fg:JC.amber, bg:"#fdf8ec", bd:"#e8d5a8"};
 }
+function ficUnfixableLine(reason, occurrences){
+  if(reason==="span-missing") return ${JSON.stringify(unfixableLine("span-missing"))};
+  if(reason==="span-repeats") return "I cannot fix this one for you: that wording appears "+((typeof occurrences==="number"&&occurrences>1)?occurrences+" times":"more than once")+" in the chapter, so there is no single line to change.";
+  if(reason==="no-replacement") return ${JSON.stringify(unfixableLine("no-replacement"))};
+  return "";
+}
 function ficCheckRow(item, fixed){
   if(fixed) return {word:"fixed", color:JC.green, border:"#cbe0d1", rule:item.rule, text:'Reads "'+item.replacement+'" now. Changed in the draft.', canFix:false};
-  if(item.kind==="conflict") return {word:"conflict", color:JC.amber, border:"#e8d5a8", rule:item.rule, text:item.note, canFix:!!(item.fixable && item.span && item.replacement)};
+  if(item.kind==="conflict"){
+    const canFix = !!(item.fixable && item.span && item.replacement);
+    const why = canFix ? "" : ficUnfixableLine(item.unfixableReason||"", item.occurrences);
+    return {word:"conflict", color:JC.amber, border:"#e8d5a8", rule:item.rule, text:(why ? (item.note+" "+why).trim() : item.note), canFix:canFix};
+  }
   return {word:"holds", color:JC.green, border:"#cbe0d1", rule:item.rule, text:item.note, canFix:false};
 }
 function ficCanonStamp(rep){

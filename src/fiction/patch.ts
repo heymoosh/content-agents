@@ -62,7 +62,10 @@ export function patchBody(body: string, span: string, replacement: string): stri
   const at = body.indexOf(target);
   const { start, end } = lineRange(body, at, at + target.length);
   const lines = body.split("\n");
-  const patchedRegion = lines.slice(start, end + 1).join("\n").replace(target, text);
+  // A replacer FUNCTION, never a replacement string: String.prototype.replace reads $&, $`, $' and
+  // $$ out of a plain replacement string, so a proposed rewrite containing "$&" would splice the
+  // flagged wording straight back into the line the patch was meant to clear.
+  const patchedRegion = lines.slice(start, end + 1).join("\n").replace(target, () => text);
   // Re-split ONLY the lines the span touched, so a two-sentence replacement still lands one
   // sentence per line and the rest of the chapter keeps its exact bytes.
   const rewritten = oneSentencePerLine(patchedRegion);

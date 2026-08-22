@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -980,4 +980,84 @@ test("chapterSnapshot reads every chapter's prose, and an empty series is an emp
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ── Fiction dedupe identity (audit finding) ─────────────────────────────────────────────────────
+// The dedupe used to match ANY queued or running fiction-draft job for the series, so a queued
+// first pass swallowed a chapter-3 second pass: the route answered ok with that unrelated job and
+// the second pass Muxin asked for never ran. Two second passes on different chapters collided the
+// same way. Identity is the whole request now.
+const dj = (over: Record<string, unknown> = {}) =>
+  ({ id: "j", kind: "fiction-draft", label: "l", status: "queued", ...over }) as never;
+
+test("findFictionDupe matches only the same request, never a different one", () => {
+  const first = dj({ id: "j1", payload: { mode: "draft", series: "a-series", beats: "b" } });
+  const list = [first] as never[];
+
+  // The same press twice is still one job.
+  assert.equal(findFictionDupe(list, { kind: "fiction-draft", series: "a-series", mode: "draft" })?.id, "j1");
+  // A second pass is NOT that draft, and must queue on its own.
+  assert.equal(findFictionDupe(list, { kind: "fiction-draft", series: "a-series", mode: "repass", chapter: 3 }), undefined);
+  // A different series never matches.
+  assert.equal(findFictionDupe(list, { kind: "fiction-draft", series: "b-series", mode: "draft" }), undefined);
+  // A different kind never matches.
+  assert.equal(findFictionDupe(list, { kind: "fiction-continuity", series: "a-series" }), undefined);
+});
+
+test("findFictionDupe keeps second passes on different chapters apart", () => {
+  const list = [dj({ id: "j3", status: "running", payload: { mode: "repass", series: "a-series", chapter: 3 } })] as never[];
+  assert.equal(findFictionDupe(list, { kind: "fiction-draft", series: "a-series", mode: "repass", chapter: 3 })?.id, "j3");
+  assert.equal(findFictionDupe(list, { kind: "fiction-draft", series: "a-series", mode: "repass", chapter: 5 }), undefined);
+  assert.equal(findFictionDupe(list, { kind: "fiction-draft", series: "a-series", mode: "draft" }), undefined);
+});
+
+test("findFictionDupe only ever matches a job still in flight", () => {
+  for (const status of ["done", "failed", "blocked"]) {
+    const list = [dj({ id: "old", status, payload: { mode: "draft", series: "a-series" } })] as never[];
+    assert.equal(findFictionDupe(list, { kind: "fiction-draft", series: "a-series", mode: "draft" }), undefined, status);
+  }
+});
+
+test("findFictionDupe reads a continuity job by series and chapter", () => {
+  const list = [
+    { id: "c3", kind: "fiction-continuity", label: "l", status: "running", payload: { series: "a-series", chapter: 3 } },
+  ] as never[];
+  assert.equal(findFictionDupe(list, { kind: "fiction-continuity", series: "a-series", chapter: 3 })?.id, "c3");
+  assert.equal(findFictionDupe(list, { kind: "fiction-continuity", series: "a-series", chapter: 4 }), undefined);
+});
+
+// ── "Do not touch git" is verified, not just asked for (audit finding) ──────────────────────────
+// The dispatch prompt tells the headless /story run not to branch, commit, push or open a PR, and
+// the run holds acceptEdits with Bash reachable (it needs `npm run story:validate`). A prompt is a
+// request, so the outcome is checked instead: git before, git after, and a loud failure if anything
+// moved. Nothing is ever reverted.
+const gs = (over: Partial<GitState> = {}): GitState =>
+  ({ head: "abc123", branch: "main", branches: "refs/heads/main", ...over });
+
+test("gitStateDrift says nothing when git stands exactly where it did", () => {
+  assert.equal(gitStateDrift(gs(), gs()), null);
+  // No reading to compare (not a checkout, or git missing) is not a violation.
+  assert.equal(gitStateDrift(null, gs()), null);
+  assert.equal(gitStateDrift(gs(), null), null);
+});
+
+test("gitStateDrift catches a commit, a checkout and a new branch, and names each one", () => {
+  const committed = gitStateDrift(gs(), gs({ head: "def456" }));
+  assert.match(String(committed), /committed something/);
+  const switched = gitStateDrift(gs(), gs({ branch: "story/chapter-02" }));
+  assert.match(String(switched), /switched the branch from main to story\/chapter-02/);
+  const branched = gitStateDrift(gs(), gs({ branches: "refs/heads/main\nrefs/heads/story/chapter-02" }));
+  assert.match(String(branched), /created story\/chapter-02/);
+});
+
+test("gitStateDrift reports the whole /story step 7 at once and never offers to undo it", () => {
+  const all = String(gitStateDrift(
+    gs(),
+    gs({ head: "def456", branch: "story/chapter-02", branches: "refs/heads/main\nrefs/heads/story/chapter-02" }),
+  ));
+  assert.match(all, /switched the branch/);
+  assert.match(all, /committed something/);
+  assert.match(all, /created story\/chapter-02/);
+  assert.match(all, /Nothing was undone for you/);
+  assert.ok(!/\u2014/.test(all), "no em dash in copy Muxin reads");
 });

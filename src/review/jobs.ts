@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
 import { appendRow, readQueue, stampOrigin } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
@@ -1090,21 +1090,44 @@ export function fictionRunProduced(
   return now !== was ? target : null;
 }
 
-export function addFictionDraftJob(seriesArg: string, beats: string): Job {
+// Which queued-or-running fiction job a new request is a duplicate of. Pure over the list so the
+// identity rule is unit-testable without pushing a job (a pushed job starts a real `claude` spawn).
+//
+// Identity is the WHOLE request, not the series. Matching on kind and series alone meant a queued
+// first-pass draft swallowed a chapter-3 second pass, and a chapter-3 second pass swallowed a
+// chapter-5 one: the route answered ok with somebody else's job and the run Muxin asked for never
+// happened.
+export function findFictionDupe(
+  list: Job[],
+  want: { kind: Job["kind"]; series: string; mode?: string; chapter?: number },
+): Job | undefined {
+  return list.find((j) => {
+    if (j.kind !== want.kind) return false;
+    if (j.status !== "queued" && j.status !== "running") return false;
+    const p = j.payload ?? {};
+    if (p.series !== want.series) return false;
+    if (want.mode !== undefined && (p.mode ?? "draft") !== want.mode) return false;
+    if (want.chapter !== undefined && p.chapter !== want.chapter) return false;
+    return true;
+  });
+}
+
+export function addFictionDraftJob(seriesArg: string, beats: string): { job: Job; queued: boolean } {
   const dir = resolveSeriesDir(seriesArg); // throws on an unknown series before anything is queued
   const slug = basename(dir);
   if (!beats.trim()) throw new Error("say the beats first");
-  const existing = jobs.find(
-    (j) => j.kind === "fiction-draft" && j.payload?.series === slug && (j.status === "queued" || j.status === "running"),
-  );
-  if (existing) return existing; // idempotent against a double-click, like addVideoJob
+  const existing = findFictionDupe(jobs, { kind: "fiction-draft", series: slug, mode: "draft" });
+  // Idempotent against a double-click, like addVideoJob. `queued: false` tells the route this run
+  // is somebody else's already in flight, so it must not overwrite the beats anchor with beats the
+  // running job never received.
+  if (existing) return { job: existing, queued: false };
   const job: Job = {
     id: nextJobId(), kind: "fiction-draft", label: `Draft a scene: ${slug}`, arg: slug, ...freshJobFields(),
     payload: { mode: "draft", series: slug, beats: beats.trim() },
   };
   jobs.push(job);
   void drain();
-  return job;
+  return { job, queued: true };
 }
 
 export function addFictionRepassJob(seriesArg: string, chapter: number, note: string): Job {
@@ -1112,9 +1135,7 @@ export function addFictionRepassJob(seriesArg: string, chapter: number, note: st
   const slug = basename(dir);
   if (!note.trim()) throw new Error("say what to change first");
   if (!chapterNumbers(dir).includes(chapter)) throw new Error(`there is no chapter ${chapter} to run again`);
-  const existing = jobs.find(
-    (j) => j.kind === "fiction-draft" && j.payload?.series === slug && (j.status === "queued" || j.status === "running"),
-  );
+  const existing = findFictionDupe(jobs, { kind: "fiction-draft", series: slug, mode: "repass", chapter });
   if (existing) return existing;
   const job: Job = {
     id: nextJobId(), kind: "fiction-draft", label: `Second pass: ${slug} chapter ${chapter}`, arg: slug, ...freshJobFields(),
@@ -1129,11 +1150,7 @@ export function addFictionCheckJob(seriesArg: string, chapter: number): Job {
   const dir = resolveSeriesDir(seriesArg);
   const slug = basename(dir);
   if (!chapterNumbers(dir).includes(chapter)) throw new Error(`there is no chapter ${chapter} to check`);
-  const existing = jobs.find(
-    (j) =>
-      j.kind === "fiction-continuity" && j.payload?.series === slug && j.payload?.chapter === chapter &&
-      (j.status === "queued" || j.status === "running"),
-  );
+  const existing = findFictionDupe(jobs, { kind: "fiction-continuity", series: slug, chapter });
   if (existing) return existing;
   const job: Job = {
     id: nextJobId(), kind: "fiction-continuity", label: `Check the canon: ${slug} chapter ${chapter}`,
@@ -1144,11 +1161,53 @@ export function addFictionCheckJob(seriesArg: string, chapter: number): Job {
   return job;
 }
 
+// ── The "do not touch git" rule, enforced rather than asked for ─────────────────────────────────
+// The /story skill's step 7 commits the chapter on a branch and opens a draft PR, and the dispatch
+// prompt tells the headless run not to. A prompt is a request. The run holds `acceptEdits` and it
+// legitimately needs Bash for `npm run story:validate`, so no tool filter can take git away from it
+// without also taking the validate step away. What CAN be enforced is the outcome: read where git
+// stands before the run and again after, and fail the job loudly if anything moved. That covers
+// every route to the same damage (a commit, a checkout, a new branch) instead of naming commands.
+//
+// It never reverts. Rewinding somebody's checkout to clean up after a bad run is a worse failure
+// than the one it fixes; the job reports exactly what moved and leaves it to Muxin.
+export interface GitState {
+  head: string; // HEAD commit sha
+  branch: string; // current branch name, or "HEAD" when detached
+  branches: string; // every local branch, newline joined
+}
+
+export function readGitState(cwd: string = repoRoot): GitState | null {
+  const run = (args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", timeout: 15_000 }).trim();
+  try {
+    return {
+      head: run(["rev-parse", "HEAD"]),
+      branch: run(["rev-parse", "--abbrev-ref", "HEAD"]),
+      branches: run(["for-each-ref", "--format=%(refname)", "refs/heads"]),
+    };
+  } catch {
+    return null; // not a git checkout, or git is unavailable: there is nothing to compare
+  }
+}
+
+// Pure: what moved, in Muxin's words. Null when git stands exactly where it did.
+export function gitStateDrift(before: GitState | null, after: GitState | null): string | null {
+  if (!before || !after) return null;
+  const moved: string[] = [];
+  if (before.branch !== after.branch) moved.push(`it switched the branch from ${before.branch} to ${after.branch}`);
+  if (before.head !== after.head) moved.push("it committed something");
+  const fresh = after.branches.split("\n").filter((b) => b && !before.branches.split("\n").includes(b));
+  if (fresh.length) moved.push(`it created ${fresh.map((b) => b.replace("refs/heads/", "")).join(", ")}`);
+  if (!moved.length) return null;
+  return `the run was told to leave git alone and did not: ${moved.join(", ")}. Nothing was undone for you, so check \`git status\` and \`git log\` before you carry on.`;
+}
+
 async function runFictionDraftJob(job: Job): Promise<void> {
   const p = job.payload ?? {};
   const mode = p.mode === "repass" ? "repass" : "draft";
   const dir = resolveSeriesDir(p.series ?? job.arg);
   const before = chapterSnapshot(dir);
+  const gitBefore = readGitState();
   const prompt =
     mode === "repass"
       ? fictionRepassPrompt(p.series ?? job.arg, p.chapter ?? 0, p.note ?? "")
@@ -1165,13 +1224,18 @@ async function runFictionDraftJob(job: Job): Promise<void> {
     includeTailOnTimeout: true,
   });
   const produced = fictionRunProduced(before, chapterSnapshot(dir), mode, p.chapter);
-  job.status = !failure && produced !== null ? "done" : "failed";
+  const drift = gitStateDrift(gitBefore, readGitState());
+  job.status = !failure && produced !== null && !drift ? "done" : "failed";
   if (produced === null || job.status !== "done") {
+    // A chapter that landed AND git that moved is both facts at once, and the run still failed.
+    const landed = produced === null ? "" : ` Chapter ${produced} was written, so the prose is on disk.`;
     job.error =
       failure ??
-      (mode === "repass"
-        ? `the second pass ran but chapter ${p.chapter} did not change, so nothing was written${logTailSuffix(job.id)}`
-        : `it ran but wrote no new chapter file, so nothing was written${logTailSuffix(job.id)}`);
+      (drift
+        ? `${drift}${landed}${logTailSuffix(job.id)}`
+        : mode === "repass"
+          ? `the second pass ran but chapter ${p.chapter} did not change, so nothing was written${logTailSuffix(job.id)}`
+          : `it ran but wrote no new chapter file, so nothing was written${logTailSuffix(job.id)}`);
     return;
   }
   const chapter: number = produced;

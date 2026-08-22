@@ -106,13 +106,27 @@ export function listFictionSeries(root: string = STORIES_ROOT): FictionSeries[] 
   return out;
 }
 
+// The ONE slug gate. Every fiction path that turns a client-supplied series name into a directory
+// goes through this: resolveDoc below, the beats anchor, and listChapters. A caller that joins
+// `slug` onto a root itself is a fourth variant waiting to drift, which is how GET
+// /api/fiction/scene ended up reading any chapters/ directory on the disk.
+export function seriesDirFor(slug: string, root: string = STORIES_ROOT): string {
+  if (!/^[a-z0-9][\w-]*$/.test(slug)) throw new Error("bad series");
+  return join(root, slug);
+}
+
+// A series' chapter list BY SLUG, gated. The by-directory `chapterDocs` above stays for callers
+// that already hold a resolved directory.
+export function listChapters(slug: string, root: string = STORIES_ROOT): FictionDoc[] {
+  return chapterDocs(seriesDirFor(slug, root));
+}
+
 // The path-traversal guard every doc read/write funnels through: the requested path must be one
 // this series' own enumeration actually produced — never a client-invented path. Chapter paths go
 // through the SAME guard, so "chapters/../../.env" is rejected for exactly the reason
 // "../../.env" always was: it is not in the list.
 export function resolveDoc(slug: string, path: string, root: string = STORIES_ROOT): { abs: string; doc: FictionDoc } {
-  if (!/^[a-z0-9][\w-]*$/.test(slug)) throw new Error("bad series");
-  const seriesDir = join(root, slug);
+  const seriesDir = seriesDirFor(slug, root);
   const doc = [...seriesDocs(seriesDir), ...chapterDocs(seriesDir)].find((d) => d.path === path);
   if (!doc) throw new Error("no such canon doc");
   return { abs: join(seriesDir, doc.path), doc };
@@ -154,8 +168,7 @@ export interface SceneBeats {
 }
 
 function beatsPath(slug: string, root: string): string {
-  if (!/^[a-z0-9][\w-]*$/.test(slug)) throw new Error("bad series");
-  return join(root, `${slug}.json`);
+  return `${seriesDirFor(slug, root)}.json`; // same gate as every other slug-to-path join
 }
 
 export function readSceneBeats(slug: string, root: string = BEATS_ROOT): SceneBeats | null {
@@ -193,9 +206,19 @@ export function readFictionDoc(slug: string, path: string, root: string = STORIE
   return { doc, body: readFileSync(abs, "utf8") };
 }
 
+// Why the desk will not write this doc, said accurately per doc. A chapter is not an append-only
+// ledger and /story lock does not write it, so it gets its own sentence naming what does: the
+// scoped span patch here, and the /story flow in GitHub for everything else.
+export function refuseSave(doc: FictionDoc): string {
+  if (doc.chapter !== undefined) {
+    return `${doc.label} is a chapter draft, and this desk does not write chapters. Fix the line changes one flagged span; every other edit goes through /story and your GitHub flow.`;
+  }
+  return `${doc.label} is append-only. /story lock writes it, not this desk.`;
+}
+
 export function saveFictionDoc(slug: string, path: string, body: string, root: string = STORIES_ROOT): void {
   const { abs, doc } = resolveDoc(slug, path, root);
-  if (!doc.editable) throw new Error(`${doc.label} is append-only — /story lock writes it, not this desk`);
+  if (!doc.editable) throw new Error(refuseSave(doc));
   if (!body.trim()) throw new Error("refusing to save an empty canon doc");
   writeFileSync(abs, body.replace(/\n*$/, "\n"));
 }

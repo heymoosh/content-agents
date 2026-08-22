@@ -21,8 +21,10 @@ import { buildContext } from "./context.js";
 // reading of a draft in progress, not canon, and canon.md stays the only ledger.
 //
 // Every finding carries the exact span it flags, verbatim from the chapter, so patch.ts can find
-// that one span and rewrite it in place. A finding whose span is not findable exactly once is
-// downgraded to a hold: there is no single line to fix, so offering a fix would be a dead end.
+// that one span and rewrite it in place. A finding whose span is not findable exactly once keeps
+// its severity and loses only the fix: it stays a conflict, it still counts as breaking, and it
+// carries the reason nobody can patch it. Downgrading it to a hold would tell Muxin a chapter is
+// clear while it still breaks canon.
 
 const execFileP = promisify(execFile);
 const CHECK_TIMEOUT_MS = 240_000;
@@ -30,6 +32,10 @@ const CHECK_TIMEOUT_MS = 240_000;
 export const CONTINUITY_ROOT = join(homedir(), ".content-agents", "fiction-continuity");
 
 export type ContinuityKind = "conflict" | "hold";
+
+// Why "Fix the line" is not on offer for a finding. "" means the fix IS on offer, or the finding
+// is a hold and was never a candidate for one.
+export type ContinuityUnfixable = "" | "span-missing" | "span-repeats" | "no-replacement";
 
 export interface ContinuityItem {
   kind: ContinuityKind;
@@ -40,6 +46,7 @@ export interface ContinuityItem {
   note: string; // written to Muxin, one or two sentences
   occurrences: number; // how many times `span` appears in the chapter body
   fixable: boolean; // exactly one occurrence AND a usable replacement
+  unfixableReason: ContinuityUnfixable; // why a conflict cannot be patched; "" when it can
 }
 
 export interface ContinuityReport {
@@ -151,12 +158,22 @@ export function extractJsonObject(raw: string): string | null {
   return text.slice(start, end + 1);
 }
 
+// Which of the three things stops "Fix the line" from being offered. Order matters: a span the
+// patch cannot locate is the first thing to say, because the replacement is moot without it.
+export function unfixableReason(occurrences: number, usableReplacement: boolean): ContinuityUnfixable {
+  if (occurrences === 0) return "span-missing";
+  if (occurrences > 1) return "span-repeats";
+  return usableReplacement ? "" : "no-replacement";
+}
+
 // Turn the model's answer into findings, sorted into conflicts and holds.
 //
-// Two downgrades happen here, both deliberate, because "Fix the line" must never be a dead click:
-// a conflict whose span is not present exactly once has no single line to patch, and a conflict
-// whose replacement is empty or carries an em dash has nothing safe to write. Either way the
-// finding is still worth showing, so it becomes a hold rather than being dropped.
+// A conflict the patch cannot apply LOSES THE FIX AND KEEPS THE SEVERITY. Two things make a
+// conflict unpatchable: its span is not present in the chapter exactly once, so there is no single
+// line to change, or its replacement is empty, unchanged or carries an em dash, so there is nothing
+// safe to write. Either way it is still a contradiction with canon, so it stays a conflict, it
+// still counts as breaking in the stamp, and it records why the fix is off the table. It used to
+// become a hold, which read as green on the rail and let a chapter that broke canon look cleared.
 export function parseContinuityResponse(raw: string, chapterBody: string): { rulesRead: number; holds: ContinuityItem[]; conflicts: ContinuityItem[] } {
   const json = extractJsonObject(raw);
   if (!json) throw new Error("the canon check returned nothing that parses as findings");
@@ -182,9 +199,9 @@ export function parseContinuityResponse(raw: string, chapterBody: string): { rul
     const occurrences = countOccurrences(chapterBody, span);
     const usableReplacement = Boolean(replacement) && !hasEmDash(replacement) && replacement !== span;
     const fixable = occurrences === 1 && usableReplacement;
-    const declared = str(o.kind) === "conflict" ? "conflict" : "hold";
+    const kind: ContinuityKind = str(o.kind) === "conflict" ? "conflict" : "hold";
     const item: ContinuityItem = {
-      kind: declared === "conflict" && fixable ? "conflict" : "hold",
+      kind,
       rule: rule || "unnamed rule",
       span,
       canonSays: str(o.canon_says),
@@ -192,6 +209,7 @@ export function parseContinuityResponse(raw: string, chapterBody: string): { rul
       note,
       occurrences,
       fixable,
+      unfixableReason: kind === "conflict" ? unfixableReason(occurrences, usableReplacement) : "",
     };
     (item.kind === "conflict" ? conflicts : holds).push(item);
   }

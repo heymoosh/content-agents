@@ -94,7 +94,7 @@ import { getAnalyst } from "../providers/registry.js";
 import { readSignals, appendBacklogCard } from "./signals.js";
 import {
   listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory,
-  readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats, chapterDocs,
+  readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats, listChapters,
 } from "./fiction.js";
 import { patchChapterSpan } from "../fiction/patch.js";
 import { readContinuityReport } from "../fiction/continuity.js";
@@ -1010,7 +1010,9 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/fiction/scene") {
       try {
         const slug = url.searchParams.get("series") ?? "";
-        const chapters = chapterDocs(join(repoRoot, "stories", slug));
+        // listChapters runs the same slug gate resolveDoc does. Joining the raw query param onto
+        // stories/ here let "../.." walk out and list any chapters/ directory on the disk.
+        const chapters = listChapters(slug);
         const beats = readSceneBeats(slug);
         const asked = Number(url.searchParams.get("chapter") ?? "");
         const latest = chapters.length ? (chapters[chapters.length - 1].chapter as number) : null;
@@ -1035,8 +1037,13 @@ const server = createServer(async (req, res) => {
       try {
         const slug = String(b.series ?? "");
         const beats = String(b.beats ?? "");
-        saveSceneBeats(slug, beats); // the anchor survives a reload, before the job even starts
-        json(res, 200, { ok: true, job: publicJob(addFictionDraftJob(slug, beats)) });
+        const { job, queued } = addFictionDraftJob(slug, beats);
+        // The anchor survives a reload, so it is written here rather than left in the page. Only
+        // for a run that actually queued: a deduped press returns the draft already in flight, and
+        // moving the anchor to beats that run never received would show Muxin one set of beats
+        // above prose written from another.
+        if (queued) saveSceneBeats(slug, beats);
+        json(res, 200, { ok: true, job: publicJob(job) });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }

@@ -96,3 +96,22 @@ test("patchChapterSpan refuses a chapter that is not there", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// The replacement is a model's proposed prose, so it must land as literal text. String.prototype
+// .replace reads $&, $`, $' and $$ out of a replacement STRING even when the pattern is a plain
+// string, which would have spliced the flagged wording straight back into the line the patch was
+// meant to clear (or dropped a stray $ into Muxin's chapter).
+test("a replacement carrying $ tokens lands verbatim, never as a substitution pattern", () => {
+  const dollar = "He felt $& and $` and $' and $$ at once.";
+  const out = patchBody(BODY, "That was when he felt it.", dollar);
+  assert.ok(out.includes(dollar), "the replacement must reach the chapter exactly as written");
+  assert.ok(!out.includes("That was when he felt it."), "$& must not restore the flagged wording");
+  assert.ok(!out.includes("The airlock was quiet.He"), "$` must not splice the text before the span");
+});
+
+test("each $ token on its own stays literal", () => {
+  for (const text of ["Cost him $$ and a hand.", "He felt $& nothing.", "Behind him: $` silence.", "Ahead: $' nothing."]) {
+    const out = patchBody(BODY, "That was when he felt it.", text);
+    assert.ok(out.includes(text), `mangled: ${text}`);
+  }
+});

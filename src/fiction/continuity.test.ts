@@ -13,6 +13,7 @@ import {
   continuityReportPath,
   readContinuityReport,
   CONTINUITY_STEPS,
+  unfixableReason,
 } from "./continuity.js";
 
 const BODY = [
@@ -62,36 +63,73 @@ test("parses a well-formed model response into conflicts and holds", () => {
   assert.equal(r.holds[0].fixable, false);
 });
 
-test("a conflict whose span is not in the chapter degrades to an unfixable hold", () => {
+// A conflict the patch cannot apply keeps its severity and loses only the button. The first two
+// tests here used to assert the opposite (the parser rewrote such a conflict into a "hold"), which
+// is how a chapter that still broke canon could read as green on the rail and be counted as
+// "holding" in the canon stamp. That was the bug; this is the contract.
+
+test("a conflict whose span is not in the chapter stays a conflict and says why it cannot be fixed", () => {
   const raw = JSON.stringify({
     items: [{ kind: "conflict", rule: "a rule", span: "a line that was never written", replacement: "something", note: "n" }],
   });
   const r = parseContinuityResponse(raw, BODY);
-  assert.equal(r.conflicts.length, 0);
-  assert.equal(r.holds.length, 1);
-  assert.equal(r.holds[0].fixable, false);
-  assert.equal(r.holds[0].replacement, "", "an unfixable finding must not carry a replacement Fix the line cannot apply");
+  assert.equal(r.conflicts.length, 1, "an unfixable conflict is still a conflict, never a hold");
+  assert.equal(r.holds.length, 0);
+  assert.equal(r.conflicts[0].kind, "conflict");
+  assert.equal(r.conflicts[0].fixable, false);
+  assert.equal(r.conflicts[0].unfixableReason, "span-missing");
+  assert.equal(r.conflicts[0].replacement, "", "an unfixable finding must not carry a replacement Fix the line cannot apply");
 });
 
-test("a conflict whose span appears twice degrades too, because there is no single line to fix", () => {
+test("a conflict whose span appears twice stays a conflict, because ambiguity is not agreement", () => {
   const twice = "He did not speak.\nSomething moved.\nHe did not speak.";
   const raw = JSON.stringify({
     items: [{ kind: "conflict", rule: "a rule", span: "He did not speak.", replacement: "He said nothing.", note: "n" }],
   });
   const r = parseContinuityResponse(raw, twice);
-  assert.equal(r.conflicts.length, 0);
-  assert.equal(r.holds[0].occurrences, 2);
-  assert.equal(r.holds[0].fixable, false);
+  assert.equal(r.conflicts.length, 1);
+  assert.equal(r.holds.length, 0);
+  assert.equal(r.conflicts[0].occurrences, 2);
+  assert.equal(r.conflicts[0].fixable, false);
+  assert.equal(r.conflicts[0].unfixableReason, "span-repeats");
 });
 
-test("a replacement carrying an em dash is never offered as a fix", () => {
+test("two unfixable conflicts both stay breaking, so the report cannot read as cleared", () => {
+  const twice = "He did not speak.\nSomething moved.\nHe did not speak.\nThe hatch held.\nThe hatch held.";
   const raw = JSON.stringify({
-    items: [{ kind: "conflict", rule: "a rule", span: "That was when he felt it.", replacement: "That was when he felt it — cold.", note: "n" }],
+    items: [
+      { kind: "conflict", rule: "one", span: "He did not speak.", replacement: "He said nothing.", note: "n" },
+      { kind: "conflict", rule: "two", span: "The hatch held.", replacement: "The hatch gave.", note: "n" },
+    ],
+  });
+  const r = parseContinuityResponse(raw, twice);
+  assert.equal(r.conflicts.length, 2, "both contradictions are still contradictions");
+  assert.equal(r.holds.length, 0, "nothing here is holding");
+});
+
+test("a declared hold stays a hold, and a fixable conflict carries no unfixable reason", () => {
+  const r = parseContinuityResponse(wellFormed(), BODY);
+  assert.equal(r.holds[0].kind, "hold");
+  assert.equal(r.holds[0].unfixableReason, "");
+  assert.equal(r.conflicts[0].unfixableReason, "");
+});
+
+test("unfixableReason names which of the three things blocked the fix", () => {
+  assert.equal(unfixableReason(0, true), "span-missing");
+  assert.equal(unfixableReason(2, true), "span-repeats");
+  assert.equal(unfixableReason(1, false), "no-replacement");
+  assert.equal(unfixableReason(1, true), "");
+});
+
+test("a replacement carrying an em dash is never offered as a fix, and never softens the finding", () => {
+  const raw = JSON.stringify({
+    items: [{ kind: "conflict", rule: "a rule", span: "That was when he felt it.", replacement: "That was when he felt it \u2014 cold.", note: "n" }],
   });
   const r = parseContinuityResponse(raw, BODY);
-  assert.equal(r.conflicts.length, 0);
-  assert.equal(r.holds[0].fixable, false);
-  assert.ok(hasEmDash("a — b"));
+  assert.equal(r.conflicts.length, 1);
+  assert.equal(r.conflicts[0].fixable, false);
+  assert.equal(r.conflicts[0].unfixableReason, "no-replacement");
+  assert.ok(hasEmDash("a \u2014 b"));
   assert.ok(!hasEmDash("a, b"));
 });
 

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import {
   listFictionSeries, resolveDoc, saveFictionDoc, readFictionDoc,
   readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats,
+  listChapters, seriesDirFor, refuseSave,
 } from "./fiction.js";
 
 function tmpSeries(): string {
@@ -106,13 +107,26 @@ test("the path-traversal guard covers the new chapter paths too", () => {
   }
 });
 
-test("a chapter is never saveable through the desk, so nothing regenerates a whole file here", () => {
+// A chapter is not an append-only ledger and /story lock does not write it, so it must not borrow
+// canon.md's refusal. The only write into a chapter is the scoped span patch, and the refusal has
+// to say so or it teaches Muxin something false about her own repo.
+test("a chapter's refusal names what actually writes a chapter, and never calls it append-only", () => {
   const root = tmpSeriesWithChapters();
   try {
     assert.throws(
       () => saveFictionDoc("the-least-of-us", "chapters/chapter-01.md", "rewritten", root),
-      /append-only|is append/,
+      (e: unknown) => {
+        const m = (e as Error).message;
+        assert.ok(!/append-only/.test(m), "a chapter is not an append-only ledger: " + m);
+        assert.ok(!/story lock writes it/.test(m), "/story lock does not write a chapter: " + m);
+        assert.ok(/chapter draft/.test(m) && /Fix the line/.test(m) && /\/story/.test(m), m);
+        assert.ok(!/\u2014/.test(m), "no em dash in copy Muxin reads: " + m);
+        return true;
+      },
     );
+    // canon.md keeps its own refusal, minus the em dash it used to carry.
+    assert.throws(() => saveFictionDoc("the-least-of-us", "canon.md", "x", root), /append-only/);
+    assert.ok(!/\u2014/.test(refuseSave({ id: "canon", label: "Canon ledger (append-only)", path: "canon.md", editable: false })));
     assert.equal(readFictionDoc("the-least-of-us", "chapters/chapter-01.md", root).body.includes("The airlock was quiet."), true);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -131,6 +145,24 @@ test("scene beats survive a reload, and starting a different scene drops the anc
     assert.equal(readSceneBeats("the-least-of-us", root), null);
     assert.throws(() => saveSceneBeats("the-least-of-us", "   ", null, root), /say the beats/);
     assert.throws(() => saveSceneBeats("../escape", "beats", null, root), /bad series/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// GET /api/fiction/scene used to join its `series` query param onto stories/ by hand, so
+// ?series=../.. read any chapters/ directory on the disk and leaked its chapter titles. Every
+// slug-to-path join now runs through the one gate.
+test("listChapters and seriesDirFor refuse a traversing series name", () => {
+  const root = tmpSeriesWithChapters();
+  try {
+    assert.deepEqual(listChapters("the-least-of-us", root).map((c) => c.path), ["chapters/chapter-01.md", "chapters/chapter-02.md"]);
+    for (const bad of ["../..", "../etc", "..%2f..", "/etc", "the-least-of-us/../..", ".", ""]) {
+      assert.throws(() => listChapters(bad, root), /bad series/, `traversal not refused: ${bad}`);
+      assert.throws(() => seriesDirFor(bad, root), /bad series/, `traversal not refused: ${bad}`);
+    }
+    // An unknown but well-formed series is empty, not an error: there is simply nothing there.
+    assert.deepEqual(listChapters("no-such-series", root), []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
