@@ -8,11 +8,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { appendBaseline, baselineIndex, buildBaseline, loadBaselineIndex, readBaselines } from "./baselines.js";
-import { baselineMultiple, classifyOutlier, isWinnersOnlySample, recordedBaselineMultiple } from "./outliers.js";
+import {
+  baselineMultiple,
+  classifyOutlier,
+  engagementScore,
+  isWinnersOnlySample,
+  median,
+  recordedBaselineMultiple,
+} from "./outliers.js";
 import { isEligibleBaselinePost, parseListing, toBaselineSample, toStagedEntry } from "./reddit.js";
 import { buildOpeners } from "./openers.js";
 import { accountKey } from "./corpus.js";
-import type { AccountBaseline, CorpusEntry, OutlierThresholds } from "./types.js";
+import type { AccountBaseline, BaselineTerm, CorpusEntry, MediaForm, OutlierThresholds } from "./types.js";
 
 const NOW = 1787000000;
 const FIXTURES = join(import.meta.dirname, "fixtures");
@@ -65,6 +72,9 @@ describe("buildBaseline", () => {
     assert.equal(baseline.sample_size, 9);
     assert.equal(baseline.scores.length, 9);
     assert.equal(baseline.metric, "engagement");
+    // Read off the sample, never passed in: reddit publishes no view count and no share count, so
+    // those terms are absent and the median counts exactly what was there.
+    assert.deepEqual(baseline.terms, ["likes", "comments"]);
     assert.equal(baseline.followers, 1234567);
     assert.ok(baseline.window_start && baseline.window_end && baseline.window_start <= baseline.window_end);
   });
@@ -155,10 +165,17 @@ describe("the multiple this change exists to fix", () => {
     assert.ok(verdict.multiple !== null);
   });
 
-  test("a baseline measured on the other metric is refused rather than divided in", () => {
-    const baseline = { ...fixtureBaseline(), metric: "views" as const };
-    // The winners are scored on engagement, because reddit publishes no view count.
+  test("a baseline measured on a count the post does not carry is refused, not divided in", () => {
+    // A share-counting median cannot be divided into a reddit post, which has no share count.
+    // Refusing is the point: a multiple across two different term sets is not a smaller error
+    // than no multiple at all.
+    const baseline = { ...fixtureBaseline(), terms: ["likes", "comments", "shares"] as BaselineTerm[] };
     assert.equal(recordedBaselineMultiple(fixtureWinners(null)[0], baseline), null);
+  });
+
+  test("a record written before terms existed cannot be divided into anything", () => {
+    const { terms: _dropped, ...legacy } = fixtureBaseline();
+    assert.equal(recordedBaselineMultiple(fixtureWinners(null)[0], legacy as AccountBaseline), null);
   });
 
   test("a zero median never becomes an infinite multiple", () => {
@@ -187,5 +204,96 @@ describe("the opener bank", () => {
     assert.ok(top);
     assert.equal(top.performance.multiple, null);
     assert.match(top.performance.note, /median of winners/);
+  });
+});
+
+// The second instance of the same bug class, caught before it shipped. A baseline summing two
+// terms into a winner scored on three reads as a finding and is not one.
+describe("a shares-bearing platform", () => {
+  const doc = JSON.parse(readFileSync(join(FIXTURES, "shares-platform-window.json"), "utf8")) as {
+    account: { platform: "threads"; handle: string };
+    window: Array<{ metrics: { views: number | null; likes: number; comments: number; shares: number }; posted_at: string }>;
+    winner: { metrics: { views: number | null; likes: number; comments: number; shares: number }; posted_at: string };
+  };
+
+  function winnerEntry(): CorpusEntry {
+    return {
+      id: "threads-fixturecreator-00000000",
+      platform: doc.account.platform,
+      handle: doc.account.handle,
+      creator: "Fixture Creator",
+      niche: "adhd",
+      url: "https://example.com/threads/winner",
+      posted_at: doc.winner.posted_at,
+      collected_at: "2026-08-23T12:00:00.000Z",
+      kind: "text",
+      body: "invented",
+      transcript_source: null,
+      metrics: { ...doc.winner.metrics, followers: null },
+      media: {
+        form: "text-only" as MediaForm,
+        onscreen_text: null,
+        description: "fixture",
+        duration_seconds: null,
+        media_count: null,
+        has_captions: null,
+        aspect: null,
+        body_is_complete: true,
+      },
+      sample: { listing: "top", window: null, rank: 1, role: "winner" },
+    };
+  }
+
+  const baseline = buildBaseline(doc.account, doc.window, {
+    followers: null,
+    method: "fixture window",
+    collected_at: "2026-08-23T12:00:00.000Z",
+  });
+
+  test("the median counts every term the window carries, shares included", () => {
+    assert.ok(baseline);
+    assert.deepEqual(baseline.terms, ["likes", "comments", "shares"]);
+    assert.equal(baseline.median, 60);
+  });
+
+  test("the old arithmetic inflated the multiple by two thirds, the new one is exact", () => {
+    assert.ok(baseline);
+    // What the old code did: a denominator summing likes and comments only, divided into a
+    // numerator that also counted shares. Reproduced here so the failure is visible, not asserted
+    // from memory.
+    const twoTermMedian = median(doc.window.map((post) => post.metrics.likes + post.metrics.comments));
+    assert.equal(twoTermMedian, 36);
+    const winner = winnerEntry();
+    const threeTermNumerator = engagementScore(winner);
+    assert.equal(threeTermNumerator, 6000);
+    const inflated = (threeTermNumerator as number) / (twoTermMedian as number);
+    assert.equal(Math.round(inflated * 100) / 100, 166.67);
+
+    // What it does now: the numerator is rebuilt from the baseline's own terms, so both sides
+    // count likes, comments and shares.
+    const honest = recordedBaselineMultiple(winner, baseline);
+    assert.ok(honest);
+    assert.equal(honest.multiple, 100);
+    assert.equal(honest.metric, "engagement");
+  });
+
+  test("a sample where only some posts carry shares drops that term from both sides", () => {
+    // All-or-nothing per term. A median built from some posts' shares and other posts' silence is
+    // not a median of anything, so shares leaves the term list and the numerator loses it too.
+    const patchy = doc.window.map((post, index) => ({
+      ...post,
+      metrics: { ...post.metrics, shares: index === 0 ? null : post.metrics.shares },
+    }));
+    const mixed = buildBaseline(doc.account, patchy, {
+      followers: null,
+      method: "fixture window",
+      collected_at: "2026-08-23T12:00:00.000Z",
+    });
+    assert.ok(mixed);
+    assert.deepEqual(mixed.terms, ["likes", "comments"]);
+    assert.equal(mixed.median, 36);
+    const honest = recordedBaselineMultiple(winnerEntry(), mixed);
+    // 3000 likes plus 600 comments over 36, with shares left out of BOTH sides.
+    assert.equal(Math.round((honest?.multiple ?? 0) * 100) / 100, 100);
   });
 });

@@ -1,0 +1,70 @@
+{
+ "note": "Invented numbers for a shares-bearing platform. No real post, no real account.",
+ "account": {
+  "platform": "threads",
+  "handle": "@fixturecreator"
+ },
+ "window": [
+  {
+   "metrics": {
+    "views": null,
+    "likes": 10,
+    "comments": 2,
+    "shares": 8
+   },
+   "posted_at": "2026-08-10"
+  },
+  {
+   "metrics": {
+    "views": null,
+    "likes": 20,
+    "comments": 4,
+    "shares": 16
+   },
+   "posted_at": "2026-08-11"
+  },
+  {
+   "metrics": {
+    "views": null,
+    "likes": 30,
+    "comments": 6,
+    "shares": 24
+   },
+   "posted_at": "2026-08-12"
+  },
+  {
+   "metrics": {
+    "views": null,
+    "likes": 40,
+    "comments": 8,
+    "shares": 32
+   },
+   "posted_at": "2026-08-13"
+  },
+  {
+   "metrics": {
+    "views": null,
+    "likes": 50,
+    "comments": 10,
+    "shares": 40
+   },
+   "posted_at": "2026-08-14"
+  }
+ ],
+ "winner": {
+  "metrics": {
+   "views": null,
+   "likes": 3000,
+   "comments": 600,
+   "shares": 2400
+  },
+  "posted_at": "2026-06-01"
+ },
+ "arithmetic": {
+  "three_term_median": 60,
+  "two_term_median": 36,
+  "winner_three_term": 6000,
+  "honest_multiple": 100,
+  "old_inflated_multiple": 166.67
+ }
+}

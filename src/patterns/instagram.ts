@@ -379,11 +379,23 @@ export function toStagedEntries(
 export function toBaselineSample(window: IgMedia[]): BaselineSamplePost[] {
   const sample: BaselineSamplePost[] = [];
   for (const media of window) {
-    const engagement = engagementOf(media);
-    if (engagement === null) continue;
-    // score carries the whole engagement figure and comments is left null on purpose, because
-    // sampleEngagement() adds the two and the comment count is already inside score here.
-    sample.push({ score: engagement, comments: null, posted_at: postedDate(media) });
+    if (engagementOf(media) === null) continue;
+    // The raw counts, not a pre-summed figure. buildBaseline decides which of them the median is
+    // measured on and records that decision in `terms`, and the winner's numerator is then built
+    // from those same terms. Summing here would let the two sides drift apart again.
+    //
+    // `views` is null even on a Reel that has one, deliberately: Meta returns view_count for Reels
+    // only, so a views median over a mixed window would be measuring two quantities and calling
+    // them one. Instagram exposes no share count at all through business_discovery.
+    sample.push({
+      metrics: {
+        views: null,
+        likes: typeof media.like_count === "number" ? media.like_count : null,
+        comments: typeof media.comments_count === "number" ? media.comments_count : null,
+        shares: null,
+      },
+      posted_at: postedDate(media),
+    });
   }
   return sample;
 }
@@ -703,7 +715,6 @@ export async function collectAccount(
     baseline = buildBaseline({ platform: "instagram", handle }, toBaselineSample(media), {
       followers,
       collected_at: collectedAt,
-      metric: "engagement",
       method:
         `Unbiased window: the ${media.length} most recent posts on @${handle}'s business_discovery media edge, which Meta returns in reverse chronological order with no way to sort by performance. ` +
         "No filter on engagement, form or topic: the flops belong in the median. " +

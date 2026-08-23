@@ -234,9 +234,12 @@ describe("isEligibleBaselinePost", () => {
     assert.equal(isEligibleBaselinePost({ created_utc: NOW - 8 * 86400 }, opts), false);
   });
 
-  test("the sample carries numbers and a date only, never text", () => {
+  test("the sample carries the same named counts an entry carries, and no text", () => {
     const sample = toBaselineSample([{ score: 5, num_comments: 2, created_utc: NOW - 8 * 86400, selftext: "invented" }]);
-    assert.deepEqual(Object.keys(sample[0]).sort(), ["comments", "posted_at", "score"]);
+    assert.deepEqual(Object.keys(sample[0]).sort(), ["metrics", "posted_at"]);
+    // shares and views are stated as null rather than omitted, which is what keeps them out of the
+    // median AND out of the numerator it is divided into.
+    assert.deepEqual(sample[0].metrics, { views: null, likes: 5, comments: 2, shares: null });
   });
 });
 

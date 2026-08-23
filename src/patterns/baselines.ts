@@ -10,8 +10,8 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { PATTERNS_DIR, accountKey } from "./corpus.js";
-import { median } from "./outliers.js";
-import type { AccountBaseline, BaselineMetric, Platform } from "./types.js";
+import { commonTerms, median, metricForTerms, scoreOverTerms, type MetricCounts } from "./outliers.js";
+import type { AccountBaseline, Platform } from "./types.js";
 
 export const BASELINES_PATH = join(PATTERNS_DIR, "baselines.jsonl");
 
@@ -44,23 +44,17 @@ export function appendBaseline(baseline: AccountBaseline, path: string = BASELIN
 
 // One ordinary post in the unbiased window, reduced to numbers. No title, no body, no author: a
 // baseline is a distribution, not a collection.
+//
+// `metrics` carries the SAME four counts a corpus entry carries, and every one of them is
+// required. A collector cannot quietly leave `shares` out of the sample the way it could when this
+// type held one pre-summed number: it has to say `shares: null`, which is a statement that the
+// route exposes no share count, and that statement then travels into `terms` and constrains the
+// numerator too. There is no longer any way to hand a two-term denominator to a three-term
+// numerator, because neither side chooses its own terms.
 export interface BaselineSamplePost {
-  // The platform's own score. Reddit's upvotes minus downvotes, which lands in metrics.likes.
-  score: number;
-  // The comment count, or null where the route did not return one.
-  comments: number | null;
+  metrics: MetricCounts;
   // ISO date string of when the post went up, used only for the window bounds.
   posted_at: string | null;
-}
-
-// The quantity a baseline is measured in, and it deliberately mirrors what outliers.ts computes
-// for a corpus entry with no view count: the sum of the public interaction counts on record.
-//
-// This has to be the SAME quantity on both sides of the division or the multiple is nonsense. A
-// median of upvotes divided into a winner's upvotes-plus-comments reports a bigger multiple than
-// really happened, because the numerator counts something the denominator left out.
-export function sampleEngagement(post: BaselineSamplePost): number {
-  return post.score + (post.comments ?? 0);
 }
 
 // Builds the baseline record from an already-filtered sample. Filtering is the caller's job,
@@ -71,26 +65,30 @@ export function sampleEngagement(post: BaselineSamplePost): number {
 export function buildBaseline(
   account: { platform: Platform; handle: string },
   sample: BaselineSamplePost[],
-  // `metric` names the quantity the scores are in, and defaults to "engagement" because that is
-  // what an upvote score is: a public interaction count, not a view count. Pass "views" only where
-  // the sample really is view counts.
-  meta: { followers: number | null; method: string; collected_at: string; metric?: BaselineMetric },
+  meta: { followers: number | null; method: string; collected_at: string },
 ): AccountBaseline | null {
   if (sample.length === 0) return null;
-  const scores = sample.map(sampleEngagement);
-  const value = median(scores);
+  // The terms are read off the sample, not passed in. A caller cannot declare the median to be
+  // something other than what was actually added up.
+  const terms = commonTerms(sample.map((post) => post.metrics));
+  const metric = metricForTerms(terms);
+  if (metric === null) return null;
+  const scores = sample.map((post) => scoreOverTerms(post.metrics, terms));
+  if (scores.some((score) => score === null)) return null;
+  const value = median(scores as number[]);
   if (value === null) return null;
   const dates = sample.map((post) => post.posted_at).filter((d): d is string => typeof d === "string" && d !== "");
   dates.sort();
   return {
     platform: account.platform,
     handle: account.handle,
-    metric: meta.metric ?? "engagement",
+    metric,
+    terms,
     median: value,
     sample_size: sample.length,
     window_start: dates[0] ?? null,
     window_end: dates[dates.length - 1] ?? null,
-    scores,
+    scores: scores as number[],
     followers: meta.followers,
     method: meta.method,
     collected_at: meta.collected_at,

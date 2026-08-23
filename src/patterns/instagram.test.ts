@@ -223,7 +223,6 @@ describe("toStagedEntry", () => {
     const baseline = buildBaseline({ platform: "instagram", handle: "fixturecreator" }, toBaselineSample(window), {
       followers: 400000,
       collected_at: context.collectedAt,
-      metric: "engagement",
       method: "test",
     });
     assert.ok(baseline);
@@ -282,13 +281,13 @@ describe("toBaselineSample", () => {
   test("measures the FULL window in likes plus comments, so a floor cannot bias the median", () => {
     const sample = toBaselineSample(window);
     assert.equal(sample.length, 7);
-    // comments is null on purpose: the count is already inside score, and sampleEngagement adds
-    // the two, so filling both would count comments twice.
-    for (const item of sample) assert.equal(item.comments, null);
+    // The raw counts travel separately now: buildBaseline reads which of them every post carries
+    // and records that in `terms`, so nothing here has to pre-sum and nothing downstream has to
+    // guess what was summed.
+    for (const item of sample) assert.equal(item.metrics.views, null);
     const baseline = buildBaseline({ platform: "instagram", handle: "fixturecreator" }, sample, {
       followers: 400000,
       collected_at: context.collectedAt,
-      metric: "engagement",
       method: "test",
     });
     assert.ok(baseline);

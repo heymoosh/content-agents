@@ -23,8 +23,17 @@ import { fileURLToPath } from "node:url";
 import { fetchWithRetry } from "../util/fetch-retry.js";
 import { INBOX_DIR, makeId, normalizeHandle, readCorpus } from "./corpus.js";
 import { BASELINES_PATH, appendBaseline, buildBaseline, type BaselineSamplePost } from "./baselines.js";
+import { recordedBaselineMultiple } from "./outliers.js";
 import { loadConfig } from "./collect.js";
-import type { AccountBaseline, CorpusEntry, CorpusMedia, MediaAspect, MediaForm, PatternMiningConfig } from "./types.js";
+import type {
+  AccountBaseline,
+  BaselineTerm,
+  CorpusEntry,
+  CorpusMedia,
+  MediaAspect,
+  MediaForm,
+  PatternMiningConfig,
+} from "./types.js";
 
 // Reddit's own hosts. Tokens are minted on www and every read goes to oauth, which is the
 // documented split for a script app.
@@ -161,16 +170,22 @@ export function isEligibleBaselinePost(
   return opts.nowSeconds - post.created_utc >= opts.minAgeSeconds;
 }
 
-// Turns an eligible sample into the shape buildBaseline wants: numbers and a date, no text.
+// Turns an eligible sample into the shape buildBaseline wants: the same four counts a corpus entry
+// carries, plus a date. No text.
 //
-// The comment count comes along because the baseline has to be measured in the same quantity the
-// outlier step measures a post in, and reddit posts have no view count, so that quantity is the
-// sum of the public interaction counts. Leaving comments out here would make every multiple read
-// higher than it really was.
+// The mapping is the one the entries themselves use, so both sides of a baseline division are
+// describing the same fields: reddit's score is the like count, and reddit publishes neither a
+// view count nor a share count, so those are null. Saying null is a statement, not an omission:
+// buildBaseline reads it and leaves those terms out of the median, and the winner's numerator is
+// then built from the remaining terms only.
 export function toBaselineSample(posts: RedditPost[]): BaselineSamplePost[] {
   return posts.map((post) => ({
-    score: post.score as number,
-    comments: typeof post.num_comments === "number" ? post.num_comments : null,
+    metrics: {
+      views: null,
+      likes: post.score as number,
+      comments: typeof post.num_comments === "number" ? post.num_comments : null,
+      shares: null,
+    },
     posted_at: postedDate(post),
   }));
 }
@@ -283,6 +298,14 @@ export function mediaFor(post: RedditPost): CorpusMedia {
   };
 }
 
+// The terms a baseline counted, in words a person reads, e.g. "upvotes plus comments".
+function readableTerms(terms: BaselineTerm[]): string {
+  const words: Record<BaselineTerm, string> = { views: "views", likes: "upvotes", comments: "comments", shares: "shares" };
+  const named = terms.map((term) => words[term]);
+  if (named.length <= 1) return named[0] ?? "nothing";
+  return `${named.slice(0, -1).join(", ")} plus ${named[named.length - 1]}`;
+}
+
 export interface EntryContext {
   // The community as Reddit writes it, e.g. "r/ADHD".
   handle: string;
@@ -311,24 +334,6 @@ export function toStagedEntry(post: RedditPost, ctx: EntryContext): CorpusEntry 
   const isVideo = media.form === "video" || media.form === "short-video";
   const score = typeof post.score === "number" ? post.score : null;
   const comments = typeof post.num_comments === "number" ? post.num_comments : null;
-  // The same quantity the baseline is measured in: upvotes plus comments, which is what the
-  // outlier step computes for a post with no view count. Dividing a bare upvote count into a
-  // baseline that counted comments too would overstate the multiple.
-  const engagement = score === null ? null : score + (comments ?? 0);
-  const multiple = ctx.baseline && engagement !== null && ctx.baseline.median > 0 ? engagement / ctx.baseline.median : null;
-
-  const notes = [
-    "PLATFORM: reddit",
-    `Community post, not a creator account: the community ${ctx.handle} is in handle, the poster u/${post.author ?? "unknown"} is in creator.`,
-    `Post title (Reddit's title is a separate field from the body, and on Reddit it is most of the craft): ${JSON.stringify(title)}`,
-    `Selection: position ${ctx.rank} in ${ctx.handle}'s ${ctx.listing} listing${ctx.window ? ` (t=${ctx.window})` : ""}, read ${ctx.collectedAt.slice(0, 10)}.`,
-    ctx.baseline
-      ? `Baseline: an unbiased window of ${ctx.baseline.sample_size} posts from ${ctx.handle}'s /new listing (posted ${ctx.baseline.window_start} to ${ctx.baseline.window_end}), all settled, has a TRUE MEDIAN engagement of ${ctx.baseline.median} (upvotes plus comments).` +
-        (multiple !== null ? ` This post's ${score} upvotes plus ${comments ?? 0} comments is about ${multiple.toFixed(1)}x that community median.` : "")
-      : "Baseline: not measured in this run. Any multiple against this account's other collected entries is a multiple against other winners, not against the community.",
-    "metrics.likes holds Reddit's score (upvotes minus downvotes) as the API reports it. metrics.upvote_ratio holds upvote_ratio. Reddit publishes no view count, so views is null; metrics.followers holds the subreddit's subscriber count where the API returned one.",
-    `Route: ${ctx.route}`,
-  ].join("\n");
 
   const entry: CorpusEntry = {
     id: makeId("reddit", ctx.handle, url),
@@ -350,15 +355,35 @@ export function toStagedEntry(post: RedditPost, ctx: EntryContext): CorpusEntry 
     metrics: {
       views: null,
       likes: score,
-      comments: typeof post.num_comments === "number" ? post.num_comments : null,
+      comments,
       shares: null,
       followers: ctx.subscribers,
       upvote_ratio: typeof post.upvote_ratio === "number" ? post.upvote_ratio : null,
     },
     media,
     sample: { listing: ctx.listing, window: ctx.window, rank: ctx.rank, role: "winner" },
-    notes,
   };
+
+  // The plain-words version of the number, and it is computed by the same function the outlier
+  // step uses, over the same terms the baseline recorded. Nothing here does its own arithmetic,
+  // because a note that disagrees with the report is worse than a note with no number in it.
+  const recorded = ctx.baseline ? recordedBaselineMultiple(entry, ctx.baseline) : null;
+  const termWords = ctx.baseline ? readableTerms(ctx.baseline.terms) : "";
+  entry.notes = [
+    "PLATFORM: reddit",
+    `Community post, not a creator account: the community ${ctx.handle} is in handle, the poster u/${post.author ?? "unknown"} is in creator.`,
+    `Post title (Reddit's title is a separate field from the body, and on Reddit it is most of the craft): ${JSON.stringify(title)}`,
+    `Selection: position ${ctx.rank} in ${ctx.handle}'s ${ctx.listing} listing${ctx.window ? ` (t=${ctx.window})` : ""}, read ${ctx.collectedAt.slice(0, 10)}.`,
+    ctx.baseline
+      ? `Baseline: an unbiased window of ${ctx.baseline.sample_size} posts from ${ctx.handle}'s /new listing (posted ${ctx.baseline.window_start} to ${ctx.baseline.window_end}), all settled, has a TRUE MEDIAN of ${ctx.baseline.median}, counting ${termWords}.` +
+        (recorded !== null
+          ? ` This post is about ${recorded.multiple.toFixed(1)}x that community median, counted the same way.`
+          : " This post could not be measured against it, because it is missing one of the counts the median was measured on.")
+      : "Baseline: not measured in this run. Any multiple against this account's other collected entries is a multiple against other winners, not against the community.",
+    "metrics.likes holds Reddit's score (upvotes minus downvotes) as the API reports it. metrics.upvote_ratio holds upvote_ratio. Reddit publishes no view count and no share count, so views and shares are null; metrics.followers holds the subreddit's subscriber count where the API returned one.",
+    `Route: ${ctx.route}`,
+  ].join("\n");
+
   return entry;
 }
 
@@ -642,6 +667,11 @@ export function baselinesFromNotes(entries: CorpusEntry[], collectedAt: string):
       platform: "reddit",
       handle: entry.handle,
       metric: "engagement",
+      // The hand pass measured the median of the UPVOTE score alone; it never wrote down the
+      // comment counts of that window. Saying so here is not a caveat in prose, it is the thing
+      // that makes the number safe: a winner is now divided by this median on upvotes alone too,
+      // so the two sides count the same thing and the multiple is exact rather than inflated.
+      terms: ["likes"],
       median: Number(median[1]),
       sample_size: size ? Number(size[1]) : 0,
       window_start: window ? window[1] : null,
@@ -651,9 +681,9 @@ export function baselinesFromNotes(entries: CorpusEntry[], collectedAt: string):
       method:
         "Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. " +
         "The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. " +
-        "READ THIS BEFORE QUOTING A MULTIPLE OFF IT: that hand median counted UPVOTES ONLY, while the corpus scores a post " +
-        "on upvotes plus comments, so this denominator is a little too small and the multiples it produces are a little too " +
-        "high. Right order of magnitude, not an exact figure. Re-measure with npm run patterns:reddit to replace it.",
+        "The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes " +
+        "only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit " +
+        "to replace this one with a wider sample and its own scores.",
       collected_at: collectedAt,
     });
   }

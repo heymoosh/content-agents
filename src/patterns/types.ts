@@ -205,6 +205,16 @@ export interface AccountBaseline {
   // Which quantity `median` is measured on, so it is never divided into a score of the other kind.
   // "engagement" on reddit, where the score lands in metrics.likes and no view count exists.
   metric: BaselineMetric;
+  // EXACTLY which counts were added together to get `median`, e.g. ["likes","comments"] or
+  // ["likes","comments","shares"] or ["views"]. Derived from the sample, never chosen by a caller.
+  //
+  // This field is what stops the arithmetic drifting apart. A winner's numerator is rebuilt from
+  // this same list before any division, so a median of likes-plus-comments can never be divided
+  // into a score that also counted shares. That exact mismatch was live and invisible: the reddit
+  // sample summed two terms while the corpus scored three, and it only looked right because reddit
+  // publishes no share count. On Threads, Instagram or TikTok it would have inflated every
+  // multiple and read as a finding.
+  terms: BaselineTerm[];
   // The median score of the unbiased sample. This is the denominator of an honest multiple.
   median: number;
   // How many posts the median was taken over.
@@ -234,6 +244,10 @@ export type OutlierReason = "ratio" | "baseline" | "both" | "none";
 // Which quantity the baseline was measured on. "views" where a public view count was recorded,
 // "engagement" where it was not and the sum of the recorded likes/comments/shares stood in.
 export type BaselineMetric = "views" | "engagement";
+
+// One count that can go into a travel score. These are the metric field names themselves, so a
+// term list is checkable against a post's own numbers rather than being a label someone wrote.
+export type BaselineTerm = "views" | "likes" | "comments" | "shares";
 
 // What `multiple` was divided by.
 //

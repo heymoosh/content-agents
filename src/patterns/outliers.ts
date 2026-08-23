@@ -6,6 +6,7 @@ import type {
   AccountBaseline,
   BaselineMetric,
   BaselineSource,
+  BaselineTerm,
   CorpusEntry,
   OutlierThresholds,
   OutlierVerdict,
@@ -19,6 +20,59 @@ export function median(values: number[]): number | null {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// The four counts a travel score can be built from, in the order entryScore prefers them. This is
+// the shape both sides of a baseline division speak, so a sample of ordinary posts and a collected
+// winner are described in exactly the same words.
+export interface MetricCounts {
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+}
+
+// The interaction counts that make up an engagement score. Keep this list and the fallback branch
+// of entryScore in step: they are the same three numbers, named once.
+export const ENGAGEMENT_TERMS: readonly BaselineTerm[] = ["likes", "comments", "shares"] as const;
+
+// Which terms a whole SAMPLE can be measured on: the ones every post in it carries.
+//
+// All-or-nothing per term, on purpose. A median built from some posts' likes-plus-shares and other
+// posts' likes alone is not a median of anything, and it would quietly become the denominator of
+// every multiple on that account.
+//
+// Views win outright where every post has them, mirroring entryScore's own priority, so a sample
+// is never half a reach measure and half an interaction measure.
+export function commonTerms(samples: MetricCounts[]): BaselineTerm[] {
+  if (samples.length === 0) return [];
+  if (samples.every((sample) => sample.views !== null)) return ["views"];
+  return ENGAGEMENT_TERMS.filter((term) => samples.every((sample) => sample[term] !== null));
+}
+
+// The score of one post over an EXACT list of terms, and null when any of them is missing.
+//
+// This is what makes a baseline division safe. The baseline records the terms its median was
+// measured on, and the winner's numerator is then built from those same terms and no others, so a
+// two-term denominator can never meet a three-term numerator. Before this existed, the reddit
+// baseline summed upvotes and comments while the corpus scored upvotes, comments and shares; it
+// happened to agree only because reddit has no share count, and the first platform with one would
+// have inflated every multiple silently.
+export function scoreOverTerms(metrics: MetricCounts, terms: readonly BaselineTerm[]): number | null {
+  if (terms.length === 0) return null;
+  let total = 0;
+  for (const term of terms) {
+    const value = metrics[term];
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    total += value;
+  }
+  return total;
+}
+
+// Which kind of quantity a term list describes. "views" is only ever measured alone.
+export function metricForTerms(terms: readonly BaselineTerm[]): BaselineMetric | null {
+  if (terms.length === 0) return null;
+  return terms[0] === "views" ? "views" : "engagement";
 }
 
 // The best available single number for "how much did this post travel", plus which kind of number
@@ -109,11 +163,19 @@ export function recordedBaselineMultiple(
   entry: CorpusEntry,
   baseline: AccountBaseline,
 ): { multiple: number; metric: BaselineMetric } | null {
-  const scored = entryScore(entry);
-  if (scored === null) return null;
-  if (baseline.metric !== scored.kind) return null;
+  // A record written before terms existed cannot say what its median counted, so it cannot be
+  // divided into anything safely. Refusing is the honest answer; re-measure to get a number back.
+  if (!Array.isArray(baseline.terms) || baseline.terms.length === 0) return null;
+  const metric = metricForTerms(baseline.terms);
+  if (metric === null) return null;
+  // The numerator is built from the baseline's own terms, so the two sides are the same quantity
+  // by construction rather than by the caller remembering to make them match. Null here means the
+  // post is missing a count the baseline was measured on, and a multiple across different term
+  // sets is not a smaller error than no multiple at all.
+  const value = scoreOverTerms(entry.metrics, baseline.terms);
+  if (value === null) return null;
   if (!Number.isFinite(baseline.median) || baseline.median <= 0) return null;
-  return { multiple: scored.value / baseline.median, metric: scored.kind };
+  return { multiple: value / baseline.median, metric };
 }
 
 // True when this account's collected entries are a selected-for-performance sample, so their
