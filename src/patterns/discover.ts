@@ -23,6 +23,8 @@ import { repoRoot } from "../db/db.js";
 import { PullError } from "../pull/errors.js";
 import { PATTERNS_DIR, normalizeHandle } from "./corpus.js";
 import { loadConfig } from "./collect.js";
+import { metricScore } from "./outliers.js";
+import { authorFromPermalink } from "./collectors/shared.js";
 import type { Platform } from "./types.js";
 
 export const PROPOSALS_PATH = join(PATTERNS_DIR, "account-proposals.jsonl");
@@ -49,6 +51,19 @@ export interface ProposalMetrics {
   followers: number | null;
 }
 
+// Whether the cited post was PROVED to be the candidate's own work.
+//
+// "confirmed" means the page carried an author signal and it named this account: a byline on
+// substack, the permalink's author segment on x, the card's own profile link on linkedin.
+// "unverified" means the surface showed no author signal at all, so the post is cited with that
+// said out loud rather than passed off as proved.
+//
+// There is no third value for "someone else's", because such a post is never cited. The live run
+// on 2026-08-22 proposed Chenell Basilio while citing a post she had merely reposted from
+// stevekamb, and every pattern later mined off that account would have inherited the false
+// citation. A missing proposal is recoverable; a wrong attribution is not.
+export type Authorship = "confirmed" | "unverified";
+
 // A real post of the candidate's, with the numbers that were actually public on it. A proposal
 // cannot exist without one.
 export interface ProposalEvidence {
@@ -59,6 +74,9 @@ export interface ProposalEvidence {
   excerpt: string;
   metrics: ProposalMetrics;
   retrieved_at: string;
+  // Optional so proposals written before this field existed still parse. Absent means the same
+  // thing "unverified" means, and both print the same way: it was not proved.
+  authorship?: Authorship;
 }
 
 export interface ProposalSource {
@@ -403,6 +421,9 @@ export function renderConfigEntry(proposal: AccountProposal, approvedOn: string)
   if (name.placeholder) {
     sentences.push("The display name was not readable at proposal time, so the handle stands in. Replace it with the real name.");
   }
+  if (proposal.evidence.authorship !== "confirmed") {
+    sentences.push("Authorship of that post was NOT verified: the page carried no author signal, so it is cited as this account's without proof.");
+  }
   const comment = commentLines(sentences.join(" "), "    ");
   return [
     `  - handle: "${proposal.handle}"`,
@@ -601,13 +622,18 @@ export interface DiscoverySource {
   fetchEvidence(context: BrowserContext, candidate: Candidate): Promise<ProposalEvidence | null>;
 }
 
-// Rank by the numbers actually on the post that matched. Views when the platform shows them to a
-// non-owner, otherwise the engagement that IS public. A missing number counts as zero rather than
-// as a guess, so an account with fewer visible numbers ranks lower instead of ranking on invented
-// ones. This is a sort of what search returned, not a model of anything.
-export function engagementScore(metrics: ProposalMetrics): number {
-  if (metrics.views !== null) return metrics.views;
-  return (metrics.likes ?? 0) + (metrics.comments ?? 0) + (metrics.shares ?? 0);
+// Rank by the numbers actually on the post that matched, using the SAME rule the corpus is scored
+// by: `metricScore` in outliers.ts, which prefers views where a platform shows them to a non-owner
+// and otherwise sums the public interaction counts. Discovery deliberately does not own a scoring
+// rule of its own; an account picked on one rule and then judged on another would be picked for
+// reasons the corpus never agrees with.
+//
+// The one thing this adds is the missing-number answer. `metricScore` returns null when nothing at
+// all was recorded, which is the honest answer for a verdict. Here the caller is a SORT, so null
+// becomes 0: an account with no visible numbers ranks last rather than ranking on invented ones.
+// The name says "rank" rather than "score" because that zero makes it a sort key and nothing more.
+export function rankScore(metrics: ProposalMetrics): number {
+  return metricScore(metrics)?.value ?? 0;
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -838,6 +864,9 @@ export const substackSource: DiscoverySource = {
         excerpt: String(best.title ?? ""),
         metrics: { views: null, likes, comments, shares: null, followers: null },
         retrieved_at: new Date().toISOString(),
+        // The byline filter above is what makes this confirmed. Substack never reaches the
+        // unverified branch: a post with no matching byline is not cited at all.
+        authorship: "confirmed",
       };
     }
     return null;
@@ -983,6 +1012,10 @@ export const linkedinSource: DiscoverySource = {
     }
   },
 
+  // The page reads RAW here and decides nothing. Which card is citable is settled by
+  // pickLinkedinCard below, which is a pure function and therefore actually testable. The earlier
+  // version made that call inside page.evaluate, where no test could reach it, and the call it
+  // made was a text heuristic with no ownership check at all.
   async fetchEvidence(context, candidate) {
     const page = await context.newPage();
     const activityUrl = `https://www.linkedin.com/in/${normalizeHandle(candidate.handle)}/recent-activity/all/`;
@@ -990,43 +1023,94 @@ export const linkedinSource: DiscoverySource = {
       await page.goto(activityUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await assertNotBlocked(page, "linkedin");
       await page.waitForSelector("div[data-urn]", { timeout: 20_000 }).catch(() => null);
-      const found = await page.evaluate(() => {
+      const cards: LinkedinActivityCard[] = await page.evaluate(() => {
+        const out = [];
         for (const post of Array.from(document.querySelectorAll('div[data-urn*="urn:li:activity"], div[data-urn*="urn:li:ugcPost"]'))) {
-          const text = (post as HTMLElement).innerText ?? "";
-          // An activity feed mixes their own posts with things they reposted or commented on.
-          // Citing someone else's post as theirs is the one mistake this file must never make,
-          // so anything that announces itself as a repost is skipped rather than cited.
-          if (/reposted this|commented on this|likes this/i.test(text)) continue;
           const urn = post.getAttribute("data-urn") ?? "";
           if (!urn) continue;
+          const text = (post as HTMLElement).innerText ?? "";
           const reactionButton = post.querySelector("button[data-reaction-details]") as HTMLElement | null;
-          return {
+          out.push({
             urn,
             text: text.slice(0, 240),
             full: text.slice(0, 4000),
             reactionAria: reactionButton?.getAttribute("aria-label") ?? null,
             reactionText: (reactionButton?.innerText ?? "").trim().split("\n")[0] || null,
-          };
+            // Every profile the card links to. The author is one of them when LinkedIn renders an
+            // author link at all, which is why an EMPTY list means "cannot tell" rather than "not
+            // theirs". UNVERIFIED selector: this specific author-link read has not been checked
+            // against a live page, only the card read around it has.
+            authorSlugs: Array.from(post.querySelectorAll('a[href*="/in/"]'))
+              .map((a) => ((a as HTMLAnchorElement).getAttribute("href") ?? "").match(/\/in\/([A-Za-z0-9-]+)/)?.[1] ?? "")
+              .filter((slug) => slug !== ""),
+          });
         }
-        return null;
+        return out;
       });
-      if (!found) return null;
-      const comments = textNumber(/([\d,.KM]+)\s+comments?/i.exec(found.full)?.[1] ?? null);
-      const shares = textNumber(/([\d,.KM]+)\s+reposts?/i.exec(found.full)?.[1] ?? null);
-      const likes = linkedinReactionCount(found.reactionAria, found.reactionText);
+      const picked = pickLinkedinCard(cards, normalizeHandle(candidate.handle));
+      if (!picked) return null;
+      const { card } = picked;
+      const comments = textNumber(/([\d,.KM]+)\s+comments?/i.exec(card.full)?.[1] ?? null);
+      const shares = textNumber(/([\d,.KM]+)\s+reposts?/i.exec(card.full)?.[1] ?? null);
+      const likes = linkedinReactionCount(card.reactionAria, card.reactionText);
       if (comments === null && shares === null && likes === null) return null;
       return {
-        url: `https://www.linkedin.com/feed/update/${found.urn}/`,
+        url: `https://www.linkedin.com/feed/update/${card.urn}/`,
         posted_at: null,
-        excerpt: found.text,
+        excerpt: card.text,
         metrics: { views: null, likes, comments, shares, followers: null },
         retrieved_at: new Date().toISOString(),
+        authorship: picked.authorship,
       };
     } finally {
       await page.close();
     }
   },
 };
+
+// One card read off a LinkedIn activity feed, before anything has been decided about it.
+export interface LinkedinActivityCard {
+  urn: string;
+  text: string;
+  full: string;
+  reactionAria: string | null;
+  reactionText: string | null;
+  // Profile slugs the card links to, lowercased by the picker rather than here.
+  authorSlugs: string[];
+}
+
+// Which card on an activity feed can be cited as this account's own post, and how sure we are.
+//
+// An activity feed mixes a person's own posts with things they reposted, commented on, or liked.
+// Citing someone else's post as theirs is the one mistake this file must never make, so the rule
+// is the same one the substack fix follows: skip a card only when it DEMONSTRABLY belongs to
+// somebody else, and where authorship cannot be determined, keep the card and say so.
+//
+// Three outcomes per card, in order:
+//   1. LinkedIn's own repost and comment banners say outright that the post is someone else's.
+//      Skip it.
+//   2. The card links to profiles and one of them is this account. It is theirs, confirmed.
+//   3. The card links to profiles and none of them is this account. Someone else's. Skip it.
+//   4. The card links to no profile at all. Undecidable, so it is kept as a fallback and marked
+//      unverified rather than dropped. Dropping it would silently lose a real post, and marking it
+//      confirmed would be the false citation this whole function exists to prevent.
+//
+// A confirmed card always beats an unverified one, however far down the feed it sits.
+export function pickLinkedinCard(
+  cards: LinkedinActivityCard[],
+  wantedHandle: string,
+): { card: LinkedinActivityCard; authorship: Authorship } | null {
+  const wanted = normalizeHandle(wantedHandle);
+  let fallback: LinkedinActivityCard | null = null;
+  for (const card of cards) {
+    if (/reposted this|commented on this|likes this/i.test(card.full || card.text)) continue;
+    const slugs = card.authorSlugs.map((slug) => slug.toLowerCase());
+    if (slugs.includes(wanted)) return { card, authorship: "confirmed" };
+    if (slugs.length > 0) continue;
+    if (fallback === null) fallback = card;
+  }
+  return fallback ? { card: fallback, authorship: "unverified" } : null;
+}
 
 // X. Settled live on 2026-08-22: the saved logged-in Chrome session DOES get through, where a
 // direct fetch does not. x.com/search?q=<term>&f=top answered HTTP 200 and rendered 7 post cards,
@@ -1086,8 +1170,10 @@ export const xSource: DiscoverySource = {
           sourceUrl: searchUrl,
           term,
           evidence:
-            engagementScore(metrics) > 0
-              ? { url: item.href, posted_at: null, excerpt: item.text, metrics, retrieved_at: new Date().toISOString() }
+            // Confirmed by construction: `handle` was read out of this post's own permalink
+            // author segment a few lines up, so the post and the account cannot disagree.
+            rankScore(metrics) > 0
+              ? { url: item.href, posted_at: null, excerpt: item.text, metrics, retrieved_at: new Date().toISOString(), authorship: "confirmed" as const }
               : null,
         });
         if (unique.size >= limit) break;
@@ -1142,6 +1228,12 @@ export const xSource: DiscoverySource = {
     }
   },
 
+  // Same split as linkedin above: the page reads raw, pickXCard decides. The earlier version took
+  // document.querySelector("article"), the FIRST card on the timeline, with no author check and no
+  // repost check of any kind, which on a profile whose top post is a repost or a pinned quote cited
+  // a stranger's post as this account's. The collector for this same platform has filtered reposts
+  // by permalink author since it was written (src/patterns/collectors/x.ts); this is that standard,
+  // applied on the discovery path too.
   async fetchEvidence(context, candidate) {
     const page = await context.newPage();
     const profileUrl = `https://x.com/${normalizeHandle(candidate.handle)}`;
@@ -1151,29 +1243,82 @@ export const xSource: DiscoverySource = {
       await page.waitForSelector("article", { timeout: 20_000 }).catch(() => null);
       // X shows a public view count on a post, confirmed live 2026-08-22. When a card does not
       // render its label the numbers stay null rather than being filled in from somewhere else.
-      const found = await page.evaluate(() => {
-        const article = document.querySelector("article");
-        if (!article) return null;
-        const link = article.querySelector('a[href*="/status/"]') as HTMLAnchorElement | null;
-        if (!link) return null;
-        const label = (article.querySelector('[role="group"]') as HTMLElement | null)?.getAttribute("aria-label") ?? "";
-        return { href: link.href, text: ((article as HTMLElement).innerText ?? "").slice(0, 240), label };
+      const cards: XTimelineCard[] = await page.evaluate(() => {
+        const out = [];
+        for (const article of Array.from(document.querySelectorAll("article"))) {
+          const link = article.querySelector('a[href*="/status/"]') as HTMLAnchorElement | null;
+          if (!link) continue;
+          out.push({
+            href: link.href,
+            text: ((article as HTMLElement).innerText ?? "").slice(0, 240),
+            label: (article.querySelector('[role="group"]') as HTMLElement | null)?.getAttribute("aria-label") ?? "",
+            socialContext: (article.querySelector('[data-testid="socialContext"]') as HTMLElement | null)?.textContent ?? "",
+            promoted: article.querySelector('[data-testid="placementTracking"]') !== null,
+          });
+        }
+        return out;
       });
-      if (!found) return null;
-      const metrics = metricsFromXLabel(found.label);
+      const picked = pickXCard(cards, normalizeHandle(candidate.handle));
+      if (!picked) return null;
+      const metrics = metricsFromXLabel(picked.card.label);
       if (metrics.views === null && metrics.likes === null && metrics.comments === null && metrics.shares === null) return null;
       return {
-        url: found.href,
+        url: picked.card.href,
         posted_at: null,
-        excerpt: found.text,
+        excerpt: picked.card.text,
         metrics,
         retrieved_at: new Date().toISOString(),
+        authorship: picked.authorship,
       };
     } finally {
       await page.close();
     }
   },
 };
+
+// One card read off an X profile timeline, before anything has been decided about it.
+export interface XTimelineCard {
+  href: string;
+  text: string;
+  label: string;
+  socialContext: string;
+  promoted: boolean;
+}
+
+// Which card on an X profile timeline can be cited as this account's own post.
+//
+// X makes ownership easy in a way the other two platforms do not: a post's permalink is
+// /<author>/status/<id>, and a repost or an embedded quote keeps the ORIGINAL author's permalink.
+// So `authorFromPermalink` answers the question outright and there is almost no undecidable case.
+// A card with no status link is not a post at all and never reaches this function.
+//
+// Promoted cards are skipped for the same reason the collector skips them: an ad is not this
+// account's organic reach. A repost banner is skipped because the post belongs to somebody else.
+//
+// The unverified branch exists only for the shape X has never actually shown us: a status
+// permalink whose path does not parse into an author. It is kept rather than dropped, on the same
+// principle as linkedin's, and marked so nobody reads it as proved.
+export function pickXCard(
+  cards: XTimelineCard[],
+  wantedHandle: string,
+): { card: XTimelineCard; authorship: Authorship } | null {
+  const wanted = normalizeHandle(wantedHandle);
+  let fallback: XTimelineCard | null = null;
+  for (const card of cards) {
+    if (card.promoted) continue;
+    if (/repost|retweet/i.test(card.socialContext)) continue;
+    let author: string | null = null;
+    try {
+      author = authorFromPermalink(card.href);
+    } catch {
+      author = null;  // a permalink that is not a url at all tells us nothing
+    }
+    if (author === wanted) return { card, authorship: "confirmed" };
+    if (author !== null) continue;
+    if (fallback === null) fallback = card;
+  }
+  return fallback ? { card: fallback, authorship: "unverified" } : null;
+}
 
 export const SOURCES: Record<DiscoverablePlatform, DiscoverySource> = {
   substack: substackSource,
@@ -1328,7 +1473,7 @@ export async function runPlatform(opts: RunOptions): Promise<RunReport> {
               evidence,
               `A post of theirs matched one of the ${niche} search terms on ${source.platform} and showed ${citedMetrics(evidence.metrics)}. The term is cited in the source below.`
             ),
-            score: engagementScore(evidence.metrics),
+            score: rankScore(evidence.metrics),
           });
         }
       }
@@ -1478,6 +1623,9 @@ function printProposals(proposals: AccountProposal[]): void {
     console.log(`    found by: ${p.source.relation === "search" ? `searching ${p.source.platform} for ${JSON.stringify(p.source.term)}` : `${p.source.relation} by @${normalizeHandle(p.source.handle ?? "")}`}`);
     console.log(`    evidence: ${p.evidence.url}`);
     console.log(`    numbers: ${citedMetrics(p.evidence.metrics) || "none recorded"}, retrieved ${isoDate(p.evidence.retrieved_at)}`);
+    if (p.evidence.authorship !== "confirmed") {
+      console.log("    authorship: NOT VERIFIED. The page showed no author signal, so this post is this account's only if the feed it came from is. Check it before approving.");
+    }
   }
   console.log("\nApprove one with: npm run patterns:discover -- --approve <handle> [--platform <name>]");
   console.log("Reject one with:  npm run patterns:discover -- --reject <handle> [--platform <name>] [--reason \"...\"]");

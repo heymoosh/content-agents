@@ -6,6 +6,7 @@ import { PullError } from "../../pull/errors.js";
 import { makeId, normalizeHandle } from "../corpus.js";
 import type { CorpusEntry } from "../types.js";
 import {
+  authorFromPermalink,
   blockSignal,
   canonicalUrl,
   countFromAriaLabel,
@@ -40,24 +41,21 @@ import {
 // downloads the owner-only Analytics > Content CSV with true impressions and engagement rates.
 // None of that exists for someone else's account. This reads the public profile timeline instead.
 //
-// SELECTORS ARE FIRST-PASS AND UNVERIFIED against a live page. They follow X's data-testid
-// contract, which is the most stable thing X exposes, and the counts are read from the action
-// bar's accessible name because that carries EXACT integers where the visible text is rounded.
-// Same convention the pull adapters shipped under: refine from a live `--headed` diagnostics run.
+// SELECTORS OBSERVED 2026-08-22 against live logged-in profile pages. The run read 24 posts with
+// real view, like, reply and repost counts, which is where the measured `view_follower_ratio` in
+// config/pattern-mining.yaml came from. They follow X's data-testid contract, which is the most
+// stable thing X exposes, and the counts are read from the action bar's accessible name because
+// that carries EXACT integers where the visible text is rounded.
+//
+// Observed does not mean permanent. X can change its markup any week, and the block, rate-limit
+// and auth-wall paths below were NOT exercised on that run, so those are still first-pass. Refine
+// from a live `--headed` diagnostics run when something stops matching.
 
 const NAME = "x-public-profile";
 const VERSION = "1";
 
 function profileUrl(handle: string): string {
   return `https://x.com/${normalizeHandle(handle)}`;
-}
-
-// The permalink path is /<author>/status/<id>, and the author segment is the most trustworthy
-// author signal on the card: a repost keeps the ORIGINAL author's permalink, which is exactly how
-// we tell a repost from an original without trusting a display name.
-function authorFromPermalink(href: string): string | null {
-  const match = /^\/([^/]+)\/status\/\d+/.exec(new URL(href, "https://x.com").pathname);
-  return match ? match[1].toLowerCase() : null;
 }
 
 // PURE. Given the captured profile HTML, return one entry per ORIGINAL post by this account.

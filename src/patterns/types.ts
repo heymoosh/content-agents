@@ -87,8 +87,9 @@ export interface PatternMiningConfig {
   niches: string[];
   accounts: AccountSeed[];
   outlier_thresholds: Record<string, OutlierThresholds>;
-  // How many OUTLIERS are worth reading in one synthesize pass. NOT a cap on the corpus, which is
-  // uncapped and should keep growing. See the comment in config/pattern-mining.yaml.
+  // How many OUTLIERS are worth reading in one analysis pass. `/patterns analyze` reads outliers;
+  // `/patterns synthesize` reads what analyze produced, so this is the analyze number. NOT a cap
+  // on the corpus, which is uncapped and should keep growing. See config/pattern-mining.yaml.
   analysis_sample: { min_outliers: number; max_outliers: number };
 }
 

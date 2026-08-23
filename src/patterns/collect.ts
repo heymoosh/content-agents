@@ -155,7 +155,7 @@ function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): 
   const groups = groupByAccount(corpus);
   console.log(`\nCorpus: ${corpus.length} entries across ${groups.size} accounts.`);
   // Deliberately NOT printed as "target 20-50". That range is how many outliers are worth reading
-  // in one synthesize pass, not a size the corpus should stop at. The corpus is uncapped and a
+  // in one analysis pass, not a size the corpus should stop at. The corpus is uncapped and a
   // bigger one makes the baseline bar more reliable, never less.
   const floor = config.analysis_sample.min_outliers;
   if (corpus.length < floor) {
@@ -166,6 +166,9 @@ function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): 
 
   console.log("\nAccount                              Platform    Entries  Outliers");
   const outlierLines: string[] = [];
+  // Set when any printed multiple was measured on engagement, so the caveat below is printed once
+  // rather than repeated on every line.
+  let anyEngagementMultiple = false;
   for (const [key, entries] of [...groups.entries()].sort()) {
     const [platform, handle] = key.split("|");
     const thresholds = thresholdsFor(config, platform);
@@ -176,8 +179,11 @@ function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): 
       if (!verdict.isOutlier) continue;
       outliers++;
       const ratio = verdict.ratio === null ? "n/a" : verdict.ratio.toFixed(1);
-      const multiple = verdict.multiple === null ? "n/a" : verdict.multiple.toFixed(1);
-      outlierLines.push(`  [${verdict.reason}] ${entry.id}  views/followers ${ratio}, baseline x${multiple}\n    ${entry.url}`);
+      // Never a bare multiple. A 4x baseline means nothing until you know 4x of WHAT, which is
+      // the entire reason baselineMetric is carried on the verdict.
+      if (verdict.baselineMetric === "engagement") anyEngagementMultiple = true;
+      const multiple = verdict.multiple === null ? "n/a" : `x${verdict.multiple.toFixed(1)} ${verdict.baselineMetric}`;
+      outlierLines.push(`  [${verdict.reason}] ${entry.id}  views/followers ${ratio}, baseline ${multiple}\n    ${entry.url}`);
     }
     const label = thresholds ? String(outliers) : "no thresholds";
     console.log(`${("@" + handle).padEnd(36)} ${platform.padEnd(11)} ${String(entries.length).padEnd(8)} ${label}`);
@@ -188,6 +194,9 @@ function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): 
   } else {
     console.log(`\nCleared the outlier bar (${outlierLines.length}):`);
     for (const line of outlierLines) console.log(line);
+    if (anyEngagementMultiple) {
+      console.log("An engagement multiple is directional, not precise: the sum adds whichever of likes, comments and shares the page showed, so two engagement scores can rest on different fields.");
+    }
   }
 }
 

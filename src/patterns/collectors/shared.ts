@@ -162,6 +162,19 @@ export function countBeforeWord(label: string | null | undefined, word: string):
 // The original name, kept because x.ts reads accessible names and that is what it is doing there.
 export const countFromAriaLabel = countBeforeWord;
 
+// The handle in an x.com permalink path, /<author>/status/<id>, lowercased. This is the most
+// trustworthy author signal X gives: a repost or an embedded quote keeps the ORIGINAL author's
+// permalink, so comparing this against the account we mean tells a repost from an original
+// without trusting a display name.
+//
+// It lives here rather than in x.ts because BOTH the collector and discovery have to answer "is
+// this post really theirs" the same way. Two copies of this rule would drift, and the drift would
+// show up as a false citation, which is the one mistake this build must never make.
+export function authorFromPermalink(href: string): string | null {
+  const match = /^\/([^/]+)\/status\/\d+/.exec(new URL(href, "https://x.com").pathname);
+  return match ? match[1].toLowerCase() : null;
+}
+
 export function canonicalUrl(raw: string): string {
   let url: URL;
   try {

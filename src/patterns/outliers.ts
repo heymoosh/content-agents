@@ -2,7 +2,7 @@
 // fetches, reads, or writes anything. If a number was not collected, the answer is null, never a
 // guess.
 
-import type { BaselineMetric, CorpusEntry, OutlierThresholds, OutlierVerdict } from "./types.js";
+import type { BaselineMetric, CorpusEntry, CorpusMetrics, OutlierThresholds, OutlierVerdict } from "./types.js";
 
 // The account needs this many OTHER comparable same-kind entries before a baseline means anything.
 export const MIN_BASELINE_SAMPLE = 3;
@@ -34,12 +34,23 @@ export function median(values: number[]): number | null {
 //
 // There is no "reposts" field on CorpusMetrics. `shares` is that number, so do not add a
 // reposts term here expecting it to pick anything up.
-function entryScore(entry: CorpusEntry): { value: number; kind: BaselineMetric } | null {
-  const { views, likes, comments, shares } = entry.metrics;
+//
+// This is THE scoring rule for the whole patterns build, which is why it takes a metrics object
+// rather than an entry: discovery ranks a candidate off a post's public numbers before that post
+// is ever a corpus entry, and it has to rank by the same rule the corpus is scored by. Two
+// independent copies of this would drift, and then discovery would pick accounts by one rule while
+// the corpus judged them by another. `ProposalMetrics` in discover.ts is the same five nullable
+// fields, so it passes here as is.
+export function metricScore(metrics: CorpusMetrics): { value: number; kind: BaselineMetric } | null {
+  const { views, likes, comments, shares } = metrics;
   if (views !== null) return { value: views, kind: "views" };
   const parts = [likes, comments, shares].filter((n): n is number => n !== null);
   if (parts.length === 0) return null;
   return { value: parts.reduce((sum, n) => sum + n, 0), kind: "engagement" };
+}
+
+function entryScore(entry: CorpusEntry): { value: number; kind: BaselineMetric } | null {
+  return metricScore(entry.metrics);
 }
 
 // The number half of entryScore, for callers that only need "how far did this travel".

@@ -37,15 +37,21 @@ import {
 // publication. This reads the PUBLIC archive API instead, which anyone can read and which
 // deliberately carries no reach numbers at all.
 //
-// THE PUBLIC ENDPOINTS, FIRST-PASS AND UNVERIFIED against a live publication:
-//   https://substack.com/api/v1/user/<handle>/public_profile
+// THE PUBLIC ENDPOINTS, and what was actually checked against a live publication:
+//   https://substack.com/api/v1/user/<handle>/public_profile      OBSERVED 2026-08-22
 //     -> the profile, and the publication its posts live on
-//   https://<publication>/api/v1/archive?sort=new&limit=N&offset=0
-//     -> the post list, with reaction and comment counts
-//   https://<publication>/api/v1/posts/<slug>
-//     -> one post, with body_html when the post is free
+//   https://<publication>/api/v1/archive?sort=new&limit=N&offset=0  OBSERVED 2026-08-22
+//     -> the post list, with reaction and comment counts. Read live against
+//        davidpepper.substack.com, sarahfay.substack.com and growthinreverse.substack.com, all
+//        HTTP 200 carrying canonical_url, reaction_count, comment_count, post_date and
+//        publishedBylines.
+//   https://<publication>/api/v1/posts/<slug>                       UNVERIFIED
+//     -> one post, with body_html when the post is free. Not traceable to a live read in this
+//        build, so it stays first-pass.
 // They are fetched from inside the logged-in page so the session and the origin match, the same
-// way the pull adapter does it. Refine from a live `--headed` run if the shapes have moved.
+// way the pull adapter does it. That is not a detail: the first live run fetched cross-origin and
+// collected nothing at all, every time, silently. Refine from a live `--headed` run if the shapes
+// have moved.
 
 const NAME = "substack-public-archive";
 const VERSION = "1";

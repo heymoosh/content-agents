@@ -171,7 +171,8 @@ reads as useful rather than partisan. And local plus specific beating national p
 
 Five npm scripts exist and they are all deterministic:
 
-- `npm run patterns:auto` collects public posts from the configured accounts on x, linkedin, and
+- `npm run patterns:auto` collects public posts from up to 12 configured accounts per run (fewest
+  entries first, so weekly runs rotate over the whole list) on x, linkedin, and
   substack through the logged-in Chrome session, dedupes by url, and appends. It records only what
   the page actually showed. It never judges, analyzes, or calls a model.
 - `npm run patterns:discover` searches for new accounts and proposes them into
@@ -362,14 +363,22 @@ is a coarser signal than one built on views.
 ### Steps, automatic path
 
 1. **Read the config.** `config/pattern-mining.yaml` for the niches and the account list. Honor
-   `--platform` and `--account` when Muxin gave them; otherwise the run covers every configured
-   account on the three automated platforms.
+   `--platform` and `--account` when Muxin gave them.
+   - **One run does NOT touch every configured account.** It touches at most **12**
+     (`DEFAULT_MAX_ACCOUNTS` in `src/patterns/auto-collect.ts`, overridable with `--max-accounts`),
+     across all three platforms combined. The cap is politeness, not a limitation: reading every
+     account every week is more traffic than this needs to send.
+   - **The 12 rotate on their own.** The runner sorts the configured accounts by how many entries
+     each already has in the corpus, fewest first, config order breaking ties so a run is
+     reproducible. So a week's run goes to whichever accounts are furthest behind, and successive
+     weekly runs even out over the whole list with no scheduling state to keep. An account held
+     back says so in the run's skipped list, with its current entry count.
 
 2. **Show her the plan first.** Run `npm run patterns:auto -- --dry-run` (adding
    `--platform` / `--account` / `--limit` when given). It fetches nothing at all and prints which
    accounts it would walk. Relay that, then run it for real.
 
-3. **Run `npm run patterns:auto`.** It walks the configured accounts, calls the adapter for each,
+3. **Run `npm run patterns:auto`.** It walks the accounts step 1's cap left in, calls the adapter for each,
    dedupes by url against the existing corpus, appends what is new, and prints per account how many
    posts it fetched, how many were new, how many cleared the outlier bar, and every failure with
    its reason. Relay that summary as is.
@@ -420,6 +429,14 @@ itself says, and search is the usual answer.
 Every proposal carries a handle, a platform, a guessed niche, why it was proposed, and a real cited
 post with its real numbers. A proposal with no post to cite is not made. Text platforms only, same
 three as collection.
+
+**The cited post is checked for ownership, and `--list` says when that check could not be made.**
+A post that demonstrably belongs to somebody else, a repost or a quote of another writer, is never
+cited: substack checks the archive byline, x checks the permalink's author segment, linkedin checks
+the card's own profile link. Where the page carried no author signal at all the post is still
+cited, and the line reads `authorship: NOT VERIFIED`. Relay that to Muxin whenever it appears; it
+means the post is that account's only if the feed it came from is. Approving anyway is her call,
+and the config comment records the same caveat.
 
 | What she wants | Command |
 |---|---|

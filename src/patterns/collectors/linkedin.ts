@@ -41,9 +41,15 @@ import {
 // adapter clicks Export on /analytics/creator/content/ and gets an xlsx with real impressions.
 // There is no equivalent for someone else's account, which is precisely why views is null here.
 //
-// SELECTORS ARE FIRST-PASS AND UNVERIFIED against a live page. LinkedIn's class names are the
-// least stable of the three platforms, and LinkedIn is the most aggressive about blocking
-// automated reading, so expect this adapter to need the most maintenance and to stop most often.
+// SELECTORS OBSERVED 2026-08-22 against a live recent-activity feed. That run is what found the
+// two real defects this adapter now guards against: comments and reposts read as the same number,
+// and a reaction count of 366000000 because a compact-number parser read the M of "Maddy" as a
+// millions suffix. See the OBSERVED blocks further down for the exact markup behind both.
+//
+// Observed does not mean stable. LinkedIn's class names are the least stable of the three
+// platforms, and LinkedIn is the most aggressive about blocking automated reading, so expect this
+// adapter to need the most maintenance and to stop most often. The block and auth-wall paths were
+// not exercised on that run.
 
 const NAME = "linkedin-public-activity";
 const VERSION = "1";

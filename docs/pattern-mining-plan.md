@@ -335,11 +335,16 @@ recorded on an entry, and never fetches anything.
   missing. It is views-only and stays that way, deliberately: a like-to-follower ratio is a
   different quantity with a different meaning, so it is not a stand-in. This bar simply does not
   exist on a platform without public views.
-- **`entryScore(entry)`**, module-private, returns `{ value, kind }` or null. Views win when
+- **`metricScore(metrics)`**, exported, returns `{ value, kind }` or null. Views win when
   present; otherwise it sums whichever of `likes`, `comments` and `shares` were recorded, and
-  returns null when none of them were. **`engagementScore(entry)`** is its exported number half,
-  for a caller that only needs "how far did this travel". Note there is no `reposts` field on
-  `CorpusMetrics`; `shares` is that number.
+  returns null when none of them were. It takes a metrics object rather than an entry because
+  `discover.ts` has to rank a candidate off a post's public numbers before that post is a corpus
+  entry, and it must rank by the SAME rule the corpus is scored by. `entryScore(entry)` is the
+  module-private wrapper over an entry's own metrics, and **`engagementScore(entry)`** is its
+  exported number half, for a caller that only needs "how far did this travel". Discovery's
+  `rankScore(metrics)` is `metricScore` with null turned into 0, because its caller is a sort and
+  an account with no visible numbers should rank last rather than rank on invented ones. Note
+  there is no `reposts` field on `CorpusMetrics`; `shares` is that number.
 - **`baselineMultiple(entry, accountEntries)`** compares a post to its own account's typical post
   using that score, which is what lets a LinkedIn or Substack entry be flagged at all. It returns
   `{ multiple, metric }` or null, not a bare number. That return-shape change is a real breaking
@@ -509,7 +514,7 @@ wrote gets led with. It may never be the reason a new fact appears.
 | Piece | Where | What it does |
 |---|---|---|
 | Collector adapters | `src/patterns/collectors/` | One per automated platform. Reads another creator's PUBLIC posts through `launchPlatform()`, the same logged-in Chrome session `src/pull/` uses, and reuses its `PullError` vocabulary. Fills what the platform actually exposes publicly and records null for the rest. |
-| The collect runner | `src/patterns/auto-collect.ts`, `npm run patterns:auto` | Walks the configured accounts, dedupes by url against the existing corpus using Phase 1's `appendEntries`, appends, and prints per account what was fetched, what was new, and every failure with its reason. `--dry-run` fetches nothing. |
+| The collect runner | `src/patterns/auto-collect.ts`, `npm run patterns:auto` | Walks up to 12 configured accounts per run (`DEFAULT_MAX_ACCOUNTS`, `--max-accounts` to change it), picked fewest-entries-first so successive weekly runs rotate over the whole list, dedupes by url against the existing corpus using Phase 1's `appendEntries`, appends, and prints per account what was fetched, what was new, and every failure with its reason. `--dry-run` fetches nothing. |
 | Discovery | `src/patterns/discover.ts`, `npm run patterns:discover` | Primarily SEARCH-based: per-niche `search_terms` from the `discovery:` block of `config/pattern-mining.yaml`, run against each platform's own public search, with walking the configured accounts' public activity kept as a secondary mechanism behind `crawl_configured_accounts`. Proposes accounts into `data/patterns/account-proposals.jsonl`, each carrying a real cited post and its numbers. `--approve <handle>` is the only path into the config; `--reject <handle>` stops a proposal coming back; `--list` shows what is pending. The search terms are Muxin's to edit and are the main lever on what gets found. |
 | The weekly job | `npm run patterns:weekly`, `src/cron/patterns-weekly.ts` | Runs the three collectors then discovery, one child process at a time, isolating failures so one blocked platform does not stop the rest, and appends a run report to `data/patterns/weekly-runs.jsonl`. The sequencing is load-bearing, see below. |
 | Enabling it | `docs/setup-patterns-weekly.md` | The launchd steps, following the same convention as `docs/setup-weekly-pull.md` and `docs/setup-notes-daily-launchd.md`. |

@@ -18,7 +18,9 @@ import {
   readProposals,
   rejectProposal,
   renderConfigEntry,
-  engagementScore,
+  rankScore,
+  pickLinkedinCard,
+  pickXCard,
   nichesFor,
   runPlatform,
   seedsFor,
@@ -29,9 +31,12 @@ import {
   type Candidate,
   type CandidateInput,
   type DiscoverySource,
+  type LinkedinActivityCard,
   type ProposalEvidence,
   type SearchHit,
+  type XTimelineCard,
 } from "./discover.js";
+import { metricScore } from "./outliers.js";
 
 let dir: string;
 let proposalsPath: string;
@@ -73,12 +78,12 @@ outlier_thresholds:
     view_follower_ratio: 3.0
     baseline_multiple: 3.0
   x:
-    view_follower_ratio: 5.0
+    view_follower_ratio: 1.0
     baseline_multiple: 3.0
 
-targets:
-  corpus_size_min: 20
-  corpus_size_max: 50
+analysis_sample:
+  min_outliers: 20
+  max_outliers: 50
 
 discovery:
   platforms:
@@ -355,7 +360,7 @@ describe("approval is the only config write path", () => {
     // And the rest of the file still means what it meant.
     const config = parse(readFileSync(configPath, "utf8")) as Record<string, any>;
     assert.equal(config.outlier_thresholds.substack.view_follower_ratio, 1.5);
-    assert.equal(config.targets.corpus_size_min, 20);
+    assert.equal(config.analysis_sample.min_outliers, 20);
     assert.equal(config.discovery.request_delay_ms, 1234);
   });
 
@@ -554,9 +559,22 @@ describe("the run", () => {
   });
 
   test("a real view count outranks engagement, and a missing number is not guessed", () => {
-    assert.equal(engagementScore({ views: 50_000, likes: 1, comments: null, shares: null, followers: null }), 50_000);
-    assert.equal(engagementScore({ views: null, likes: 10, comments: 5, shares: null, followers: null }), 15);
-    assert.equal(engagementScore({ views: null, likes: null, comments: null, shares: null, followers: 900_000 }), 0);
+    assert.equal(rankScore({ views: 50_000, likes: 1, comments: null, shares: null, followers: null }), 50_000);
+    assert.equal(rankScore({ views: null, likes: 10, comments: 5, shares: null, followers: null }), 15);
+    assert.equal(rankScore({ views: null, likes: null, comments: null, shares: null, followers: 900_000 }), 0);
+  });
+
+  test("ranking uses the same rule the corpus is scored by", () => {
+    // rankScore is metricScore with null turned into 0 for the sort, and nothing else. If the two
+    // ever diverge, discovery picks accounts by a rule the corpus does not judge them by.
+    for (const metrics of [
+      { views: 50_000, likes: 1, comments: null, shares: null, followers: null },
+      { views: null, likes: 10, comments: 5, shares: 2, followers: null },
+      { views: null, likes: null, comments: null, shares: null, followers: 900_000 },
+      { views: 0, likes: 99, comments: null, shares: null, followers: null },
+    ]) {
+      assert.equal(rankScore(metrics), metricScore(metrics)?.value ?? 0);
+    }
   });
 
   test("crawling configured accounts still runs as the second pass", async () => {
@@ -831,6 +849,114 @@ describe("substack evidence proves the post is theirs", () => {
     });
     const evidence = await substackSource.fetchEvidence(context, { ...candidate, postUrl: "https://growthinreverse.substack.com/p/matched?utm_source=x" });
     assert.equal(evidence?.url, "https://growthinreverse.substack.com/p/matched");
+  });
+});
+
+// The same defect the substack tests above guard against, on the other two platforms. LinkedIn
+// checked the card's text for a repost banner and nothing else; X took the first article on the
+// timeline with no author check and no repost check at all. Both could cite a stranger's post.
+//
+// The rule is substack's rule: skip a card only when it DEMONSTRABLY belongs to someone else, and
+// where authorship cannot be determined, keep it and record that it was not verified.
+describe("linkedin evidence proves the post is theirs", () => {
+  function card(over: Partial<LinkedinActivityCard> = {}): LinkedinActivityCard {
+    return {
+      urn: "urn:li:activity:1",
+      text: "a post",
+      full: "a post\n237 comments\n5 reposts",
+      reactionAria: "371 reactions",
+      reactionText: "371",
+      authorSlugs: [],
+      ...over,
+    };
+  }
+
+  test("a card whose only author link is someone else is not cited, even as the only card there", () => {
+    const cards = [card({ urn: "urn:li:activity:9", authorSlugs: ["stevekamb"] })];
+    assert.equal(pickLinkedinCard(cards, "@chenell"), null);
+  });
+
+  test("their own card is cited and marked confirmed", () => {
+    const cards = [
+      card({ urn: "urn:li:activity:9", authorSlugs: ["stevekamb"] }),
+      card({ urn: "urn:li:activity:10", authorSlugs: ["chenell"] }),
+    ];
+    const picked = pickLinkedinCard(cards, "@chenell");
+    assert.equal(picked?.card.urn, "urn:li:activity:10");
+    assert.equal(picked?.authorship, "confirmed");
+  });
+
+  test("a confirmed card wins over an earlier undecidable one", () => {
+    const cards = [card({ urn: "urn:li:activity:1" }), card({ urn: "urn:li:activity:2", authorSlugs: ["Chenell"] })];
+    const picked = pickLinkedinCard(cards, "chenell");
+    assert.equal(picked?.card.urn, "urn:li:activity:2");
+    assert.equal(picked?.authorship, "confirmed");
+  });
+
+  test("a card with no author link at all is kept, and says it was not verified", () => {
+    const picked = pickLinkedinCard([card({ urn: "urn:li:activity:3" })], "@chenell");
+    assert.equal(picked?.card.urn, "urn:li:activity:3");
+    assert.equal(picked?.authorship, "unverified");
+  });
+
+  test("LinkedIn's own repost and comment banners still skip the card", () => {
+    const cards = [
+      card({ urn: "urn:li:activity:4", full: "Chenell Basilio reposted this\n12 comments" }),
+      card({ urn: "urn:li:activity:5", full: "Chenell Basilio commented on this\n12 comments" }),
+      card({ urn: "urn:li:activity:6", authorSlugs: ["chenell"] }),
+    ];
+    assert.equal(pickLinkedinCard(cards, "@chenell")?.card.urn, "urn:li:activity:6");
+  });
+});
+
+describe("x evidence proves the post is theirs", () => {
+  function card(over: Partial<XTimelineCard> = {}): XTimelineCard {
+    return {
+      href: "https://x.com/chenell/status/1",
+      text: "a post",
+      label: "12 replies, 40 reposts, 300 likes, 50000 views",
+      socialContext: "",
+      promoted: false,
+      ...over,
+    };
+  }
+
+  test("a post whose permalink belongs to someone else is not cited, even as the only one there", () => {
+    // This is the exact shape the old code cited: document.querySelector("article"), first card,
+    // no author check. A profile whose top card is a repost handed back stevekamb's post as
+    // chenell's.
+    const cards = [card({ href: "https://x.com/stevekamb/status/9", socialContext: "chenell reposted" })];
+    assert.equal(pickXCard(cards, "@chenell"), null);
+  });
+
+  test("their own post is cited and marked confirmed, past a repost sitting above it", () => {
+    const cards = [
+      card({ href: "https://x.com/stevekamb/status/9", socialContext: "chenell reposted" }),
+      card({ href: "https://x.com/chenell/status/10" }),
+    ];
+    const picked = pickXCard(cards, "@chenell");
+    assert.equal(picked?.card.href, "https://x.com/chenell/status/10");
+    assert.equal(picked?.authorship, "confirmed");
+  });
+
+  test("a quoted post with no repost banner is still rejected on its permalink author", () => {
+    // The banner is not the check. A card can embed someone else's post with no social context at
+    // all, and the permalink is what settles it.
+    const cards = [card({ href: "https://x.com/someoneelse/status/11" })];
+    assert.equal(pickXCard(cards, "@chenell"), null);
+  });
+
+  test("a promoted card is never cited", () => {
+    const cards = [card({ href: "https://x.com/chenell/status/12", promoted: true })];
+    assert.equal(pickXCard(cards, "@chenell"), null);
+  });
+
+  test("a permalink with no author segment is kept, and says it was not verified", () => {
+    // X has never shown us this shape. It is here because dropping a real post on a page whose
+    // markup moved is the wrong failure, and citing it as proved is the worse one.
+    const picked = pickXCard([card({ href: "https://x.com/status/13" })], "@chenell");
+    assert.equal(picked?.card.href, "https://x.com/status/13");
+    assert.equal(picked?.authorship, "unverified");
   });
 });
 
