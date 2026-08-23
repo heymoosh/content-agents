@@ -91,10 +91,20 @@ accounts:
 
   - handle: "@AnandWrites"
     creator: Anand Giridharadas
-    # Verified indirectly: x.com blocks direct fetch (HTTP 402), so this was confirmed from the
-    # search-indexed profile x.com/AnandWrites, whose display name is "The.Ink, from Anand
-    # Giridharadas", plus the exact hook pattern 8 quote sitting at
-    # x.com/AnandWrites/status/1763575873687724519. Checked 2026-08-22.
+    # Verified 2026-08-22 from the search-indexed profile x.com/AnandWrites, whose display name is
+    # "The.Ink, from Anand Giridharadas", plus the exact hook pattern 8 quote sitting at
+    # x.com/AnandWrites/status/1763575873687724519.
+    # CORRECTION, 2026-08-23. This comment used to say "x.com blocks direct fetch (HTTP 402)",
+    # which forced the indirect route above. THAT IS NO LONGER TRUE and it was left standing long
+    # enough to matter, because the next reader trusts it and does not retry a route that works.
+    # A direct curl of an x.com profile now returns the page, and its twitter:title meta reads
+    # "Display Name (@handle) on X" while a wrong handle returns "User Profile Not Found - X | 404
+    # Error". That is a real first-party handle check and it is what every x row added 2026-08-23
+    # uses. Re-verified on this account the same day: the meta confirms the display name above.
+    # Two things the 402 note got right and that still hold: x.com exposes no follower count on
+    # any page (this row's number comes from the api.fxtwitter.com mirror, see the followers line),
+    # and the syndication endpoint truncates post bodies at 279 characters, so X BODIES still have
+    # no honest automated route and stay paste-only.
     platform: x   # cited separately by hook pattern 9
     niche: civic-democracy
     followers: 603822   # exact count via api.fxtwitter.com, read 2026-08-23
@@ -222,17 +232,20 @@ accounts:
     niche: building-solopreneur
     followers: 1700000   # profile shows "1.7M followers", retrieved 2026-08-22
 
-  - handle: "okdork"
+  - handle: "@noahkagan"
     creator: Noah Kagan
-    # Verified from his own site noahkagan.com, which links youtube.com/okdork and states
-    # 1.3M subscribers, retrieved 2026-08-22.
-    # CORRECTED 2026-08-23. The old value, 1300000, came from a figure stated on noahkagan.com,
-    # which is exactly the substitution platform-collection.md warns against: a creator's site
-    # publishes a cross-platform audience number, not a per-platform subscriber count. The /about
-    # page reads 1.18M across 562 videos, so that is what the row now holds.
-    # HANDLE DRIFT, flagged not changed: the channel's own vanityChannelUrl now resolves to
-    # youtube.com/@noahkagan. "okdork" still redirects there and still fetches correctly, so the
-    # handle is left as seeded rather than edited. Worth updating deliberately at some point.
+    # HANDLE UPDATED 2026-08-23, from "okdork" to "@noahkagan". The channel's own
+    # vanityChannelUrl now reads youtube.com/@noahkagan, so that is the canonical handle. The old
+    # one was seeded 2026-08-22 off his site noahkagan.com, which links youtube.com/okdork, and it
+    # still redirects and still fetches correctly today. It was changed anyway: a redirect that
+    # works now is not a guarantee, and this project has already been bitten by drifted handles.
+    # Prefer the canonical handle and keep the history here.
+    # FOLLOWER COUNT CORRECTED 2026-08-23. The old value, 1300000, came from a figure stated on
+    # noahkagan.com, which is exactly the substitution platform-collection.md warns against: a
+    # creator's site publishes a cross-platform audience number, not a per-platform subscriber
+    # count. The /about page reads 1.18M across 562 videos. Note the direction: the corrected
+    # number is LOWER than the cited one, which growth cannot explain and which is the clearest
+    # evidence in this file that a site figure and a platform figure are different quantities.
     platform: youtube
     niche: building-solopreneur
     followers: 1180000   # rounded display figure from the channel /about page, read 2026-08-23
@@ -596,30 +609,22 @@ accounts:
 
   # civic-democracy, youtube. Beyond the two gaps this round targeted, these three close the
   # civic youtube thinness reported after round 1 (it was 2 accounts).
-  - handle: "@valariekaurofficial"
-    creator: Valarie Kaur
-    # Verified from her own site valariekaur.com, which links youtube.com/@valariekaurofficial,
-    # retrieved 2026-08-22. She is already seeded above on instagram; this is the same person on
-    # a second platform, kept separate because the collector is keyed on platform.
-    # PRUNE CANDIDATE, added 2026-08-23 once the /about route made counts readable: this channel
-    # carries 412 subscribers across 58 videos. Read twice on separate attempts, same answer both
-    # times. The handle is genuinely hers and the row is not wrong, but an account this size
-    # cannot be a reference creator: there is no meaningful engagement baseline to sample. Her
-    # instagram row (121k) is the live one. Cut this row unless someone wants it for contrast.
-    platform: youtube
-    niche: civic-democracy
-    followers: 412   # rounded display figure from the channel /about page, read 2026-08-23
+  # youtube.com/@valariekaurofficial was seeded 2026-08-22 and REMOVED 2026-08-23, once the /about
+  # route made subscriber counts readable. REMOVED FOR SIZE, NOT AUTHENTICITY, and the difference
+  # matters: the handle is genuinely Valarie Kaur's, her own site valariekaur.com links it, and the
+  # original verification was sound. The channel simply carries 412 subscribers across 58 videos,
+  # read twice on separate attempts with the same answer, and an account that size has no
+  # engagement baseline to sample. This is not a rejection of the creator. Her live row is her
+  # instagram account @valariekaur at 121k, seeded further up this file. Do not re-add this
+  # channel from the same website link; the link is real, the audience is not there.
 
-  - handle: "@deepaviyer"
-    creator: Deepa Iyer
-    # Verified from her own site deepaiyer.com, which links youtube.com/@deepaviyer,
-    # retrieved 2026-08-22.
-    # PRUNE CANDIDATE, added 2026-08-23: 90 subscribers across 7 videos, read twice on separate
-    # attempts. Genuinely her channel, but seven videos cannot be sampled and ninety subscribers
-    # cannot be a baseline. Her substack and linkedin rows are the live ones.
-    platform: youtube
-    niche: civic-democracy
-    followers: 90   # rounded display figure from the channel /about page, read 2026-08-23
+  # youtube.com/@deepaviyer was seeded 2026-08-22 and REMOVED 2026-08-23, for the same reason as
+  # @valariekaurofficial above. REMOVED FOR SIZE, NOT AUTHENTICITY: the handle is genuinely Deepa
+  # Iyer's and her own site deepaiyer.com links it. The channel holds 90 subscribers across 7
+  # videos, read twice on separate attempts. Seven videos cannot be sampled and ninety subscribers
+  # cannot be a baseline. Her live rows are her substack (@deepaiyer, 4.2k) and her linkedin
+  # (@deepa-iyer-3575ba6), both seeded elsewhere in this file. Do not re-add this channel from the
+  # same website link.
 
   - handle: "@moshehnews"
     creator: Mosheh Oinounou (Mo News)
