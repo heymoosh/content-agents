@@ -6,12 +6,14 @@ import Database from "better-sqlite3";
 import { repoRoot } from "../db/db.js";
 import {
   applyExplorationOverride,
+  applyOriginBlock,
   applySubstackRepost,
   CONTROL_RUN_SOURCE,
   CORE_TEXT,
   decideForPillar,
   loadData,
   mergeDecisions,
+  originPlatform,
   type Decision,
   type LoadedData,
   type MergedDecision,
@@ -221,6 +223,138 @@ describe("applyExplorationOverride: the exploration-budget's routing hook (card 
 describe("CORE_TEXT: substack is never an unconditional routing target", () => {
   test("substack is absent from CORE_TEXT", () => {
     assert.ok(!CORE_TEXT.includes("substack"), "substack must only ever be added conditionally, via applySubstackRepost");
+  });
+});
+
+describe("originPlatform: mapping source.md `origin` onto a routing channel (v5 handoff §9.9)", () => {
+  test("maps the platforms whose origin URL names them unambiguously", () => {
+    assert.equal(originPlatform("https://www.linkedin.com/posts/muxin-li_something-activity-7123"), "linkedin");
+    assert.equal(originPlatform("https://linkedin.com/feed/update/urn:li:activity:7123"), "linkedin");
+    assert.equal(originPlatform("https://x.com/humaninference/status/1234567890"), "x");
+    assert.equal(originPlatform("https://twitter.com/humaninference/status/1234567890"), "x", "twitter.com is the same channel as x.com");
+    assert.equal(originPlatform("https://mobile.twitter.com/humaninference/status/1"), "x", "subdomains resolve too");
+    assert.equal(originPlatform("https://bsky.app/profile/humaninference.bsky.social/post/3k"), "bluesky");
+    assert.equal(originPlatform("https://www.threads.net/@humaninference/post/Cabc"), "threads");
+    assert.equal(originPlatform("https://www.threads.com/@humaninference/post/Cabc"), "threads");
+    assert.equal(originPlatform("https://humaninference.substack.com/p/some-essay"), "substack");
+    assert.equal(originPlatform("https://substack.com/@humaninference/note/c-292558121"), "substack");
+  });
+
+  test("HTTP is treated the same as HTTPS", () => {
+    assert.equal(originPlatform("http://www.linkedin.com/posts/x-activity-7123"), "linkedin");
+  });
+
+  test("the scaffolder's non-URL origins name no platform at all", () => {
+    // new-content.ts writes exactly these three shapes for a non-URL source.
+    assert.equal(originPlatform("file:Building an Innovation Nation.md"), undefined);
+    assert.equal(originPlatform("voice-memo:idea.m4a"), undefined);
+    assert.equal(originPlatform("pasted-text"), undefined);
+    assert.equal(originPlatform(""), undefined, "an absent origin (readSourceOrigin returns '') names nothing");
+  });
+
+  test("platforms this repo cannot resolve a host for FAIL OPEN rather than being guessed", () => {
+    // Mastodon is federated and no instance host is configured anywhere in config/; a community
+    // is recorded in config/platforms.yaml with notes only, no URL. Guessing either would drop a
+    // channel on no evidence, so both must return undefined.
+    assert.equal(originPlatform("https://mastodon.social/@humaninference/1234"), undefined);
+    assert.equal(originPlatform("https://hachyderm.io/@humaninference/1234"), undefined);
+    assert.equal(originPlatform("https://circle.so/c/democratic-resilience/post/abc"), undefined);
+    assert.equal(originPlatform("https://humaninference.com/p/some-essay"), undefined, "a Substack publication on a custom domain carries no substack.com marker");
+  });
+
+  test("a malformed URL fails open instead of throwing", () => {
+    assert.equal(originPlatform("https://"), undefined);
+  });
+
+  test("a lookalike hostname does not match by substring", () => {
+    assert.equal(originPlatform("https://notlinkedin.com/posts/1"), undefined, "suffix match is on a dot boundary, not a substring");
+    assert.equal(originPlatform("https://x.com.evil.example/status/1"), undefined, "the registrable domain must be the tail of the host");
+  });
+});
+
+describe("applyOriginBlock: a piece is never routed back to the platform it is already live on", () => {
+  function md(overrides: Partial<MergedDecision>): MergedDecision {
+    return { platform: "x", decision: "include", score: null, confidence: "cold-start", rationale: "", pillars: ["human-ai"], ...overrides };
+  }
+
+  test("a LinkedIn-origin piece never routes to linkedin, even though config defaults include it", () => {
+    const merged = [
+      md({ platform: "linkedin", decision: "include", confidence: "cold-start", rationale: "cold-start (no tagged data yet) — posting broadly to gather signal" }),
+      md({ platform: "x", decision: "include" }),
+    ];
+    const out = applyOriginBlock(merged, "https://www.linkedin.com/posts/muxin-li_x-activity-7123");
+    const li = out.find((m) => m.platform === "linkedin")!;
+    assert.equal(li.decision, "skip", "the origin platform is a hard exclusion, outranking the config `include` default");
+    assert.equal(li.confidence, "rule", "'rule' is the un-overridable confidence — applyExplorationOverride and validate.ts both key off it");
+  });
+
+  test("the exclusion is VISIBLE: the row survives, saying it is already live there and what the decision was before", () => {
+    const merged = [md({ platform: "linkedin", rationale: "cold-start (no tagged data yet) — posting broadly to gather signal" })];
+    const out = applyOriginBlock(merged, "https://www.linkedin.com/posts/muxin-li_x-activity-7123");
+    assert.equal(out.length, merged.length, "a blocked channel must not vanish from routing.md");
+    assert.match(out[0].rationale, /already live there/, "routing.md has to say WHY the channel was excluded");
+    assert.match(out[0].rationale, /linkedin\.com/, "and name the origin it read that from");
+    assert.match(out[0].rationale, /was: cold-start \(no tagged data yet\)/, "and preserve the decision it replaced");
+  });
+
+  test("a data-driven include is blocked just the same (the block outranks every include path)", () => {
+    const merged = [md({ platform: "x", decision: "include", score: 1.8, confidence: "data", rationale: "config default: include — data shows 1.80× platform norm (n=9)" })];
+    const out = applyOriginBlock(merged, "https://x.com/humaninference/status/1234567890");
+    assert.equal(out[0].decision, "skip");
+    assert.equal(out[0].confidence, "rule");
+  });
+
+  test("no origin recorded: decisions are byte-identical to today's behaviour", () => {
+    const merged = [md({ platform: "x" }), md({ platform: "linkedin" }), md({ platform: "bluesky", decision: "skip" })];
+    assert.deepEqual(applyOriginBlock(merged, ""), merged);
+  });
+
+  test("a local/pasted origin routes exactly as it does today", () => {
+    const merged = [md({ platform: "x" }), md({ platform: "linkedin" })];
+    assert.deepEqual(applyOriginBlock(merged, "file:Building an Innovation Nation.md"), merged);
+    assert.deepEqual(applyOriginBlock(merged, "voice-memo:idea.m4a"), merged);
+    assert.deepEqual(applyOriginBlock(merged, "pasted-text"), merged);
+  });
+
+  test("an origin the mapper cannot resolve routes normally rather than losing a channel", () => {
+    const merged = [md({ platform: "x" }), md({ platform: "mastodon" }), md({ platform: "linkedin" })];
+    assert.deepEqual(applyOriginBlock(merged, "https://mastodon.social/@humaninference/1234"), merged, "an unmappable host must fail open, never fail wrong");
+    assert.deepEqual(applyOriginBlock(merged, "https://some-blog.example/posts/1"), merged);
+  });
+
+  test("only the origin platform is touched — every other channel keeps its exact decision", () => {
+    const merged = [md({ platform: "linkedin" }), md({ platform: "x" }), md({ platform: "bluesky" }), md({ platform: "quote-card", confidence: "always" })];
+    const out = applyOriginBlock(merged, "https://www.linkedin.com/posts/muxin-li_x-activity-7123");
+    assert.deepEqual(out.filter((m) => m.platform !== "linkedin"), merged.filter((m) => m.platform !== "linkedin"));
+  });
+
+  test("a channel already skipping is left exactly as it was (no rationale rewrite)", () => {
+    const merged = [md({ platform: "linkedin", decision: "skip", confidence: "rule", rationale: "editorial rule: never route here" })];
+    assert.deepEqual(applyOriginBlock(merged, "https://www.linkedin.com/posts/muxin-li_x-activity-7123"), merged);
+  });
+
+  test("DEMOTE-ONLY: never appends a decision for a platform that was not already a candidate", () => {
+    const merged = [md({ platform: "x" })];
+    const out = applyOriginBlock(merged, "https://humaninference.substack.com/p/some-essay");
+    assert.deepEqual(out, merged, "substack was never a candidate, so there is nothing to exclude and no row to invent");
+  });
+
+  test("an exploration probe cannot punch through the origin block", () => {
+    const blocked = applyOriginBlock([md({ platform: "linkedin" })], "https://www.linkedin.com/posts/muxin-li_x-activity-7123");
+    const out = applyExplorationOverride(blocked, "human-ai", "linkedin");
+    assert.deepEqual(out, blocked, "confidence 'rule' is what applyExplorationOverride refuses to override");
+  });
+
+  test("main()'s order keeps the Muxin-approved Note repost alive (card df11d0db)", () => {
+    // A Substack Note's origin IS substack, and the block runs BEFORE applySubstackRepost. Since
+    // the block is demote-only, `substack` is still absent when the repost hook runs, so the one
+    // republish-to-origin Muxin decided on purpose still happens.
+    const merged = [md({ platform: "x" }), md({ platform: "bluesky" })];
+    const blocked = applyOriginBlock(merged, "https://substack.com/@humaninference/note/c-292558121");
+    const out = applySubstackRepost(blocked, ["human-ai"], "substack-note");
+    const sub = out.find((m) => m.platform === "substack");
+    assert.ok(sub, "the Note repost must survive the origin block");
+    assert.equal(sub!.decision, "include");
   });
 });
 
