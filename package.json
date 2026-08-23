@@ -83,6 +83,7 @@
     "patterns:collect": "tsx src/patterns/collect.ts",
     "patterns:outliers": "tsx src/patterns/collect.ts outliers",
     "patterns:openers": "tsx src/patterns/openers.ts",
+    "patterns:instagram": "tsx src/patterns/instagram.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",

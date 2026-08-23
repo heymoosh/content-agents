@@ -53,6 +53,11 @@ export interface CorpusMetrics {
   comments: number | null;
   shares: number | null;
   followers: number | null;
+  // Reddit's ratio of upvotes to total votes, 0..1, as the API reports it. Absent everywhere else,
+  // because no other platform publishes it. It is recorded but deliberately NOT part of the
+  // outlier score: a 0.95 ratio on a 12-point post and on a 12,000-point post are the same number
+  // and mean different things, so it is context a reader weighs, never a bar the code fires on.
+  upvote_ratio?: number | null;
 }
 
 // Every form a post can take on the page. This is the axis the analysis compares on - which form
@@ -128,6 +133,31 @@ export interface CorpusMedia {
   body_is_complete: boolean;
 }
 
+// Where a collected post was found, so a reader can tell a winner from an ordinary post without
+// re-reading the platform.
+//
+// This exists because of a real mistake. Every reddit entry in the corpus was pulled from a
+// top-of-year listing, which made each one an outlier's sibling, so measuring a post against its
+// siblings measured a winner against other winners. r/ADHD's biggest post of the year scored 2.2x
+// that way and 4095x against the community's true median. `role` is what stops that reading:
+// "winner" says the post was selected FOR having travelled, so its siblings are not a baseline.
+//
+// "baseline" is defined here for completeness, but the unbiased sample itself does not enter the
+// corpus. It lives in data/patterns/baselines.jsonl as one AccountBaseline per account, because a
+// few hundred ordinary posts per community would drown the collected winners the analysis reads.
+export type SampleRole = "winner" | "baseline";
+
+export interface CorpusSample {
+  // The platform listing the post came out of, in that platform's own words: "top", "new", "hot".
+  listing: string;
+  // The listing's time window where it has one, e.g. "year" for reddit's top?t=year. Null on a
+  // listing with no window, like "new".
+  window: string | null;
+  // 1-based position in that listing at collection time. Null where position was not recorded.
+  rank: number | null;
+  role: SampleRole;
+}
+
 // One collected post. Stored one JSON object per line in data/patterns/corpus.jsonl.
 export interface CorpusEntry {
   // Stable slug: <platform>-<handle>-<short hash of url>.
@@ -145,9 +175,52 @@ export interface CorpusEntry {
   body: string;
   transcript_source: TranscriptSource;
   metrics: CorpusMetrics;
+  // The post's own title, where the platform has one as a separate field from the body. On reddit
+  // the title is most of the craft and is often the entire artifact: a stranger scrolling a
+  // subreddit sees the title and nothing else. Absent on platforms with no title field, and absent
+  // on entries collected before this field existed.
+  //
+  // A titled post with no body of its own copies the title into `body` too, following the
+  // convention the hand-collected reddit entries already use, and marks
+  // `media.body_is_complete: false` so nothing downstream reads that title as a whole post.
+  title?: string | null;
   // Absent on an entry not yet examined, and absent where the form could not be determined.
   media?: CorpusMedia;
+  // How this post was found. Absent on entries collected before this field existed, which is why
+  // no reader may assume an absent `sample` means an unbiased one.
+  sample?: CorpusSample;
   notes?: string;
+}
+
+// An account's TRUE typical post, measured on a sample that was not selected for performance.
+// Stored one JSON object per line in data/patterns/baselines.jsonl, gitignored like the corpus,
+// because the scores belong to other people's posts.
+//
+// The whole point of this record is that it is measured somewhere other than the corpus. A
+// corpus full of an account's best posts cannot produce it, and the median of that corpus is the
+// wrong number by three orders of magnitude on reddit.
+export interface AccountBaseline {
+  platform: Platform;
+  handle: string;
+  // Which quantity `median` is measured on, so it is never divided into a score of the other kind.
+  // "engagement" on reddit, where the score lands in metrics.likes and no view count exists.
+  metric: BaselineMetric;
+  // The median score of the unbiased sample. This is the denominator of an honest multiple.
+  median: number;
+  // How many posts the median was taken over.
+  sample_size: number;
+  // Earliest and latest posting date in the sample, ISO date strings, so the window is auditable.
+  window_start: string | null;
+  window_end: string | null;
+  // Every score in the sample, numbers only and no text, so the median can be rechecked or a
+  // different percentile taken later without recollecting.
+  scores: number[];
+  // The account's audience size where the route exposes one: subscriber count on a subreddit.
+  // Null where the number exists on the platform but not on this route.
+  followers: number | null;
+  // Plain words: which listing, what filter, what the sample deliberately excludes.
+  method: string;
+  collected_at: string;
 }
 
 // Per-platform bars from config/pattern-mining.yaml. Either bar clearing makes an outlier.
@@ -162,6 +235,14 @@ export type OutlierReason = "ratio" | "baseline" | "both" | "none";
 // "engagement" where it was not and the sum of the recorded likes/comments/shares stood in.
 export type BaselineMetric = "views" | "engagement";
 
+// What `multiple` was divided by.
+//
+//   "recorded" - a real AccountBaseline, measured on a sample that was not selected for
+//                performance. The trustworthy one.
+//   "siblings" - the median of the account's OTHER collected entries. Only as unbiased as the
+//                collection is, and a collection of winners is not unbiased at all.
+export type BaselineSource = "recorded" | "siblings";
+
 export interface OutlierVerdict {
   isOutlier: boolean;
   ratio: number | null;
@@ -169,6 +250,10 @@ export interface OutlierVerdict {
   // Which metric `multiple` was measured on, so a 4x is never ambiguous between views and
   // engagement. Null exactly when `multiple` is null.
   baselineMetric: BaselineMetric | null;
+  // Where the denominator came from. Null exactly when `multiple` is null. Print it next to any
+  // multiple you show a human: "12x against a recorded baseline" and "12x against other winners"
+  // are not the same claim.
+  baselineSource: BaselineSource | null;
   reason: OutlierReason;
 }
 

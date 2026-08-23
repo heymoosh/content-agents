@@ -1,0 +1,110 @@
+{
+  "business_discovery": {
+    "id": "17841400000000001",
+    "username": "fixturecreator",
+    "name": "Fixture Creator",
+    "followers_count": 400000,
+    "media_count": 1820,
+    "media": {
+      "data": [
+        {
+          "id": "17800000000000001",
+          "caption": "invented caption for a fixture reel, no real post",
+          "like_count": 52000,
+          "comments_count": 858,
+          "view_count": 1240000,
+          "media_type": "VIDEO",
+          "media_product_type": "REELS",
+          "permalink": "https://www.instagram.com/reel/FIXTURE001/",
+          "timestamp": "2026-08-01T14:22:05+0000",
+          "username": "fixturecreator",
+          "media_url": "https://example.invalid/fixture-001.mp4",
+          "thumbnail_url": "https://example.invalid/fixture-001.jpg"
+        },
+        {
+          "id": "17800000000000002",
+          "caption": "invented caption for a fixture carousel, no real post",
+          "like_count": 9100,
+          "comments_count": 240,
+          "media_type": "CAROUSEL_ALBUM",
+          "media_product_type": "FEED",
+          "permalink": "https://www.instagram.com/p/FIXTURE002/",
+          "timestamp": "2026-07-28T09:00:00+0000",
+          "username": "fixturecreator",
+          "children": {
+            "data": [
+              { "id": "17800000000000021", "media_type": "IMAGE" },
+              { "id": "17800000000000022", "media_type": "IMAGE" },
+              { "id": "17800000000000023", "media_type": "IMAGE" },
+              { "id": "17800000000000024", "media_type": "IMAGE" }
+            ]
+          }
+        },
+        {
+          "id": "17800000000000003",
+          "caption": "invented caption for a fixture single image, no real post",
+          "like_count": 3400,
+          "comments_count": 61,
+          "media_type": "IMAGE",
+          "media_product_type": "FEED",
+          "permalink": "https://www.instagram.com/p/FIXTURE003/",
+          "timestamp": "2026-07-20T18:45:30+0000",
+          "username": "fixturecreator",
+          "media_url": "https://example.invalid/fixture-003.jpg",
+          "alt_text": "invented alt text supplied by the fixture creator"
+        },
+        {
+          "id": "17800000000000004",
+          "caption": "invented caption for a fixture feed video, no real post",
+          "like_count": 2100,
+          "comments_count": 33,
+          "media_type": "VIDEO",
+          "media_product_type": "FEED",
+          "permalink": "https://www.instagram.com/p/FIXTURE004/",
+          "timestamp": "2026-07-11T11:05:00+0000",
+          "username": "fixturecreator",
+          "media_url": "https://example.invalid/fixture-004.mp4"
+        },
+        {
+          "id": "17800000000000005",
+          "like_count": 1800,
+          "comments_count": 12,
+          "media_type": "IMAGE",
+          "media_product_type": "FEED",
+          "permalink": "https://www.instagram.com/p/FIXTURE005/",
+          "timestamp": "2026-07-02T07:30:00+0000",
+          "username": "fixturecreator"
+        },
+        {
+          "id": "17800000000000006",
+          "caption": "invented caption for a fixture reel with no view count returned",
+          "like_count": 700,
+          "comments_count": 9,
+          "media_type": "VIDEO",
+          "media_product_type": "REELS",
+          "permalink": "https://www.instagram.com/reel/FIXTURE006/",
+          "timestamp": "2026-06-24T16:10:00+0000",
+          "username": "fixturecreator"
+        },
+        {
+          "id": "17800000000000007",
+          "caption": "invented caption for a fixture post of an unrecognised type",
+          "like_count": 410,
+          "comments_count": 4,
+          "media_type": "SOMETHING_NEW",
+          "media_product_type": "FEED",
+          "permalink": "https://www.instagram.com/p/FIXTURE007/",
+          "timestamp": "2026-06-15T12:00:00+0000",
+          "username": "fixturecreator"
+        }
+      ],
+      "paging": {
+        "cursors": {
+          "before": "FIXTUREBEFORECURSOR",
+          "after": "FIXTUREAFTERCURSOR"
+        }
+      }
+    }
+  },
+  "id": "17841400000000999"
+}

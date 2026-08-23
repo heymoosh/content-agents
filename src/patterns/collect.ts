@@ -10,12 +10,14 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { CORPUS_PATH, INBOX_DIR, appendEntries, groupByAccount, makeId, readCorpus } from "./corpus.js";
-import { classifyOutlier } from "./outliers.js";
+import { BASELINES_PATH, loadBaselineIndex } from "./baselines.js";
+import { classifyOutlier, isWinnersOnlySample } from "./outliers.js";
 import {
   PLATFORMS,
   MEDIA_FORMS,
   type CorpusEntry,
   type CorpusMedia,
+  type CorpusSample,
   type OutlierThresholds,
   type PatternMiningConfig,
   type MediaAspect,
@@ -99,6 +101,16 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
       }
       metrics[key] = v;
     }
+    // Optional, and bounded rather than merely non-negative: it is a proportion of votes, so
+    // anything outside 0..1 is a misread field rather than a surprising post.
+    const upvoteRatio = (rawMetrics as Record<string, unknown>).upvote_ratio ?? null;
+    if (upvoteRatio !== null) {
+      if (typeof upvoteRatio !== "number" || !Number.isFinite(upvoteRatio) || upvoteRatio < 0 || upvoteRatio > 1) {
+        errors.push("metrics.upvote_ratio must be a number between 0 and 1, or null");
+      } else {
+        metrics.upvote_ratio = upvoteRatio;
+      }
+    }
   }
   // `media` is optional, so an entry collected before this field existed still validates. When it
   // is there it is checked strictly, because body_is_complete is what a downstream step trusts
@@ -151,6 +163,40 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
     }
   }
   if (r.notes !== undefined && typeof r.notes !== "string") errors.push("notes must be a string when present");
+  if (r.title !== undefined && r.title !== null && typeof r.title !== "string") {
+    errors.push("title must be a string or null when present");
+  }
+  // `sample` is optional so entries staged before it existed still validate, and strict when it is
+  // there, because role is what stops a winner's siblings being read as a baseline.
+  let sample: CorpusSample | null = null;
+  if (r.sample !== undefined && r.sample !== null) {
+    const rs = r.sample;
+    if (typeof rs !== "object" || Array.isArray(rs)) {
+      errors.push("sample must be an object when present");
+    } else {
+      const sm = rs as Record<string, unknown>;
+      if (typeof sm.listing !== "string" || sm.listing.trim() === "") {
+        errors.push("sample.listing must name the listing the post came from");
+      }
+      if (sm.role !== "winner" && sm.role !== "baseline") {
+        errors.push('sample.role must be "winner" or "baseline"');
+      }
+      const window = sm.window ?? null;
+      if (window !== null && typeof window !== "string") errors.push("sample.window must be a string or null");
+      const rank = sm.rank ?? null;
+      if (rank !== null && (typeof rank !== "number" || !Number.isFinite(rank) || rank < 1)) {
+        errors.push("sample.rank must be a 1-based position or null");
+      }
+      if (errors.length === 0) {
+        sample = {
+          listing: sm.listing as string,
+          window: window as string | null,
+          rank: rank as number | null,
+          role: sm.role as CorpusSample["role"],
+        };
+      }
+    }
+  }
 
   if (errors.length > 0) return { entry: null, errors };
 
@@ -168,7 +214,9 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
     transcript_source: transcriptSource as CorpusEntry["transcript_source"],
     metrics,
   };
+  if (typeof r.title === "string") entry.title = r.title;
   if (media) entry.media = media;
+  if (sample) entry.sample = sample;
   if (typeof r.notes === "string") entry.notes = r.notes;
   return { entry, errors };
 }
@@ -194,6 +242,7 @@ interface Args {
   inboxDir: string;
   entries: string[];
   configPath: string;
+  baselinesPath: string;
 }
 
 export function parseArgs(argv: string[]): Args {
@@ -203,6 +252,7 @@ export function parseArgs(argv: string[]): Args {
     inboxDir: INBOX_DIR,
     entries: [],
     configPath: CONFIG_PATH,
+    baselinesPath: BASELINES_PATH,
   };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
@@ -211,14 +261,16 @@ export function parseArgs(argv: string[]): Args {
     else if (flag === "--corpus" && value) (args.corpusPath = value), i++;
     else if (flag === "--inbox" && value) (args.inboxDir = value), i++;
     else if (flag === "--config" && value) (args.configPath = value), i++;
+    else if (flag === "--baselines" && value) (args.baselinesPath = value), i++;
   }
   return args;
 }
 
 // The shared report both commands print: how many entries each account has now, and which of
 // them cleared the outlier bar.
-function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): void {
+function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig, baselinesPath?: string): void {
   const groups = groupByAccount(corpus);
+  const baselines = loadBaselineIndex(baselinesPath);
   console.log(`\nCorpus: ${corpus.length} entries across ${groups.size} accounts (target ${config.targets.corpus_size_min}-${config.targets.corpus_size_max}).`);
   if (corpus.length < config.targets.corpus_size_min) {
     console.log(`Below the ${config.targets.corpus_size_min}-entry floor. Collect more before running the analysis step.`);
@@ -226,18 +278,26 @@ function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): 
 
   console.log("\nAccount                              Platform    Entries  Outliers");
   const outlierLines: string[] = [];
+  const unmeasured: string[] = [];
   for (const [key, entries] of [...groups.entries()].sort()) {
     const [platform, handle] = key.split("|");
     const thresholds = thresholdsFor(config, platform);
+    const baseline = baselines.get(key) ?? null;
+    // A winners-only collection with no measured baseline has no honest denominator, so say that
+    // rather than printing the median of the winners and letting it read as the community's norm.
+    if (!baseline && isWinnersOnlySample(entries)) unmeasured.push(`${platform} ${handle}`);
     let outliers = 0;
     for (const entry of entries) {
       if (!thresholds) continue;
-      const verdict = classifyOutlier(entry, entries, thresholds);
+      const verdict = classifyOutlier(entry, entries, thresholds, baseline);
       if (!verdict.isOutlier) continue;
       outliers++;
       const ratio = verdict.ratio === null ? "n/a" : verdict.ratio.toFixed(1);
       const multiple = verdict.multiple === null ? "n/a" : verdict.multiple.toFixed(1);
-      outlierLines.push(`  [${verdict.reason}] ${entry.id}  views/followers ${ratio}, baseline x${multiple}\n    ${entry.url}`);
+      // The source is printed with the number on purpose. "12x against a measured baseline" and
+      // "12x against this account's other collected winners" are different claims.
+      const against = verdict.baselineSource === null ? "" : ` (vs ${verdict.baselineSource === "recorded" ? "measured baseline" : "other collected entries"})`;
+      outlierLines.push(`  [${verdict.reason}] ${entry.id}  views/followers ${ratio}, baseline x${multiple}${against}\n    ${entry.url}`);
     }
     const label = thresholds ? String(outliers) : "no thresholds";
     console.log(`${("@" + handle).padEnd(36)} ${platform.padEnd(11)} ${String(entries.length).padEnd(8)} ${label}`);
@@ -249,6 +309,13 @@ function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): 
     console.log(`\nCleared the outlier bar (${outlierLines.length}):`);
     for (const line of outlierLines) console.log(line);
   }
+
+  if (unmeasured.length > 0) {
+    console.log(`\nNo baseline measured yet for ${unmeasured.length} account(s) whose entries were all collected as winners.`);
+    console.log("Their multiples are left blank rather than measured against each other. Measure one with:");
+    console.log("  npm run patterns:reddit -- --sub r/<name>   (reddit)");
+    for (const line of unmeasured) console.log(`  ${line}`);
+  }
 }
 
 export function main(argv: string[] = process.argv.slice(2)): number {
@@ -257,7 +324,7 @@ export function main(argv: string[] = process.argv.slice(2)): number {
 
   if (args.command === "outliers") {
     const corpus = readCorpus(args.corpusPath);
-    printCorpusReport(corpus, config);
+    printCorpusReport(corpus, config, args.baselinesPath);
     return 0;
   }
 
@@ -295,7 +362,7 @@ export function main(argv: string[] = process.argv.slice(2)): number {
   console.log(`Appended: ${appended.length}. Skipped as already collected: ${duplicates.length}.`);
   for (const dup of duplicates) console.log(`  already collected: ${dup.url}`);
 
-  printCorpusReport(readCorpus(args.corpusPath), config);
+  printCorpusReport(readCorpus(args.corpusPath), config, args.baselinesPath);
   return invalid > 0 ? 1 : 0;
 }
 
