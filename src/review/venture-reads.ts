@@ -46,8 +46,10 @@ export interface VentureReadResult {
 // The same allowlist src/review/fiction.ts:113 uses for a fiction series, deliberately rather than
 // paths.ts's safeSlug blocklist. A blocklist that names "/", "\" and ".." has to be right about
 // every other way a path can escape; an allowlist of [a-z0-9][\w-]* has nothing left to be wrong
-// about. Percent-encoding is covered for free: Node leaves "%2e%2e" in url.pathname, and "%" is
-// not in the allowlist. A `?slug=../../..` traversal was a real, fixed bug in this repo — this is
+// about. Percent-encoding is covered by two independent layers: WHATWG URL normalizes "%2e%2e"
+// away as a dot segment before serve.ts ever dispatches, and any "%" that did survive fails the
+// allowlist here. The tests drive this function directly with raw strings, so what they exercise
+// is the second layer rather than trusting the first. A `?slug=../../..` traversal was a real, fixed bug in this repo — this is
 // the gate every venture read passes before a slug reaches the filesystem.
 const SAFE_SLUG = /^[a-z0-9][\w-]*$/;
 
