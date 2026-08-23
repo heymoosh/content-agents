@@ -4,17 +4,21 @@ The structure library that sits alongside `references/hook-patterns.md` and
 `references/civic-adaptation.md`. Hook patterns cover the first line. This file covers the whole
 post: the arc after the hook, what it makes the reader feel, how it closes, and how long it runs.
 
-**Status: partly mined, synthesis runs 2026-08-22 and 2026-08-23.** `substack` (6 patterns),
-`youtube` (5 patterns), `linkedin` (4 patterns) and `mastodon` (3 patterns) carry mined records.
-**Mastodon's are the best-evidenced in this file**, because it is the only platform sampled without
-cherry-picking; weight them accordingly. LinkedIn was withheld from the first
-pass pending a data-provenance check, then cleared and mined once its entries had been rebuilt from
-raw page markup and independently verified. **Every other platform section below is still a
-placeholder.** This file is populated by `/patterns synthesize`, the synthesis step of the pattern-mining
-pass. **If you are drafting for a platform whose section still reads "Not yet mined", fall back to
-`references/hook-patterns.md`** and to the per-channel angle in `config/platforms.yaml`
-`spin_angles`. An empty section is not permission to invent a structure and call it proven, and a
-populated section is never permission to carry its patterns to a different platform.
+**Status: mined across three synthesis runs, 2026-08-22 and 2026-08-23, on a 292-entry corpus.**
+Every one of the 292 collected posts now carries a structural analysis. Sections exist for
+`reddit`, `tiktok`, `substack`, `substack-notes`, `hackernews`, `bluesky`, `mastodon`, `threads`,
+`x`, `youtube` and `linkedin`; `instagram` and `devto` were mined and are too thin to carry
+patterns, and say so in place.
+
+**Weight the sections by how the posts were sampled, not by how many patterns they carry.** Reddit,
+Hacker News, Mastodon, Bluesky, Threads, Substack, Substack Notes and dev.to were sampled against a
+real, unbiased baseline: a full timeline window or a whole community's true median. TikTok, X,
+LinkedIn, YouTube and Instagram were reached by SEARCH, which finds a creator's famous posts, so
+their structures are real and their multiples are not evidence. Each section says which it is.
+
+This file is populated by `/patterns synthesize`. A populated section is never permission to carry
+its patterns to a different platform, and the corpus has now twice shown a finding reverse when it
+crossed from a cherry-picked platform to an honestly sampled one.
 
 ## How to use this, read before drafting
 
@@ -62,8 +66,9 @@ almost every time it appeared.
 ### The length claim died when better data arrived, and that is the useful part
 
 An earlier version of this section, written on 58 posts, said the winner was shorter than the
-creator's own average in 7 of 10 accounts. **With 100 posts it is 9 of 18, or 8 of 17 excluding the
-search-biased X account. That is a coin flip, and the claim is withdrawn.**
+creator's own average in 7 of 10 accounts. **With 100 posts it was 9 of 18. Recomputed on 292 across
+23 accounts with at least four scored posts each, it is 11 shorter and 12 longer. That is a coin
+flip, measured twice on growing data, and the claim stays withdrawn.**
 
 The split is not random, and how it splits is the real finding:
 
@@ -89,13 +94,21 @@ performer relative to its own baseline is a 13-character greeting, and one of th
 
 ### What did survive
 
-- **No link.** In all 8 accounts that had both linked and unlinked posts, the top post was the one
-  without a link. That now includes 3 Mastodon accounts. **Two honest qualifiers.** One creator
-  links on all five of his posts and still records the highest raw engagement in his platform's set,
-  so this is about relative performance inside one feed rather than a rule that links suppress
-  reach. And on Mastodon a linked post is usually a forward of somebody else's work, so part of what
-  this measures is that original material beats forwarding, which converges with the point below.
-  One Mastodon outlier does carry a link and still ran 3.7x, so the effect is a tendency, not a law.
+- **No link, recomputed at 292 and now a tendency rather than a rule.** At 100 posts this read "in
+  all 8 accounts that had both linked and unlinked posts, the top post was the one without a link."
+  Recomputed across the whole corpus, **19 accounts and communities have both, and the top post is
+  unlinked in 16 of them.** Broader, and no longer unanimous. The three exceptions are worth naming
+  rather than hiding: two Mastodon accounts whose top post carries a link, both of which are
+  body-incomplete entries sitting at only 2.0x, and one Reddit community the popularity gate
+  eliminated entirely. **Three honest qualifiers.** One creator links on all five of his posts and
+  still records the highest raw engagement in his platform's set, so this is about relative
+  performance inside one feed rather than a rule that links suppress reach. On Mastodon a linked post
+  is usually a forward of somebody else's work, so part of what this measures is that original
+  material beats forwarding, which converges with the point below. And the strongest counterexample
+  in the corpus is a Bluesky account whose single best post at 13.7x carries TWO links, because it
+  puts a verdict and the reason to care in front of both. That is pattern 1 in the mastodon section
+  working exactly as written, and it is why "no link" is the wrong lesson to draw. **Say something
+  before the link** is the right one.
 - **Recycled and forwarded material loses.** The clearest cases sit on opposite ends of the corpus:
   one Substack account's two losers are an openly revisited interview and a republished book
   excerpt, while its two winners open on something the author personally found in a primary source;
@@ -129,89 +142,133 @@ against an unbiased 40-post window and deserve the most weight; every other plat
 rest on cherry-picked siblings and deserve less. None of this is a controlled experiment and no
 causal claim here has been tested.
 
-## What form the post takes, and the one thing the corpus can prove about it
+## What form the post takes, and what the corpus can prove about it
 
-**A second run-level finding from the 2026-08-22 mining pass, not a pattern record.** Like the
-section above it, this is something to ask of a draft before reaching for a skeleton. It comes from
-a `media.form` classification on 56 corpus entries.
+**A run-level finding, first written on 56 classified entries in the 2026-08-22 pass, and REWRITTEN
+on 2026-08-23 against 292 entries because the larger corpus broke it.** Like the section above, this
+is something to ask of a draft before reaching for a skeleton.
 
-**These figures were NOT recomputed when the corpus grew to 100, and they did not need to be:
-none of the 42 Mastodon entries carries a media classification, so they cannot join this analysis.**
-The table still rests on the same 56 classified entries. A scorable-but-unclassified bucket of 44
-does exist and averages 3.48x, and it is not a form and must never be read as one: it is mostly
-Mastodon, where every account contributes its guaranteed top post by design, so the bucket is
-inflated by construction. Classifying Mastodon media is a known gap, and it is not empty, 6 of the
-42 carry attachments according to their notes.
+### The image-beats-text result did not survive, and this is the most important correction in the file
 
-The control that matters here is `body_is_complete`. Some entries are posts whose substance sat in
-something never collected, an image, a carousel, a thread, being scored on engagement that
-substance earned. Dropping those is what separates a real result from an artifact.
+The previous version of this section said an image post outperforms a text-only post by 2.19x on 13
+body-complete entries against 0.62x on 8, called it "the most trustworthy result in this corpus,"
+and said it "survives every control." **That claim is withdrawn.** Here is what happened when the
+corpus tripled.
 
-| form | all scorable | body-complete only |
-|---|---|---|
-| mixed | 2.74x on 12 | 2.63x on 11 |
-| image | 2.18x on 17 | **2.19x on 13** |
-| text-only | 0.62x on 8 | **0.62x on 8** |
-| carousel | 6.34x on 2 | nothing left |
-| thread | 23.84x on 1 | nothing left |
-| video | 7.69x on 1 | nothing left |
-| short-video | 5.89x on 1 | nothing left |
+The text-only comparison group grew from 8 entries to 55. Its average went from 0.62x to 2.46x. The
+image group grew from 13 to 17 and its average fell from 2.19x to 2.10x. The gap closed and then
+crossed.
 
-**There are exactly two defensible claims here. Do not extract a third.**
+| body-complete, with a real multiple, all platforms except reddit and Hacker News | n | mean | median |
+|---|---|---|---|
+| text-only | 55 | **2.46x** | 0.68x |
+| image | 17 | **2.10x** | 1.09x |
+| mixed | 11 | 2.63x | 0.59x |
+| link-preview | 8 | 2.45x | 0.67x |
+| short-video | 36 | 34.89x | 1.02x |
 
-### 1. A post carrying an image outperforms a text-only post, and this survives every control
+Reddit and Hacker News are excluded from that table on purpose: their multiples are measured against
+a whole community's median rather than one account's, which puts them on a scale of hundreds and
+thousands and would swamp everything else. The short-video mean is likewise one post: remove the
+single documented account outlier and it drops from 34.89x to 1.56x, so read its median.
 
-2.19x on 13 body-complete entries against 0.62x on 8. It is the most trustworthy result in this
-corpus, and three independent things back it up:
+Two things went wrong with the original claim and both are worth naming, because they are the same
+two mistakes any future pass can repeat.
 
-- **Within one account, holding audience and period constant.** One LinkedIn creator's five posts:
-  his four image posts run 5.06x, 1.68x, 0.88x and 0.63x, and his single text-only post is his worst
-  at 0.53x. The gradient inside that is worth as much as the ranking. The more the image carried and
-  the less the caption said, the better the post did. To be even-handed about it: his top two are
-  flagged body-incomplete, so they sit outside the controlled 13-entry figure above exactly as the
-  38,442-like post does. This gradient is a within-account observation, not part of the measured
-  result, and it is offered as corroboration rather than as evidence.
-- **Convergent professional practice.** 14 of 15 LinkedIn posts in the corpus, from three separate
-  creators who do this for a living, carry an image. They arrived at that independently.
-- **It is not one account's artifact.** The 8 text-only entries span 4 creators on 4 platforms.
-  Excluding the two search-biased X entries, the remaining 6 average 0.78x, still far below the
-  image figure. Bluesky points the same way but weakly, image 8.35x against text-only 0.69x at
-  n=2 per side, which is directional only.
+- **The losing group was tiny and unrepresentative.** Eight text-only entries carried the whole
+  result, and they came mostly from search-discovered accounts where a plain tweet sits next to a
+  famous one. The honestly-sampled text-only posts that arrived later, six Substack Notes running
+  3.4x to 13.4x against a real 96-note median, six Bluesky posts from an account that posts nothing
+  but text, five Threads posts from a real timeline window, are all text-only and several of them
+  win.
+- **The winning group was one platform wearing a form's clothes.** Of the 17 body-complete image
+  entries, 11 are LinkedIn, a search-discovered tier-2 platform, and 4 are dev.to, where the
+  classified image is an article COVER image rather than an image post. That leaves two genuine
+  image posts on honestly-sampled platforms. **Restricted to the platforms sampled without
+  cherry-picking, the body-complete image sample is a single post.** There is no image evidence
+  there at all.
 
-**Where this does NOT apply: Substack.** The Substack numbers look like a win for illustration,
-2.74x on 12 illustrated posts against 0.91x on 3 plain-text ones, and **you should not believe
-them.** All three plain-text posts belong to one author whose absolute numbers dwarf every other
-account in the corpus. That is an account effect wearing a form effect's clothes. **The corpus
-cannot tell whether illustrating a Substack essay helps.** Treat it as an open question.
+**What is left, stated at its real strength.** Three LinkedIn creators who do this professionally
+put an image on almost every post, and they arrived at that independently. That is convergent
+professional practice on one platform and it is worth respecting. It is not a measured result, and
+this file should never have called it one.
 
-### 2. Every other form is unmeasured, and that is a collection gap, not a verdict
+**What to do with this.** On LinkedIn, carry an image, because the people who live on that platform
+all do. Everywhere else, the corpus does not tell you to. What it does tell you, repeatedly and
+across five platforms now, is in the section above: give the reader something your ordinary posts do
+not. A photograph can be that. So can six numbered steps in plain text.
 
-Carousel, thread, video and short video all lose their entire body-complete sample. Whatever their
-rows say in the left column, the corpus has no controlled evidence about any of them.
+### Short video is no longer unmeasured, and what it shows is not what anyone expected
 
-**This matters most for short video, so say it plainly: the absence of short video from the
-evidence above is a failure of collection, not a finding about short video.** Short video is the
-second most common form in the corpus at 15 of 58 entries, and only ONE of those 15 is scorable at
-all. The other 14 returned no usable metrics, because the platforms hide play counts and like counts
-from a logged-out reader. All 11 YouTube entries are Shorts, confirmed against the platform's own
-classification at 24 to 159 seconds, vertical and captioned, four of them behind ordinary watch URLs
-that disguised it.
+The previous version of this section said the absence of short video from the evidence was "a
+failure of collection, not a finding about short video," and called fixing it "the single
+highest-value improvement to this corpus." **That collection gap is now closed.** 38 TikTok entries
+carry real play counts, real follower counts and complete auto-caption transcripts, 37 of them
+body-complete.
 
-Nothing in this file says short video does not work. This corpus simply cannot see it. A reader who
-concludes otherwise has misread the table, and a future collection run that fixes the metrics
-problem for short video would be the single highest-value improvement to this corpus.
+What they show, in full, is in the `tiktok` section below. The three headlines belong here because
+they contradict things people believe about the form:
 
-### What to do with this
+- **Reaching past your own audience is rare and is not a function of audience size.** The
+  view-to-follower ratio has a median of 0.19 across 38 videos, and only 4 clear 1.0. The highest,
+  at 6.08, belongs to the SMALLEST account in the set. The three largest accounts, at 14.6M, 3.8M
+  and 1.5M followers, contribute one between them.
+- **Duration predicts nothing.** Sorted by views inside each account, videos of 35 seconds or less
+  average a rank percentile of 0.51 and videos over 35 seconds average 0.50. The corpus's two
+  shortest videos are the best post on one account and the worst post on another.
+- **On-screen text predicts nothing either.** 20 entries carry it and average 0.49; 18 do not and
+  average 0.51. It does real craft work, described in the tiktok section, and it does not buy reach.
 
-Ask of any draft: **is this carrying an image, and is the image doing real work?** On LinkedIn the
-answer should almost always be yes, and the corpus's strongest single instance is a post where the
-image carried the whole argument and the text was a lead-in. On Substack the honest answer is that
-nobody knows. On short video there is no answer here at all.
+**One honest limit that has not changed.** Every TikTok transcript in this corpus is words. Nobody
+watched a single video. Cuts, faces, pacing, music and the first visual frame are invisible here, and
+on that platform they may matter more than the script does. The gap moved; it did not close.
 
-One measure of how far this goes: the single highest-engagement post in the entire corpus, at 38,442
-likes, is 331 characters whose body ends on a photo credit and stops. The photograph is the post.
-Note that this entry is flagged body-incomplete and therefore sits outside the controlled figures
-above, so it illustrates the point rather than proving it.
+## Does a completable CTA actually buy reach? The corpus can now answer, and the answer is no
+
+**A third run-level finding, new on 2026-08-23.** `.claude/skills/patterns/SKILL.md` mode 2 records
+`immediate_payoff` and `cta_completable` on every analysed post, civic or not, and says explicitly
+that the point is "to find out whether payoff and completable CTAs correlate with reach across every
+niche, which is a real question the corpus can answer and this skill should not pre-answer." All 292
+entries now carry both fields, so it can be answered.
+
+Across the corpus, 100 of 292 posts close on a micro-action, 7 close on a vague ask, and 185 ask for
+nothing at all.
+
+**On the honestly sampled account platforms, body-complete, measured against real windows:**
+
+| close | n | mean multiple | median |
+|---|---|---|---|
+| none | 40 | 2.38x | 0.99x |
+| micro-action | 14 | 2.31x | 0.86x |
+
+**There is no difference.** The same test on immediate payoff gives the same answer: posts that offer
+the reader something right now average 2.62x and posts that offer nothing average 2.55x.
+
+On Reddit and Hacker News the micro-action posts look far worse, a median of 33x against 985x, and
+**that comparison must not be used**: it is an artifact of which communities carry which kind of
+post. r/LifeProTips is nearly all micro-actions and has a true median of 691, while r/ADHD is nearly
+all conversation and has a true median of 3. The two multiples are not on the same scale. The
+honest read of Reddit is that both kinds win in the communities that want them.
+
+### What this does and does not mean
+
+**It does not mean drop the civic rubric.** `references/civic-adaptation.md` is Muxin's decided
+standard and it was never a reach tactic. It exists so that a reader who has been persuaded has
+somewhere to go. Reach and consequence are different outcomes, and this file has just measured one
+of them. A post that travels 10x and leaves a moved reader with nothing has succeeded at the thing
+that is easy to count and failed at the thing Muxin actually wants.
+
+**It does mean stop expecting the CTA to carry the post.** If a draft is not travelling, adding a
+micro-action to the end will not fix it, and the corpus is now clear about that. What separates
+winners is in the first section of this file: giving the reader something your ordinary posts do
+not. The CTA is what you do once that has already worked.
+
+**One genuinely useful pairing does show up.** The two civic items that travelled furthest anywhere
+in this corpus relative to their baselines, a petition at 205x and an open-source deliberation tool
+at 114x on Hacker News, plus the strongest civic post on Mastodon, a queryable research map, are all
+cases where **the artifact IS the micro-action**. Nobody appended an ask to an argument. They
+shipped the thing and the shipping was the post. That is the shape of civic work this corpus
+actually rewards, and it is a build instruction rather than a writing one.
 
 ## Record format
 
@@ -265,7 +322,141 @@ from that platform.
 
 ### x
 
-Not yet mined. Fall back to `references/hook-patterns.md`.
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 33 X analyses in a 292-entry
+corpus, across 6 accounts contributing 3 to 9 posts each, niches `building-solopreneur`,
+`inner-journey` and `general-viral`. **NOTHING on this platform cleared the outlier bar, and nothing
+could have.** Read the next paragraph before reading anything else.
+
+**There is no true baseline for X in this corpus and there is no way to build one.** Every profile
+timeline route that was tried came back empty: one endpoint did not resolve at all, two returned
+HTTP 200 with zero bytes. The posts here were found by web SEARCH, which surfaces a creator's most
+famous work, so the collected set for each account is a mixture of famous posts and whatever
+ordinary ones happened to be findable. A multiple computed inside that set measures the search
+engine, not the audience. **Every number in this section is context, never evidence.**
+
+**Two further collection limits.** Long posts come back truncated at roughly 279 characters from the
+endpoint used, so all of them were discarded and this section is structurally biased toward short
+posts. And 15 of the 33 entries are body-incomplete: images, thread heads, and reposts with comment
+whose payloads were never collected. That leaves 18 posts whose words are all present.
+
+**What this section is for.** Shapes. Six accounts writing for a fast, short, hostile feed produced
+some constructions worth borrowing, and the corpus can see the constructions clearly even though it
+cannot see what won. The three below repeat across accounts. Everything else is in the analyses
+file.
+
+#### 1. One Idea, Three Registers `(shape only, no measured evidence)`
+
+- **Platform:** x
+- **Mechanism:** a single idea is stated three times, as an instruction, then in plain language, then
+  as something measurable, so the reader can lift whichever version fits their own sentence. Seen in
+  2 posts by 1 creator, and the construction is visible in 2 more posts by 2 other creators.
+- **Structure / arc:**
+  1. A two word label that classifies the post, of the sort that flags it as advice, or as a
+     position the writer expects disagreement with.
+  2. The idea as an instruction, four to six words.
+  3. The premise it rests on, stated as something the reader cannot avoid.
+  4. A short list of instances, in fragments, ending on a dismissive word.
+  5. The idea restated in plainer words.
+  6. The idea restated a third time as a measurable quantity. Shrink the window. Zoom out.
+  7. A closing phrase short enough to be quoted alone.
+- **Emotional trigger:** recognition of an unfixable problem, then relief that the fixable part is a
+  different variable than the one the reader was pushing on.
+- **Immediate personal payoff:** a variable they can change today, named in a way that makes it
+  measurable.
+- **CTA style:** none in any instance. **CIVIC GATE:** this shape has no close at all, so on civic
+  material it fails `references/civic-adaptation.md` until one is added. Add a verified,
+  finishable-in-ten-minutes action after beat 7.
+- **Length and formatting:** 280 to 300 characters, one block, no line breaks, no bullets, no emoji,
+  no hashtags, no link. All the instances that use this shape are unbroken paragraphs.
+- **Shape:**
+  ```
+  [Beat 1: a two-word label classifying the post. Muxin's own words, not a borrowed one]
+  [Beat 2: the idea as an instruction, four to six words]
+  [Beat 3: the premise. Something the reader cannot avoid]
+  [Beat 4: instances, as fragments, ending on a dismissive word]
+  [Beat 5: the same idea, plainer]
+  [Beat 6: the same idea, measurable]
+  [Beat 7: a closing phrase short enough to quote alone]
+  ```
+  The three restatements are not padding, they are the mechanism. Cutting to one leaves a slogan
+  with nothing for a reader to carry.
+- **Real example:** the inner-journey account's post about recovery speed after failure. Citation
+  only, do not reuse the wording.
+
+#### 2. The List Whose Last Item Is the Question `(shape only, single sighting)`
+
+- **Platform:** x
+- **Mechanism:** a numbered list of specific things, where the final numbered item is not a thing but
+  a question, so the reader completes the list themselves. It converts readers into commenters
+  without asking them anything. Seen in 1 post by 1 creator.
+- **Structure / arc:**
+  1. A framing verb with no object yet, ending in a colon. So basically, we killed:
+  2. Three or four numbered items, each one or two words, each a specific named group or thing.
+  3. The final numbered item, in the same format, is the question. What is next.
+- **Emotional trigger:** accumulating recognition, then an open door.
+- **Immediate personal payoff:** none.
+- **CTA style:** none stated. The unfinished item is the ask, and it is the most efficient
+  engagement device in this section. **CIVIC GATE:** an open item is not a micro-action. On civic
+  material, keep the device and add a verified action underneath it.
+- **Length and formatting:** about 130 characters. A five item numbered list where item five is a
+  question. No links, no emoji, no hashtags.
+- **Shape:**
+  ```
+  [Beat 1: a framing verb with no object yet, ending in a colon]
+  1) [specific thing]
+  2) [specific thing]
+  3) [specific thing]
+  4) [specific thing]
+  5) [What is next?]
+  ```
+  Items 1 to 4 must be specific and named. A list of abstractions gives the reader nothing to add to.
+- **Real example:** the general-viral account's five item list ending on an open question about what
+  comes next. Citation only, do not reuse the wording.
+
+#### 3. The Label, Then the Procedure, With Nothing Sold `(shape only)`
+
+- **Platform:** x
+- **Mechanism:** two words naming what is about to be shown, then the procedure itself in bullets,
+  with no claim, no credential, no promise and no link. Seen in 2 posts across 2 creators, and both
+  are the best body-complete post on their account.
+- **Structure / arc:**
+  1. A two or three word label plus a colon, naming what is about to be shown. A process, a data
+     update, a teardown.
+  2. Stage one, as a small bulleted group.
+  3. Stage two, what stage one produces, as a second bulleted group.
+  4. One line closing the loop. Then fill in the details.
+- **Emotional trigger:** the pull of watching a process rather than being given advice about one.
+  The bullets promise it will be short.
+- **Immediate personal payoff:** the strongest in this section. A checklist they can apply to the
+  next thing they make.
+- **CTA style:** none, and the absence is the point. Neither instance sells anything, and the same
+  accounts' posts that DO carry a link and an offer are body-incomplete and cannot be compared.
+  **CIVIC GATE:** the procedure IS the completable action, so this shape is close to the rubric
+  already. It must point at something real.
+- **Length and formatting:** 260 to 300 characters. Six bullets in two groups, blank lines between
+  every block, no hashtags, no emoji, no link.
+- **Shape:**
+  ```
+  [Beat 1: two or three words naming what this is, then a colon]
+  [Beat 2: stage one, as a bulleted group of three]
+  [Beat 3: what stage one produces, as a second bulleted group]
+  [Beat 4: one line closing the loop]
+  ```
+  The discipline is the absence. No credential, no result claim, no link. The moment one is added
+  this becomes the offer post that the same accounts publish constantly and that this corpus cannot
+  evaluate.
+- **Real example:** the writing account's three question, five headline, one summary process post.
+  Citation only, do not reuse the wording.
+
+#### The one thing in this section Muxin should read as a warning
+
+Two of the highest-engagement posts collected here are personal result claims: a portfolio with
+named profit figures, and a career transformation with a revenue number attached. Both are
+body-incomplete, so neither is evidence about anything. They are recorded because the shape is
+seductive and Muxin cannot use it. **CLAUDE.md rule 1 and `venture/rules.md` item 9 forbid asserting
+a result, customer, number or experience she did not have.** A structure whose load-bearing beat is
+a number she does not have is not a structure she can borrow. The procedure shape above is the
+version of it she can.
 
 ### linkedin
 
@@ -774,16 +965,219 @@ on the shape, not something the mined creators were doing.
 
 ### bluesky
 
-Not yet mined. Fall back to `references/hook-patterns.md`.
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 22 Bluesky analyses in a
+292-entry corpus, across 4 accounts contributing 4 to 6 posts each, niches `adhd`, `ai-building`,
+`product-thinking` and `civic-democracy`. **3 cleared the outlier bar, one per account for three of
+the four accounts.**
+
+**Bluesky publishes no view count**, so every result here is an engagement-baseline result and never
+a view ratio, the same constraint the mastodon section carries.
+
+**One account here is the cleanest single account in the entire corpus.** All six of its posts are
+text-only and body-complete, from one creator in one window. Nothing is hidden in an image, nothing
+is a thread head, nothing is a forward. Where this section needs a controlled comparison, it uses
+that account, and says so.
+
+**Body-complete control.** 6 of the 22 are body-incomplete, and they cluster: one account's top
+three posts are all images that were never collected, so that account contributes form observations
+and no body patterns.
+
+#### 1. Say Something Before the Link, With the Source First
+
+- **Platform:** bluesky
+- **Mechanism:** the poster's own verdict and the reason to care arrive before the link, and then
+  TWO destinations are offered in rank order, the primary source first and the poster's own
+  commentary second. Seen in 2 posts across 1 creator at 13.7x and 2.1x that account's own baseline,
+  both body-complete. **This is the mastodon section's pattern 1 appearing on a second platform**,
+  which is the only cross-platform confirmation of a full-post pattern in this file, so read that
+  record alongside this one.
+- **Structure / arc:**
+  1. Who published it and what it is, with the one adjective that matters. Detailed, new, big.
+  2. The verdict, given as the poster's own reaction rather than a summary of the piece.
+  3. The primary link.
+  4. Optional and distinctive: the poster's own notes, offered separately as a second, lower-ranked
+     destination.
+- **Emotional trigger:** trust transfer. A judgment from someone the reader already relies on, with
+  the reason attached, so a reader who never clicks still leaves with something.
+- **Immediate personal payoff:** a vetted read plus, in the two-tier version, a shortcut past it.
+- **CTA style:** read the linked thing, with the post complete without it. **CIVIC GATE:** on civic
+  material the linked thing must be real and verified, and where possible it should be the
+  completable thing itself rather than an article about one. The corpus is emphatic on this point:
+  the civic items that travelled furthest on Hacker News and Mastodon were both artifacts a reader
+  could use, not arguments.
+- **Length and formatting:** 200 to 260 characters. Two blocks, each ending on its own link. No
+  emoji, no hashtags on either winner.
+- **Shape:**
+  ```
+  [Beat 1: who published it, what it is, and the one adjective that matters]
+  [Beat 2: Muxin's verdict, as her reaction. Not a summary]
+  [Beat 3: the primary link]
+  [Beat 4, optional: her own notes, as a separate second destination]
+  ```
+  Beat 4 is the addition this platform contributes. Putting the source above your own commentary
+  respects readers who want the thing itself, and it costs nothing.
+- **Real example:** the technical account's post about a published incident report, pairing the
+  primary source with the poster's own separately linked notes. Citation only, do not reuse the
+  wording.
+
+#### 2. The Self-Sabotage, Framed As Something Happening To You
+
+- **Platform:** bluesky
+- **Mechanism:** the poster describes their own avoidance as an external obligation rather than a
+  choice, which is simultaneously the joke and the accurate description. Seen in 1 post by 1 creator
+  at 4.0x that account's own baseline, and it is the top post on the cleanest account in the corpus.
+  `(thin evidence, single sighting)`
+- **Structure / arc:**
+  1. A stretched interjection of mock dismay.
+  2. The self-indictment, phrased as a discovered requirement. Looks like I have to do X instead of
+     the thing I am avoiding.
+  3. Stop. There is no third beat and no explanation.
+- **Emotional trigger:** recognition made safe. The poster is confessing rather than diagnosing the
+  reader, so nobody has to get defensive.
+- **Immediate personal payoff:** none. Recognition only.
+- **CTA style:** none, and this shape cannot carry one. **CIVIC GATE:** not applicable to the mined
+  post. If adapted, the action would have to sit outside the joke entirely.
+- **Length and formatting:** about 100 characters, one sentence, all lowercase, no emoji, no link,
+  no hashtag.
+- **Shape:**
+  ```
+  [Beat 1: mock dismay, stretched. Lowercase]
+  [Beat 2: state the avoidance as a discovered requirement, not a choice: apparently she now has
+   to do [the avoidance activity] rather than [the actual work]]
+  [Stop]
+  ```
+  The whole device is the fake externality in beat 2. Say "I decided to" and it becomes a
+  confession, which is a different and weaker post.
+- **Real example:** the ADHD account's one-sentence post about needing to build a system to help
+  with work instead of doing the work. Citation only, do not reuse the wording.
+
+#### 3. Grant Every Piece of Advice, Then Collapse
+
+- **Platform:** bluesky
+- **Mechanism:** the post ticks off, in the advice's own vocabulary, every thing the reader has ever
+  been told to do, then shows that having all of it changes nothing. It refutes an entire genre in
+  five lines. Seen in 1 post by 1 creator at 2.0x that account's own baseline. `(thin evidence,
+  single sighting)`
+- **Structure / arc:**
+  1. The setup with a colon, promising a list. The thing about X is that I can know:
+  2. Three or four ticked items, each short, each one of the things advice-givers ask for.
+  3. The turn on a capitalised conjunction. AND STILL.
+  4. The image: what actually happens instead, physical and specific.
+- **Emotional trigger:** the build of confident checkmarks and then the collapse, which the reader
+  sees coming and which lands harder because of it.
+- **Immediate personal payoff:** a defence. The reader gets something to point at the next time they
+  are told to plan better.
+- **CTA style:** none. **CIVIC GATE:** unchanged if adapted.
+- **Length and formatting:** about 220 characters. A ticked list using check emoji, one capitalised
+  turn, a closing image in one line. No link, no hashtag.
+- **Shape:**
+  ```
+  [Beat 1: set up the list with a colon. She can know all of the following about [X]:]
+  [Beat 2: three or four ticked items, in the ADVICE'S own words]
+  [Beat 3: the turn, on a capitalised conjunction]
+  [Beat 4: what actually happens. Physical, specific, one image]
+  ```
+  Beat 2 must be generous. If the ticks are strawmen the refutation collapses; the power comes from
+  granting the whole case first.
+- **Real example:** the ADHD account's post ticking off what, when, why and how before landing on
+  sitting frozen while a deadline approaches. Citation only, do not reuse the wording.
+
+#### What the losing posts on the cleanest account establish
+
+This is the section's most useful content and it is not a pattern. One account gives six text-only
+body-complete posts from one creator in one window, so the comparison is as controlled as this
+corpus gets. Ranked by engagement, its **shortest post is its worst**, at a thirteenth of its top
+post: four words, a wry self-title, no context. Its most compressed and cleverest post, two parallel
+equations totalling about 60 characters, sits fifth of six.
+
+Put that beside the mastodon section's finding that a 13 character greeting was the worst performer
+in that entire sample, and beside the TikTok result that the corpus's two shortest videos are the
+best post on one account and the worst on another, and the conclusion is consistent across three
+honestly sampled platforms: **maximum compression is not a strategy.** It is a thing that sometimes
+coincides with a good post.
+
+The same account also supplies the one counterexample to the ask-back finding in the reddit section.
+The only post in the Bluesky set that asks its audience a direct question is the worst post on its
+account. Ask-backs work where the community is the product. On a follower feed they appear to be
+worth much less, and the two platforms should not be treated as one.
 
 ### threads
 
-Not yet mined. Fall back to `references/hook-patterns.md`.
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 15 Threads analyses in a
+292-entry corpus, across 3 accounts contributing 5 each, niches `adhd`, `ai-building` and
+`building-solopreneur`. **NOTHING on this platform cleared the outlier bar.** Read that first, and
+read the reason, because it is the most instructive elimination in this pass.
+
+**The sampling here is good.** Each account's profile page was fetched with a crawler user agent,
+which returns a server-rendered page; the same URL in a normal browser returns a login wall with no
+post text at all. The window is the 15 original top-level posts that page serves, self-replies
+filtered out, and each entry records its POSITION in that window. So these are real timeline
+samples, tier 1, and the multiples are measured.
+
+**And then the popularity gate removed both winners.** The two biggest posts on this platform, at
+49.1x and 27.3x their own accounts' windows, are BOTH carousels whose substance is images that were
+never collected. One has four words of caption, the other has two lines. After eliminating them,
+**the highest measured multiple left on the whole platform is 2.1x, against a threshold of 3.0x.**
+
+That is the honest state of Threads in this corpus, and it produces a specific instruction: the
+shapes below are the best-performing complete posts in a real window, and **none of them is a
+winner.** They are the ceiling of a thin sample. Treat them as leads to test, not as proven
+structures, and do not let them acquire authority by sitting in the same file as the reddit and
+mastodon records.
+
+**What the two eliminated carousels do establish, as form evidence.** Both accounts' single biggest
+post is an image carousel with a caption of under 260 characters, and on both accounts the drop to
+the next post is enormous: 49.1x to 1.7x on one, 27.3x to 4.1x on the other. Whatever wins on
+Threads for these two creators is happening in pictures. That is a collection gap with a clear fix
+and it is the highest-value improvement available for this platform.
+
+#### Leads worth testing, from the measured window
+
+Not written as full pattern records, deliberately. A record with a Shape block reads as proven, and
+nothing here is. Each lead names its position in a real 15-post window.
+
+- **The unexplained verdict beats the explained one, on the same account and the same advice.** One
+  account's top post is a single sentence defining a method by its END CONDITION rather than by a
+  quantity: write until you are no longer confused. Its third post gives the SAME advice with a
+  three part justification attached, and draws 60 percent of it. Same author, same window, same
+  claim. The lead: on this platform, adding the reasoning may cost more than it buys.
+- **Reshares go to compressed verdicts, and they are a different currency than likes.** That
+  account's top two posts carry the highest reshare ratios in the set, 119 reshares on 1,068 likes
+  and 99 on 822. Both are single sentences. This is the mastodon boost finding appearing on a second
+  platform: a reader reshares a claim in order to make it themselves, so what gets repeated is what
+  is short enough to be repeated.
+- **The triple parallel swap.** One post is one sentence naming an era and then three replacements
+  in a row, X replaces Y three times. It is a compression trick rather than an argument, and there
+  is nothing in the detail to disagree with because there is no detail. Second on its account.
+- **The numbered cycle that ends on the word repeat.** One account's best complete post is a ten
+  item numbered cycle from avoidance to burnout where the tenth item is the word repeat, so the
+  structure itself argues that nothing changes. Note that the identical closing device appears on
+  the biggest Substack Note in the corpus, on completely unrelated material. Two platforms, two
+  creators, and worth watching.
+- **A lead about what LOSES, held at exactly its evidence weight.** The worst post on each of the
+  two accounts with complete bodies is the most reassuring one: unconditional comfort, nothing
+  withheld, nothing asked. Two accounts, two creators, ONE platform. That is a lead, not a finding,
+  and it must not be written up as one until a differently sampled platform confirms it.
+
+**CIVIC GATE for anything drawn from this section.** None of the 15 posts is civic, so no civic
+adaptation was mined here. Any civic use runs through `references/civic-adaptation.md` table 1 from
+scratch: concrete hook, immediate personal payoff, one specific verified action finishable in under
+5 to 10 minutes, everyday local language. The compressed-verdict leads above are structurally the
+FURTHEST from that rubric of anything in this file, because their entire mechanism is having nothing
+attached.
 
 ### mastodon
 
-**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 42 Mastodon analyses, corpus at
-100 entries, across 7 accounts contributing 6 posts each. 3 accounts are `building-solopreneur`,
+**Provenance:** originally mined on 2026-08-23 from 42 Mastodon analyses with the corpus at 100
+entries, across 7 accounts contributing 6 posts each. **Updated 2026-08-23 in the 292-entry pass:
+two more accounts were collected, so this platform now holds 54 analyses across 9 accounts.** The
+three patterns below were re-checked against the two new accounts and all three still hold. The new
+accounts add one thing worth knowing and change nothing else: the strongest civic post across both
+of them is a queryable research map rather than an argument, which converges with the Hacker News
+finding that the two civic submissions that travelled there were a petition and a tool. Note also
+that 12 of the 54 now carry a media classification, so the classification gap this section flags
+below is partly closed. The paragraph beneath describes the ORIGINAL 7 accounts, whose sampling
+method is what earns this section its weight. 3 accounts are `building-solopreneur`,
 4 are `civic-democracy`. **`inner-journey` is absent from this platform**, not under-collected: a
 search across 11 hashtags on 3 instances found no creator at meaningful scale. Do not plan around
 filling that gap.
@@ -974,7 +1368,304 @@ across 5 creators measured against unbiased baselines.
 
 ### tiktok
 
-Not yet mined. Fall back to `references/hook-patterns.md`.
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 38 TikTok analyses in a 292-entry
+corpus, across 7 accounts contributing 3 to 8 posts each: two ADHD and mental-health accounts, two
+AI and solopreneur accounts, two civic and news accounts, one general. Follower counts run 147,500
+to 14,600,000.
+
+**TikTok is the only platform in this corpus with real views, real follower counts, AND real spoken
+transcripts on every entry.** Every other section is working from engagement sums, or from captions,
+or from a description of a video nobody transcribed. Here, 37 of 38 entries carry a complete
+auto-caption transcript pulled from TikTok's own JSON, plus a play count and the account's follower
+count. That makes one bar available here and nowhere else, and it is the bar Muxin's original
+reference tools were built on.
+
+**The view-to-follower ratio, on the whole 38.**
+
+| ratio | posts | what it means |
+|---|---|---|
+| above 1.0 | 4 of 38 | the post reached more people than the account has followers |
+| 0.5 to 1.0 | 6 | |
+| median | **0.19** | the typical collected post reaches about a fifth of its own following |
+| below 0.1 | 12 | |
+
+The four that cleared 1.0 are worth naming because the pattern in them is not what a reader expects:
+6.08, 2.60, 1.87 and 1.05. The highest belongs to the SMALLEST account in the set, 147,500
+followers, and the three largest accounts in the set (14.6M, 3.8M and 1.5M followers) contribute one
+between them. **Reaching past your own audience is not a function of having a big one.**
+
+**Read the multiples here as unreliable, with one stated exception.** These accounts were reached by
+search, so which of their posts got collected is not random and a within-account ranking is not a
+measured result. The exception is `@realmattgray`, and the exception comes from the entry's own
+collection notes rather than from this file's judgment: the notes record an account sample median of
+782 views across 7 collected posts, and one post at 896,100. Six posts between 248 and 2,805 views
+are not a search-discovered set, because nobody searches their way to a 248 view video. That one is
+treated as a real within-account outlier and it is cited as such below. Every other TikTok number
+here is a shape donor, never proof a shape wins.
+
+**Two things the corpus tested and did NOT find. Both matter, because both are widely believed.**
+
+- **Duration does not predict within-account rank.** Sorted by views inside each account and scored
+  by rank percentile, videos of 35 seconds or less average 0.51 and videos over 35 seconds average
+  0.50, where 0 is best in its account. The two shortest videos in the entire corpus land at
+  opposite extremes: a 10 second video is the best post on its account, and a 13 second video is the
+  worst on its own. The longest video in the corpus, at 118 seconds, is its account's worst, and the
+  second longest, at 94 seconds, is another account's best. **Do not shorten a video because this
+  file told you to. This file did not.**
+- **On-screen text does not predict within-account rank either.** 20 entries carry on-screen text
+  and average 0.49; 18 do not and average 0.51. On-screen text does real craft work, described in
+  pattern 2 below, and the corpus cannot show that its presence buys reach.
+
+**What the corpus can see and cannot see.** Every transcript is words. Nobody watched a single
+video. Cuts, pacing, faces, captions burned into the frame, music, and the first visual frame are
+all invisible here, and on this platform they may matter more than the words do. Read every pattern
+below as a claim about the SCRIPT and about nothing else.
+
+#### 1. Open on Something True of Everyone
+
+- **Platform:** tiktok
+- **Mechanism:** the first sentence is a fact about the viewer's own life that requires no interest
+  in the creator's subject. The topic narrows afterwards. Carried by 1 post from 1 creator, and it
+  is the single best-evidenced TikTok record in this file: 896,100 views against that account's own
+  782 view median, a view-to-follower ratio of 6.08, the highest in the corpus. Its six siblings, at
+  248 to 2,805 views, all open by addressing founders.
+- **Structure / arc:**
+  1. The blunt universal fact, three to six words, second person, no preamble.
+  2. A consequence of it, made concrete with real units of time or number.
+  3. The pivot: given that, why are you doing the thing you are doing.
+  4. The generalisation, one line, that reframes the pressure the viewer is under.
+  5. A short instruction to close, two or three parallel clauses.
+- **Emotional trigger:** a jolt in the first second, then relief as it converts into permission. The
+  jolt is the scroll-stopper and the permission is why the viewer stays to the end.
+- **Immediate personal payoff:** permission, applied to something bothering the viewer today. No
+  information is transferred at all, which is the point: the payoff is a released obligation.
+- **CTA style:** none. The mined post closes on an instruction about how to live, not a click.
+  **CIVIC GATE:** this shape opens perfectly for civic material, because a concrete personal
+  consequence is exactly what `references/civic-adaptation.md` table 1 asks for in the first three
+  seconds. It closes badly, because a life instruction is not a micro-action. Keep beats 1 to 4 and
+  replace beat 5 with one specific verified thing finishable in under 5 to 10 minutes, or with
+  neutral record-based value matching. Never invent the thing being pointed at.
+- **Length and formatting:** 26 seconds, no on-screen text, spoken straight to camera, about 570
+  characters of transcript. Note that this is less than half its own account's median duration, and
+  note equally that duration explains nothing across the corpus. What changed was the audience the
+  first sentence addressed, not the runtime.
+- **Shape:**
+  ```
+  [Beat 1: a fact true of every viewer, second person, under six words]
+  [Beat 2: its consequence, with a real number or time unit]
+  [Beat 3: the pivot. Given that, ask why they are doing [the thing they are doing]]
+  [Beat 4: the reframe, one line]
+  [Beat 5: the close. Two or three parallel instructions]
+  ```
+  Beat 1 has to be true of someone who has never heard of Muxin and does not care about her subject.
+  If it contains a job title, a tool name, or a niche word, this shape is not being used.
+- **Real example:** Matt Gray, TikTok, his 26 second video opening on mortality, set against the six
+  founder-advice videos on the same account. Citation only, do not reuse the wording.
+
+#### 2. The Frame On Screen, the Delivery in the Mouth
+
+- **Platform:** tiktok
+- **Mechanism:** the on-screen text says what this is, and the spoken track never does. The audio
+  performs, re-enacts or delivers, while the text supplies the premise, the count and the labels.
+  Seen in 9 posts across 4 creators. **This is a craft record, not a performance claim:** on-screen
+  text does not predict rank in this corpus, so use this for legibility, never as a reach tactic.
+- **Structure / arc:**
+  1. On-screen line 1: the frame. What the viewer is about to watch, and why.
+  2. On-screen line 2, optional: the count, the promise, or the fix.
+  3. Spoken track: straight into performance, mid-scene or mid-list, with no framing at all.
+  4. On-screen labels appear through the video to number or name what the audio is doing.
+  5. No spoken restatement of the frame at any point.
+- **Emotional trigger:** varies by fill. The structural effect is that a muted viewer still knows
+  what they are watching, and an unmuted one is never told twice.
+- **Immediate personal payoff:** varies. The consistent one is orientation in under a second.
+- **CTA style:** none in seven of the nine. **CIVIC GATE:** unchanged, and this shape offers a good
+  place to put a real micro-action, as a final on-screen line rather than a spoken ask.
+- **Length and formatting:** 10 to 94 seconds. On-screen text is short, 2 to 6 lines total, often
+  all capitals. The spoken track never opens with a greeting, a name, or a channel introduction in
+  any of the nine.
+- **Shape:**
+  ```
+  [ON SCREEN: the frame. What this is]
+  [ON SCREEN, optional: the count, the promise, or the fix]
+  [SPOKEN: begin mid-scene or mid-list. Never explain the frame]
+  [ON SCREEN: labels through the video, numbering or naming]
+  [Never say out loud what the screen already said]
+  ```
+  The discipline is the negative rule. The moment the audio starts explaining the premise, this
+  structure collapses into a talking head with subtitles.
+- **Real example:** the ADHD account's 10 second video whose on-screen text names three things the
+  creator was ashamed of while the audio only acts them out. Citation only, do not reuse the wording.
+
+#### 3. The Chain of Reasonable Steps `(thin evidence, single sighting)`
+
+- **Platform:** tiktok
+- **Mechanism:** a simple shared intention, then each line adds one individually sensible
+  prerequisite, until the chain has consumed the original intention entirely. The absurdity is
+  visible only from outside. Seen in 1 post by 1 creator, ranked 2 of 6 on its account at 460,100
+  views.
+- **Structure / arc:**
+  1. The intention, stated plainly. Small and ordinary.
+  2. Prerequisite 1, offered as an improvement rather than an obstacle.
+  3. Prerequisites 2 through 4, each triggered by the last, each defensible alone.
+  4. A hard blocker appears that cannot be solved today.
+  5. The solution defers everything to tomorrow.
+  6. The punchline: someone asks what we are doing now, and the answer is the original state,
+     unchanged.
+- **Emotional trigger:** recognition escalating into helpless laughter. The open question is whether
+  they will ever get up, and it is withheld until the final line.
+- **Immediate personal payoff:** none. Recognition only, which on an identity-niche account is what
+  the audience came for.
+- **CTA style:** none, and adding one would break the ending. **CIVIC GATE:** this shape has no
+  natural place for a micro-action, so on civic material either pick a different pattern or append
+  the action as a separate final beat outside the bit.
+- **Length and formatting:** 65 seconds, dialogue only, two speakers, no narration. On-screen text
+  is a two line frame naming the bit. About 1,200 characters of transcript.
+- **Shape:**
+  ```
+  [Beat 1: the small ordinary intention]
+  [Beat 2: prerequisite one, framed as an improvement]
+  [Beats 3 to 5: each new prerequisite triggered by the last, each defensible alone]
+  [Beat 6: a blocker that cannot be solved today]
+  [Beat 7: everything deferred to tomorrow]
+  [Beat 8: someone asks what is happening now, and the answer is beat 1, undone]
+  ```
+  Every link must be genuinely reasonable. One obviously silly step and the viewer stops recognising
+  themselves and starts watching a sketch.
+- **Real example:** the ADHD account's video about a plan to shower that ends in bed. Citation only,
+  do not reuse the dialogue.
+
+#### 4. Evidence First, Judgment Second, Ask Third
+
+- **Platform:** tiktok
+- **Mechanism:** the source material plays before any narration, so the viewer forms the reaction
+  themselves and the creator arrives to confirm it rather than to install it. Seen in 3 posts across
+  2 creators, at 8.4M, 7.9M and 1.1M views.
+- **Structure / arc:**
+  1. The raw clip or the primary detail, first, with no framing.
+  2. The minimum orientation: where, who, what they were doing. Two sentences at most.
+  3. An invitation to verify, in the versions that have one: if you do not believe me, look.
+  4. The creator's position, often posed as a question to the audience before being answered.
+  5. The ask, which in the strongest version is the same act as sharing the post.
+  6. A closing line that returns it to the audience as a group.
+- **Emotional trigger:** anger or disbelief that the viewer arrived at before being told to, which is
+  what makes it feel like their own conclusion.
+- **Immediate personal payoff:** an outlet for a feeling the post just created, available in one tap.
+- **CTA style:** distribute it. **CIVIC GATE, and read this one carefully.** The strongest post in
+  this pattern asks viewers to mass-identify a private individual. That is a real, completable
+  action and Muxin must not copy it. `references/civic-adaptation.md` requires the action to point
+  at something real and verified, and this file adds the obvious constraint that it must not be a
+  person. Take the ordering, evidence then judgment then ask, and put a verified micro-action in the
+  ask slot: a specific bill, a specific form, a named record, local where possible.
+- **Length and formatting:** 50 to 94 seconds. Little or no on-screen text. Source audio runs before
+  the narration in two of the three.
+- **Shape:**
+  ```
+  [Beat 1: the primary source. Plays first. No framing]
+  [Beat 2: minimum orientation. Where, who, what. Two sentences]
+  [Beat 3: invite the viewer to check for themselves, then supply the evidence]
+  [Beat 4: Muxin's position, put as a question first]
+  [Beat 5: the ask. One verified, specific, finishable action. Never a person]
+  [Beat 6: back to the audience as a group]
+  ```
+  Beat 1 requires the evidence to actually exist and to be Muxin's to show. Without it this shape is
+  just an angry monologue with a delay at the front.
+- **Real example:** the Spanish-language civic account's video that opens on the source audio of an
+  incident before any narration begins. Citation only, do not reuse the wording, and do not reuse
+  the target.
+
+#### 5. The Dry Policy Story Told Through the Joke Everyone Already Has
+
+- **Platform:** tiktok
+- **Mechanism:** a piece of genuinely dull policy is delivered entirely through an object the
+  audience already jokes about, and the closing line lands the ruling on the viewer's own street.
+  Seen in 1 post by 1 creator, at 4,000,000 views and a view-to-follower ratio of 1.05, one of only
+  four posts in the corpus to travel past its own following. `(thin evidence, single sighting)`
+- **Structure / arc:**
+  1. Two words of news framing, then the specific outcome in the same sentence.
+  2. The scale, in counted units the viewer can picture.
+  3. The price or the number that makes it absurd.
+  4. The problem quantified, as a percentage or a frequency the audience has personally met.
+  5. The old constraint: who was allowed to fix it, and what that cost.
+  6. The challenger and the conflict.
+  7. The ruling.
+  8. The landing: what this means at the branch nearest the viewer.
+- **Emotional trigger:** the satisfaction of finally learning why a running joke was true. The
+  curiosity gap is why was this ever broken, and the answer turns out to be a policy story.
+- **Immediate personal payoff:** understanding of a thing that has personally annoyed them, plus the
+  prospect it gets fixed.
+- **CTA style:** none in the mined post. **CIVIC GATE:** this is the closest thing in the corpus to
+  a model civic structure and it is one beat short of clearing the bar. Beat 8 already localises,
+  which table 1 asks for. Add one verified micro-action after it and this shape does everything
+  `references/civic-adaptation.md` wants.
+- **Length and formatting:** 46 seconds, a two line on-screen news label, dense narration of about
+  900 characters carrying at least five specific numbers.
+- **Shape:**
+  ```
+  [Beat 1: news framing plus the specific outcome, one sentence]
+  [Beat 2: the scale, in counted units]
+  [Beat 3: the number that makes it absurd]
+  [Beat 4: the problem, quantified, that the viewer has personally hit]
+  [Beat 5: the old constraint and what it cost]
+  [Beat 6: the challenger and the fight]
+  [Beat 7: the ruling]
+  [Beat 8: what it means at the [shop / office / school] nearest the viewer]
+  ```
+  The object in beat 1 must be something the audience already has a relationship with. On this same
+  account, a straightforwardly shocking crime story with no such object ran at a seventh of this
+  one's reach.
+- **Real example:** the news account's video explaining a right-to-repair ruling entirely through a
+  fast food chain's ice cream machines. Citation only, do not reuse the wording.
+
+#### 6. Count and Fix in the Same Breath
+
+- **Platform:** tiktok
+- **Mechanism:** the on-screen title names a counted list AND the remedy at once, so the viewer knows
+  the length of the commitment and the reward before a word is spoken. Seen in 3 posts across 2
+  creators, ranked 1, 3 and 5 on their accounts.
+- **Structure / arc:**
+  1. On-screen title: the count, then the fix, in one line each.
+  2. Straight into the list, no preamble, items delivered fast and surface-level so each is
+     checkable against the viewer's own behaviour.
+  3. The reframe that stops it being an attack: the problem is doing it badly, not doing it.
+  4. The turn to the fix, announced.
+  5. The fix delivered in a form the viewer can keep: a prompt, a URL, a specification.
+- **Emotional trigger:** mild embarrassment about something they did this week, resolved inside the
+  same video rather than left as homework.
+- **Immediate personal payoff:** the strongest in the TikTok set. A saveable artifact usable in under
+  a minute.
+- **CTA style:** save it, or go to a named destination. One of the three reads a URL aloud and shows
+  it on screen, and it is the second best post on its account, which is worth knowing given the
+  common claim that links suppress a video. **CIVIC GATE:** already close. The destination must be
+  real and verified, and on civic material it should be local and specific.
+- **Length and formatting:** 38 to 94 seconds. Two line on-screen title carrying the count and the
+  promise. No spoken introduction in any of the three.
+- **Shape:**
+  ```
+  [ON SCREEN: a count plus the category, then, on its own line, that a remedy is included]
+  [Beat 1: straight into the list. No preamble. Items surface-level and checkable]
+  [Beat 2: the reframe. The problem is doing it badly, not doing it]
+  [Beat 3: announce the turn to the fix]
+  [Beat 4: the fix, in a keepable form: a prompt, a URL, a specification]
+  ```
+  Beat 2 is what keeps the audience from feeling accused. Beat 4 has to be something they can hold,
+  not advice; an instruction to be more careful does not fill this slot.
+- **Real example:** the AI account's video listing tells of machine-written text and closing with a
+  saveable editing prompt. Citation only, do not reuse the wording or the prompt.
+
+#### What TikTok shows that is worth more than a seventh pattern
+
+- **The best-travelling script in the set contains no information.** The 6.08 ratio post transfers no
+  fact, names no tool, and teaches nothing. Two of the other three posts that beat their own follower
+  count are the same: a staged conversation and a permission. The one that does carry information,
+  the policy explainer, wraps it in an object the audience already jokes about. **Reach past your own
+  audience did not come from being useful in this corpus.** It came from being about the viewer.
+- **The weakest accounts open on themselves.** The lowest-ratio account in the set, at 0.06 to 0.12,
+  opens every one of its four videos on a thought the creator had. The strongest openers name a state
+  the viewer is already in, or start mid-scene with no narrator at all.
+- **A repurposed clip lost to five original scenes on the same account, in the same window.** One
+  podcast excerpt sits last of six on an account whose other five are original. That is one account,
+  and it converges with the recycled-material finding this file already carries from Substack and
+  Mastodon.
 
 ### youtube
 
@@ -1216,4 +1907,795 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
 
 ### instagram
 
-Not yet mined. Fall back to `references/hook-patterns.md`.
+**Mined 2026-08-23 and too thin to carry patterns. This is a finding, not a to-do.** 13 Instagram
+analyses across 4 accounts. **11 of the 13 are body-incomplete and none cleared the outlier bar.**
+
+The blocker is structural rather than a matter of collecting more. Every video entry's `body` is the
+written CAPTION, not the spoken track, and Instagram exposes no play count to a logged-out reader,
+so what a reel actually said and how far it actually travelled are both invisible. One account
+contributes three entries with no metrics at all. Under the mode 2 rule, a caption entry cannot be
+made to answer for a spoken hook and none was guessed here.
+
+What the captions do show, recorded as caption craft only and not as patterns:
+
+- **Break your own visible rule as the signal.** One account's top caption establishes a five and a
+  half year track record, states a rule it has never broken, and then breaks it, letting the breach
+  carry the urgency without describing the emergency. It requires a long public track record first.
+- **Concede, then draw the line in the first person plural.** Grant the reader's position, then say
+  what we cannot do rather than what you cannot do, which lets a disagreeing reader stay in the room.
+  This is the joyful-activism register `references/hook-patterns.md` already prefers for civic
+  material, compressed into one sentence.
+- **Frame the frightening thing as the next lesson.** One caption pivots to an ominous subject by
+  calling it the next lesson in a course the audience has been taking, which lowers the temperature
+  without softening the content.
+
+**To make this platform minable**, a collection run needs the spoken transcript and a play count.
+Until then, do not draft for Instagram from this file. Fall back to `references/hook-patterns.md`
+and to the per-channel angle in `config/platforms.yaml`.
+
+### reddit
+
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 25 Reddit analyses in a 292-entry
+corpus, across **6 subreddits and 25 different posters** (no poster appears twice). Niches:
+`adhd`, `general-viral`, `ai-building`, `product-thinking`, `solopreneur`, `civic-tech`.
+
+**The unit here is the SUBREDDIT, not the account.** Every other section in this file is organised
+around creators who have followers. Reddit has neither: 25 posts, 25 strangers, no account effect
+to control for. What replaces it is the community, and what wins splits so hard between communities
+that a single "Reddit pattern set" would be false in every direction at once.
+
+**Every multiple below is measured against a TRUE community median**, taken from an unbiased window
+of that subreddit's `/new` listing, posts left to settle for days so votes had landed. The collected
+posts are the top-of-year listing, and their position in it is recorded. **This is the only place in
+the corpus where the scoring script is wrong and must be ignored.** `npm run patterns:outliers`
+compares each post against its siblings, and here every sibling is also a top-of-year post, so it
+reports r/ADHD's biggest post of the year at 2.2x and flags zero Reddit outliers. The real numbers
+are these:
+
+| subreddit | true median | top post | multiple | what the top of the year looks like |
+|---|---|---|---|---|
+| r/SideProject | 1 | 5,777 | 5777x | video demos, positions 1 and 2, first text post at 68 |
+| r/ClaudeAI | 2 | 20,414 | 10207x | screenshots, positions 1 to 19, first text post at 20 |
+| r/ADHD | 3 | 12,286 | 4095x | **all plain text** |
+| r/ProductManagement | 12 | 899 | 75x | one screenshot at 1, then text |
+| r/LifeProTips | 691 | 42,477 | 61x | **all plain text** |
+| r/civictech | 4 | 27 | 6.8x | **eliminated, see below** |
+
+**Read the r/LifeProTips row against the r/ADHD row before using any number here.** 61x in
+r/LifeProTips is a harder thing to do than 4095x in r/ADHD, because heavy moderation kills the weak
+posts before they can drag the median down, so the median it beats is 691 rather than 3. A multiple
+is only meaningful next to the median it was measured against. Never rank these against each other.
+
+**r/civictech was eliminated by the popularity gate.** Its best post of the entire year is 27
+upvotes on a true median of 4. The 6.8x is arithmetic on numbers too small to mean anything, and no
+pattern below is drawn from it. All three of its posts were analysed anyway and are on the record as
+eliminated evidence. The useful finding from them is not a shape: **r/civictech is a room of
+practitioners, not a distribution channel.** One of its posts opens on a genuinely strong statistic
+contrast and still drew 22 upvotes. Structure and venue are separate problems, and this is the
+cleanest proof of it in the corpus.
+
+**Where the title patterns went, and why.** Reddit and Hacker News are the only channels in this
+corpus where the title is a separate field from the body, and on both of them it is most of the
+craft. Those title shapes are written **here, inside the platform sections**, not appended to
+`references/hook-patterns.md`. The reason is that a hook pattern is the first line of a body, read
+by someone who has already stopped scrolling on that post. A Reddit title is the entire artifact in
+the feed: it has to survive alone, with no body visible, and on the two title-first posts in this
+set (a screenshot and a video demo) it is also the only text that exists. Those are different jobs,
+and merging them would let title logic leak into feeds where it does not apply. Cross-reference
+rather than copy.
+
+**Body-complete control.** Four collected posts have `body_is_complete: false`: two r/SideProject
+video demos and two screenshot posts, whose bodies are just their titles repeated. They are used as
+**title and form evidence only** and never as body-structure evidence. That distinction is load
+bearing, because those four are the biggest posts in two of the six subreddits.
+
+#### 1. The Whole-Tip Title `(subreddit-specific: r/LifeProTips)`
+
+- **Platform:** reddit
+- **Mechanism:** the title carries the complete, usable tip, so a reader who never opens the post
+  still gets the value. The body exists only to prove the title. Seen in 5 posts across 5 posters,
+  all 5 in r/LifeProTips, running 61x, 36x, 33x, 19x and 16x that community's true median of 691.
+- **Structure / arc:**
+  1. Title: the whole instruction, in the imperative, specific enough to act on.
+  2. Body beat 1: the occasion it came from, or the source it was read in. Concrete and dated where
+     possible.
+  3. Body beat 2: what happened without the tip, in the poster's own experience.
+  4. Body beat 3: the mechanism spelled out, including the geometry, the number, or the exact
+     wording of the alternative.
+  5. Body beat 4, optional: a second domain the same rule works in.
+  6. Stop. No summary, no moral, no ask.
+- **Emotional trigger:** the click of an obvious thing nobody said out loud. There is no suspense
+  to hold, and trying to add any is what breaks this shape.
+- **Immediate personal payoff:** direct, and it is the whole point of the subreddit. Four of the
+  five winners can be acted on within a day at zero cost. The lowest performer of the five is the
+  one whose action costs an email and an hour of the reader's time, which is a real signal about
+  how much friction this shape tolerates.
+- **CTA style:** none. Not one of the five asks for anything, and none carries a link. The tip is
+  the CTA. **CIVIC GATE:** this shape is unusually well suited to Muxin's civic rubric, because a
+  micro-action that can be finished in under 5 to 10 minutes IS a whole-tip title. It must point at
+  something real and verified, never an invented form, deadline, race or measure
+  (`references/civic-adaptation.md`). Local and specific beats national and abstract here for the
+  same reason the arena-seating tip beat the philosophical ones: the reader can do it.
+- **Length and formatting:** title 45 to 115 characters. Body 450 to 1,500 characters, three to
+  seven short paragraphs. **No bullet lists in any of the five, including the one describing a
+  four-step physical procedure.** No emoji except one closing smiley in one post. No links in any
+  of the five.
+- **Shape:**
+  ```
+  TITLE: [the complete instruction, imperative, specific enough to do]
+  [Beat 1: the occasion or the source. Where this came from, concretely]
+  [Beat 2: what went wrong without it, in your own experience]
+  [Beat 3: the mechanism, with the number, the geometry, or the exact alternative wording]
+  [Beat 4, optional: one more place the same rule works]
+  [Stop]
+  ```
+  Beat 2 must be Muxin's own experience or clearly attributed to someone else. Beat 3 is where a
+  vague tip dies, so if there is no number, geometry or exact wording to put there, this is the
+  wrong shape.
+- **Real example:** the top-of-year post in r/LifeProTips about how to arrange a group's seats at a
+  sports arena, and its sibling about a rule borrowed from a parenting forum. Citation only, do not
+  reuse the wording.
+
+#### 2. The Withheld-Payoff Title
+
+- **Platform:** reddit
+- **Mechanism:** the title names that something happened without naming what, so the only way to
+  close the gap is to open the post. The opposite bet from pattern 1, and it works in the
+  discussion subreddits rather than the tip subreddits. Seen in 3 posts across 3 posters in 3
+  different subreddits, at 1859x (r/ADHD, true median 3), 33x (r/ProductManagement, true median 12)
+  and 943x (r/SideProject, true median 1).
+- **Structure / arc:**
+  1. Title: two to twelve words. A subject and a verb, or a superlative with the noun missing.
+  2. Body beat 1: the mundane setup, stated flatly. The more ordinary this is, the better the turn
+     lands.
+  3. Body beat 2: the turn, arriving early. In all three cases it is in the first third.
+  4. Body beat 3: the specifics, dialogue or detail, so the reader can judge it themselves.
+  5. Body beat 4: the poster's own position, stated plainly.
+  6. Body beat 5: hand it to the room.
+- **Emotional trigger:** an open loop the title opens and only the body closes. Underneath it, in
+  all three, sits something the reader wants adjudicated rather than explained.
+- **Immediate personal payoff:** thin, and that is honest. Two of the three offer no payoff at all
+  beyond a verdict to agree with. The third offers a self-test the reader can run in ten seconds.
+  **This shape trades payoff for reach**, and Muxin's civic rubric wants payoff, so see the gate
+  below before using it on civic material.
+- **CTA style:** a call to conversation, sometimes one word. **CIVIC GATE:** this shape's natural
+  close is an opinion request, which is not a micro-action and will not clear
+  `references/civic-adaptation.md`. On civic or social-issues material the withheld title can stay,
+  but the close must be replaced with either one specific verified action finishable in under 5 to
+  10 minutes, or neutral record-based value matching. Never "vote", "get involved", or "stay
+  informed". If neither can be verified as real, fall back to the general default rather than
+  inventing one.
+- **Length and formatting:** title 22 to 60 characters. Body 450 to 1,400 characters. One of the
+  three is a single unbroken paragraph, the other two run many one-line paragraphs. Dialogue in
+  quotation marks. No emoji, no links, no hashtags in any of the three.
+- **Shape:**
+  ```
+  TITLE: [subject + verb, or a superlative with the noun withheld. Say that it happened, not what]
+  [Beat 1: the ordinary setup, flat]
+  [Beat 2: the turn, in the first third]
+  [Beat 3: the specifics, quoted or counted, so the reader can judge]
+  [Beat 4: where Muxin actually stands, one sentence]
+  [Beat 5: hand it to the room]
+  ```
+  Beat 3 is the load-bearing beat. A withheld title that pays off in generalities reads as
+  clickbait, and this audience punishes that harder than most.
+- **Real example:** the r/ProductManagement post whose title promises the most unexpected part of a
+  career and whose body turns out to be about translating one feature for five different internal
+  audiences. Citation only, do not reuse the wording.
+
+#### 3. The Self-Implicating Confession Title
+
+- **Platform:** reddit
+- **Mechanism:** the poster is the subject of their own criticism, stated in the title, which buys
+  the right to make the point without lecturing. Seen in 3 posts across 3 posters in 3 different
+  subreddits, at 4095x, 10207x and 992x their community medians. **Note the middle one is a
+  screenshot post, admitted here as TITLE evidence only.**
+- **Structure / arc:**
+  1. Title: first person, past tense, admitting the thing.
+  2. Body beat 1: the apology or the admission, addressed to the group, before any content.
+  3. Body beat 2: the wrong belief stated in the words the group actually hears from outsiders.
+  4. Body beat 3: the correction, blunt and short.
+  5. Body beat 4: the evidence, observable and mundane rather than felt or clinical.
+  6. Body beat 5: the turn to what actually helps, or to the upside.
+  7. No moral, no summary.
+- **Emotional trigger:** vindication for the group. Someone is conceding in public a point the
+  reader has lost arguments about, and the confession in line one tells them so before they have to
+  get defensive.
+- **Immediate personal payoff:** social ammunition, right now. The reader gets something they can
+  send to a person who does not believe them, which is the payoff the top r/ADHD post of the year
+  actually delivered.
+- **CTA style:** none in any of the three. **CIVIC GATE:** unchanged. If this shape is used on
+  civic material it still needs a verified micro-action or record-based value matching at the
+  close, per `references/civic-adaptation.md`, and the confession does not substitute for it.
+- **Length and formatting:** title 26 to 58 characters. Body 450 to 1,700 characters. One uses a
+  four item bulleted list of observed behaviours, the others use none. No links, no hashtags. The
+  one emoji in the set is on the screenshot post's title.
+- **Shape:**
+  ```
+  TITLE: [first person, past tense: the thing Muxin got wrong or did]
+  [Beat 1: the admission, addressed to the people it concerns, before any content]
+  [Beat 2: the wrong belief, phrased the way those people actually hear it]
+  [Beat 3: the correction. One sentence. Blunt]
+  [Beat 4: the evidence. Observable and mundane. A list is allowed here and only here]
+  [Beat 5: the turn, what actually helps]
+  [Stop]
+  ```
+  Beat 4 must be observation, not feeling. The reason the r/ADHD winner works as ammunition is that
+  every item on its list is something a sceptic would accept as visible fact.
+- **Real example:** the r/ADHD top-of-year post written by someone without ADHD who lives with two
+  people who have it. Citation only, do not reuse the wording, and specifically do not reuse its
+  list of observed behaviours in its order.
+
+#### 4. The Refused Framing
+
+- **Platform:** reddit
+- **Mechanism:** the post names the obvious reading of a thing, rejects it in one line, and then
+  argues for a different one. The rejection is what earns the attention, because the reader has
+  already had the obvious thought. Seen in 3 posts across 3 posters in 3 different subreddits, at
+  3065x, 26x and 943x their community medians.
+- **Structure / arc:**
+  1. The subject, one line, stated neutrally.
+  2. The obvious framing named and refused. "The real story is not X."
+  3. The alternative framing, stated as a claim rather than a question.
+  4. The mechanics that support it, concrete and checkable.
+  5. The concession: the strongest argument for the other side, granted honestly.
+  6. The concession withdrawn, narrowly. Not "you are wrong" but "stop pretending this is ordinary".
+  7. A second supporting thread, usually about money or incentives.
+  8. The sharpest version of the claim, labelled as an opinion.
+- **Emotional trigger:** the relief of having a shapeless unease turned into a sentence, plus a
+  named thing to be against.
+- **Immediate personal payoff:** language for an argument the reader was already half having, about
+  something they are paying for or living inside right now.
+- **CTA style:** none. All three end on an opinion, which is itself the invitation. **CIVIC GATE:**
+  this is the shape most likely to be reached for on civic material and it is the one that fails
+  the rubric fastest, because a reframe with no action attached is exactly what
+  `references/civic-adaptation.md` was written against. Keep beats 1 to 8 and add a real,
+  verified, finishable-in-10-minutes close, local and specific where possible. If no verified
+  action exists, use the general civic default rather than inventing a form or a deadline.
+- **Length and formatting:** 1,400 to 1,700 characters. Ten or more short paragraphs, several of
+  them one line, set alone for emphasis. No bullet lists. No emoji, no links, no hashtags.
+- **Shape:**
+  ```
+  [Beat 1: the subject, neutrally, one line]
+  [Beat 2: name the obvious reading and reject it, in one clause]
+  [Beat 3: the alternative reading, as a claim]
+  [Beat 4: the mechanics that support it, checkable]
+  [Beat 5: the concession. The best argument against Muxin, granted]
+  [Beat 6: the narrow withdrawal. What she still refuses]
+  [Beat 7: a second thread, usually the money or the incentive]
+  [Beat 8: the sharpest version, labelled an opinion]
+  ```
+  Beat 5 is not optional and cannot be a strawman. In all three winners it is the beat that
+  survives the top comment, and skipping it is what turns this shape into a rant.
+- **Real example:** the r/ClaudeAI post that refuses to read a model launch as a product story and
+  reads it as a tiering story instead, granting the safety rationale before rejecting the framing.
+  Citation only, do not reuse the wording.
+
+#### 5. The Procedure You Can Finish Tonight
+
+- **Platform:** reddit
+- **Mechanism:** a named anxiety, then a procedure short and concrete enough that not doing it
+  becomes a choice. Seen in 3 posts across 3 posters in 2 subreddits, at 45x, 19x and 16x their
+  community medians.
+- **Structure / arc:**
+  1. Solidarity, two or three words. The reader's situation named, not their failure.
+  2. The comparison that stings: what the better-resourced version of them has.
+  3. The fear named out loud, in the reader's own vocabulary.
+  4. The refusal: it is not that hard.
+  5. The time and place. Put the kids to bed, or do this while you are sitting there.
+  6. The procedure. Concrete down to the folder name, the price, the angle, or the exact email.
+  7. The part most people miss, flagged as such.
+  8. The release: that is all, now use what you already know how to do.
+- **Emotional trigger:** anxiety about being behind, addressed directly and then dissolved by
+  something finishable in one evening.
+- **Immediate personal payoff:** the strongest of any Reddit shape here, and it is the payoff
+  `references/civic-adaptation.md` names as the thing that makes a piece work: a task the reader
+  can complete today, with the cost stated honestly.
+- **CTA style:** the procedure is the CTA. Two of the three carry a link and name a real price
+  openly, which is what kept them from reading as a sales post. **CIVIC GATE:** this shape already
+  clears the bar in its non-civic form. On civic material the procedure must point at something
+  verified, and the honesty about cost carries over. Never invent a form, link, deadline, race or
+  measure.
+- **Length and formatting:** 1,000 to 1,800 characters. The one with a numbered procedure uses
+  bullets and a full sample prompt written out; the other two run the procedure in prose despite
+  being step-by-step, which suggests the list is optional. At most one outbound link, placed inside
+  the procedure rather than at the end. No emoji, no hashtags.
+- **Shape:**
+  ```
+  [Beat 1: solidarity, two or three words]
+  [Beat 2: what the better-resourced version of the reader has that they do not]
+  [Beat 3: the fear, in their words]
+  [Beat 4: the refusal. Say plainly that the feared thing is not difficult]
+  [Beat 5: when and where. Tonight, after X]
+  [Beat 6: the steps. Concrete to the folder name, the price, the angle, the exact wording]
+  [Beat 7: the part most people miss, flagged]
+  [Beat 8: the release. Now use what you already have]
+  ```
+  Beat 6 is the test. If a step cannot be written concretely enough that failing it would be
+  obvious, the shape has nothing to stand on.
+- **Real example:** the r/ProductManagement post that walks a reader from zero to a running agentic
+  coding tool in five steps, naming the subscription price out loud. Citation only, do not reuse
+  the wording.
+
+#### 6. The Question Only the Room Can Answer
+
+- **Platform:** reddit
+- **Mechanism:** the post exists to be replied to, not read. It asks something the poster genuinely
+  cannot resolve alone, and the comment count rather than the upvote count is what carries it. Seen
+  in 5 posts across 5 posters in 2 subreddits, at 2219x, 1583x and 1859x (r/ADHD) and 33x and 26x
+  (r/ProductManagement).
+- **Structure / arc:**
+  1. The question, in the title, aimed at the group rather than at the world.
+  2. Body beat 1: the poster's own legwork. What they already checked, so the question is not lazy.
+  3. Body beat 2: their own answer, offered first as the seed data point.
+  4. Body beat 3: a sharpening. Is this the thing itself, or an ordinary thing turned up.
+  5. Body beat 4: one or two unanswerable extensions. These are the engine, because they give
+     people with nothing to report something to argue about.
+  6. Body beat 5: the ask, restated in one line, alone.
+- **Emotional trigger:** curiosity about oneself. The reader cannot find out whether their
+  experience is normal without either reading the replies or adding to them.
+- **Immediate personal payoff:** none in the post, by design. The payoff lives in the comments, and
+  the poster is trading their own payoff for the room's participation. Worth knowing before
+  reaching for this shape, because it is the one Reddit pattern here that does not feed Muxin's
+  civic rubric on its own.
+- **CTA style:** the ask itself, sometimes one word. **CIVIC GATE:** an open question is not a
+  micro-action. On civic material this shape needs a verified, finishable close added underneath
+  the question, or it fails `references/civic-adaptation.md`. The two accepted forms are unchanged.
+- **Length and formatting:** 600 to 1,100 characters. Casual register, lowercase and typos left in
+  on two of the five, which does not appear to have cost anything. No lists, no links, no emoji.
+  The ask is the last line and stands alone.
+- **Shape:**
+  ```
+  TITLE: [the question, aimed at this specific group]
+  [Beat 1: what Muxin already checked, so it does not read as lazy]
+  [Beat 2: her own answer, as the first data point]
+  [Beat 3: the sharpening. Is this the thing, or an ordinary thing turned up]
+  [Beat 4: one or two unanswerable extensions]
+  [Beat 5: the ask, one line, alone]
+  ```
+  Beat 4 is what separates a post with 65 comments from one with 1,221. Beat 1 is what separates it
+  from a question the room ignores.
+- **Real example:** the r/ADHD post asking how many people have constant music playing in their
+  head, which draws 1,221 comments off roughly 750 characters. Citation only, do not reuse the
+  wording.
+
+#### 7. The Insider Parody `(thin evidence, single sighting)`
+
+- **Platform:** reddit
+- **Mechanism:** the community's most repetitive complaint genre, played back with the roles
+  swapped. Every beat rewards knowledge only that community has. Seen in 1 post by 1 poster, at
+  3120x r/ClaudeAI's true median, and it is the FIRST text post in that subreddit's top-of-year
+  listing, at position 20 behind nineteen screenshots.
+- **Structure / arc:**
+  1. The swap established in one line, using the community's own veteran-poster formula.
+  2. A baseline: it used to be fine, with two or three specific competences named.
+  3. A list, six items, each mapping a piece of the community's jargon onto an ordinary human
+     behaviour.
+  4. Each item lands on a domestic detail concrete enough to make the mapping click.
+  5. The worst category held back for last, given the most human example.
+- **Emotional trigger:** recognition escalating into delight, with the list format promising another
+  hit every few lines.
+- **Immediate personal payoff:** none material. Being seen by a joke that requires exactly the
+  knowledge the reader has.
+- **CTA style:** none, and adding one would break it. **CIVIC GATE:** not applicable to the mined
+  post, which is not civic. If ever adapted to civic material, the rubric applies unchanged and this
+  shape offers no natural place to put a micro-action, which is a reason to pick a different one.
+- **Length and formatting:** about 1,800 characters. A six item bulleted list with a short paragraph
+  above and below. Each bullet opens on the jargon term and then translates it. No emoji, no links.
+- **Shape:**
+  ```
+  [Beat 1: the swap, in the community's own opening formula]
+  [Beat 2: the baseline. It used to be fine, and here is what fine looked like]
+  [Beat 3: six items. Each one: the jargon term, then the human behaviour it maps to]
+  [Beat 4: each item ends on a concrete domestic detail]
+  [Beat 5: the last item is the emotional one, held back deliberately]
+  ```
+  This shape requires Muxin to be a genuine insider in the community she is parodying. It is the
+  fastest of any pattern here to read as an outsider doing an impression, and this audience catches
+  that immediately.
+- **Real example:** the r/ClaudeAI post written from the model's point of view about its human
+  being quietly nerfed. Citation only, do not reuse the wording or the mapped list.
+
+#### What r/SideProject and r/ClaudeAI prove that no pattern above can
+
+Two of the six subreddits are won by things this file cannot write a text pattern for, and saying so
+plainly is more useful than a seventh skeleton.
+
+- **r/SideProject: positions 1 and 2 of the year are video demos, and the first text post appears at
+  position 68.** Both video titles are under 90 characters and neither has a body. On that
+  subreddit, writing a good description is a structural disadvantage rather than a style choice. The
+  two text posts that did break in (at 68 and 75) both refuse the launch-post conventions entirely:
+  no metrics, no stack, no link, no ask.
+- **r/ClaudeAI: positions 1 through 19 are screenshots.** The best text post in the community's year
+  sits at position 20. The screenshots were never collected, so nothing can be said about what makes
+  a good one, and nothing here should be read as saying text competes with them.
+
+Both are collection gaps with a clear fix, and both are worth more to Muxin than another skeleton:
+if she wants reach in either community, the medium is the decision and the writing comes second.
+
+### hackernews
+
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 9 Hacker News analyses in a
+292-entry corpus, 9 different submitters, niches `ai-building`, `adhd`, `civic-tech` and
+`solopreneur`. **4 of the 9 cleared the outlier bar.** The other 5 are link submissions and are
+admitted as TITLE evidence only.
+
+**The baseline here is the best in the whole corpus.** Every story submitted to HN in one full
+24-hour window about 30 days before collection was pulled, 1,000 of the 1,012 in that window, which
+is the API's page cap. That population has a **true median of 3 points, a 90th percentile of 22,
+and a maximum of 1,778**. Nothing was selected for looking good. So an HN multiple here is measured
+against the entire platform rather than against one account, which no other section can say.
+
+Read the scale before reading any number: the smallest collected submission, at 124 points, is
+**41x** the median and still above the 90th percentile of the whole window. The largest, at 3,346
+points, is **1,115x** the median and nearly double the maximum of that entire 1,000-story day.
+
+**Title and body are separate fields here, and the title is the whole channel.** HN displays nothing
+but the title for a link submission, so five of these nine posts have no body at all. As with
+Reddit, the title shapes are written here rather than appended to `references/hook-patterns.md`,
+because an HN title has to survive alone in a ranked list with no body visible. See the reddit
+section for the full reasoning; it is the same argument and it is not repeated.
+
+**One finding this platform gives Muxin that nothing else does.** The two civic submissions here are
+the two highest-performing civic items anywhere in the corpus relative to their baseline, at 205x
+and 114x, and **neither is an argument.** One is a petition. One is a tool. On this platform a civic
+opinion has no visible constituency and a civic ARTIFACT does. That converges exactly with the
+strongest civic post on Mastodon, which is a queryable research map rather than a claim, and it is
+the clearest cross-platform signal in this pass for what her civic work should ship.
+
+#### 1. The Prefix, the Number, and the Refusal to Sell
+
+- **Platform:** hackernews
+- **Mechanism:** the title states an outcome with the arithmetic already done, and the body then
+  refuses to be a product pitch, opening on a person instead. Seen in 1 post by 1 submitter at 978x
+  the site median, 2,935 points, the highest-scoring text submission collected. `(thin evidence,
+  single sighting)`
+- **Structure / arc:**
+  1. Title: the community's own prefix, then the outcome with both numbers in it. The reader does
+     the division themselves.
+  2. Body beat 1: an improbable identity claim in one sentence, with a wry aside.
+  3. Beat 2: the origin, concrete and unglamorous, with the motive stated as a local need.
+  4. Beat 3: a coined phrase that reframes the motive, built off a term the reader already knows.
+  5. Beat 4: the honest state of the thing, including a parenthetical admitting it still does not
+     fully work.
+  6. Beat 5: the narrowing to the one subsystem this post is about, and why it is interesting.
+  7. Beat 6: what the expensive version actually does, in technical detail, unexplained.
+- **Emotional trigger:** two gaps at once. The title's price gap asks how, the first line's identity
+  gap asks who is this person, and answering the second buys patience for the first.
+- **Immediate personal payoff:** none material. A build report and a price comparison that resets
+  what the reader thinks infrastructure should cost.
+- **CTA style:** none. **CIVIC GATE:** if this shape carries civic material it still needs a
+  verified, finishable close per `references/civic-adaptation.md`. Note that on this platform the
+  civic submissions that travelled ARE the completable thing, so the natural civic version of this
+  pattern is shipping the artifact rather than writing about it.
+- **Length and formatting:** title 60 to 70 characters with two numbers. Body about 1,000 characters
+  in the collected portion, five to seven short paragraphs, no lists, no emoji, no hashtags,
+  technical terms used without explanation.
+- **Shape:**
+  ```
+  TITLE: [Show HN: ] [what was replaced] with [what replaced it]. Both numbers, no adjectives
+  [Beat 1: an improbable one-sentence identity claim, with a wry aside]
+  [Beat 2: the origin. Concrete, unglamorous, with the real motive]
+  [Beat 3: a coined phrase built off a term the reader already knows]
+  [Beat 4: what is still broken, in a parenthetical]
+  [Beat 5: the one subsystem this is about, and why it is interesting]
+  [Beat 6: the technical detail, unexplained, as a sign of respect]
+  ```
+  Beat 4 is not optional. This audience is faster than any other in the corpus at detecting
+  marketing register, and the admission is the cheapest available proof that this is a real project.
+- **Real example:** the Show HN replacing a six-figure bowling centre scoring system with a low
+  four-figure pile of microcontrollers. Citation only, do not reuse the wording.
+
+#### 2. The Question With the Unit Named
+
+- **Platform:** hackernews
+- **Mechanism:** an Ask HN that tightens its own scope in one clause and names the unit answers
+  should arrive in, so replies are comparable and the low-effort ones are ruled out before they are
+  typed. Seen in 2 posts across 2 submitters at 439x and 41x the site median, producing 563 and 149
+  comments off bodies of about 230 and 900 characters.
+- **Structure / arc:**
+  1. Title: the whole question, aimed at practitioners, naming the specific things being compared.
+  2. Body beat 1: the scope tightener. Fully, as the main tool, not as a side experiment.
+  3. Beat 2: the request for specifics, with the unit named in a parenthesis.
+  4. Optional beat 3, on the longer variant: the asker's own position first, including a hedge about
+     their own status, which lowers the bar for others to answer.
+  5. Optional beat 4: one or two unanswerable extensions, which give people with nothing to report
+     something to argue about.
+  6. The ask restated as a short list of direct questions.
+- **Emotional trigger:** the fear of having missed a shift other people have already made, which
+  only the replies can resolve.
+- **Immediate personal payoff:** none in the post, by design. The payoff is the thread, and the
+  asker is trading their own payoff for the room's.
+- **CTA style:** the question. **CIVIC GATE:** an open question is not a micro-action and this shape
+  cannot clear `references/civic-adaptation.md` on its own. On civic material, add one verified
+  finishable action beneath the question rather than replacing it.
+- **Length and formatting:** title 60 to 80 characters, always prefixed. Body 230 to 900 characters.
+  The short variant is two sentences. The long variant runs four paragraphs then a bulleted question
+  list. Typos and asides left in on the long one, apparently at no cost.
+- **Shape:**
+  ```
+  TITLE: Ask HN: [the question, naming the specific things being compared]
+  [Beat 1: the scope tightener. Rule out the casual case in one clause, so the low-effort
+   answers are excluded before anyone types one]
+  [Beat 2: what to include in an answer, with the UNIT named in a parenthesis]
+  [Beat 3, optional: Muxin's own position first, hedged, so others feel entitled to answer]
+  [Beat 4, optional: one unanswerable extension]
+  [Beat 5: the ask, as a short list of direct questions]
+  ```
+  Beat 2 is the rare move and the one worth stealing. Naming the unit turns a pile of anecdotes into
+  a comparable table.
+- **Real example:** the Ask HN about whether anyone has fully swapped a commercial model for a local
+  one as their main coding tool, which asks for setup and throughput in a named unit. Citation only,
+  do not reuse the wording.
+
+#### 3. The Dated Enthusiasm
+
+- **Platform:** hackernews
+- **Mechanism:** the writer names obsolete technologies that date them precisely, is
+  self-deprecating about it, and uses the credibility that buys to be sincerely, unguardedly excited
+  about something new. Seen in 1 post by 1 submitter at 362x the site median, with 988 comments
+  against 1,086 points, the highest comment-to-point ratio in the set. `(thin evidence, single
+  sighting)`
+- **Structure / arc:**
+  1. Title: a fact about the writer, then the claim, in two short sentences.
+  2. Body beat 1: the counter-position. What the writer was about to do instead.
+  3. Beat 2: a memory list. Three named things from decades ago, deliberately unglamorous.
+  4. Beat 3: the self-deprecating aside, these are laughable now.
+  5. Beat 4: what they felt like at the time, and the physical effect they had.
+  6. Beat 5: the jump forward. The new thing gives the same feeling.
+  7. Beat 6: a plain declarative. Three words at most.
+  8. Beat 7: the closing image, physical rather than conceptual.
+- **Emotional trigger:** recognition across a generation gap. Older readers get their own memory
+  named, younger ones get a rare sight of what forty years of enthusiasm looks like.
+- **Immediate personal payoff:** none. Permission to be excited, which on a sceptical forum is
+  genuinely scarce.
+- **CTA style:** none, and adding one would destroy it. **CIVIC GATE:** unchanged if adapted, and
+  this shape has no natural slot for an action.
+- **Length and formatting:** title two short sentences, about 55 characters. Body about 480
+  characters, one paragraph, three named technologies, no lists, no links, no emoji.
+- **Shape:**
+  ```
+  TITLE: [a fact about Muxin]. [the claim].
+  [Beat 1: the counter-position. What she was about to do instead]
+  [Beat 2: three named things from her own past, specific enough to date her]
+  [Beat 3: the self-deprecating aside about them]
+  [Beat 4: what they felt like, and the physical effect]
+  [Beat 5: the jump. The new thing feels the same]
+  [Beat 6: a plain declarative. Three words]
+  [Beat 7: a physical closing image]
+  ```
+  Beat 2 must be true and must be specific. A generic reference to the old days does none of the
+  work; the whole device is that the named things place the writer exactly.
+- **Real example:** the Tell HN from a sixty year old about a coding tool reigniting the feeling of
+  learning server-side programming decades earlier. Citation only, do not reuse the wording.
+
+#### Title shapes, from all 9 including the 5 link submissions
+
+Recorded separately because five of these posts have no body and their titles are still real
+evidence. Counts are of the 9 collected titles.
+
+- **The prefix is load-bearing.** 4 of 9 carry a community prefix (Show, Ask, Tell). All 3 body
+  patterns above are prefixed submissions. The prefix tells the reader what kind of attention is
+  being asked for before the subject arrives.
+- **Numbers with no adjectives, 2 of 9.** One title is three numbers and no verb, letting the reader
+  compute the interesting ratio themselves. Note that it is the LOWEST scoring of the nine, so this
+  is a shape observation, not a performance claim.
+- **The plain subject, 2 of 9.** The shortest title in the set is four words naming a topic, with no
+  hook at all, and it ran 211x the site median. On a self-selecting audience the subject alone can
+  be the hook, which is the opposite of what every other section in this file says.
+- **Pointed at the community itself, 1 of 9,** and it is the biggest submission collected at 1,115x.
+  Worth knowing and hard to reuse: it only works if you are inside the community you are pointing at.
+
+### substack-notes
+
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 12 Substack Notes analyses in a
+292-entry corpus, across 2 accounts contributing 6 each, niches `civic-democracy` and
+`general-viral`. **6 cleared the outlier bar.**
+
+**Notes are not Substack posts.** Different surface, different feed, different numbers, different
+craft. Do not carry anything from the `substack` section into this one. A Note is short, it lives in
+a scrolling feed rather than an inbox, and its dominant metric is the restack, which is a reader
+repeating your sentence as their own.
+
+**Baselines are real here.** Both accounts were sampled by pulling a chronological window of 96 of
+that account's own top-level Notes, restacks and replies filtered out, and computing the true median
+across all 96. One account's median is 2,930 likes across five months; the other's is 116 likes
+across one month. So a multiple in this section is measured against an unbiased window of the same
+person's own Notes.
+
+**Read the creator counts before the patterns.** 5 of the 6 posts that cleared the bar belong to ONE
+account. Every pattern below therefore says "1 creator," and that is a real limit, not a formatting
+quirk. What saves them from being one person's habits is that they were measured against a
+96-note window of that same person's own work, so the comparison inside the account is honest even
+though the comparison across accounts does not exist.
+
+**The single most useful thing in this section is a warning, not a shape.** The largest civic Notes
+account in the corpus, whose top note drew 39,173 likes and 6,472 restacks, **fails Muxin's CTA
+rubric on every close it makes.** Its asks are "we must get big money out of politics" and "the
+Senate must reject him": demands addressed to institutions, not actions a reader can finish. Under
+`references/civic-adaptation.md` those are the vague form the whole rubric was written against. The
+notes travel enormously and they leave a persuaded reader with nowhere to go. Copy the structures
+below. Do not copy the closes.
+
+**One measurable thing this account does show.** Across its six notes the ranking tracks specificity
+almost perfectly. The top three carry counted facts or a numbered mechanism. The bottom one carries
+a principle, with no number, no name and no event in it, and it draws a quarter of the top note.
+
+#### 1. The Numbered Loop
+
+- **Platform:** substack-notes
+- **Mechanism:** an accusation is turned into a diagram. Four numbered steps that return to their
+  own start, so the structure itself argues that the thing is self-sustaining. Seen in 1 post by 1
+  creator at 13.4x that account's true 96-note median, with 6,472 restacks, the most in the set.
+  `(thin evidence, single sighting)`
+- **Structure / arc:**
+  1. One framing sentence promising a mechanism, not an opinion. This is how X works.
+  2. Four numbered steps, each under ten words, each an action by a named kind of actor.
+  3. The fourth step is the word repeat, which closes the loop.
+  4. One line stating what must change.
+  5. One line stating why it is the root rather than a symptom.
+- **Emotional trigger:** compression. A diffuse grievance collapses onto one screen, and nothing is
+  withheld. There is no curiosity gap at all, which is worth noticing: this shape does not need one.
+- **Immediate personal payoff:** none, and the record is honest that this is the shape's weakness.
+  The reader gets a frame and nothing to do with it.
+- **CTA style:** a demand rather than an action, and it is the **vague** form. **CIVIC GATE: this
+  close FAILS `references/civic-adaptation.md` as mined and must be replaced.** Keep the loop, then
+  put one specific verified thing the reader can finish in under 5 to 10 minutes underneath it,
+  local where possible, or neutral record-based value matching. The loop is what earns the restack;
+  the action is what makes it worth having earned.
+- **Length and formatting:** about 300 characters. Four numbered items with blank lines between
+  them, two one-line paragraphs, no emoji, no hashtags, no link.
+- **Shape:**
+  ```
+  [Beat 1: promise a mechanism rather than an opinion. One sentence saying that this is how
+   [the thing] operates]
+  1) [actor] does [action]
+  2) [second actor] does [consequence]
+  3) [first actor] gets [payoff]
+  4) Repeat
+  [Beat 2: what has to change. One line]
+  [Beat 3: one verified thing the reader can finish in ten minutes]  <- REQUIRED for civic, replaces the mined close
+  ```
+  Every step must be something that actually happens, in order. A loop with an invented step is a
+  factual claim about real people and `venture/rules.md` item 9 and CLAUDE.md rule 1 both apply.
+- **Real example:** the civic Notes account's four-step note on political donations. Citation only,
+  do not reuse the wording, and do not reuse its close.
+
+#### 2. Fact, Contrasting Fact, Five Word Verdict
+
+- **Platform:** substack-notes
+- **Mechanism:** two checkable numbers are placed beside each other and the argument happens in the
+  gap between them. The verdict just names what the reader already concluded. Seen in 2 posts across
+  1 creator at 8.7x and 5.1x that account's true median, with 6,016 and 3,355 restacks.
+- **Structure / arc:**
+  1. Fact one: a promise made, with the incentive or the claim quantified and the place named.
+  2. Fact two: what actually happened, quantified, placed against fact one with no connective
+     argument.
+  3. The verdict: five words or fewer, naming the theory the two facts refute.
+  4. In the stronger variant, fact one is a statistic that INCLUDES the other side's own supporters,
+     which closes the partisan escape route before it opens.
+- **Emotional trigger:** anger arrived at by arithmetic. The reader does the subtraction and owns
+  the conclusion.
+- **Immediate personal payoff:** none immediate. It hands over an argument with receipts, which is
+  social currency rather than an action.
+- **CTA style:** none in either. **CIVIC GATE:** no close means no rubric violation and no rubric
+  compliance either. This is the shape Muxin can most safely use, because it needs only real numbers
+  and one short judgment, and it leaves the close free for a verified micro-action.
+- **Length and formatting:** 340 to 360 characters. Three short blocks, one per beat. No lists, no
+  links, no emoji, no hashtags. Every number specific and sourced in the writing itself.
+- **Shape:**
+  ```
+  [Beat 1: the promise or the claim, with its number and its place]
+  [Beat 2: what happened, with its number. No connective. Just put it there]
+  [Beat 3: the verdict. Five words. Name the theory the two facts kill]
+  [Beat 4, optional and stronger: make beat 1 a statistic that includes the other side's own people]
+  ```
+  Both numbers must be real and checkable. This is the pattern in the file with the least room for
+  invention and the most dependence on Muxin actually having done the reading.
+- **Real example:** the note pairing a company's tax incentives against its job cuts in the same
+  period, and its sibling leading on a cross-party polling number. Citation only, do not reuse the
+  wording.
+
+#### 3. Do It First, Then Ask
+
+- **Platform:** substack-notes
+- **Mechanism:** the writer reports a small action they personally took, dated and counted, before
+  recommending it, and immediately qualifies the recommendation for people who cannot afford it.
+  Seen in 1 post by 1 creator at 4.9x that account's true median, the best body-complete note on
+  that account. `(thin evidence, single sighting)`
+- **Structure / arc:**
+  1. The action, first person, dated to yesterday, with a count.
+  2. The recommendation, followed immediately by the affordability qualification in the same
+     sentence.
+  3. The stakes widened: why the thing being supported matters and why it is fragile.
+  4. The position, stated as a we rather than a you.
+  5. The mechanism, what this place is actually for.
+  6. The consequence if it fails.
+- **Emotional trigger:** solidarity with a cost already paid. The writer spent first, which is what
+  licenses the ask.
+- **Immediate personal payoff:** real and small. A thing the reader can do in two minutes for
+  someone whose work they value.
+- **CTA style:** a genuine micro-action, and the best-formed close in this section. It names no
+  specific beneficiary, which keeps it from reading as self-promotion. **CIVIC GATE: this one
+  passes** as written, and it is the model the two patterns above should borrow their closes from.
+- **Length and formatting:** about 600 characters, three paragraphs, no lists, no links, no emoji.
+- **Shape:**
+  ```
+  [Beat 1: what Muxin did. First person, dated, counted]
+  [Beat 2: the recommendation, with the affordability qualification in the SAME sentence]
+  [Beat 3: why the thing matters, and why it is fragile]
+  [Beat 4: the position, as "we"]
+  [Beat 5: what happens if it fails]
+  ```
+  Beat 1 must be true and must have already happened. Recommending an action you have not taken
+  inverts this shape into the thing it is designed to avoid.
+- **Real example:** the note reporting two paid subscriptions taken out the previous day before
+  recommending that readers support independent writers. Citation only, do not reuse the wording.
+
+#### 4. The Reminder Frame `(thin evidence, single sighting, and read the caveat)`
+
+- **Platform:** substack-notes
+- **Mechanism:** a contested claim is presented as something everybody already knows and merely
+  needs reminding of, which skips the argument entirely. Seen in 2 posts across 1 creator at 10.3x
+  and 6.2x that account's true median, with 4,917 and 3,437 restacks.
+- **Structure / arc:**
+  1. The frame: a random reminder, or the single word reminder followed by the subject.
+  2. The claim, stated as settled history or as a list of settled charges.
+  3. In the list variant, three bulleted items, each one line, each a specific action.
+  4. The verdict, one line.
+- **Emotional trigger:** the comfort of already agreeing, and the small social permission of being
+  told this is common knowledge.
+- **Immediate personal payoff:** none.
+- **CTA style:** the list variant closes on an institutional demand, which is the vague form.
+  **CIVIC GATE: fails as mined.** Replace the close.
+- **Length and formatting:** 200 to 380 characters. The list variant uses three hyphen bullets. No
+  links, no emoji.
+- **Shape:**
+  ```
+  [Beat 1: a reminder frame. Present the claim as something already known, then the subject]
+  [Beat 2: the claim as settled fact, or three bulleted specific charges]
+  [Beat 3: the verdict, one line]
+  [Beat 4: one verified finishable action]  <- REQUIRED for civic
+  ```
+  **The caveat, and it is the reason this record is marked rather than recommended.** This shape
+  works precisely BY not arguing. That is fine when the claim is genuinely settled and documented,
+  and it is a way to smuggle a contested claim past scrutiny when it is not. Under CLAUDE.md rule 1
+  and `references/civic-adaptation.md`, Muxin uses this only for things she can show are true, and
+  she does not use it to make an argument she has not made.
+- **Real example:** the two reminder-framed notes on that civic account, one historical and one a
+  bulleted charge sheet about a named official. Citation only, do not reuse the wording.
+
+#### Why 4 patterns and not 5 to 7
+
+Twelve notes, two accounts, and six that cleared the bar, five of them from one person. The other
+account's biggest note by far is six words of caption attached to an image nobody collected, so its
+top result is unusable. Four patterns is what the evidence carries. The fifth thing worth knowing is
+not a shape and is recorded above: on the honestly sampled account, ranking tracks specificity, and
+the note with no number, name or event in it finished last.
+
+### devto
+
+**Mined 2026-08-23 and too thin to carry patterns, for an unusual reason: the platform barely
+produces outliers at all.** 4 dev.to analyses from 1 author. 2 cleared the configured 2.0x bar.
+
+The sampling is the best in the corpus and the result is still unusable. The author's COMPLETE
+published window was pulled from dev.to's own public API, 59 articles over a year, and its true
+median is 122 reactions. Her single best article of that entire year draws 265, which is **2.2x**.
+The distribution here is compressed: dev.to has winners and it does not really have outliers, so
+there is no gap between a great post and an ordinary one large enough to learn a shape from.
+
+One author is also not a platform. Recorded rather than dropped, because two observations are worth
+carrying:
+
+- **The candid topic-selection preamble.** Both of her two best articles open by explaining why the
+  piece exists and what it deliberately is not, before any technical claim. One names the two kinds
+  of article she rejected and why. On a platform of interchangeable tutorials, that preamble is the
+  differentiator.
+- **Reactions and comments are different currencies, and the shape chooses which.** Her article
+  admitting she does not know what to think about a shift in her own field draws her LOWEST
+  reactions and by far her HIGHEST comments, 257 against her next best of 133. Admitting uncertainty
+  converts readers into repliers rather than likers. Pick the shape for the response you want.
+
+**To make this platform minable**, collect several authors rather than one. The per-article ceiling
+being 2.2x means dev.to is more useful as a place to be consistently read than as a place to break
+out, which is itself worth knowing before Muxin spends time there.
