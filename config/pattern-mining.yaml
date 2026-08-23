@@ -700,6 +700,1775 @@ accounts:
   # Mastodon has no creator-scale inner-journey account worth seeding. That is a real finding about
   # the platform, not a gap to fill later with a marginal account.
 
+  # ===============================================================================================
+  # ROUND 3, added 2026-08-23: CREATORS FIRST, for the five niches Muxin named plus general-viral.
+  #
+  # Why this block exists. Everything above was seeded creator-by-creator off hook-patterns.md's
+  # citations, under the three ORIGINAL niches. The five niches Muxin named on 2026-08-23
+  # (ai-building, product-thinking, adhd, civic-tech, solopreneur) plus general-viral had ZERO
+  # accounts, and four platforms (bluesky, reddit, hackernews, substack-notes) had zero accounts
+  # of any kind. This block fills that.
+  #
+  # It is also a correction of method. On tiktok, x, linkedin and youtube the earlier corpus was
+  # built by SEARCHING for famous posts and fetching them one at a time. Search surfaces a
+  # creator's greatest hits, so the median those posts get scored against is inflated by selection
+  # and the multiples are unreliable in both directions. Recording the CREATOR here, rather than
+  # the post, is what lets a future run pull a real timeline window and compute an honest median.
+  #
+  # Consistency was a selection criterion, not an afterthought. A creator with three posts a year
+  # cannot be baseline-scored, so an account that had visibly stopped posting was dropped even
+  # when it was large. Two were dropped for exactly that: Rex Chapman on bluesky (377k followers,
+  # last original post 2025-06-30) and Marty Cagan on x (his own bio reads "I'm no longer active
+  # on this platform").
+  #
+  # VERIFICATION ROUTES USED IN THIS BLOCK, all raw fetch with no model anywhere in the path.
+  # Cited per row as "<route>, retrieved 2026-08-23".
+  #   bluesky   public.api.bsky.app app.bsky.actor.getProfile / getProfiles. Returns the handle,
+  #             display name, an EXACT followersCount and postsCount. The strongest route in this
+  #             file. getAuthorFeed was also read per account to confirm the account still posts.
+  #   mastodon  the instance's own /api/v1/accounts/lookup. Exact followers_count, statuses_count,
+  #             last_status_at, and rel=me verified links.
+  #   threads   NOT verifiable by fetching threads.com, which answers HTTP 200 for any string at
+  #             all including nonsense. Verified instead through the fediverse: a Threads account
+  #             with fediverse sharing on federates out, so mastodon.social's
+  #             /api/v1/accounts/lookup?acct=<user>@threads.net returns its real display name,
+  #             follower count and last post date. A hit is strong evidence. A miss is ambiguous
+  #             (either no such account, or sharing is off), so a miss was never recorded as an
+  #             absence.
+  #   instagram www.instagram.com/api/v1/users/web_profile_info with the public web app id. Exact
+  #             follower count, post count and the verified badge.
+  #   tiktok    the profile page's own embedded JSON, reading followerCount ONLY where it sits
+  #             adjacent to the matching "uniqueId". This CONTRADICTS platform-collection.md's
+  #             2026-08-22 note that TikTok profile pages yield nothing; the route worked on
+  #             2026-08-23. That file is not this block's to edit, so the delta is recorded here.
+  #   youtube   the channel page's channelMetadataRenderer title plus vanityChannelUrl. Subscriber
+  #             counts are NOT server-rendered: every subscriberCountText in that markup belongs
+  #             to a sidebar channel, and reading one gives a different channel's number. So every
+  #             youtube row below is followers: null, deliberately.
+  #   x         the profile page's twitter:title meta, which reads "Display Name (@handle) on X".
+  #             A wrong handle returns "User Profile Not Found - X | 404 Error", so this route
+  #             genuinely discriminates. No follower count is exposed, so x rows are followers:
+  #             null.
+  #   linkedin  the profile page <title>, "Name - Headline | LinkedIn". A wrong slug returns
+  #             "Profile Not Found | LinkedIn". A BLANK response is a wall, not a negative, and
+  #             was retried rather than recorded either way.
+  #   substack  substack.com/api/v1/user/<handle>/public_profile. Returns the profile handle, the
+  #             name, the publications with their subdomains, and a rounded subscriber string.
+  #   reddit    www.reddit.com/r/<sub>/.rss, which is the only reddit surface still answering a
+  #             plain fetch (about.json, api.reddit.com and old.reddit.com all return a wall). The
+  #             feed's <category label="r/Name"> confirms the community and its exact casing.
+  #             Reddit exposes NO subscriber count through it, so every reddit row is
+  #             followers: null. It is not an estimate withheld; it is a number this route cannot
+  #             see.
+  # ===============================================================================================
+
+  # ---------------------------------------------------------------------------------------------
+  # BLUESKY. The file had none, and bluesky had never been collected from at all, despite this
+  # repo already talking to the platform for Muxin's own analytics.
+  #
+  # Handle convention on bluesky: the full handle exactly as the API returns it, WITHOUT a leading
+  # "@". Bluesky handles are domains (either <name>.bsky.social or a custom domain the person
+  # controls, which is itself a form of verification), so "danidonovan.com" is the handle, not a
+  # website reference. This deliberately differs from the "@" convention on every other platform
+  # here, because prefixing an "@" would not round-trip against the API.
+  #
+  # Every followers figure below is an EXACT integer read from app.bsky.actor.getProfiles on
+  # 2026-08-23, not a rounded profile-page reading. Bluesky has NO public view count, so every
+  # entry scores on the baseline_multiple bar only, never on view_follower_ratio.
+  # ---------------------------------------------------------------------------------------------
+
+  # adhd, bluesky. Discovery was mechanical rather than remembered: searchActors was run across
+  # "ADHD", "neurodivergent" and "executive function", every hit was resolved through getProfiles,
+  # and the set was ranked by follower count. The niche tops out at about 16k here, which is the
+  # real finding: bluesky has a genuine ADHD community but no creator at the scale instagram or
+  # tiktok carry.
+  - handle: "adhd-alien.bsky.social"
+    creator: Pina (ADHD Alien)
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23: displayName "Pina ✨ ADHD
+    # Alien". getAuthorFeed showed 12 original posts spanning 2026-06-23 to 2026-08-20 with a
+    # median of 364 likes, the highest engagement per follower in this cell. Comic artist.
+    platform: bluesky
+    niche: adhd
+    followers: 16091   # exact API followersCount, read 2026-08-23
+
+  - handle: "danidonovan.com"
+    creator: Dani Donovan
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23: displayName "Dani Donovan 👩🏻‍🎨
+    # ADHD Comics", custom-domain handle. getAuthorFeed showed 25 original posts spanning
+    # 2026-07-30 to 2026-08-23, median 92 likes. The most consistent poster in this cell.
+    platform: bluesky
+    niche: adhd
+    followers: 15909   # exact API followersCount, read 2026-08-23
+
+  - handle: "adhdjesse.com"
+    creator: ADHD Jesse
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23. getAuthorFeed showed 24
+    # original posts spanning 2026-05-21 to 2026-08-19, median 34 likes. He is also on mastodon
+    # and youtube under the same name; those are separate rows because the collector is keyed on
+    # platform.
+    platform: bluesky
+    niche: adhd
+    followers: 13940   # exact API followersCount, read 2026-08-23
+
+  - handle: "neurodivergentrebel.substack.com"
+    creator: Lyric Rivera
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23: displayName "Lyric Rivera |
+    # NeuroDivergent Rebel". 12,327 total posts, 22 originals in the last ten days, so volume and
+    # consistency are not in question. Recorded caveat: median 7 likes on that window, far below
+    # the three creators above despite a similar follower count. That gap is itself worth
+    # studying, but do not read this account's outliers as comparable to theirs.
+    platform: bluesky
+    niche: adhd
+    followers: 13103   # exact API followersCount, read 2026-08-23
+
+  # product-thinking, bluesky. This cell is nearly empty and that is a finding, not a shortfall.
+  # searchActors across "product management", "product strategy" and "product design" returned
+  # one account at creator scale; the next dozen sat between 2k and 7k followers with a MEDIAN OF
+  # 0 TO 2 LIKES per post, which cannot support a baseline multiple at all. Only the one row.
+  - handle: "carnage4life.bsky.social"
+    creator: Dare Obasanjo
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23. getAuthorFeed showed 25
+    # original posts all within 2026-08-21 to 2026-08-23, median 90 likes, so he posts several
+    # times a day. The only product account on this platform with enough volume AND enough
+    # engagement to baseline honestly.
+    platform: bluesky
+    niche: product-thinking
+    followers: 79782   # exact API followersCount, read 2026-08-23
+
+  # general-viral, bluesky. These are the shape donors: picked purely on scale and on posting
+  # consistency, never on subject. Ranked out of searchActors sweeps by follower count, then
+  # each one's feed was read to confirm it is still active.
+  - handle: "theonion.com"
+    creator: The Onion
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23. 25 original posts spanning
+    # 2026-08-20 to 2026-08-23, median 991 likes. The largest account this sweep surfaced. Its
+    # whole form is a headline, which makes it an unusually pure hook donor.
+    platform: bluesky
+    niche: general-viral
+    followers: 1353564   # exact API followersCount, read 2026-08-23
+
+  - handle: "atrupar.com"
+    creator: Aaron Rupar
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23. 33,334 posts lifetime, 13
+    # originals dated 2026-08-23 alone, median 479 likes. Clip-plus-one-line format.
+    platform: bluesky
+    niche: general-viral
+    followers: 964756   # exact API followersCount, read 2026-08-23
+
+  - handle: "dril.bsky.social"
+    creator: wint (dril)
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23: displayName "wint". 24
+    # original posts spanning 2026-04-01 to 2026-08-08 with a MEDIAN OF 4,770 LIKES, roughly five
+    # times the next account here on a third of the followers. That per-post rate against only
+    # 543 lifetime posts makes this the single most concentrated short-form structure account in
+    # the whole file. Posts irregularly, which is a real caveat for a timeline window: a "last
+    # 40" here reaches back months.
+    platform: bluesky
+    niche: general-viral
+    followers: 574596   # exact API followersCount, read 2026-08-23
+
+  - handle: "catsofyore.bsky.social"
+    creator: Molly Hodgdon (Cats of Yore)
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23. 19,546 posts, 13 originals in
+    # the 2026-08-20 to 2026-08-23 window, median 1,761 likes. Included deliberately as the
+    # NON-POLITICAL half of this cell: the sweep showed bluesky's largest accounts skew heavily
+    # US-political, and a corpus built only from those would teach Muxin one register rather than
+    # a structure. This one wins on image-plus-caption craft alone.
+    platform: bluesky
+    niche: general-viral
+    followers: 341445   # exact API followersCount, read 2026-08-23
+
+  # culturecrave.co (290,959 followers, median 467 likes) verified cleanly on 2026-08-23 and is
+  # deliberately NOT seeded. It is a pop-culture news-aggregation account, so its posts are other
+  # people's announcements rather than its own writing, which is the category this file already
+  # rejects on sight. Recorded here so nobody re-adds it after finding it in the same ranked
+  # search: it is a big account and it is still the wrong kind of account.
+
+  - handle: "artbutmakeitsports.bsky.social"
+    creator: ArtButMakeItSports
+    # Verified via app.bsky.actor.getProfile, retrieved 2026-08-23. 25 originals spanning
+    # 2026-07-12 to 2026-08-21, median 924 likes on only 1,506 lifetime posts. A one-joke format
+    # executed thousands of times, which is exactly what a "series / recurring frame" pattern
+    # looks like when it works.
+    platform: bluesky
+    niche: general-viral
+    followers: 205828   # exact API followersCount, read 2026-08-23
+
+  # No bluesky row for ai-building, solopreneur or civic-tech, deliberately. searchActors was run
+  # across "building with AI", "AI agents", "LLM", "AI coding", "AI developer", "AI product",
+  # "solopreneur", "bootstrapped founder", "indie hacker", "building in public", "SaaS founder",
+  # "one person business", "civic tech", "government technology", "public interest technology" and
+  # "open data" on 2026-08-23, and every hit was resolved and ranked by follower count. The three
+  # cells failed for two different reasons, both worth recording:
+  #   - ai-building and solopreneur: the accounts that actually work those niches sit under ~10k
+  #     followers with low single-digit medians. Everything above 100k in those result sets was a
+  #     US-politics or journalism account that merely contained the word "founder" or "AI" in its
+  #     bio, which is a search artifact, not a niche creator.
+  #   - civic-tech: what surfaced was ORGANISATIONS, not creators (Civic Tech Field Guide, Code for
+  #     America chapters, SF/Toronto/Montreal civic tech groups, ProPublica, 404 Media). Their
+  #     reachable output is announcements and event notices, which is exactly the kind of account
+  #     earlier rounds correctly rejected. Seeding them would fill a cell and poison the patterns.
+  # Do not fill these three later with a marginal account just to make the grid look complete.
+
+  # ---------------------------------------------------------------------------------------------
+  # YOUTUBE, round 3. Every row here is followers: null and that is not laziness. See the
+  # verification note at the top of this block: a channel page does not server-render its own
+  # subscriber count, and every subscriberCountText in the markup belongs to a sidebar channel.
+  # Reading one would record a different channel's number as this channel's. Muxin can read the
+  # rounded figure off the page herself; nothing here may guess it.
+  # ---------------------------------------------------------------------------------------------
+
+  # general-viral, youtube. Shape donors, picked on scale and on format discipline, not subject.
+  - handle: "@MrBeast"
+    creator: MrBeast
+    # Verified: channelMetadataRenderer title "MrBeast", vanityChannelUrl youtube.com/@MrBeast,
+    # retrieved 2026-08-23. The most-optimised retention structure on the platform, which is the
+    # entire reason he is here.
+    platform: youtube
+    niche: general-viral
+    followers: null
+
+  - handle: "@veritasium"
+    creator: Derek Muller (Veritasium)
+    # Verified: channelMetadataRenderer title "Veritasium", vanityChannelUrl
+    # youtube.com/@veritasium, retrieved 2026-08-23. Long-form explainer with an unusually strong
+    # cold open, which is the transferable part for Muxin.
+    platform: youtube
+    niche: general-viral
+    followers: null
+
+  - handle: "@mkbhd"
+    creator: Marques Brownlee
+    # Verified: channelMetadataRenderer title "Marques Brownlee", vanityChannelUrl
+    # youtube.com/@mkbhd, retrieved 2026-08-23.
+    platform: youtube
+    niche: general-viral
+    followers: null
+
+  - handle: "@MarkRober"
+    creator: Mark Rober
+    # Verified: channelMetadataRenderer title "Mark Rober", vanityChannelUrl
+    # youtube.com/@MarkRober, retrieved 2026-08-23. Note the capitalisation: the vanity URL is
+    # @MarkRober even though the lowercase form also resolves.
+    platform: youtube
+    niche: general-viral
+    followers: null
+
+  - handle: "@kurzgesagt"
+    creator: Kurzgesagt (In a Nutshell)
+    # Verified: channelMetadataRenderer title "Kurzgesagt – In a Nutshell", vanityChannelUrl
+    # youtube.com/@kurzgesagt, retrieved 2026-08-23.
+    platform: youtube
+    niche: general-viral
+    followers: null
+
+  - handle: "@ColinandSamir"
+    creator: Colin and Samir
+    # Verified: channelMetadataRenderer title "Colin and Samir", vanityChannelUrl
+    # youtube.com/@ColinandSamir, retrieved 2026-08-23. Included deliberately as the one account
+    # in this cell whose SUBJECT is how the platform works, so its structure and its topic teach
+    # the same lesson.
+    platform: youtube
+    niche: general-viral
+    followers: null
+
+  # ai-building, youtube. This is youtube's strongest new cell: the niche is large, active, and
+  # every one of these posts weekly or more.
+  - handle: "@mreflow"
+    creator: Matt Wolfe
+    # Verified: channelMetadataRenderer title "Matt Wolfe", vanityChannelUrl youtube.com/@mreflow,
+    # retrieved 2026-08-23.
+    platform: youtube
+    niche: ai-building
+    followers: null
+
+  - handle: "@matthew_berman"
+    creator: Matthew Berman
+    # Verified: channelMetadataRenderer title "Matthew Berman", vanityChannelUrl
+    # youtube.com/@matthew_berman, retrieved 2026-08-23.
+    platform: youtube
+    niche: ai-building
+    followers: null
+
+  - handle: "@TheAIAdvantage"
+    creator: The AI Advantage
+    # Verified: channelMetadataRenderer title "The AI Advantage", vanityChannelUrl
+    # youtube.com/@TheAIAdvantage, retrieved 2026-08-23. The page names only the brand, not a
+    # person, so the creator field records the brand rather than inventing a name.
+    platform: youtube
+    niche: ai-building
+    followers: null
+
+  - handle: "@indydevdan"
+    creator: IndyDevDan
+    # Verified: channelMetadataRenderer title "IndyDevDan", vanityChannelUrl
+    # youtube.com/@indydevdan, retrieved 2026-08-23. Closest of this set to Muxin's actual case:
+    # one developer, agentic coding workflows, no team.
+    platform: youtube
+    niche: ai-building
+    followers: null
+
+  - handle: "@AIJasonZ"
+    creator: AI Jason
+    # Verified: channelMetadataRenderer title "AI Jason", vanityChannelUrl youtube.com/@AIJasonZ,
+    # retrieved 2026-08-23.
+    platform: youtube
+    niche: ai-building
+    followers: null
+
+  - handle: "@DavidOndrej"
+    creator: David Ondrej
+    # Verified: channelMetadataRenderer title "David Ondrej", vanityChannelUrl
+    # youtube.com/@DavidOndrej, retrieved 2026-08-23.
+    platform: youtube
+    niche: ai-building
+    followers: null
+
+  # solopreneur, youtube
+  - handle: "@starterstory"
+    creator: Pat Walls (Starter Story)
+    # Verified: channelMetadataRenderer title "Starter Story", vanityChannelUrl
+    # youtube.com/@starterstory, retrieved 2026-08-23. Founder name is carried over from his
+    # verified x profile @thepatwalls; the channel page itself names only the brand.
+    platform: youtube
+    niche: solopreneur
+    followers: null
+
+  - handle: "@GregIsenberg"
+    creator: Greg Isenberg
+    # Verified: channelMetadataRenderer title "Greg Isenberg", vanityChannelUrl
+    # youtube.com/@GregIsenberg, retrieved 2026-08-23.
+    platform: youtube
+    niche: solopreneur
+    followers: null
+
+  - handle: "@MyFirstMillionPod"
+    creator: My First Million
+    # Verified: channelMetadataRenderer title "My First Million", vanityChannelUrl
+    # youtube.com/@MyFirstMillionPod, retrieved 2026-08-23. The page names the show rather than
+    # its hosts, so the creator field records the show.
+    platform: youtube
+    niche: solopreneur
+    followers: null
+
+  - handle: "@indiehackers"
+    creator: Indie Hackers
+    # Verified: channelMetadataRenderer title "Indie Hackers", vanityChannelUrl
+    # youtube.com/@indiehackers, retrieved 2026-08-23.
+    platform: youtube
+    niche: solopreneur
+    followers: null
+
+  - handle: "@thefutur"
+    creator: The Futur
+    # Verified: channelMetadataRenderer title "The Futur", vanityChannelUrl
+    # youtube.com/@thefutur, retrieved 2026-08-23.
+    platform: youtube
+    niche: solopreneur
+    followers: null
+
+  # civic-tech, youtube
+  - handle: "@johnnyharris"
+    creator: Johnny Harris
+    # Verified: channelMetadataRenderer title "Johnny Harris", vanityChannelUrl
+    # youtube.com/@johnnyharris, retrieved 2026-08-23. Description on the page reads "Independent
+    # Filmmaker helping you better understand the world".
+    platform: youtube
+    niche: civic-tech
+    followers: null
+
+  - handle: "@CGPGrey"
+    creator: CGP Grey
+    # Verified: channelMetadataRenderer title "CGP Grey", vanityChannelUrl youtube.com/@CGPGrey,
+    # retrieved 2026-08-23. The clearest existing model for what Muxin's civic-tech work wants to
+    # be: voting systems and how government actually works, explained without grievance. Posts
+    # infrequently, which is a real caveat for a timeline window.
+    platform: youtube
+    niche: civic-tech
+    followers: null
+
+  - handle: "@moreperfectunion"
+    creator: More Perfect Union
+    # Verified: channelMetadataRenderer title "More Perfect Union", vanityChannelUrl
+    # youtube.com/@moreperfectunion, retrieved 2026-08-23. Register warning, same as the
+    # civic-democracy video block above: this is an advocacy newsroom, not the joyful-activism
+    # register hook-patterns.md sets as the civic default. Here for hook mechanics.
+    platform: youtube
+    niche: civic-tech
+    followers: null
+
+  # adhd, youtube
+  - handle: "@HowtoADHD"
+    creator: Jessica McCabe
+    # Verified: channelMetadataRenderer title "How to ADHD", vanityChannelUrl
+    # youtube.com/@HowtoADHD, retrieved 2026-08-23. The largest and longest-running ADHD explainer
+    # channel there is.
+    platform: youtube
+    niche: adhd
+    followers: null
+
+  - handle: "@adhdjesse"
+    creator: Jesse J. Anderson (ADHD Jesse)
+    # Verified: channelMetadataRenderer title "ADHD Jesse", vanityChannelUrl
+    # youtube.com/@adhdjesse, retrieved 2026-08-23. Also seeded on bluesky and substack; separate
+    # rows because the collector is keyed on platform.
+    platform: youtube
+    niche: adhd
+    followers: null
+
+  # product-thinking, youtube
+  - handle: "@LennysPodcast"
+    creator: Lenny Rachitsky
+    # Verified: channelMetadataRenderer title "Lenny's Podcast", vanityChannelUrl
+    # youtube.com/@LennysPodcast, retrieved 2026-08-23. This is the ONLY product-thinking youtube
+    # row, and the cell is thin on purpose. Product thinking is a written-medium niche: its
+    # audience reads newsletters and LinkedIn posts, and what exists on youtube is mostly long
+    # interview footage rather than structured short-form. Do not pad this cell with course
+    # channels; one of the two candidates checked, youtube.com/@productschool, resolves to a
+    # channel titled "Werner Muller", which is a good reminder to verify before recording.
+    platform: youtube
+    niche: product-thinking
+    followers: null
+
+  # ---------------------------------------------------------------------------------------------
+  # TIKTOK, round 3. Follower counts here ARE real: they were read from the followerCount value
+  # sitting adjacent to the matching "uniqueId" in the profile page's own embedded JSON on
+  # 2026-08-23. Reading the first followerCount in the markup without that anchor returns a
+  # different account's number, which is why the anchoring is spelled out.
+  #
+  # This CONTRADICTS references/platform-collection.md, which recorded on 2026-08-22 that TikTok
+  # profile pages return only a follower header and that TikTok needs the Phase 2 scraper. The
+  # profile route worked on 2026-08-23. Per-video numbers and transcripts were NOT re-checked, so
+  # that half of the guide's verdict still stands as written.
+  #
+  # Counts are TikTok's own rounded display figures (138300000 is "138.3M"), not exact integers.
+  # ---------------------------------------------------------------------------------------------
+
+  # general-viral, tiktok. The most market-tested short-form structures that exist anywhere.
+  - handle: "@khaby.lame"
+    creator: Khabane Lame
+    # Verified: profile page JSON uniqueId "khaby.lame", nickname "Khabane lame", followerCount
+    # read adjacent to that uniqueId, retrieved 2026-08-23. Wordless format, which makes him a
+    # pure structure donor: nothing about his wording can be borrowed even by accident.
+    platform: tiktok
+    niche: general-viral
+    followers: 162700000   # rounded display figure, read 2026-08-23
+
+  - handle: "@charlidamelio"
+    creator: Charli D'Amelio
+    # Verified: profile page JSON uniqueId "charlidamelio", nickname "charli d'amelio",
+    # retrieved 2026-08-23.
+    platform: tiktok
+    niche: general-viral
+    followers: 159300000   # rounded display figure, read 2026-08-23
+
+  - handle: "@mrbeast"
+    creator: MrBeast
+    # Verified: profile page JSON uniqueId "mrbeast", nickname "MrBeast", 1.4B hearts across only
+    # 465 videos, retrieved 2026-08-23. That ratio is the interesting number: extreme selectivity
+    # rather than volume.
+    platform: tiktok
+    niche: general-viral
+    followers: 138300000   # rounded display figure, read 2026-08-23
+
+  - handle: "@bellapoarch"
+    creator: Bella Poarch
+    # Verified: profile page JSON uniqueId "bellapoarch", nickname "Bella Poarch", 127 videos
+    # total, retrieved 2026-08-23. The lowest post count of any account in this file at this
+    # scale, so a timeline window here covers years. Recorded because that is exactly the sampling
+    # caveat a collector needs before pulling her feed.
+    platform: tiktok
+    niche: general-viral
+    followers: 91800000   # rounded display figure, read 2026-08-23
+
+  - handle: "@addisonre"
+    creator: Addison Rae
+    # Verified: profile page JSON uniqueId "addisonre", nickname "Addison Rae", retrieved
+    # 2026-08-23.
+    platform: tiktok
+    niche: general-viral
+    followers: 87900000   # rounded display figure, read 2026-08-23
+
+  - handle: "@zachking"
+    creator: Zach King
+    # Verified: profile page JSON uniqueId "zachking", nickname "Zach King", 614 videos,
+    # retrieved 2026-08-23. Included as the craft-and-payoff end of this cell: every video is a
+    # setup and a visual reveal, which is the most directly reusable arc here.
+    platform: tiktok
+    niche: general-viral
+    followers: 86800000   # rounded display figure, read 2026-08-23
+
+  # adhd, tiktok. The strongest new cell in this whole block, and by a wide margin the largest
+  # audience for Muxin's adhd niche anywhere: four accounts between 1.3M and 5.5M followers, all
+  # posting consistently, none of them a repost or meme-aggregation account.
+  - handle: "@connordewolfe"
+    creator: Connor DeWolfe
+    # Verified: profile page JSON uniqueId "connordewolfe", nickname "Connor DeWolfe", 688 videos,
+    # 228.8M hearts, retrieved 2026-08-23. Note for anyone tempted to cross-reference: the
+    # instagram username "connordewolfe" is a DIFFERENT, near-empty account (264 followers, 2
+    # posts), so do not seed him on instagram off this row.
+    platform: tiktok
+    niche: adhd
+    followers: 5500000   # rounded display figure, read 2026-08-23
+
+  - handle: "@domesticblisters"
+    creator: KC Davis
+    # Verified: profile page JSON uniqueId "domesticblisters", nickname "Kc Davis", 5,214 videos,
+    # retrieved 2026-08-23. The highest post volume in this cell by a factor of six, which makes
+    # her the easiest account here to baseline honestly.
+    platform: tiktok
+    niche: adhd
+    followers: 1800000   # rounded display figure, read 2026-08-23
+
+  - handle: "@catieosaurus"
+    creator: Catieosaurus
+    # Verified: profile page JSON uniqueId "catieosaurus", nickname "Catieosaurus", 3,637 videos,
+    # retrieved 2026-08-23.
+    platform: tiktok
+    niche: adhd
+    followers: 1700000   # rounded display figure, read 2026-08-23
+
+  - handle: "@adhd_love"
+    creator: Rich and Rox (ADHD Love)
+    # Verified: profile page JSON uniqueId "adhd_love", nickname "rich & rox • adhd love", 871
+    # videos, retrieved 2026-08-23. Same couple as instagram @adhd_love_ below; note the trailing
+    # underscore differs between the two platforms, which is exactly the kind of detail a guessed
+    # handle gets wrong.
+    platform: tiktok
+    niche: adhd
+    followers: 1300000   # rounded display figure, read 2026-08-23
+
+  # civic-tech, tiktok
+  - handle: "@moreperfectunion"
+    creator: More Perfect Union
+    # Verified: profile page JSON uniqueId "moreperfectunion", nickname "More Perfect Union",
+    # 2,964 videos, 51.2M hearts, retrieved 2026-08-23. Same register warning as its youtube row.
+    platform: tiktok
+    niche: civic-tech
+    followers: 1400000   # rounded display figure, read 2026-08-23
+
+  # solopreneur, tiktok. Two rows only, and both are small. That is the finding: the solopreneur
+  # audience is not on tiktok at anything like the scale it is on youtube or x. Both accounts
+  # below are cross-posting operations whose main home is elsewhere, which is worth knowing before
+  # treating their tiktok medians as meaningful.
+  - handle: "@starterstory"
+    creator: Pat Walls (Starter Story)
+    # Verified: profile page JSON uniqueId "starterstory", nickname "Starter Story", 429 videos,
+    # retrieved 2026-08-23.
+    platform: tiktok
+    niche: solopreneur
+    followers: 156600   # rounded display figure, read 2026-08-23
+
+  - handle: "@gregisenberg"
+    creator: Greg Isenberg
+    # Verified: profile page JSON uniqueId "gregisenberg", nickname "Greg Isenberg", 310 videos,
+    # retrieved 2026-08-23. 33.8k followers against roughly a million on x, so this is plainly a
+    # secondary channel for him. Collect it as a cross-post comparison, not as a top account.
+    platform: tiktok
+    niche: solopreneur
+    followers: 33800   # rounded display figure, read 2026-08-23
+
+  # No tiktok row for ai-building or product-thinking, and the ai-building failure is worth
+  # spelling out because it is a verification story, not a search story. Three plausible-looking
+  # ai-building handles were checked on 2026-08-23. One did not exist at all. The other two
+  # resolved to real pages carrying 3 followers and 0 followers respectively, which means the
+  # handle a human would guess for a well-known AI creator is a squatted or abandoned account, not
+  # theirs. The same thing happened to a civic candidate: tiktok.com/@johnnyharris exists and has
+  # 14 followers and 11 videos, and is NOT the Johnny Harris whose youtube channel is seeded
+  # above. Anyone extending this cell must resolve each handle and read its follower count before
+  # writing it down; a name-shaped handle on tiktok is very often somebody else.
+  # product-thinking on tiktok was not pursued past that: the niche is written-medium and did not
+  # show a single short-form video account worth seeding.
+
+  # ---------------------------------------------------------------------------------------------
+  # INSTAGRAM, round 3. Follower counts here are EXACT integers from
+  # instagram.com/api/v1/users/web_profile_info, read 2026-08-22 and 2026-08-23. That endpoint
+  # rate-limits hard: after a couple of dozen lookups it starts answering with a wall that looks
+  # identical to a real "no such user". Every row below was read on a successful call; a lookup
+  # that came back walled was retried rather than recorded as an absence.
+  # ---------------------------------------------------------------------------------------------
+
+  # general-viral, instagram. The largest audiences on any platform in this file. Their subject is
+  # irrelevant; their packaging is the lesson.
+  - handle: "@cristiano"
+    creator: Cristiano Ronaldo
+    # Verified: web_profile_info username "cristiano", full_name "Cristiano Ronaldo", verified
+    # badge true, retrieved 2026-08-23. The largest account on instagram.
+    platform: instagram
+    niche: general-viral
+    followers: 679697682   # exact API count, read 2026-08-23
+
+  - handle: "@selenagomez"
+    creator: Selena Gomez
+    # Verified: web_profile_info username "selenagomez", full_name "Selena Gomez", verified badge
+    # true, 2,182 posts, retrieved 2026-08-23.
+    platform: instagram
+    niche: general-viral
+    followers: 403879452   # exact API count, read 2026-08-23
+
+  - handle: "@therock"
+    creator: Dwayne Johnson
+    # Verified: web_profile_info username "therock", full_name "Dwayne Johnson", verified badge
+    # true, 8,512 posts, retrieved 2026-08-23. Highest post volume in this cell, so the easiest of
+    # the mega-accounts to baseline.
+    platform: instagram
+    niche: general-viral
+    followers: 381828592   # exact API count, read 2026-08-23
+
+  - handle: "@kyliejenner"
+    creator: Kylie Jenner
+    # Verified: web_profile_info username "kyliejenner", full_name "Kylie", verified badge true,
+    # 7,387 posts, retrieved 2026-08-23.
+    platform: instagram
+    niche: general-viral
+    followers: 381305686   # exact API count, read 2026-08-23
+
+  - handle: "@mrbeast"
+    creator: MrBeast
+    # Verified: web_profile_info username "mrbeast", full_name "MrBeast", verified badge true,
+    # 502 posts, retrieved 2026-08-23.
+    platform: instagram
+    niche: general-viral
+    followers: 88932427   # exact API count, read 2026-08-23
+
+  - handle: "@zachking"
+    creator: Zach King
+    # Verified: web_profile_info username "zachking", full_name "Zach King", verified badge true,
+    # 1,315 posts, retrieved 2026-08-23. Same setup-and-visual-reveal arc as his tiktok row, on a
+    # different feed, which makes the pair a genuinely useful cross-platform comparison.
+    platform: instagram
+    niche: general-viral
+    followers: 31693025   # exact API count, read 2026-08-23
+
+  # adhd, instagram
+  - handle: "@adhd_love_"
+    creator: Rich and Rox (ADHD Love)
+    # Verified: web_profile_info username "adhd_love_", full_name "rich & rox • adhd love",
+    # verified badge true, 857 posts, retrieved 2026-08-23. Note the TRAILING UNDERSCORE, which is
+    # part of the instagram username and is absent from their tiktok handle.
+    platform: instagram
+    niche: adhd
+    followers: 1381684   # exact API count, read 2026-08-23
+
+  - handle: "@mommacusses"
+    creator: Gwenna Laithland
+    # Verified: web_profile_info username "mommacusses", full_name "Gwenna Laithland", verified
+    # badge true, 2,062 posts, retrieved 2026-08-23. Neurodivergent-parenting register rather than
+    # ADHD explainer, which is a different and useful shape.
+    platform: instagram
+    niche: adhd
+    followers: 899148   # exact API count, read 2026-08-23
+
+  - handle: "@danidonovan"
+    creator: Dani Donovan
+    # Verified: web_profile_info username "danidonovan", full_name "Dani Donovan", 913 posts,
+    # retrieved 2026-08-23. Note the verified badge is FALSE here, which is recorded rather than
+    # smoothed over: the identity check is the bio, which names her book "The Anti-Planner", plus
+    # the matching custom-domain bluesky handle danidonovan.com seeded above. Same person, two
+    # platforms, one of them badged and one not.
+    platform: instagram
+    niche: adhd
+    followers: 128602   # exact API count, read 2026-08-23
+
+  - handle: null   # TODO: confirm handle
+    creator: Jessica McCabe (How to ADHD)
+    # Her youtube channel is verified above as youtube.com/@HowtoADHD. An instagram row for her is
+    # left NULL on purpose. The username "howtoadhd" was looked up four times on 2026-08-23 and
+    # every call came back walled rather than resolved, and the endpoint's wall is indistinguishable
+    # from a genuine miss. Confirm it with one clean web_profile_info read before collecting, and
+    # do not fill this in from a search snippet.
+    platform: instagram
+    niche: adhd
+    followers: null
+
+  # No instagram row for ai-building, product-thinking, solopreneur or civic-tech in this round.
+  # This is a coverage gap rather than a proven absence, and the difference matters. The endpoint
+  # rate-limited partway through the sweep, and the candidates for those four cells were the ones
+  # still unresolved when it did. Instagram almost certainly has creators in at least
+  # ai-building and solopreneur. Re-run those four cells on a fresh window before concluding
+  # anything about them. Do not read the silence here as a finding.
+
+  # ---------------------------------------------------------------------------------------------
+  # X, round 3. Every row is followers: null. The profile page's meta tags verify WHO a handle
+  # belongs to but expose no follower count, and platform-collection.md's other X findings still
+  # hold (the syndication endpoint truncates bodies at 279 characters, so X bodies still have no
+  # honest automated route and stay paste-only).
+  #
+  # The verification route does genuinely discriminate: a wrong handle returns "User Profile Not
+  # Found - X | 404 Error". Two candidates in this round returned exactly that and were dropped.
+  # ---------------------------------------------------------------------------------------------
+
+  # general-viral, x
+  - handle: "@elonmusk"
+    creator: Elon Musk
+    # Verified: twitter:title meta "Elon Musk (@elonmusk) on X", retrieved 2026-08-23.
+    platform: x
+    niche: general-viral
+    followers: null
+
+  - handle: "@BarackObama"
+    creator: Barack Obama
+    # Verified: twitter:title meta "Barack Obama (@BarackObama) on X", bio "Dad, husband,
+    # President, citizen.", retrieved 2026-08-23.
+    platform: x
+    niche: general-viral
+    followers: null
+
+  - handle: "@Cristiano"
+    creator: Cristiano Ronaldo
+    # Verified: twitter:title meta "Cristiano Ronaldo (@Cristiano) on X", bio "Welcome to the
+    # official account of Cristiano Ronaldo.", retrieved 2026-08-23. Note the capital C, which
+    # differs from his lowercase instagram username.
+    platform: x
+    niche: general-viral
+    followers: null
+
+  - handle: "@dril"
+    creator: wint (dril)
+    # Verified: twitter:title meta "wint (@dril) on X", retrieved 2026-08-23. Same person as the
+    # bluesky row above. Seeded on both deliberately: he is the clearest case in this file of one
+    # writer's identical short-form structure being measurable on two platforms at once, which is
+    # exactly the atomized-versus-organic comparison this repo already runs on Muxin's own posts.
+    platform: x
+    niche: general-viral
+    followers: null
+
+  - handle: "@MrBeast"
+    creator: MrBeast
+    # Verified: twitter:title meta "MrBeast (@MrBeast) on X", retrieved 2026-08-23.
+    platform: x
+    niche: general-viral
+    followers: null
+
+  # ai-building, x. This is x's strongest new cell. X is where AI builders actually argue, and all
+  # six post daily or near it.
+  - handle: "@karpathy"
+    creator: Andrej Karpathy
+    # Verified: twitter:title meta "Andrej Karpathy (@karpathy) on X", bio "deep learning",
+    # retrieved 2026-08-23.
+    platform: x
+    niche: ai-building
+    followers: null
+
+  - handle: "@simonw"
+    creator: Simon Willison
+    # Verified: twitter:title meta "Simon Willison (@simonw) on X", bio names @datasetteproj and
+    # co-creating Django, retrieved 2026-08-23. Closest in this cell to Muxin's own practice:
+    # one person, tools, worked examples, published continuously.
+    platform: x
+    niche: ai-building
+    followers: null
+
+  - handle: "@swyx"
+    creator: swyx (Shawn Wang)
+    # Verified: twitter:title meta "swyx (@swyx) on X", bio names @smol_ai, @cognition and
+    # @aidotengine, retrieved 2026-08-23. Also seeded on substack below as Latent.Space.
+    platform: x
+    niche: ai-building
+    followers: null
+
+  - handle: "@AndrewYNg"
+    creator: Andrew Ng
+    # Verified: twitter:title meta "Andrew Ng (@AndrewYNg) on X", bio "Co-Founder of Coursera;
+    # Stanford CS adjunct faculty", retrieved 2026-08-23.
+    platform: x
+    niche: ai-building
+    followers: null
+
+  - handle: "@rowancheung"
+    creator: Rowan Cheung
+    # Verified twice on 2026-08-23: twitter:title meta "Rowan Cheung (@rowancheung) on X", and
+    # separately his linkedin profile title "Rowan Cheung - The Rundown | LinkedIn". Newsletter
+    # operator rather than a builder, so watch him for packaging, not for practice.
+    platform: x
+    niche: ai-building
+    followers: null
+
+  - handle: "@mattshumer_"
+    creator: Matt Shumer
+    # Verified: twitter:title meta "Matt Shumer (@mattshumer_) on X", retrieved 2026-08-23. Note
+    # the TRAILING UNDERSCORE; the handle without it is a different account.
+    platform: x
+    niche: ai-building
+    followers: null
+
+  # product-thinking, x
+  - handle: "@shreyas"
+    creator: Shreyas Doshi
+    # Verified: twitter:title meta "Shreyas Doshi (@shreyas) on X", bio names Stripe, Twitter,
+    # Google and Yahoo, retrieved 2026-08-23. Note the handle is the bare first name, not a
+    # full-name slug.
+    platform: x
+    niche: product-thinking
+    followers: null
+
+  - handle: "@lennysan"
+    creator: Lenny Rachitsky
+    # Verified: twitter:title meta "Lenny Rachitsky (@lennysan) on X", retrieved 2026-08-23.
+    # Careful: "lennysan" is his X handle but NOT his substack profile handle, which is "lenny".
+    # Reusing one for the other lands on a decoy profile with a single subscriber. See his
+    # substack row below.
+    platform: x
+    niche: product-thinking
+    followers: null
+
+  - handle: "@gibsonbiddle"
+    creator: Gibson Biddle
+    # Verified: twitter:title meta "Gibson Biddle (@gibsonbiddle) on X", bio "Former Netflix/Chegg
+    # VP/CPO", retrieved 2026-08-23.
+    platform: x
+    niche: product-thinking
+    followers: null
+
+  # Marty Cagan was checked on x on 2026-08-23 and deliberately NOT seeded. The handle @cagan is
+  # genuinely his (twitter:title meta "Marty Cagan (@cagan) on X"), but his own bio reads "I'm no
+  # longer active on this platform." An account that has stopped posting cannot be baseline-scored,
+  # so it stays out. His linkedin row below is the live one.
+
+  # solopreneur, x
+  - handle: "@gregisenberg"
+    creator: Greg Isenberg
+    # Verified: twitter:title meta "GREG ISENBERG (@gregisenberg) on X", bio "I drop startup ideas
+    # daily", retrieved 2026-08-23.
+    platform: x
+    niche: solopreneur
+    followers: null
+
+  - handle: "@dvassallo"
+    creator: Daniel Vassallo
+    # Verified twice on 2026-08-23: twitter:title meta "Daniel Vassallo (@dvassallo) on X", and
+    # his substack profile "dvassallo" carrying the Small Bets Newsletter.
+    platform: x
+    niche: solopreneur
+    followers: null
+
+  - handle: "@tdinh_me"
+    creator: Tony Dinh
+    # Verified: twitter:title meta "Tony Dinh (@tdinh_me) on X", bio "Creating software I love to
+    # use" with a stated $137K/m, retrieved 2026-08-23. Build-in-public revenue posting, which is
+    # the same shape as @levelsio already seeded above.
+    platform: x
+    niche: solopreneur
+    followers: null
+
+  - handle: "@thepatwalls"
+    creator: Pat Walls
+    # Verified: twitter:title meta "Pat Walls (@thepatwalls) on X", retrieved 2026-08-23. Runs
+    # Starter Story, seeded on youtube and tiktok above.
+    platform: x
+    niche: solopreneur
+    followers: null
+
+  # civic-tech, x. Thin and honest at one row. The two other candidates checked, @BetaNYC and
+  # @codeforamerica, are ORGANISATION accounts whose reachable output is announcements and event
+  # notices, which is the category earlier rounds correctly rejected. @BetaNYC's own display name
+  # on 2026-08-23 reads "Beta.NYC - Now at @betanyc.bsky.social", so it has additionally moved off
+  # the platform.
+  - handle: "@profgalloway"
+    creator: Scott Galloway
+    # Verified: twitter:title meta "Scott Galloway (@profgalloway) on X", retrieved 2026-08-23.
+    # Prune candidate, flagged plainly: his subject is markets and business rather than civic tech,
+    # and his register is combative. He is here because he is the one individual at creator scale
+    # on x working the "how power actually operates, explained with numbers" shape that Muxin's
+    # civic-tech pillar wants. Cut him if the corpus starts pulling her toward contrarian takes.
+    platform: x
+    niche: civic-tech
+    followers: null
+
+  # No x row for adhd. Not searched exhaustively in this round, so this is an unexamined cell
+  # rather than a proven empty one. Say that rather than implying a finding.
+
+  # ---------------------------------------------------------------------------------------------
+  # LINKEDIN, round 3. Handle convention unchanged from the round-2 block: the linkedin.com/in/
+  # slug with an "@" prefix. Verified by the profile page's own <title>, which reads
+  # "Name - Headline | LinkedIn"; a wrong slug returns "Profile Not Found | LinkedIn", so the
+  # route genuinely discriminates. followers stays null, because LinkedIn does not publish a
+  # follower count in the fetched markup and impressions are owner-only.
+  #
+  # Read this before extending the cell: LinkedIn began WALLING the profile fetch partway through
+  # this round, returning an empty response rather than a title. An empty response is a wall, NOT
+  # a "no such person". Every row below sits on a real title read; every candidate that came back
+  # empty was retried and then left out rather than recorded either way.
+  # ---------------------------------------------------------------------------------------------
+
+  # product-thinking, linkedin. LinkedIn is where this niche actually lives, and it shows: this is
+  # the deepest cell in the round.
+  - handle: "@shreyasdoshi"
+    creator: Shreyas Doshi
+    # Verified: profile title "Shreyas Doshi - High Leverage Labs | LinkedIn", retrieved
+    # 2026-08-23. Also verified on x as @shreyas and on substack as "shreyasdoshi".
+    platform: linkedin
+    niche: product-thinking
+    followers: null
+
+  - handle: "@lennyrachitsky"
+    creator: Lenny Rachitsky
+    # Verified: profile title "Lenny Rachitsky - Lenny's Newsletter | LinkedIn", retrieved
+    # 2026-08-23. Three different handles for one person across three platforms, all verified
+    # separately and none derivable from the others: linkedin "lennyrachitsky", x "lennysan",
+    # substack "lenny".
+    platform: linkedin
+    niche: product-thinking
+    followers: null
+
+  - handle: "@cagan"
+    creator: Marty Cagan
+    # Verified: profile title "Marty Cagan - Silicon Valley Product Group | LinkedIn", retrieved
+    # 2026-08-23. This is where he still posts; his x account says outright that he does not.
+    platform: linkedin
+    niche: product-thinking
+    followers: null
+
+  - handle: "@scottbelsky"
+    creator: Scott Belsky
+    # Verified: profile title "Scott Belsky - A24 | LinkedIn", retrieved 2026-08-23.
+    platform: linkedin
+    niche: product-thinking
+    followers: null
+
+  - handle: "@gibsonbiddle"
+    creator: Gibson Biddle
+    # Verified: profile title "Gibson Biddle - Gibson Biddle | LinkedIn", retrieved 2026-08-23.
+    platform: linkedin
+    niche: product-thinking
+    followers: null
+
+  # ai-building, linkedin
+  - handle: "@andrewyng"
+    creator: Andrew Ng
+    # Verified: profile title "Andrew Ng - DeepLearning.AI | LinkedIn", retrieved 2026-08-23.
+    platform: linkedin
+    niche: ai-building
+    followers: null
+
+  - handle: "@simonwillison"
+    creator: Simon Willison
+    # Verified: profile title "Simon Willison - Datasette | LinkedIn", retrieved 2026-08-23.
+    platform: linkedin
+    niche: ai-building
+    followers: null
+
+  - handle: "@rowancheung"
+    creator: Rowan Cheung
+    # Verified: profile title "Rowan Cheung - The Rundown | LinkedIn", retrieved 2026-08-23.
+    platform: linkedin
+    niche: ai-building
+    followers: null
+
+  # solopreneur, linkedin
+  - handle: "@danielvassallo"
+    creator: Daniel Vassallo
+    # Verified: profile title "Daniel Vassallo - Small Bets | LinkedIn", retrieved 2026-08-23.
+    platform: linkedin
+    niche: solopreneur
+    followers: null
+
+  - handle: "@sahilbloom"
+    creator: Sahil Bloom
+    # Verified: profile title "Sahil Bloom - Wild Roman | LinkedIn", retrieved 2026-08-23. Already
+    # seeded on x and instagram above; separate row because the collector is keyed on platform.
+    platform: linkedin
+    niche: solopreneur
+    followers: null
+
+  - handle: "@nathanlatka"
+    creator: Nathan Latka
+    # Verified: profile title "Nathan Latka - Founderpath | LinkedIn", retrieved 2026-08-23.
+    platform: linkedin
+    niche: solopreneur
+    followers: null
+
+  # No linkedin row for adhd, civic-tech or general-viral in this round. Two different reasons,
+  # kept apart on purpose:
+  #   - civic-tech: the round-2 block above already seeded four civic linkedin accounts and
+  #     recorded the honest register warning that goes with them. Nothing new cleared the bar here.
+  #   - adhd and general-viral: candidates were queued but LinkedIn's wall arrived first, so these
+  #     are UNEXAMINED cells, not empty ones. Do not read the silence as a finding. A
+  #     general-viral cell on linkedin is also conceptually awkward in a way the other platforms'
+  #     are not: reach there is gated by connections and follower graph rather than by an open
+  #     feed, so "just big in general" means something weaker on this platform than it does on
+  #     tiktok or reddit.
+
+  # ---------------------------------------------------------------------------------------------
+  # SUBSTACK, round 3. Handle convention unchanged from the round-1 note: the creator's Substack
+  # PROFILE handle, so substack.com/<handle> resolves. Publication name and host in the comment.
+  #
+  # A followers figure here is the rounded subscriber string the profile page itself serves,
+  # converted to an integer ("470K+ subscribers" becomes 470000). It is a rounded reading, never
+  # an estimate. Where the profile answered "See subscribers" instead of a number, followers stays
+  # null rather than being filled from anywhere else.
+  #
+  # A warning that cost real time this round: a creator's substack profile handle is often NOT
+  # their handle anywhere else, and the near-miss handles are frequently REAL but empty accounts
+  # rather than 404s. "lennysan" resolves to a substack profile with 1 subscriber and an empty
+  # publication; the actual Lenny's Newsletter profile is "lenny" with 1.2M+. Resolve the profile
+  # and read the publication before recording.
+  # ---------------------------------------------------------------------------------------------
+
+  # ai-building, substack
+  - handle: "@oneusefulthing"   # verified: substack.com/api/v1/user/oneusefulthing/public_profile, retrieved 2026-08-23
+    creator: Ethan Mollick
+    # Publication "One Useful Thing", subdomain oneusefulthing, custom domain
+    # www.oneusefulthing.org, role admin. Bio names the Wharton School.
+    platform: substack
+    niche: ai-building
+    followers: 470000   # profile shows "470K+ subscribers", read 2026-08-23
+
+  - handle: "@swyx"   # verified: substack.com/api/v1/user/swyx/public_profile, retrieved 2026-08-23
+    creator: swyx (Shawn Wang)
+    # Publication "Latent.Space", subdomain swyx, custom domain www.latent.space, role admin.
+    # Also verified on x above.
+    platform: substack
+    niche: ai-building
+    followers: 197000   # profile shows "197K+ subscribers", read 2026-08-23
+
+  - handle: "@natesnewsletter"   # verified: substack.com/api/v1/user/natesnewsletter/public_profile, retrieved 2026-08-23
+    creator: Nate (Nate's Substack)
+    # Publication "Nate's Substack", subdomain natesnewsletter, no custom domain, role admin. Bio
+    # reads "Dad, VP Product, suffering Seahawks fan", which puts him across ai-building and
+    # product-thinking; filed under ai-building because that is what the publication is about.
+    # The profile does not give a surname, so the creator field records what the platform states.
+    platform: substack
+    niche: ai-building
+    followers: 169000   # profile shows "169K+ subscribers", read 2026-08-23
+
+  - handle: "@nateliason"   # verified: substack.com/api/v1/user/nateliason/public_profile, retrieved 2026-08-23
+    creator: Nat Eliason
+    # Publication "Nat Eliason's Newsletter", subdomain nateliason, custom domain
+    # blog.nateliason.com, role admin.
+    platform: substack
+    niche: ai-building
+    followers: 46000   # profile shows "46K+ subscribers", read 2026-08-23
+
+  # product-thinking, substack
+  - handle: "@lenny"   # verified: substack.com/api/v1/user/lenny/public_profile, retrieved 2026-08-23
+    creator: Lenny Rachitsky
+    # The single largest subscriber figure in this file. See the warning above: "lennysan" and
+    # "lennyrachitsky" both resolve to real but near-empty decoy profiles. This is the live one.
+    platform: substack
+    niche: product-thinking
+    followers: 1200000   # profile shows "1.2M+ subscribers", read 2026-08-23
+
+  - handle: "@aakashgupta"   # verified: substack.com/api/v1/user/aakashgupta/public_profile, retrieved 2026-08-23
+    creator: Aakash Gupta
+    # Publication "Product Growth", subdomain aakashgupta, custom domain www.news.aakashg.com,
+    # role admin. Bio "The AI PM guy".
+    platform: substack
+    niche: product-thinking
+    followers: 253000   # profile shows "253K+ subscribers", read 2026-08-23
+
+  - handle: "@shreyasdoshi"   # verified: substack.com/api/v1/user/shreyasdoshi/public_profile, retrieved 2026-08-23
+    creator: Shreyas Doshi
+    # Publication "Shreyas Free Newsletter", subdomain shreyasdoshi, no custom domain, role admin.
+    platform: substack
+    niche: product-thinking
+    followers: 47000   # profile shows "47K+ subscribers", read 2026-08-23
+
+  # solopreneur, substack
+  - handle: "@dickiebush"   # verified: substack.com/api/v1/user/dickiebush/public_profile, retrieved 2026-08-23
+    creator: Dickie Bush
+    # Publication "AI Operator", subdomain aioperatornewsletter, no custom domain, role admin.
+    # Already seeded on x in the original block; this is the same person on a second platform.
+    platform: substack
+    niche: solopreneur
+    followers: 131000   # profile shows "131K+ subscribers", read 2026-08-23
+
+  - handle: "@dvassallo"   # verified: substack.com/api/v1/user/dvassallo/public_profile, retrieved 2026-08-23
+    creator: Daniel Vassallo
+    # Publication "Small Bets Newsletter", subdomain cattlenotpets, custom domain
+    # newsletter.smallbets.co, role admin. Note the subdomain does not match the handle, which is
+    # normal on substack and is why the publication has to be read rather than assumed.
+    platform: substack
+    niche: solopreneur
+    followers: 8200   # profile shows "8.2K+ subscribers", read 2026-08-23
+
+  # adhd, substack
+  - handle: "@adhdjesse"   # verified: substack.com/api/v1/user/adhdjesse/public_profile, retrieved 2026-08-23
+    creator: Jesse J. Anderson (ADHD Jesse)
+    # Publication "Extra Focus • ADHD Newsletter", subdomain adhdjesse, custom domain
+    # www.extrafocus.com, role admin. The largest ADHD newsletter this sweep found.
+    platform: substack
+    niche: adhd
+    followers: 71000   # profile shows "71K+ subscribers", read 2026-08-23
+
+  - handle: "@neurodivergentrebel"   # verified: substack.com/api/v1/user/neurodivergentrebel/public_profile, retrieved 2026-08-23
+    creator: Lyric Rivera
+    # Publication "NeuroDivergent Rebel's Substack", subdomain neurodivergentrebel, no custom
+    # domain, role admin. Same person as the bluesky row above.
+    platform: substack
+    niche: adhd
+    followers: 14000   # profile shows "14K+ subscribers", read 2026-08-23
+
+  # general-viral, substack
+  - handle: "@noahpinion"   # verified: substack.com/api/v1/user/noahpinion/public_profile, retrieved 2026-08-23
+    creator: Noah Smith
+    # Publication "Noahpinion", subdomain noahpinion, custom domain www.noahpinion.blog, role
+    # admin. Bio "Econ blogger".
+    platform: substack
+    niche: general-viral
+    followers: 457000   # profile shows "457K+ subscribers", read 2026-08-23
+
+  - handle: "@bariweiss"   # verified: substack.com/api/v1/user/bariweiss/public_profile, retrieved 2026-08-23
+    creator: Bari Weiss
+    # Publication "The Free Press", subdomain bariweiss, custom domain www.thefp.com, role admin.
+    # followers is null on purpose: this profile answered "See subscribers" rather than a number,
+    # so there is nothing to record. Do not fill it from a press figure; that would be an estimate
+    # dressed as a reading. Note that the separate profile handle "thefreepress" points at the
+    # SAME publication, so seeding both would double-count one outlet.
+    platform: substack
+    niche: general-viral
+    followers: null
+
+  # ---------------------------------------------------------------------------------------------
+  # SUBSTACK-NOTES, round 3. The file had none, and this platform key existed with a threshold but
+  # no accounts at all.
+  #
+  # Kept separate from "substack" on purpose, exactly as src/patterns/types.ts says: a Note and an
+  # essay are different products and pooling them would put an essay's baseline under a Note.
+  #
+  # WHY THESE PEOPLE AND NOT THE BIGGEST NEWSLETTERS. Notes activity was MEASURED, not assumed,
+  # through substack.com/api/v1/reader/feed/profile/<user_id>?types[]=note, which returns each
+  # note's date, reaction count and restack count. Being a large newsletter turns out to predict
+  # Notes activity badly, and several of the biggest names failed outright on 2026-08-23:
+  #   Lenny Rachitsky      4 notes total, spread across three years
+  #   Ethan Mollick        2 notes total, both on one day in 2025
+  #   Bari Weiss           1 note ever, in 2023
+  #   Daniel Vassallo      3 notes, all in April 2023
+  #   Heather Cox Richardson   ZERO notes despite 3M+ subscribers
+  #   swyx                 12 notes spread over two and a half years
+  # None of them can be baseline-scored on Notes and none is seeded here. Every row below sits on
+  # a real reading of that endpoint.
+  #
+  # Handle convention: the same substack profile handle as the substack rows, because Notes are
+  # posted from the same profile. followers is the same rounded subscriber figure where the
+  # profile served one, and it is the NEWSLETTER subscriber count rather than a Notes-specific
+  # audience, which does not exist as a public number. Substack publishes no view count on Notes
+  # either, so every row here scores on baseline_multiple against reaction and restack counts.
+  # ---------------------------------------------------------------------------------------------
+
+  - handle: "@aakashgupta"
+    creator: Aakash Gupta
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-08-13 to 2026-08-23, median 11.5
+    # reactions. Roughly one a day, which is the most reliably samplable Notes account found.
+    platform: substack-notes
+    niche: product-thinking
+    followers: 253000   # newsletter subscriber figure, read 2026-08-23
+
+  - handle: "@shreyasdoshi"
+    creator: Shreyas Doshi
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-01-12 to 2026-07-27, median 18.5
+    # reactions, max 86. Slower cadence than Aakash Gupta, so a window here covers half a year.
+    platform: substack-notes
+    niche: product-thinking
+    followers: 47000   # newsletter subscriber figure, read 2026-08-23
+
+  - handle: "@dickiebush"
+    creator: Dickie Bush
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-08-13 to 2026-08-21, median 18
+    # reactions, max 51.
+    platform: substack-notes
+    niche: solopreneur
+    followers: 131000   # newsletter subscriber figure, read 2026-08-23
+
+  - handle: "@natesnewsletter"
+    creator: Nate (Nate's Substack)
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-06-06 to 2026-08-14, median 81
+    # reactions, max 190. The highest median in this cell.
+    platform: substack-notes
+    niche: ai-building
+    followers: 169000   # newsletter subscriber figure, read 2026-08-23
+
+  - handle: "@adhdjesse"
+    creator: Jesse J. Anderson (ADHD Jesse)
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-01-05 to 2026-08-19, median 19.5
+    # reactions and a MAX OF 3,993, which is a 200x spread within one account's own notes. That is
+    # the single widest outlier gap this whole sweep turned up on any platform, and it is the best
+    # argument in this file for why Notes is worth studying separately from essays.
+    platform: substack-notes
+    niche: adhd
+    followers: 71000   # newsletter subscriber figure, read 2026-08-23
+
+  - handle: "@neurodivergentrebel"
+    creator: Lyric Rivera
+    # Notes activity verified 2026-08-23: 12 notes spanning only 2026-08-21 to 2026-08-23, so
+    # several a day, but a median of just 2 reactions. Very high volume against very low
+    # engagement, the same pattern their bluesky account shows. Useful as a volume comparison,
+    # not as a winner.
+    platform: substack-notes
+    niche: adhd
+    followers: 14000   # newsletter subscriber figure, read 2026-08-23
+
+  - handle: "@davidpepper"
+    creator: David Pepper
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-07-10 to 2026-08-13, median 60
+    # reactions, max 2,667. Already seeded on substack in the round-1 block under
+    # civic-democracy; filed here under civic-tech because this row is about the Notes surface and
+    # the newer niche vocabulary.
+    platform: substack-notes
+    niche: civic-tech
+    followers: 27000   # newsletter subscriber figure from the round-1 reading, 2026-08-22
+
+  - handle: "@anandwrites"
+    creator: Anand Giridharadas
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-06-15 to 2026-08-18, median 45.5
+    # reactions, max 213. Already seeded on substack and x above. followers stays null here for
+    # the same reason his substack row does: the profile served an implausible "1K+" figure that
+    # an earlier round deliberately refused to record.
+    platform: substack-notes
+    niche: civic-tech
+    followers: null
+
+  - handle: "@noahpinion"
+    creator: Noah Smith
+    # Notes activity verified 2026-08-23: 12 notes spanning 2026-08-09 to 2026-08-22, median 39
+    # reactions, max 138.
+    platform: substack-notes
+    niche: general-viral
+    followers: 457000   # newsletter subscriber figure, read 2026-08-23
+
+  # ---------------------------------------------------------------------------------------------
+  # MASTODON, round 3. Handle convention and verification convention both unchanged from the
+  # round-1 mastodon block: "@user@instance" because handles are not global, followers read from
+  # the account's HOME instance, and "rel=me verified" means the server itself confirmed the site
+  # links back.
+  #
+  # One discovery caveat that cost real time and is worth writing down. Searching mastodon for a
+  # niche returns a lot of high-follower accounts that are NOT mastodon accounts: @user@threads.net
+  # rows (Threads accounts federating in, whose real home is Threads and which belong on the
+  # threads rows below), @user@lemmy.world and @user@kbin.social rows (link-aggregator communities,
+  # not creators), @user@flipboard.com rows (automated magazine crossposts), and bot mirrors such
+  # as sportsbots.xyz. Every one of those was excluded. Filter by instance before ranking.
+  # ---------------------------------------------------------------------------------------------
+
+  # solopreneur, mastodon. This is mastodon's real strength for Muxin's niches: independent
+  # developers shipping their own products, which is the closest thing on any platform to what she
+  # is actually doing.
+  - handle: "@jamesthomson@mastodon.social"
+    creator: James Thomson
+    # Verified via the public API on 2026-08-23: rel=me verified links to pcalc.com and to his
+    # podcast page at theincomparable.com. Indie iOS and Mac developer, maker of PCalc. 9,564
+    # statuses with a last post the same day it was read, so the sampling window here is days.
+    platform: mastodon
+    niche: solopreneur
+    followers: 21582   # API followers_count from mastodon.social, read 2026-08-23
+
+  - handle: "@sindresorhus@mastodon.social"
+    creator: Sindre Sorhus
+    # Verified via the public API on 2026-08-23: rel=me verified links to sindresorhus.com/apps
+    # and github.com/sindresorhus. Bio reads "Full-time open-sourcerer & indie Mac developer".
+    # Posts far less often than James Thomson (1,767 statuses, last 2026-07-19), so a window here
+    # reaches back weeks.
+    platform: mastodon
+    niche: solopreneur
+    followers: 7186   # API followers_count from mastodon.social, read 2026-08-23
+
+  - handle: "@djlink@mastodon.gamedev.place"
+    creator: David Amador
+    # Verified via the public API on 2026-08-23: rel=me verified links to david-amador.com,
+    # upfallstudios.com and his itch.io page. Indie game developer, 10,085 statuses, last post
+    # 2026-08-22. Note the instance: mastodon.gamedev.place, not mastodon.social.
+    platform: mastodon
+    niche: solopreneur
+    followers: 4608   # API followers_count from mastodon.gamedev.place, read 2026-08-23
+
+  - handle: "@rafa@mastodon.design"
+    creator: Rafa
+    # Verified via the public API on 2026-08-23: rel=me verified link to rafa.design. Designer and
+    # indie app developer, 4,321 statuses, last post 2026-08-20. The profile gives no surname, so
+    # the creator field records what the platform states rather than inventing one.
+    platform: mastodon
+    niche: solopreneur
+    followers: 5296   # API followers_count from mastodon.design, read 2026-08-23
+
+  # civic-tech, mastodon. Both rows carry a LANGUAGE caveat that matters more than usual here:
+  # they post primarily in German. Their structural moves still transfer, but nothing they write
+  # can be read as a wording reference for English-language work, and a collector staging bodies
+  # from them is staging German text.
+  - handle: "@anneroth@systemli.social"
+    creator: Anne Roth
+    # Verified via the public API on 2026-08-23: rel=me verified links to her contact page and her
+    # digital-policy column at annalist.noblogs.org, plus a liberapay page. Digital-policy adviser
+    # in the German Bundestag. 15,246 statuses, last post 2026-08-23.
+    platform: mastodon
+    niche: civic-tech
+    followers: 24101   # API followers_count from systemli.social, read 2026-08-23
+
+  - handle: "@markus_netzpolitik@chaos.social"
+    creator: Markus Beckedahl
+    # Verified WEAKER than the rows above, and recorded as such: NO rel=me verified link. The
+    # evidence is the profile bio, which reads "Fighting for your digital rights -
+    # digitalrechte.de, re:publica and Digitalpolitik", and the posting itself. Checked
+    # 2026-08-23. Founder of netzpolitik.org and re:publica.
+    platform: mastodon
+    niche: civic-tech
+    followers: 22205   # API followers_count from chaos.social, read 2026-08-23
+
+  # adhd, mastodon. One row, and the cell is genuinely small. Ranked searches across "ADHD" and
+  # "neurodivergent" on 2026-08-23 returned a top slice that was almost entirely @threads.net
+  # federated accounts rather than mastodon natives. The largest actual mastodon native in the
+  # niche was this one at about 3k followers.
+  - handle: "@adhdjesse@mastodon.social"
+    creator: Jesse J. Anderson (ADHD Jesse)
+    # Verified via the public API on 2026-08-23: rel=me verified link to adhdjesse.com. 630
+    # statuses, last post 2026-08-15. Same person as the bluesky, youtube, substack and
+    # substack-notes rows; his mastodon audience is a twentieth of his bluesky one, which makes
+    # this a genuinely useful same-writer cross-platform comparison rather than a duplicate.
+    platform: mastodon
+    niche: adhd
+    followers: 3028   # API followers_count from mastodon.social, read 2026-08-23
+
+  # ai-building, mastodon. Searched across "AI", "LLM", "machine learning", "AI developer" on
+  # 2026-08-23. The niche exists but has largely GONE QUIET: the recognisable names that surfaced
+  # (Mark Riedl, Margaret Mitchell, Sebastian Raschka, Olivier Grisel, Gael Varoquaux) all had a
+  # last_status_at in 2025 or earlier, and an account that has stopped posting cannot be
+  # baseline-scored. One row seeded, the only active one found at any scale.
+  - handle: "@aallan@mastodon.social"
+    creator: Alasdair Allan
+    # Verified via the public API on 2026-08-23: rel=me verified link to alasdairallan.com. 1,544
+    # statuses, last post 2026-07-18, which is a month before it was read, so the cadence is weeks
+    # rather than days. Recorded honestly: this is the thinnest active account seeded in this
+    # round, and it is here because the alternative was an empty cell that hid the real finding.
+    platform: mastodon
+    niche: ai-building
+    followers: 4930   # API followers_count from mastodon.social, read 2026-08-23
+
+  # No mastodon row for product-thinking or general-viral, deliberately.
+  #   - product-thinking: the same search that filled bluesky's cell returned, on mastodon, only
+  #     design and UX accounts under 4k followers with last posts in 2023 and 2024.
+  #   - general-viral: mastodon has no general-viral tier in the sense the other platforms do, and
+  #     this is a property of the network rather than a gap in the search. There is no algorithmic
+  #     feed pushing a post past its author's followers, no view count anywhere by design, and the
+  #     largest accounts a ranked search surfaces are news brands and Flipboard crossposts rather
+  #     than creators. A "just big in general" shape donor does not exist here. Do not fill this
+  #     cell later; filling it would mean recording a news brand as a creator.
+
+  # ---------------------------------------------------------------------------------------------
+  # THREADS, round 3. The file had none.
+  #
+  # READ THIS BEFORE ADDING A ROW. threads.com CANNOT verify a handle: it answers HTTP 200 for any
+  # string at all, including deliberate nonsense, so a fetch tells you nothing. Every row below was
+  # verified through the FEDIVERSE instead. A Threads account whose owner has turned on fediverse
+  # sharing federates out, and mastodon.social's /api/v1/accounts/lookup?acct=<user>@threads.net
+  # then returns its real display name, an exact follower count, a status count and a last-post
+  # date. That is a genuine platform record, not an inference.
+  #
+  # The route's limit is important and is the reason this block is short. Fediverse sharing is
+  # OPT-IN and most large Threads accounts have not turned it on. Twenty-six candidates were
+  # looked up on 2026-08-23 and six resolved. A miss is therefore AMBIGUOUS (either no such
+  # account, or sharing is off) and was never recorded as an absence.
+  #
+  # Two accounts that DID resolve were rejected on the promo rule rather than the verification
+  # rule: zuck@threads.net (5,722,789 followers) and mosseri@threads.net (1,038,105) are Meta
+  # executives whose reachable output is product announcements about the platform itself. So is
+  # theartificialintelligence@threads.net (202,096), an AI-news aggregation account. None is a
+  # creator and none is seeded.
+  # ---------------------------------------------------------------------------------------------
+
+  # adhd, threads. The one cell this route filled well, and the accounts are real ones.
+  - handle: "@adhd_memetherapy"
+    creator: Behrad (ADHD Meme Therapy)
+    # Verified via the fediverse on 2026-08-23: mastodon.social lookup of
+    # adhd_memetherapy@threads.net returned display name "Behrad | ADHD Meme Therapy", 1,201
+    # posts, last post 2026-08-17. The largest verified Threads account in any of Muxin's niches.
+    platform: threads
+    niche: adhd
+    followers: 261994   # exact federated followers_count, read 2026-08-23
+
+  - handle: "@myadhdcounselor"
+    creator: Andrew (ADHD Therapist)
+    # Verified via the fediverse on 2026-08-23: display name "Andrew, LCSW | ADHD Therapist",
+    # 21,974 posts, last post 2026-08-22. Extremely high volume, which makes him the easiest
+    # Threads account here to baseline. Surname is not given on the profile, so the creator field
+    # records only what the platform states.
+    platform: threads
+    niche: adhd
+    followers: 54207   # exact federated followers_count, read 2026-08-23
+
+  - handle: "@the144days"
+    creator: MJ (ADHD Witch)
+    # Verified via the fediverse on 2026-08-23: display name "MJ | ADHD Witch | Burnout Recovery",
+    # 8,834 posts, last post 2026-08-11.
+    platform: threads
+    niche: adhd
+    followers: 14581   # exact federated followers_count, read 2026-08-23
+
+  # doctoradhd@threads.net also resolved cleanly (19,796 followers, 8,133 posts) and is NOT seeded:
+  # its last post was 2026-05-09, more than three months before it was read. Same consistency rule
+  # that dropped Rex Chapman on bluesky.
+  #
+  # No threads row for ai-building, product-thinking, civic-tech, solopreneur or general-viral.
+  # This is a ROUTE limit, not a finding about the platform, and the distinction matters: Threads
+  # is one of the largest text networks in the world and certainly has creators in all five. What
+  # it does not have is a way to verify them from here. The fediverse sweep for those niches
+  # returned mostly low-follower coaching and AI-news-aggregation accounts, which fail the promo
+  # rule anyway. Filling these cells honestly needs either a creator's own site linking their
+  # Threads profile, or Muxin reading the handle off the app herself.
+
+  # ---------------------------------------------------------------------------------------------
+  # REDDIT, round 3. The file had none, and the platform key existed with a threshold but no
+  # accounts.
+  #
+  # ON REDDIT THE UNIT IS A SUBREDDIT, NOT A CREATOR, so `handle` holds "r/Name" and `creator`
+  # names the community. Nobody follows redditors; they follow communities, and the community is
+  # what decides what a post has to look like. Seeding individual redditors would be modelling the
+  # platform wrong.
+  #
+  # `followers` is null on EVERY row and it is not an omission. The only reddit surface still
+  # answering a plain fetch is the RSS feed, and RSS carries no subscriber count. about.json,
+  # api.reddit.com and old.reddit.com all return a wall. So the number exists on the platform but
+  # not on this route, and the rule is to record null rather than borrow a figure from anywhere
+  # else.
+  #
+  # Verified by fetching www.reddit.com/r/<sub>/top/.rss?t=year and reading the feed's own
+  # <category label="r/Name">, which also confirms exact casing (r/yimby is lowercase; r/AskReddit
+  # is not). Retrieved 2026-08-23.
+  #
+  # WHAT WINS HERE SPLITS HARD BY SUBREDDIT, AND IT WAS MEASURED. For each community below the top
+  # ten posts of the past year were pulled and the media thumbnails counted. The split is not
+  # subtle and it is recorded per row, because posting a text essay into an image subreddit is a
+  # format mismatch before it is a content one.
+  #
+  # A CAUTION ON THRESHOLDS, for whoever tunes them: the existing outlier_thresholds comment
+  # already notes that reddit medians differ wildly by subreddit. That is visible in the sampling
+  # here too, and one community below has a top-of-year list partly occupied by spam, which drags
+  # its median in a direction no bar can fix. Tune per subreddit if this becomes load-bearing.
+  # ---------------------------------------------------------------------------------------------
+
+  # adhd, reddit. The clearest text-versus-image split in the whole sweep sits inside this one
+  # niche, which is why all three are seeded rather than just the biggest.
+  - handle: "r/ADHD"
+    creator: r/ADHD (subreddit)
+    # Verified: RSS category label "r/ADHD", retrieved 2026-08-23. WHAT WINS: plain text, entirely.
+    # ZERO of the top ten posts of the past year carried an image. They are first-person
+    # confessionals with blunt titles ("Psychiatrist blindsided me", "I'm so pissed exercise
+    # works", "The Gross reality of adhd no one wants to talks about"). The one exception in tone
+    # is a research link. Post text here; do not post a graphic.
+    platform: reddit
+    niche: adhd
+    followers: null
+
+  - handle: "r/adhdwomen"
+    creator: r/adhdwomen (subreddit)
+    # Verified: RSS category label "r/adhdwomen", retrieved 2026-08-23. WHAT WINS: mixed. Top
+    # titles read as reaction and recognition rather than as advice ("So... you're telling me the
+    # neurotypicals haven't figured it out yet??", "I made myself a badge to celebrate taking
+    # accountability at work"). A softer, more communal register than r/ADHD's.
+    platform: reddit
+    niche: adhd
+    followers: null
+
+  - handle: "r/adhdmeme"
+    creator: r/adhdmeme (subreddit)
+    # Verified: RSS category label "r/adhdmeme", retrieved 2026-08-23. WHAT WINS: images, entirely.
+    # 25 media thumbnails across the ten top posts, and the titles are reduced to captions ("True
+    # story.", "Well, shit.", "My tribe."). Same niche as r/ADHD, opposite format. This pair is
+    # the single best illustration in this file of why the subreddit, not the topic, decides the
+    # shape.
+    platform: reddit
+    niche: adhd
+    followers: null
+
+  # ai-building, reddit
+  - handle: "r/ClaudeAI"
+    creator: r/ClaudeAI (subreddit)
+    # Verified: RSS category label "r/ClaudeAI", retrieved 2026-08-23. WHAT WINS: screenshots, 23
+    # thumbnails across ten posts. The winning shape is a short absurd or frustrating anecdote
+    # about the tool with an image as proof ("You accidentally say 'Hello' to Claude and it
+    # consumes 4% of your session limit", "Taught Claude to talk like a caveman to use 75% less
+    # tokens"). Directly relevant to Muxin: this is the community her own working practice sits in.
+    platform: reddit
+    niche: ai-building
+    followers: null
+
+  - handle: "r/LocalLLaMA"
+    creator: r/LocalLLaMA (subreddit)
+    # Verified: RSS category label "r/LocalLLaMA", retrieved 2026-08-23. WHAT WINS: images, 24
+    # thumbnails across ten posts. More technical and more news-reactive than r/ClaudeAI.
+    platform: reddit
+    niche: ai-building
+    followers: null
+
+  - handle: "r/ChatGPTCoding"
+    creator: r/ChatGPTCoding (subreddit)
+    # Verified: RSS category label "r/ChatGPTCoding", retrieved 2026-08-23. WHAT WINS: images, 18
+    # thumbnails across ten posts, with a visible seam between meme posts and genuine
+    # how-I-did-it writeups ("How to ACTUALLY make your (vibe coded) apps secure (from an actual
+    # hacker)").
+    platform: reddit
+    niche: ai-building
+    followers: null
+
+  - handle: "r/ArtificialInteligence"
+    creator: r/ArtificialInteligence (subreddit)
+    # Verified: RSS category label "r/ArtificialInteligence", retrieved 2026-08-23. Note the
+    # MISSPELLING: the community name is genuinely missing an "l", and that is the correct string,
+    # not a typo in this file. WHAT WINS: text, zero thumbnails across ten posts, which makes it
+    # the one AI community in this set where a written argument outperforms a screenshot.
+    platform: reddit
+    niche: ai-building
+    followers: null
+
+  # product-thinking, reddit
+  - handle: "r/ProductMgmt"
+    creator: r/ProductMgmt (subreddit)
+    # Verified: RSS category label "r/ProductMgmt", retrieved 2026-08-23. WHAT WINS: text, zero
+    # thumbnails across ten posts. CAUTION, recorded plainly rather than smoothed over: four of
+    # the ten top-of-year posts on 2026-08-23 were World Cup betting-site spam. That corrupts this
+    # community's median in a way no threshold setting can correct, so score anything collected
+    # here by hand rather than trusting a computed multiple.
+    platform: reddit
+    niche: product-thinking
+    followers: null
+
+  - handle: "r/UI_Design"
+    creator: r/UI_Design (subreddit)
+    # Verified: RSS category label "r/UI_Design", retrieved 2026-08-23. WHAT WINS: images, 22
+    # thumbnails across ten posts, which is what a design community should look like and is the
+    # opposite of its sibling above.
+    platform: reddit
+    niche: product-thinking
+    followers: null
+
+  # solopreneur, reddit
+  - handle: "r/Entrepreneur"
+    creator: r/Entrepreneur (subreddit)
+    # Verified: RSS category label "r/Entrepreneur", retrieved 2026-08-23. WHAT WINS: text, zero
+    # thumbnails across ten posts, and the shape is unusually consistent: a first-person revenue
+    # or life confession, often with a number in the title ("I billed $200k this month and I don't
+    # know who else to tell", "I quit my $300k finance job at 30", "How i made $0 with 0$
+    # investment in just 3 months"). The self-deprecating variant performs as well as the
+    # boast, which is worth noting before assuming the shape requires a win.
+    platform: reddit
+    niche: solopreneur
+    followers: null
+
+  - handle: "r/indiehackers"
+    creator: r/indiehackers (subreddit)
+    # Verified: RSS category label "r/indiehackers", retrieved 2026-08-23. WHAT WINS: text, 1
+    # thumbnail across ten posts.
+    platform: reddit
+    niche: solopreneur
+    followers: null
+
+  - handle: "r/smallbusiness"
+    creator: r/smallbusiness (subreddit)
+    # Verified: RSS category label "r/smallbusiness", retrieved 2026-08-23. WHAT WINS: text, zero
+    # thumbnails across ten posts.
+    platform: reddit
+    niche: solopreneur
+    followers: null
+
+  - handle: "r/microsaas"
+    creator: r/microsaas (subreddit)
+    # Verified: RSS category label "r/microsaas", retrieved 2026-08-23. WHAT WINS: images, 20
+    # thumbnails across ten posts, which is a screenshot-and-revenue-chart culture rather than the
+    # written confession that wins in r/Entrepreneur. Same niche, different body.
+    platform: reddit
+    niche: solopreneur
+    followers: null
+
+  # civic-tech, reddit. Read the r/civictech note below before anything else in this block; it is
+  # the most directly actionable finding in the whole round.
+  - handle: "r/civictech"
+    creator: r/civictech (subreddit)
+    # Verified: RSS category label "r/civictech", retrieved 2026-08-23. WHAT WINS: 11 thumbnails
+    # across ten posts, so mixed, but the FORMAT is not the finding here. Nearly every top post of
+    # the past year is one person announcing a free tool they built for other people to use, and
+    # more than half are specifically about legislative and representative tracking: "I built a
+    # free nonpartisan app to make congressional tracking accessible to everyday people", "I built
+    # a free tool that shows exactly how your representatives vote", "I made this app to follow
+    # bills in congress", "Free MCP endpoint to fetch local city meeting info". That is Muxin's
+    # civic-tech pillar and her voting-tool CTA, already proven as a winning post shape, in a
+    # community that will read it. Note the community has a live rule proposal to BAN project
+    # feedback requests, so check its current rules before posting rather than assuming.
+    platform: reddit
+    niche: civic-tech
+    followers: null
+
+  - handle: "r/opendata"
+    creator: r/opendata (subreddit)
+    # Verified: RSS category label "r/opendata", retrieved 2026-08-23. WHAT WINS: text, zero
+    # thumbnails across ten posts, and the shape is a titled dataset with the finding stated in
+    # the title itself ("utility-scale solar fell from $359/MWh in 2010 to $24/MWh in 2023, a 93%
+    # cost collapse"). The number carries the hook; the link is secondary.
+    platform: reddit
+    niche: civic-tech
+    followers: null
+
+  - handle: "r/PublicPolicy"
+    creator: r/PublicPolicy (subreddit)
+    # Verified: RSS category label "r/PublicPolicy", retrieved 2026-08-23. WHAT WINS: text, zero
+    # thumbnails. Prune candidate, flagged honestly: the top of this community is dominated by
+    # graduate-school admissions and career questions rather than policy substance, so it is a
+    # weaker fit for Muxin's civic work than r/civictech or r/opendata.
+    platform: reddit
+    niche: civic-tech
+    followers: null
+
+  - handle: "r/yimby"
+    creator: r/yimby (subreddit)
+    # Verified: RSS category label "r/yimby", retrieved 2026-08-23. Note the label is LOWERCASE
+    # even though the community is usually written r/YIMBY. Included as the LOCAL-AND-SPECIFIC
+    # civic community in this set, which is exactly what civic-adaptation.md table 2 prefers over
+    # national abstraction: top posts are individual buildings and individual local fights
+    # ("A Burger King was just transformed into 31 new homes in the Lakeview neighborhood of
+    # Chicago").
+    platform: reddit
+    niche: civic-tech
+    followers: null
+
+  # general-viral, reddit. The open-feed shape donors: enormous, topic-agnostic, and reached
+  # without any following at all. Note the text-versus-image split runs straight through this cell
+  # too, which is why both kinds are seeded.
+  - handle: "r/AskReddit"
+    creator: r/AskReddit (subreddit)
+    # Verified: RSS category label "r/AskReddit", retrieved 2026-08-23. WHAT WINS: text, zero
+    # thumbnails across ten posts. Pure question-as-post format, which is the most stripped-down
+    # hook mechanism on any platform in this file: the entire post is the hook and nothing else.
+    platform: reddit
+    niche: general-viral
+    followers: null
+
+  - handle: "r/todayilearned"
+    creator: r/todayilearned (subreddit)
+    # Verified: RSS category label "r/todayilearned", retrieved 2026-08-23. WHAT WINS: 23
+    # thumbnails across ten posts, so image-led despite the format being one surprising fact
+    # stated fully in the title. The closest thing reddit has to a headline-craft laboratory.
+    platform: reddit
+    niche: general-viral
+    followers: null
+
+  - handle: "r/explainlikeimfive"
+    creator: r/explainlikeimfive (subreddit)
+    # Verified: RSS category label "r/explainlikeimfive", retrieved 2026-08-23. WHAT WINS: text,
+    # zero thumbnails across ten posts. Included deliberately over a larger meme community: this is
+    # where the "make a complicated thing simple" shape is market-tested at scale, which is the
+    # shape most of Muxin's own material already wants to take.
+    platform: reddit
+    niche: general-viral
+    followers: null
+
+  - handle: "r/NoStupidQuestions"
+    creator: r/NoStupidQuestions (subreddit)
+    # Verified: RSS category label "r/NoStupidQuestions", retrieved 2026-08-23. WHAT WINS: text,
+    # zero thumbnails across ten posts.
+    platform: reddit
+    niche: general-viral
+    followers: null
+
+  - handle: "r/YouShouldKnow"
+    creator: r/YouShouldKnow (subreddit)
+    # Verified: RSS category label "r/YouShouldKnow", retrieved 2026-08-23. WHAT WINS: text, zero
+    # thumbnails across ten posts. Every post is a titled piece of useful information, which is the
+    # closest general-viral shape on reddit to what Muxin actually writes.
+    platform: reddit
+    niche: general-viral
+    followers: null
+
+  - handle: "r/Damnthatsinteresting"
+    creator: r/Damnthatsinteresting (subreddit)
+    # Verified: RSS category label "r/Damnthatsinteresting", retrieved 2026-08-23. WHAT WINS:
+    # images, 25 thumbnails across ten posts, the most image-dominated community in this whole
+    # block. Seeded as the visual counterweight to the five text communities above so the corpus
+    # does not learn that reddit is a text platform, which is only true of some of it.
+    platform: reddit
+    niche: general-viral
+    followers: null
+
+  # Subreddits that were CANDIDATES and could NOT be confirmed inside this run: r/ADHD_Programmers,
+  # r/neurodiversity (confirmed but not seeded, see below), r/OpenAI, r/LLMDevs,
+  # r/ProductManagement, r/userexperience, r/SideProject, r/EntrepreneurRideAlong, r/SaaS,
+  # r/solopreneur, r/microsaas's sibling r/dataisbeautiful, r/LifeProTips, r/interestingasfuck and
+  # r/mildlyinteresting.
+  #
+  # THIS IS NOT A FINDING THAT THEY DO NOT EXIST. Several of them plainly do. Reddit's RSS route
+  # rate-limits aggressively and a wall is indistinguishable from a miss, so each of these was
+  # retried six times and then left out rather than guessed at in either direction. Re-run them on
+  # a slower sweep. The clearest demonstration that an unconfirmed row here means nothing about
+  # the community: r/LLMDevs, r/SideProject and r/ProductManagement all CONFIRMED on an earlier
+  # attempt the same day and then walled on the re-run.
+  #
+  # r/neurodiversity and r/singularity and r/cursor all confirmed cleanly and are deliberately not
+  # seeded, to keep three-to-four communities per cell rather than stacking one niche. r/cursor
+  # (21 thumbnails of 10) and r/singularity (24 of 10) are both image-led and would add nothing
+  # the four seeded ai-building communities do not already cover; r/neurodiversity is text-led (0
+  # of 10) and duplicates r/ADHD's shape.
+
+  # ---------------------------------------------------------------------------------------------
+  # HACKER NEWS, round 3. The file had none, and the platform key existed with a threshold but no
+  # accounts.
+  #
+  # HACKER NEWS HAS NO CREATORS AND NO COMMUNITIES, and that is the entry, not a gap. There is one
+  # front page, one submission queue, and no follower graph, no profile feed anyone reads, and no
+  # per-author audience of any kind. A "top creator" is not a thing that exists here. What exists
+  # is a small set of SUBMISSION SURFACES, and those are what a collector samples.
+  #
+  # `handle` therefore holds a surface, not a person, in the same spirit as the reddit rows above
+  # holding a community. `followers` is null everywhere and always: there is no follower concept
+  # on the platform, which is why outlier_thresholds already marks hackernews's
+  # view_follower_ratio inert.
+  #
+  # Verified via the public Algolia API (hn.algolia.com/api/v1/search), which answers a plain
+  # fetch with no key and returns each story's points and comment count. Read 2026-08-23.
+  #
+  # The bar, measured rather than assumed: a front_page query on 2026-08-23 returned stories from
+  # 139 to 438 points with a median of 241. The existing threshold comment for hackernews says the
+  # median submission dies at 3 points and the front page is the top 1%; this reading is
+  # consistent with that and gives a real number to tune against.
+  # ---------------------------------------------------------------------------------------------
+
+  - handle: "hn:front-page"
+    creator: Hacker News front page
+    # The whole-site outlier surface. Sampled via tags=front_page. Not a person and not a
+    # community: it is the union of everything that cleared the bar today, across every topic. The
+    # right unit for the general-viral question on this platform, because HN's ranking is
+    # explicitly indifferent to who posted.
+    platform: hackernews
+    niche: general-viral
+    followers: null
+
+  - handle: "hn:show-hn"
+    creator: Show HN
+    # The launch surface, sampled via a "Show HN" query. Measured 2026-08-23: the top of this
+    # surface runs from about 2,700 to 3,500 points, an order of magnitude above the front-page
+    # median, and its winners are almost uniformly first-person build stories ("I made an
+    # open-source laptop from scratch", "I replaced a $120k bowling center system with $1,600 in
+    # ESP32s"). This is the closest surface on any platform to what Muxin does, and reaching it
+    # requires no audience at all.
+    platform: hackernews
+    niche: solopreneur
+    followers: null
+
+  - handle: "hn:query:adhd"
+    creator: Hacker News, ADHD topic
+    # Sampled by keyword rather than by surface. Measured 2026-08-23: the top ADHD stories run
+    # 456 to 784 points, and every one of the top five is a first-person practitioner essay ("How
+    # I Run a Company with ADHD", "Hacking ADHD: Strategies for the modern developer", "Notes on
+    # Managing ADHD", "My ADHD founder toolbox"). The shape that wins here is unusually
+    # consistent, which makes it a cheap and unusually clean pattern to mine.
+    platform: hackernews
+    niche: adhd
+    followers: null
+
+  - handle: "hn:query:ai-agents"
+    creator: Hacker News, AI agents topic
+    # Measured 2026-08-23: top stories 879 to 2,346 points. The winners are incident narratives and
+    # failure stories rather than tutorials ("An AI agent published a hit piece on me", "AI agent
+    # bankrupted their operator"). Worth recording as a shape finding: on this surface the AI
+    # niche rewards what went wrong, not what to do.
+    platform: hackernews
+    niche: ai-building
+    followers: null
+
+  # No hackernews row for product-thinking or civic-tech, and both were MEASURED rather than
+  # assumed on 2026-08-23:
+  #   - product-thinking: top stories peak at 286 points and skew to career questions ("Ask HN:
+  #     Move to product management at 35?") rather than product craft. The niche is present but
+  #     never wins big here.
+  #   - civic-tech: the top result for the term scores 59 points, and the rest of the top five
+  #     score 5, 3, 3 and 2. That is effectively dead. HN is the wrong platform for Muxin's civic
+  #     work and this row exists to say so rather than to leave the question open.
+
 # Either bar clearing marks a post as an outlier worth studying.
 #
 # view_follower_ratio: views divided by the account's follower count. Views only. A post with no
