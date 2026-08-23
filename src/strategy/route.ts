@@ -460,7 +460,7 @@ export function applyOriginBlock(merged: MergedDecision[], origin: string): Merg
       ...d,
       decision: "skip",
       confidence: "rule",
-      rationale: `origin block: this piece is already live there (source.md origin: ${origin}) — was: ${d.rationale}`,
+      rationale: `origin block: this piece is already live there (source.md origin: ${origin}). Was: ${d.rationale}`,
     };
   });
 }

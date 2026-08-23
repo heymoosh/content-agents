@@ -294,7 +294,13 @@ describe("applyOriginBlock: a piece is never routed back to the platform it is a
     assert.equal(out.length, merged.length, "a blocked channel must not vanish from routing.md");
     assert.match(out[0].rationale, /already live there/, "routing.md has to say WHY the channel was excluded");
     assert.match(out[0].rationale, /linkedin\.com/, "and name the origin it read that from");
-    assert.match(out[0].rationale, /was: cold-start \(no tagged data yet\)/, "and preserve the decision it replaced");
+    assert.match(out[0].rationale, /Was: cold-start \(no tagged data yet\)/, "and preserve the decision it replaced");
+  });
+
+  test("the text this block introduces carries no em dash (root CLAUDE.md rule 5: routing.md is a file Muxin reads)", () => {
+    const merged = [md({ platform: "linkedin", rationale: "cold-start (no tagged data yet), posting broadly to gather signal" })];
+    const out = applyOriginBlock(merged, "https://www.linkedin.com/posts/muxin-li_x-activity-7123");
+    assert.ok(!out[0].rationale.includes("\u2014"), "no em dash in the origin-block rationale");
   });
 
   test("a data-driven include is blocked just the same (the block outranks every include path)", () => {
