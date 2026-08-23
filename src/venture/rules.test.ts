@@ -1,12 +1,12 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, rmSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import { loadRules, assertRulesVersion, artifactKindRule, requireRulesVersionMatch, RulesVersionMismatchError } from "./rules.js";
 import { appendCanonEvent } from "./canon.js";
-import { ventureDir } from "./paths.js";
 import { SCORECARD_FIXED } from "./intake.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 // The anti-drift mechanism venture-build-plan.md §F requires: every threshold/enum/predicate
 // venture/rules.yaml encodes must match what venture/rules.md's prose currently states. This
@@ -304,9 +304,8 @@ describe("assertRulesVersion", () => {
 describe("requireRulesVersionMatch", () => {
   const SLUG = "zz-test-rules-version-match";
 
-  afterEach(() => {
-    rmSync(ventureDir(SLUG), { recursive: true, force: true });
-  });
+  beforeEach(useTempVentureRoot);
+  afterEach(clearTempVentureRoot);
 
   test("no-ops before a kickoff event exists", () => {
     assert.doesNotThrow(() => requireRulesVersionMatch(SLUG, rules));

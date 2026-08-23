@@ -1,21 +1,22 @@
 import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync, existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { kickoffVenture, INTAKE_QUESTIONS, type IntakeAnswers } from "./intake.js";
-import { intakePath, ventureDir } from "./paths.js";
+import { intakePath } from "./paths.js";
 import { hasCanonEvent, findCanonEvent } from "./canon.js";
 import { loadRules, type VentureRules } from "./rules.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-intake";
 let rules: VentureRules;
+
+beforeEach(useTempVentureRoot);
 
 beforeEach(() => {
   rules = loadRules();
 });
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+afterEach(clearTempVentureRoot);
 
 function fullAnswers(): IntakeAnswers {
   const a: IntakeAnswers = {};

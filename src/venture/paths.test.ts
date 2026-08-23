@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { safeSlug, ventureDir, requireVentureDir, VENTURE_ROOT } from "./paths.js";
+import { safeSlug, ventureDir, requireVentureDir, ventureRoot } from "./paths.js";
 
 describe("safeSlug", () => {
   test("accepts a bare slug", () => {
@@ -23,11 +23,11 @@ describe("safeSlug", () => {
 });
 
 describe("ventureDir", () => {
-  test("joins under VENTURE_ROOT", () => {
-    assert.equal(ventureDir("voter-choice"), `${VENTURE_ROOT}/voter-choice`);
+  test("joins under the venture root", () => {
+    assert.equal(ventureDir("voter-choice"), `${ventureRoot()}/voter-choice`);
   });
 
-  test("a traversal slug never escapes VENTURE_ROOT even indirectly", () => {
+  test("a traversal slug never escapes the venture root even indirectly", () => {
     assert.throws(() => ventureDir("../../../tmp/evil"), /bad venture slug/);
   });
 });

@@ -1,18 +1,19 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { ventureDir, intakePath } from "./paths.js";
+import { intakePath } from "./paths.js";
 import { INTAKE_QUESTIONS } from "./intake.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SCRIPT = join(repoRoot, "src", "venture", "new-venture.ts");
 const SLUG = "zz-test-new-venture";
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+beforeEach(useTempVentureRoot);
+
+afterEach(clearTempVentureRoot);
 
 function run(stdin: string) {
   const r = spawnSync("npx", ["tsx", SCRIPT, SLUG], { cwd: repoRoot, input: stdin, encoding: "utf8" });

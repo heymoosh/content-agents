@@ -1,14 +1,15 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync, existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { ventureDir, readyToPasteDir } from "./paths.js";
+import { readyToPasteDir } from "./paths.js";
 import { appendCanonEvent } from "./canon.js";
 import { readArtifact, transitionArtifact, type Evidence } from "./artifacts.js";
 import { clearCheckpoint } from "./checkpoint.js";
 import { deliverVenture } from "./deliver.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 // Exercises the real CLI as a subprocess, same discipline as research-gate.test.ts (avoids
 // fighting process.argv/stdin mutation across tests, tests the actual contract).
@@ -46,9 +47,9 @@ function must(r: { status: number | null; stdout: string; stderr: string }, labe
   return r;
 }
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+beforeEach(useTempVentureRoot);
+
+afterEach(clearTempVentureRoot);
 
 const REQUIRED_SOURCES = [
   "note_reply",

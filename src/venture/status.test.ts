@@ -1,6 +1,6 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { formatStatus } from "./status.js";
 import { clearCheckpoint } from "./checkpoint.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
@@ -8,12 +8,13 @@ import { appendCanonEvent, hasCanonEvent } from "./canon.js";
 import { writeDecision, selectDecision, type DecisionKind } from "./decisions.js";
 import { ventureDir, clusterAnalysisPath } from "./paths.js";
 import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-status";
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+beforeEach(useTempVentureRoot);
+
+afterEach(clearTempVentureRoot);
 
 describe("formatStatus -- plain language, no internal vocabulary", () => {
   test("no artifacts yet reads as nothing drafted", () => {

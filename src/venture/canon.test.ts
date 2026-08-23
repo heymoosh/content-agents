@@ -1,14 +1,13 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
 import { appendCanonEvent, readCanonEvents, hasCanonEvent, findCanonEvent } from "./canon.js";
-import { ventureDir } from "./paths.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-canon";
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+beforeEach(useTempVentureRoot);
+
+afterEach(clearTempVentureRoot);
 
 describe("appendCanonEvent / readCanonEvents", () => {
   test("a fresh event is recorded and readable back", () => {

@@ -2,7 +2,15 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
 
-export const VENTURE_ROOT = join(repoRoot, "venture");
+// Resolved lazily, and overridable via env (same CONTENT_AGENTS_TEST_* convention as
+// src/publish/slots.ts's ledgerPath() and queue.ts's betsPath()). Tests point this at their own
+// throwaway directory so a test venture never lands in the real repo tree, where it would
+// otherwise be shared by every concurrent test run in the checkout and survive a killed run.
+// Nothing outside tests ever sets it. This deliberately does NOT move rules.ts's RULES_PATH --
+// venture/rules.yaml is real committed input that every run must keep reading.
+export function ventureRoot(): string {
+  return process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT ?? join(repoRoot, "venture");
+}
 
 // Mirrors safeFolder's traversal guard in src/review/rows.ts: reject anything that isn't a bare
 // slug segment before it ever touches the filesystem.
@@ -14,7 +22,7 @@ export function safeSlug(slug: string): string {
 }
 
 export function ventureDir(slug: string): string {
-  return join(VENTURE_ROOT, safeSlug(slug));
+  return join(ventureRoot(), safeSlug(slug));
 }
 
 export function requireVentureDir(slug: string): string {

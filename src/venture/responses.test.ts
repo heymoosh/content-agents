@@ -1,6 +1,5 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
 import {
   ingestResponse,
   correctResponse,
@@ -10,14 +9,16 @@ import {
   getResponseGateState,
   type ResponseRecord,
 } from "./responses.js";
-import { ventureDir } from "./paths.js";
 import { hasCanonEvent, findCanonEvent, readCanonEvents } from "./canon.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-responses";
 const originalKey = process.env.RESEARCH_HASH_KEY;
 
+beforeEach(useTempVentureRoot);
+
 afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
+  clearTempVentureRoot();
   if (originalKey === undefined) delete process.env.RESEARCH_HASH_KEY;
   else process.env.RESEARCH_HASH_KEY = originalKey;
 });
