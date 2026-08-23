@@ -5,20 +5,57 @@ The structure library that sits alongside `references/hook-patterns.md` and
 post: the arc after the hook, what it makes the reader feel, how it closes, and how long it runs.
 
 **Status: mined across three synthesis runs, 2026-08-22 and 2026-08-23, on a 292-entry corpus.**
-Every one of the 292 collected posts now carries a structural analysis. Sections exist for
-`reddit`, `tiktok`, `substack`, `substack-notes`, `hackernews`, `bluesky`, `mastodon`, `threads`,
-`x`, `youtube` and `linkedin`; `instagram` and `devto` were mined and are too thin to carry
-patterns, and say so in place.
+Every one of the 292 collected posts carries a structural analysis. Sections exist for `reddit`,
+`tiktok`, `substack`, `substack-notes`, `hackernews`, `bluesky`, `mastodon`, `threads`, `x`,
+`youtube` and `linkedin`; `instagram` and `devto` were mined and are too thin to carry patterns, and
+say so in place.
 
-**Weight the sections by how the posts were sampled, not by how many patterns they carry.** Reddit,
-Hacker News, Mastodon, Bluesky, Threads, Substack, Substack Notes and dev.to were sampled against a
-real, unbiased baseline: a full timeline window or a whole community's true median. TikTok, X,
-LinkedIn, YouTube and Instagram were reached by SEARCH, which finds a creator's famous posts, so
-their structures are real and their multiples are not evidence. Each section says which it is.
+## What this file is and how a pattern earns its place
 
-This file is populated by `/patterns synthesize`. A populated section is never permission to carry
-its patterns to a different platform, and the corpus has now twice shown a finding reverse when it
-crossed from a cherry-picked platform to an honestly sampled one.
+**The templates are the product.** This file exists so Muxin can find what already works in a place,
+take the exact structure, and fill it with her own material. That is the method she picked and it is
+the method Sabrina Ramonov and Justin Welsh both use. So judge every record below by one test:
+**could she write a post tonight from this template alone, without ever seeing the original?** A full
+beat-by-beat skeleton with the real mechanics in it beats an elegant observation every time.
+
+**A post earns its way in by being genuinely, obviously popular.** Not by beating its own author's
+average, not by any computed ratio. Big raw numbers, judged against what that place actually
+produces. Two things still disqualify a post, and both are about truthfulness rather than metrics:
+
+1. **Its substance has to be in the text that was collected.** A post whose real content sat in an
+   image, a carousel, a video or later tweets cannot teach anyone what its words did. Entries flagged
+   `body_is_complete: false` are never used as body-structure evidence. This rule has caught four
+   real errors in this project, and it is why the two biggest Threads posts and the biggest Substack
+   Note in the corpus are not behind any pattern here.
+2. **Trivial numbers disqualify.** A 9x on a median of 3 upvotes is noise dressed as a finding. This
+   is the main thing the gate now does.
+
+**The popularity floors, stated so they can be argued with.** These are judgment calls, set from what
+each platform actually produces in this corpus. They are not sacred and they are visible on purpose.
+
+| platform | floor | measured on |
+|---|---|---|
+| tiktok | 100,000 | views |
+| youtube | 25,000 | views |
+| instagram | 10,000 | engagement |
+| reddit, hackernews, x, linkedin | 250 | engagement |
+| bluesky, mastodon, threads, substack, substack-notes, devto | 150 | engagement |
+
+Engagement means likes plus comments plus shares, whichever of them the platform published. At those
+floors, of 292 analysed posts **132 are admitted as pattern evidence**, 80 fall below the floor, 71
+are body-incomplete, and 9 are Reddit or Hacker News link and image posts admitted as TITLE evidence
+only, because on those two channels the title is a separate field and is most of the craft.
+
+**Multiples against an author's own baseline are recorded as CONTEXT, not as the gate.** Where a real
+baseline exists it is quoted, because knowing a post did fourteen times its author's normal is worth
+knowing. It is never what admits a post.
+
+**The one caveat about sampling, and then this file stops talking about it.** Some accounts here were
+reached by searching for their famous posts, and some came from a real timeline window or a whole
+community's true median. That difference is not academic: it reversed a headline finding in this
+project once already, which is documented in the image-versus-text section below. Where a section's
+numbers come from a search-discovered set, it says so in one line. Read that line, then read the
+template.
 
 ## How to use this, read before drafting
 
@@ -53,9 +90,11 @@ committed. If you want to change what gets mined, edit `config/pattern-mining.ya
 
 ## What separated the winners from the same creators' ordinary posts
 
-**A run-level finding from the mining pass, revised 2026-08-23 against a 100-post corpus, not a
-pattern record.** It is placed above the patterns because it is more useful than any single skeleton
-below: it tells you what to ask of a draft, rather than which shape to pour it into. Most creators
+**A run-level finding from the mining pass, revised 2026-08-23, not a pattern record.** It is placed
+above the patterns because it tells you what to ask of a draft rather than which shape to pour it
+into. **Everything in this section and the two below is measured on within-account multiples, which
+this file records as CONTEXT and no longer gates on.** Read them as what the corpus can and cannot
+answer, then go and use a template. Most creators
 contributed 4 to 6 posts, so an outlier could be compared against the same person's ordinary work.
 That comparison is the thing a list of famous posts cannot give you.
 
@@ -148,7 +187,7 @@ causal claim here has been tested.
 on 2026-08-23 against 292 entries because the larger corpus broke it.** Like the section above, this
 is something to ask of a draft before reaching for a skeleton.
 
-### The image-beats-text result did not survive, and this is the most important correction in the file
+### The image-beats-text result did not survive, and this is why the file carries a sampling caveat
 
 The previous version of this section said an image post outperforms a text-only post by 2.19x on 13
 body-complete entries against 0.62x on 8, called it "the most trustworthy result in this corpus,"
@@ -182,7 +221,7 @@ two mistakes any future pass can repeat.
   but text, five Threads posts from a real timeline window, are all text-only and several of them
   win.
 - **The winning group was one platform wearing a form's clothes.** Of the 17 body-complete image
-  entries, 11 are LinkedIn, a search-discovered tier-2 platform, and 4 are dev.to, where the
+  entries, 11 are LinkedIn, whose posts were reached by search, and 4 are dev.to, where the
   classified image is an article COVER image rather than an image post. That leaves two genuine
   image posts on honestly-sampled platforms. **Restricted to the platforms sampled without
   cherry-picking, the body-complete image sample is a single post.** There is no image evidence
@@ -203,16 +242,15 @@ not. A photograph can be that. So can six numbered steps in plain text.
 The previous version of this section said the absence of short video from the evidence was "a
 failure of collection, not a finding about short video," and called fixing it "the single
 highest-value improvement to this corpus." **That collection gap is now closed.** 38 TikTok entries
-carry real play counts, real follower counts and complete auto-caption transcripts, 37 of them
-body-complete.
+carry real play counts and complete auto-caption transcripts, 37 of them body-complete.
 
 What they show, in full, is in the `tiktok` section below. The three headlines belong here because
 they contradict things people believe about the form:
 
-- **Reaching past your own audience is rare and is not a function of audience size.** The
-  view-to-follower ratio has a median of 0.19 across 38 videos, and only 4 clear 1.0. The highest,
-  at 6.08, belongs to the SMALLEST account in the set. The three largest accounts, at 14.6M, 3.8M
-  and 1.5M followers, contribute one between them.
+- **Big numbers are common here and they are not evenly spread.** 24 of the 38 videos clear 100,000
+  views, 9 clear a million, and the largest is 9.7 million. The corpus's single most striking result
+  is a 896,100 view video on an account whose six other collected videos run 248 to 2,805 views, so a
+  breakout on this platform can be enormous relative to everything else that account has made.
 - **Duration predicts nothing.** Sorted by views inside each account, videos of 35 seconds or less
   average a rank percentile of 0.51 and videos over 35 seconds average 0.50. The corpus's two
   shortest videos are the best post on one account and the worst post on another.
@@ -225,7 +263,8 @@ on that platform they may matter more than the script does. The gap moved; it di
 
 ## Does a completable CTA actually buy reach? The corpus can now answer, and the answer is no
 
-**A third run-level finding, new on 2026-08-23.** `.claude/skills/patterns/SKILL.md` mode 2 records
+**A third run-level finding, new on 2026-08-23. Computed on within-account multiples, which are
+context here rather than the gate, and it answers the question either way.** `.claude/skills/patterns/SKILL.md` mode 2 records
 `immediate_payoff` and `cta_completable` on every analysed post, civic or not, and says explicitly
 that the point is "to find out whether payoff and completable CTAs correlate with reach across every
 niche, which is a real question the corpus can answer and this skill should not pre-answer." All 292
@@ -324,32 +363,31 @@ from that platform.
 
 **Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 33 X analyses in a 292-entry
 corpus, across 6 accounts contributing 3 to 9 posts each, niches `building-solopreneur`,
-`inner-journey` and `general-viral`. **NOTHING on this platform cleared the outlier bar, and nothing
-could have.** Read the next paragraph before reading anything else.
+`inner-journey` and `general-viral`. **9 clear this file's popularity floor and are the basis for the
+templates below**, running from 362 to 16,119 engagements. 15 are body-incomplete and 9 fall below
+the floor.
 
-**There is no true baseline for X in this corpus and there is no way to build one.** Every profile
-timeline route that was tried came back empty: one endpoint did not resolve at all, two returned
-HTTP 200 with zero bytes. The posts here were found by web SEARCH, which surfaces a creator's most
-famous work, so the collected set for each account is a mixture of famous posts and whatever
-ordinary ones happened to be findable. A multiple computed inside that set measures the search
-engine, not the audience. **Every number in this section is context, never evidence.**
+**The admitted posts, so you can see what these templates were built from.** 16,119 engagements on a
+single 280-character post; 9,371 on a thread head; 2,429; 2,261; 1,970; 1,502; 1,056; 1,008; 362.
+Four creators. Those are real numbers of real people, which is what earns these shapes their place.
 
-**Two further collection limits.** Long posts come back truncated at roughly 279 characters from the
-endpoint used, so all of them were discarded and this section is structurally biased toward short
-posts. And 15 of the 33 entries are body-incomplete: images, thread heads, and reposts with comment
-whose payloads were never collected. That leaves 18 posts whose words are all present.
+**One sampling line.** Every X profile-timeline route tried came back empty, so these posts were
+found by web search rather than pulled from a window. That means the collected set skews toward each
+account's famous work and there is no baseline to compute a multiple against. It does not make the
+engagement counts less real, and this section is written off the counts.
 
-**What this section is for.** Shapes. Six accounts writing for a fast, short, hostile feed produced
-some constructions worth borrowing, and the corpus can see the constructions clearly even though it
-cannot see what won. The three below repeat across accounts. Everything else is in the analyses
-file.
+**Two collection limits worth knowing before you copy a length.** Long posts came back truncated at
+roughly 279 characters from the endpoint used and were all discarded, so this section is biased
+toward short posts. And 15 of the 33 entries hide their payload in an image, a thread continuation or
+a quoted post, so they are not behind any template here.
 
-#### 1. One Idea, Three Registers `(shape only, no measured evidence)`
+#### 1. One Idea, Three Registers
 
 - **Platform:** x
 - **Mechanism:** a single idea is stated three times, as an instruction, then in plain language, then
   as something measurable, so the reader can lift whichever version fits their own sentence. Seen in
-  2 posts by 1 creator, and the construction is visible in 2 more posts by 2 other creators.
+  2 posts by 1 creator, at 16,119 and 1,008 engagements, and the construction is visible in 2 more
+  posts by 2 other creators. The 16,119 post is the largest single result in the X set.
 - **Structure / arc:**
   1. A two word label that classifies the post, of the sort that flags it as advice, or as a
      position the writer expects disagreement with.
@@ -383,12 +421,12 @@ file.
 - **Real example:** the inner-journey account's post about recovery speed after failure. Citation
   only, do not reuse the wording.
 
-#### 2. The List Whose Last Item Is the Question `(shape only, single sighting)`
+#### 2. The List Whose Last Item Is the Question `(single sighting)`
 
 - **Platform:** x
 - **Mechanism:** a numbered list of specific things, where the final numbered item is not a thing but
   a question, so the reader completes the list themselves. It converts readers into commenters
-  without asking them anything. Seen in 1 post by 1 creator.
+  without asking them anything. Seen in 1 post by 1 creator, at 2,261 engagements.
 - **Structure / arc:**
   1. A framing verb with no object yet, ending in a colon. So basically, we killed:
   2. Three or four numbered items, each one or two words, each a specific named group or thing.
@@ -413,12 +451,12 @@ file.
 - **Real example:** the general-viral account's five item list ending on an open question about what
   comes next. Citation only, do not reuse the wording.
 
-#### 3. The Label, Then the Procedure, With Nothing Sold `(shape only)`
+#### 3. The Label, Then the Procedure, With Nothing Sold
 
 - **Platform:** x
 - **Mechanism:** two words naming what is about to be shown, then the procedure itself in bullets,
-  with no claim, no credential, no promise and no link. Seen in 2 posts across 2 creators, and both
-  are the best body-complete post on their account.
+  with no claim, no credential, no promise and no link. Seen in 2 posts across 2 creators, at 1,970
+  and 1,502 engagements, and both are the best body-complete post on their account.
 - **Structure / arc:**
   1. A two or three word label plus a colon, naming what is about to be shown. A process, a data
      update, a teardown.
@@ -967,11 +1005,11 @@ on the shape, not something the mined creators were doing.
 
 **Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 22 Bluesky analyses in a
 292-entry corpus, across 4 accounts contributing 4 to 6 posts each, niches `adhd`, `ai-building`,
-`product-thinking` and `civic-democracy`. **3 cleared the outlier bar, one per account for three of
-the four accounts.**
+`product-thinking` and `civic-democracy`.
 
-**Bluesky publishes no view count**, so every result here is an engagement-baseline result and never
-a view ratio, the same constraint the mastodon section carries.
+**7 of the 22 clear this file's 150-engagement floor**, running from 178 to 11,598 engagements. 6
+are body-incomplete and 9 fall below the floor. Bluesky publishes no view count, so every number here
+is an engagement count.
 
 **One account here is the cleanest single account in the entire corpus.** All six of its posts are
 text-only and body-complete, from one creator in one window. Nothing is hidden in an image, nothing
@@ -1105,66 +1143,151 @@ worth much less, and the two platforms should not be treated as one.
 
 **Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 15 Threads analyses in a
 292-entry corpus, across 3 accounts contributing 5 each, niches `adhd`, `ai-building` and
-`building-solopreneur`. **NOTHING on this platform cleared the outlier bar.** Read that first, and
-read the reason, because it is the most instructive elimination in this pass.
+`building-solopreneur`. **5 clear this file's popularity floor**, at 1,237, 969, 727, 473 and 331
+engagements. **All five belong to ONE creator**, and that is stated on every record below because it
+is a real limit, not a formatting quirk.
 
-**The sampling here is good.** Each account's profile page was fetched with a crawler user agent,
-which returns a server-rendered page; the same URL in a normal browser returns a login wall with no
-post text at all. The window is the 15 original top-level posts that page serves, self-replies
-filtered out, and each entry records its POSITION in that window. So these are real timeline
-samples, tier 1, and the multiples are measured.
+**The sampling here is unusually good and it is worth one line.** Each account's profile was fetched
+with a crawler user agent, which returns a server-rendered page; the same URL in a normal browser
+returns a login wall with no post text at all. The window is the 15 original top-level posts the page
+serves, self-replies filtered out, with each entry's POSITION recorded. So these are real timeline
+windows, and the one creator's five posts below are his five most recent originals rather than a
+selection of his best.
 
-**And then the popularity gate removed both winners.** The two biggest posts on this platform, at
-49.1x and 27.3x their own accounts' windows, are BOTH carousels whose substance is images that were
-never collected. One has four words of caption, the other has two lines. After eliminating them,
-**the highest measured multiple left on the whole platform is 2.1x, against a threshold of 3.0x.**
+**Why the other two accounts contribute nothing.** Both of their biggest posts by far, at 1,241 and
+4,255 engagements, are image carousels whose substance was never collected. One has four words of
+caption and the other has two lines. They are the two largest posts on this platform and neither can
+teach anyone what its text did, so neither is behind a template. Their remaining complete posts run
+27 to 101 engagements, below the floor.
 
-That is the honest state of Threads in this corpus, and it produces a specific instruction: the
-shapes below are the best-performing complete posts in a real window, and **none of them is a
-winner.** They are the ceiling of a thin sample. Treat them as leads to test, not as proven
-structures, and do not let them acquire authority by sitting in the same file as the reddit and
-mastodon records.
+**What those two eliminated carousels DO establish, as form evidence.** On both accounts the single
+biggest post is an image carousel with a caption under 260 characters, and on both the drop to the
+next post is enormous: 4,255 to 154 on one, 1,241 to 185 on the other. Whatever is winning biggest on
+Threads for those two creators is happening in pictures, and collecting carousel contents is the
+highest-value fix available for this platform.
 
-**What the two eliminated carousels do establish, as form evidence.** Both accounts' single biggest
-post is an image carousel with a caption of under 260 characters, and on both accounts the drop to
-the next post is enormous: 49.1x to 1.7x on one, 27.3x to 4.1x on the other. Whatever wins on
-Threads for these two creators is happening in pictures. That is a collection gap with a clear fix
-and it is the highest-value improvement available for this platform.
+#### 1. The Method Defined By Its Stopping Point
 
-#### Leads worth testing, from the measured window
+- **Platform:** threads
+- **Mechanism:** a method is defined by the STATE that ends it rather than by a quantity, so the
+  reader gets a finish line they can actually recognise instead of a number they have to trust. Seen
+  in 1 post by 1 creator, at 1,237 engagements including 119 reshares, the largest post on its
+  account and the highest reshare count in the Threads set.
+- **Structure / arc:**
+  1. A superlative claim about method. The fastest way to become X.
+  2. The method, stated as an end condition rather than an amount. Do the thing until [the state
+     that means you are finished].
+  3. Stop. There is no beat 3, and this is the whole discipline of the pattern.
+- **Emotional trigger:** relief from an open-ended obligation. The reader has been told to do this
+  daily and never told when it is done.
+- **Immediate personal payoff:** a finish line they can apply to the thing they are working on today.
+- **CTA style:** none, and adding one breaks it. **CIVIC GATE:** a bare verdict is the furthest thing
+  in this file from `references/civic-adaptation.md`, because its entire mechanism is having nothing
+  attached. On civic material, either pick a different pattern or put one specific verified action
+  finishable in under 5 to 10 minutes on a line beneath the verdict, and accept that the addition
+  costs some of what makes the shape work.
+- **Length and formatting:** about 100 characters, ONE sentence, no line breaks, no bullets, no
+  emoji, no hashtags, no link. Every high-reshare post on this account is one sentence.
+- **Shape:**
+  ```
+  [Beat 1: "the fastest way to [outcome] is"]
+  [Beat 2: the method, defined by the state that ends it, not by a number or a duration]
+  [Stop]
+  ```
+  Beat 2 is the whole pattern. If the stopping condition is a quantity (thirty minutes, a thousand
+  words) this becomes ordinary advice. It has to be a state the reader can check themselves against.
+- **Real example:** the solopreneur account's one-sentence post defining a writing method by the
+  point at which confusion ends. Citation only, do not reuse the wording.
 
-Not written as full pattern records, deliberately. A record with a Shape block reads as proven, and
-nothing here is. Each lead names its position in a real 15-post window.
+#### 2. The Triple Parallel Swap
 
-- **The unexplained verdict beats the explained one, on the same account and the same advice.** One
-  account's top post is a single sentence defining a method by its END CONDITION rather than by a
-  quantity: write until you are no longer confused. Its third post gives the SAME advice with a
-  three part justification attached, and draws 60 percent of it. Same author, same window, same
-  claim. The lead: on this platform, adding the reasoning may cost more than it buys.
-- **Reshares go to compressed verdicts, and they are a different currency than likes.** That
-  account's top two posts carry the highest reshare ratios in the set, 119 reshares on 1,068 likes
-  and 99 on 822. Both are single sentences. This is the mastodon boost finding appearing on a second
-  platform: a reader reshares a claim in order to make it themselves, so what gets repeated is what
-  is short enough to be repeated.
-- **The triple parallel swap.** One post is one sentence naming an era and then three replacements
-  in a row, X replaces Y three times. It is a compression trick rather than an argument, and there
-  is nothing in the detail to disagree with because there is no detail. Second on its account.
-- **The numbered cycle that ends on the word repeat.** One account's best complete post is a ten
-  item numbered cycle from avoidance to burnout where the tenth item is the word repeat, so the
-  structure itself argues that nothing changes. Note that the identical closing device appears on
-  the biggest Substack Note in the corpus, on completely unrelated material. Two platforms, two
-  creators, and worth watching.
-- **A lead about what LOSES, held at exactly its evidence weight.** The worst post on each of the
-  two accounts with complete bodies is the most reassuring one: unconditional comfort, nothing
-  withheld, nothing asked. Two accounts, two creators, ONE platform. That is a lead, not a finding,
-  and it must not be written up as one until a differently sampled platform confirms it.
+- **Platform:** threads
+- **Mechanism:** an era or a shift is named, then three replacements are stated in a row in identical
+  grammar, so the claim arrives as a pattern rather than an argument. There is no detail to disagree
+  with because there is no detail. Seen in 1 post by 1 creator, at 969 engagements including 99
+  reshares, second on its account.
+- **Structure / arc:**
+  1. Name the era or the shift, in a clause. We are in the middle of X.
+  2. Swap one: [new thing] replaces [old thing].
+  3. Swap two, in the same grammar.
+  4. Swap three, in the same grammar, and this one carries the sharpest pair.
+  5. Stop. One sentence total.
+- **Emotional trigger:** the satisfaction of a tidy frame for a change the reader already feels and
+  has not been able to name.
+- **Immediate personal payoff:** none, and the record is honest that this is a frame rather than an
+  action. It buys language, not a task.
+- **CTA style:** none. **CIVIC GATE:** same as pattern 1. A frame with nothing attached fails the
+  rubric; add a verified finishable action or choose another shape.
+- **Length and formatting:** about 170 characters, one sentence, three parallel clauses separated by
+  commas, no bullets, no line breaks, no emoji, no link.
+- **Shape:**
+  ```
+  [Beat 1: "we are in [the named era/shift] where"]
+  [Beat 2: [new thing] replaces [old thing],]
+  [Beat 3: [new thing] replaces [old thing],]
+  [Beat 4: [new thing] replaces [old thing]]
+  [Stop. One sentence]
+  ```
+  The three swaps must be in identical grammar and must escalate, with the most contestable pair
+  last. Two swaps reads as a throwaway; four reads as a list.
+- **Real example:** the solopreneur account's one-sentence post naming a shift with three
+  replacements in a row. Citation only, do not reuse the wording.
 
-**CIVIC GATE for anything drawn from this section.** None of the 15 posts is civic, so no civic
-adaptation was mined here. Any civic use runs through `references/civic-adaptation.md` table 1 from
-scratch: concrete hook, immediate personal payoff, one specific verified action finishable in under
-5 to 10 minutes, everyday local language. The compressed-verdict leads above are structurally the
-FURTHEST from that rubric of anything in this file, because their entire mechanism is having nothing
-attached.
+#### 3. Reattribute the Problem
+
+- **Platform:** threads
+- **Mechanism:** the reader is told the thing they have been trying to fix is not broken, and the
+  problem is reassigned to a different variable entirely. It absolves and redirects in the same
+  breath. Seen in 2 posts by 1 creator, at 473 and 331 engagements, positions 4 and 5 on that
+  account's five. **Both are the account's weakest admitted posts**, which is stated because it
+  matters: this shape clears the popularity floor and sits at the bottom of its own creator's range,
+  so treat it as usable rather than as a winner.
+- **Structure / arc:**
+  1. The reassurance, stated as a refusal of the standard advice. Your X works fine. You do not need
+     to fix it.
+  2. The reattribution. The problem is not X, it is that you do not have Y.
+  3. The condition sharpened, so Y becomes concrete. No Y strong enough that everything else becomes
+     [the consequence].
+  4. Stop.
+- **Emotional trigger:** contrarian comfort. The reader is let off a hook and handed a different,
+  larger problem, which is a trade most people will take.
+- **Immediate personal payoff:** a reframe they can apply immediately to something they have been
+  blaming themselves for.
+- **CTA style:** none in either. **CIVIC GATE:** unchanged. Add a verified finishable action if this
+  is used on civic material.
+- **Length and formatting:** 210 to 230 characters, three or four sentences run together as one
+  block, no bullets, no emoji, no link. Quotation marks around the rejected word in one of the two.
+- **Shape:**
+  ```
+  [Beat 1: "Your [thing they blame] works fine. You do not need to fix it."]
+  [Beat 2: "You just do not have [the real missing variable]."]
+  [Beat 3: sharpen it. No [variable] strong enough that [everything else becomes X]]
+  [Stop]
+  ```
+  Beat 2 must name something concrete enough to go looking for. Reassigning the problem to a vague
+  noun leaves the reader worse off than the advice you just refused.
+- **Real example:** the solopreneur account's post reassigning an attention problem to a missing
+  target. Citation only, do not reuse the wording.
+
+#### What this account's own range says, and one lead not written as a pattern
+
+Five posts, one creator, one real window, so the internal comparison is honest even though the
+cross-account one does not exist.
+
+- **The unexplained verdict beat the explained one, on the same advice.** The account's top post is a
+  single sentence. Its third post gives the SAME underlying advice with a three part justification
+  attached, and draws 727 against 1,237. Same author, same window, same claim, and adding the
+  reasoning cost roughly 40 percent. That is one comparison and it is worth testing rather than
+  believing.
+- **Reshares track compression.** The top two posts carry 119 and 99 reshares and both are one
+  sentence; the bottom two carry 17 and 13. A reader reshares a claim in order to make it themselves,
+  so what gets repeated is what is short enough to repeat. This is the Mastodon boost finding
+  appearing on a second platform.
+- **A lead held at exactly its weight, not written as a pattern.** The worst post on each of the two
+  accounts with complete bodies is the most reassuring one: unconditional comfort, nothing withheld,
+  nothing asked. Two accounts, two creators, ONE platform, and one of the two accounts is below the
+  popularity floor entirely. That is a lead. It is not written up as a pattern and should not be
+  until a differently sampled platform confirms it.
 
 ### mastodon
 
@@ -1280,8 +1403,11 @@ across 5 creators measured against unbiased baselines.
 - **Platform:** mastodon
 - **Mechanism:** the person running the thing states an unflattering internal reality in specific
   terms, explains why it is that way, and often ends by asking for the help that would fix it. The
-  admission buys credibility and the ask spends it. Seen in 3 posts across 2 creators, all three
-  outliers, all body-complete, at 15.3x, 6.2x and 3.7x.
+  admission buys credibility and the ask spends it. **Seen in 2 posts by 1 creator**, at 841 and 205
+  favourites-plus-boosts, both body-complete. It was written on 3 posts across 2 creators; the third,
+  a 6.2x post at 117 engagements, fell below this platform's popularity floor when the gate changed
+  on 2026-08-23 and is now named as context rather than counted as evidence. Its multiple was real
+  and its raw numbers were not big.
 - **Structure / arc:**
   1. The uncomfortable fact, first, with an exact number in it where one exists.
   2. The honest reaction, in the words actually used privately rather than in status-update
@@ -1370,38 +1496,26 @@ across 5 creators measured against unbiased baselines.
 
 **Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 38 TikTok analyses in a 292-entry
 corpus, across 7 accounts contributing 3 to 8 posts each: two ADHD and mental-health accounts, two
-AI and solopreneur accounts, two civic and news accounts, one general. Follower counts run 147,500
-to 14,600,000.
+AI and solopreneur accounts, two civic and news accounts, one general. They range from a small
+account to one of the largest in the corpus.
 
-**TikTok is the only platform in this corpus with real views, real follower counts, AND real spoken
-transcripts on every entry.** Every other section is working from engagement sums, or from captions,
+**TikTok is the only platform in this corpus with real view counts AND real spoken transcripts on
+every entry.** Every other section is working from engagement sums, or from captions,
 or from a description of a video nobody transcribed. Here, 37 of 38 entries carry a complete
 auto-caption transcript pulled from TikTok's own JSON, plus a play count and the account's follower
 count. That makes one bar available here and nowhere else, and it is the bar Muxin's original
 reference tools were built on.
 
-**The view-to-follower ratio, on the whole 38.**
+**How popular these actually are.** 24 of the 38 clear this file's 100,000 view floor and are
+admitted as pattern evidence; 13 fall below it and 1 is body-incomplete. Of the admitted set, 9 clear
+a million views and the largest is 9.7 million. Those are the numbers the templates below were
+written from.
 
-| ratio | posts | what it means |
-|---|---|---|
-| above 1.0 | 4 of 38 | the post reached more people than the account has followers |
-| 0.5 to 1.0 | 6 | |
-| median | **0.19** | the typical collected post reaches about a fifth of its own following |
-| below 0.1 | 12 | |
-
-The four that cleared 1.0 are worth naming because the pattern in them is not what a reader expects:
-6.08, 2.60, 1.87 and 1.05. The highest belongs to the SMALLEST account in the set, 147,500
-followers, and the three largest accounts in the set (14.6M, 3.8M and 1.5M followers) contribute one
-between them. **Reaching past your own audience is not a function of having a big one.**
-
-**Read the multiples here as unreliable, with one stated exception.** These accounts were reached by
-search, so which of their posts got collected is not random and a within-account ranking is not a
-measured result. The exception is `@realmattgray`, and the exception comes from the entry's own
-collection notes rather than from this file's judgment: the notes record an account sample median of
-782 views across 7 collected posts, and one post at 896,100. Six posts between 248 and 2,805 views
-are not a search-discovered set, because nobody searches their way to a 248 view video. That one is
-treated as a real within-account outlier and it is cited as such below. Every other TikTok number
-here is a shape donor, never proof a shape wins.
+**One sampling line, as promised at the top of the file.** These accounts were reached by search, so
+which of their videos got collected is not random and a within-account ranking is not a measured
+result. One account is the documented exception: its collection notes record a real 7-video account
+sample with a median of 782 views, alongside one video at 896,100. Multiples appear below as
+context. The view counts are what admit a post.
 
 **Two things the corpus tested and did NOT find. Both matter, because both are widely believed.**
 
@@ -1426,9 +1540,9 @@ below as a claim about the SCRIPT and about nothing else.
 - **Platform:** tiktok
 - **Mechanism:** the first sentence is a fact about the viewer's own life that requires no interest
   in the creator's subject. The topic narrows afterwards. Carried by 1 post from 1 creator, and it
-  is the single best-evidenced TikTok record in this file: 896,100 views against that account's own
-  782 view median, a view-to-follower ratio of 6.08, the highest in the corpus. Its six siblings, at
-  248 to 2,805 views, all open by addressing founders.
+  is the single best-evidenced TikTok record in this file: **896,100 views**, nine times this file's
+  floor for the platform. Its six siblings, at 248 to 2,805 views, all open by addressing founders,
+  and the account's own collection notes record a 782 view median across the seven.
 - **Structure / arc:**
   1. The blunt universal fact, three to six words, second person, no preamble.
   2. A consequence of it, made concrete with real units of time or number.
@@ -1578,8 +1692,8 @@ below as a claim about the SCRIPT and about nothing else.
 - **Platform:** tiktok
 - **Mechanism:** a piece of genuinely dull policy is delivered entirely through an object the
   audience already jokes about, and the closing line lands the ruling on the viewer's own street.
-  Seen in 1 post by 1 creator, at 4,000,000 views and a view-to-follower ratio of 1.05, one of only
-  four posts in the corpus to travel past its own following. `(thin evidence, single sighting)`
+  Seen in 1 post by 1 creator, at **4,000,000 views**, the second largest in the TikTok set.
+  `(thin evidence, single sighting)`
 - **Structure / arc:**
   1. Two words of news framing, then the specific outcome in the same sentence.
   2. The scale, in counted units the viewer can picture.
@@ -1654,13 +1768,13 @@ below as a claim about the SCRIPT and about nothing else.
 
 #### What TikTok shows that is worth more than a seventh pattern
 
-- **The best-travelling script in the set contains no information.** The 6.08 ratio post transfers no
-  fact, names no tool, and teaches nothing. Two of the other three posts that beat their own follower
-  count are the same: a staged conversation and a permission. The one that does carry information,
-  the policy explainer, wraps it in an object the audience already jokes about. **Reach past your own
-  audience did not come from being useful in this corpus.** It came from being about the viewer.
-- **The weakest accounts open on themselves.** The lowest-ratio account in the set, at 0.06 to 0.12,
-  opens every one of its four videos on a thought the creator had. The strongest openers name a state
+- **The biggest scripts in the set contain no information.** The 896,100 view breakout transfers no
+  fact, names no tool, and teaches nothing. The two largest videos on other accounts are the same: a
+  staged conversation at 3.9 million and a policy explainer at 4 million, and the explainer wraps its
+  one fact in an object the audience already jokes about. **The biggest numbers here did not come
+  from being useful.** They came from being about the viewer.
+- **The weakest accounts open on themselves.** The smallest account in the set by views, at 23,800
+  to 48,300, opens every one of its four videos on a thought the creator had. The strongest openers name a state
   the viewer is already in, or start mid-scene with no narrator at all.
 - **A repurposed clip lost to five original scenes on the same account, in the same window.** One
   podcast excerpt sits last of six on an account whose other five are original. That is one account,
@@ -1675,12 +1789,14 @@ roughly 30 to 120 seconds, in the `building-solopreneur` and `inner-journey` nic
 these are civic and none carry a civic adaptation.** For civic material on this platform, run the
 chosen shape through `references/civic-adaptation.md` table 1 before drafting.
 
-**Read this before trusting these records.** ZERO YouTube posts cleared the outlier bar. Six of the
-eleven returned no view or like count at all, and two accounts have only a single entry, so no
-baseline exists to score them against. These patterns therefore rest on posts collected because
-they were popular, not on measured outliers, and the strongest of them are supported by repetition
-across creators rather than by a performance multiple. Where a pattern is carried by one creator,
-the record says so.
+**Read this before trusting these records, and note what changed on 2026-08-23.** Under the old
+ratio-based gate ZERO YouTube posts qualified. Under the popularity gate **5 of the 24 collected
+YouTube entries clear the 25,000 view floor**, at 26,700, 55,100, 73,400, 112,500 and 183,600 views.
+That is real popularity and these patterns are no longer evidence-free. What has NOT changed: 13 of
+the 24 are body-incomplete, and on this platform that mostly means the collected body is the written
+DESCRIPTION rather than the spoken track, so those cannot say what the video said. The patterns below
+are supported by repetition across creators as much as by any single number. Where a pattern is
+carried by one creator, the record says so.
 
 A hook here is the first three seconds of spoken words. All four accounts open on content rather
 than on a greeting or a channel intro. The one self-introduction in the set is not an exception to
@@ -1908,7 +2024,8 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
 ### instagram
 
 **Mined 2026-08-23 and too thin to carry patterns. This is a finding, not a to-do.** 13 Instagram
-analyses across 4 accounts. **11 of the 13 are body-incomplete and none cleared the outlier bar.**
+analyses across 4 accounts. **11 of the 13 are body-incomplete and NONE clears the popularity
+floor**, so nothing here is admitted as pattern evidence.
 
 The blocker is structural rather than a matter of collecting more. Every video entry's `body` is the
 written CAPTION, not the spoken track, and Instagram exposes no play count to a logged-out reader,
@@ -1944,10 +2061,14 @@ around creators who have followers. Reddit has neither: 25 posts, 25 strangers, 
 to control for. What replaces it is the community, and what wins splits so hard between communities
 that a single "Reddit pattern set" would be false in every direction at once.
 
-**Every multiple below is measured against a TRUE community median**, taken from an unbiased window
-of that subreddit's `/new` listing, posts left to settle for days so votes had landed. The collected
-posts are the top-of-year listing, and their position in it is recorded. **This is the only place in
-the corpus where the scoring script is wrong and must be ignored.** `npm run patterns:outliers`
+**These are big numbers first.** 18 of the 25 clear this file's 250-engagement floor and are the
+basis for the templates below, running from 422 to 43,342 engagements. 4 are body-incomplete
+screenshot or video posts, admitted as TITLE evidence only, and 3 fall below the floor.
+
+**The multiples are unusually good context here, so they are quoted throughout.** Each subreddit's
+TRUE median was computed from an unbiased window of its `/new` listing, posts left to settle for days
+so votes had landed, and the collected posts are its top-of-year listing with position recorded.
+**This is the only place in the corpus where the scoring script is wrong and must be ignored.** `npm run patterns:outliers`
 compares each post against its siblings, and here every sibling is also a top-of-year post, so it
 reports r/ADHD's biggest post of the year at 2.2x and flags zero Reddit outliers. The real numbers
 are these:
@@ -1961,14 +2082,15 @@ are these:
 | r/LifeProTips | 691 | 42,477 | 61x | **all plain text** |
 | r/civictech | 4 | 27 | 6.8x | **eliminated, see below** |
 
-**Read the r/LifeProTips row against the r/ADHD row before using any number here.** 61x in
+**Read the r/LifeProTips row against the r/ADHD row before using any multiple here.** 61x in
 r/LifeProTips is a harder thing to do than 4095x in r/ADHD, because heavy moderation kills the weak
 posts before they can drag the median down, so the median it beats is 691 rather than 3. A multiple
-is only meaningful next to the median it was measured against. Never rank these against each other.
+is only meaningful next to the median it was measured against, which is exactly why this file no
+longer gates on them. The raw counts are comparable and the multiples are not.
 
 **r/civictech was eliminated by the popularity gate.** Its best post of the entire year is 27
-upvotes on a true median of 4. The 6.8x is arithmetic on numbers too small to mean anything, and no
-pattern below is drawn from it. All three of its posts were analysed anyway and are on the record as
+upvotes, which is 34 engagements all in, well under this file's 250 floor. Its 6.8x multiple is
+arithmetic on numbers too small to mean anything, and no pattern below is drawn from it. All three of its posts were analysed anyway and are on the record as
 eliminated evidence. The useful finding from them is not a shape: **r/civictech is a room of
 practitioners, not a distribution channel.** One of its posts opens on a genuinely strong statistic
 contrast and still drew 22 upvotes. Structure and venue are separate problems, and this is the
@@ -2317,10 +2439,14 @@ if she wants reach in either community, the medium is the decision and the writi
 
 **Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 9 Hacker News analyses in a
 292-entry corpus, 9 different submitters, niches `ai-building`, `adhd`, `civic-tech` and
-`solopreneur`. **4 of the 9 cleared the outlier bar.** The other 5 are link submissions and are
-admitted as TITLE evidence only.
+`solopreneur`.
 
-**The baseline here is the best in the whole corpus.** Every story submitted to HN in one full
+**These are big numbers by any reading.** The 4 text submissions behind the templates below run
+273 to 3,295 engagements, and their point counts are 124, 1,086, 1,318 and 2,935. The 5 link
+submissions are admitted as TITLE evidence only, because Hacker News displays nothing but the title
+for a link post.
+
+**The baseline is also the best in the whole corpus, so it is quoted as context throughout.** Every story submitted to HN in one full
 24-hour window about 30 days before collection was pulled, 1,000 of the 1,012 in that window, which
 is the API's page cap. That population has a **true median of 3 points, a 90th percentile of 22,
 and a maximum of 1,778**. Nothing was selected for looking good. So an HN multiple here is measured
@@ -2490,21 +2616,24 @@ evidence. Counts are of the 9 collected titles.
 
 **Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 12 Substack Notes analyses in a
 292-entry corpus, across 2 accounts contributing 6 each, niches `civic-democracy` and
-`general-viral`. **6 cleared the outlier bar.**
+`general-viral`.
 
 **Notes are not Substack posts.** Different surface, different feed, different numbers, different
 craft. Do not carry anything from the `substack` section into this one. A Note is short, it lives in
 a scrolling feed rather than an inbox, and its dominant metric is the restack, which is a reader
 repeating your sentence as their own.
 
-**Baselines are real here.** Both accounts were sampled by pulling a chronological window of 96 of
-that account's own top-level Notes, restacks and replies filtered out, and computing the true median
-across all 96. One account's median is 2,930 likes across five months; the other's is 116 likes
+**These are the largest raw numbers in the corpus.** 8 of the 12 clear the floor and run from 195
+to 46,541 engagements; the top note alone carries 39,173 likes and 6,472 restacks. 4 are
+body-incomplete and are behind nothing here.
+
+**Baselines are real here too, so they are quoted as context.** Both accounts were sampled by pulling
+a chronological window of 96 of that account's own top-level Notes, restacks and replies filtered
+out, and computing the true median across all 96. One account's median is 2,930 likes across five months; the other's is 116 likes
 across one month. So a multiple in this section is measured against an unbiased window of the same
 person's own Notes.
 
-**Read the creator counts before the patterns.** 5 of the 6 posts that cleared the bar belong to ONE
-account. Every pattern below therefore says "1 creator," and that is a real limit, not a formatting
+**Read the creator counts before the patterns.** 6 of the 8 admitted posts belong to ONE account. Every pattern below therefore says "1 creator," and that is a real limit, not a formatting
 quirk. What saves them from being one person's habits is that they were measured against a
 96-note window of that same person's own work, so the comparison inside the account is honest even
 though the comparison across accounts does not exist.
@@ -2675,8 +2804,10 @@ the note with no number, name or event in it finished last.
 
 ### devto
 
-**Mined 2026-08-23 and too thin to carry patterns, for an unusual reason: the platform barely
-produces outliers at all.** 4 dev.to analyses from 1 author. 2 cleared the configured 2.0x bar.
+**Mined 2026-08-23 and too thin to carry patterns, for two reasons, neither of which is popularity.**
+4 dev.to analyses from 1 author. **All four clear this file's 150-engagement floor**, at 289 to 457
+reactions-plus-comments, so popularity is not what disqualifies them. One author is not a platform,
+and the distribution is so compressed there is nothing to learn a shape from.
 
 The sampling is the best in the corpus and the result is still unusable. The author's COMPLETE
 published window was pulled from dev.to's own public API, 59 articles over a year, and its true

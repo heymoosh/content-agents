@@ -87,12 +87,11 @@ corpus in which every entry carries an analysis.**
 
 **The bar rows 29 to 31 had to clear.** Only three were added from 192 newly analysed posts, and
 that is deliberate. A shape was admitted only if it is distinct from all 28 above AND its supporting
-posts were genuinely popular against a real, unbiased baseline: a whole community's true median or a
-full timeline window, with absolute numbers large enough for the multiple to mean something. Shapes
-whose evidence came from search-discovered accounts were refused outright, because on those
-platforms a multiple measures the search engine rather than the audience. Several good-looking
-single sightings were refused on that basis, including one bluesky construction at 2.0x, and they
-are recorded in `data/patterns/analyses.jsonl` rather than here. Full-post structure for these lives in `references/post-patterns.md`
+posts were **genuinely, obviously popular in raw terms**: big point, view or upvote counts for the
+place they ran in. That is the same gate `references/post-patterns.md` uses, and the floors are
+stated there. Several good-looking single sightings were refused for having interesting ratios and
+small raw numbers, including one bluesky construction, and they are recorded in
+`data/patterns/analyses.jsonl` rather than here. Full-post structure for these lives in `references/post-patterns.md`
 under the platform it was mined on; these rows cover only the opening.
 
 **On the LinkedIn rows.** Rows 24 to 26 were written while the corpus's LinkedIn entries were
@@ -109,7 +108,7 @@ nothing in this file.
 | 27 | Refused Premise | Reject, in the first line, a forced choice or a piece of received advice the reader has already accepted, so the post begins by taking a weight off them rather than adding one | "[The forced choice or the received advice, in the reader's own terms]. [Flat rejection, same breath, no hedging]." | Justin Welsh, LinkedIn, his post rejecting the standard quit-your-job advice, and his post refusing the money-or-freedom either-or. Seen at the opening in 2 posts across 2 creators, one refusing an either-or and one rejecting named advice; a third post uses the move after its opening line |
 | 28 | Counterfactual Snap | Build an invented but recognisable world, voice the rationalisation someone would offer inside it, then snap to the real subject in one short sentence and stop | "If you lived in a world where [recognisable harm returning at a pinned scale], would you [work inside it] to make it less bad? \"[the rationalisation, in the voice of someone who means it]\" [Snap: this is what [the real subject] now sounds like.]" | Baldur Bjarnason, Mastodon, his post transposing a technology-industry argument onto a different regulated industry. Single sighting, and the largest clean multiple in the corpus at 37.3x on its best-sampled platform. DISTINCT FROM 10: pattern 10 opens on a REAL historical scene and pivots; this builds an INVENTED counterfactual and embeds a quoted rationalisation inside it |
 | 29 | Scope Tightener With the Unit Named | Ask the question, then immediately rule out the low-effort answers by tightening the scope in one clause, and name the unit an answer should arrive in, so replies are comparable to each other instead of a pile of anecdotes | "[The question, naming the specific things being compared] [+ a tightener that rules out the casual case: fully, as the main tool, not as a side experiment]? [Then: what an answer should contain, with the UNIT named in a parenthesis]." | Two Ask HN submissions, one about replacing a commercial model with a local one for daily work and one about managing a constant stream of ideas. Seen in 2 posts across 2 submitters, at 439x and 41x the TRUE median of every story submitted to that platform in a full 24-hour window (median 3 points, 90th percentile 22). The shorter of the two produced 563 comments off about 230 characters. DISTINCT FROM 6: pattern 6 implicates the reader personally and wants a feeling; this one narrows a factual question and specifies the format of the answer |
-| 30 | The Universal Opener | Open on a blunt fact that is true of every reader regardless of whether they care about your subject, then narrow to your subject afterwards, so the audience is recruited before the topic can filter them out | "[Fact true of everyone, second person, under six words]. [Its consequence, with a real time unit or number]. [If that is so, why are you [the thing they are doing]?]" | Matt Gray, TikTok, his 26 second video opening on mortality. Single sighting, and the largest documented within-account outlier in the corpus: 896,100 views against that account's own 782-view median across seven collected posts, a view-to-follower ratio of 6.08, the highest anywhere in the corpus. Its six siblings all open by addressing founders and run 248 to 2,805 views. DISTINCT FROM 4: pattern 4 leads with the INSTRUCTION and uses mortality as the justification; this one leads with the bare fact, withholds any instruction until the final beat, and its whole mechanism is that beat 1 contains no niche word at all |
+| 30 | The Universal Opener | Open on a blunt fact that is true of every reader regardless of whether they care about your subject, then narrow to your subject afterwards, so the audience is recruited before the topic can filter them out | "[Fact true of everyone, second person, under six words]. [Its consequence, with a real time unit or number]. [If that is so, why are you [the thing they are doing]?]" | Matt Gray, TikTok, his 26 second video opening on mortality. Single sighting, and one of the largest raw results in the corpus: 896,100 views, against six siblings on the same account running 248 to 2,805 views and an account median of 782 across the seven collected. Its six siblings all open by addressing founders and run 248 to 2,805 views. DISTINCT FROM 4: pattern 4 leads with the INSTRUCTION and uses mortality as the justification; this one leads with the bare fact, withholds any instruction until the final beat, and its whole mechanism is that beat 1 contains no niche word at all |
 | 31 | The Outsider's Concession | Open by apologising to the group and admitting you personally held the exact belief the group is tired of hearing, before offering any evidence, so the reader gets vindication instead of another diagnosis | "[Apology, addressed to the group, before any content]. [Admit having held the dismissal that group actually hears, phrased the way they hear it]. [Why it seemed reasonable at the time]. [Flat correction, one sentence]." | The top-of-year post in r/ADHD, written by someone without the condition who lives with two people who have it. Single sighting, and the largest absolute and relative result in the reddit set: 12,286 upvotes at 4,095x that community's TRUE median of 3, computed from an unbiased 163-post window of its /new listing. DISTINCT FROM 15: pattern 15 is an unflattering admission about YOURSELF with the lesson delayed; here the confessor is not the subject, the group is, and what is conceded is the group's own long-running argument |
 
 ## Verification caveats (carry forward, don't drop)
@@ -137,18 +136,19 @@ nothing in this file.
   strong measured result on an unbiased sample is not the same as n=1 with none, but it is still
   n=1: treat the shape as promising, not proven, until a second creator is seen using it. If LinkedIn entries later clear their
   provenance check, they may add rows; they did not inform these.
-- Pattern 29 is the best-evidenced row in this file. Its baseline is the only one in the corpus
-  measured against an entire PLATFORM rather than one account or one community: every story
-  submitted in a full 24-hour window, 1,000 of 1,012. Two submitters, both above the 90th percentile
-  of that window. The one limit: both are Ask-prefixed posts on a forum whose audience self-selects
-  by subject, so whether the tightener transfers to a follower feed is untested.
+- Pattern 29 is the best-evidenced row in this file. Its two posts drew 1,318 and 124 points and
+  563 and 149 comments, and its baseline is the only one in the corpus measured against an entire
+  PLATFORM rather than one account or one community: every story submitted in a full 24-hour window,
+  1,000 of 1,012, whose median is 3 points and whose 90th percentile is 22. The one limit: both are
+  Ask-prefixed posts on a forum whose audience self-selects by subject, so whether the tightener
+  transfers to a follower feed is untested.
 - Patterns 30 and 31 each rest on a SINGLE post, and are admitted on exactly the precedent pattern
-  28 set: n=1 with a strong measured result against an unbiased sample is not the same as n=1 with
-  none. Both are the largest results in their respective platform sets, both measured against real
-  baselines, and both have absolute numbers far too large to be noise. **They are still n=1.** Treat
+  28 set: n=1 carrying a genuinely large result is not the same as n=1 with none. 896,100 views and
+  12,286 upvotes are both far too large to be noise, and both are the biggest results in their
+  platform's set. **They are still n=1.** Treat
   each as promising rather than proven until a second creator is seen using it.
 - Pattern 30 was mined from short-form video, where the hook is the first three seconds of spoken
-  words. Like patterns 24 and 25 it should transfer to text, and like them that has not been
+  words. Its evidence is the raw view count, not a ratio; this library gates on plain popularity. Like patterns 24 and 25 it should transfer to text, and like them that has not been
   measured here. Note also that this corpus can see the video's WORDS and nothing else: no cuts, no
   faces, no first visual frame.
 - Pattern 31 was mined from a community forum, where a post is read by people who chose that
