@@ -129,7 +129,8 @@ sibling, covering the arc after the hook, the emotional trigger, the CTA and the
 written by the `/patterns` skill and is empty until the first mining pass runs, so fall back to
 hook-patterns.md while it is.
 `references/civic-adaptation.md` is Muxin's own decided rubric for civic and social-issues material
-(what a piece must deliver, plus the micro-action bar every civic CTA has to clear); `/patterns`
+(what a piece must deliver, plus the two-form bar every civic CTA has to clear, a micro-action or
+neutral record-based value-aligned matching); `/patterns`
 never rewrites that one. The first two say what shape to reach for, the third says what a civic
 piece owes the reader, and the joyful-activism note below says in which register. They stack.
 

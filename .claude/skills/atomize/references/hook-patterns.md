@@ -32,8 +32,8 @@ statistic, or detail that isn't already there.
 **Companion libraries:** `references/post-patterns.md` covers FULL-POST structure (arc, emotional
 trigger, CTA, length) the way this file covers the opening line; both are populated and maintained
 by the `/patterns` skill. `references/civic-adaptation.md` is Muxin's own decided rubric for civic
-and social-issues material (what a piece must deliver, and the micro-action bar every civic CTA has
-to clear); it stacks with the joyful-activism default below rather than competing with it, and
+and social-issues material (what a piece must deliver, and the two-form bar every civic CTA has to
+clear, a micro-action or neutral record-based value-aligned matching); it stacks with the joyful-activism default below rather than competing with it, and
 `/patterns` never rewrites it. The three are one system. If you need a shape this file doesn't
 have, check those before starting a fourth library.
 

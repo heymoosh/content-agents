@@ -30,9 +30,11 @@ material being atomized, the same as every other pattern in this skill.
 **A micro-action CTA must point at something real.** Never invent a link, a form, a deadline, a
 race, or a ballot measure. If the specific thing cannot be verified as real and current, the CTA
 falls back to the general default (civic material routes to the voting tool, general material to
-the Substack subscribe) rather than fabricating a specific one. A plausible-sounding fake deadline
-is worse than a generic CTA, and CLAUDE.md rule 1's no-invented-proof spirit covers it. This
-rubric sharpens the existing CTA default, it does not replace it.
+the Substack subscribe) rather than fabricating a specific one. Value-matching carries the harder
+rule: if the record cannot be verified it is not written at all, not written with a caveat and not
+labeled as needing verification. A plausible-sounding fake deadline is worse than a generic CTA,
+and CLAUDE.md rule 1's no-invented-proof spirit covers it. This rubric sharpens the existing CTA
+default, it does not replace it.
 
 ## What to steal from viral niches
 
@@ -72,8 +74,9 @@ rather than collected data. Three places read it:
 
 - **`SKILL.md` step 4 (drafting).** Civic and social-issues derivatives are drafted against table 1:
   concrete hook, immediate personal payoff, one specific next action, everyday local language.
-- **`SKILL.md` step 4.5 (CTA).** A civic CTA is expected to be a specific micro-action from table 2,
-  set through the existing literal-`cta` / `cta_label` override that already points civic-tech
+- **`SKILL.md` step 4.5 (CTA).** A civic CTA has two accepted forms from table 2: a specific
+  micro-action, or belief- or value-aligned matching kept neutral and record-based. Either is set
+  through the existing literal-`cta` / `cta_label` override that already points civic-tech
   pieces at the voting tool. The mechanics are unchanged. The bar for what goes in them is higher.
 - **`references/post-patterns.md`.** Every synthesized full-post pattern records an immediate
   personal payoff and a CTA, and its CTA field carries this rubric's civic gate.

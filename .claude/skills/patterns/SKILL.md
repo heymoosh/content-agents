@@ -363,6 +363,10 @@ gitignored, same as the corpus.
    - **`cta_completable`**: one of `"micro-action"` (a specific thing a reader could finish in
      under 5 to 10 minutes), `"vague"` (a "vote" / "get involved" / "stay informed" style ask), or
      `"none"`. Judge what the post actually asked, not what it should have asked.
+     **Do not "align" this enum with the two-form civic CTA bar.** It classifies what a MINED post
+     did, not what one of Muxin's CTAs may be, a value-matching close already classifies as
+     `"micro-action"` here, and changing the vocabulary mid-corpus would make records written
+     before and after the change incomparable.
 
    Record these two the same way on non-civic posts. The point is to find out whether payoff and
    completable CTAs correlate with reach across every niche, which is a real question the corpus
