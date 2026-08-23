@@ -44,18 +44,45 @@ export interface CorpusMetrics {
   followers: number | null;
 }
 
-// The five shapes a post can take on the page. "none" is a recorded observation, not a default:
-// it means someone looked and found no image, carousel, video or thread, which is a different
-// fact from `visual` being absent because nobody ever checked.
-export const VISUAL_FORMS = ["image", "carousel", "video", "thread", "none"] as const;
-
-export type VisualForm = (typeof VISUAL_FORMS)[number];
-
-// What the post actually looked like on the page, and whether `body` alone is the whole post.
+// Every form a post can take on the page. This is the axis the analysis compares on - which form
+// wins, per platform - so a form recorded here must be a determination, never a shrug.
 //
-// Absent on an entry nobody has examined for a visual yet. Present means someone looked.
-export interface CorpusVisual {
-  form: VisualForm;
+// "text-only" is a recorded observation, not a default: it means someone looked and found no
+// attached media at all, which is a different fact from `media` being absent because nobody ever
+// checked. "video" and "short-video" are split deliberately: a 40-second vertical short and a
+// 20-minute upload are different products and perform differently. "document" is LinkedIn's PDF
+// carousel, a distinct high-performing form there, and is never folded into "carousel".
+//
+// "mixed" is for a post that genuinely combines forms, with the parts named in `description`. It
+// is NOT the label for a post whose form could not be determined - for that, leave the whole
+// `media` object absent.
+export const MEDIA_FORMS = [
+  "text-only",
+  "image",
+  "carousel",
+  "video",
+  "short-video",
+  "thread",
+  "link-preview",
+  "document",
+  "poll",
+  "audio",
+  "gif",
+  "live",
+  "repost-with-comment",
+  "mixed",
+] as const;
+
+export type MediaForm = (typeof MEDIA_FORMS)[number];
+
+export type MediaAspect = "vertical" | "square" | "horizontal";
+
+// What form the post actually took, and whether `body` alone is the whole post.
+//
+// Absent on an entry nobody has examined yet, and absent on an entry whose form could not be
+// determined. Present means someone looked and reached an answer.
+export interface CorpusMedia {
+  form: MediaForm;
   // The text the creator typeset ONTO the image, frame or slide as its hook, word for word. This
   // is Sabrina Ramonov's "on-screen title", and remix mode copies it into Muxin's own post
   // VERBATIM. So a guess here does not degrade gracefully: it puts words she never verified into
@@ -64,18 +91,25 @@ export interface CorpusVisual {
   // Null when the post has no such title, and also null when one was simply not retrievable.
   // `description` is what tells those two apart. Never "probably something like this".
   onscreen_text: string | null;
-  // What the visual depicts, in plain words. An observation of what was actually seen, e.g. "a
-  // slide of stacked text on a plain background". Never a guess at text that could not be read.
+  // What the media is, in plain words. An observation of what was actually seen, e.g. "a slide of
+  // stacked text on a plain background". Never a guess at text that could not be read. On a
+  // "mixed" entry this is where the parts are named, and on any entry it is where the method that
+  // determined `form` is recorded.
   description: string | null;
-  // Slides in a carousel. Null when the post is not a carousel, or when the count was not
-  // retrievable.
-  slide_count: number | null;
-  // Tweets/posts in a thread. Null when the post is not a thread, or when the length was not
-  // retrievable.
-  thread_length: number | null;
+  // Real running time of a video, short-video or audio post, in seconds. NEVER estimated from a
+  // title, a thumbnail or a transcript length: null means it was not retrievable, and a null here
+  // is a better answer than a plausible number.
+  duration_seconds: number | null;
+  // How many parts the media has: slides in a carousel, images in a set, pages in a document,
+  // posts in a thread. Null when there is one part, and null when the count was not retrievable.
+  media_count: number | null;
+  // Whether a video carries captions, burned into the frame or served as a caption track. Null on
+  // a non-video post, and null where it could not be determined.
+  has_captions: boolean | null;
+  aspect: MediaAspect | null;
   // READ THIS ONE TWICE. False means the post's substance is NOT in `body` - it sits in an
-  // attached image, in slides 2..n of a carousel, or in reply tweets, none of which were
-  // collected. A 22-character caption over an image that earned 3,536 likes has
+  // attached image, in slides 2..n of a carousel, in a video, or in reply tweets, none of which
+  // were collected. A 22-character caption over an image that earned 3,536 likes has
   // body_is_complete: false, because the caption is not what won.
   //
   // This is the flag that stops a downstream step copying that caption and calling it a proven
@@ -100,8 +134,8 @@ export interface CorpusEntry {
   body: string;
   transcript_source: TranscriptSource;
   metrics: CorpusMetrics;
-  // Absent on a plain text post, and absent on any entry not yet examined for a visual.
-  visual?: CorpusVisual;
+  // Absent on an entry not yet examined, and absent where the form could not be determined.
+  media?: CorpusMedia;
   notes?: string;
 }
 
@@ -199,11 +233,11 @@ export interface Opener {
 // Refuse the pick on any of these three. All three mean the post's substance sat OUTSIDE the body
 // the corpus holds, so copying its opener copies a fragment and misses the thing that worked:
 //
-//   "substance-outside-body" - RECORDED, not guessed: the entry's `visual.body_is_complete` is
+//   "substance-outside-body" - RECORDED, not guessed: the entry's `media.body_is_complete` is
 //                              false, meaning someone looked at the post and confirmed the body is
 //                              not the whole of it. This is the trustworthy one, and when it fires
 //                              the two guesses below are not used at all.
-//   "short-body"             - a guess, used only where no `visual` block was recorded. The body is
+//   "short-body"             - a guess, used only where no `media` block was recorded. The body is
 //                              short enough to be a caption over an image, a carousel, or a video
 //                              that was never collected. It can also be a genuinely short post that
 //                              worked on its own words. Nothing in the corpus tells those apart,
@@ -213,7 +247,7 @@ export interface Opener {
 //
 // Do NOT refuse on these two. They are context, not disqualification:
 //
-//   "missing-onscreen-title" - the post has a visual but no on-screen text on record. Muxin reads
+//   "missing-onscreen-title" - the post has media but no on-screen text on record. Muxin reads
 //                              it off the original and supplies it; see remix-mode.md.
 //   "truncated-body"         - the opener is intact but the body was cut off later, so the rest of
 //                              the post is not fully known.

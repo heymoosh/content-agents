@@ -121,16 +121,16 @@ export function extractOpener(entry: CorpusEntry): string | null {
 export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
   const warnings: OpenerWarning[] = [];
   const body = entry.body.trim();
-  const visual = entry.visual;
+  const media = entry.media;
 
-  // A recorded observation beats both guesses. `visual` present means someone looked at the post,
+  // A recorded observation beats both guesses. `media` present means someone looked at the post,
   // so the body-length and platform priors below have nothing left to add and are skipped.
-  if (visual) {
-    if (!visual.body_is_complete) {
-      const title = visual.onscreen_text === null ? "and its on-screen text was not captured" : "though its on-screen text WAS captured";
+  if (media) {
+    if (!media.body_is_complete) {
+      const title = media.onscreen_text === null ? "and its on-screen text was not captured" : "though its on-screen text WAS captured";
       warnings.push({
         code: "substance-outside-body",
-        note: `Someone looked at this post: its form is ${visual.form}, and its substance is not in the collected body, ${title}. Copying this opener copies a fragment of what actually worked.`,
+        note: `Someone looked at this post: its form is ${media.form}, and its substance is not in the collected body, ${title}. Copying this opener copies a fragment of what actually worked.`,
       });
     }
   } else {
@@ -149,11 +149,11 @@ export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
     }
   }
 
-  // Sabrina's method copies the title as well as the opener, so a post that HAS a visual and no
+  // Sabrina's method copies the title as well as the opener, so a post that HAS a media and no
   // captured on-screen text is missing half the method. Form "none" means someone looked and found
-  // no visual at all, which is not a gap.
-  const visualCarriesTitle = visual ? visual.form !== "none" && visual.form !== "thread" : entry.kind === "video";
-  if (visualCarriesTitle && (visual?.onscreen_text ?? null) === null) {
+  // no media at all, which is not a gap.
+  const mediaCarriesTitle = media ? media.form !== "text-only" && media.form !== "thread" : entry.kind === "video";
+  if (mediaCarriesTitle && (media?.onscreen_text ?? null) === null) {
     warnings.push({
       code: "missing-onscreen-title",
       note: "No on-screen title on record. Sabrina's method copies the title as well as the opener, so read it off the original and supply it by hand.",
@@ -190,7 +190,7 @@ function performanceNote(multiple: number | null, entry: CorpusEntry): string {
 // Builds one Opener per entry that has a knowable opener. Entries whose opener cannot be known
 // are skipped rather than guessed at.
 //
-// `onscreen_title` comes from the entry's `visual.onscreen_text` and is null when no visual was
+// `onscreen_title` comes from the entry's `media.onscreen_text` and is null when no media was
 // recorded or its on-screen text was not retrievable. Null means unknown, never "probably
 // something like this", so a remix says unknown rather than inventing a title.
 export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOptions = {}): Opener[] {
@@ -215,7 +215,7 @@ export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOption
       opener_text,
       // Verbatim, straight off the entry, and null when nobody captured it. Never derived, never
       // guessed: this text gets copied into Muxin's own post word for word.
-      onscreen_title: entry.visual?.onscreen_text ?? null,
+      onscreen_title: entry.media?.onscreen_text ?? null,
       kind: entry.kind,
       performance: {
         multiple,

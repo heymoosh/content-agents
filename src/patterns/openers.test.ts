@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { appendOpeners, buildOpeners, extractOpener, grantedHandles, openerWarnings, rankOpeners, readOpeners } from "./openers.js";
-import type { CorpusEntry, CorpusVisual, Opener, OpenerWarningCode, PatternMiningConfig } from "./types.js";
+import type { CorpusEntry, CorpusMedia, Opener, OpenerWarningCode, PatternMiningConfig } from "./types.js";
 
 let dir: string;
 let openersPath: string;
@@ -139,8 +139,18 @@ describe("openerWarnings", () => {
     return openerWarnings(e).map((w) => w.code);
   }
 
-  function visual(overrides: Partial<CorpusVisual> = {}): CorpusVisual {
-    return { form: "image", onscreen_text: null, description: null, slide_count: null, thread_length: null, body_is_complete: false, ...overrides };
+  function media(overrides: Partial<CorpusMedia> = {}): CorpusMedia {
+    return {
+      form: "image",
+      onscreen_text: null,
+      description: null,
+      duration_seconds: null,
+      media_count: null,
+      has_captions: null,
+      aspect: null,
+      body_is_complete: false,
+      ...overrides,
+    };
   }
 
   test("a body long enough to be the whole post carries no warnings", () => {
@@ -177,34 +187,34 @@ describe("openerWarnings", () => {
     assert.deepEqual(codes(both).slice(0, 2), ["short-body", "media-first-platform"]);
   });
 
-  test("a recorded visual saying the body is not the whole post is flagged as recorded, not guessed", () => {
-    const koe = entry({ platform: "linkedin", body: "the best advice I ever got", visual: visual({ form: "image" }) });
+  test("a recorded media saying the body is not the whole post is flagged as recorded, not guessed", () => {
+    const koe = entry({ platform: "linkedin", body: "the best advice I ever got", media: media({ form: "image" }) });
     assert.ok(codes(koe).includes("substance-outside-body"));
     assert.match(openerWarnings(koe)[0].note, /Someone looked at this post/);
   });
 
-  test("a recorded visual replaces the guesses instead of piling on top of them", () => {
-    const looked = entry({ platform: "instagram", body: "short one", visual: visual({ form: "image" }) });
+  test("a recorded media replaces the guesses instead of piling on top of them", () => {
+    const looked = entry({ platform: "instagram", body: "short one", media: media({ form: "image" }) });
     assert.ok(!codes(looked).includes("short-body"));
     assert.ok(!codes(looked).includes("media-first-platform"));
   });
 
   test("a short post someone confirmed is the whole post carries no doubt at all", () => {
-    const confirmed = entry({ body: "short but complete", visual: visual({ form: "none", body_is_complete: true }) });
+    const confirmed = entry({ body: "short but complete", media: media({ form: "text-only", body_is_complete: true }) });
     assert.deepEqual(codes(confirmed), []);
   });
 
-  test("a visual with no captured on-screen text is missing half the method", () => {
-    assert.ok(codes(entry({ visual: visual({ form: "carousel" }) })).includes("missing-onscreen-title"));
+  test("a media with no captured on-screen text is missing half the method", () => {
+    assert.ok(codes(entry({ media: media({ form: "carousel" }) })).includes("missing-onscreen-title"));
   });
 
   test("a captured on-screen title closes that gap", () => {
-    const titled = entry({ visual: visual({ form: "image", onscreen_text: "THE BEST ADVICE I EVER GOT" }) });
+    const titled = entry({ media: media({ form: "image", onscreen_text: "THE BEST ADVICE I EVER GOT" }) });
     assert.ok(!codes(titled).includes("missing-onscreen-title"));
   });
 
   test("a thread has no on-screen title to be missing", () => {
-    const thread = entry({ body: "one of two", visual: visual({ form: "thread", thread_length: 7 }) });
+    const thread = entry({ body: "one of two", media: media({ form: "thread", media_count: 7 }) });
     assert.ok(!codes(thread).includes("missing-onscreen-title"));
   });
 });
@@ -267,7 +277,16 @@ describe("buildOpeners", () => {
     const [built] = buildOpeners([
       entry({
         body: "the best advice I ever got",
-        visual: { form: "image", onscreen_text: "THE BEST ADVICE I EVER GOT", description: "stacked text on plain background", slide_count: null, thread_length: null, body_is_complete: false },
+        media: {
+          form: "image",
+          onscreen_text: "THE BEST ADVICE I EVER GOT",
+          description: "stacked text on plain background",
+          duration_seconds: null,
+          media_count: null,
+          has_captions: null,
+          aspect: null,
+          body_is_complete: false,
+        },
       }),
     ]);
     assert.equal(built.onscreen_title, "THE BEST ADVICE I EVER GOT");

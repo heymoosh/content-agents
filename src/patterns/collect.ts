@@ -13,13 +13,14 @@ import { CORPUS_PATH, INBOX_DIR, appendEntries, groupByAccount, makeId, readCorp
 import { classifyOutlier } from "./outliers.js";
 import {
   PLATFORMS,
-  VISUAL_FORMS,
+  MEDIA_FORMS,
   type CorpusEntry,
-  type CorpusVisual,
+  type CorpusMedia,
   type OutlierThresholds,
   type PatternMiningConfig,
+  type MediaAspect,
+  type MediaForm,
   type Platform,
-  type VisualForm,
 } from "./types.js";
 
 const CONFIG_PATH = join(repoRoot, "config", "pattern-mining.yaml");
@@ -99,42 +100,52 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
       metrics[key] = v;
     }
   }
-  // `visual` is optional, so an entry collected before this field existed still validates. When it
+  // `media` is optional, so an entry collected before this field existed still validates. When it
   // is there it is checked strictly, because body_is_complete is what a downstream step trusts
-  // before quoting `body` as a whole post.
-  let visual: CorpusVisual | null = null;
-  if (r.visual !== undefined && r.visual !== null) {
-    const rv = r.visual;
-    if (typeof rv !== "object" || Array.isArray(rv)) {
-      errors.push("visual must be an object when present");
+  // before quoting `body` as a whole post, and `form` is the axis the analysis compares on.
+  let media: CorpusMedia | null = null;
+  if (r.media !== undefined && r.media !== null) {
+    const rm = r.media;
+    if (typeof rm !== "object" || Array.isArray(rm)) {
+      errors.push("media must be an object when present");
     } else {
-      const v = rv as Record<string, unknown>;
-      const form = v.form;
-      if (typeof form !== "string" || !VISUAL_FORMS.includes(form as VisualForm)) {
-        errors.push(`visual.form must be one of: ${VISUAL_FORMS.join(", ")}`);
+      const m = rm as Record<string, unknown>;
+      const form = m.form;
+      if (typeof form !== "string" || !MEDIA_FORMS.includes(form as MediaForm)) {
+        errors.push(`media.form must be one of: ${MEDIA_FORMS.join(", ")}`);
       }
-      if (typeof v.body_is_complete !== "boolean") {
-        errors.push("visual.body_is_complete must be true or false, so nothing downstream has to guess");
+      if (typeof m.body_is_complete !== "boolean") {
+        errors.push("media.body_is_complete must be true or false, so nothing downstream has to guess");
       }
       for (const key of ["onscreen_text", "description"] as const) {
-        const value = v[key] ?? null;
-        if (value !== null && typeof value !== "string") errors.push(`visual.${key} must be a string or null`);
+        const value = m[key] ?? null;
+        if (value !== null && typeof value !== "string") errors.push(`media.${key} must be a string or null`);
       }
-      for (const key of ["slide_count", "thread_length"] as const) {
-        const value = v[key] ?? null;
+      for (const key of ["duration_seconds", "media_count"] as const) {
+        const value = m[key] ?? null;
         if (value === null) continue;
         if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-          errors.push(`visual.${key} must be a non-negative number or null`);
+          errors.push(`media.${key} must be a non-negative number or null`);
         }
       }
+      const hasCaptions = m.has_captions ?? null;
+      if (hasCaptions !== null && typeof hasCaptions !== "boolean") {
+        errors.push("media.has_captions must be true, false, or null");
+      }
+      const aspect = m.aspect ?? null;
+      if (aspect !== null && aspect !== "vertical" && aspect !== "square" && aspect !== "horizontal") {
+        errors.push('media.aspect must be "vertical", "square", "horizontal", or null');
+      }
       if (errors.length === 0) {
-        visual = {
-          form: form as VisualForm,
-          onscreen_text: (v.onscreen_text as string | null | undefined) ?? null,
-          description: (v.description as string | null | undefined) ?? null,
-          slide_count: (v.slide_count as number | null | undefined) ?? null,
-          thread_length: (v.thread_length as number | null | undefined) ?? null,
-          body_is_complete: v.body_is_complete as boolean,
+        media = {
+          form: form as MediaForm,
+          onscreen_text: (m.onscreen_text as string | null | undefined) ?? null,
+          description: (m.description as string | null | undefined) ?? null,
+          duration_seconds: (m.duration_seconds as number | null | undefined) ?? null,
+          media_count: (m.media_count as number | null | undefined) ?? null,
+          has_captions: hasCaptions as boolean | null,
+          aspect: aspect as MediaAspect | null,
+          body_is_complete: m.body_is_complete as boolean,
         };
       }
     }
@@ -157,7 +168,7 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
     transcript_source: transcriptSource as CorpusEntry["transcript_source"],
     metrics,
   };
-  if (visual) entry.visual = visual;
+  if (media) entry.media = media;
   if (typeof r.notes === "string") entry.notes = r.notes;
   return { entry, errors };
 }

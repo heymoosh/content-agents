@@ -4,7 +4,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { validateEntry } from "./collect.js";
-import type { PatternMiningConfig } from "./types.js";
+import { MEDIA_FORMS, type PatternMiningConfig } from "./types.js";
 
 const config: PatternMiningConfig = {
   niches: ["building-solopreneur", "inner-journey", "civic-democracy"],
@@ -67,56 +67,70 @@ describe("validateEntry transcript_source", () => {
   });
 });
 
-describe("validateEntry visual", () => {
-  function visual(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+describe("validateEntry media", () => {
+  function media(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return {
       form: "image",
       onscreen_text: "THE 5 AM RULE",
       description: "a slide of stacked text on a plain background",
-      slide_count: null,
-      thread_length: null,
+      duration_seconds: null,
+      media_count: null,
+      has_captions: null,
+      aspect: "square",
       body_is_complete: false,
       ...overrides,
     };
   }
 
-  test("an entry with no visual at all still validates, so entries collected before the field survive", () => {
+  test("an entry with no media at all still validates, so entries collected before the field survive", () => {
     const { entry, errors } = validateEntry(staged(), config);
     assert.deepEqual(errors, []);
-    assert.equal(entry?.visual, undefined);
+    assert.equal(entry?.media, undefined);
   });
 
-  test("a valid visual survives onto the entry rather than being validated and dropped", () => {
-    const { entry, errors } = validateEntry(staged({ visual: visual() }), config);
+  test("a valid media block survives onto the entry rather than being validated and dropped", () => {
+    const { entry, errors } = validateEntry(staged({ media: media() }), config);
     assert.deepEqual(errors, []);
-    assert.deepEqual(entry?.visual, {
+    assert.deepEqual(entry?.media, {
       form: "image",
       onscreen_text: "THE 5 AM RULE",
       description: "a slide of stacked text on a plain background",
-      slide_count: null,
-      thread_length: null,
+      duration_seconds: null,
+      media_count: null,
+      has_captions: null,
+      aspect: "square",
       body_is_complete: false,
     });
   });
 
-  test("all five forms are accepted", () => {
-    for (const form of ["image", "carousel", "video", "thread", "none"] as const) {
-      const { entry, errors } = validateEntry(staged({ visual: visual({ form }) }), config);
+  test("every declared form is accepted", () => {
+    for (const form of MEDIA_FORMS) {
+      const { entry, errors } = validateEntry(staged({ media: media({ form }) }), config);
       assert.deepEqual(errors, [], `${form} should be valid`);
-      assert.equal(entry?.visual?.form, form);
+      assert.equal(entry?.media?.form, form);
     }
   });
 
-  test("a sixth form is rejected, and the message lists the five", () => {
-    const { entry, errors } = validateEntry(staged({ visual: visual({ form: "gif" }) }), config);
+  test('"short-video" is its own form, kept apart from "video" on purpose', () => {
+    const { entry, errors } = validateEntry(
+      staged({ media: media({ form: "short-video", duration_seconds: 41 }) }),
+      config,
+    );
+    assert.deepEqual(errors, []);
+    assert.equal(entry?.media?.form, "short-video");
+    assert.equal(entry?.media?.duration_seconds, 41);
+  });
+
+  test("a form outside the list is rejected, and the message lists the real ones", () => {
+    const { entry, errors } = validateEntry(staged({ media: media({ form: "reel" }) }), config);
     assert.equal(entry, null);
-    assert.match(errors[0], /image, carousel, video, thread, none/);
+    assert.match(errors[0], /text-only, image, carousel, video, short-video/);
   });
 
   test("body_is_complete must be a boolean, never missing and never a stringly-typed guess", () => {
     for (const bad of [undefined, "false", 0, null]) {
       const { entry, errors } = validateEntry(
-        staged({ visual: visual({ body_is_complete: bad }) }),
+        staged({ media: media({ body_is_complete: bad }) }),
         config,
       );
       assert.equal(entry, null, `${JSON.stringify(bad)} should be rejected`);
@@ -126,36 +140,58 @@ describe("validateEntry visual", () => {
 
   test("onscreen_text and description may be null, which is how an unreadable image is recorded", () => {
     const { entry, errors } = validateEntry(
-      staged({ visual: visual({ onscreen_text: null, description: null }) }),
+      staged({ media: media({ onscreen_text: null, description: null }) }),
       config,
     );
     assert.deepEqual(errors, []);
-    assert.equal(entry?.visual?.onscreen_text, null);
-    assert.equal(entry?.visual?.description, null);
+    assert.equal(entry?.media?.onscreen_text, null);
+    assert.equal(entry?.media?.description, null);
   });
 
   test("onscreen_text may not be a number dressed up as text", () => {
-    const { entry, errors } = validateEntry(staged({ visual: visual({ onscreen_text: 12 }) }), config);
+    const { entry, errors } = validateEntry(staged({ media: media({ onscreen_text: 12 }) }), config);
     assert.equal(entry, null);
-    assert.match(errors[0], /visual.onscreen_text must be a string or null/);
+    assert.match(errors[0], /media.onscreen_text must be a string or null/);
   });
 
-  test("slide_count and thread_length take a non-negative number or null", () => {
+  test("duration_seconds and media_count take a non-negative number or null", () => {
     const ok = validateEntry(
-      staged({ visual: visual({ form: "carousel", slide_count: 9, thread_length: null }) }),
+      staged({ media: media({ form: "carousel", media_count: 9, duration_seconds: null }) }),
       config,
     );
     assert.deepEqual(ok.errors, []);
-    assert.equal(ok.entry?.visual?.slide_count, 9);
+    assert.equal(ok.entry?.media?.media_count, 9);
 
-    const bad = validateEntry(staged({ visual: visual({ thread_length: -1 }) }), config);
+    const bad = validateEntry(staged({ media: media({ duration_seconds: -1 }) }), config);
     assert.equal(bad.entry, null);
-    assert.match(bad.errors[0], /visual.thread_length must be a non-negative number or null/);
+    assert.match(bad.errors[0], /media.duration_seconds must be a non-negative number or null/);
   });
 
-  test("visual must be an object, not an array of them", () => {
-    const { entry, errors } = validateEntry(staged({ visual: [visual()] }), config);
+  test("has_captions is a tri-state: true, false, or null for not determined", () => {
+    for (const value of [true, false, null]) {
+      const { entry, errors } = validateEntry(staged({ media: media({ has_captions: value }) }), config);
+      assert.deepEqual(errors, [], `${value} should be valid`);
+      assert.equal(entry?.media?.has_captions, value);
+    }
+    const bad = validateEntry(staged({ media: media({ has_captions: "yes" }) }), config);
+    assert.equal(bad.entry, null);
+    assert.match(bad.errors[0], /has_captions must be true, false, or null/);
+  });
+
+  test("aspect takes the three shapes or null", () => {
+    for (const value of ["vertical", "square", "horizontal", null] as const) {
+      const { entry, errors } = validateEntry(staged({ media: media({ aspect: value }) }), config);
+      assert.deepEqual(errors, [], `${value} should be valid`);
+      assert.equal(entry?.media?.aspect, value);
+    }
+    const bad = validateEntry(staged({ media: media({ aspect: "portrait" }) }), config);
+    assert.equal(bad.entry, null);
+    assert.match(bad.errors[0], /aspect must be "vertical", "square", "horizontal", or null/);
+  });
+
+  test("media must be an object, not an array of them", () => {
+    const { entry, errors } = validateEntry(staged({ media: [media()] }), config);
     assert.equal(entry, null);
-    assert.match(errors[0], /visual must be an object when present/);
+    assert.match(errors[0], /media must be an object when present/);
   });
 });
