@@ -11,7 +11,16 @@ import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { CORPUS_PATH, INBOX_DIR, appendEntries, groupByAccount, makeId, readCorpus } from "./corpus.js";
 import { classifyOutlier } from "./outliers.js";
-import { PLATFORMS, type CorpusEntry, type OutlierThresholds, type PatternMiningConfig, type Platform } from "./types.js";
+import {
+  PLATFORMS,
+  VISUAL_FORMS,
+  type CorpusEntry,
+  type CorpusVisual,
+  type OutlierThresholds,
+  type PatternMiningConfig,
+  type Platform,
+  type VisualForm,
+} from "./types.js";
 
 const CONFIG_PATH = join(repoRoot, "config", "pattern-mining.yaml");
 
@@ -90,6 +99,46 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
       metrics[key] = v;
     }
   }
+  // `visual` is optional, so an entry collected before this field existed still validates. When it
+  // is there it is checked strictly, because body_is_complete is what a downstream step trusts
+  // before quoting `body` as a whole post.
+  let visual: CorpusVisual | null = null;
+  if (r.visual !== undefined && r.visual !== null) {
+    const rv = r.visual;
+    if (typeof rv !== "object" || Array.isArray(rv)) {
+      errors.push("visual must be an object when present");
+    } else {
+      const v = rv as Record<string, unknown>;
+      const form = v.form;
+      if (typeof form !== "string" || !VISUAL_FORMS.includes(form as VisualForm)) {
+        errors.push(`visual.form must be one of: ${VISUAL_FORMS.join(", ")}`);
+      }
+      if (typeof v.body_is_complete !== "boolean") {
+        errors.push("visual.body_is_complete must be true or false, so nothing downstream has to guess");
+      }
+      for (const key of ["onscreen_text", "description"] as const) {
+        const value = v[key] ?? null;
+        if (value !== null && typeof value !== "string") errors.push(`visual.${key} must be a string or null`);
+      }
+      for (const key of ["slide_count", "thread_length"] as const) {
+        const value = v[key] ?? null;
+        if (value === null) continue;
+        if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+          errors.push(`visual.${key} must be a non-negative number or null`);
+        }
+      }
+      if (errors.length === 0) {
+        visual = {
+          form: form as VisualForm,
+          onscreen_text: (v.onscreen_text as string | null | undefined) ?? null,
+          description: (v.description as string | null | undefined) ?? null,
+          slide_count: (v.slide_count as number | null | undefined) ?? null,
+          thread_length: (v.thread_length as number | null | undefined) ?? null,
+          body_is_complete: v.body_is_complete as boolean,
+        };
+      }
+    }
+  }
   if (r.notes !== undefined && typeof r.notes !== "string") errors.push("notes must be a string when present");
 
   if (errors.length > 0) return { entry: null, errors };
@@ -108,6 +157,7 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
     transcript_source: transcriptSource as CorpusEntry["transcript_source"],
     metrics,
   };
+  if (visual) entry.visual = visual;
   if (typeof r.notes === "string") entry.notes = r.notes;
   return { entry, errors };
 }

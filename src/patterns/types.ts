@@ -44,6 +44,42 @@ export interface CorpusMetrics {
   followers: number | null;
 }
 
+// The five shapes a post can take on the page. "none" is a recorded observation, not a default:
+// it means someone looked and found no image, carousel, video or thread, which is a different
+// fact from `visual` being absent because nobody ever checked.
+export const VISUAL_FORMS = ["image", "carousel", "video", "thread", "none"] as const;
+
+export type VisualForm = (typeof VISUAL_FORMS)[number];
+
+// What the post actually looked like on the page, and whether `body` alone is the whole post.
+//
+// Absent on an entry nobody has examined for a visual yet. Present means someone looked.
+export interface CorpusVisual {
+  form: VisualForm;
+  // The text rendered ON the image, frame or slide, word for word. This is Sabrina Ramonov's
+  // "on-screen title", and remix mode copies it into Muxin's own post VERBATIM. So a guess here
+  // does not degrade gracefully: it puts words she never verified into her feed under a claim
+  // they were market-tested. Null means "not retrievable", never "probably something like this".
+  onscreen_text: string | null;
+  // What the visual depicts, in plain words. An observation of what was actually seen, e.g. "a
+  // slide of stacked text on a plain background". Never a guess at text that could not be read.
+  description: string | null;
+  // Slides in a carousel. Null when the post is not a carousel, or when the count was not
+  // retrievable.
+  slide_count: number | null;
+  // Tweets/posts in a thread. Null when the post is not a thread, or when the length was not
+  // retrievable.
+  thread_length: number | null;
+  // READ THIS ONE TWICE. False means the post's substance is NOT in `body` - it sits in an
+  // attached image, in slides 2..n of a carousel, or in reply tweets, none of which were
+  // collected. A 22-character caption over an image that earned 3,536 likes has
+  // body_is_complete: false, because the caption is not what won.
+  //
+  // This is the flag that stops a downstream step copying that caption and calling it a proven
+  // opener. Any step that quotes `body` as if it were the whole post must check this first.
+  body_is_complete: boolean;
+}
+
 // One collected post. Stored one JSON object per line in data/patterns/corpus.jsonl.
 export interface CorpusEntry {
   // Stable slug: <platform>-<handle>-<short hash of url>.
@@ -61,6 +97,8 @@ export interface CorpusEntry {
   body: string;
   transcript_source: TranscriptSource;
   metrics: CorpusMetrics;
+  // Absent on a plain text post, and absent on any entry not yet examined for a visual.
+  visual?: CorpusVisual;
   notes?: string;
 }
 

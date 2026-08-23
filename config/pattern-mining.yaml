@@ -599,6 +599,18 @@ accounts:
 # engagement counts are much smaller absolute numbers than view counts, so a multiple computed on
 # them is noisier, and a post at 8 likes against a median of 2 clears a 3x bar on almost nothing.
 # If real data shows engagement-scored accounts producing junk outliers, split the bar then.
+# Creators who have PUBLICLY granted permission to remix their content verbatim.
+# Only these handles may have their opener copied word for word by /patterns remix
+# (references/remix-mode.md). Everyone else defaults to false: their opener is studied as a shape,
+# never reused as text. Add a handle here only with a real, citable grant, and cite it inline.
+# A wrong entry here puts someone else's words in Muxin's feed under a permission she does not have.
+verbatim_ok:
+  - handle: "@sabrinaramonov"
+    creator: Sabrina Ramonov
+    # "BTW you have full permission to remix all my content :)" - her Substack post
+    # "How I'd Start a 1-Person Business + Personal Brand with AI in 30 Days", 2026-07-14.
+    grant: public blanket grant in the post that introduced this remix method
+
 outlier_thresholds:
   x:
     view_follower_ratio: 5.0    # starting guess, tune once real data lands
