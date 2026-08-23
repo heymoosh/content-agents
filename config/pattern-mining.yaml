@@ -577,6 +577,116 @@ accounts:
     niche: civic-democracy
     followers: null
 
+  # ---------------------------------------------------------------------------------------------
+  # MASTODON ACCOUNTS, added 2026-08-22. The file had none, and mastodon had never been collected
+  # from at all.
+  #
+  # Handle convention on mastodon: "@user@instance", because mastodon handles are NOT global. The
+  # same "@baldur" exists on other servers and is a different person. The instance half is part of
+  # the identity, not decoration.
+  #
+  # Verification convention here is STRONGER than the rest of this file where the marker is
+  # present. Mastodon's own rel=me check stamps `verified_at` on a profile link the platform
+  # itself confirmed, so "profile carries a platform-verified link to <site>" means the server
+  # checked that the site links back. Two rows below have no such link and say so plainly rather
+  # than borrowing the phrase.
+  #
+  # `followers` here is a real API number read from the account's HOME instance on 2026-08-22, not
+  # a rounded profile-page reading. Read counts from the home instance: a remote server only
+  # reports what federated to it, so the same account reads lower elsewhere.
+  #
+  # Mastodon has NO view count anywhere, by design. Every mastodon entry will score on the
+  # baseline_multiple bar only, never on view_follower_ratio.
+
+  # building-solopreneur, mastodon
+  - handle: "@dansup@mastodon.social"
+    creator: Daniel Supernault
+    # Verified via the public API on 2026-08-22: the profile carries platform-verified (rel=me)
+    # links to pixelfed.org, joinloops.org, fediverse.info and fedidb.com. He is the solo
+    # developer of Pixelfed and Loops, funded by donations, and posts ship-by-ship build-in-public
+    # updates. The clearest build-in-public account on this platform.
+    platform: mastodon
+    niche: building-solopreneur
+    followers: 40411   # API followers_count from mastodon.social, read 2026-08-22
+
+  - handle: "@baldur@toot.cafe"
+    creator: Baldur Bjarnason
+    # Verified via the public API on 2026-08-22: the profile carries platform-verified (rel=me)
+    # links to baldurbjarnason.com and to his two self-published books at
+    # softwarecrisis.baldurbjarnason.com and illusion.baldurbjarnason.com. Independent consultant
+    # and self-publishing author, which is the niche exactly.
+    platform: mastodon
+    niche: building-solopreneur
+    followers: 9945   # API followers_count from toot.cafe, read 2026-08-22
+
+  - handle: "@bagder@mastodon.social"
+    creator: Daniel Stenberg
+    # Verified via the public API on 2026-08-22: the profile carries platform-verified (rel=me)
+    # links to daniel.haxx.se and github.com/bagder. Niche fit is a judgement call and is recorded
+    # as one: he is employed, not self-employed, so he is not literally a solopreneur. He is here
+    # because his posts are about the economics of running the project he owns, unpaid support
+    # burden, what to drop, what a maintainer owes users. That is the building half of the niche.
+    # Prune him if the corpus starts reading as open-source politics rather than building.
+    platform: mastodon
+    niche: building-solopreneur
+    followers: 53407   # API followers_count from mastodon.social, read 2026-08-22
+
+  # civic-democracy, mastodon. This is mastodon's strongest niche by a wide margin: the platform
+  # absorbed a large share of the tech-policy, digital-rights and rule-of-law commentariat.
+  - handle: "@dangillmor@mastodon.social"
+    creator: Dan Gillmor
+    # Verified via the public API on 2026-08-22: the profile carries platform-verified (rel=me)
+    # links to dangillmor.com and dangillmor.com/contact. Media critic and democracy writer.
+    platform: mastodon
+    niche: civic-democracy
+    followers: 60741   # API followers_count from mastodon.social, read 2026-08-22
+
+  - handle: "@heidilifeldman@mastodon.social"
+    creator: Heidi Li Feldman
+    # Verified via the public API on 2026-08-22: the profile carries platform-verified (rel=me)
+    # links to heidilifeldman.com, leadersfromlaw.com and heidi-says.ghost.io. Law professor
+    # posting on rule of law and on a live state elections campaign, which is the closest thing
+    # in this whole file to local-and-specific civic material rather than national abstraction.
+    platform: mastodon
+    niche: civic-democracy
+    followers: 18253   # API followers_count from mastodon.social, read 2026-08-22
+
+  # The two rows below are verified WEAKER than the five above. Both are almost certainly the real
+  # person, but neither carries a rel=me link and no external site was found linking to either
+  # account, so the evidence is the profile plus the posts, not a two-way check. Recorded as it is
+  # rather than dressed up.
+  - handle: "@mmasnick@mastodon.social"
+    creator: Mike Masnick
+    # No rel=me verified link. Profile fields point at techdirt.com and copia.is (unverified), the
+    # bio names his "Protocols, not Platforms" paper, and the account posts in the first person as
+    # Techdirt with techdirt.com links. Checked techdirt.com, its contact page, his author page
+    # and copia.is on 2026-08-22 for a link back and found none, so this stays a one-way check.
+    platform: mastodon
+    niche: civic-democracy
+    followers: 67817   # API followers_count from mastodon.social, read 2026-08-22
+
+  - handle: "@Mer__edith@mastodon.world"
+    creator: Meredith Whittaker
+    # No rel=me verified link and no profile fields at all. The bio @-mentions
+    # mastodon.world/@signalapp, which IS rel=me verified to signal.org, but that verifies Signal's
+    # account and not hers. The posts speak in the first person for Signal leadership. Checked
+    # signal.org and her Wikipedia article on 2026-08-22 for a link back and found none.
+    #
+    # Sampling caveat for whoever collects here next: she and Mike Masnick have both gone quiet on
+    # original top-level posts, so a "last 40" window on either one reaches back a year or more,
+    # unlike the fresh weeks-long windows on the other five.
+    platform: mastodon
+    niche: civic-democracy
+    followers: 33619   # API followers_count from mastodon.world, read 2026-08-22
+
+  # No inner-journey mastodon row, deliberately. Searched 2026-08-22 across the #mindfulness,
+  # #meditation, #mentalhealth, #selfcompassion, #journaling, #burnout, #therapy, #personalgrowth,
+  # #selfimprovement, #adhd and #anxiety tag timelines on mastodon.social, mstdn.social and mas.to.
+  # Everything that surfaced was under ~6k followers with single-digit engagement, and was mostly
+  # orgs, aggregators, or people posting about the topic rather than creators working the niche.
+  # Mastodon has no creator-scale inner-journey account worth seeding. That is a real finding about
+  # the platform, not a gap to fill later with a marginal account.
+
 # Either bar clearing marks a post as an outlier worth studying.
 #
 # view_follower_ratio: views divided by the account's follower count. Views only. A post with no
