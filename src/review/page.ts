@@ -921,6 +921,273 @@ export function captureVerdict(room: CaptureRoom): CaptureVerdictView {
 // intends and its room order already implies. The nav's resting `on` class, `currentTab` and the
 // boot `setRoom()` all read from here so the three cannot drift apart.
 export type DeskRoom = "content" | "studio" | "outreach" | "fiction" | "charles" | "venture" | "signals";
+// ── Signals: the four outcome families ──────────────────────────────────────────────────────────
+//
+// src/review/signals.ts's readOutcomeFamilies() groups what data/analytics.db really holds into
+// the four families of docs/venture-schema-contract.md §5.8. Everything below is a FORMATTER over
+// that read: nothing here computes a number, and nothing here invents a threshold.
+//
+// Three states, never two (docs/prototype-port-rules.md Rule 3). A MetricRead is either measured
+// (a real number, zero included) or not_measured (no source exists to measure it at all). A
+// not_measured renders its own reason and never a number, never a zero and never a dash that
+// reads like one. A measured value renders WITH the number of posts it was measured on, so a
+// measured zero and a sum over no posts stay different sentences.
+//
+// The prototype's family numbers (4,180 / 37 / 12 / 1) and its per-family thresholds
+// (500 / 20 / 30 / 25) appear in no document in this repo. They are not rendered.
+
+export type MetricReadView =
+  | { state: "measured"; value: number; posts_measured: number; posts_unmeasured: number }
+  | { state: "not_measured"; reason: string };
+
+export type ReadTone = "ink" | "grey" | "green" | "amber";
+
+/** Thousands separators, written out rather than left to a locale so both copies agree exactly. */
+export function groupDigits(n: number): string {
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return String(n);
+  const digits = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return n < 0 ? "-" + digits : digits;
+}
+
+/**
+ * One sub-metric, formatted. Four visibly different outcomes, which is the point:
+ *   not measured        no source exists; the reason is the whole cell
+ *   sum of nothing      state "measured" but no post carried the column, so the 0 is not a finding
+ *   measured as zero    posts carried the column and it added to 0, which IS a finding
+ *   measured            a real number, and how many posts it came off
+ */
+export function metricLine(m: MetricReadView): { value: string; note: string; tone: ReadTone } {
+  if (m.state === "not_measured") return { value: "not measured", note: m.reason, tone: "grey" };
+  if (m.posts_measured === 0) {
+    return {
+      value: "0",
+      note: "no record carried this number, so this is a sum over nothing rather than a measured zero",
+      tone: "grey",
+    };
+  }
+  // "record", not "post": the audience rolls come off capture rows and the research count off
+  // observation sources, so calling every one of them a post would be a claim about the shape of
+  // the data that is not true of half of them.
+  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured + " records";
+  const missing = m.posts_unmeasured
+    ? ", " + m.posts_unmeasured + (m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
+    : "";
+  return { value: groupDigits(m.value), note: "measured on " + on + missing, tone: "ink" };
+}
+
+export interface PlatformConfidenceView {
+  platform: string;
+  posts: number;
+  weeks: number;
+  status: string;
+  sufficient: boolean;
+}
+export interface SampleRuleView { kind: string; threshold_weeks: number; source: string }
+
+/**
+ * How much data is behind the whole screen, said in one sentence. The threshold is whatever the
+ * read hands over (the repo's own four-week INSUFFICIENT rule), never a number typed here. An
+ * empty confidence list means no posts on record at all, which is the honest "nothing live yet".
+ */
+export function sampleNote(confidence: PlatformConfidenceView[], rule: SampleRuleView): string {
+  const bar = rule.threshold_weeks + (rule.threshold_weeks === 1 ? " week" : " weeks");
+  if (!confidence.length) return "No posts on record in this database, so nothing below has been measured yet.";
+  const ok = confidence.filter((c) => c.sufficient).length;
+  const total = confidence.length;
+  const platforms = total === 1 ? "platform" : "platforms";
+  if (ok === 0) return "None of the " + total + " " + platforms + " on record clears " + bar + " of data. Everything below is directional only.";
+  if (ok === total) return "All " + total + " " + platforms + " on record clear " + bar + " of data.";
+  return ok + " of " + total + " " + platforms + " on record clear " + bar + " of data. The rest are directional only.";
+}
+
+export type OutcomeFamilyName = "attention" | "conversation" | "audience" | "business";
+
+/**
+ * The suppression rule, on screen. Not a measurement: it restates a policy the code structurally
+ * enforces (signals.ts's SuppressionInputs can only ever hold attention + conversation, so a
+ * suppression caller cannot see the other two).
+ */
+export function familyGate(family: OutcomeFamilyName): { text: string; tone: ReadTone } {
+  return family === "attention" || family === "conversation"
+    ? { text: "MAY INFORM A ROUTING OR SUPPRESSION CALL", tone: "green" }
+    : { text: "NEVER USED TO SUPPRESS A PILLAR OR PLATFORM", tone: "amber" };
+}
+
+// ── Content: the per-channel treatment ──────────────────────────────────────────────────────────
+//
+// src/review/treatment.ts answers, per channel: does it fit, has this piece been placed there
+// recently, and when is the next free slot. These formatters render that and nothing more.
+//
+// FitBasis is the honesty hinge. A COLD START standing on no data must never look like a STRONG
+// FIT standing on a measured score, and a channel that was never fit-scored at all (an editorial
+// rule, a format asset) gets no label rather than a made-up one. So the label never renders alone:
+// it always carries the basis it is standing on (Rule 3, "a claim never renders bare").
+
+export type FitBasisView = "measured" | "insufficient-data" | "editorial-rule" | "format-asset" | "unknown";
+
+export interface ChannelTreatmentView {
+  channel: string;
+  decision: "include" | "skip" | null;
+  recordedDecision: "include" | "skip" | null;
+  score: number | null;
+  fitLabel: string | null;
+  fitBasis: FitBasisView;
+  belowFloor: boolean;
+  reuse: {
+    key: string;
+    allowed: boolean;
+    everPlaced: boolean;
+    lastPlacedAt: string | null;
+    daysSince: number | null;
+    minDays: number;
+    reason: string | null;
+  } | null;
+  reuseNote: string | null;
+  slot: { time: string; label: string };
+}
+
+/**
+ * The fit label plus what it is standing on. `label` is never empty: where treatment.ts returns a
+ * null label it means the channel was never fit-scored, and that gets said in words rather than
+ * mapped into one of the four verdicts.
+ */
+export function fitLine(ch: ChannelTreatmentView, floor: number): { label: string; basis: string; tone: ReadTone } {
+  const score = ch.score == null ? "" : String(Math.round(ch.score * 100) / 100);
+  if (ch.fitBasis === "measured") {
+    const tone: ReadTone = ch.fitLabel === "STRONG FIT" ? "green" : ch.fitLabel === "POOR FIT" ? "amber" : "ink";
+    return {
+      label: ch.fitLabel ?? "NO FIT CALL",
+      basis: "measured, scoring " + score + " where this platform's own norm is 1.0 and the floor is " + floor,
+      tone,
+    };
+  }
+  if (ch.fitBasis === "insufficient-data") {
+    return {
+      label: ch.fitLabel ?? "COLD START",
+      basis: "not enough posts or weeks on this channel to score it, so there is no verdict here yet",
+      tone: "grey",
+    };
+  }
+  if (ch.fitBasis === "editorial-rule") {
+    return { label: "EDITORIAL RULE", basis: "your own rule in config/routing.yaml put it here, the data never spoke", tone: "grey" };
+  }
+  if (ch.fitBasis === "format-asset") {
+    return { label: "ALWAYS GENERATED", basis: "a format asset, so it was never fit scored", tone: "grey" };
+  }
+  return { label: "NOT SCORED", basis: "nothing on disk says what this piece is about, so fit was never computed", tone: "grey" };
+}
+
+/**
+ * The "scored under the floor and still on" note. treatment.ts honesty rule 2: since route.ts a
+ * score never flips include/skip, so this is information about a channel, never an exclusion.
+ */
+export function floorNote(ch: ChannelTreatmentView, floor: number): string {
+  if (!ch.belowFloor) return "";
+  return "Scores under the floor of " + floor + " and stays on. A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.";
+}
+
+/**
+ * This channel's OWN reuse window. There is no global window (config/platforms.yaml sets
+ * min_reuse_days per platform), so every sentence below names the number that came back with this
+ * channel and no other.
+ */
+export function reuseLine(ch: ChannelTreatmentView): { text: string; tone: ReadTone } {
+  if (!ch.reuse) return { text: ch.reuseNote ?? "no reuse check runs for this channel", tone: "grey" };
+  const window = "this channel's own window of " + fmtDays(ch.reuse.minDays);
+  if (!ch.reuse.everPlaced) return { text: "Never placed here, so " + window + " is holding nothing.", tone: "ink" };
+  const ago = ch.reuse.daysSince == null ? "at an unrecorded time" : fmtDays(ch.reuse.daysSince) + " ago";
+  if (ch.reuse.allowed) return { text: "Last placed " + ago + ", which is past " + window + ".", tone: "ink" };
+  return { text: "Held: placed " + ago + ", inside " + window + ".", tone: "amber" };
+}
+
+export interface TreatmentView {
+  slug: string;
+  pillars: string[];
+  pillarSource: "routing.md" | "none";
+  floor: number;
+  channels: ChannelTreatmentView[];
+  scoredBelowFloorButEnabled: string[];
+}
+
+/**
+ * The four-cell "what this recommendation was built out of" grid. Every cell is derived from the
+ * treatment read or from the piece's own cuts. Three of the prototype's four cells claimed things
+ * this repo cannot support and are replaced by the real read:
+ *   REUSE WINDOW    the prototype says "The window is 14 days". There is no global window, so this
+ *                   cell names each holding channel's own number instead.
+ *   NOTHING SKIPPED the prototype names channels and post counts it had no source for. This reads
+ *                   scoredBelowFloorButEnabled and the configured floor.
+ *   YOUR WORDS      only claims extraction where the piece's cuts actually carry source_lines.
+ */
+export function readsFromCells(
+  t: TreatmentView,
+  cuts: { lens: string; sourceLines?: (number | string)[] }[]
+): { k: string; v: string; tone: ReadTone }[] {
+  const held = t.channels.filter((c) => c.reuse && c.reuse.everPlaced && !c.reuse.allowed);
+  const pillar =
+    t.pillarSource === "routing.md"
+      ? {
+          k: "PILLAR",
+          v: t.pillars.join(" + ") + ", read from this piece's routing.md. It is what drove every fit call below.",
+          tone: "ink" as ReadTone,
+        }
+      : {
+          k: "PILLAR",
+          v: "None. This piece has no routing.md, so nothing below was fit scored and every call is yours.",
+          tone: "grey" as ReadTone,
+        };
+  const reuse = held.length
+    ? {
+        k: "REUSE WINDOWS",
+        v:
+          held
+            .map((c) => c.channel + " carried this " + fmtDays(c.reuse!.daysSince ?? 0) + " ago, against its own window of " + fmtDays(c.reuse!.minDays))
+            .join(". ") + ". Every channel carries its own window, so there is no single number here.",
+        tone: "amber" as ReadTone,
+      }
+    : {
+        k: "REUSE WINDOWS",
+        v: "Nothing is holding this piece. Each channel was checked against its own window, not one shared number.",
+        tone: "ink" as ReadTone,
+      };
+  const below = t.scoredBelowFloorButEnabled;
+  const skipped = below.length
+    ? {
+        k: "NOTHING SKIPPED",
+        v:
+          below.join(", ") +
+          (below.length === 1 ? " scores under the floor of " : " score under the floor of ") + t.floor +
+          (below.length === 1 ? " and stays on. " : " and stay on. ") +
+          "A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.",
+        tone: "ink" as ReadTone,
+      }
+    : {
+        k: "NOTHING SKIPPED",
+        v:
+          t.pillarSource === "routing.md"
+            ? "No channel scored under the floor of " + t.floor + ". A score could not have skipped one anyway, the defaults list decides that."
+            : "No score to skip anything on, so every channel below is on and the call is yours.",
+        tone: "ink" as ReadTone,
+      };
+  const traced = cuts.filter((c) => c.sourceLines && c.sourceLines.length);
+  const words = traced.length
+    ? {
+        k: "YOUR WORDS",
+        v:
+          (traced.length === 1
+            ? "The cut below carries the source lines it was built from"
+            : "All " + traced.length + " cuts below carry the source lines they were built from") +
+          ", so every draft is your text, trimmed. Nothing composed.",
+        tone: "ink" as ReadTone,
+      }
+    : {
+        k: "YOUR WORDS",
+        v: "No cut here records the lines it came from, so this screen makes no claim about how the drafts were built.",
+        tone: "grey" as ReadTone,
+      };
+  return [pillar, reuse, skipped, words];
+}
+
 export const BOOT_ROOM: DeskRoom = "studio";
 
 export const CAPTURE_RAIL_IDLE = "One place to say it";
@@ -1505,6 +1772,72 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .dev-format { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:10px 0 4px;
     padding:10px 14px; border:1px dashed var(--line); border-radius:9px; }
   .dev-working { font-size:13px; color:#5b46b8; font-weight:600; margin:6px 0; }
+  /* Shared read tones. Grey is never "zero" — it is "this was not measured", and the copy next to
+     it always says which. Kept as four names so a formatter can return a tone without knowing hex. */
+  .t-ink { color:var(--ink); } .t-grey { color:#a89a80; } .t-green { color:#2f7d46; } .t-amber { color:#9a6b12; }
+  /* Signals: the four outcome families (never collapsed into one score) */
+  .fam { border-top:1px solid #efe7d6; padding:14px 0 4px; }
+  .fam-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .fam-name { font:600 15px/1.3 Georgia,serif; color:var(--ink); }
+  .fam-ask { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.05em; color:#a89a80; }
+  .fam-metrics { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px 22px; margin-top:11px; }
+  .metric { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .metric .k { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em; color:#a89a80; }
+  .metric .v { font:400 21px/1.15 Georgia,"Times New Roman",serif; }
+  .metric .v.small { font:600 13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.03em; }
+  .metric .n { font-size:12px; line-height:1.5; color:#5a5346; }
+  .fam-gate { font:10.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em; margin-top:9px; }
+  .fam-note { font-size:12.5px; line-height:1.55; color:#5a5346; margin-top:7px; max-width:560px; }
+  .sig-sample { font-size:12.5px; line-height:1.55; color:#5a5346; margin-top:8px; }
+  .sig-plat { display:grid; grid-template-columns:120px 96px minmax(0,1fr); gap:14px; align-items:baseline;
+    padding:9px 0; border-top:1px solid #f2ece0; font-size:13px; }
+  /* Content: the three-step wizard */
+  .cw-steps { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid #dfd4bb; }
+  .cw-step { border:none; background:none; padding:0; display:flex; align-items:baseline; gap:7px; cursor:pointer; }
+  .cw-step[disabled] { cursor:default; }
+  .cw-step .num { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#c0b498; }
+  .cw-step .nm { font-size:13.5px; color:#b0a488; border-bottom:1.5px solid transparent; padding-bottom:3px; }
+  .cw-step.done .nm { color:#5a5346; } .cw-step.done .num { color:#c0b498; }
+  .cw-step.on .nm { color:var(--ink); font-weight:600; border-bottom-color:var(--ink); }
+  .cw-step.on .num { color:var(--ink); }
+  .cw-sep { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#cdc0a4; padding:0 8px; }
+  .cw-rail { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em; white-space:nowrap; }
+  .cw-src { display:grid; grid-template-columns:96px minmax(0,1fr) auto; gap:16px; align-items:baseline;
+    padding:13px 12px; margin:0 -12px; border-top:1px solid #f2ece0; cursor:pointer; }
+  .cw-src:hover { background:#faf6ec; }
+  .cw-src.on { background:#f4efe3; }
+  .cw-tag { justify-self:start; font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em;
+    border-radius:3px; padding:4px 7px; }
+  .cw-tag.substack { color:#5a5346; background:#f2ece0; }
+  .cw-tag.yours { color:#2f5d9a; background:#eaeff7; }
+  .cw-tag.readin { color:#8a7f6d; background:#f2ece0; }
+  .cw-tag.untagged { color:#a89a80; background:#f6f2e8; }
+  .cw-src .ttl { font:400 17px/1.4 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .cw-src .meta { font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; display:block; }
+  .cw-picked { border:1px solid var(--line); border-radius:9px; background:var(--card); padding:15px 17px;
+    display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; align-items:start; }
+  .cw-reads { margin-top:18px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 26px; }
+  .cw-cell { display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .cw-cell .k { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em; color:#a89a80; }
+  .cw-cell .v { font-size:12.5px; line-height:1.5; }
+  .cw-chans { margin-top:13px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; }
+  .cw-chan { border:1px solid #eee8db; background:#faf7f0; border-radius:9px; padding:13px 15px;
+    display:flex; flex-direction:column; gap:6px; }
+  .cw-chan .top { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .cw-chan .nm { font-size:14.5px; font-weight:600; }
+  .cw-chan .fit { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em; white-space:nowrap; }
+  .cw-chan .basis, .cw-chan .reuse, .cw-chan .slot { font-size:12px; line-height:1.5; }
+  .cw-chan .slot { font:9.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.04em; color:#a89a80; }
+  .cw-tabs { margin-top:18px; display:flex; flex-wrap:wrap; gap:7px; }
+  .cw-tab { border:1px solid #e2dac8; background:var(--card); color:#3a352c; border-radius:7px; padding:7px 12px;
+    display:flex; align-items:baseline; gap:9px; cursor:pointer; }
+  .cw-tab.on { border-color:var(--ink); background:var(--ink); color:#faf8f3; font-weight:600; }
+  .cw-tab .badge { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.04em; white-space:nowrap; }
+  .cw-tabhead { margin-top:16px; padding-bottom:13px; border-bottom:1px solid #efe7d6;
+    display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+  .cw-yesall { margin-top:20px; padding-top:17px; border-top:1px solid #efe7d6;
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
 </style>
 </head>
 <body>
@@ -1529,6 +1862,10 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 <main>
   <section class="view" id="roomContent">
     <div class="sheet" id="stripContent" hidden style="padding:24px 56px 10px"></div>
+    <div class="sheet" id="contentWizard">
+      <div class="cw-steps" id="cwSteps"></div>
+      <div id="cwBody"><div class="empty">Loading…</div></div>
+    </div>
     <div id="workbench"></div>
     <div class="sheet" id="reviewSheet">
       <div class="sheet-head">
@@ -1649,6 +1986,13 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
+    <div style="margin-top:26px">
+      <div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80">This read</div>
+      <div style="font:400 27px/1.35 Georgia,'Times New Roman',serif;color:#1c1a17;margin:8px 0 0;max-width:520px">Four things, kept apart</div>
+      <div class="sheet-sub" style="max-width:560px">One number across all four would hide the thing you most need to see. Nothing on this page adds them up, and two of them are never allowed to argue for dropping a pillar or a platform.</div>
+      <div id="signalsFamilies"><div class="empty">Loading…</div></div>
+    </div>
+    <div id="signalsResearch"></div>
     <div id="signalsTop"><div class="empty">Loading…</div></div>
     <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
@@ -1985,6 +2329,9 @@ function render(){
   $("#count").textContent = String(pending);
   $("#count").hidden = pending === 0;
   if (!shown) main.innerHTML = '<div class="empty">Nothing '+(showDecided?"here yet":"awaiting review")+'. 🎉</div>';
+  // Step 3 of the wizard renders the SAME rows out of the same DATA, so a status change anywhere
+  // has to repaint it too. renderContentWizard never calls back into render().
+  if (typeof renderContentWizard === "function") renderContentWizard();
 }
 
 // ── rooms ──
@@ -2843,6 +3190,7 @@ async function loadContent(){
   const r = await fetch("/api/content"); const d = await r.json();
   WB_SESSIONS = d.sessions || [];
   renderWorkbench();
+  renderContentWizard();
 }
 async function devStart(){
   const ta = $("#src"); const source = ta.value.trim();
@@ -2913,6 +3261,380 @@ $("#workbench").addEventListener("click", async (e)=>{
     renderWorkbench();
   } else if (t.classList.contains("wb-goto-review")){
     $("#reviewSheet").scrollIntoView({behavior:"smooth", block:"start"});
+  }
+});
+
+// ── Content: the three-step wizard (pick a source, decide the treatment, approve the drafts) ──
+//
+// Step 1 reads GET /api/content (the same sessions the workbench below renders), step 2 reads
+// GET /api/content/treatment?slug=…, step 3 reads the piece's own rows out of GET /api/queue and
+// approves them through the SAME POST /api/status every review card uses. No new write path.
+//
+// Refused from the design prototype, because no read in this repo supports them:
+//   * the tick-a-channel-then-generate control. config/routing.yaml's defaults list is the only
+//     thing that includes or skips a channel (src/strategy/route.ts, a locked policy), so a
+//     checkbox here would claim a power the pipeline does not give it. The grid is a read.
+//   * the per-draft treatment block (a CTA toggle and persona spins sized by an audience cluster).
+//     Nothing in src/ clusters Muxin's own audience, so none of it has a source.
+//   * the VENTURE source tag. Nothing hands a Venture artifact to content/. See develop.ts.
+let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, loading:false, yesErrors:[] };
+
+// ── begin the treatment mirror ──
+// Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
+function fitLine(ch, floor){
+  const score = ch.score == null ? "" : String(Math.round(ch.score*100)/100);
+  if(ch.fitBasis === "measured"){
+    const tone = ch.fitLabel === "STRONG FIT" ? "green" : ch.fitLabel === "POOR FIT" ? "amber" : "ink";
+    return { label: ch.fitLabel || "NO FIT CALL",
+      basis: "measured, scoring "+score+" where this platform's own norm is 1.0 and the floor is "+floor,
+      tone: tone };
+  }
+  if(ch.fitBasis === "insufficient-data"){
+    return { label: ch.fitLabel || "COLD START",
+      basis: "not enough posts or weeks on this channel to score it, so there is no verdict here yet",
+      tone: "grey" };
+  }
+  if(ch.fitBasis === "editorial-rule"){
+    return { label:"EDITORIAL RULE", basis:"your own rule in config/routing.yaml put it here, the data never spoke", tone:"grey" };
+  }
+  if(ch.fitBasis === "format-asset"){
+    return { label:"ALWAYS GENERATED", basis:"a format asset, so it was never fit scored", tone:"grey" };
+  }
+  return { label:"NOT SCORED", basis:"nothing on disk says what this piece is about, so fit was never computed", tone:"grey" };
+}
+function floorNote(ch, floor){
+  if(!ch.belowFloor) return "";
+  return "Scores under the floor of "+floor+" and stays on. A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.";
+}
+function reuseLine(ch){
+  if(!ch.reuse) return { text: ch.reuseNote || "no reuse check runs for this channel", tone:"grey" };
+  const window = "this channel's own window of "+fmtDays(ch.reuse.minDays);
+  if(!ch.reuse.everPlaced) return { text:"Never placed here, so "+window+" is holding nothing.", tone:"ink" };
+  const ago = ch.reuse.daysSince == null ? "at an unrecorded time" : fmtDays(ch.reuse.daysSince)+" ago";
+  if(ch.reuse.allowed) return { text:"Last placed "+ago+", which is past "+window+".", tone:"ink" };
+  return { text:"Held: placed "+ago+", inside "+window+".", tone:"amber" };
+}
+function readsFromCells(t, cuts){
+  const held = t.channels.filter(c=>c.reuse && c.reuse.everPlaced && !c.reuse.allowed);
+  const pillar = t.pillarSource === "routing.md"
+    ? { k:"PILLAR", v:t.pillars.join(" + ")+", read from this piece's routing.md. It is what drove every fit call below.", tone:"ink" }
+    : { k:"PILLAR", v:"None. This piece has no routing.md, so nothing below was fit scored and every call is yours.", tone:"grey" };
+  const reuse = held.length
+    ? { k:"REUSE WINDOWS",
+        v: held.map(c=>c.channel+" carried this "+fmtDays(c.reuse.daysSince == null ? 0 : c.reuse.daysSince)+" ago, against its own window of "+fmtDays(c.reuse.minDays)).join(". ")+
+           ". Every channel carries its own window, so there is no single number here.",
+        tone:"amber" }
+    : { k:"REUSE WINDOWS",
+        v:"Nothing is holding this piece. Each channel was checked against its own window, not one shared number.",
+        tone:"ink" };
+  const below = t.scoredBelowFloorButEnabled;
+  const skipped = below.length
+    ? { k:"NOTHING SKIPPED",
+        v: below.join(", ")+(below.length === 1 ? " scores under the floor of " : " score under the floor of ")+t.floor+
+           (below.length === 1 ? " and stays on. " : " and stay on. ")+
+           "A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.",
+        tone:"ink" }
+    : { k:"NOTHING SKIPPED",
+        v: t.pillarSource === "routing.md"
+          ? "No channel scored under the floor of "+t.floor+". A score could not have skipped one anyway, the defaults list decides that."
+          : "No score to skip anything on, so every channel below is on and the call is yours.",
+        tone:"ink" };
+  const traced = cuts.filter(c=>c.sourceLines && c.sourceLines.length);
+  const words = traced.length
+    ? { k:"YOUR WORDS",
+        v:(traced.length === 1
+            ? "The cut below carries the source lines it was built from"
+            : "All "+traced.length+" cuts below carry the source lines they were built from")+
+          ", so every draft is your text, trimmed. Nothing composed.",
+        tone:"ink" }
+    : { k:"YOUR WORDS",
+        v:"No cut here records the lines it came from, so this screen makes no claim about how the drafts were built.",
+        tone:"grey" };
+  return [pillar, reuse, skipped, words];
+}
+// ── end of the treatment mirror ──
+
+const CW_STEPS = [["1","Pick a source"],["2","Decide the treatment"],["3","Approve the drafts"]];
+const CW_TAGCLASS = { "SUBSTACK":"substack", "YOURS":"yours", "READ IN":"readin" };
+
+function cwSources(){ return WB_SESSIONS || []; }
+function cwSession(){ return cwSources().filter(s=>s.slug===CW.slug)[0] || null; }
+function cwPiece(){ return (DATA.pieces||[]).filter(p=>p.slug===CW.slug)[0] || null; }
+function cwRows(){ const p = cwPiece(); return p ? p.rows : []; }
+// One group per channel this piece actually has drafts for. Three counts, not one, because a bulk
+// yes must not touch everything a badge counts:
+//   pending  neither decided nor already approved. This is what the tab badge and the step rail
+//            report, matching the review sheet's own idea of outstanding work.
+//   fresh    no status at all. ONLY these are what "Yes to all" approves.
+//   flagged  pending but carrying a status of her own (revise, blocked). A bulk yes that swept a
+//            row she asked to have changed would approve, and on a scheduled platform SCHEDULE,
+//            the very draft she flagged. Those stay hers to handle one at a time.
+function cwGroups(){
+  const order = [];
+  const byPlatform = {};
+  for(const r of cwRows()){
+    if(!byPlatform[r.platform]){ byPlatform[r.platform] = []; order.push(r.platform); }
+    byPlatform[r.platform].push(r);
+  }
+  return order.map(platform=>{
+    const rows = byPlatform[platform];
+    const pending = rows.filter(r=>!DECIDED.has(r.status) && r.status!=="approve");
+    return {
+      platform: platform,
+      rows: rows,
+      total: rows.length,
+      pending: pending.length,
+      fresh: pending.filter(r=>!r.status).length,
+      flagged: pending.filter(r=>!!r.status).length,
+    };
+  });
+}
+function cwActiveGroup(){
+  const gs = cwGroups();
+  return gs.filter(g=>g.platform===CW.tab)[0] || gs[0] || null;
+}
+function cwChannel(name){
+  if(!CW.treat) return null;
+  return CW.treat.channels.filter(c=>c.channel===name)[0] || null;
+}
+function cwStep(){
+  if(!CW.slug) return 1;
+  return CW.step > 3 ? 3 : CW.step < 1 ? 1 : CW.step;
+}
+function cwRail(step){
+  if(step === 1){
+    const n = cwSources().length;
+    return { text: n+" SOURCE"+(n===1?"":"S")+" ON THE DESK", tone: n ? "grey" : "amber" };
+  }
+  if(step === 2){
+    if(CW.treatErr) return { text:"COULD NOT READ THE TREATMENT", tone:"amber" };
+    if(!CW.treat) return { text:"READING THE TREATMENT", tone:"grey" };
+    const n = CW.treat.channels.length;
+    return { text: n+" CHANNEL"+(n===1?"":"S")+" READ FOR THIS PIECE", tone:"grey" };
+  }
+  const gs = cwGroups();
+  const total = gs.reduce((a,g)=>a+g.total, 0);
+  const pending = gs.reduce((a,g)=>a+g.pending, 0);
+  if(!total) return { text:"NO DRAFTS EXIST FOR THIS PIECE YET", tone:"amber" };
+  return pending
+    ? { text: pending+" OF "+total+" STILL NEED YOUR YES", tone:"amber" }
+    : { text:"ALL "+total+" HAVE YOUR YES", tone:"green" };
+}
+function cwStepsHtml(step){
+  const rail = cwRail(step);
+  return CW_STEPS.map((sd,i)=>{
+    const num = i+1;
+    const cls = num===step ? " on" : num<step ? " done" : "";
+    const reachable = num===1 || !!CW.slug;
+    return '<span style="display:flex;align-items:baseline;gap:9px">'+
+      '<button class="cw-step'+cls+'" data-step="'+num+'"'+(reachable?"":" disabled")+'>'+
+      '<span class="num">'+sd[0]+'</span><span class="nm">'+esc(sd[1])+'</span></button>'+
+      '<span class="cw-sep">'+(i<2?"→":"")+'</span></span>';
+  }).join("")+'<span style="flex:1"></span><span class="cw-rail t-'+rail.tone+'">'+esc(rail.text)+'</span>';
+}
+function cwSourceMeta(s){
+  const bits = [];
+  if(s.date) bits.push("on the desk since "+fmtDay(s.date));
+  // published_at is a full ISO timestamp for a Note and a plain date for an essay. Show the day.
+  if(s.publishedAt) bits.push("published "+fmtDay(String(s.publishedAt).slice(0,10)));
+  bits.push(s.tagBasis);
+  if(s.pending) bits.push(s.pending+" draft"+(s.pending===1?"":"s")+" waiting for your yes");
+  return bits.join(" · ");
+}
+function cwStep1Html(){
+  const sources = cwSources();
+  if(!sources.length){
+    return '<div class="empty">Nothing on the desk yet. Hand something to your director in Studio, or format it directly, and it shows up here.</div>';
+  }
+  const rows = sources.map(s=>{
+    const tag = s.tag || "UNTAGGED";
+    const cls = CW_TAGCLASS[s.tag] || "untagged";
+    const on = s.slug===CW.slug;
+    return '<div class="cw-src'+(on?" on":"")+'" data-slug="'+esc(s.slug)+'">'+
+      '<span class="cw-tag '+cls+'">'+esc(tag)+'</span>'+
+      '<span style="min-width:0"><span class="ttl">'+esc(s.title)+'</span>'+
+      '<span class="meta">'+esc(cwSourceMeta(s))+'</span></span>'+
+      '<span class="src" style="justify-self:end;white-space:nowrap">'+(on?"PICKED":"Make versions")+'</span>'+
+      '</div>';
+  }).join("");
+  return '<div style="margin-top:22px">'+
+    '<div class="fam-ask">WHAT YOU CAN MAKE VERSIONS OF</div>'+
+    '<div class="src" style="margin-top:6px;max-width:560px">Everything here has a source.md on disk. The tag says where it came from and the line under it says which fact the tag is standing on. Nothing leaves this room until you say yes to each draft.</div>'+
+    '<div style="margin-top:16px">'+rows+'</div>'+
+    '<div class="src" style="margin-top:16px;max-width:520px">An essay from somewhere else comes in through Studio. Paste the link there and pick "Versions for Content".</div>'+
+    '</div>';
+}
+function cwPickedHtml(s){
+  const cls = CW_TAGCLASS[s.tag] || "untagged";
+  return '<div class="cw-picked">'+
+    '<span style="min-width:0;display:flex;flex-direction:column;gap:6px">'+
+    '<span style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">'+
+    '<span class="cw-tag '+cls+'">'+esc(s.tag||"UNTAGGED")+'</span>'+
+    '<span class="src">'+esc(s.slug)+'</span></span>'+
+    '<span style="font:400 20px/1.45 Georgia,serif">'+esc(s.title)+'</span>'+
+    '<span class="src">'+esc(cwSourceMeta(s))+'</span></span>'+
+    '<button class="cw-back" data-step="1">Pick a different one</button></div>';
+}
+function cwChannelHtml(c){
+  const fit = fitLine(c, CW.treat.floor);
+  const reuse = reuseLine(c);
+  const fn = floorNote(c, CW.treat.floor);
+  const drift = (c.recordedDecision && c.decision && c.recordedDecision !== c.decision)
+    ? '<div class="basis t-amber">routing.md on disk records "'+esc(c.recordedDecision)+'" while a fresh routing read says "'+esc(c.decision)+'".</div>'
+    : "";
+  const routed = c.decision ? "routing: "+c.decision : "not routed";
+  return '<div class="cw-chan">'+
+    '<div class="top"><span class="nm">'+esc(c.channel)+'</span>'+
+    '<span class="fit t-'+fit.tone+'">'+esc(fit.label)+'</span>'+
+    '<span style="flex:1"></span><span class="src">'+esc(routed)+'</span></div>'+
+    '<div class="basis t-grey">'+esc(fit.basis)+'</div>'+
+    (fn?'<div class="basis t-grey">'+esc(fn)+'</div>':"")+
+    drift+
+    '<div class="reuse t-'+reuse.tone+'">'+esc(reuse.text)+'</div>'+
+    '<div class="slot">NEXT FREE SLOT · '+esc(c.slot ? c.slot.label : "")+'</div>'+
+    '</div>';
+}
+function cwStep2Html(){
+  const s = cwSession();
+  if(!s) return '<div class="empty">That source is no longer on the desk. Pick another one.</div>';
+  if(CW.treatErr){
+    return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read the treatment for this piece: '+esc(CW.treatErr)+'</div>';
+  }
+  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading the treatment…</div>';
+  const cells = readsFromCells(CW.treat, s.cuts||[]).map(c=>
+    '<span class="cw-cell"><span class="k">'+esc(c.k)+'</span><span class="v t-'+c.tone+'">'+esc(c.v)+'</span></span>'
+  ).join("");
+  const chans = CW.treat.channels.map(cwChannelHtml).join("");
+  const groups = cwGroups();
+  const total = groups.reduce((a,g)=>a+g.total, 0);
+  const forward = total
+    ? '<button class="primary cw-fwd" data-step="3">See the '+total+' draft'+(total===1?"":"s")+'</button>'+
+      '<span class="src" style="max-width:360px">Every one of them still waits for your yes, one channel at a time.</span>'
+    : '<span class="fam-note t-amber" style="margin:0">No drafts exist for this piece yet. Hand it to the team in the workbench below and they land here.</span>';
+  return cwPickedHtml(s)+
+    '<div class="cw-reads">'+cells+'</div>'+
+    '<div class="fam-ask" style="margin-top:28px">CHANNELS · READ, NOT CHOSEN HERE</div>'+
+    '<div class="src" style="margin-top:6px;max-width:560px">The defaults list in config/routing.yaml is the only thing that includes or skips a channel, so this grid reports what routing decided rather than offering to change it. Each row carries the reuse window that belongs to that channel and its own next free slot.</div>'+
+    '<div class="cw-chans">'+chans+'</div>'+
+    '<div class="cw-yesall">'+forward+'</div>';
+}
+function cwStep3Html(){
+  const s = cwSession();
+  const groups = cwGroups();
+  const total = groups.reduce((a,g)=>a+g.total, 0);
+  if(!total){
+    return '<div class="cw-yesall" style="border:none;padding:0;margin-top:20px"><button class="cw-back" data-step="2">Back to the treatment</button></div>'+
+      '<div class="empty">No drafts exist for this piece yet.</div>';
+  }
+  const active = cwActiveGroup();
+  const tabs = groups.map(g=>
+    '<button class="cw-tab'+(g.platform===active.platform?" on":"")+'" data-tab="'+esc(g.platform)+'">'+
+    '<span>'+esc(g.platform)+'</span>'+
+    '<span class="badge t-'+(g.pending?"amber":"green")+'">'+(g.pending?g.pending+" OF "+g.total:"ALL YES")+'</span></button>'
+  ).join("");
+  const c = cwChannel(active.platform);
+  let head = '<span class="src">No treatment read for '+esc(active.platform)+', so nothing here says how it fits.</span>';
+  if(c){
+    const fit = fitLine(c, CW.treat.floor);
+    const reuse = reuseLine(c);
+    head = '<span class="fit t-'+fit.tone+'" style="font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em">'+esc(fit.label)+'</span>'+
+      '<span class="src" style="max-width:430px">'+esc(fit.basis)+'</span>'+
+      '<span style="flex:1"></span>'+
+      '<span class="src t-'+reuse.tone+'">'+esc(reuse.text)+'</span>';
+  }
+  const errs = CW.yesErrors.length
+    ? '<div class="fam-note t-amber">'+CW.yesErrors.map(e=>esc(e)).join("<br />")+'</div>'
+    : "";
+  const schedulable = ["x","linkedin","bluesky"].indexOf(active.platform) >= 0;
+  const flagged = active.flagged
+    ? ' '+active.flagged+' you marked revise or blocked '+(active.flagged===1?"stays":"stay")+' yours to handle one at a time, and this button leaves '+(active.flagged===1?"it":"them")+' alone.'
+    : "";
+  const yesAll = active.fresh
+    ? '<button class="cw-yes-all">Yes to all '+active.fresh+' left in '+esc(active.platform)+'</button>'+
+      '<span class="src" style="max-width:460px">Approves only the '+active.fresh+' untouched draft'+(active.fresh===1?"":"s")+' in '+esc(active.platform)+
+      ', one call each, exactly the same call the Approve button on each card makes. '+
+      (schedulable
+        ? 'On '+esc(active.platform)+' that also books the next free slot as a scheduled Typefully draft. Nothing posts instantly.'
+        : 'On '+esc(active.platform)+' it marks the draft ready and schedules nothing.')+
+      ' Nothing outside this channel is touched.'+flagged+'</span>'
+    : '<span class="src" style="max-width:460px">'+
+      (active.flagged
+        ? 'Nothing in '+esc(active.platform)+' is waiting on a plain yes.'+flagged
+        : 'Every draft in '+esc(active.platform)+' already has your yes.')+'</span>';
+  return '<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-top:20px">'+
+    '<span class="fam-ask">'+total+' DRAFT'+(total===1?"":"S")+' ON THIS PIECE · '+groups.length+' CHANNEL'+(groups.length===1?"":"S")+'</span>'+
+    '<span style="flex:1"></span><button class="cw-back" data-step="2">Change nothing, look at the treatment again</button></div>'+
+    '<div class="src" style="max-width:560px">'+(s?esc(s.title):"")+'</div>'+
+    '<div class="cw-tabs">'+tabs+'</div>'+
+    '<div class="cw-tabhead">'+head+'</div>'+
+    '<div id="cwRows" style="margin-top:14px"></div>'+
+    '<div class="cw-yesall">'+yesAll+'</div>'+errs+
+    '<div class="src" style="margin-top:8px;max-width:560px">A yes marks a draft ready and holds it. Nothing posts from this room.</div>';
+}
+function renderContentWizard(){
+  const step = cwStep();
+  $("#cwSteps").innerHTML = cwStepsHtml(step);
+  const body = $("#cwBody");
+  body.innerHTML = step === 1 ? cwStep1Html() : step === 2 ? cwStep2Html() : cwStep3Html();
+  if(step === 3){
+    const holder = $("#cwRows");
+    const piece = cwPiece();
+    const active = cwActiveGroup();
+    if(holder && piece && active) for(const row of active.rows) holder.appendChild(rowEl(piece, row));
+  }
+}
+async function cwLoadTreatment(){
+  const slug = CW.slug;
+  if(!slug) return;
+  CW.loading = true; CW.treatErr = null;
+  try {
+    const r = await fetch("/api/content/treatment?slug="+encodeURIComponent(slug));
+    const d = await r.json();
+    if(d && d.error){ CW.treat = null; CW.treatFor = null; CW.treatErr = d.error; }
+    else { CW.treat = d; CW.treatFor = slug; CW.treatErr = null; }
+  } catch(e){
+    CW.treat = null; CW.treatFor = null; CW.treatErr = String(e && e.message ? e.message : e);
+  } finally {
+    CW.loading = false;
+    if(CW.slug === slug) renderContentWizard();
+  }
+}
+async function cwYesAll(btn){
+  const g = cwActiveGroup();
+  if(!g || !CW.slug) return;
+  // Only untouched drafts. A row she marked revise (or one the pipeline blocked) is deliberately
+  // out of reach here, because approving it would act against the note she left on it.
+  const targets = g.rows.filter(r=>!DECIDED.has(r.status) && !r.status);
+  btn.disabled = true;
+  // Every refusal is kept and rendered. A bulk yes must never report success it did not get.
+  CW.yesErrors = targets.filter(r=>r.approveBlocked).map(r=>r.id+": "+r.approveBlocked);
+  let done = 0;
+  for(const row of targets.filter(r=>!r.approveBlocked)){
+    const res = await post("/api/status",{slug:CW.slug,id:row.id,status:"approve"});
+    if(res && res.ok === false) CW.yesErrors.push(row.id+": "+(res.error||"the approve was refused"));
+    else if(res && res.scheduleError) CW.yesErrors.push(row.id+": approved, but scheduling failed, "+res.scheduleError);
+    else done++;
+  }
+  await load(); // re-reads every row's real status from the server rather than assuming
+  flash(done ? "Yes on "+done+" in "+g.platform : "Nothing was approved");
+  renderContentWizard();
+}
+// Delegated: the wizard is rebuilt wholesale on every render, same pattern as the workbench.
+$("#contentWizard").addEventListener("click", (e)=>{
+  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-tab],.cw-yes-all") : null;
+  if(!t) return;
+  if(t.classList.contains("cw-yes-all")){ cwYesAll(t); return; }
+  if(t.dataset.tab !== undefined){ CW.tab = t.dataset.tab; CW.yesErrors = []; renderContentWizard(); return; }
+  if(t.dataset.slug !== undefined){
+    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = [];
+    renderContentWizard(); cwLoadTreatment(); return;
+  }
+  if(t.dataset.step !== undefined){
+    const n = Number(t.dataset.step);
+    if(n > 1 && !CW.slug) return;
+    CW.step = n; CW.yesErrors = [];
+    renderContentWizard();
+    if(n === 2 && CW.slug && CW.treatFor !== CW.slug) cwLoadTreatment();
   }
 });
 
@@ -3825,6 +4547,148 @@ async function loadSignals(){
   const r = await fetch("/api/signals");
   SIGNALS = await r.json();
   renderSignals();
+  await loadOutcomes();
+}
+
+// ── Signals: the four outcome families + the redacted research read ──
+//
+// GET /api/signals/outcomes groups what data/analytics.db really holds into the four families of
+// docs/venture-schema-contract.md §5.8; GET /api/research/report is the redacted account-level
+// research read. Nothing here adds a family to another one, and nothing here computes a number.
+//
+// Refused from the design prototype, all of them fixtures with no source in this repo: its four
+// family totals, its per-family sample thresholds, its per-platform trend vocabulary, its "too weak
+// to trust yet" sidebar and its "a post almost nobody saw brought in a subscriber" line.
+let OUTCOMES = null, RESEARCH = null;
+
+// ── begin the signals mirror ──
+// Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
+function groupDigits(n){
+  if(!Number.isFinite(n) || !Number.isInteger(n)) return String(n);
+  const digits = String(Math.abs(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ",");
+  return n < 0 ? "-"+digits : digits;
+}
+function metricLine(m){
+  if(m.state === "not_measured") return { value:"not measured", note:m.reason, tone:"grey" };
+  if(m.posts_measured === 0){
+    return { value:"0",
+      note:"no record carried this number, so this is a sum over nothing rather than a measured zero",
+      tone:"grey" };
+  }
+  // "record", not "post": half of these come off capture rows and observation sources, not posts.
+  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured+" records";
+  const missing = m.posts_unmeasured
+    ? ", "+m.posts_unmeasured+(m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
+    : "";
+  return { value:groupDigits(m.value), note:"measured on "+on+missing, tone:"ink" };
+}
+function sampleNote(confidence, rule){
+  const bar = rule.threshold_weeks+(rule.threshold_weeks === 1 ? " week" : " weeks");
+  if(!confidence.length) return "No posts on record in this database, so nothing below has been measured yet.";
+  const ok = confidence.filter(c=>c.sufficient).length;
+  const total = confidence.length;
+  const platforms = total === 1 ? "platform" : "platforms";
+  if(ok === 0) return "None of the "+total+" "+platforms+" on record clears "+bar+" of data. Everything below is directional only.";
+  if(ok === total) return "All "+total+" "+platforms+" on record clear "+bar+" of data.";
+  return ok+" of "+total+" "+platforms+" on record clear "+bar+" of data. The rest are directional only.";
+}
+function familyGate(family){
+  return (family === "attention" || family === "conversation")
+    ? { text:"MAY INFORM A ROUTING OR SUPPRESSION CALL", tone:"green" }
+    : { text:"NEVER USED TO SUPPRESS A PILLAR OR PLATFORM", tone:"amber" };
+}
+// ── end of the signals mirror ──
+
+// Which sub-metrics each family carries, in the order signals.ts declares them. A key the read did
+// not return is skipped rather than rendered as a blank.
+const FAMILY_METRICS = [
+  ["attention", [["impressions","IMPRESSIONS"]]],
+  ["conversation", [["likes","LIKES"],["replies","REPLIES"],["reposts","REPOSTS"],["saves","SAVES"],["comments","COMMENTS"],["research_observations","REPLY SIGNALS"]]],
+  ["audience", [["new_follows","NEW FOLLOWS"],["follower_total","FOLLOWER TOTAL"],["follower_delta","FOLLOWER CHANGE"],["landing_visits","LANDING VISITS"],["opt_ins","OPT-INS"],["survey_responses","SURVEY RESPONSES"]]],
+  ["business", [["qualified_inquiries","QUALIFIED INQUIRIES"],["calls","CALLS"],["opportunities","OPPORTUNITIES"],["purchases","PURCHASES"]]],
+];
+function metricHtml(label, m){
+  const l = metricLine(m);
+  const big = l.tone === "ink";
+  return '<div class="metric"><span class="k">'+esc(label)+'</span>'+
+    '<span class="v '+(big?"":"small ")+'t-'+l.tone+'">'+esc(l.value)+'</span>'+
+    '<span class="n">'+esc(l.note)+'</span></div>';
+}
+function familyHtml(fam, metrics){
+  const present = metrics.filter(pair=>fam[pair[0]]);
+  const gate = familyGate(fam.family);
+  // "Nothing measured here" is derived, never a phase flag: it is true exactly when every
+  // sub-metric this family carries came back not_measured.
+  const nothing = present.length > 0 && present.every(pair=>fam[pair[0]].state === "not_measured");
+  const bySource = fam.research_observations_by_source || {};
+  const srcKeys = Object.keys(bySource);
+  return '<div class="fam">'+
+    '<div class="fam-head"><span class="fam-name">'+esc(fam.family.charAt(0).toUpperCase()+fam.family.slice(1))+'</span>'+
+    '<span class="fam-ask">'+esc(fam.question)+'</span><span style="flex:1"></span>'+
+    (nothing?'<span class="fam-ask t-grey">NOTHING MEASURED HERE</span>':"")+'</div>'+
+    '<div class="fam-metrics">'+present.map(pair=>metricHtml(pair[1], fam[pair[0]])).join("")+'</div>'+
+    (srcKeys.length?'<div class="fam-note">Reply signals by source: '+srcKeys.map(k=>esc(k)+" "+bySource[k]).join(", ")+'.</div>':"")+
+    (fam.partial_note?'<div class="fam-note">'+esc(fam.partial_note)+'</div>':"")+
+    (fam.empty_state?'<div class="fam-note t-grey">'+esc(fam.empty_state)+'</div>':"")+
+    '<div class="fam-gate t-'+gate.tone+'">'+esc(gate.text)+'</div>'+
+    '</div>';
+}
+function renderOutcomes(){
+  const box = $("#signalsFamilies");
+  if(!OUTCOMES){ box.innerHTML = '<div class="empty">Loading…</div>'; return; }
+  if(OUTCOMES.error){ box.innerHTML = '<div class="empty">Could not read the outcome families: '+esc(OUTCOMES.error)+'</div>'; return; }
+  const conf = OUTCOMES.confidence || [];
+  const plats = conf.map(c=>
+    '<div class="sig-plat"><span style="font-weight:600">'+esc(c.platform)+'</span>'+
+    '<span class="t-'+(c.sufficient?"green":"amber")+'" style="font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace">'+esc(c.sufficient?"enough data":"insufficient")+'</span>'+
+    '<span style="color:#5a5346">'+c.posts+' post'+(c.posts===1?"":"s")+' on record over '+c.weeks+' week'+(c.weeks===1?"":"s")+'. '+esc(c.status)+'</span></div>'
+  ).join("");
+  box.innerHTML =
+    '<div class="sig-sample">'+esc(sampleNote(conf, OUTCOMES.sample_rule))+'</div>'+
+    '<div class="src" style="margin-top:4px">Sample rule: '+esc(OUTCOMES.sample_rule ? OUTCOMES.sample_rule.source : "")+'</div>'+
+    FAMILY_METRICS.map(pair=>OUTCOMES[pair[0]] ? familyHtml(OUTCOMES[pair[0]], pair[1]) : "").join("")+
+    (plats?'<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:2px;">How much data is behind this</div>'+
+      '<div class="src" style="margin-bottom:4px">Counted straight off the posts table, one row per platform. No trend words: nothing in this repo computes one.</div>'+plats+'</div>':"");
+}
+function researchLine(k, v){
+  return '<div class="sig-plat" style="grid-template-columns:220px minmax(0,1fr)"><span class="src">'+esc(k)+'</span><span>'+esc(String(v))+'</span></div>';
+}
+function renderResearch(){
+  const box = $("#signalsResearch");
+  if(!RESEARCH){ box.innerHTML = ""; return; }
+  const head = '<div class="wb-sep" style="margin-top:34px"><span class="rule"></span><span class="txt">reply signals, redacted</span><span class="rule"></span></div>';
+  if(RESEARCH.state !== "available"){
+    box.innerHTML = head+'<div class="fam-note t-grey" style="margin-top:12px">'+esc(RESEARCH.reason||"")+'</div>'+
+      '<div class="src" style="margin-top:6px">Capture '+(RESEARCH.capture_configured?"is configured (RESEARCH_HASH_KEY is set)":"is not configured (RESEARCH_HASH_KEY is unset)")+'. This is an absence of measurement, not a zero.</div>';
+    return;
+  }
+  const r = RESEARCH.report || {};
+  const active = r.active_observation_counts || {};
+  const keys = Object.keys(active).sort();
+  const resp = r.audience_respondent_summary || {};
+  const thread = r.largest_audience_thread || {};
+  const cov = (r.coverage||[]).slice(-3).map(c=>
+    researchLine("coverage · "+(c.source||""), (c.status||"")+", "+(c.records_captured==null?"no record count":c.records_captured+" records")+(c.gap_reason?", gap: "+c.gap_reason:""))
+  ).join("");
+  const replies = (r.reply_observations||[]).filter(x=>x.redacted_text).slice(0,3).map(x=>
+    '<div class="fam-note">"'+esc(x.redacted_text)+'"</div>'
+  ).join("");
+  box.innerHTML = head+
+    '<div class="src" style="margin-top:12px">Account level and redacted by construction: counts and redacted text only, never an exact reply and never a respondent identity.</div>'+
+    (keys.length?keys.map(k=>researchLine("active observations · "+k, active[k])).join(""):'<div class="fam-note t-grey">No active observations recorded.</div>')+
+    researchLine("your own replies", r.creator_reply_observations==null?"not recorded":r.creator_reply_observations)+
+    researchLine("audience observations", (resp.observation_count==null?"not recorded":resp.observation_count)+" from "+(resp.unique_respondents==null?"an unrecorded number of":resp.unique_respondents)+" known respondents, "+(resp.observations_without_respondent_hash==null?"an unrecorded number":resp.observations_without_respondent_hash)+" with no respondent recorded")+
+    researchLine("largest single thread", (thread.observation_count==null?"not recorded":thread.observation_count)+" observations, "+(thread.known_respondents==null?"an unrecorded number of":thread.known_respondents)+" known respondents")+
+    cov+
+    (replies?'<div class="src" style="margin-top:10px">A few redacted lines, as stored:</div>'+replies:"");
+}
+async function loadOutcomes(){
+  const [o, rr] = await Promise.all([
+    fetch("/api/signals/outcomes").then(r=>r.json()).catch(e=>({error:String(e)})),
+    fetch("/api/research/report").then(r=>r.json()).catch(()=>null),
+  ]);
+  OUTCOMES = o; RESEARCH = rr;
+  renderOutcomes(); renderResearch();
 }
 
 // ── Studio home (Content Studio Riff 3c) ──

@@ -13,6 +13,8 @@ import {
   jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
   classifyCapture, captureVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
   LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
+  groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
+  type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -221,18 +223,12 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
 //
 // To add one: append the path and a comment in this format saying what it is and why its UI is
 // not here yet. Keep the list at or near zero.
-const PENDING_UI_ROUTES = new Set([
-  // The Content room's "decide the treatment" read layer (fit label per channel, that channel's
-  // own reuse window, next free slot). Backend shipped separately from the page.ts surface.
-  "/api/content/treatment",
-  // Card D: the four outcome families grouped at read time out of data/analytics.db
-  // (docs/venture-schema-contract.md §5.8). Built backend-only by agreement; page.ts is owned by
-  // another worker, so the Signals screen that calls this has not landed yet.
-  "/api/signals/outcomes",
-  // The redacted account-level research read (contract §5.4b), exposed to the GUI in the same
-  // backend-only Card D change. Same reason: its Signals surface lands separately.
-  "/api/research/report",
-]);
+// Empty, and meant to stay that way. The three routes that used to sit here
+// (/api/content/treatment, /api/signals/outcomes, /api/research/report) are all called by the page
+// now: the Content room's three-step wizard reads the first, the Signals room's outcome families
+// read the other two. Add an entry only for a route whose UI genuinely has not landed yet, and
+// delete it the moment it has.
+const PENDING_UI_ROUTES = new Set<string>([]);
 
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
   const script = emittedScripts().join("\n");
@@ -1825,4 +1821,344 @@ test("boot room: Studio, with the nav highlight, currentTab and the first fetch 
   }
   // The Content pending badge lives in the header rail, so its read still runs at boot.
   assert.ok(boot.includes("load()"), "the pending-count badge's read must still run at boot");
+});
+
+
+// ── Signals: the four outcome families ──────────────────────────────────────────────────────────
+//
+// Rule 5's strong form: every vector is answered twice, once by the export and once by the copy
+// the browser actually gets, sliced out of the emitted <script> and evaluated. A test that only
+// exercised the export would go green while the browser kept a bug.
+
+type SignalsMirror = {
+  groupDigits: typeof groupDigits;
+  metricLine: typeof metricLine;
+  sampleNote: typeof sampleNote;
+  familyGate: typeof familyGate;
+};
+
+function signalsMirror(): SignalsMirror {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin the signals mirror ──");
+  const end = script.indexOf("// ── end of the signals mirror ──");
+  assert.ok(start > -1, "the inline signals mirror must reach the browser");
+  assert.ok(end > start, "the signals mirror's end marker must follow it");
+  return new Function(
+    script.slice(start, end) + "\nreturn { groupDigits, metricLine, sampleNote, familyGate };"
+  )() as SignalsMirror;
+}
+
+const METRIC_VECTORS: MetricReadView[] = [
+  { state: "measured", value: 4180, posts_measured: 12, posts_unmeasured: 0 },
+  { state: "measured", value: 0, posts_measured: 12, posts_unmeasured: 0 },   // a MEASURED zero
+  { state: "measured", value: 0, posts_measured: 0, posts_unmeasured: 11 },   // a sum over nothing
+  { state: "measured", value: 7, posts_measured: 1, posts_unmeasured: 1 },    // singular wording
+  { state: "measured", value: -3, posts_measured: 2, posts_unmeasured: 0 },   // a negative delta
+  { state: "measured", value: 1234567, posts_measured: 9, posts_unmeasured: 2 },
+  { state: "not_measured", reason: "the metrics table has no saves column" },
+];
+
+test("metricLine: measured, measured-as-zero and never-measured are three different cells", () => {
+  const real = metricLine(METRIC_VECTORS[0]);
+  const zero = metricLine(METRIC_VECTORS[1]);
+  const nothing = metricLine(METRIC_VECTORS[2]);
+  const absent = metricLine(METRIC_VECTORS[6]);
+
+  assert.equal(real.value, "4,180");
+  assert.equal(real.tone, "ink");
+
+  // measured-as-zero prints the zero AND says how many posts it was measured on
+  assert.equal(zero.value, "0");
+  assert.match(zero.note, /measured on 12 records/);
+  assert.equal(zero.tone, "ink");
+
+  // a sum over no posts is not the same claim, and is not toned like a measurement
+  assert.equal(nothing.value, "0");
+  assert.match(nothing.note, /sum over nothing/);
+  assert.equal(nothing.tone, "grey");
+  assert.notEqual(nothing.note, zero.note);
+
+  // never measured renders its reason and NEVER a number, a zero, or a bare dash
+  assert.equal(absent.value, "not measured");
+  assert.equal(absent.note, "the metrics table has no saves column");
+  assert.equal(absent.tone, "grey");
+  assert.ok(!/^[-–—]?\d*$/.test(absent.value), "an unmeasured cell must not read as a number or a dash");
+});
+
+test("metricLine: the browser copy answers every vector identically", () => {
+  const mirror = signalsMirror().metricLine;
+  for (const v of METRIC_VECTORS) assert.deepEqual(mirror(v), metricLine(v), JSON.stringify(v));
+});
+
+test("groupDigits: grouping is written out, not left to a locale, and both copies agree", () => {
+  const mirror = signalsMirror().groupDigits;
+  for (const n of [0, 7, 999, 1000, 4180, 1234567, -3, -1234, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(mirror(n), groupDigits(n), String(n));
+  }
+  assert.equal(groupDigits(1234567), "1,234,567");
+  assert.equal(groupDigits(-1234), "-1,234");
+});
+
+const RULE = { kind: "weeks_of_data", threshold_weeks: 4, source: "the repo's own INSUFFICIENT rule" };
+const CONF_VECTORS: { platform: string; posts: number; weeks: number; status: string; sufficient: boolean }[][] = [
+  [],
+  [{ platform: "x", posts: 3, weeks: 1, status: "INSUFFICIENT", sufficient: false }],
+  [{ platform: "x", posts: 30, weeks: 9, status: "OK", sufficient: true }],
+  [
+    { platform: "x", posts: 30, weeks: 9, status: "OK", sufficient: true },
+    { platform: "bluesky", posts: 3, weeks: 1, status: "INSUFFICIENT", sufficient: false },
+  ],
+];
+
+test("sampleNote: no posts on record reads as 'nothing measured yet', never as four zeros", () => {
+  assert.match(sampleNote([], RULE), /No posts on record/);
+  assert.match(sampleNote(CONF_VECTORS[1], RULE), /None of the 1 platform on record clears 4 weeks/);
+  assert.match(sampleNote(CONF_VECTORS[2], RULE), /All 1 platform on record clear/);
+  assert.match(sampleNote(CONF_VECTORS[3], RULE), /1 of 2 platforms on record clear 4 weeks/);
+  // the threshold is whatever the read handed over, never a number typed into the page
+  assert.match(sampleNote(CONF_VECTORS[3], { ...RULE, threshold_weeks: 1 }), /1 week of data/);
+});
+
+test("sampleNote and familyGate: the browser copies answer identically", () => {
+  const m = signalsMirror();
+  for (const conf of CONF_VECTORS) {
+    for (const weeks of [1, 4, 12]) {
+      const rule = { ...RULE, threshold_weeks: weeks };
+      assert.equal(m.sampleNote(conf, rule), sampleNote(conf, rule), JSON.stringify([conf.length, weeks]));
+    }
+  }
+  for (const f of ["attention", "conversation", "audience", "business"] as const) {
+    assert.deepEqual(m.familyGate(f), familyGate(f), f);
+  }
+});
+
+test("familyGate: only attention and conversation may feed a suppression call", () => {
+  for (const f of ["attention", "conversation"] as const) {
+    assert.match(familyGate(f).text, /MAY INFORM/);
+  }
+  for (const f of ["audience", "business"] as const) {
+    assert.match(familyGate(f).text, /NEVER USED TO SUPPRESS/);
+  }
+});
+
+test("the Signals screen calls both new reads and renders no prototype fixture number", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('fetch("/api/signals/outcomes")'), "the outcome families must be fetched");
+  assert.ok(script.includes('fetch("/api/research/report")'), "the research read must be fetched");
+  // The prototype's Signals numbers and thresholds have no source in this repo (port rules, Rule 2).
+  for (const n of ["4,180", "trending up", "home base", "still testing"]) {
+    assert.ok(!script.includes(n), "the page must not carry the prototype's fixture value " + n);
+  }
+});
+
+// ── Content: the treatment grid ─────────────────────────────────────────────────────────────────
+
+type TreatmentMirror = {
+  fitLine: typeof fitLine;
+  floorNote: typeof floorNote;
+  reuseLine: typeof reuseLine;
+  readsFromCells: typeof readsFromCells;
+};
+
+function treatmentMirror(): TreatmentMirror {
+  const script = emittedScripts().join("\n");
+  // readsFromCells/reuseLine both call the browser's own fmtDays, so the slice needs it too. Taking
+  // it out of the emitted script (rather than redefining it here) keeps the browser copy on trial.
+  const fmtAt = script.indexOf("function fmtDays(n){");
+  assert.ok(fmtAt > -1, "the browser needs its own fmtDays for the treatment mirror");
+  const fmtSrc = script.slice(fmtAt, script.indexOf("\n", fmtAt));
+  const start = script.indexOf("// ── begin the treatment mirror ──");
+  const end = script.indexOf("// ── end of the treatment mirror ──");
+  assert.ok(start > -1, "the inline treatment mirror must reach the browser");
+  assert.ok(end > start, "the treatment mirror's end marker must follow it");
+  return new Function(
+    fmtSrc + "\n" + script.slice(start, end) + "\nreturn { fitLine, floorNote, reuseLine, readsFromCells };"
+  )() as TreatmentMirror;
+}
+
+function chan(over: Partial<ChannelTreatmentView>): ChannelTreatmentView {
+  return {
+    channel: "x", decision: "include", recordedDecision: "include", score: null,
+    fitLabel: null, fitBasis: "unknown", belowFloor: false,
+    reuse: { key: "x", allowed: true, everPlaced: false, lastPlacedAt: null, daysSince: null, minDays: 14, reason: null },
+    reuseNote: null, slot: { time: "t", label: "Tue 09:00 PT" },
+    ...over,
+  };
+}
+
+const CHANNEL_VECTORS: ChannelTreatmentView[] = [
+  chan({ channel: "x", score: 1.4, fitLabel: "STRONG FIT", fitBasis: "measured" }),
+  chan({ channel: "linkedin", score: 0.8, fitLabel: "REACH ONLY", fitBasis: "measured" }),
+  chan({ channel: "threads", score: 0.42, fitLabel: "POOR FIT", fitBasis: "measured", belowFloor: true }),
+  chan({ channel: "bluesky", fitLabel: "COLD START", fitBasis: "insufficient-data" }),
+  chan({ channel: "mastodon", fitBasis: "editorial-rule", decision: "skip" }),
+  chan({ channel: "quote-card", fitBasis: "format-asset", reuse: null, reuseNote: "enforced per fan-out target" }),
+  chan({ channel: "x", fitBasis: "unknown", decision: null, recordedDecision: null }),
+  chan({ channel: "linkedin", reuse: { key: "linkedin", allowed: false, everPlaced: true, lastPlacedAt: "x", daysSince: 12, minDays: 60, reason: "inside the window" } }),
+  chan({ channel: "x", reuse: { key: "x", allowed: true, everPlaced: true, lastPlacedAt: "x", daysSince: 40, minDays: 14, reason: null } }),
+  chan({ channel: "x", reuse: { key: "x", allowed: false, everPlaced: true, lastPlacedAt: "x", daysSince: null, minDays: 1, reason: null } }),
+];
+
+test("fitLine: a COLD START from no data never looks like a STRONG FIT from a measured score", () => {
+  const strong = fitLine(CHANNEL_VECTORS[0], 0.6);
+  const cold = fitLine(CHANNEL_VECTORS[3], 0.6);
+  assert.equal(strong.label, "STRONG FIT");
+  assert.equal(strong.tone, "green");
+  assert.match(strong.basis, /measured, scoring 1\.4/);
+  assert.equal(cold.label, "COLD START");
+  assert.notEqual(cold.tone, strong.tone, "the two must not share a tone");
+  assert.match(cold.basis, /not enough posts or weeks/);
+  assert.ok(!/measured/.test(cold.basis), "a cold start must never claim a measurement");
+});
+
+test("fitLine: an unscored channel gets words, not one of the four verdicts", () => {
+  const rule = fitLine(CHANNEL_VECTORS[4], 0.6);
+  const asset = fitLine(CHANNEL_VECTORS[5], 0.6);
+  const unknown = fitLine(CHANNEL_VECTORS[6], 0.6);
+  const verdicts = ["STRONG FIT", "REACH ONLY", "POOR FIT", "COLD START"];
+  for (const r of [rule, asset, unknown]) {
+    assert.ok(!verdicts.includes(r.label), r.label + " must not be a fit verdict");
+    assert.ok(r.basis.length > 0, "the label never renders bare");
+    assert.equal(r.tone, "grey");
+  }
+  assert.equal(rule.label, "EDITORIAL RULE");
+  assert.equal(asset.label, "ALWAYS GENERATED");
+  assert.equal(unknown.label, "NOT SCORED");
+});
+
+test("fitLine: the configured floor is printed, never a literal typed into the page", () => {
+  assert.match(fitLine(CHANNEL_VECTORS[1], 0.6).basis, /floor is 0\.6/);
+  assert.match(fitLine(CHANNEL_VECTORS[1], 0.25).basis, /floor is 0\.25/);
+});
+
+test("floorNote: scoring under the floor is information, never an exclusion", () => {
+  assert.equal(floorNote(CHANNEL_VECTORS[0], 0.6), "");
+  const note = floorNote(CHANNEL_VECTORS[2], 0.6);
+  assert.match(note, /stays on/);
+  assert.match(note, /never skips a channel/);
+});
+
+test("reuseLine: every sentence names THIS channel's own window, never one global number", () => {
+  const never = reuseLine(CHANNEL_VECTORS[0]);
+  const held = reuseLine(CHANNEL_VECTORS[7]);
+  const clear = reuseLine(CHANNEL_VECTORS[8]);
+  const card = reuseLine(CHANNEL_VECTORS[5]);
+  assert.match(never.text, /14 days/);
+  assert.match(held.text, /60 days/);
+  assert.equal(held.tone, "amber");
+  assert.match(clear.text, /14 days/);
+  assert.equal(clear.tone, "ink");
+  assert.equal(card.text, "enforced per fan-out target");
+  assert.equal(card.tone, "grey");
+  // the prototype's single global "The window is 14 days" must not survive anywhere
+  for (const v of CHANNEL_VECTORS) assert.ok(!/The window is 14 days/.test(reuseLine(v).text));
+});
+
+test("the treatment mirror answers every channel vector identically", () => {
+  const m = treatmentMirror();
+  for (const v of CHANNEL_VECTORS) {
+    for (const floor of [0.6, 0.25]) {
+      assert.deepEqual(m.fitLine(v, floor), fitLine(v, floor), v.channel + " @ " + floor);
+      assert.equal(m.floorNote(v, floor), floorNote(v, floor), v.channel + " @ " + floor);
+    }
+    assert.deepEqual(m.reuseLine(v), reuseLine(v), v.channel);
+  }
+});
+
+const TREATMENT_VECTORS: { t: TreatmentView; cuts: { lens: string; sourceLines?: (number | string)[] }[] }[] = [
+  {
+    t: { slug: "s", pillars: ["human-ai"], pillarSource: "routing.md", floor: 0.6,
+         channels: [CHANNEL_VECTORS[0], CHANNEL_VECTORS[7]], scoredBelowFloorButEnabled: ["threads"] },
+    cuts: [{ lens: "extract", sourceLines: [4, "9-11"] }],
+  },
+  {
+    t: { slug: "s", pillars: [], pillarSource: "none", floor: 0.6,
+         channels: [CHANNEL_VECTORS[6]], scoredBelowFloorButEnabled: [] },
+    cuts: [],
+  },
+  {
+    t: { slug: "s", pillars: ["civic-tech", "human-ai"], pillarSource: "routing.md", floor: 0.25,
+         channels: [CHANNEL_VECTORS[0]], scoredBelowFloorButEnabled: ["threads", "mastodon"] },
+    cuts: [{ lens: "a", sourceLines: [1] }, { lens: "b", sourceLines: [2] }, { lens: "c" }],
+  },
+];
+
+test("readsFromCells: one channel and one cut read as singular, several read as plural", () => {
+  const one = readsFromCells(TREATMENT_VECTORS[0].t, TREATMENT_VECTORS[0].cuts);
+  const many = readsFromCells(TREATMENT_VECTORS[2].t, TREATMENT_VECTORS[2].cuts);
+  assert.match(one[2].v, /threads scores under the floor of 0\.6 and stays on\./);
+  assert.match(many[2].v, /threads, mastodon score under the floor of 0\.25 and stay on\./);
+  assert.match(one[3].v, /The cut below carries the source lines it was built from,/);
+  assert.match(many[3].v, /All 2 cuts below carry the source lines they were built from,/);
+});
+
+test("readsFromCells: four cells, each standing on a read rather than on the prototype's copy", () => {
+  const [withPillar, noPillar] = TREATMENT_VECTORS.map((v) => readsFromCells(v.t, v.cuts));
+  assert.equal(withPillar.length, 4);
+  assert.deepEqual(withPillar.map((c) => c.k), ["PILLAR", "REUSE WINDOWS", "NOTHING SKIPPED", "YOUR WORDS"]);
+
+  assert.match(withPillar[0].v, /human-ai, read from this piece's routing\.md/);
+  // the held channel names ITS OWN window, and no global constant appears
+  assert.match(withPillar[1].v, /60 days/);
+  assert.ok(!/The window is 14 days/.test(withPillar[1].v));
+  assert.match(withPillar[2].v, /floor of 0\.6/);
+  assert.match(withPillar[2].v, /never skips a channel/);
+  assert.match(withPillar[3].v, /Nothing composed/);
+
+  // no routing.md: no pillar, no score, and NO extraction claim, because no cut carries source lines
+  assert.match(noPillar[0].v, /has no routing\.md/);
+  assert.equal(noPillar[0].tone, "grey");
+  assert.match(noPillar[2].v, /No score to skip anything on/);
+  assert.match(noPillar[3].v, /makes no claim/);
+  assert.equal(noPillar[3].tone, "grey");
+});
+
+test("readsFromCells: the browser copy answers every treatment vector identically", () => {
+  const m = treatmentMirror().readsFromCells;
+  for (const v of TREATMENT_VECTORS) assert.deepEqual(m(v.t, v.cuts), readsFromCells(v.t, v.cuts), v.t.pillarSource);
+});
+
+test("the Content wizard calls the treatment read and offers no control the backend cannot honour", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('"/api/content/treatment?slug="'), "the wizard must read the treatment");
+  // Refused ports: routing decides channels (route.ts), so there is no channel checkbox here, and
+  // nothing in src/ clusters Muxin's own audience.
+  assert.ok(!script.includes("Make the "), "the prototype's 'Make the N drafts' control does not ship");
+  assert.ok(!script.includes("sit in that cluster"), "no cluster-size claim ships");
+  // VENTURE_SLUGS/VENTURE_THREAD are the Venture room's own state; the TAG would be a quoted literal
+  assert.ok(!script.includes('"VENTURE"'), "no source can earn a VENTURE tag, so the tag does not ship");
+  assert.ok(script.includes('"SUBSTACK"') && script.includes('"YOURS"') && script.includes('"READ IN"'),
+    "the three tags that a real source.md fact can earn do ship");
+});
+
+test("the wizard's bulk yes reuses the row status route and says what it approves", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('post("/api/status"'), "a bulk yes must reuse the same write every card uses");
+  assert.ok(script.includes("Yes to all "), "the scoped label ships");
+  assert.ok(script.includes("Nothing outside this channel is touched"), "the scope is stated");
+  assert.ok(script.includes("Nothing posts instantly"), "scheduling is not hidden behind the word approve");
+  // A row she flagged revise must be out of reach: approving it would act against her own note.
+  assert.ok(script.includes("!DECIDED.has(r.status) && !r.status"), "the bulk yes targets untouched drafts only");
+  assert.ok(script.includes("marked revise or blocked"), "the button says what it deliberately leaves alone");
+});
+
+test("cwGroups: the bulk yes counts only untouched drafts, never a row marked revise", () => {
+  // The browser's cwGroups is DOM-bound, so this asserts the shape of the emitted source instead:
+  // the three counts must be distinct, and `fresh` (what the button acts on) must exclude a status.
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function cwGroups(){");
+  assert.ok(start > -1, "cwGroups must reach the browser");
+  const body = script.slice(start, script.indexOf("\nfunction ", start + 10));
+  assert.match(body, /fresh: pending\.filter\(r=>!r\.status\)\.length/);
+  assert.match(body, /flagged: pending\.filter\(r=>!!r\.status\)\.length/);
+  // and a live check of the same predicate over a realistic row set
+  const rows = [
+    { status: "" }, { status: "" }, { status: "approve" }, { status: "revise" },
+    { status: "blocked" }, { status: "published" }, { status: "discard" },
+  ];
+  const DECIDED_SET = new Set(["published", "discard", "locked"]);
+  const pending = rows.filter((r) => !DECIDED_SET.has(r.status) && r.status !== "approve");
+  assert.equal(pending.length, 4, "the badge counts revise and blocked as outstanding");
+  assert.equal(pending.filter((r) => !r.status).length, 2, "but only two are what a bulk yes may touch");
+  assert.equal(pending.filter((r) => !!r.status).length, 2);
 });
