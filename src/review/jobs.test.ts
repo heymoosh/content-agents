@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -1060,4 +1060,238 @@ test("gitStateDrift reports the whole /story step 7 at once and never offers to 
   assert.match(all, /created story\/chapter-02/);
   assert.match(all, /Nothing was undone for you/);
   assert.ok(!/\u2014/.test(all), "no em dash in copy Muxin reads");
+});
+
+
+// ── Stop it (per-job stop) ─────────────────────────────────────────────────────────────────────
+// Before this, the ONLY way out of a running job was restarting the server: runCommandSpawn kept
+// the child in a local `const`, so nothing in the process could signal it, and a stuck run held
+// the single `draining` lane against every job queued behind it.
+
+test("stopping a queued job never spawns anything, and drain() skips it", async () => {
+  jobs.length = 0;
+  let taskRan = false;
+  const first = runQueued("revise", "holds the lane", async () => {
+    await new Promise((r) => setTimeout(r, 60));
+  });
+  const second = runQueued("revise", "stopped before it ever ran", async () => {
+    taskRan = true;
+  });
+  await new Promise((r) => setTimeout(r, 10));
+  const queued = jobs.find((j) => j.label === "stopped before it ever ran")!;
+  assert.equal(queued.status, "queued", "the first job holds the lane");
+
+  const out = stopJob(queued.id);
+  assert.ok("job" in out && out.stopped);
+  assert.equal(queued.status, "stopped");
+  assert.equal(queued.error, null, "a stop is not a fault");
+  // The caller's promise must settle, or the HTTP request that enqueued it hangs forever.
+  await assert.rejects(second, /stopped/);
+
+  await first;
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(taskRan, false, "drain() finds work by status === 'queued' — a stopped job is never picked");
+  assert.equal(queued.status, "stopped", "and nothing later flipped it to done or failed");
+  jobs.length = 0;
+});
+
+// THE core regression. `claude` catches SIGTERM and exits 143 rather than dying by signal (see
+// isSpawnTimeout), so the close handler hands settleJob a failure-shaped result for a run Muxin
+// deliberately ended. Drop the stoppedByMuxin check in settleJob and this test reports "failed"
+// with a Retry button attached.
+test("a stopped subprocess job settles as stopped, not failed, even when it exits 143", async () => {
+  jobs.length = 0;
+  const run = runQueued("revise", "killed mid-run", async (job) => {
+    stopJob(job.id); // stands in for the route firing while this job is running
+    // What runCommandSpawn's close handler records for a SIGTERM'd `claude`: exit 143, no signal.
+    job.lastSpawn = { code: 143, timedOut: true, enoent: false };
+    throw new Error("revise timed out after 180s");
+  });
+  await assert.rejects(run, /timed out|stopped/);
+  await new Promise((r) => setTimeout(r, 30));
+
+  const job = jobs.find((j) => j.label === "killed mid-run")!;
+  assert.equal(job.status, "stopped", "exit 143 after a deliberate stop is a stop, not a broken run");
+  assert.notEqual(job.status, "failed");
+  assert.equal(job.error, null, "no 'timed out' error text on a run she ended herself");
+  assert.equal(job.retryable, false, "Retry means 'the run broke, try again' — she did not ask for that");
+  assert.equal(job.failedAtStep, null);
+  assert.ok(job.finishedAt !== null, "and it stopped the clock");
+  jobs.length = 0;
+});
+
+test("stopping a task-closure job with no subprocess still settles as stopped and discards its result", async () => {
+  jobs.length = 0;
+  let release: (() => void) | null = null;
+  const run = runQueued("insights", "mid-await, nothing to kill", async () => {
+    await new Promise<void>((r) => { release = r; });
+    return "the answer nobody is waiting for any more";
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  const job = jobs.find((j) => j.label === "mid-await, nothing to kill")!;
+  assert.equal(job.status, "running");
+  assert.equal(job.proc, undefined, "a task closure has no child process to signal");
+
+  const out = stopJob(job.id);
+  assert.ok("job" in out && out.stopped);
+  assert.equal(job.status, "stopped", "no process means stopping can only mean 'mark it and drop the result'");
+  await assert.rejects(run, /stopped/, "the caller's promise is rejected, not left hanging");
+
+  // The orphaned closure finishes into nothing: drain() clobbers the status back to done, and
+  // settleJob's rule 0 must put it back without releasing a lane the NEXT job now holds.
+  release!();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(job.status, "stopped", "its late result is discarded, not rendered as a green done");
+  jobs.length = 0;
+});
+
+// The mutex half of the case above: the lane is handed on ONCE. If settleJob re-released it when
+// the orphan resolved, two jobs would run at the same time.
+test("an orphaned stopped task resolving late does not double-release the job lane", async () => {
+  jobs.length = 0;
+  let release: (() => void) | null = null;
+  const stoppedRun = runQueued("insights", "orphan", async () => {
+    await new Promise<void>((r) => { release = r; });
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  const orphan = jobs.find((j) => j.label === "orphan")!;
+
+  let concurrent = 0;
+  let maxConcurrent = 0;
+  const body = async () => {
+    concurrent++;
+    maxConcurrent = Math.max(maxConcurrent, concurrent);
+    await new Promise((r) => setTimeout(r, 40));
+    concurrent--;
+  };
+  const nextA = runQueued("insights", "next A", body);
+  const nextB = runQueued("insights", "next B", body);
+
+  stopJob(orphan.id);
+  await assert.rejects(stoppedRun, /stopped/);
+  await new Promise((r) => setTimeout(r, 10));
+  release!(); // the orphan's own promise resolves while "next A" holds the lane
+  await Promise.all([nextA, nextB]);
+
+  assert.equal(maxConcurrent, 1, "one Claude at a time — the stopped job's late resolve must not free the lane again");
+  assert.equal(orphan.status, "stopped");
+  jobs.length = 0;
+});
+
+test("a stopped job is sweepable by Clear finished", () => {
+  assert.equal(jobIsSweepable({ status: "stopped", answer: null }), true, "she ended it; that is finished work");
+  assert.equal(jobIsSweepable({ status: "stopped", answer: "A" }), true);
+});
+
+test("stopping an already-settled job is a safe no-op", () => {
+  jobs.length = 0;
+  jobs.push({
+    id: buildJobId(Date.now(), 4242), kind: "revise", label: "already done", arg: "",
+    status: "done", slugs: [], error: null, createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: Date.now(), lastStdoutLine: null, steps: [], stepTotal: null, step: 0,
+    failedAtStep: null, retryable: false, ask: null, answer: null,
+  });
+  const done = jobs[0];
+  const out = stopJob(done.id);
+  assert.ok("job" in out);
+  assert.equal(out.stopped, false, "nothing to stop");
+  assert.equal(done.status, "done", "and its verdict is left exactly as it was");
+
+  assert.deepEqual(stopJob("job-that-never-existed"), { error: "no such job" });
+  jobs.length = 0;
+});
+
+test("a stopped job is never offered a retry", () => {
+  jobs.length = 0;
+  jobs.push({
+    id: buildJobId(Date.now(), 4243), kind: "revise", label: "she stopped it", arg: "",
+    status: "running", slugs: [], error: null, createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: null, lastStdoutLine: null, steps: [], stepTotal: null, step: 0,
+    failedAtStep: null, retryable: true, ask: null, answer: null,
+  });
+  const job = jobs[0];
+  stopJob(job.id);
+  assert.equal(job.status, "stopped");
+  assert.equal(job.retryable, false);
+  // And the route guard agrees: only a `failed` job can be run again.
+  const retried = retryJob(job.id);
+  assert.ok("error" in retried && /only a failed job/.test(retried.error));
+  jobs.length = 0;
+});
+
+test("publicJob stays JSON-serializable and never carries the process handle", () => {
+  jobs.length = 0;
+  const fakeChild = { pid: 4242, kill: () => true, stdout: null, stderr: null } as unknown as NonNullable<
+    Parameters<typeof publicJob>[0]["proc"]
+  >;
+  jobs.push({
+    id: buildJobId(Date.now(), 4244), kind: "revise", label: "has a live child", arg: "",
+    status: "running", slugs: [], error: null, createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: null, lastStdoutLine: null, steps: [], stepTotal: null, step: 0,
+    failedAtStep: null, retryable: false, ask: null, answer: null,
+    proc: fakeChild, stoppedByMuxin: true, discard: () => {},
+    task: async () => {},
+  });
+  const shape = publicJob(jobs[0]);
+  assert.equal("proc" in shape, false, "a ChildProcess is not serializable — /api/jobs must never see it");
+  assert.equal("stoppedByMuxin" in shape, false);
+  assert.equal("discard" in shape, false);
+  assert.equal("task" in shape, false);
+  assert.equal("lastSpawn" in shape, false);
+  // The real check: the polled read still round-trips through JSON unchanged.
+  assert.deepEqual(JSON.parse(JSON.stringify(shape)), shape);
+  jobs.length = 0;
+});
+
+// The headline mechanism, on a REAL child process: before this, `spawn()`'s result was a local
+// `const child` captured only by its own listeners, so nothing in the process could signal a
+// running job. Delete `job.proc = child` from runCommandSpawn and stopJob silently falls through
+// to its task-closure branch — settling the job and releasing the lane while the child is still
+// alive, which is two Claudes at once. `sleep` stands in for `claude`: no binary needed, and it
+// dies by SIGTERM the same way.
+test("runCommandSpawn retains the child, stopJob signals it, and close clears the handle", async () => {
+  jobs.length = 0;
+  jobs.push({
+    id: buildJobId(Date.now(), 4245), kind: "revise", label: "a real subprocess", arg: "",
+    status: "running", slugs: [], error: null, createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: null, lastStdoutLine: null, steps: [], stepTotal: null, step: 0,
+    failedAtStep: null, retryable: false, ask: null, answer: null,
+  });
+  const job = jobs[0];
+
+  // spawn() is synchronous, so the handle is on the job by the time this call returns.
+  const running = runCommandSpawn(job, "sleep", ["30"], { timeoutMs: 60_000 });
+  assert.ok(job.proc, "nothing can stop a running job unless the child is retained on it");
+
+  const out = stopJob(job.id);
+  assert.ok("job" in out && out.stopped);
+  assert.equal(
+    job.status, "running",
+    "the kill branch hands off to the close handler — it must NOT settle here and free the lane under a live child",
+  );
+
+  const result = await running;
+  assert.equal(result.timedOut, true, "the child really took the SIGTERM");
+  // And this is precisely the ambiguity stoppedByMuxin exists to resolve: the result of a
+  // deliberate stop is indistinguishable from the result of our own 15-minute timeout firing.
+  assert.equal(job.lastSpawn?.timedOut, true);
+  assert.equal(job.proc, undefined, "and the dead handle is cleared on close");
+  jobs.length = 0;
+});
+
+// A stopped job's later spawns are stillborn, so an orphaned task closure can never put a second
+// `claude` behind the next job's back.
+test("a stopped job's next spawn never starts a process", async () => {
+  jobs.length = 0;
+  jobs.push({
+    id: buildJobId(Date.now(), 4246), kind: "revise", label: "stopped between spawns", arg: "",
+    status: "stopped", slugs: [], error: null, createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: Date.now(), lastStdoutLine: null, steps: [], stepTotal: null, step: 0,
+    failedAtStep: null, retryable: false, ask: null, answer: null, stoppedByMuxin: true,
+  });
+  const job = jobs[0];
+  const result = await runCommandSpawn(job, "sleep", ["30"], { timeoutMs: 60_000 });
+  assert.equal(job.proc, undefined, "no child was ever spawned");
+  assert.deepEqual(result, { code: null, timedOut: false, enoent: false, stdout: "" });
+  jobs.length = 0;
 });
