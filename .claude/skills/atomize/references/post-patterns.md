@@ -97,6 +97,32 @@ because nothing reads it. Trust `gate`, `popularity` and `platform_floor`; treat
 diary entry. The field was called `outlier` in earlier passes and was renamed once its meaning
 stopped matching `classifyOutlier` in `src/patterns/outliers.ts`.
 
+**Before you add a pattern, read this. It is the most expensive lesson this file has learned.**
+Rule 1 forbids reusing a creator's wording. Three separate sweeps for violations each found more,
+because each check was narrower than the problem: the first scanned quoted strings, the second
+scanned Shape blocks, the third scanned every line. Only the third worked. Two rules follow.
+
+1. **A single-sighting pattern is presumptively contaminated until checked.** Of 17 lifts found in
+   the final sweep, 15 came from records resting on one post, which is roughly 88 percent of the
+   errors from about half the patterns. The mechanism is simple and it will happen to you: with one
+   example there is nothing to abstract against, so the creator's sentence becomes the skeleton by
+   default. Three violations were introduced by the agent writing them within an hour of it
+   reporting that it had scrubbed 16 of the same class.
+2. **Check by n-gram against the collected bodies, over the whole file.** Not by scanning quoted
+   strings. Two real violations survived that method: one was unquoted prose in a numbered beat, and
+   one was bracket-interleaved so no long unbroken run existed to match. Compare normalised word
+   sequences from every line of this file against every collected body, transcript, on-screen text
+   and title. Anything at 6 words or longer needs reading individually.
+
+**Structure and arc beats count.** 13 of those 17 lifts were in beats rather than Shape blocks. A
+beat is an instruction a drafter follows, so it propagates into copy exactly like a template does.
+Sweep both.
+
+**What is NOT in scope:** our own collection metadata in the `notes` field. A raw n-gram run
+overlaps heavily with our methodology prose, how a crawler window was pulled, what a baseline
+covers. That is our writing, not a creator's, and rewording it makes the metric look better without
+making the file safer. Filter to creator content: bodies, transcripts, on-screen text and titles.
+
 ## What separated the winners from the same creators' ordinary posts
 
 **A run-level finding from the mining pass, revised 2026-08-23, not a pattern record.** It is placed
