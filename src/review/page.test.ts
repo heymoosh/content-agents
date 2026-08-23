@@ -11,6 +11,8 @@ import {
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
   jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
+  classifyCapture, captureVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
+  LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -1630,4 +1632,171 @@ test("stopJob claims nothing when the job had already settled", async () => {
   await make({ ok: false, error: "no such job" })("j1");
   assert.equal(flashed[0], "no such job");
   assert.equal(reloads.length, 2, "a failed stop must not trigger a reload as if something changed");
+});
+
+// ── Studio capture: the classifier, its mirror, and the bare-link ask ────────────────────────────
+// The capture box moved from the Content room to the top of Studio, and grew a classifier that
+// picks a room. Three things must hold, and each has bitten this file before:
+//   - the rule itself, including precedence (first match wins, and the order is load-bearing);
+//   - the inline browser copy behaving IDENTICALLY to the export (Rule 5 — fixing one and
+//     forgetting the other went green twice);
+//   - the dispatch never claiming to start work that has no route behind it.
+
+type CaptureFn = (t: string) => { kind: string; room?: string; url?: string };
+type VerdictFn = (room: string) => { room: string; line: string; actionLabel: string | null };
+
+// Pulls the client's own copy of the two helpers back out of the emitted <script> and evaluates it.
+// String-presence would pass on a mangled regex (`\s` emitted as `s`, `\/` emitted as `/` opening a
+// line comment); running the extracted code cannot.
+function captureMirror(): { classifyCapture: CaptureFn; captureVerdict: VerdictFn } {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("const BARE_URL_RE");
+  const end = script.indexOf("// ── end of the capture mirror ──");
+  assert.ok(start > -1, "the inline classifyCapture mirror must reach the browser");
+  assert.ok(end > start, "the capture mirror's end marker must follow it");
+  const src = script.slice(start, end);
+  return new Function(src + "\nreturn { classifyCapture: classifyCapture, captureVerdict: captureVerdict };")() as {
+    classifyCapture: CaptureFn; captureVerdict: VerdictFn;
+  };
+}
+
+// [text, expected room]. The precedence cases are the point: each one matches more than one rule.
+const CAPTURE_ROOM_VECTORS: [string, string][] = [
+  ["follow up with Jamie R. about the pitch", "Outreach"],
+  ["met Dana at the meetup, she runs the fund", "Outreach"],
+  ["reply to https://someplace.com", "Outreach"],       // a keyword beats the bare-URL branch
+  ["intro to plotting", "Outreach"],                     // rule 1 beats Fiction's "plot"
+  ["email the scene to my editor", "Outreach"],          // rule 1 beats Fiction's "scene"
+  ["chapter 4 needs a colder open", "Fiction"],
+  ["elias finally says it out loud", "Fiction"],
+  ["a scene where the offer lands badly", "Fiction"],    // rule 2 beats Venture's "offer"
+  ["what should the price be", "Venture"],
+  ["survey answers are coming in faster than I thought", "Venture"],
+  ["a thought about how atomization actually scales", "Content"],
+  ["I read https://example.com/post today and it stuck with me", "Content"], // a link inside a sentence
+  ["foo.xyz", "Content"],                                // a TLD the bare-link rule does not accept
+];
+
+const CAPTURE_ASK_VECTORS = [
+  "https://example.com",
+  "www.someone.ai",
+  "example.substack.com/p/a-thing",
+  "  https://foo.org  ",
+  "http://localhost.dev/x?y=1",
+];
+
+test("classifyCapture: five branches, first match wins, and the order is load-bearing", () => {
+  for (const [text, room] of CAPTURE_ROOM_VECTORS) {
+    const v = classifyCapture(text);
+    assert.equal(v.kind, "room", text);
+    assert.equal((v as { room: string }).room, room, text);
+  }
+});
+
+test("classifyCapture: a bare link is a question, never a room", () => {
+  for (const text of CAPTURE_ASK_VECTORS) {
+    const v = classifyCapture(text);
+    assert.equal(v.kind, "ask-link", text);
+    assert.equal((v as { url: string }).url, text.trim(), "the ask carries the trimmed link");
+  }
+  // Muxin's decision, recorded so nobody re-litigates it from the v5 handoff's match table (which
+  // sent anything containing http / .com / .ai / .org straight to Signals): the app asks.
+  assert.notEqual(classifyCapture("https://example.com").kind, "room");
+});
+
+test("classifyCapture: empty text classifies as empty, not as Content", () => {
+  for (const t of ["", "   ", "\n\t "]) assert.equal(classifyCapture(t).kind, "empty", JSON.stringify(t));
+});
+
+test("classifyCapture mirror: the browser copy answers identically on every vector (Rule 5)", () => {
+  const mirror = captureMirror().classifyCapture;
+  for (const [text, room] of CAPTURE_ROOM_VECTORS) {
+    assert.deepEqual(mirror(text), classifyCapture(text), text);
+    assert.equal(mirror(text).room, room, text);
+  }
+  for (const text of CAPTURE_ASK_VECTORS) {
+    assert.deepEqual(mirror(text), classifyCapture(text), text);
+    assert.equal(mirror(text).kind, "ask-link", text);
+  }
+  for (const t of ["", "   "]) assert.deepEqual(mirror(t), classifyCapture(t));
+});
+
+test("captureVerdict: every routed capture names the room it chose, and its mirror agrees", () => {
+  const mirror = captureMirror().captureVerdict;
+  for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
+    const v = captureVerdict(room);
+    assert.ok(v.line.includes(room), "the verdict must name the room it picked: " + room);
+    assert.deepEqual(mirror(room), v, "the browser copy of captureVerdict must match: " + room);
+  }
+  // The two rooms with no free-text entry say so, rather than offering a start they cannot perform.
+  assert.ok(captureVerdict("Outreach").line.includes("lead folder"));
+  assert.ok(captureVerdict("Venture").line.includes("no free text"));
+  // Content needs no move: its two buttons are already on this screen.
+  assert.equal(captureVerdict("Content").actionLabel, null);
+  assert.equal(captureVerdict("Fiction").actionLabel, "Take it to Fiction");
+});
+
+test("Studio capture: the box moved out of the Content room and into Studio", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const studio = html.slice(html.indexOf('id="roomStudio"'), html.indexOf('id="roomFiction"'));
+  const content = html.slice(html.indexOf('id="roomContent"'), html.indexOf('id="roomStudio"'));
+  for (const id of ['id="src"', 'id="captureTitle"', 'id="devStartBtn"', 'id="addBtn"', 'id="notesBtn"', 'id="notesPanel"', 'id="routeBtn"']) {
+    assert.ok(studio.includes(id), id + " must live in the Studio room now");
+    assert.ok(!content.includes(id), id + " must no longer be in the Content room");
+  }
+  // The notes browser came with it, so its copy must not still point "below" at a sheet that is
+  // now in a different room.
+  assert.ok(studio.includes("waits for your yes in the Content room"));
+  assert.ok(!html.includes("every draft still waits for your yes below"));
+  // The promo bridge fills #src, so it has to land in the room #src is in.
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('setRoom("studio"); // the capture box lives in Studio now'));
+});
+
+test("the bare-link ask: three controls, the honest explainer, and the honest Signals copy", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes(LINK_ASK_HEADING), "the ask must be headed " + LINK_ASK_HEADING);
+  assert.ok(html.includes("Versions for Content"), "the default-weighted button");
+  assert.ok(html.includes("Source for Signals"), "the filing button");
+  assert.ok(html.includes("Never mind, clear it"), "the cancel");
+  assert.ok(html.includes(LINK_ASK_EXPLAINER), "the explainer ships verbatim");
+  // Signals has no ingest for "a URL a reader came from". The button must not imply one.
+  assert.ok(html.includes(LINK_ASK_SIGNALS_NOTE), "the Signals button must say what it actually does");
+  assert.ok(LINK_ASK_SIGNALS_NOTE.includes("not attribution"));
+  // The ask's own state: an amber rail and a dimmed, read-only textarea while it is open.
+  assert.ok(html.includes(CAPTURE_RAIL_IDLE) && html.includes('id="captureRail"'));
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes(JSON.stringify(CAPTURE_RAIL_ASKING)), "the amber rail label must reach the browser");
+  assert.ok(script.includes('ta.readOnly = true; ta.classList.add("dimmed");'));
+});
+
+// The capture section may only reach routes that exist. Outreach drafting needs a lead folder and
+// Venture has no free-text entry, so a dispatch to either would be a claim this system cannot back.
+test("Studio capture: the dispatch never posts to a route that cannot take free text", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── Studio capture: one front door (v7 Studio)");
+  const end = script.indexOf("// ── Substack Notes checklist");
+  assert.ok(start > -1 && end > start, "the capture client section must be identifiable");
+  const section = script.slice(start, end);
+  const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
+  assert.deepEqual(paths, ["/api/develop/start", "/api/signals/backlog"], "unexpected route in the capture dispatch");
+  // Both are already wired: develop/start enqueues (so it must be armed), signals/backlog files a
+  // card and correctly is not an enqueue route.
+  assert.ok(enqueuesJob("/api/develop/start"));
+  assert.ok(!enqueuesJob("/api/signals/backlog"));
+  // Outreach and Venture get a room switch and a plain sentence, not a fabricated job.
+  assert.ok(section.includes('setRoom("outreach"); flash("Opened Outreach. Your words are still in the capture box.");'));
+  assert.ok(section.includes('setRoom("venture"); flash("Opened Venture. Your words are still in the capture box.");'));
+  assert.ok(!/room==="Outreach".*post\(/s.test(section.slice(section.indexOf("function takeCaptureTo"), section.indexOf("function consumeCapturedBeats"))));
+});
+
+test("Studio capture copy: no em dashes, and nothing claims a job was started", () => {
+  const strings = [
+    CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING, LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE,
+    ...(["Content", "Fiction", "Outreach", "Venture"] as const).map((r) => captureVerdict(r).line),
+  ];
+  for (const s of strings) assert.ok(!s.includes("—"), "em dash in capture copy: " + s);
+  for (const r of ["Outreach", "Venture"] as const) {
+    assert.ok(/cannot start/.test(captureVerdict(r).line), r + " must say plainly that it cannot start one");
+  }
 });
