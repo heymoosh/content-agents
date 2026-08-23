@@ -84,9 +84,18 @@ opted out with `rehook: false` in `config/platforms.yaml`, and it still never ap
 Notes-sourced folder (`source_kind: substack-note`), which stays a near-verbatim cross-post.
 
 **How this file gets written:** the `/patterns` skill collects real posts into `data/patterns/`
-(gitignored, other creators' full text never enters git), scores them for outlier reach, and
-`/patterns synthesize` distills the winners into records below. Only the distilled shapes are
-committed. If you want to change what gets mined, edit `config/pattern-mining.yaml`, not this file.
+(gitignored, other creators' full text never enters git), and `/patterns synthesize` distills the
+ones that clear the popularity gate into records below. Only the distilled shapes are committed. If
+you want to change what gets mined, edit `config/pattern-mining.yaml`, not this file.
+
+**Reading `data/patterns/analyses.jsonl`, for whoever opens it next.** Each record carries the eight
+structural fields, plus `gate` (one of `ADMITTED`, `BELOW-FLOOR`, `INCOMPLETE`, `TITLE-ONLY`),
+`admissible` (true only when `gate` is `ADMITTED`), `popularity`, `popularity_metric` and
+`platform_floor`. **The per-record `reason` prose is historical working notes from the first pass on
+2026-08-23 and may describe a gate that has since been retired.** It was deliberately not rewritten,
+because nothing reads it. Trust `gate`, `popularity` and `platform_floor`; treat `reason` as a
+diary entry. The field was called `outlier` in earlier passes and was renamed once its meaning
+stopped matching `classifyOutlier` in `src/patterns/outliers.ts`.
 
 ## What separated the winners from the same creators' ordinary posts
 
@@ -699,8 +708,11 @@ here rather than repeated in each record.
   The corpus can now show one image that worked and what it contained, but two posts from one
   creator is not enough to say what makes such an image good in general. That judgment is still
   largely Muxin's.
-  The measured backing for the form itself is in the media section above: image posts run 2.19x
-  against 0.62x for text-only across 13 and 8 body-complete entries.
+  **The measured backing this record used to cite has been withdrawn.** It quoted image posts at
+  2.19x against 0.62x for text-only, computed at 100 corpus entries. At 292 the text-only comparison
+  group grew from 8 posts to 55 and the gap closed and crossed; see the image-versus-text section
+  above. What still supports this shape is convergent professional practice on this platform, not a
+  measured effect.
 - **Real example:** Dan Koe, LinkedIn, his two highest-engagement posts in this corpus, both
   one-line captions over attached images. The higher of the two is a dark quote card whose text
   repeats a single unit of time across four parallel lines. Citation only: describe the shape, never
@@ -1174,7 +1186,7 @@ highest-value fix available for this platform.
   in 1 post by 1 creator, at 1,237 engagements including 119 reshares, the largest post on its
   account and the highest reshare count in the Threads set.
 - **Structure / arc:**
-  1. A superlative claim about method. The fastest way to become X.
+  1. A superlative claim about method, naming the outcome it produces.
   2. The method, stated as an end condition rather than an amount. Do the thing until [the state
      that means you are finished].
   3. Stop. There is no beat 3, and this is the whole discipline of the pattern.
@@ -1190,7 +1202,7 @@ highest-value fix available for this platform.
   emoji, no hashtags, no link. Every high-reshare post on this account is one sentence.
 - **Shape:**
   ```
-  [Beat 1: "the fastest way to [outcome] is"]
+  [Beat 1: a superlative claim about method, naming the outcome]
   [Beat 2: the method, defined by the state that ends it, not by a number or a duration]
   [Stop]
   ```
@@ -1207,8 +1219,8 @@ highest-value fix available for this platform.
   with because there is no detail. Seen in 1 post by 1 creator, at 969 engagements including 99
   reshares, second on its account.
 - **Structure / arc:**
-  1. Name the era or the shift, in a clause. We are in the middle of X.
-  2. Swap one: [new thing] replaces [old thing].
+  1. Name the era or the shift, in a clause that sets up a list.
+  2. Swap one: the new thing stated in place of the old one.
   3. Swap two, in the same grammar.
   4. Swap three, in the same grammar, and this one carries the sharpest pair.
   5. Stop. One sentence total.
@@ -1222,10 +1234,10 @@ highest-value fix available for this platform.
   commas, no bullets, no line breaks, no emoji, no link.
 - **Shape:**
   ```
-  [Beat 1: "we are in [the named era/shift] where"]
-  [Beat 2: [new thing] replaces [old thing],]
-  [Beat 3: [new thing] replaces [old thing],]
-  [Beat 4: [new thing] replaces [old thing]]
+  [Beat 1: name the era or shift, in a clause that sets up a list]
+  [Beat 2: swap one. [the new thing] in place of [the old thing]]
+  [Beat 3: swap two, in the same grammar as beat 2]
+  [Beat 4: swap three, same grammar, carrying the sharpest pair]
   [Stop. One sentence]
   ```
   The three swaps must be in identical grammar and must escalate, with the most contestable pair
@@ -1243,11 +1255,10 @@ highest-value fix available for this platform.
   matters: this shape clears the popularity floor and sits at the bottom of its own creator's range,
   so treat it as usable rather than as a winner.
 - **Structure / arc:**
-  1. The reassurance, stated as a refusal of the standard advice. Your X works fine. You do not need
-     to fix it.
-  2. The reattribution. The problem is not X, it is that you do not have Y.
-  3. The condition sharpened, so Y becomes concrete. No Y strong enough that everything else becomes
-     [the consequence].
+  1. The reassurance, stated as a refusal of the standard advice: the thing they blame is not
+     broken and does not need fixing.
+  2. The reattribution. The problem is not that thing, it is a different variable they lack.
+  3. The condition sharpened, so that variable becomes concrete rather than a vague noun.
   4. Stop.
 - **Emotional trigger:** contrarian comfort. The reader is let off a hook and handed a different,
   larger problem, which is a trade most people will take.
@@ -1259,9 +1270,9 @@ highest-value fix available for this platform.
   block, no bullets, no emoji, no link. Quotation marks around the rejected word in one of the two.
 - **Shape:**
   ```
-  [Beat 1: "Your [thing they blame] works fine. You do not need to fix it."]
-  [Beat 2: "You just do not have [the real missing variable]."]
-  [Beat 3: sharpen it. No [variable] strong enough that [everything else becomes X]]
+  [Beat 1: absolve them. State that [the thing they blame] is not broken and needs no fixing]
+  [Beat 2: reassign the problem. What they are actually missing is [the real variable]]
+  [Beat 3: sharpen it, so the missing variable becomes concrete enough to go looking for]
   [Stop]
   ```
   Beat 2 must name something concrete enough to go looking for. Reassigning the problem to a vague
@@ -1480,7 +1491,8 @@ across 5 creators measured against unbiased baselines.
 - **Shape:**
   ```
   [Beat 1: the counterfactual world, one long sentence, harm named concretely and scale pinned]
-  [Beat 2: "would you [work inside it / take that job / defend it]?" put to the reader directly]
+  [Beat 2: put the choice to the reader directly. Would they participate in that world, and on
+     what terms]
   [Beat 3: the rationalisation, in quotes, in the voice of someone who believes it and is not stupid]
   [Beat 4: the snap, one short sentence naming the real subject]
   [Stop. No explanation, no restatement, no link.]
@@ -1958,7 +1970,7 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
   real-time demonstration, second person for instructions and first person for the demonstration.
 - **Shape:**
   ```
-  [Beat 1: "first, we're going to [do the thing]" and start immediately, no setup]
+  [Beat 1: announce the first action in the first person plural and begin it immediately, no setup]
   [Beat 2: name any jargon and defuse it in the same breath]
   [Beat 3: lower the stakes twice, on quality and on audience, in your own words]
   [Beat 4: the physical setup, concrete enough that they can follow it while watching]
@@ -2008,7 +2020,7 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
   ```
   [Beat 1: introduce yourself as their peer, not their expert, in a few words]
   [Beat 2: their state, then their three most likely excuses, in the order they would actually say them]
-  [Beat 3: "here's what I want to tell you", or your own version of the turn signal]
+  [Beat 3: a turn signal in Muxin's own words, marking that the advice is arriving now]
   [Beat 4: the principle as a trade, what easy today costs them later and what hard today buys]
   [Beat 5: your own resistance, with one specific physical detail from a real day]
   [Beat 6: what you felt afterwards, named as felt states rather than as achievements]
@@ -2640,8 +2652,9 @@ though the comparison across accounts does not exist.
 
 **The single most useful thing in this section is a warning, not a shape.** The largest civic Notes
 account in the corpus, whose top note drew 39,173 likes and 6,472 restacks, **fails Muxin's CTA
-rubric on every close it makes.** Its asks are "we must get big money out of politics" and "the
-Senate must reject him": demands addressed to institutions, not actions a reader can finish. Under
+rubric on every close it makes.** Its asks are a demand that money be removed from politics and a
+demand that a legislature reject a nominee: both addressed to institutions, neither an action the
+reader can finish. Under
 `references/civic-adaptation.md` those are the vague form the whole rubric was written against. The
 notes travel enormously and they leave a persuaded reader with nowhere to go. Copy the structures
 below. Do not copy the closes.
