@@ -120,6 +120,11 @@ test("the browser interceptor refuses every non-GET, so no write request leaves 
   assert.ok(!/realFetch\(input, init\);\s*\n\s*}\s*;\s*$/.test(script.split("if (method !== \"GET\")")[0]));
 });
 
+test("the venture read dispatcher is GET-only, so a fixture override of one cannot write", () => {
+  const src = readFileSync(join(HERE, "venture-reads.ts"), "utf8");
+  assert.match(src, /if \(method !== "GET" \|\| !pathname\.startsWith\("\/api\/venture\/"\)\) return null;/);
+});
+
 test("serve.ts refuses every non-GET above every route while fixtures are on", () => {
   const src = readFileSync(join(HERE, "serve.ts"), "utf8");
   const guard = src.indexOf('if (FIXTURES_ON && req.method !== "GET")');
@@ -140,20 +145,42 @@ test("no fixture scenario fakes a route that writes — every override is a GET 
   const src = readFileSync(join(HERE, "serve.ts"), "utf8");
   for (const s of FIXTURE_SCENARIOS) {
     for (const path of Object.keys(s.overrides)) {
+      // Venture reads are owned by handleVentureRead rather than by a literal pathname compare, and
+      // that dispatcher is GET-only by construction (asserted just below), so a /api/venture/ path
+      // it answers is as provably read-only as a literal GET route here.
+      const isVentureRead = path.startsWith("/api/venture/") && src.includes("handleVentureRead");
       assert.ok(
-        src.includes(`req.method === "GET" && url.pathname === "${path}"`),
+        isVentureRead || src.includes(`req.method === "GET" && url.pathname === "${path}"`),
         `${s.id} overrides ${path}, which is not a GET route in serve.ts`,
       );
     }
   }
 });
 
+// `import type` is erased before anything runs, so it can never pull code in; only a VALUE import
+// can. The check below therefore separates the two rather than counting every `from` clause, which
+// is strictly stronger than the old "one import, and it is a type" rule: it now proves the property
+// transitively for the one value import fixtures.ts has.
+function valueImports(src: string): string[] {
+  return [...src.matchAll(/^import\s+(?!type\s)[^;]*?from\s+"([^"]+)";/gms)].map((m) => m[1]);
+}
+
 test("the fixtures module is I/O-free by construction — it cannot write anything", () => {
   const src = readFileSync(join(HERE, "fixtures.ts"), "utf8");
-  const imports = [...src.matchAll(/^import\s[^;]*?from\s+"([^"]+)";/gms)].map((m) => m[1]);
-  assert.deepEqual(imports, ["./page.js"], "fixtures.ts imports nothing but a type");
+  // Two value imports, and the second is why this test grew a second half: fixtures.ts builds its
+  // Venture scenarios by running the REAL buildVentureThread over fixture data, so a scenario can
+  // never drift from what the room renders. That is only safe while the builder is itself I/O-free.
+  assert.deepEqual(valueImports(src), ["./venture-thread.js"], "fixtures.ts value-imports only the thread builder");
   for (const banned of ["node:fs", "node:child_process", "node:http", "writeFileSync", "appendFileSync", "mkdirSync", "execSync", "spawn("]) {
     assert.ok(!src.includes(banned), `fixtures.ts must not reference ${banned}`);
+  }
+});
+
+test("venture-thread.ts is I/O-free too, which is what makes importing it into fixtures safe", () => {
+  const src = readFileSync(join(HERE, "venture-thread.ts"), "utf8");
+  assert.deepEqual(valueImports(src), [], "venture-thread.ts must import types only — a value import could drag node:fs in");
+  for (const banned of ["node:fs", "node:child_process", "node:http", "writeFileSync", "appendFileSync", "mkdirSync"]) {
+    assert.ok(!src.includes(banned), `venture-thread.ts must not reference ${banned}`);
   }
 });
 

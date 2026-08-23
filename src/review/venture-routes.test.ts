@@ -408,12 +408,41 @@ test("no route can leak a raw quote or a respondent hash", () => {
       assert.ok(!text.includes(EXACT_SENTINEL), `${path} leaked a raw quote`);
       assert.ok(!text.includes(HASH_SENTINEL), `${path} leaked a respondent hash`);
     }
-    // The redacted quote is the deliberate exception, and only through /clusters.
+    // The redacted quote is the deliberate exception, and it reaches exactly two routes: /clusters,
+    // and /thread once the venture is far enough along to render the problem panel (the thread
+    // composes the same cluster read). Widened here knowingly rather than left to pass by accident
+    // — this venture is Phase 1, so /thread does not carry it yet, and the Phase 3 case is asserted
+    // in its own test below.
+    const REDACTED_OK = ["/clusters", "/thread"];
     assert.ok(seen["/api/venture/private/clusters"].includes(REDACTED_SENTINEL));
     for (const [path, text] of Object.entries(seen)) {
-      if (path.endsWith("/clusters")) continue;
+      if (REDACTED_OK.some((p) => path.endsWith(p))) continue;
       assert.ok(!text.includes(REDACTED_SENTINEL), `${path} should not carry response text at all`);
     }
+  });
+});
+
+test("the thread carries redacted cluster quotes but never a raw one or a respondent hash", () => {
+  withRoot((root) => {
+    const dir = seedVenture(root, "deep");
+    kickoff("deep", fullAnswers());
+    seedResponses(dir, 25);
+    // Far enough along that the thread renders the problem panel at all.
+    writeFileSync(join(dir, "canon.md"), readFileSync(join(dir, "canon.md"), "utf8") +
+      `- 2026-08-20T00:00:00.000Z **checkpoint-cleared** \`deep/checkpoint-1\`\n` +
+      `- 2026-08-20T00:00:00.000Z **checkpoint-cleared** \`deep/checkpoint-2\`\n`);
+    writeFileSync(
+      join(dir, "cluster-analysis.json"),
+      JSON.stringify({
+        analyzed_at: "2026-08-20T00:00:00.000Z",
+        clusters: [{ cluster_id: "c1", label: "a problem", count: 3, evidence: [`${REDACTED_SENTINEL}-0`], stuck_point: "s", desired_outcome: null, visible_consequences: null }],
+      })
+    );
+
+    const thread = JSON.stringify(body("/api/venture/deep/thread"));
+    assert.ok(thread.includes(REDACTED_SENTINEL), "the problem panel is built out of the redacted quotes");
+    assert.ok(!thread.includes(EXACT_SENTINEL), "the thread leaked a raw quote");
+    assert.ok(!thread.includes(HASH_SENTINEL), "the thread leaked a respondent hash");
   });
 });
 

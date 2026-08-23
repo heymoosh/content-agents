@@ -37,6 +37,7 @@ import { getResponseGateState } from "../venture/responses.js";
 import { loadRules } from "../venture/rules.js";
 import { computeState } from "../venture/state.js";
 import { formatStatusReadOnly } from "../venture/status.js";
+import { buildVentureThread } from "./venture-thread.js";
 
 export interface VentureReadResult {
   status: number;
@@ -117,6 +118,27 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
       },
     };
   },
+
+  // The whole room in one read: the derived thread (src/review/venture-thread.ts) over every read
+  // below it. A tenth route rather than the client assembling it from the other nine, because the
+  // builder is several hundred lines of honesty-critical derivation and page.ts's Rule 5 mirror
+  // convention would mean maintaining two hand-synced copies of it. Composed from the SAME pure
+  // reads as the routes above, so it inherits their no-write and no-response-content guarantees.
+  thread: (slug) => ({
+    thread: buildVentureThread({
+      slug,
+      state: computeState(slug),
+      statusText: formatStatusReadOnly(slug),
+      artifacts: readArtifacts(slug),
+      decisions: readDecisions(slug),
+      canon: readCanonEvents(slug),
+      gate: getResponseGateState(slug),
+      clusters: readClusterAnalysis(slug),
+      answers: readIntakeAnswers(slug) ?? null,
+      rulesVersion: loadRules().rules_version,
+      now: new Date().toISOString(),
+    }),
+  }),
 
   // Muxin's own 25 answers, verbatim. `answers: null` means there is no intake.md yet — the room
   // must not draw 25 blank rows for a venture that was never interviewed. The question text rides
