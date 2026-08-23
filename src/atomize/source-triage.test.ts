@@ -7,6 +7,7 @@ import {
   classifySourceClass,
   readSourceClass,
   readSourceKind,
+  readSourceOrigin,
   writeSourceClass,
   triageEffects,
   triageSummary,
@@ -177,6 +178,49 @@ describe("readSourceClass: undefined when no fact has been recorded yet (no sour
     withSourceMd((dir) => {
       assert.equal(readSourceClass(dir), undefined);
     });
+  });
+});
+
+describe("readSourceOrigin: reads source.md's origin fact for route.ts's origin block (v5 handoff §9.9)", () => {
+  test("missing source.md -> empty string, so routing is never blocked on a guess", () => {
+    const dir = mkdtempSync(join(tmpdir(), "source-triage-test-"));
+    try {
+      assert.equal(readSourceOrigin(dir), "");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a URL origin is read back verbatim", () => {
+    withSourceMd((dir) => {
+      assert.equal(readSourceOrigin(dir), "https://muxin.substack.com/p/some-essay");
+    });
+  });
+
+  test("the scaffolder's non-URL origins are read back verbatim too", () => {
+    const dir = mkdtempSync(join(tmpdir(), "source-triage-test-"));
+    try {
+      writeFileSync(
+        join(dir, "source.md"),
+        `---\ntitle: "A Local Draft"\norigin: file:Building an Innovation Nation.md\npublished_at: null\ningested_at: 2026-07-01T00:00:00.000Z\n---\n\nBody.\n`
+      );
+      assert.equal(readSourceOrigin(dir), "file:Building an Innovation Nation.md");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("source.md with no origin field -> empty string", () => {
+    const dir = mkdtempSync(join(tmpdir(), "source-triage-test-"));
+    try {
+      writeFileSync(
+        join(dir, "source.md"),
+        `---\ntitle: "No Origin"\npublished_at: null\ningested_at: 2026-07-01T00:00:00.000Z\n---\n\nBody.\n`
+      );
+      assert.equal(readSourceOrigin(dir), "");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

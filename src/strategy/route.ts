@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
 import { runDriftCheck } from "./routing-drift.js";
-import { readSourceClass, readSourceKind, triageEffects } from "../atomize/source-triage.js";
+import { readSourceClass, readSourceKind, readSourceOrigin, triageEffects } from "../atomize/source-triage.js";
 
 // Intelligent content router: decide which platforms a piece should be posted to,
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
@@ -394,6 +394,77 @@ export function applySourceTriage(merged: MergedDecision[], excludePlatforms: st
   });
 }
 
+// The origin block (v5 handoff §9.9): a piece ingested from a URL carries, in source.md's
+// `origin`, the address it is ALREADY LIVE at. Routing it back to that platform would generate a
+// derivative of a post its own audience there has already seen — a duplicate. So a platform the
+// origin resolves to is a HARD exclusion: it outranks config/routing.yaml's `include` default,
+// because posting a duplicate is worse than missing a channel.
+//
+// Registrable domains we can map to a routing channel HONESTLY. Suffix-matched, so
+// `www.linkedin.com`, `mobile.twitter.com` and `humaninference.substack.com` all resolve.
+// Deliberately absent, because guessing would be worse than routing normally:
+//   - mastodon — federated across thousands of instance hosts, and this repo configures none
+//     (config/platforms.yaml carries cadence/style for `mastodon` but no instance domain).
+//   - community:<id> — config/platforms.yaml's `communities` records notes only, no URL or host.
+//   - a Substack publication on its own custom domain — the host carries no substack.com marker.
+// Each of those falls through to `undefined` below and the piece routes exactly as it does today.
+const ORIGIN_PLATFORM_DOMAINS: Record<string, string> = {
+  "x.com": "x",
+  "twitter.com": "x",
+  "linkedin.com": "linkedin",
+  "bsky.app": "bluesky",
+  "threads.net": "threads",
+  "threads.com": "threads",
+  "substack.com": "substack",
+};
+
+// Map a source.md `origin` value onto a routing channel id, or undefined when it names no
+// platform we can resolve with confidence. Non-URL origins (`file:<name>`, `voice-memo:<name>`,
+// `pasted-text`) name no platform at all and always return undefined — the piece was never
+// published anywhere, so nothing is blocked. FAIL OPEN is the rule here: an unrecognized origin
+// routes normally rather than silently losing a channel to a guess.
+export function originPlatform(origin: string): string | undefined {
+  const trimmed = origin.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return undefined;
+  let host: string;
+  try {
+    host = new URL(trimmed).hostname.toLowerCase();
+  } catch {
+    return undefined; // malformed URL — fail open, same as an unrecognized host
+  }
+  for (const [domain, platform] of Object.entries(ORIGIN_PLATFORM_DOMAINS)) {
+    if (host === domain || host.endsWith(`.${domain}`)) return platform;
+  }
+  return undefined;
+}
+
+// Force the piece's own origin platform to `skip`, confidence "rule" — the same un-overridable
+// hard-veto confidence an editorial `never` rule and applySourceTriage already use, so
+// applyExplorationOverride can't punch through it and validate.ts's checkRoutingGate enforces it
+// on any derivative drafted anyway. The exclusion is RECORDED, never silent: the routing.md row
+// stays, with a rationale naming the origin and preserving the decision it replaced.
+//
+// DEMOTE-ONLY, exactly like applySourceTriage: it never appends a decision for a platform that
+// wasn't already a candidate. Two reasons. (1) A channel that was never in play has nothing to
+// exclude, and inventing a `skip` row for it would put a claim on screen that routing never made.
+// (2) applySubstackRepost below appends `substack` only when it is absent, so an invented
+// `substack | skip` row here would silently kill the Muxin-approved Note repost (card df11d0db).
+// That repost is the ONE deliberate republish-to-origin in this pipeline — she decided it — which
+// is why main() runs this block BEFORE applySubstackRepost, not after.
+export function applyOriginBlock(merged: MergedDecision[], origin: string): MergedDecision[] {
+  const platform = originPlatform(origin);
+  if (!platform) return merged;
+  return merged.map((d) => {
+    if (d.platform !== platform || d.decision === "skip") return d;
+    return {
+      ...d,
+      decision: "skip",
+      confidence: "rule",
+      rationale: `origin block: this piece is already live there (source.md origin: ${origin}). Was: ${d.rationale}`,
+    };
+  });
+}
+
 // The Substack-Notes repost hook (card df11d0db, Muxin-approved 2026-07-10): a Note-derived piece
 // (source_kind: substack-note, source-triage.ts's readSourceKind — set by new-notes.ts when it
 // scaffolds a picked Note) is allowed to route BACK to Substack as a repost, once
@@ -499,6 +570,12 @@ function main() {
     if (sourceClass) {
       merged = applySourceTriage(merged, triageEffects(sourceClass).excludePlatforms);
     }
+    // Origin block (v5 handoff §9.9) runs here — after source triage, BEFORE applySubstackRepost
+    // and before --explore. Before the repost hook because a Substack Note going back to Substack
+    // is the one republish-to-origin Muxin approved on purpose (card df11d0db); before --explore
+    // because an exploration probe must never punch through a hard exclusion, same as an
+    // editorial `never` rule.
+    merged = applyOriginBlock(merged, readSourceOrigin(abs));
     merged = applySubstackRepost(merged, pillars, readSourceKind(abs));
   }
 
