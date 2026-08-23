@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -1240,5 +1240,58 @@ test("publicJob stays JSON-serializable and never carries the process handle", (
   assert.equal("lastSpawn" in shape, false);
   // The real check: the polled read still round-trips through JSON unchanged.
   assert.deepEqual(JSON.parse(JSON.stringify(shape)), shape);
+  jobs.length = 0;
+});
+
+// The headline mechanism, on a REAL child process: before this, `spawn()`'s result was a local
+// `const child` captured only by its own listeners, so nothing in the process could signal a
+// running job. Delete `job.proc = child` from runCommandSpawn and stopJob silently falls through
+// to its task-closure branch — settling the job and releasing the lane while the child is still
+// alive, which is two Claudes at once. `sleep` stands in for `claude`: no binary needed, and it
+// dies by SIGTERM the same way.
+test("runCommandSpawn retains the child, stopJob signals it, and close clears the handle", async () => {
+  jobs.length = 0;
+  jobs.push({
+    id: buildJobId(Date.now(), 4245), kind: "revise", label: "a real subprocess", arg: "",
+    status: "running", slugs: [], error: null, createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: null, lastStdoutLine: null, steps: [], stepTotal: null, step: 0,
+    failedAtStep: null, retryable: false, ask: null, answer: null,
+  });
+  const job = jobs[0];
+
+  // spawn() is synchronous, so the handle is on the job by the time this call returns.
+  const running = runCommandSpawn(job, "sleep", ["30"], { timeoutMs: 60_000 });
+  assert.ok(job.proc, "nothing can stop a running job unless the child is retained on it");
+
+  const out = stopJob(job.id);
+  assert.ok("job" in out && out.stopped);
+  assert.equal(
+    job.status, "running",
+    "the kill branch hands off to the close handler — it must NOT settle here and free the lane under a live child",
+  );
+
+  const result = await running;
+  assert.equal(result.timedOut, true, "the child really took the SIGTERM");
+  // And this is precisely the ambiguity stoppedByMuxin exists to resolve: the result of a
+  // deliberate stop is indistinguishable from the result of our own 15-minute timeout firing.
+  assert.equal(job.lastSpawn?.timedOut, true);
+  assert.equal(job.proc, undefined, "and the dead handle is cleared on close");
+  jobs.length = 0;
+});
+
+// A stopped job's later spawns are stillborn, so an orphaned task closure can never put a second
+// `claude` behind the next job's back.
+test("a stopped job's next spawn never starts a process", async () => {
+  jobs.length = 0;
+  jobs.push({
+    id: buildJobId(Date.now(), 4246), kind: "revise", label: "stopped between spawns", arg: "",
+    status: "stopped", slugs: [], error: null, createdAt: Date.now(), startedAt: Date.now(),
+    finishedAt: Date.now(), lastStdoutLine: null, steps: [], stepTotal: null, step: 0,
+    failedAtStep: null, retryable: false, ask: null, answer: null, stoppedByMuxin: true,
+  });
+  const job = jobs[0];
+  const result = await runCommandSpawn(job, "sleep", ["30"], { timeoutMs: 60_000 });
+  assert.equal(job.proc, undefined, "no child was ever spawned");
+  assert.deepEqual(result, { code: null, timedOut: false, enoent: false, stdout: "" });
   jobs.length = 0;
 });
