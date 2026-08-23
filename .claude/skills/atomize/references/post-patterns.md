@@ -78,47 +78,48 @@ Two specific ways a full-post pattern can go wrong that a hook pattern cannot:
   in one of its slots. That slot gets filled from Muxin's own material or it stays empty. Never
   from the cited creator's post.
 
-### How that rule gets enforced, and what three passes over it taught
+### How that rule gets enforced, and where it keeps failing
 
-**Read this before writing or editing any record.** The no-reused-wording rule above was swept three
-times on 2026-08-23. Each pass found more, and each time the reason was the same: the check was
-narrower than the problem. Pass one scanned quoted strings and fixed 16. Pass two scanned Shape
-blocks and fixed 13, including three introduced an hour earlier by the same agent that had just
-reported the file clean. Pass three scanned every line and fixed 17. The lesson is not that people
-are careless about rule 1. It is that each check covered the surface just worked on rather than the
-surface a drafter reads.
+**Read this before adding or editing a pattern. It is the most expensive lesson this file has
+learned.** The no-reused-wording rule above was swept three times on 2026-08-23. Each sweep found
+more, because each check was narrower than the problem: the first scanned quoted strings and fixed
+16, the second scanned Shape blocks and fixed 13, the third scanned every line and fixed 17. Only
+the third worked. Three of the second sweep's violations were introduced by the agent writing them
+within an hour of that same agent reporting it had scrubbed 16 of the identical class. The lesson is
+not that people are careless about rule 1. It is that each check covered the surface just worked on
+rather than the surface a drafter reads.
 
-**Two rules follow from that, and they are worth more than the 46 fixes.**
+**Two rules follow, and they are worth more than the 46 fixes.**
 
-**1. A single-sighting pattern is presumptively contaminated until checked.** 15 of the 17 lifts in
-the third pass came from `(single sighting)` or `(thin evidence)` records, roughly 88 percent of the
-errors from about half the patterns. The mechanism is obvious once seen: with one source post there
-is nothing to abstract against, so the creator's sentence becomes the skeleton by default. Whenever a
-new n=1 record is written, check it against its source before committing, and re-check every existing
-n=1 record whenever this file is swept.
+1. **A single-sighting pattern is presumptively contaminated until checked.** Of the 17 lifts in the
+   final sweep, 15 came from records resting on one post, roughly 88 percent of the errors from
+   about half the patterns. The mechanism is simple and it will happen to you: with one example
+   there is nothing to abstract against, so the creator's sentence becomes the skeleton by default.
+   Check every new n=1 record against its source before committing, and re-check every existing one
+   whenever this file is swept.
+2. **Check by n-gram over the whole file, never by scanning quoted strings.** Two real violations
+   survived the quoted-string method, and both misses are instructive. One was unquoted prose in a
+   numbered beat. One was bracket-interleaved, a creator's opening clause with his content bracketed
+   out, so no long unbroken run existed to match while it still read as his sentence to anyone who
+   knows the post.
 
-**2. Check by n-gram over the WHOLE file, never by scanning quoted strings.** The quoted-string
-method missed two real lifts that a word-sequence comparison caught immediately, and both misses are
-instructive:
+**Structure and arc beats count, and are where the errors actually live.** 13 of those 17 lifts were
+in beats rather than Shape blocks. A beat is an instruction a drafter follows, so it propagates into
+copy exactly as a template does. Sweep beats, Shape blocks, Mechanism and Length lines alike.
 
-- One was unquoted **beat prose**. A numbered beat in a Structure / arc list is an instruction a
-  drafter follows, so it propagates exactly like a Shape block does. **13 of the third pass's 17
-  lifts were in beats rather than Shape blocks.** Sweep both, plus Mechanism and Length lines.
-- One was **bracket-interleaved**: a creator's opening clause with his content bracketed out, so it
-  never formed a long enough quoted run to be extracted, while reading as his sentence to anyone who
-  knows the post.
+**The method, in five lines of script.** Lowercase both sides, strip everything that is not a letter,
+digit or apostrophe, build every n-word sequence, and intersect.
 
-The method that works, in five lines of script: lowercase both sides, strip everything that is not a
-letter, digit or apostrophe, build every n-word sequence, and intersect. **Compare against CREATOR
-content only**: each entry's `body`, its `media.onscreen_text`, and the post titles quoted inside
-`notes`. **Exclude the rest of `notes` and `media.description`**, which are our own collection
-metadata describing how a window was pulled or what a baseline covers. That distinction matters
-enormously to the numbers: on this file a raw 6-gram sweep returns about 37 hits and looks alarming,
-and the split is 1 against creator content and 31 against our own methodology prose. Rule 1 governs
-creator wording, not our writing about our own method, so do not spend effort rewording the 31.
+**What is in scope and what is not.** Compare against CREATOR content only: each entry's `body`, its
+`media.onscreen_text`, and the post titles quoted inside `notes`. Exclude the rest of `notes` and
+`media.description`, which are our own collection metadata about how a window was pulled or what a
+baseline covers. That is our writing, not a creator's, and rewording it makes the metric look better
+without making the file safer. The distinction dominates the numbers: a raw 6-gram sweep of this
+file returns about 37 hits and looks alarming, and the split is 1 against creator content and 31
+against our own methodology prose.
 
 **The bar to clear.** Zero at 7-grams. At 6, 5 and 4 grams, read every hit individually rather than
-counting them: ordinary English collocations and Real example lines quoting a fragment to identify a
+counting it: ordinary English collocations and Real example lines quoting a fragment to identify a
 post are both legitimate and both will appear. At the last sweep this file stood at 0 / 1 / 8 / 65
 for 7 / 6 / 5 / 4 grams, with every remaining hit read and classified into those two benign
 categories, and nothing traceable left inside a template or a beat.
@@ -141,32 +142,6 @@ structural fields, plus `gate` (one of `ADMITTED`, `BELOW-FLOOR`, `INCOMPLETE`, 
 because nothing reads it. Trust `gate`, `popularity` and `platform_floor`; treat `reason` as a
 diary entry. The field was called `outlier` in earlier passes and was renamed once its meaning
 stopped matching `classifyOutlier` in `src/patterns/outliers.ts`.
-
-**Before you add a pattern, read this. It is the most expensive lesson this file has learned.**
-Rule 1 forbids reusing a creator's wording. Three separate sweeps for violations each found more,
-because each check was narrower than the problem: the first scanned quoted strings, the second
-scanned Shape blocks, the third scanned every line. Only the third worked. Two rules follow.
-
-1. **A single-sighting pattern is presumptively contaminated until checked.** Of 17 lifts found in
-   the final sweep, 15 came from records resting on one post, which is roughly 88 percent of the
-   errors from about half the patterns. The mechanism is simple and it will happen to you: with one
-   example there is nothing to abstract against, so the creator's sentence becomes the skeleton by
-   default. Three violations were introduced by the agent writing them within an hour of it
-   reporting that it had scrubbed 16 of the same class.
-2. **Check by n-gram against the collected bodies, over the whole file.** Not by scanning quoted
-   strings. Two real violations survived that method: one was unquoted prose in a numbered beat, and
-   one was bracket-interleaved so no long unbroken run existed to match. Compare normalised word
-   sequences from every line of this file against every collected body, transcript, on-screen text
-   and title. Anything at 6 words or longer needs reading individually.
-
-**Structure and arc beats count.** 13 of those 17 lifts were in beats rather than Shape blocks. A
-beat is an instruction a drafter follows, so it propagates into copy exactly like a template does.
-Sweep both.
-
-**What is NOT in scope:** our own collection metadata in the `notes` field. A raw n-gram run
-overlaps heavily with our methodology prose, how a crawler window was pulled, what a baseline
-covers. That is our writing, not a creator's, and rewording it makes the metric look better without
-making the file safer. Filter to creator content: bodies, transcripts, on-screen text and titles.
 
 ## What separated the winners from the same creators' ordinary posts
 
