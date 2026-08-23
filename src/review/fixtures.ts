@@ -292,6 +292,177 @@ const COLD_START: Record<string, unknown> = {
   "/api/notes": { ok: true, notes: [] },
 };
 
+// ── Venture ──────────────────────────────────────────────────────────────────────────────────────
+//
+// Built by running the REAL buildVentureThread over fixture domain data, not by hand-authoring
+// thread JSON. That is the whole point of the builder being pure: a scenario cannot drift from what
+// the room actually renders, because it IS what the room renders. venture-thread.ts imports nothing
+// but types, so this stays I/O-free (fixtures.test.ts greps this file's own source for that).
+//
+// The three scenarios are chosen to exercise the honesty rules rather than to look good: mixed
+// proof types on one checkpoint (the case where a single "3 OF 3 LIVE" would hide what it is
+// resting on), a closed response gate with real zeros and a null cluster analysis, and a retracted
+// artifact carrying BOTH its original evidence and its takedown.
+
+import { buildVentureThread, type ThreadInput } from "./venture-thread.js";
+import type { VentureArtifact, Evidence, Retraction } from "../venture/artifacts.js";
+import type { CheckpointState, VentureState } from "../venture/state.js";
+import type { DecisionRecord } from "../venture/decisions.js";
+
+const FX_AT = "2026-08-18T09:00:00.000Z";
+const FX_NOW = "2026-08-21T09:00:00.000Z";
+
+function fxArtifact(over: Partial<VentureArtifact> & { artifact_id: string; title: string }): VentureArtifact {
+  return {
+    phase: 1, artifact_kind: "substack-post", body_path: null, checkpoint_id: "checkpoint-1", fields: null,
+    delivery_mode: "manual", publishable: false, editorial_status: "draft", delivery_status: "awaiting_approval",
+    evidence: null, retraction: null, failure: null, origin_type: "venture", venture_id: "fixture-venture",
+    venture_phase: 1, message_id: "fx", cta_id: null, rules_version: "fixture-rules", probe_id: null,
+    unknown_id: null, claim_refs: [], created_at: FX_AT, updated_at: FX_AT,
+    ...over,
+  } as VentureArtifact;
+}
+
+const ev = (type: Evidence["type"], value: string): Evidence => ({ type, value, confirmed_by: "muxin", confirmed_at: FX_AT });
+
+const FX_LIVE_URL = fxArtifact({
+  artifact_id: "p1-essay-01", title: "FIXTURE — why the ballot measure nobody reads decides the most",
+  body_path: "phase-1-attention/p1-essay-01.md", editorial_status: "approved", delivery_status: "live_confirmed",
+  evidence: ev("url", "https://example.invalid/fixture-essay"),
+  claim_refs: [{ claim: "FIXTURE — a traced claim", ref: "intake:q7" }],
+});
+const FX_LIVE_AGENT = fxArtifact({
+  artifact_id: "p1-note-01", title: "FIXTURE — the note the agent posted", artifact_kind: "text-post-note",
+  delivery_mode: "app", publishable: true, editorial_status: "approved", delivery_status: "live_confirmed",
+  evidence: ev("agent", "substack-notes"),
+});
+// The row the whole badge system exists for: live on Muxin's word alone, which must never render
+// with the same mark as the two above.
+const FX_LIVE_WORD = fxArtifact({
+  artifact_id: "p1-note-02", title: "FIXTURE — the one you told me went up", artifact_kind: "welcome-email",
+  editorial_status: "approved", delivery_status: "live_confirmed",
+  evidence: ev("attestation", "I pasted it into Substack on the 18th and it is up."),
+});
+const FX_APPROVED_NOT_LIVE = fxArtifact({
+  artifact_id: "p1-essay-02", title: "FIXTURE — approved, and not live", body_path: "phase-1-attention/p1-essay-02.md",
+  editorial_status: "approved", delivery_status: "handed_off",
+});
+const FX_RETRACTED = fxArtifact({
+  artifact_id: "p1-essay-03", title: "FIXTURE — the one that came down",
+  editorial_status: "discarded", delivery_status: "cancelled",
+  evidence: ev("url", "https://example.invalid/fixture-retracted"),
+  retraction: { attestation: "I unpublished it, the link is dead now.", retracted_at: FX_NOW, retracted_by: "muxin" } as Retraction,
+});
+
+function fxCheckpoint(required: VentureArtifact[], over: Partial<CheckpointState> = {}): CheckpointState {
+  const complete = required.filter((a) => a.delivery_status === "live_confirmed").length;
+  return {
+    required, complete_count: complete, required_count: required.length, pace_recorded: true,
+    decisions_required_count: 0, decisions_complete_count: 0, cleared: false, blocking: [], ...over,
+  };
+}
+
+function fxState(phase: 1 | 2 | 3 | 4, checkpoints: Record<string, CheckpointState>): VentureState {
+  return {
+    slug: "fixture-venture", current_phase: phase, phase_status: "awaiting_you", checkpoints,
+    phase4: {
+      operating_plan: { drafted: false, approved: false }, thank_you_notes_count: 0,
+      day_14_review: { drafted: false, approved: false }, day_14_decision: { made: false, candidate_id: null },
+      complete: false, blocking: [],
+    },
+  };
+}
+
+const FX_DECISION: DecisionRecord = {
+  decision_id: "p1-platform-01", decision_kind: "platform-recommendation", rules_version: "fixture-rules",
+  input_refs: ["intake:q18"],
+  candidates: [
+    { candidate_id: "substack", label: "FIXTURE — Substack", scores: { reach: 4, fit: 5 }, evidence_refs: [], rationale: "FIXTURE — where the essays already live." },
+    { candidate_id: "linkedin", label: "FIXTURE — LinkedIn", scores: { reach: 5, fit: 2 }, evidence_refs: [], rationale: "FIXTURE — bigger room, wrong room." },
+  ],
+  recommended_candidate_ids: ["substack"], selected_candidate_ids: ["linkedin"], selected_by: "muxin",
+  override_reason: "FIXTURE — the people I want are on LinkedIn, and I would rather be early there.",
+  rationale: null, status: "selected", created_at: FX_AT, decided_at: FX_AT,
+};
+
+const FX_ANSWERS = {
+  q1: "FIXTURE — help people vote on the local measures that actually change their street.",
+  q2: "FIXTURE — people who already vote in the big races and skip everything under them.",
+  q18: "FIXTURE — Substack. I already write there and it does not feel like performing.",
+  q20: "FIXTURE — about forty minutes a day, and I will be honest when that slips.",
+  q24: "FIXTURE — it should never become a thing that tells people how to vote.",
+};
+
+function fxThread(over: Partial<ThreadInput>) {
+  return buildVentureThread({
+    slug: "fixture-venture",
+    state: fxState(1, { "checkpoint-1": fxCheckpoint([FX_LIVE_URL, FX_LIVE_AGENT, FX_LIVE_WORD]) }),
+    statusText: "fixture-venture -- Phase 1\n3 of 3 posts are live.",
+    artifacts: [FX_LIVE_URL, FX_LIVE_AGENT, FX_LIVE_WORD, FX_APPROVED_NOT_LIVE],
+    decisions: [FX_DECISION],
+    canon: [
+      { at: FX_AT, type: "kickoff", id: "fixture-venture/kickoff", fields: { rules_version: "fixture-rules" } },
+      { at: FX_AT, type: "pace-recorded", id: "fixture-venture/phase-1/pace", fields: { per_week: "5" } },
+    ],
+    gate: { state: "closed", have: 0, need: 20, target: 30, opened_at: null },
+    clusters: null,
+    answers: FX_ANSWERS,
+    rulesVersion: "fixture-rules",
+    now: FX_NOW,
+    ...over,
+  });
+}
+
+const VENTURE_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "venture-mixed-proof",
+    group: "Venture",
+    label: "checkpoint on mixed proof",
+    room: "venture",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": { ok: true, thread: fxThread({}) },
+    },
+  },
+  {
+    id: "venture-gate-closed",
+    group: "Venture",
+    label: "phase 3, gate closed at zero",
+    room: "venture",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": {
+        ok: true,
+        thread: fxThread({
+          state: fxState(3, { "checkpoint-3": fxCheckpoint([], { decisions_required_count: 3, decisions_complete_count: 1, blocking: [{ artifact_id: null, reason: 'missing required decision kind "transformation-choice"' }, { artifact_id: null, reason: 'missing required decision kind "product-format-and-price"' }] }) }),
+          statusText: "fixture-venture -- Phase 3\n0 of 20 people who count toward the goal so far.",
+          artifacts: [],
+        }),
+      },
+    },
+  },
+  {
+    id: "venture-retracted",
+    group: "Venture",
+    label: "a retracted post keeps its evidence",
+    room: "venture",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": {
+        ok: true,
+        thread: fxThread({
+          artifacts: [FX_RETRACTED, FX_APPROVED_NOT_LIVE],
+          state: fxState(1, { "checkpoint-1": fxCheckpoint([FX_RETRACTED, FX_APPROVED_NOT_LIVE]) }),
+          canon: [
+            { at: FX_AT, type: "kickoff", id: "fixture-venture/kickoff", fields: {} },
+            { at: FX_NOW, type: "retracted", id: "fixture-venture/p1-essay-03/retracted/" + FX_NOW, fields: { artifact: "p1-essay-03" } },
+          ],
+        }),
+      },
+    },
+  },
+];
+
 // ── The scenario table ───────────────────────────────────────────────────────────────────────────
 
 export const FIXTURE_SCENARIOS: FixtureScenario[] = [
@@ -321,6 +492,7 @@ export const FIXTURE_SCENARIOS: FixtureScenario[] = [
     id: f.id, group: "Fiction", label: f.label, room: "fiction",
     overrides: { ...FIC_BASE, "/api/fiction/scene": f.scene },
   })),
+  ...VENTURE_SCENARIOS,
   ...Object.entries(EMPTY_BY_ROOM).map(([tab, overrides]) => ({
     id: `empty-${tab}`, group: "Empty", label: tab, room: tab, overrides,
   })),

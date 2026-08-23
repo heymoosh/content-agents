@@ -133,6 +133,37 @@ export const JOB_COLORS = {
 
 // Which room a job lands in. Drives the rail label on `done`, the "Watch it in <Room>" link, the
 // landing sentence, the team-rail name and which room's strip shows it.
+// ── Venture room ────────────────────────────────────────────────────────────────────────────────
+//
+// The room renders GET /api/venture/:slug/thread, which src/review/venture-thread.ts already built
+// server-side. These two are the only Venture logic that lives here, and both are small enough for
+// the Rule 5 mirror convention: each is written once as an export (tested DOM-free) and once inline
+// in the browser script, kept in sync by hand and asserted by a test that reads the emitted script.
+
+/**
+ * A dot tone to a colour. Note "amber" carries two meanings that must not be merged into green:
+ * something still waiting, AND something live only on Muxin's own word. Both are "do not read this
+ * as verified", which is exactly what the colour says.
+ */
+export function ventureDotColor(tone: string): string {
+  if (tone === "green") return "#2f7d46";
+  if (tone === "amber") return "#9a6b12";
+  if (tone === "red") return "#9a2f2f";
+  if (tone === "blue") return "#2f5d9a";
+  return "#b0a488";
+}
+
+/**
+ * The elapsed-day line. The prototype's "DAY 8 OF 14" had a source for neither half; the kickoff
+ * canon event gives the elapsed side and nothing gives the total, so this renders the half that is
+ * measured and says what it is measured from. `null` (no kickoff event) renders nothing at all
+ * rather than "day 0", which would be a measurement nobody took.
+ */
+export function ventureDayLine(elapsedDays: number | null | undefined): string {
+  if (elapsedDays === null || elapsedDays === undefined) return "";
+  return elapsedDays === 0 ? "started today" : "day " + (elapsedDays + 1) + " since kickoff";
+}
+
 export function jobRoom(kind: string): JobRoom {
   // "outreach-revise" is the Outreach thread's "Update it". It is a separate kind from "revise"
   // precisely so it lands here instead of under Content with the Formatter.
@@ -1219,6 +1250,81 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     padding:4px 12px; font-size:12.5px; white-space:nowrap; cursor:pointer; }
   .jrow-tail button.jstop:hover { border-color:#b9ada0; color:var(--ink); }
   .room-strip .jrow-tail { border-top:none; padding-top:6px; margin-top:8px; }
+  /* ── Venture room ─────────────────────────────────────────────────────────────────────────────
+     Two columns: the derived thread, and the "what this is built on" rail. The rail is the only
+     place in the app that carries a sticky sidebar, so its own collapse rule lives here too — this
+     is page.ts's first @media block, authored because a two-column room is the first thing here
+     that genuinely breaks below ~900px. */
+  .vroom { display:grid; grid-template-columns:minmax(0,1fr) 268px; }
+  .vthread { min-width:0; padding:26px 40px 34px; display:flex; flex-direction:column; gap:22px; }
+  .vrail { border-left:1px solid var(--line); background:#faf7f0; border-radius:0 5px 5px 0; }
+  .vrail-in { position:sticky; top:58px; box-sizing:border-box; padding:22px 24px 30px;
+    display:flex; flex-direction:column; gap:15px; max-height:calc(100vh - 72px); overflow-y:auto; }
+  @media (max-width:900px) {
+    .vroom { grid-template-columns:minmax(0,1fr); }
+    .vthread { padding:22px 22px 26px; }
+    .vrail { border-left:none; border-top:1px solid var(--line); border-radius:0 0 5px 5px; }
+    .vrail-in { position:static; max-height:none; overflow-y:visible; }
+  }
+  .vmono { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.06em; color:#a89a80; }
+  .vsaid { font-size:15.5px; line-height:1.62; color:var(--ink); max-width:600px; white-space:pre-wrap; }
+  /* Muxin's own words. Georgia + the blue rule is HER register and nothing else in this room may
+     use the pair — see docs/prototype-port-rules.md Rule 3. */
+  .vmine { font:400 18px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); padding-left:16px;
+    border-left:2px solid var(--blue); white-space:pre-wrap; max-width:600px; }
+  /* AI-written prose. Purple rule + its own label, so the two are never confusable. */
+  .vdrafted { font:400 17px/1.62 Georgia,"Times New Roman",serif; color:var(--ink); padding-left:16px;
+    border-left:2px solid #5b46b8; white-space:pre-wrap; margin-top:7px; max-width:600px; }
+  .vpen { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.05em; color:#5b46b8; }
+  .vreceipt { display:grid; grid-template-columns:7px minmax(0,1fr); gap:12px; align-items:baseline; max-width:600px; }
+  .vreceipt i { width:6px; height:6px; border-radius:50%; margin-top:6px; display:block; }
+  .vreceipt span { font-size:13px; line-height:1.5; color:#8a7f6d; }
+  .vblock { border-top:1px solid #dfd4bb; border-bottom:1px solid var(--line); padding:16px 0 18px; max-width:640px; }
+  /* Serif with NO coloured rule: a card title is neither her words nor drafted prose, and the rule
+     is what carries authorship. */
+  .vtitle { font:400 21px/1.35 Georgia,"Times New Roman",serif; margin-top:6px; color:var(--ink); }
+  .vstate { display:grid; grid-template-columns:7px 1fr; gap:12px; align-items:baseline; margin-top:11px; }
+  .vstate i { width:7px; height:7px; border-radius:50%; margin-top:6px; display:block; }
+  .vstate span { font-size:14px; line-height:1.55; }
+  .vbadge { display:inline-flex; align-items:center; gap:5px; border-radius:4px; padding:2px 6px;
+    font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em; white-space:nowrap; }
+  .vbadge.link { border:1px solid #c3d3e8; background:#eef2f8; color:#2f5d9a; }
+  .vbadge.system { border:1px solid #cbe0d1; background:#eef5f0; color:#2f7d46; }
+  .vbadge.word { border:1px solid #e8d5a8; background:#fdf8ec; color:#9a6b12; }
+  .vhow { font-size:12.5px; line-height:1.5; color:#8a7f6d; margin-top:5px; max-width:460px; }
+  .vcp { border:1px solid #d8cfbb; background:#f6f1e4; border-radius:10px; padding:17px 20px 19px; max-width:640px; }
+  .vcp-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  .vcp-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:start;
+    padding:13px 0; border-top:1px solid #e2d8c1; }
+  .vcp-row .t { font-size:15px; line-height:1.45; color:var(--ink); }
+  .vcp-row .l { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:6px; font-size:13px; line-height:1.5; }
+  .vcp-row .l i { width:7px; height:7px; border-radius:50%; flex:none; display:block; }
+  .vcp-appr { font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em;
+    color:#a89a80; white-space:nowrap; }
+  .vgate-n { font:400 30px/1 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .vgate-bar { height:3px; background:#eae2ce; border-radius:2px; margin-top:11px; max-width:420px; overflow:hidden; }
+  .vgate-bar span { display:block; height:3px; background:#9a6b12; }
+  .vchoice-row { display:grid; grid-template-columns:20px minmax(0,1fr); gap:13px; align-items:baseline;
+    border-top:1px solid var(--line); padding:12px 0; }
+  .vchoice-row .mark { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; }
+  .vchoice-row .n { display:block; font:400 18px/1.4 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .vchoice-row .w { display:block; font-size:13.5px; line-height:1.5; color:#7a7266; margin-top:3px; }
+  .vchoice-row .sc { display:block; font:10.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+    letter-spacing:.05em; color:#a89a80; margin-top:4px; }
+  .vrail-grp { font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b0a488;
+    letter-spacing:.06em; border-top:1px solid var(--line); padding-top:11px; }
+  .vrail-item { display:grid; grid-template-columns:5px minmax(0,1fr); gap:9px; align-items:start; }
+  .vrail-item i { width:4px; height:4px; border-radius:50%; margin-top:6px; display:block; background:#b0a488; }
+  .vrail-item .lbl { font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b0a488; letter-spacing:.04em; }
+  .vrail-item .q { display:block; font:italic 400 13px/1.5 Georgia,"Times New Roman",serif; color:var(--ink);
+    padding-left:9px; border-left:2px solid var(--blue); }
+  .vrail-item .p { font-size:13px; line-height:1.45; color:#5a5346; }
+  .vrail-item .from { font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b8ad94; }
+  .vrail-item a.jump { font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.04em;
+    color:var(--blue); border-bottom:1px solid #c9d6e6; text-decoration:none; align-self:flex-start; }
+  .vnote { font-size:12.5px; line-height:1.5; color:#8a7f6d; max-width:420px; }
   /* The destination room's progress strip: same data, its own shorter strings. */
   .room-strip { border-top:1px solid #dfd4bb; border-bottom:1px solid #efe7d6; padding:15px 0 17px;
     margin-bottom:28px; max-width:600px; }
@@ -1273,6 +1379,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <button class="room" data-room="outreach">Outreach</button>
     <button class="room" data-room="fiction">Fiction</button>
     <button class="room" data-room="charles">Charles</button>
+    <button class="room" data-room="venture">Venture</button>
     <button class="room" data-room="signals">Signals</button>
   </nav>
   <span class="grow"></span>
@@ -1369,6 +1476,19 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <div class="session-main" id="charlesMain"><div class="empty">Loading…</div></div>
         <div class="session-margin" id="charlesSide"></div>
       </div>
+    </div>
+  </section>
+  <section class="view" id="roomVenture" hidden>
+    <div class="sheet" style="padding:18px 40px">
+      <div class="sheet-head"><h2>Venture</h2><span class="grow"></span>
+        <select id="ventureSlug"></select>
+        <span class="src" id="ventureDay"></span>
+      </div>
+      <div class="sheet-sub">The 14-day build, read straight out of canon. Nothing on this screen is stored as a conversation: every line below is derived from the ledger, the decisions, the artifacts and your own intake answers.</div>
+    </div>
+    <div class="sheet vroom">
+      <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
+      <div class="vrail"><div class="vrail-in" id="ventureRail"></div></div>
     </div>
   </section>
   <section class="view" id="roomSignals" hidden>
@@ -1720,7 +1840,7 @@ function render(){
 // with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = "content";
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
-function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
+function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
   currentTab = t;
   document.querySelectorAll(".room").forEach(b=>b.classList.toggle("on", b.dataset.room===t));
@@ -1729,6 +1849,7 @@ function setRoom(t){
   $("#roomOutreach").hidden = t!=="outreach";
   $("#roomFiction").hidden = t!=="fiction";
   $("#roomCharles").hidden = t!=="charles";
+  $("#roomVenture").hidden = t!=="venture";
   $("#roomSignals").hidden = t!=="signals";
   $("#refresh").textContent = refreshLabelFor(t);
   if (t==="content"){ loadContent(); }
@@ -1737,6 +1858,7 @@ function setRoom(t){
   if (t==="outreach"){ setOutreachSub(outreachSub); }
   if (t==="fiction"){ loadFiction(); }
   if (t==="charles"){ loadCharles(); }
+  if (t==="venture"){ loadVentureList(); }
 }
 document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
 function setOutreachSub(s){
@@ -1765,6 +1887,7 @@ async function doRefresh(){
     else if (currentTab === "outreach") { if (outreachSub === "followups") await loadFollowups(); else await scoutRun(); }
     else if (currentTab === "fiction") { await loadFiction(); }
     else if (currentTab === "charles") { await loadCharles(); }
+    else if (currentTab === "venture") { await loadVenture(); }
     else { if(currentTab==="studio") await loadStudio(); await loadJobs(); }
   } finally {
     $("#refresh").disabled = false;
@@ -2697,6 +2820,211 @@ let ficDocData = null;
 let ficScene = null;      // { beats, chapter, continuity } from /api/fiction/scene
 let ficPassNote = "";
 let ficFixed = {};        // spans fixed in this session, so the rail says "fixed" until the next check
+// ── Venture room ────────────────────────────────────────────────────────────────────────────────
+//
+// Read-only. Deliberately NO controls: the write routes exist, but a button this PR does not wire
+// is a dead button, which is exactly what the wiring guard exists to catch, and a disabled composer
+// is a promise this screen cannot keep. The decision panels render as lists, and the one that is
+// awaiting Muxin says so without pretending to be clickable.
+//
+// Almost nothing is computed here. src/review/venture-thread.ts already derived the whole view
+// model server-side; this walks it and writes markup. The two exceptions are the mirrors below.
+let VENTURE_SLUGS = [];
+let ventureSlug = null;
+let VENTURE_THREAD = null;
+
+// Rule 5 mirrors of ventureDotColor / ventureDayLine in page.ts. Change one, change both.
+function vDot(tone){
+  if (tone === "green") return "#2f7d46";
+  if (tone === "amber") return "#9a6b12";
+  if (tone === "red") return "#9a2f2f";
+  if (tone === "blue") return "#2f5d9a";
+  return "#b0a488";
+}
+function vDayLine(elapsedDays){
+  if (elapsedDays === null || elapsedDays === undefined) return "";
+  return elapsedDays === 0 ? "started today" : "day " + (elapsedDays + 1) + " since kickoff";
+}
+
+async function loadVentureList(){
+  const r = await fetch("/api/venture/list");
+  const j = await r.json();
+  VENTURE_SLUGS = j.ventures || [];
+  const sel = $("#ventureSlug");
+  sel.innerHTML = VENTURE_SLUGS.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join("");
+  if(!VENTURE_SLUGS.length){
+    ventureSlug = null;
+    sel.hidden = true;
+    $("#ventureDay").textContent = "";
+    $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. Start one with /venture new &lt;slug&gt; in a terminal.</div>';
+    $("#ventureRail").innerHTML = "";
+    return;
+  }
+  sel.hidden = false;
+  if(!ventureSlug || !VENTURE_SLUGS.includes(ventureSlug)) ventureSlug = VENTURE_SLUGS[0];
+  sel.value = ventureSlug;
+  await loadVenture();
+}
+async function loadVenture(){
+  if(!ventureSlug) return loadVentureList();
+  const r = await fetch("/api/venture/"+encodeURIComponent(ventureSlug)+"/thread");
+  const j = await r.json();
+  if(!j.ok){ $("#ventureThread").innerHTML = '<div class="empty">'+esc(j.error||"could not read this venture")+'</div>'; return; }
+  VENTURE_THREAD = j.thread;
+  renderVenture();
+}
+function vBadge(ev){
+  if(!ev) return "";
+  return '<span class="vbadge '+esc(ev.tone)+'">'+esc(ev.glyph)+' '+esc(ev.badge)+'</span>';
+}
+// A live artifact's proof, rendered by TYPE. A URL is a link anyone can re-check; an attestation is
+// a sentence and never renders as one. The "how" line always ships with it: a claim never renders
+// bare (docs/prototype-port-rules.md Rule 3).
+function vEvidence(ev){
+  if(!ev) return "";
+  const val = ev.isUrl
+    ? '<a href="'+esc(ev.value)+'" target="_blank" rel="noreferrer">'+esc(ev.value)+'</a>'
+    : '<span class="vmine" style="display:block;margin-top:4px">'+esc(ev.value)+'</span>';
+  const when = ev.confirmedAt ? '<div class="vmono" style="margin-top:5px">CONFIRMED '+esc(String(ev.confirmedAt).slice(0,10))+'</div>' : "";
+  return '<div style="margin-top:9px;font-size:13px">'+val+'</div>'+when+'<div class="vhow">'+esc(ev.how)+'</div>';
+}
+function vCard(m){
+  let h = '<div class="vblock"><div class="vmono">'+esc(m.rail)+'</div>'
+    + '<div class="vtitle">'+esc(m.title)+'</div>'
+    + '<div class="vstate"><i style="background:'+vDot(m.dot)+'"></i><span>'+esc(m.state)+'</span>'+vBadge(m.evidence)+'</div>';
+  if(m.evidence) h += vEvidence(m.evidence);
+  if(m.retraction){
+    h += '<div style="margin-top:11px"><div class="vmono">TAKEN DOWN '+esc(String(m.retraction.retractedAt).slice(0,10))+'</div>'
+      + '<div class="vmine" style="margin-top:5px">'+esc(m.retraction.attestation)+'</div>'
+      + '<div class="vhow">The evidence that it was live is kept above. Both facts are true, and the record needs both.</div></div>';
+  }
+  if(m.failure){
+    h += '<div style="margin-top:11px"><div class="vmono" style="color:'+vDot("red")+'">DELIVERY FAILED '+esc(String(m.failure.at).slice(0,10))+'</div>'
+      + '<div class="vnote" style="margin-top:4px">'+esc(m.failure.message)+'</div></div>';
+  }
+  if(m.bodyPath){
+    h += '<div style="margin-top:15px"><div class="vpen">I DRAFTED THIS</div>'
+      + '<div class="vnote" style="margin-top:6px;font:11px/1.5 ui-monospace,monospace">'+esc(m.bodyPath)+'</div></div>';
+  }
+  if(m.claimRefs && m.claimRefs.length){
+    h += '<div class="vmono" style="margin-top:11px">'+m.claimRefs.length+' CLAIM'+(m.claimRefs.length===1?"":"S")+' TRACED · '
+      + esc(m.claimRefs.map(c=>c.ref).join(", "))+'</div>';
+  }
+  return h+'</div>';
+}
+function vChoice(m){
+  const rows = m.items.map(it=>{
+    const mark = it.selected ? "●" : it.recommended ? "○" : "·";
+    return '<div class="vchoice-row"><span class="mark">'+mark+'</span><span>'
+      + '<span class="n">'+esc(it.title)+'</span>'
+      + (it.why ? '<span class="w">'+esc(it.why)+'</span>' : "")
+      + (it.scoreLine ? '<span class="sc">'+esc(it.scoreLine)+'</span>' : "")
+      + (it.recommended && !it.selected ? '<span class="sc">RECOMMENDED</span>' : "")
+      + '</span></div>';
+  }).join("");
+  let h = '<div class="vblock"><div class="vmono">'+esc(m.rail)+'</div>'
+    + (m.sub ? '<div class="vnote" style="margin-top:7px;max-width:560px;font-size:14.5px;color:#5a5346">'+esc(m.sub)+'</div>' : "")
+    + '<div style="margin-top:13px">'+rows+'</div>';
+  // Her reason for going against the recommendation is HER words, so it renders in her register.
+  if(m.overrideReason){
+    h += '<div style="margin-top:13px"><div class="vmono">YOUR REASON FOR OVERRIDING</div>'
+      + '<div class="vmine" style="margin-top:5px">'+esc(m.overrideReason)+'</div></div>';
+  }
+  if(m.rationale){
+    h += '<div style="margin-top:11px"><div class="vmono">YOUR REASONING</div>'
+      + '<div class="vmine" style="margin-top:5px">'+esc(m.rationale)+'</div></div>';
+  }
+  h += '<div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;align-items:baseline">'
+    + (m.live ? '<span class="vmono" style="color:'+vDot("amber")+'">WAITING ON YOU</span>' : '<span class="vmono">DECIDED</span>')
+    + '<span class="vmono" style="color:#b0a488">'+esc(m.rulesVersion)+'</span></div>';
+  return h+'</div>';
+}
+function vGate(m){
+  return '<div class="vblock"><div class="vmono">'+esc(m.rail)+'</div>'
+    + '<div class="vtitle" style="font-size:20px">'+esc(m.title)+'</div>'
+    + '<div style="display:flex;align-items:baseline;gap:12px;margin-top:14px;flex-wrap:wrap">'
+    + '<span class="vgate-n">'+m.have+'</span><span style="font-size:14px;color:#7a7266">of '+m.need+' needed, aiming for '+m.target+'</span></div>'
+    + '<div class="vgate-bar"><span style="width:'+m.pct+'%"></span></div>'
+    + '<div class="vnote" style="margin-top:13px;max-width:530px;font-size:13.5px;color:#5a5346">'+esc(m.note)+'</div></div>';
+}
+function vCheckpoint(m){
+  const rows = m.rows.map(r=>
+    '<div class="vcp-row"><div style="min-width:0"><div class="t">'+esc(r.title)+'</div>'
+    + '<div class="l"><i style="background:'+vDot(r.dot)+'"></i><span style="color:'+(r.isLive?vDot(r.dot):"#9a6b12")+'">'+esc(r.live)+'</span>'+vBadge(r.evidence)+'</div>'
+    + '</div><div style="text-align:right"><span class="vcp-appr">'+esc(r.approval)+'</span></div></div>'
+  ).join("");
+  const decisions = m.decisions.length
+    ? '<div style="margin-top:13px;padding-top:13px;border-top:1px solid #e2d8c1">'
+      + '<div class="vmono">AND THESE DECISIONS</div>'
+      + m.decisions.map(d=>'<div class="l" style="display:flex;align-items:center;gap:9px;margin-top:7px;font-size:13px">'
+        + '<i style="width:7px;height:7px;border-radius:50%;display:block;background:'+vDot(d.selected?"green":"amber")+'"></i>'
+        + '<span>'+esc(d.kind.replace(/-/g," "))+(d.selected?"":" — not chosen yet")+'</span></div>').join("")
+      + '</div>'
+    : "";
+  return '<div class="vcp"><div class="vcp-head"><span class="vmono" style="color:#8a7f6d">'+esc(m.rail)+'</span>'
+    + '<span class="grow" style="flex:1"></span>'
+    + '<span class="vmono" style="color:'+vDot(m.stampTone)+'">'+esc(m.stamp)+'</span></div>'
+    + '<div class="vnote" style="margin-top:8px;max-width:520px;font-size:14.5px;color:#3a352c">'+esc(m.sub)+'</div>'
+    + '<div style="display:flex;justify-content:space-between;gap:14px;margin-top:16px">'
+    + '<span class="vmono" style="font-size:9.5px;color:#b0a488">CONDITION, AND WHETHER IT IS LIVE</span>'
+    + '<span class="vmono" style="font-size:9.5px;color:#b0a488">YOUR APPROVAL</span></div>'
+    + rows + decisions
+    + '<div class="vnote" style="margin-top:15px;padding-top:15px;border-top:1px solid #e2d8c1">'+esc(m.footNote)+'</div></div>';
+}
+function vQuotes(m){
+  return '<div class="vblock" style="border-bottom:none"><div class="vmono">'+esc(m.rail)+'</div>'
+    + '<div class="vnote" style="margin-top:7px;max-width:560px;font-size:14.5px;color:#5a5346">'+esc(m.sub)+'</div>'
+    + '<div style="display:flex;flex-direction:column;gap:19px;margin-top:17px">'
+    + m.lines.map(q=>'<div id="'+esc(q.anchor)+'"><div class="vmono">'+esc(q.question)+'</div>'
+      + '<div class="vmine" style="margin-top:6px">'+esc(q.answer)+'</div></div>').join("")
+    + '</div></div>';
+}
+function vClusters(m){
+  return '<div class="vblock"><div class="vmono">'+esc(m.rail)+'</div>'
+    + '<div class="vnote" style="margin-top:7px;max-width:560px;font-size:14.5px;color:#5a5346">'+esc(m.sub)+'</div>'
+    + m.items.map(c=>'<div style="margin-top:15px"><div class="vtitle" style="font-size:18px">'+esc(c.label)+'</div>'
+      + '<div class="vnote" style="margin-top:4px">'+esc(c.stuckPoint)+'</div>'
+      + c.evidence.map(e=>'<div class="vdrafted" style="border-left-color:#d8cfbb;font-size:15px;margin-top:7px">'+esc(e)+'</div>').join("")
+      + '</div>').join("")
+    + '</div>';
+}
+function renderVenture(){
+  const t = VENTURE_THREAD;
+  if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
+  $("#ventureDay").textContent = vDayLine(t.elapsedDays);
+  $("#ventureThread").innerHTML = t.messages.map(m=>{
+    if(m.kind==="rail") return '<div class="vmono">'+esc(m.text)+'</div>';
+    if(m.kind==="said") return '<div class="vsaid">'+esc(m.text)+'</div>';
+    if(m.kind==="receipt") return '<div class="vreceipt"><i style="background:'+vDot(m.dot)+'"></i><span>'+esc(m.text)+'</span></div>';
+    if(m.kind==="card") return vCard(m);
+    if(m.kind==="choice") return vChoice(m);
+    if(m.kind==="gate") return vGate(m);
+    if(m.kind==="quotes") return vQuotes(m);
+    if(m.kind==="clusters") return vClusters(m);
+    if(m.kind==="checkpoint") return vCheckpoint(m);
+    return "";
+  }).join("");
+  $("#ventureRail").innerHTML = '<div><div class="vmono">WHAT THIS IS BUILT ON</div>'
+    + '<div class="vnote" style="font-size:12px;margin-top:2px">Every line here came from a file, and says which one.</div></div>'
+    + t.rail.map(g=>'<div style="display:flex;flex-direction:column;gap:9px">'
+      + '<div class="vrail-grp">'+esc(g.name)+'</div>'
+      + g.items.map(it=>'<div class="vrail-item"><i></i><span style="min-width:0;display:flex;flex-direction:column;gap:2px">'
+        + '<span class="lbl">'+esc(it.label)+'</span>'
+        + (it.isQuote ? '<span class="q">'+esc(it.value)+'</span>' : '<span class="p">'+esc(it.value)+'</span>')
+        + '<span class="from">'+esc(it.from)+'</span>'
+        + (it.jumpTo ? '<a class="jump" href="#'+esc(it.jumpTo)+'">jump to it</a>' : "")
+        + '</span></div>').join("")
+      + '</div>').join("")
+    + '<div style="margin-top:auto;padding-top:15px;border-top:1px solid var(--line)">'
+    + '<div class="vmono">READ FROM</div>'
+    + t.refs.map(r=>'<div style="margin-top:6px"><div style="font-size:12px;line-height:1.4;color:#5a5346">'+esc(r.name)+'</div>'
+      + '<div class="from" style="font:10px/1.5 ui-monospace,monospace;color:#b8ad94">'+esc(r.stamp)+'</div></div>').join("")
+    + '</div>';
+}
+document.addEventListener("change", e=>{
+  if(e.target && e.target.id === "ventureSlug"){ ventureSlug = e.target.value; loadVenture(); }
+});
+
 async function loadFiction(){
   const r = await fetch("/api/fiction");
   FICTION = (await r.json()).series || [];

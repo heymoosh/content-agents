@@ -239,6 +239,12 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
   for (const m of serveSrc.matchAll(/url\.pathname === "(\/api\/[^"]+)"/g)) routes.add(m[1]);
   // the one regex route: GET /api/jobs/<id>/log
   const routePrefixes = /\/api\\\/jobs\\\//.test(serveSrc) || serveSrc.includes("^\\/api\\/jobs\\/") ? ["/api/jobs/"] : [];
+  // Two whole prefixes are owned by a dispatcher rather than by `url.pathname === "..."` literals,
+  // so the extractor above cannot see any of their routes: /api/jobs/<id>/log, and every venture
+  // route (handleVentureRead / handleVentureWrite). Their per-route coverage is asserted by the
+  // PENDING_UI_VENTURE block below, which reads the real path lists from those modules; here the
+  // prefix only has to stop a genuine venture call being reported as a dead button.
+  if (serveSrc.includes("handleVentureRead")) routePrefixes.push("/api/venture/");
 
   // client refs: "…/api/foo" (exact) or "…/api/foo/" + concat (prefix). Query strings stop the match.
   const refs = new Set<string>();
@@ -288,7 +294,6 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
 // asserts its route is STILL uncalled, so wiring the room turns the entry red and the only way
 // back to green is deleting it. Keep the list at or near zero.
 const PENDING_UI_VENTURE: { route: string; reason: string }[] = [
-  { route: "/api/venture/list", reason: "Venture room venture picker" },
   { route: "/api/venture/:slug/state", reason: "Venture room phase + checkpoint header" },
   { route: "/api/venture/:slug/artifacts", reason: "Venture room artifact list" },
   { route: "/api/venture/:slug/decisions", reason: "Venture room decision list" },
