@@ -81,6 +81,7 @@
     "outreach:status": "tsx src/outreach/status.ts",
     "scout": "tsx src/discovery/discover.ts",
     "patterns:collect": "tsx src/patterns/collect.ts",
+    "patterns:catalog": "tsx src/patterns/catalog.ts",
     "patterns:outliers": "tsx src/patterns/collect.ts outliers",
     "patterns:openers": "tsx src/patterns/openers.ts",
     "patterns:reddit": "tsx src/patterns/reddit.ts",
