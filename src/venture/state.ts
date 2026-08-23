@@ -264,7 +264,12 @@ function checkpointLabel(checkpointId: string): string {
 // without seeding three real fixtures. Checkpoint-2 and any future checkpoint always reads its
 // count from rules.yaml directly, with no equivalent override -- this is the one legitimate
 // exception to "don't have two plumbing paths for the same information," not a second general path.
-export function deriveState(slug: string, checkpoint1RequiredCount?: number): VentureState {
+//
+// SPLIT (Venture room read routes): the caching write below is what makes deriveState unsafe for a
+// GET. computeState() is this same derivation with the write removed -- byte-identical result, no
+// mkdirSync, no state.md. Read-only HTTP callers use computeState; everything that was already
+// calling deriveState keeps the cache-refreshing behavior it had.
+export function computeState(slug: string, checkpoint1RequiredCount?: number): VentureState {
   const rules = loadRules();
   const artifacts = readArtifacts(slug);
 
@@ -319,6 +324,13 @@ export function deriveState(slug: string, checkpoint1RequiredCount?: number): Ve
     checkpoints,
     phase4,
   };
+  return state;
+}
+
+// The original entry point, unchanged in behavior: derive, then refresh the disposable state.md
+// snapshot beside canon.md.
+export function deriveState(slug: string, checkpoint1RequiredCount?: number): VentureState {
+  const state = computeState(slug, checkpoint1RequiredCount);
   mkdirSync(ventureDir(slug), { recursive: true });
   writeFileSync(statePath(slug), renderStateMd(state));
   return state;

@@ -170,6 +170,62 @@ export function readIntakeScorecard(slug: string): ScorecardInput | undefined {
   };
 }
 
+// Reads the 25 verbatim answers back out of intake.md. Nothing did before: kickoffVenture writes
+// them through renderIntakeMd and they were never read again, so the room had no way to show
+// Muxin her own words (the quotes panel, the context rail's YOUR WORDS group, the thread's jump
+// anchors, and the platform read of q18 all need them).
+//
+// Parses exactly what renderIntakeMd writes, the same "depends on the render format staying put"
+// bargain readIntakeScorecard already takes. Deliberately NOT regex-based on the question text:
+// q21 contains "(", ")" and "?", so building a RegExp per question would either mis-match or
+// need escaping nobody would maintain. Instead it walks the fixed INTAKE_QUESTIONS order with
+// indexOf on the literal "**<question>**" marker and slices what sits between consecutive
+// markers -- which also means a multi-line answer survives intact, where line-matching would
+// keep only its first line.
+//
+// Returns undefined when there is no intake.md at all, or when the file is not in this format
+// (no marker found), rather than an object of empty strings a caller would render as blank
+// answers. An individual question that somehow still holds renderIntakeMd's
+// "_(not yet answered)_" placeholder is omitted from the map for the same reason -- an absent key
+// is honestly "not answered", an empty string reads as "answered with nothing".
+const NOT_ANSWERED = "_(not yet answered)_";
+const VOICE_HEADING = "## Voice evidence";
+
+export function readIntakeAnswers(slug: string): IntakeAnswers | undefined {
+  const path = intakePath(slug);
+  if (!existsSync(path)) return undefined;
+  const text = readFileSync(path, "utf8");
+
+  // One forward pass: each marker is searched from the end of the previous one, so a question
+  // whose wording happened to appear inside an earlier answer cannot pull the cursor backwards.
+  const markerStart: number[] = [];
+  const answerStart: number[] = [];
+  let cursor = 0;
+  for (const q of INTAKE_QUESTIONS) {
+    const marker = `**${q.question}**`;
+    const at = text.indexOf(marker, cursor);
+    if (at === -1) return undefined;
+    markerStart.push(at);
+    answerStart.push(at + marker.length);
+    cursor = at + marker.length;
+  }
+  const voiceAt = text.indexOf(VOICE_HEADING, cursor);
+  const endOfLast = voiceAt === -1 ? text.length : voiceAt;
+
+  const answers: IntakeAnswers = {};
+  for (let i = 0; i < INTAKE_QUESTIONS.length; i++) {
+    const end = i + 1 < INTAKE_QUESTIONS.length ? markerStart[i + 1] : endOfLast;
+    // A block boundary puts a "## Block ..." heading between one answer and the next question --
+    // drop it, it is document structure, never Muxin's words.
+    const body = text
+      .slice(answerStart[i], end)
+      .replace(/\n##[^\n]*\s*$/, "")
+      .trim();
+    if (body && body !== NOT_ANSWERED) answers[INTAKE_QUESTIONS[i].id] = body;
+  }
+  return answers;
+}
+
 // Non-deferrable: everything downstream in Phase 1 cites intake:qN as evidence, and the kickoff
 // canon event stamps the rules_version + source hashes every later step is checked against.
 export function kickoffVenture(input: KickoffInput): { alreadyKickedOff: boolean } {

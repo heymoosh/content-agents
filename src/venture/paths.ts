@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
 
@@ -10,6 +10,20 @@ import { repoRoot } from "../db/db.js";
 // venture/rules.yaml is real committed input that every run must keep reading.
 export function ventureRoot(): string {
   return process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT ?? join(repoRoot, "venture");
+}
+
+// Every venture on disk, slug-sorted. Nothing enumerated ventures before this: every entry point
+// took a slug the caller already had (the CLI from argv, the skill from Muxin). The room needs a
+// picker, so it needs the list. Read-only -- a missing venture root is an empty list, never a
+// created directory. Directories only, and dotfiles/dot-directories are skipped so a stray
+// .DS_Store never renders as a venture.
+export function listVentures(): string[] {
+  const root = ventureRoot();
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+    .map((e) => e.name)
+    .sort();
 }
 
 // Mirrors safeFolder's traversal guard in src/review/rows.ts: reject anything that isn't a bare

@@ -36,6 +36,7 @@ import { listLeadDetails } from "../outreach/status.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { handleVentureRead } from "./venture-reads.js";
 import { buildFollowups, markResponded, markContacted, moveOn, markSent, latestLockedMessage, isBucket } from "../outreach/tracker.js";
 import { CHANNELS } from "../outreach/draft.js";
 import {
@@ -1892,6 +1893,18 @@ const server = createServer(async (req, res) => {
       const result = readIntakeDraft(parts[3], Number(parts[5]));
       json(res, result.ok ? 200 : 400, result);
       return;
+    }
+    // The Venture room's read side (nine GETs). Every one wraps an existing src/venture/** read
+    // and NOTHING here writes — see src/review/venture-reads.ts for the three properties that
+    // file holds (no writes, no response content, three states never two). Placed after the
+    // intake-draft routes above so it can never shadow GET :slug/intake/drafts. Returns null for
+    // anything that isn't a venture read, so the fall-through 404 below is unchanged.
+    {
+      const ventureRead = handleVentureRead(req.method ?? "", url.pathname);
+      if (ventureRead) {
+        json(res, ventureRead.status, ventureRead.body);
+        return;
+      }
     }
     res.writeHead(404).end("not found");
   } catch (e) {
