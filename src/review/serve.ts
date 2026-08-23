@@ -1895,7 +1895,7 @@ const server = createServer(async (req, res) => {
       json(res, result.ok ? 200 : 400, result);
       return;
     }
-    // The Venture room's write side (eleven POSTs). Every one wraps the function that already
+    // The Venture room's write side (twelve POSTs). Every one wraps the function that already
     // owns the rule -- see src/review/venture-writes.ts. Placed before the read dispatcher below
     // (they cannot collide: one is POST-only, the other GET-only) and after the intake-draft
     // routes above, so POST :slug/intake/<n>/draft still reaches its own handler.

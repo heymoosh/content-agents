@@ -14,8 +14,13 @@ import {
   classifyCapture, captureVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
   LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
   groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
+  intakeProgressLine, intakeUnanswered, intakeSaveLine, intakeSlugError,
   type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { saveIntakeDraft } from "./intake-draft.js";
+import { INTAKE_QUESTIONS } from "../venture/intake.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
   const row = {
@@ -190,6 +195,7 @@ import { renderPage } from "./page.js";
 import { repoRoot } from "../db/db.js";
 import { VENTURE_READ_PATHS } from "./venture-reads.js";
 import { VENTURE_WRITE_PATHS } from "./venture-writes.js";
+import { INTAKE_DRAFT_PATHS } from "./intake-draft.js";
 import { CARD_ACTION_IDS } from "./venture-thread.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -292,14 +298,22 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
 // The mechanism is identical in spirit and identical in the property that matters — each entry
 // asserts its route is STILL uncalled, so wiring the room turns the entry red and the only way
 // back to green is deleting it. Keep the list at or near zero.
-const PENDING_UI_VENTURE: { route: string; reason: string }[] = [
-  { route: "/api/venture/:slug/intake/drafts/clear", reason: "the intake interview screen, which is not built yet" },
-];
+const PENDING_UI_VENTURE: { route: string; reason: string }[] = [];
 
 // A parameterised route counts as called when the emitted script both reaches into /api/venture/
 // and names this route's own literal segments — the client builds these as
 // "/api/venture/" + slug + "/artifacts/" + id + "/approve", so ":slug"/":id" never appear as text
 // and the fixed segments around them are what to look for.
+//
+// The segments are matched as QUOTED fragments, not as bare substrings, and that distinction is
+// load-bearing rather than fussy. A concatenated path writes each literal run between two quotes
+// ("/intake/" + n + "/draft"), so requiring the quotes costs nothing — and without them
+// "/api/venture/:slug/intake/drafts" reads as called by the clear button alone, because
+// "/intake/drafts/clear" contains "/intake/drafts" as a substring. That is a route reported as
+// wired when nothing fetches it, which is the exact failure this guard exists to catch.
+function quotedRunPresent(script: string, run: string): boolean {
+  return script.includes('"' + run + '"') || script.includes("'" + run + "'");
+}
 function venturePathIsCalled(script: string, route: string): boolean {
   if (!route.includes(":")) return script.includes(route);
   if (!script.includes("/api/venture/")) return false;
@@ -312,10 +326,21 @@ function venturePathIsCalled(script: string, route: string): boolean {
   if (verb && (CARD_ACTION_IDS as readonly string[]).includes(verb)) {
     return script.includes('"/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id');
   }
-  return route
-    .split("/")
-    .filter((seg) => seg && !seg.startsWith(":") && seg !== "api" && seg !== "venture")
-    .every((seg) => script.includes("/" + seg));
+  // Split the path into the literal runs a concatenation would write between its parameters:
+  // "/api/venture/:slug/intake/:n/draft" → ["/api/venture/", "/intake/", "/draft"]. Every run has
+  // to appear quoted.
+  const runs: string[] = [];
+  let run = "";
+  for (const seg of route.split("/").slice(1)) {
+    if (seg.startsWith(":")) {
+      runs.push(run + "/");
+      run = "";
+    } else {
+      run += "/" + seg;
+    }
+  }
+  if (run) runs.push(run);
+  return runs.every((r) => quotedRunPresent(script, r));
 }
 
 test("every artifact-lifecycle route has a CardAction id, and every id has a route", () => {
@@ -323,7 +348,57 @@ test("every artifact-lifecycle route has a CardAction id, and every id has a rou
   assert.deepEqual([...lifecycle].sort(), [...CARD_ACTION_IDS].sort(), "the action id union and the artifact routes must be the same set");
 });
 
-const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS];
+// The intake-draft routes are the third source: unlike the other venture routes they are written
+// straight into serve.ts rather than through handleVentureRead/handleVentureWrite, so neither
+// dispatcher's path list carries them. Folding them in here is what makes them subject to the same
+// called-or-parked rule as everything else; the test below is what stops the NEXT such route from
+// being written without a declaration at all.
+const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS, ...INTAKE_DRAFT_PATHS];
+
+// Every regex-dispatched route in serve.ts must be declared in one of the path lists above.
+//
+// This closes the hole all three intake-draft routes fell through. The first wiring guard finds
+// routes by scanning for `url.pathname === "..."` literals and cannot see a regex; the second
+// reads its list from the venture dispatchers and cannot see a route written straight into
+// serve.ts. A regex route that is in neither is invisible to both — it can ship with no caller,
+// and no test notices. So: extract every `/^\/api\/...$/.test(url.pathname)` pattern out of
+// serve.ts's own source, canonicalize it back to a :param path, and require it to be declared.
+//
+// `/api/jobs/` keeps its existing prefix-level treatment in the first guard (the client builds
+// those paths from a job id the same way), so those four are listed here rather than re-plumbed.
+const DECLARED_JOB_REGEX_PATHS = ["/api/jobs/:id/stop", "/api/jobs/:id/log", "/api/jobs/:id/answer", "/api/jobs/:id/retry"];
+
+/** `/^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/` → `/api/venture/:slug/intake/:n/draft`. */
+export function canonicalRegexRoute(pattern: string): string {
+  return pattern
+    .replace(/^\^/, "")
+    .replace(/\$$/, "")
+    .replace(/\\\//g, "/")
+    .replace(/\(\[\^\/\]\+\)|\[\^\/\]\+/g, ":slug")
+    .replace(/\\d\+/g, ":n");
+}
+
+test("wiring guard: every regex-dispatched route in serve.ts is declared in a path list", () => {
+  const serveSrc = readFileSync(join(HERE, "serve.ts"), "utf8");
+  const declared = new Set([...VENTURE_PATHS, ...DECLARED_JOB_REGEX_PATHS]);
+  const found: string[] = [];
+  for (const m of serveSrc.matchAll(/\/(\^\\\/api\\\/[^\n]*?\$)\/\.test\(url\.pathname\)/g)) {
+    found.push(canonicalRegexRoute(m[1]));
+  }
+  assert.ok(found.length >= 7, `expected serve.ts's regex routes to be found, got ${found.length}`);
+  for (const route of found) {
+    // Only the FIRST :param of a venture path is the slug; a later [^/]+ is an id, and the
+    // declarations spell those out. Compare on shape rather than on the parameter's name.
+    const shape = (p: string) => p.replace(/:[a-zA-Z]+/g, ":x");
+    const ok = [...declared].some((d) => shape(d) === shape(route));
+    assert.ok(
+      ok,
+      `serve.ts dispatches ${route} by regex, and no path list declares it. A regex route is ` +
+        `invisible to both wiring guards until it is declared — add it to INTAKE_DRAFT_PATHS, ` +
+        `VENTURE_READ_PATHS/VENTURE_WRITE_PATHS, or DECLARED_JOB_REGEX_PATHS above.`
+    );
+  }
+});
 
 test("wiring guard: every venture route is either called by the page or parked in PENDING_UI_VENTURE", () => {
   const script = emittedScripts().join("\n");
@@ -2161,4 +2236,123 @@ test("cwGroups: the bulk yes counts only untouched drafts, never a row marked re
   assert.equal(pending.length, 4, "the badge counts revise and blocked as outstanding");
   assert.equal(pending.filter((r) => !r.status).length, 2, "but only two are what a bulk yes may touch");
   assert.equal(pending.filter((r) => !!r.status).length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// The intake interview's Rule 5 mirrors.
+//
+// Same mechanism as captureMirror above: slice the browser's own copies out of the emitted script,
+// `new Function` them, and run every vector through BOTH. String-presence would not catch the
+// failure that matters — an inline copy edited out of step with the export, which goes green while
+// the browser keeps the old answer.
+
+type IntakeMirror = {
+  ivProgressLine: (step: number, total: number) => string;
+  ivUnanswered: (drafts: { n: number; text: string }[], total: number) => number[];
+  ivSaveLine: (s: { state: string; savedAt?: string; error?: string }) => string;
+  ivSlugError: (slug: string) => string | null;
+};
+
+function intakeMirror(): IntakeMirror {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function ivProgressLine(");
+  const end = script.indexOf("// ── end of the intake mirror ──");
+  assert.ok(start > -1, "the inline intake mirrors must reach the browser");
+  assert.ok(end > start, "the intake mirror's end marker must follow it");
+  const src = script.slice(start, end);
+  return new Function(
+    src + "\nreturn { ivProgressLine, ivUnanswered, ivSaveLine, ivSlugError };"
+  )() as IntakeMirror;
+}
+
+test("intakeProgressLine: counted, never estimated, and the two panels are named not numbered", () => {
+  const m = intakeMirror().ivProgressLine;
+  const vectors: [number, number][] = [[1, 25], [7, 25], [25, 25], [26, 25], [27, 25], [0, 25], [28, 25], [3, 4]];
+  for (const [step, total] of vectors) {
+    assert.equal(m(step, total), intakeProgressLine(step, total), `mirror disagrees at step ${step}`);
+  }
+  assert.equal(intakeProgressLine(7, 25), "Question 7 of 25");
+  assert.equal(intakeProgressLine(26, 25), "Voice evidence", "the panels after the interview are named steps");
+  assert.equal(intakeProgressLine(27, 25), "Day 14 scorecard");
+  assert.equal(intakeProgressLine(28, 25), "");
+  // Rule 3: nothing on this screen may render a duration nobody measured.
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("const IV_QUESTIONS");
+  const body = script.slice(start, script.indexOf("async function loadFiction(", start));
+  assert.ok(start > -1 && body.length > 0, "the interview client must reach the browser");
+  assert.doesNotMatch(body, /minutes? (left|remaining)|about \d+ min|est\w* time|takes about/i,
+    "the interview must not estimate how long it takes — nothing here measures that");
+});
+
+test("intakeUnanswered: whitespace is not an answer, and the mirror agrees", () => {
+  const m = intakeMirror().ivUnanswered;
+  const vectors: { n: number; text: string }[][] = [
+    [],
+    [{ n: 1, text: "a" }, { n: 3, text: "c" }],
+    [{ n: 1, text: "   " }, { n: 2, text: "\n" }, { n: 3, text: "x" }],
+    [{ n: 1, text: "" }, { n: 2, text: "ok" }, { n: 5, text: "ok" }],
+  ];
+  for (const drafts of vectors) {
+    assert.deepEqual(m(drafts, 5), intakeUnanswered(drafts, 5), "mirror disagrees");
+  }
+  assert.deepEqual(intakeUnanswered([{ n: 1, text: "   " }, { n: 2, text: "x" }], 3), [1, 3],
+    "a box holding only whitespace is unanswered, exactly as kickoffVenture reads it");
+});
+
+test("intakeSaveLine: 'saved' is only ever said about a write the server confirmed", () => {
+  const m = intakeMirror().ivSaveLine;
+  const vectors = [
+    { state: "" },
+    { state: "saving" },
+    { state: "saved", savedAt: "2026-08-23T09:05:00.000Z" },
+    { state: "saved" },                              // no timestamp: no time claimed
+    { state: "saved", savedAt: "not a date" },
+    { state: "failed", error: "bad venture name" },
+    { state: "failed" },
+  ];
+  for (const v of vectors) assert.equal(m(v), intakeSaveLine(v), `mirror disagrees on ${JSON.stringify(v)}`);
+  assert.equal(intakeSaveLine({ state: "" }), "", "an untouched box claims nothing");
+  assert.equal(intakeSaveLine({ state: "saved" }), "saved", "no savedAt means no clock time is invented");
+  assert.match(intakeSaveLine({ state: "failed", error: "disk full" }), /^NOT SAVED — disk full/);
+  // Rule 2's banned pattern: a bare timer that says "saved" without a response.
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("async function ivSaveNow(");
+  const body = script.slice(start, script.indexOf("\nfunction ivQueue(", start));
+  assert.ok(start > -1, "ivSaveNow must reach the browser");
+  assert.ok(body.includes('j.draft.savedAt'), "the saved time comes off the server's own response");
+  assert.doesNotMatch(body, /setTimeout/, "the save indicator must not be driven by a timer");
+});
+
+test("intakeSlugError mirrors intake-draft.ts's own rule, in both runtimes", () => {
+  const m = intakeMirror().ivSlugError;
+  const vectors = ["voter-choice", "a", "9lives", "", "A", "-x", ".hidden", "a/b", "..", "a b", "a_b-2"];
+  for (const s of vectors) assert.equal(m(s), intakeSlugError(s), `mirror disagrees on ${JSON.stringify(s)}`);
+  // and it agrees with the server's copy, which is the one that actually refuses
+  for (const s of vectors) {
+    const serverOk = saveIntakeDraft(s, 1, "x", mkdtempSync(join(tmpdir(), "iv-slug-"))).ok;
+    assert.equal(intakeSlugError(s) === null, serverOk, `client and server disagree about ${JSON.stringify(s)}`);
+  }
+});
+
+test("the interview screen carries no second copy of the 25 questions", () => {
+  const script = emittedScripts().join("\n");
+  // The list is serialized from src/venture/intake.ts, so every question must be there verbatim...
+  for (const q of INTAKE_QUESTIONS) {
+    assert.ok(script.includes(JSON.stringify(q.question)), `question ${q.id} must reach the browser from the real list`);
+  }
+  // ...and exactly once. A hand-typed second copy is the failure this guards: it would be a change
+  // to what the interview asks (root CLAUDE.md rule 7) hiding inside a GUI diff.
+  const first = INTAKE_QUESTIONS[0].question;
+  assert.equal(script.split(JSON.stringify(first)).length - 1, 1, "the question list must be serialized once, not retyped");
+});
+
+test("the interview types her answers in her own register, and never in the AI one", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const css = html.slice(html.indexOf(".iv-in {"), html.indexOf(".iv-save {"));
+  assert.match(css, /Georgia/, "the box she types in is Georgia — those are her words");
+  assert.match(css, /border-left:2px solid var\(--blue\)/, "and carries the blue rule, the same pair .vmine uses");
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("const IV_QUESTIONS");
+  const body = script.slice(start, script.indexOf("async function loadFiction(", start));
+  assert.doesNotMatch(body, /5b46b8|vdrafted|vpen/, "nothing in the interview may render in the AI-written register");
 });
