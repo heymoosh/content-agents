@@ -21,6 +21,7 @@ import { handleVentureRead, VENTURE_READ_PATHS } from "./venture-reads.js";
 import { listVentures, ventureRoot } from "../venture/paths.js";
 import { INTAKE_QUESTIONS, readIntakeAnswers, kickoffVenture, type IntakeAnswers } from "../venture/intake.js";
 import { loadRules } from "../venture/rules.js";
+import { appendCanonEvent } from "../venture/canon.js";
 
 const ROOT_ENV = "CONTENT_AGENTS_TEST_VENTURE_ROOT";
 
@@ -119,6 +120,15 @@ function seedResponses(dir: string, count: number): void {
   writeFileSync(join(dir, "responses.jsonl"), lines.join("\n") + "\n");
 }
 
+// The gate and cluster panels only render from Phase 3, and current_phase is derived from cleared
+// checkpoints -- so a test that wants either has to walk the venture there through canon, the same
+// way a real run would.
+function reachPhase3(dir: string, slug: string): void {
+  appendCanonEvent(slug, "checkpoint-cleared", `${slug}/checkpoint-1`, {}, "2026-08-02T00:00:00.000Z");
+  appendCanonEvent(slug, "checkpoint-cleared", `${slug}/checkpoint-2`, {}, "2026-08-02T00:00:00.000Z");
+  void dir;
+}
+
 function fullAnswers(): IntakeAnswers {
   const a: IntakeAnswers = {};
   for (const q of INTAKE_QUESTIONS) a[q.id] = `answer for ${q.id}`;
@@ -205,10 +215,10 @@ test("readIntakeAnswers is undefined when there is no intake yet, not a map of b
   withRoot((root) => {
     seedVenture(root, "no-intake");
     assert.equal(readIntakeAnswers("no-intake"), undefined);
-    const b = body("/api/venture/no-intake/intake/answers");
-    assert.equal(b.ok, true);
-    assert.equal(b.answers, null); // "never interviewed", distinct from "answered with nothing"
-    assert.equal((b.questions as unknown[]).length, 25);
+    // No transcript panel at all, rather than 25 blank rows. (The dedicated /intake/answers route
+    // is gone; the answers reach the room only inside the thread now.)
+    const thread = body("/api/venture/no-intake/thread").thread as { messages: { kind: string }[] };
+    assert.equal(thread.messages.filter((m) => m.kind === "quotes").length, 0);
   });
 });
 
@@ -233,49 +243,56 @@ test("readIntakeAnswers parses the tracked zz-test-phase4 fixture", () => {
 
 // --- the routes ----------------------------------------------------------------------------------
 
-test("every read route answers a seeded venture", () => {
+// Everything the eight deleted routes returned still has to reach the room, so each one's content
+// is re-asserted here as a property of the thread rather than of its own URL.
+test("the thread carries what the eight deleted routes used to return", () => {
   withRoot((root) => {
     seedVenture(root, "full");
     kickoff("full", fullAnswers());
 
-    const state = body("/api/venture/full/state");
-    assert.equal(state.ok, true);
-    assert.equal((state.state as { slug: string }).slug, "full");
-    assert.equal((state.state as { current_phase: number }).current_phase, 1);
-    assert.match(String(state.status), /^full -- Phase 1/);
-
-    assert.deepEqual(body("/api/venture/full/artifacts").artifacts, []);
-    assert.deepEqual(body("/api/venture/full/decisions").decisions, []);
-
-    const canon = body("/api/venture/full/canon").events as { type: string }[];
-    assert.equal(canon.length, 1);
-    assert.equal(canon[0].type, "kickoff");
-
-    const rules = body("/api/venture/full/rules");
-    const real = loadRules();
-    assert.equal(rules.rules_version, real.rules_version);
-    assert.deepEqual(rules.sources, {
-      starter_kit_sha256: real.sources.starter_kit_sha256,
-      welsh_note_sha256: real.sources.welsh_note_sha256,
-    });
-    // The trimmed shape only — never the whole rubric.
-    assert.deepEqual(Object.keys(rules).sort(), ["ok", "rules_version", "sources"]);
-
-    const answers = body("/api/venture/full/intake/answers").answers as IntakeAnswers;
-    assert.equal(answers.q1, "answer for q1");
+    const b = body("/api/venture/full/thread");
+    assert.equal(b.ok, true);
+    const t = b.thread as {
+      slug: string; phase: number; statusText: string; elapsedDays: number | null;
+      messages: { kind: string; text?: string; lines?: { answer: string }[] }[];
+      refs: { name: string; stamp: string }[];
+    };
+    // ...state + status
+    assert.equal(t.slug, "full");
+    assert.equal(t.phase, 1);
+    assert.match(t.statusText, /^full -- Phase 1/);
+    // ...canon
+    assert.equal(t.messages.filter((m) => m.kind === "receipt").length, 1);
+    // ...artifacts and decisions: nothing drafted yet, so no cards and no choice panels
+    assert.equal(t.messages.filter((m) => m.kind === "card" || m.kind === "choice").length, 0);
+    // ...rules_version, on the thread's own refs
+    assert.ok(t.refs.some((r) => r.stamp === loadRules().rules_version));
+    // ...intake answers, in the quotes panel
+    const quotes = t.messages.find((m) => m.kind === "quotes");
+    assert.ok(quotes?.lines?.length === 25);
+    assert.equal(quotes.lines[0].answer, "answer for q1");
   });
 });
 
-test("a venture with nothing recorded yet answers 200 with honest empties, not 404", () => {
+test("only two read routes remain, and the rest 404 like any unknown path", () => {
+  withRoot((root) => {
+    seedVenture(root, "full");
+    for (const gone of ["state", "artifacts", "decisions", "canon", "gate", "clusters", "rules", "intake/answers"]) {
+      assert.equal(handleVentureRead("GET", `/api/venture/full/${gone}`), null, `${gone} should no longer be a route`);
+    }
+    assert.deepEqual(VENTURE_READ_PATHS, ["/api/venture/list", "/api/venture/:slug/thread"]);
+  });
+});
+
+test("a venture with nothing recorded yet answers 200 with an honest empty thread, not 404", () => {
   withRoot((root) => {
     seedVenture(root, "brand-new");
-    for (const path of ["artifacts", "decisions", "canon"]) {
-      const r = get(`/api/venture/brand-new/${path}`);
-      assert.equal(r.status, 200, `${path} should be 200`);
-    }
-    assert.deepEqual(body("/api/venture/brand-new/artifacts").artifacts, []);
-    assert.deepEqual(body("/api/venture/brand-new/canon").events, []);
-    assert.equal(body("/api/venture/brand-new/clusters").clusters, null);
+    const r = get("/api/venture/brand-new/thread");
+    assert.equal(r.status, 200);
+    const t = (r.body as { thread: { messages: { kind: string }[]; rail: unknown[] } }).thread;
+    // No receipts, no cards, no transcript, no clusters -- just where the venture is.
+    assert.deepEqual(t.messages.map((m) => m.kind), ["rail", "said", "rail", "checkpoint"]);
+    assert.deepEqual(t.rail, []);
   });
 });
 
@@ -294,8 +311,7 @@ test("an unknown slug 404s, distinct from a known slug with no data", () => {
 
 test("a 404 for an unknown slug does not bring that venture into existence", () => {
   withRoot((root) => {
-    assert.equal(get("/api/venture/ghost/state").status, 404);
-    assert.equal(get("/api/venture/ghost/artifacts").status, 404);
+    assert.equal(get("/api/venture/ghost/thread").status, 404);
     assert.deepEqual(readdirSync(root), []);
   });
 });
@@ -314,7 +330,7 @@ test("the dispatcher declines anything that is not one of its reads", () => {
 test("a single-segment bad slug is refused by name, before it reaches the filesystem", () => {
   withRoot(() => {
     for (const bad of ["..", ".", "%2e%2e", "%2e%2e%2f%2e%2e", ".hidden", "-leading", "_leading", "Upper", "a b", "a.b", "a%2fb"]) {
-      const r = get(`/api/venture/${bad}/state`);
+      const r = get(`/api/venture/${bad}/thread`);
       assert.equal(r.status, 400, `slug ${JSON.stringify(bad)} should be refused`);
       assert.equal((r.body as { error: string }).error, "bad venture slug");
     }
@@ -325,8 +341,7 @@ test("a multi-segment traversal matches no read at all — it can never be answe
   withRoot(() => {
     for (const bad of ["../..", "../../..", "a/../..", "../../../etc"]) {
       // The slug is one path segment by construction, so this cannot even present as a slug.
-      assert.equal(handleVentureRead("GET", `/api/venture/${bad}/state`), null, `${bad} should match nothing`);
-      assert.equal(handleVentureRead("GET", `/api/venture/${bad}/canon`), null, `${bad} should match nothing`);
+      assert.equal(handleVentureRead("GET", `/api/venture/${bad}/thread`), null, `${bad} should match nothing`);
     }
   });
 });
@@ -339,49 +354,33 @@ test("a traversal is never answered from a venture outside the root", () => {
     seedVenture(root, "secret");
     process.env[ROOT_ENV] = inner;
     const escape = relative(inner, join(root, "secret")); // "../secret"
-    const r = handleVentureRead("GET", `/api/venture/${escape}/canon`);
+    const r = handleVentureRead("GET", `/api/venture/${escape}/thread`);
     assert.ok(r === null || r.status >= 400, "a path that escapes the venture root must never be answered");
   });
 });
 
 // --- privacy ---------------------------------------------------------------------------------
 
-test("the gate route returns counts and never a response", () => {
+// The gate panel replaces the /gate route. It still carries counts and only counts: the panel's own
+// key list is asserted in venture-thread.test.ts, and the leak sweep below covers the content half.
+function gatePanel(slug: string): { have: number; need: number; opened: boolean } | undefined {
+  const t = body(`/api/venture/${slug}/thread`).thread as { messages: { kind: string; have?: number; need?: number; opened?: boolean }[] };
+  const g = t.messages.find((m) => m.kind === "gate");
+  return g as { have: number; need: number; opened: boolean } | undefined;
+}
+
+test("the gate panel counts eligible people, and a venture with none reports a measured zero", () => {
   withRoot((root) => {
     const dir = seedVenture(root, "gated");
+    kickoff("gated", fullAnswers());
+    reachPhase3(dir, "gated");
     seedResponses(dir, 4);
-    const gate = body("/api/venture/gated/gate").gate as Record<string, unknown>;
-    assert.deepEqual(Object.keys(gate).sort(), ["have", "need", "opened_at", "state", "target"]);
-    assert.equal(gate.have, 4); // measured, not "some"
-    assert.equal(gate.state, "closed");
-    assert.equal(gate.opened_at, null);
-  });
-});
+    assert.equal(gatePanel("gated")?.have, 4); // measured, not "some"
 
-test("a venture with zero responses reports have: 0 — a measured zero, not an absence", () => {
-  withRoot((root) => {
-    seedVenture(root, "quiet");
-    const gate = body("/api/venture/quiet/gate").gate as { have: number; state: string };
-    assert.equal(gate.have, 0);
-    assert.equal(gate.state, "closed");
-  });
-});
-
-test("/clusters is null before the analysis exists, and passes it through once it does", () => {
-  withRoot((root) => {
-    const dir = seedVenture(root, "clustered");
-    seedResponses(dir, 4);
-    assert.equal(body("/api/venture/clustered/clusters").clusters, null);
-
-    writeFileSync(
-      join(dir, "cluster-analysis.json"),
-      JSON.stringify({
-        analyzed_at: "2026-08-02T00:00:00.000Z",
-        clusters: [{ cluster_id: "c1", label: "a problem", evidence: [`${REDACTED_SENTINEL}-0`], stuck_point: "s", desired_outcome: null, visible_consequences: null }],
-      })
-    );
-    const clusters = body("/api/venture/clustered/clusters").clusters as { clusters: unknown[] };
-    assert.equal(clusters.clusters.length, 1);
+    const quiet = seedVenture(root, "quiet");
+    kickoff("quiet", fullAnswers());
+    reachPhase3(quiet, "quiet");
+    assert.deepEqual({ have: gatePanel("quiet")?.have, opened: gatePanel("quiet")?.opened }, { have: 0, opened: false });
   });
 });
 
@@ -413,10 +412,10 @@ test("no route can leak a raw quote or a respondent hash", () => {
     // composes the same cluster read). Widened here knowingly rather than left to pass by accident
     // — this venture is Phase 1, so /thread does not carry it yet, and the Phase 3 case is asserted
     // in its own test below.
-    const REDACTED_OK = ["/clusters", "/thread"];
-    assert.ok(seen["/api/venture/private/clusters"].includes(REDACTED_SENTINEL));
+    // The redacted quote is the deliberate exception and now reaches exactly one route: /thread,
+    // once the venture is far enough along to render the problem panel. That case has its own test
+    // below; this venture is Phase 1, so nothing here should carry it.
     for (const [path, text] of Object.entries(seen)) {
-      if (REDACTED_OK.some((p) => path.endsWith(p))) continue;
       assert.ok(!text.includes(REDACTED_SENTINEL), `${path} should not carry response text at all`);
     }
   });

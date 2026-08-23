@@ -20,13 +20,16 @@ import {
   railGroups,
   receiptFor,
   QUESTION_DISPLAY,
+  CARD_ACTION_IDS,
+  cardActions,
+  choiceFor,
   type CheckpointRow,
   type ThreadInput,
   type ThreadMsg,
 } from "./venture-thread.js";
 import { INTAKE_QUESTIONS } from "../venture/intake.js";
 import type { VentureArtifact, Evidence } from "../venture/artifacts.js";
-import type { DecisionRecord } from "../venture/decisions.js";
+import { OVERRIDE_SELECT_KINDS, type DecisionRecord } from "../venture/decisions.js";
 import type { CheckpointState, VentureState } from "../venture/state.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -109,6 +112,9 @@ function input(over: Partial<ThreadInput> = {}): ThreadInput {
     clusters: null,
     answers: null,
     rulesVersion: "r1",
+    minEvidence: { "substack-post": "url", "text-post-note": "agent", "welcome-email": "attestation", "product-outline": null, "phase_1_research_read": null, "day-14-review": null, "daily-operating-plan": null },
+    selectCounts: { "idea-ranking": 3, "lead-magnet-concept": 1 },
+    day14Candidates: ["continue", "revise_positioning", "revise_lead_magnet", "collect_more_evidence", "stop"],
     now: NOW,
     ...over,
   };
@@ -524,4 +530,213 @@ test("the two page.ts helpers ship to the browser as mirrors, and the room uses 
     assert.ok(src.includes(line), `the browser mirror drifted: ${line}`);
   }
   assert.ok(src.includes('$("#ventureDay").textContent = vDayLine(t.elapsedDays);'), "renderVenture must use the day mirror");
+});
+
+// ── the write side's view model ──────────────────────────────────────────────────────────────────
+//
+// Every control the room draws comes from here, so "would this button be refused?" is answerable
+// without a browser. The rule these enforce: a control exists only where a route exists AND the
+// server would not refuse it outright.
+
+const MIN_EVIDENCE: Record<string, "url" | "agent" | "attestation" | null> = {
+  "substack-post": "url",
+  "text-post-note": "agent",
+  "welcome-email": "attestation",
+  "product-outline": null,
+};
+
+function actions(over: Partial<VentureArtifact>): string[] {
+  return cardActions(artifact({ artifact_id: "x", ...over }), MIN_EVIDENCE).map((a) => a.id);
+}
+
+test("every action a card offers maps to a route that exists", () => {
+  const routed = new Set(CARD_ACTION_IDS as readonly string[]);
+  const pairs: Partial<VentureArtifact>[] = [
+    { editorial_status: "draft", delivery_status: "awaiting_approval" },
+    { editorial_status: "draft", delivery_status: "not_applicable" },
+    { editorial_status: "approved", delivery_status: "ready" },
+    { editorial_status: "approved", delivery_status: "handed_off" },
+    { editorial_status: "approved", delivery_status: "handed_off", delivery_mode: "app" },
+    { editorial_status: "approved", delivery_status: "live_confirmed" },
+    { editorial_status: "approved", delivery_status: "failed" },
+    { editorial_status: "approved", delivery_status: "not_applicable" },
+    { editorial_status: "discarded", delivery_status: "cancelled" },
+  ];
+  for (const p of pairs) {
+    for (const id of actions(p)) assert.ok(routed.has(id), `${JSON.stringify(p)} offers ${id}, which has no route`);
+  }
+});
+
+test("an app-mode hand-off offers no confirm-live, because the server would refuse it outright", () => {
+  // §2.2's app row lists "Confirm live", but confirmManualDelivery throws "is not a manual-delivery
+  // artifact" for anything whose delivery_mode is not manual -- the AGENT confirms those. Drawing
+  // the button would be a control backed by a guaranteed refusal.
+  assert.ok(!actions({ editorial_status: "approved", delivery_status: "handed_off", delivery_mode: "app" }).includes("confirm-live"));
+  assert.ok(actions({ editorial_status: "approved", delivery_status: "handed_off", delivery_mode: "manual" }).includes("confirm-live"));
+});
+
+test("confirm-live asks for the proof the artifact kind's own floor demands", () => {
+  const forKind = (kind: string) =>
+    cardActions(artifact({ artifact_id: "x", artifact_kind: kind as VentureArtifact["artifact_kind"], editorial_status: "approved", delivery_status: "handed_off" }), MIN_EVIDENCE)
+      .find((a) => a.id === "confirm-live")?.proof;
+  assert.equal(forKind("substack-post"), "url");
+  assert.equal(forKind("welcome-email"), "attestation");
+  // A kind with no floor is never delivered by hand at all, so there is nothing to confirm.
+  assert.equal(forKind("product-outline"), undefined);
+});
+
+test("a live artifact offers only the takedown, and a draft never offers it", () => {
+  assert.deepEqual(actions({ editorial_status: "approved", delivery_status: "live_confirmed" }), ["retract"]);
+  assert.ok(!actions({ editorial_status: "draft", delivery_status: "awaiting_approval" }).includes("retract"));
+});
+
+test("a failed delivery offers give-up but never a Retry with nothing behind it", () => {
+  // §2.2 lists Retry; re-delivery runs through deliverVenture, which is deliberately not routed.
+  assert.deepEqual(actions({ editorial_status: "approved", delivery_status: "failed" }), ["discard"]);
+});
+
+test("the destructive actions are marked, so the room can ask first", () => {
+  const live = cardActions(artifact({ artifact_id: "x", editorial_status: "approved", delivery_status: "live_confirmed" }), MIN_EVIDENCE);
+  assert.equal(live[0].destructive, true);
+  const draft = cardActions(artifact({ artifact_id: "x" }), MIN_EVIDENCE);
+  assert.equal(draft.find((a) => a.id === "approve")?.destructive, undefined);
+  assert.equal(draft.find((a) => a.id === "discard")?.destructive, true);
+});
+
+test("the override-discipline list matches decisions.ts's own, exactly", () => {
+  // venture-thread.ts cannot value-import the real constant (decisions.ts reaches the filesystem and
+  // this module must stay importable by fixtures.ts), so it holds a copy. A test may import
+  // anything, so this is where the two are held together.
+  const mine = new Set<string>();
+  for (const kind of OVERRIDE_SELECT_KINDS) {
+    mine.add(kind);
+    assert.equal(choiceFor(decision({ decision_kind: kind })).overrideDiscipline, true, `${kind} should carry the override discipline`);
+  }
+  for (const kind of ["idea-ranking", "transformation-choice", "day-14-decision"] as const) {
+    assert.equal(mine.has(kind), false);
+    assert.equal(choiceFor(decision({ decision_kind: kind })).overrideDiscipline, false, `${kind} has no recommendation to override`);
+  }
+});
+
+test("an empty recommendation set makes every option an override, matching the server", () => {
+  // selectWithOverride: isOverride = !recommended_candidate_ids.includes(id). With an empty list
+  // that is true for everything. The prototype let a selection through with no reason here.
+  const c = choiceFor(decision({ recommended_candidate_ids: [] }));
+  assert.equal(c.overrideDiscipline, true);
+  assert.equal(c.items.every((i) => !i.recommended), true);
+});
+
+test("the Day 14 panel exists before its record does, with rules.yaml's own options", () => {
+  const withReview = state({
+    current_phase: 4,
+    phase4: {
+      operating_plan: { drafted: true, approved: true },
+      thank_you_notes_count: 0,
+      day_14_review: { drafted: true, approved: true },
+      day_14_decision: { made: false, candidate_id: null },
+      complete: false,
+      blocking: [],
+    },
+  });
+  const [c] = msgs("choice", { state: withReview });
+  assert.ok(c && c.kind === "choice");
+  assert.equal(c.decisionId, "p4-day-14-decision");
+  assert.equal(c.recordExists, false);
+  assert.equal(c.reasonAlwaysRequired, true, "rules.md §8.5 requires a reason for every option");
+  assert.equal(c.overrideDiscipline, false, "the system never recommends one of these");
+  assert.deepEqual(c.items.map((i) => i.candidateId), ["continue", "revise_positioning", "revise_lead_magnet", "collect_more_evidence", "stop"]);
+});
+
+test("the Day 14 panel is absent before the review is approved, and once the decision is made", () => {
+  const p4 = (review: boolean, made: boolean) =>
+    state({
+      current_phase: 4,
+      phase4: {
+        operating_plan: { drafted: true, approved: true },
+        thank_you_notes_count: 0,
+        day_14_review: { drafted: true, approved: review },
+        day_14_decision: { made, candidate_id: made ? "continue" : null },
+        complete: false,
+        blocking: [],
+      },
+    });
+  assert.equal(msgs("choice", { state: p4(false, false) }).length, 0);
+  assert.equal(msgs("choice", { state: p4(true, true) }).length, 0);
+});
+
+test("the clear button starts enabled only when every row is live and every decision is made", () => {
+  const live = artifact({ artifact_id: "l", editorial_status: "approved", delivery_status: "live_confirmed", evidence: ev("url", "https://x.test/a") });
+  const notLive = artifact({ artifact_id: "n", editorial_status: "approved", delivery_status: "handed_off" });
+  const cpFor = (req: VentureArtifact[], over: Partial<CheckpointState> = {}) =>
+    buildVentureThread(input({ state: state({ checkpoints: { "checkpoint-1": checkpoint({ required: req, required_count: req.length, ...over }) } }), artifacts: req }))
+      .messages.find((m) => m.kind === "checkpoint") as { canClear: boolean; needsPace: boolean };
+  assert.equal(cpFor([live]).canClear, true);
+  assert.equal(cpFor([live, notLive]).canClear, false);
+  assert.equal(cpFor([live], { decisions_required_count: 2, decisions_complete_count: 1 }).canClear, false);
+  // An empty checkpoint cannot be cleared into existence.
+  assert.equal(cpFor([]).canClear, false);
+});
+
+test("the pace control appears only where the checkpoint actually demands a pace", () => {
+  const live = artifact({ artifact_id: "l", editorial_status: "approved", delivery_status: "live_confirmed", evidence: ev("url", "https://x.test/a") });
+  const cp = (blocking: { artifact_id: string | null; reason: string }[], paceRecorded: boolean) =>
+    buildVentureThread(
+      input({ state: state({ checkpoints: { "checkpoint-1": checkpoint({ required: [live], required_count: 1, blocking, pace_recorded: paceRecorded }) } }), artifacts: [live] })
+    ).messages.find((m) => m.kind === "checkpoint") as { needsPace: boolean; canClear: boolean };
+  // checkpoint-2 and 3 never demand one, and pace_recorded is false on them forever.
+  assert.equal(cp([], false).needsPace, false);
+  assert.equal(cp([{ artifact_id: null, reason: "posting pace not recorded -- run recordPace first" }], false).needsPace, true);
+  assert.equal(cp([{ artifact_id: null, reason: "posting pace not recorded -- run recordPace first" }], false).canClear, false);
+});
+
+test("only a research read carries findings, and only its emergent ones", () => {
+  const read = artifact({
+    artifact_id: "p1-read",
+    artifact_kind: "phase_1_research_read",
+    fields: {
+      findings: [
+        { finding_id: "e1", finding_origin: "emergent", emergent_description: "people skip the down-ballot", lead_magnet_implications: "the guide should start there", signal_quality: "strong", muxin_confirmed_emergent: null },
+        { finding_id: "p1", finding_origin: "planned", emergent_description: "planned one" },
+      ],
+    },
+  });
+  const card = buildVentureThread(input({ artifacts: [read] })).messages.find((m) => m.kind === "card");
+  assert.ok(card && card.kind === "card");
+  assert.equal(card.findings?.length, 1);
+  assert.equal(card.findings?.[0].findingId, "e1");
+  assert.equal(card.findings?.[0].confirmed, null, "not yet ruled on is its own state, not false");
+  assert.equal(card.findings?.[0].signalQuality, "strong");
+  // Every other kind has none at all, so the panel is absent rather than empty.
+  const plain = buildVentureThread(input({ artifacts: [artifact({ artifact_id: "x" })] })).messages.find((m) => m.kind === "card");
+  assert.equal(plain?.kind === "card" ? plain.findings : "wrong", null);
+});
+
+test("a finding note is never invented when the read did not write one", () => {
+  const read = artifact({
+    artifact_id: "p1-read",
+    artifact_kind: "phase_1_research_read",
+    fields: { findings: [{ finding_id: "e1", finding_origin: "emergent" }] },
+  });
+  const card = buildVentureThread(input({ artifacts: [read] })).messages.find((m) => m.kind === "card");
+  assert.equal(card?.kind === "card" ? card.findings?.[0].note : "wrong", "");
+});
+
+// ── the client mirrors, again (Rule 5) ───────────────────────────────────────────────────────────
+
+test("the write layer ships to the browser, and refetches the whole thread rather than patching", () => {
+  const src = readFileSync(join(HERE, "page.ts"), "utf8");
+  assert.ok(src.includes("await loadVenture();"), "a successful write must refetch the thread");
+  // The dispatch the wiring guard checks for, and the one that keeps the state machine server-side.
+  assert.ok(src.includes('"/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id'));
+  // The refusal path: the server's sentence is what renders, never a rewritten one.
+  assert.ok(src.includes("ventureOpen.error = j.error"), "a refusal must carry the server's own message");
+  assert.ok(src.includes('class="vrefusal"'), "the refusal must render next to the control");
+  // needsReason reads the server's recommendation, not source order.
+  assert.ok(src.includes("function vNeedsReason(choice, item){"));
+  assert.ok(src.includes("return !!choice.overrideDiscipline && !item.recommended;"));
+});
+
+test("a settled decision offers no control, because a second selection is refused", () => {
+  const src = readFileSync(join(HERE, "page.ts"), "utf8");
+  assert.ok(src.includes("const pick = m.live ?"), "only a live decision is clickable");
 });
