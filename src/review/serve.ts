@@ -62,6 +62,7 @@ import {
   clearFinishedJobs,
   answerJob,
   retryJob,
+  stopJob,
   jobLogPath,
   lastNonEmptyLine,
   tailLines,
@@ -1401,6 +1402,20 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/jobs/clear") {
       const removed = clearFinishedJobs();
       json(res, 200, { ok: true, removed });
+      return;
+    }
+    // Stop ONE job — the per-job counterpart to "Clear finished" above. Path-matched by regex like
+    // the /log, /answer and /retry routes, since the job id is in the path. `stopped: false` means
+    // it had already settled and nothing changed: a safe no-op, not an error. See stopJob for what
+    // "stop" means for each of the three job shapes (queued, subprocess, task closure).
+    if (req.method === "POST" && /^\/api\/jobs\/[^/]+\/stop$/.test(url.pathname)) {
+      const jobId = url.pathname.split("/")[3];
+      const result = stopJob(jobId);
+      if ("error" in result) {
+        res.writeHead(404).end("no such job");
+        return;
+      }
+      json(res, 200, { ok: true, status: result.job.status, stopped: result.stopped });
       return;
     }
     if (req.method === "GET" && /^\/api\/jobs\/[^/]+\/log$/.test(url.pathname)) {

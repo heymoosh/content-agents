@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { repoRoot } from "../db/db.js";
 import { appendRow, readQueue, stampOrigin } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
@@ -331,7 +331,19 @@ const ATOMIZE_PERMISSION_MODE = process.env.ATOMIZE_PERMISSION_MODE ?? "acceptEd
 // "blocked" is a job that printed an ASK and stopped: it is waiting on Muxin, not on the machine.
 // It does NOT hold the job lane (see settleJob below) and it is never swept by clearFinishedJobs —
 // an unanswered question is not finished work.
-type JobStatus = "queued" | "running" | "blocked" | "done" | "failed";
+//
+// "stopped" is Muxin pressing Stop it. It is deliberately its OWN status rather than a reuse of
+// either neighbour:
+// - Not `blocked`: blocked means "the subprocess asked an answerable question and is waiting".
+//   answerJob validates her answer against `ask.options`, and a stopped job has no ask — so it
+//   would be unanswerable AND, since jobIsSweepable only sweeps `blocked` once `answer !== null`,
+//   permanently unclearable. That is exactly the stranding the >=2-options guard in
+//   shouldBlockOnAsk exists to prevent.
+// - Not `failed`: her stopping something is not a break. `failed` carries retry-as-repair
+//   semantics ("the run broke, the same attempt may work") she never asked for.
+// Like `done`/`failed` it is finished work, so clearFinishedJobs sweeps it; unlike them it is
+// never retryable (see settleJob).
+type JobStatus = "queued" | "running" | "blocked" | "done" | "failed" | "stopped";
 // "url" | "file" | "text" | "notes" | "continue" | "video" are the atomize-family kinds (dispatch
 // a slash-command against a folder/source, verified by artifact check — see drain() below).
 // "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" |
@@ -395,6 +407,19 @@ interface Job {
   // kind treats as one word, and a paragraph of beats does not belong there. Internal, and omitted
   // from publicJob() like `task` and `lastSpawn`.
   payload?: { mode?: "draft" | "repass"; beats?: string; note?: string; series?: string; chapter?: number };
+  // Subprocess jobs only: the live child, kept ONLY so stopJob has something to signal. Set in
+  // runCommandSpawn, cleared on close. Internal and omitted from publicJob like `task` — a
+  // ChildProcess is not JSON-serializable, so leaking it would break the /api/jobs read outright.
+  proc?: ChildProcess;
+  // Set by stopJob BEFORE it signals anything. settleJob checks it FIRST, ahead of every other
+  // verdict, because a SIGTERM'd `claude` exits 143 rather than dying by signal (see
+  // isSpawnTimeout) — so the close handler hands back a failure-shaped result for a run Muxin
+  // deliberately ended. Without this flag every Stop would render as "Did not work".
+  stoppedByMuxin?: boolean;
+  // Task jobs only (runQueued): reject the caller-facing promise this job's closure would
+  // otherwise settle. A stopped queued job never runs its task, so without this the HTTP request
+  // that awaited runQueued() would hang forever. Internal, omitted from publicJob.
+  discard?: (reason: Error) => void;
 }
 
 // The fields every enqueue site initializes identically. Kept in one place so a new job kind can't
@@ -418,7 +443,9 @@ let draining = false;
 // drain() finds work via jobs.find(status==="queued"), not by index, so splicing mid-array here is
 // safe even while a job is actively running.
 export function jobIsSweepable(job: Pick<Job, "status" | "answer">): boolean {
-  if (job.status === "done" || job.status === "failed") return true;
+  // `stopped` sweeps like done/failed: it is finished work by Muxin's own decision, and leaving it
+  // out would make "Clear finished" quietly incomplete.
+  if (job.status === "done" || job.status === "failed" || job.status === "stopped") return true;
   return job.status === "blocked" && job.answer !== null;
 }
 export function clearFinishedJobs(): number {
@@ -464,6 +491,13 @@ export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => P
       // Writes to `j`, the job actually running, NOT the captured `job`: an answered job is
       // requeued as a CLONE that reuses this same closure, and a rerun failure must land its error
       // on the clone, not back on the original blocked job.
+      // Muxin's Stop it, on a task job that never gets to run its closure. Without this the HTTP
+      // request that awaited runQueued() would hang forever waiting on a promise nothing settles.
+      // Rejecting early IS "discard the result": if the task was already mid-flight and later
+      // resolves, that resolve lands on an already-settled promise and is a harmless no-op.
+      // Rejects the promise WITHOUT writing job.error: a stop is not a fault, and settleJob's
+      // rule 0 keeps a stopped job's error null.
+      discard: (reason: Error) => reject(reason),
       task: async (j) => {
         try {
           resolve(await task(j));
@@ -559,6 +593,13 @@ export function runCommandSpawn(
   args: string[],
   opts: { timeoutMs: number; env?: NodeJS.ProcessEnv }
 ): Promise<CommandSpawnResult> {
+  // A stopped job's future spawns are stillborn. A task job stopped between two spawns has no
+  // child to signal, so stopJob settles it and hands the lane on immediately — without this guard
+  // the orphaned closure could still spawn `claude` alongside the next job and break the
+  // GUI-wide "one Claude at a time" bound this module's whole `draining` mutex exists to hold.
+  if (job.stoppedByMuxin) {
+    return Promise.resolve({ code: null, timedOut: false, enoent: false, stdout: "" });
+  }
   mkdirSync(JOB_LOG_DIR, { recursive: true });
   const log = createWriteStream(jobLogPath(job.id), { flags: "a" });
   const reader = createSpawnStreamReader(job);
@@ -580,6 +621,8 @@ export function runCommandSpawn(
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, ...opts.env },
     });
+    // The only handle stopJob has to signal. Internal — publicJob never serializes it.
+    job.proc = child;
     let enoent = false;
     child.on("error", (e) => {
       enoent = (e as { code?: string }).code === "ENOENT";
@@ -587,6 +630,7 @@ export function runCommandSpawn(
     child.stdout?.on("data", onChunk(true));
     child.stderr?.on("data", onChunk(false));
     child.on("close", (code, signal) => {
+      job.proc = undefined; // dead child, nothing left to signal
       // Flushes the last stdout line even without a trailing newline, and hands back everything
       // stdout said.
       const stdoutBuf = reader.close();
@@ -1287,6 +1331,30 @@ async function runFictionCheckJob(job: Job): Promise<void> {
 //    Holding the lane for a human's answer would stall every job queued behind it.
 // 3. A failure records where it died and whether Retry is worth offering.
 function settleJob(job: Job): void {
+  // RULE 0, checked before every other verdict: Muxin's Stop wins. `claude` catches SIGTERM and
+  // exits 143 (see isSpawnTimeout), so the close handler hands back a failure-shaped result for a
+  // run she deliberately ended — without this branch every Stop would render as "Did not work",
+  // complete with a Retry button for a run that was not broken.
+  if (job.stoppedByMuxin) {
+    // A task-closure job has no child to signal, so stopJob settled it and handed the lane on the
+    // moment she pressed the button. Its orphaned promise resolving later re-enters here with
+    // drain() having just clobbered the status back to done/failed: re-force `stopped`, but do
+    // NOT touch `draining` — a different job holds the lane now, and releasing it again would run
+    // two jobs at once.
+    const alreadySettled = job.finishedAt !== null;
+    job.status = "stopped";
+    job.error = null;
+    // Retry's contract is "the run broke, the same attempt may work". A deliberate stop is not
+    // that, and `retryable` is derived from a spawn result a stopped job never produces.
+    job.retryable = false;
+    job.failedAtStep = null;
+    job.proc = undefined;
+    if (alreadySettled) return;
+    job.finishedAt = Date.now();
+    draining = false;
+    void drain(); // next queued job — the lane she just freed
+    return;
+  }
   // `job.status !== "done"` is the load-bearing half of rule 1. The override exists ONLY to rescue
   // a job the artifact check just marked failed because the subprocess asked instead of writing.
   // A skill that wrote its artifact AND printed an ask has already done the work, so flipping it
@@ -1433,6 +1501,55 @@ export function answerJob(id: string, answer: string): { error: string } | { job
   jobs.push(job);
   void drain();
   return { job };
+}
+
+// Muxin pressed Stop it. Three shapes of job, three different mechanics — and only one of them
+// actually has a process to kill:
+//
+// 1. QUEUED: nothing was ever started, so there is nothing to signal. Mark it `stopped` and it is
+//    simply never picked: drain() finds work with `jobs.find(status === "queued")`. Deliberately
+//    NOT routed through settleJob — a queued job holds no lane, and settleJob's `draining = false`
+//    would hand away a lane some OTHER job is actively running in.
+// 2. RUNNING WITH A SUBPROCESS: flag it, then SIGTERM. The natural close -> run function -> drain
+//    -> settleJob path finishes the job, and settleJob's rule 0 turns the exit-143 failure shape
+//    back into `stopped`.
+// 3. RUNNING A TASK CLOSURE (revise/insights/duplicate, mid-await between spawns): there is no
+//    process. Stopping can only mean "mark it stopped and throw its result away" — so settle it
+//    now, reject the caller's promise via `discard`, and let the orphan finish into nothing. The
+//    stoppedByMuxin guard at the top of runCommandSpawn keeps that orphan from spawning `claude`
+//    behind the next job's back.
+//
+// Anything already settled (done/failed/blocked/stopped) is a no-op: `stopped: false` back, status
+// untouched. Stopping is not a way to dismiss an unanswered question — that would throw away the
+// ask Muxin has not answered yet.
+export function stopJob(id: string): { error: string } | { job: Job; stopped: boolean } {
+  const job = jobs.find((j) => j.id === id);
+  if (!job) return { error: "no such job" };
+  if (job.status !== "queued" && job.status !== "running") return { job, stopped: false };
+
+  job.stoppedByMuxin = true; // set BEFORE any signal — the settle path reads it first
+
+  if (job.status === "queued") {
+    job.status = "stopped";
+    job.error = null;
+    job.retryable = false;
+    job.finishedAt = Date.now();
+    job.discard?.(new Error("you stopped this one"));
+    return { job, stopped: true };
+  }
+
+  if (job.proc) {
+    try {
+      job.proc.kill("SIGTERM"); // the only signal this module sends — see runCommandSpawn
+    } catch {
+      // already gone between the check and the kill; the close handler settles it either way
+    }
+    return { job, stopped: true };
+  }
+
+  job.discard?.(new Error("you stopped this one"));
+  settleJob(job);
+  return { job, stopped: true };
 }
 
 // Run a failed job again. Same job id on purpose: the log file opens in append mode, so the second
