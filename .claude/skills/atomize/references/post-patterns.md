@@ -4,10 +4,11 @@ The structure library that sits alongside `references/hook-patterns.md` and
 `references/civic-adaptation.md`. Hook patterns cover the first line. This file covers the whole
 post: the arc after the hook, what it makes the reader feel, how it closes, and how long it runs.
 
-**Status: partly mined, first synthesis run 2026-08-22.** `substack` (6 patterns) and `youtube`
-(5 patterns) carry mined records. **Every other platform section below is still a placeholder**,
-including `linkedin`, whose corpus entries were withheld from this run pending a data-provenance
-check. This file is populated by `/patterns synthesize`, the synthesis step of the pattern-mining
+**Status: partly mined, synthesis run 2026-08-22.** `substack` (6 patterns), `youtube`
+(5 patterns) and `linkedin` (4 patterns) carry mined records. LinkedIn was withheld from the first
+pass pending a data-provenance check, then cleared and mined once its entries had been rebuilt from
+raw page markup and independently verified. **Every other platform section below is still a
+placeholder.** This file is populated by `/patterns synthesize`, the synthesis step of the pattern-mining
 pass. **If you are drafting for a platform whose section still reads "Not yet mined", fall back to
 `references/hook-patterns.md`** and to the per-channel angle in `config/platforms.yaml`
 `spin_angles`. An empty section is not permission to invent a structure and call it proven, and a
@@ -43,6 +44,56 @@ Notes-sourced folder (`source_kind: substack-note`), which stays a near-verbatim
 (gitignored, other creators' full text never enters git), scores them for outlier reach, and
 `/patterns synthesize` distills the winners into records below. Only the distilled shapes are
 committed. If you want to change what gets mined, edit `config/pattern-mining.yaml`, not this file.
+
+## What separated the winners from the same creators' ordinary posts
+
+**This is a run-level finding from the 2026-08-22 mining pass, not a pattern record.** It is placed
+above the patterns because it is more useful than any single skeleton below: it tells you what to
+ask of a draft, rather than which shape to pour it into. It comes from a 58-post corpus in which
+most creators contributed 4 or 5 posts, so an outlier could be compared against the same person's
+ordinary work. That comparison is the thing a list of famous posts cannot give you.
+
+**The finding:** the post that beats a creator's own baseline is the one that gives the reader
+something that creator's ordinary posts do not. Recycled and inward-facing material lost every time
+it appeared.
+
+Three measured contrasts sit behind it:
+
+- **Shorter than their own average, in 7 of the 10 accounts** with two or more scored posts. Six of
+  those are dramatic, from 0.03x to 0.62x of the creator's own mean length. **Two of the seven come
+  with a caveat that changes their meaning:** on one LinkedIn account and one Instagram account the
+  short winner was a CAPTION over an image the corpus never captured, so the brevity is a property
+  of the caption, not of the post. Those two are not evidence that short text wins. They are
+  evidence that a visual did work the text did not have to.
+- **No link.** In all 4 accounts that had both linked and unlinked posts, the top post was the one
+  with no link. **The honest counterexample:** one creator links on all five of his posts and still
+  records the highest raw engagement in his platform's set. So this is about relative performance
+  inside one creator's feed, not a rule that links suppress reach.
+- **A person, not a topic.** The winners center someone specific where the same creators' ordinary
+  posts center a subject. One Bluesky post naming and praising one person drew 10,135 likes against
+  153 for that same author's most carefully constructed post, a 66 to 1 gap on 84 characters versus
+  297.
+
+**The three exceptions are what make this credible rather than a slogan.** Not every winner was
+short, and the ones that were not are the most instructive:
+
+- One Substack account's two outliers are among its LONGEST posts and still beat its ordinary posts
+  tenfold. What they have is original labour: each opens on something the author personally found in
+  a primary source. That account's two losers are openly recycled, a revisited interview and a
+  republished book excerpt.
+- Another Substack account's winner is LONGER than its own average. What it has is timing plus a
+  named tool aimed at the exact week the reader was living through.
+- One YouTube account's best scored post is its longest of the two, not its shortest.
+
+So "shorter wins" is the wrong lesson and this file does not teach it. The right question to ask of
+a draft is: **what does this give the reader that my ordinary posts do not?** Brevity is one answer.
+A specific person is another. Original labour is another. Having no answer is the failure the
+losing posts in this corpus share.
+
+**One honest limit.** These are engagement comparisons within a single creator's feed, mostly on
+raw like counts, on posts of different ages, and on platforms where view counts are not public.
+They show relative performance inside an account. They are not controlled experiments, and no
+causal claim here has been tested.
 
 ## Record format
 
@@ -100,7 +151,203 @@ Not yet mined. Fall back to `references/hook-patterns.md`.
 
 ### linkedin
 
-Not yet mined. Fall back to `references/hook-patterns.md`.
+**Provenance:** mined by `/patterns synthesize` on 2026-08-22 from 15 LinkedIn analyses, corpus at
+58 entries at this run, across 3 accounts (Justin Welsh, Dan Koe, Codie Sanchez), all in the
+`building-solopreneur` niche. Not civic, so no civic adaptation is applied; run any civic piece
+through `references/civic-adaptation.md` table 1 before using these.
+
+**Data history, because it matters.** These 15 entries were purged from the corpus mid-build and
+rebuilt from raw `ld+json` page markup, after a summarizing fetch was found to have returned
+paraphrased bodies and, on one post, a COMMENT written by a different person under the creator's
+name. The rebuild was verified independently before these patterns were written. Anything you may
+have read that was mined from the earlier bodies is void.
+
+**LinkedIn has no public view counts** (impressions are owner-only), so all 15 entries score on
+engagement baseline alone, never on a view ratio. One outlier fired here, at 5.1x, and it is the
+one pattern below you should be most careful with.
+
+**Why there are 4 patterns and not 7.** Two arcs dominate these 15 posts. Most of the rest are
+single sightings, and writing them up as patterns would be describing individual posts, which is
+the failure mode this file is meant to avoid. Four evidenced shapes are the honest yield.
+
+**The formatting is the platform signature, and it is not optional.** All 15 posts break almost
+every sentence onto its own line, with blank lines between: 33 to 46 line breaks in a 1,000 to
+1,400 character post, 65 in a 2,651 character one. Fragments are used as beats. Lists of
+professions, negations, or constraints are stacked one item per line so a scrolling reader can
+self-select without reading prose. Assume this formatting in every Shape below; it is recorded once
+here rather than repeated in each record.
+
+#### 1. The Numbered Playbook
+
+- **Platform:** linkedin
+- **Mechanism:** the post pays off completely on its own with a set of discrete, labelled plays, and
+  the offer at the end is positioned as more of the same rather than the missing piece, so the
+  reader never feels the body was a toll gate. Seen in 5 posts across all 3 creators, the most
+  repeated arc on this platform in the corpus.
+- **Structure / arc:**
+  1. A claim or a promise stated in one line, usually counted.
+  2. A short concession that it is hard, which pre-empts the obvious objection.
+  3. The condition, meaning what has to be true for the plays to work.
+  4. A signposted handoff into the list.
+  5. N numbered or dashed plays, each with a short label and two to three sentences under it.
+  6. A closing frame naming the plays as the writer's own.
+  7. A second concession, that getting them right is not easy, which opens the gap.
+  8. One free resource named with its full title, and exactly one link.
+- **Emotional trigger:** competence within reach. Each labelled play is small enough to picture
+  doing, and the two concessions at beats 2 and 7 stop the post reading as a pitch.
+- **Immediate personal payoff:** several concrete operating rules usable this week, delivered in
+  full before any click. It lands across beat 5, which is why beat 5 must be genuinely complete
+  rather than teased.
+- **CTA style:** one click to one free resource, named by its full title, with the link last and
+  nowhere else. Non-civic material, so the ordinary `config/cta.yaml` pillar default applies and the
+  CTA stays conditional. Note the account-level observation: the creator who links on all five of
+  his posts still posts the highest raw numbers here, so a link is not a penalty in this shape.
+- **Length and formatting:** 550 to 2,650 characters. Numbered or dashed items with labels, blank
+  line between each. Single-sentence paragraphs throughout. No emoji except occasionally one in a
+  closing line, no hashtags. The link sits at the very bottom, after the resource is named.
+- **Shape:**
+  ```
+  [Beat 1: the promise, counted: "[N] [plays/steps/traits] for [specific outcome]"]
+  [Beat 2: concede it is hard, one line, before anyone objects]
+  [Beat 3: the condition, what has to be true for these to work at all]
+  [Beat 4: the handoff line into the list]
+  [Beat 5: play 1, a short label, then 2 to 3 sentences of how it actually works]
+  [Repeat beat 5 for each play, keeping the label-then-explanation shape identical]
+  [Beat 6: name them as your own, one line]
+  [Beat 7: concede that getting them right is hard, which is what the resource is for]
+  [Beat 8: one free resource, named in full, one link, nothing else]
+  ```
+  Every play at beat 5 must be something Muxin has actually run. N must equal the number delivered.
+- **Real example:** Justin Welsh, LinkedIn, his numbered posts on running a one-person business,
+  each closing on the same free field manual. Also Codie Sanchez, LinkedIn, her stepwise post on
+  acquiring a small business. Citation only, do not reuse the wording.
+
+#### 2. The Refused Premise
+
+- **Platform:** linkedin
+- **Mechanism:** line one rejects a choice or a piece of advice the reader has already accepted, and
+  the rest of the post supplies the version that fits their real life, so the reader who felt
+  cowardly is handed a defensible position instead of a push. Seen in 3 posts across 2 creators.
+  Related hook shape: pattern 27 in `hook-patterns.md`.
+- **Structure / arc:**
+  1. The forced choice or the received advice, stated in the reader's own terms, then rejected flat.
+  2. The reader's real constraints, listed one per line, concrete and unglamorous.
+  3. A summary line naming what those constraints add up to.
+  4. A concession to the appeal of the reckless version.
+  5. The alternative introduced as the reasonable route.
+  6. Numbered steps, each one line, that fit alongside the reader's current life.
+  7. A specific numeric threshold that tells them when they are allowed to take the bigger step.
+  8. The permission, then the reasoning for why the threshold is the right one.
+  9. The hard part named honestly, which opens the gap the resource fills.
+- **Emotional trigger:** defence of the cautious reader. This niche mostly shames people for not
+  leaping. Beat 2 is what earns the trust, because it proves the writer knows what the reader
+  actually has at stake.
+- **Immediate personal payoff:** permission to keep their current situation without feeling like a
+  coward, plus a number to aim at. It lands at beat 7, and a version of this shape without a
+  specific threshold degrades into a mood.
+- **CTA style:** one free resource and one link, same as pattern 1. Non-civic, so the
+  `config/cta.yaml` default applies and stays conditional.
+- **Length and formatting:** 1,200 to 2,700 characters. The most heavily line-broken shape in the
+  set, up to 46 breaks. Stacked constraint lists, a short numbered block, one-word paragraphs used
+  as beats. No emoji or hashtags.
+- **Shape:**
+  ```
+  [Beat 1: the advice or forced choice, in the reader's own words, then rejected in one line]
+  [Beat 2: their real constraints, one per line, concrete (what they owe, who depends on them)]
+  [Beat 3: one line naming what those add up to]
+  [Beat 4: concede why the reckless version is appealing]
+  [Beat 5: your alternative, introduced as the reasonable route rather than the bold one]
+  [Beat 6: the steps, numbered, each one line, each doable alongside what they already do]
+  [Beat 7: the threshold, a specific number that tells them when to take the bigger step]
+  [Beat 8: the permission, and why that number is the right one]
+  [Beat 9: the hard part, named honestly, then the resource and one link]
+  ```
+  Beat 7's number has to come from Muxin's own experience or her own reasoning she can defend.
+  Inventing a threshold is inventing proof.
+- **Real example:** Justin Welsh, LinkedIn, his post rejecting the standard quit-your-job advice and
+  giving a keep-your-salary route with a stated income threshold. Citation only, do not reuse the
+  wording.
+
+#### 3. Status Deflation `(thin evidence)`
+
+- **Platform:** linkedin
+- **Mechanism:** a person the reader would consider qualified immediately removes the qualification,
+  either by listing their own unremarkable origins, by listing what the success cost them, or by
+  saying the successful people they know lack the credentials the reader assumes are required. In
+  all three the reader loses their reason to feel disqualified. Seen in 3 posts across 2 creators.
+- **Structure / arc:**
+  1. The status fact, stated plainly and briefly, with no dwelling on it.
+  2. The deflation, immediate, stacked one item per line: ordinary origins, real costs, or absent
+     credentials.
+  3. The turn, naming what actually explains the outcome, which is always something unglamorous and
+     available to anyone.
+  4. The close, which is either a flat statement of gratitude, or a small instruction to act today.
+- **Emotional trigger:** removal of an excuse, delivered as humility rather than as a challenge.
+  Beat 2 has to be genuinely unflattering or the whole thing reads as a humblebrag.
+- **Immediate personal payoff:** relief from believing they are unqualified, and in the instruction
+  variant, one small step available the same day. It lands at beat 3.
+- **CTA style:** varies, and the variation is the finding. The version with NO ask and NO link is
+  the top-performing post of its account by more than two and a half times, and it is that
+  creator's only post without a link. The versions that close on a link sit below it. Consistent
+  with the corpus-wide no-link observation recorded in the findings section near the top of this
+  file. Non-civic, so the `config/cta.yaml` default applies and stays conditional.
+- **Length and formatting:** 300 to 1,000 characters, short for this platform. Stacked one-per-line
+  deflation list, single-sentence paragraphs, no numbering. No hashtags.
+- **Shape:**
+  ```
+  [Beat 1: the status fact, one line, stated flat and then dropped]
+  [Beat 2: the deflation, stacked one per line. Pick ONE fill and stay in it:
+     (a) your ordinary origins, or (b) what it actually cost you, or
+     (c) what the successful people you know visibly lack]
+  [Beat 3: the turn, what actually explains it, and make it available to anyone]
+  [Beat 4: close on gratitude with no ask, or on one small thing to do today]
+  ```
+  Beat 2 must be true and must be genuinely unflattering. A softened version inverts the mechanism
+  and reads as boasting.
+- **Real example:** Codie Sanchez, LinkedIn, her short post listing her unremarkable background and
+  closing on gratitude with no link, her highest-performing post in this corpus. Also Justin Welsh,
+  LinkedIn, his short post on what successful entrepreneurs he knows do not have. Citation only, do
+  not reuse the wording.
+
+#### 4. Caption Over Image `(thin evidence, and read the warning)`
+
+- **Platform:** linkedin
+- **Mechanism:** a one-line caption carries no information and exists only to frame an attached
+  image, which carries every claim the post makes. Seen in 2 posts from 1 creator, and they are that
+  creator's top two by a wide margin.
+- **THE WARNING, READ IT BEFORE USING THIS.** The 5.1x outlier behind this pattern is a
+  22-character caption over an image the corpus does not hold. **The corpus cannot show what made
+  the image work.** Anyone who reads this as "write four words and win" will omit the thing that
+  actually did the work and publish an empty post. This record exists to describe a FORM, the
+  caption-plus-visual division of labour, and to warn that its most important half was never
+  captured. It is not a licence to post fragments.
+- **Structure / arc:**
+  1. The image carries the entire substance: the claim, the framework, the list, the argument.
+  2. The caption does one job only, and it is not summary. In the two collected examples it is
+     either a bare plea, or a line asserting that the image matters more than it appears to.
+  3. Nothing else. No explanation, no link, no list.
+- **Emotional trigger:** unreadable from the collected text. Whatever the reader felt was produced
+  by the image. The caption's only contribution is a referential gap that gives them a reason to
+  look down.
+- **Immediate personal payoff:** unreadable for the same reason. Any payoff was in the visual.
+- **CTA style:** none in either collected post, and neither carries a link. That is consistent with
+  the corpus-wide observation that within an account, the post without a link tends to be the top
+  one, but here it may simply be that a caption has no room for one. Do not over-read it.
+- **Length and formatting:** 22 to 62 characters of caption. One line, no breaks, no list, no emoji,
+  no hashtag, no link. Plus an image, which is the actual post and which this corpus does not have.
+- **Shape:**
+  ```
+  [The image: carries the entire substance. This is the post. Build it first and build it well.]
+  [The caption, one line, doing ONE job and not summarising the image:
+     either a direct ask, or a claim that the image matters more than it looks like it does]
+  [Nothing else. No explanation, no link.]
+  ```
+  **Do not use this shape unless the image is genuinely strong enough to carry the post by itself.**
+  The corpus offers no evidence about what makes that image good, so that judgment is entirely
+  Muxin's and nothing here informs it.
+- **Real example:** Dan Koe, LinkedIn, his two highest-engagement posts in this corpus, both
+  one-line captions over attached images. The images were not collected. Citation only, do not reuse
+  the wording.
 
 ### substack
 

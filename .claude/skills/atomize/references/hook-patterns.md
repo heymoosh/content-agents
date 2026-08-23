@@ -85,14 +85,18 @@ recorded numbers (`data/patterns/corpus.jsonl`, gitignored), analysed in
 than a shape observed once. Full-post structure for these lives in `references/post-patterns.md`
 under the platform it was mined on; these rows cover only the opening.
 
-**None of these rest on a LinkedIn body.** The corpus's LinkedIn entries were withheld from this
-synthesis run pending a data-provenance check, so no row below draws on one.
+**On the LinkedIn rows.** Rows 24 to 26 were written while the corpus's LinkedIn entries were
+withheld pending a data-provenance check, and none of the three draws on a LinkedIn body. Row 27 was
+added afterwards, once those entries had been rebuilt from raw `ld+json` page markup and verified
+independently by the team lead on 2026-08-22. The earlier, paraphrased LinkedIn bodies informed
+nothing in this file.
 
 | # | Name | Mechanism | Shape | Real example (citation only, do not copy) |
 |---|---|---|---|---|
 | 24 | Named-Tool Handover | Name the technique and give away the entire mechanic in the same breath, so the value arrives before the viewer has decided whether to stay | "[Two or three word tool name] is [what kind of thing it is]. Here it is: [the whole mechanic, one sentence, nothing withheld]." | Ali Abdaal, YouTube shorts, his timer-based rule for starting when procrastinating; Mel Robbins, YouTube shorts, her two-word relationship technique. Seen at the opening in 5 posts across 3 creators; the full-post version is in `post-patterns.md` under youtube |
 | 25 | State-and-Excuses Open | Recite the reader's current state and their own excuses back to them, in the order they would give them, closing the escape route before they can reach it | "There's something you know you should [do] today, and you're not doing it, because [their excuse], [their second excuse], [their third]." | Mel Robbins, YouTube shorts, her short on doing the hard thing, which is the full form; Nicole LePera, YouTube, who names the state without the excuses. Seen in 2 posts across 2 creators, both YouTube, and only one of the two is the complete shape |
 | 26 | Found-Artifact Open | Lead with the labour you personally did and the one thing it turned up, so the reader is buying a discovery instead of an opinion | "[Real amount of time] into [the research you actually did], I found [one specific artifact] that [what it did to you]." | Anand Giridharadas, Substack (The Ink), the numbered chapters of his Epstein files series. Seen in 2 posts, one creator, both of them that account's outliers |
+| 27 | Refused Premise | Reject, in the first line, a forced choice or a piece of received advice the reader has already accepted, so the post begins by taking a weight off them rather than adding one | "[The forced choice or the received advice, in the reader's own terms]. [Flat rejection, same breath, no hedging]." | Justin Welsh, LinkedIn, his post rejecting the standard quit-your-job advice, and his post refusing the money-or-freedom either-or. Seen at the opening in 2 posts across 2 creators, one refusing an either-or and one rejecting named advice; a third post uses the move after its opening line |
 
 ## Verification caveats (carry forward, don't drop)
 
@@ -107,7 +111,10 @@ synthesis run pending a data-provenance check, so no row below draws on one.
   own excuses); the other names the state alone. It is the thinnest of the three mined rows. Neither
   post had a retrievable view or like count, so there is no performance evidence behind it at all,
   only the structure.
-- No mined row (24 to 26) draws on a LinkedIn body. If LinkedIn entries later clear their
+- Pattern 27 rests on 2 posts that carry the shape at the opening. Both are strong performers for
+  their accounts but neither is a measured outlier, and LinkedIn exposes no view counts, so there is
+  engagement evidence behind it but no reach evidence.
+- Rows 24 to 26 draw on no LinkedIn body. If LinkedIn entries later clear their
   provenance check, they may add rows; they did not inform these.
 - The joyful-activism register (16–23) is genuinely thinner in short-form (X/LinkedIn) than the
   outrage-framed register — most source material sits in Substack essays, books, and long-form
