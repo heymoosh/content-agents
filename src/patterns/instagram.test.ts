@@ -683,8 +683,11 @@ describe("smoke", () => {
     const code = await smoke(client, ["@broken", "@fixturecreator"], (line) => lines.push(line));
     const out = lines.join("\n");
     assert.equal(code, 1);
-    assert.match(out, /1 of 2 account\(s\) readable/);
+    assert.match(out, /SEEDS: 1 of 2 account\(s\) readable/);
     assert.match(out, /Not readable: @broken/);
+    // The exit code must not read as a setup failure. A caller error would have aborted above.
+    assert.match(out, /SETUP: working/);
+    assert.match(out, /at least one SEED needs attention, never that the setup failed/);
   });
 
   test("a dead token stops the run instead of calling every account non-professional", async () => {

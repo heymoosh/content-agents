@@ -907,9 +907,15 @@ export async function smoke(client: InstagramClient, handles: string[], log: (li
   }
 
   const unreadable = results.filter((r) => !r.professional);
-  log(`\n${results.length - unreadable.length} of ${results.length} account(s) readable through business_discovery.`);
+  // Two different questions, answered separately, because a run that reaches here has already
+  // proved the first one. Every credential failure aborts above with its own message, so getting
+  // this far means the token and the IG user id were accepted. A seed that cannot be read after
+  // that is a fact about the seed, and it must never be read as "my setup is broken".
+  log("\nSETUP: working. The token and IG_GRAPH_USER_ID were accepted, or this run would have stopped above.");
+  log(`SEEDS: ${results.length - unreadable.length} of ${results.length} account(s) readable through business_discovery.`);
   if (unreadable.length > 0) {
-    log(`Not readable: ${unreadable.map((r) => "@" + r.handle).join(", ")}. See the three causes above; none of them is an API failure.`);
+    log(`Not readable: ${unreadable.map((r) => "@" + r.handle).join(", ")}. See the three causes above; none of them is an API failure or a setup problem.`);
+    log("A nonzero exit code below means at least one SEED needs attention, never that the setup failed.");
   }
   log("\nNo transcript, caption track, on-screen text or slide text appears anywhere above, because no such field exists on this route.");
   log("Every entry the collector writes will therefore be body_is_complete: false. That is the honest value, not a gap in the run.");
