@@ -40,9 +40,13 @@ import {
 
 const PROFILE_BASE = "https://www.threads.com/@";
 
-// Enough posts per account for the engagement baseline to mean something. `classifyOutlier` needs
-// at least 3 other scored posts on an account before it will return a multiple, and a couple of
-// dozen gives that room while keeping one run to a few minutes.
+// The profile feed is reverse-chronological and Threads offers no sort-by-top for a stranger, so
+// this window is the account's most recent N posts and nothing about it was chosen for
+// performance. That UNSELECTED quality is a property worth having, not a limitation to apologise
+// for: a sample discovered by searching for winners makes a denominator of winners, and dividing a
+// winner by that understates how far it actually travelled. `classifyOutlier` needs at least 3
+// other scored posts on an account before it returns a multiple, and a couple of dozen gives it
+// that room while keeping one run to a few minutes.
 const MAX_POSTS_PER_ACCOUNT = 24;
 
 // How many times to scroll a profile before reading it. Threads loads its feed in pages.
@@ -72,7 +76,7 @@ function handleOf(seed: AccountSeed): string {
 
 // Where a post's slide images land so a human can read the words off them. Gitignored with the
 // rest of data/patterns/**, because these are other creators' images.
-function slideDirFor(username: string, code: string): string {
+export function slideDirFor(username: string, code: string): string {
   return join(PATTERNS_DIR, "media", "threads", `${username}-${code}`);
 }
 

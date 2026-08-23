@@ -13,6 +13,8 @@ import {
 } from "./threads-extract.js";
 import { loadConfig, validateEntry } from "../patterns/collect.js";
 import { DEFAULT_PULL_PLATFORMS, PULLERS } from "./registry.js";
+import { slideDirFor } from "./platforms/threads.js";
+import { isAbsolute } from "node:path";
 
 // Fixture markup in the shape a Threads profile page ships: server-rendered state inside
 // `<script type="application/json">` blobs, with the post objects buried somewhere down a Relay
@@ -265,6 +267,15 @@ test("describeMedia labels Meta's alt text as Meta's and never as the typeset he
   assert.match(text, /auto-generated alt text/);
   assert.match(text, /not the typeset headline/);
   assert.match(text, /\/tmp\/slides/);
+});
+
+test("the slide directory is named as an absolute path a human can paste into Finder", () => {
+  const post = toThreadsPost(carouselPost()) as ThreadsPost;
+  const dir = slideDirFor("buildsolo", "Cdef456");
+  assert.ok(isAbsolute(dir), `${dir} must be absolute`);
+  const { entry } = stageEntry(post, { handle: "buildsolo", creator: "Sam Builds", niche: "solopreneur", slideDir: dir });
+  assert.match(entry?.media.description ?? "", /paste this path into Finder/);
+  assert.ok((entry?.media.description ?? "").includes(dir));
 });
 
 test("describeMedia on a text-only post makes no claim about images", () => {

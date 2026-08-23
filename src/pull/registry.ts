@@ -17,8 +17,10 @@ export const PULLERS: Partial<Record<PullPlatform, PlatformPuller>> = {
   threads,
 };
 
-// What a bare `npm run pull` sweeps. Deliberately NOT every key of PULLERS: `npm run pull:weekly`
-// runs `npm run pull -- --ingest` on a schedule, and that job exists to refresh Muxin's own
-// analytics. Threads collects OTHER creators' posts for `/patterns`, which is a different job on a
-// different cadence, so it is opt-in by name: `npm run pull -- threads`.
+// What a bare `npm run pull` sweeps. Deliberately NOT every key of PULLERS, so read this before
+// "fixing" the omission: `npm run pull:weekly` runs `npm run pull -- --ingest` on a cron, and that
+// job exists to refresh MUXIN'S OWN analytics. Threads collects OTHER creators' posts for
+// `/patterns`, a different job on a different cadence, and adding it here would quietly turn the
+// weekly analytics job into an unattended weekly scrape of other people's profiles. It is opt-in
+// by name instead: `npm run pull -- threads`.
 export const DEFAULT_PULL_PLATFORMS: PullPlatform[] = ["linkedin", "x", "substack"];

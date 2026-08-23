@@ -114,9 +114,26 @@ None of them is required for v1. Every platform below has a free route or an hon
 
 ## threads
 
+> **Before the first run, expect this.** The collector reads Threads payload field names that were
+> reconstructed from Instagram's schema and never checked against a live logged-in response. If
+> they are wrong, the first `npm run pull -- threads` **fails with `UI_CHANGED`**, and that is a
+> normal step, not a crash. It writes every JSON payload the session captured to
+> `~/.content-agents/pull-diagnostics/threads-<timestamp>-no-posts-extracted/captured-payloads.json`
+> and prints that path. Open it, read the real field names, correct them in
+> `src/pull/threads-extract.ts`, run again. A first run that fails and hands over the data needed
+> to fix it is the design. It is the same loop `x.ts` and `substack.ts` went through.
+
 - **Free sort.** None. There is no public way to sort another account's Threads posts by
-  performance. Scroll the profile. The puller below therefore takes the most recent posts, not the
-  best ones, and the outlier math finds the winners inside that sample.
+  performance. Scroll the profile. The puller below therefore takes an **unselected window**: the
+  account's most recent 24 posts, none of them chosen for how they did, and the outlier math finds
+  the winners inside that sample.
+- **The unselected window is a feature, and this file has the scar to prove it.** A sample
+  discovered by searching for winners makes a denominator of winners, and dividing a winner by that
+  understates how far it travelled. That is not hypothetical: on this branch the outlier script
+  rated r/ADHD's biggest post of the year at 2.2x against its collected siblings, because every
+  sibling was also a top-of-year post. Against a real community median the true figure is 4095x,
+  three orders of magnitude out. Threads has no top-sort to tempt anyone into that mistake, so its
+  window is honest by default and can serve as a baseline denominator rather than only as a corpus.
 - **Visible to a non-owner.** Likes, replies, reposts, quotes.
 - **View counts?** Threads shows a view count to the post's own author. Whether any view number is
   currently public to other readers is **unverified**; assume not, and leave `views` null unless
@@ -144,9 +161,10 @@ None of them is required for v1. Every platform below has a free route or an hon
   goes in `media.description` labelled as Meta's own. The caption is recorded as the caption and is
   never allowed to stand in for the slides.
   What the collector does instead is **download the slide images** to
-  `data/patterns/media/threads/<handle>-<code>/` (gitignored) and name that directory in the
-  entry's `description`, so a human can read the words off them and fill `onscreen_text` in by
-  hand. That is the honest half-measure: the pictures are collected, the words on them are not.
+  `<repo>/data/patterns/media/threads/<handle>-<code>/` (gitignored) and name that directory in the
+  entry's `description` as a full absolute path, ready to paste into Finder, so a human can open
+  the folder, read the words off the slides, and fill `onscreen_text` in by hand. That is the
+  honest half-measure: the pictures are collected, the words on them are not.
 - **A post with no caption at all is skipped, not padded.** `validateEntry` requires a non-empty
   `body`, and a wordless carousel has none. The collector skips it and prints why. Writing a
   description into `body` to get it past the gate would put text in the corpus the creator never

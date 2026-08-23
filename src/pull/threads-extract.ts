@@ -305,7 +305,9 @@ export function describeMedia(post: ThreadsPost, slideDir: string | null): strin
     parts.push(`Meta's own auto-generated alt text (a machine description of the picture, not the typeset headline): ${alts.join(" | ")}`);
   }
   if (slideDir) {
-    parts.push(`slide images saved for a human to read at ${slideDir}`);
+    // An absolute path on purpose, and named as one, because the entire reason the slides are
+    // downloaded is that a human opens the folder and reads the words off them by hand.
+    parts.push(`slide images downloaded so the words on them can be read by hand, paste this path into Finder: ${slideDir}`);
   }
   return parts.join(". ") + ".";
 }
