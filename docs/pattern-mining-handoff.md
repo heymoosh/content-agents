@@ -177,10 +177,30 @@ with real before/after samples is at the session scratchpad's `pr-body.md`.
 
 ## Findings worth keeping
 
-- **r/civictech's entire top-of-year is Muxin's niche almost verbatim:** positions 1, 5, 7, 9, 13,
-  16 and 23 are all "I built a free tool to track your representatives / follow bills". Winning
-  form is a plain text post. A moderator proposal to ban project-feedback posts is live; check
-  before posting.
+**r/civictech is the best topical fit and has essentially no reach, and these two facts do not
+  cancel.** Its top-of-year list is almost wall-to-wall "I built a free tool to track your
+  representatives", the closest topical match to Muxin's work anywhere in this corpus. **Its top
+  post of the entire year is 27 upvotes. Its median top-25 post is 12.** By contrast r/LifeProTips
+  tops out at 42,483 and r/YouShouldKnow at 33,892, roughly 1,500x larger, both pure text, both
+  rewarding exactly the shape she already writes: a titled, self-contained useful claim. **The
+  civic audience is not on r/civictech at any scale worth posting for; it is inside the general
+  advice subs, where a civic tip competes as a tip.** An earlier draft of this doc recommended
+  r/civictech on topical fit alone, before anyone had measured its reach. That recommendation is
+  withdrawn.
+- **The asymmetry is what makes Reddit worth posting to at zero followers.** r/ADHD's top-of-year
+  is 4,094x its own community median of 3, reproduced from a fresh 192-post sample five months
+  after the hand pass got the same median. r/civictech's is 7x. A 4,094x number is not "this post
+  is great", it is a community where almost everything gets 1 to 3 upvotes and a handful escape.
+  That is invisible without an unselected /new sample, which is the whole argument for collecting
+  one.
+- **Reddit top-25 by community** (top post / median of its top 25): LifeProTips 42,483 / 12,306.
+  YouShouldKnow 33,892 / 10,247. ClaudeAI 20,419 / 6,892. ADHD 12,283 / 4,583. SideProject
+  5,778 / 2,326. LocalLLaMA 5,150 / 3,279. Entrepreneur 3,968 / 932. microsaas 806 / 331.
+  civictech 27 / 12.
+- **Reddit pagination does NOT respond to scrolling.** The loader is
+  `<faceplate-partial loading="programmatic">`, so it never fires on scroll or intersection. Call
+  `loadContent()` on the last partial; it advances 3 to 28 to 53 to 78 to 103 at about 2.2s a
+  round. Scrolling 40 times leaves you at 3 posts.
 - **Civic artifacts beat civic arguments** everywhere an honest baseline exists. A petition at 205x
   and an open-source deliberation tool at 114x on HN. Nobody appended an ask to an opinion; they
   shipped the thing and the shipping was the post.
