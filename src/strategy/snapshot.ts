@@ -69,7 +69,7 @@ function main() {
   const now = Date.now();
   const WEEK = 7 * 24 * 3600 * 1000;
 
-  console.log(`# Channel performance snapshot — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Channel performance snapshot, ${new Date().toISOString().slice(0, 10)}\n`);
 
   console.log(`## Data confidence\n`);
   console.log(`| Channel | Posts | Weeks of data | Status |`);
@@ -81,7 +81,7 @@ function main() {
     const weeks = dates.length
       ? Math.max(1, Math.round((Math.min(now, Math.max(...dates)) - Math.min(...dates)) / WEEK))
       : 0;
-    const status = weeks >= 4 ? "OK" : `INSUFFICIENT (<4 wks) — directional only`;
+    const status = weeks >= 4 ? "OK" : `INSUFFICIENT (<4 wks), directional only`;
     console.log(`| ${pl} | ${dates.length} | ${weeks} | ${status} |`);
   }
 
@@ -113,7 +113,7 @@ function main() {
   const untaggedCount = posts.filter((p) => p.pillar == null).length;
   if (untaggedCount > 0) {
     console.log(
-      `\n> ⚠ ${untaggedCount} posts untagged — run \`npm run snapshot -- --untagged\`, assign pillars, write back with \`tsx src/db/tag-posts.ts\`.`
+      `\n> ⚠ ${untaggedCount} posts untagged. Run \`npm run snapshot -- --untagged\`, assign pillars, write back with \`tsx src/db/tag-posts.ts\`.`
     );
   }
 
@@ -130,16 +130,16 @@ function main() {
     for (const pl of platforms) {
       const cell = (mt: string): string => {
         const group = withType.filter((p) => p.platform === pl && p.media_type === mt);
-        if (group.length === 0) return "—";
+        if (group.length === 0) return "-";
         const withMetrics = group.filter((p) => p.impressions != null || p.likes != null);
         const avgEng =
           withMetrics.length > 0
             ? (withMetrics.reduce((s, p) => s + engagement(p), 0) / withMetrics.length).toFixed(1)
-            : "—";
+            : "-";
         const avgImp =
           withMetrics.length > 0
             ? Math.round(withMetrics.reduce((s, p) => s + (p.impressions ?? 0), 0) / withMetrics.length)
-            : "—";
+            : "-";
         return `n=${group.length} | eng ${avgEng} | imp ${avgImp}`;
       };
       console.log(`| ${pl} | ${mediaTypes.map((mt) => cell(mt)).join(" | ")} |`);

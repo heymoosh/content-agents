@@ -60,7 +60,7 @@ function main() {
   try {
     md = readFileSync(BETS_PATH, "utf8");
   } catch {
-    console.log("No bets ledger yet (briefs/bets.md). Nothing to grade — this is the first cycle.");
+    console.log("No bets ledger yet (briefs/bets.md). Nothing to grade, this is the first cycle.");
     return;
   }
   const bets = parseBets(md).filter((b) => b.status === "open" || b.status === "carried");
@@ -92,7 +92,7 @@ function main() {
   };
 
   const now = Date.now();
-  console.log(`# Bet scoreboard — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Bet scoreboard, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(`Reference = avg engagement (likes + replies×3 + reposts×2) of all measured posts per platform.\n`);
   console.log(`| Bet | Type | n | Avg eng | Platform ref | Weeks open | Verdict |`);
   console.log(`|---|---|---|---|---|---|---|`);
@@ -122,7 +122,7 @@ function main() {
     // SUGGEST_RETIRE: open too long and still unresolvable at current sample.
     if (typeof weeksOpen === "number" && weeksOpen > STALE_WEEKS && verdict === "insufficient-sample") {
       flags.push(
-        `SUGGEST_RETIRE bet:${bet.id} — open ${weeksOpen} wks, only n=${n} (<${MIN_SAMPLE}); not resolvable at current cadence.`
+        `SUGGEST_RETIRE bet:${bet.id}: open ${weeksOpen} wks, only n=${n} (<${MIN_SAMPLE}); not resolvable at current cadence.`
       );
     }
 
@@ -132,7 +132,7 @@ function main() {
       streakUpdates.push(`bet:${bet.id} underperform_streak → ${newStreak}`);
       if (newStreak >= 2) {
         flags.push(
-          `SUGGEST_FLIP bet:${bet.id} — DO_MORE underperformed platform ref ${newStreak} cycles running (avg ${avg.toFixed(1)} < ref ${ref.toFixed(1)}); flip to DO_LESS or justify keeping it.`
+          `SUGGEST_FLIP bet:${bet.id}: DO_MORE underperformed platform ref ${newStreak} cycles running (avg ${avg.toFixed(1)} < ref ${ref.toFixed(1)}); flip to DO_LESS or justify keeping it.`
         );
       }
     } else if (verdict === "pass" && bet.streak > 0) {
@@ -149,7 +149,7 @@ function main() {
   }
 
   console.log(
-    `\n> n<${MIN_SAMPLE} is "insufficient-sample" — such a bet may be carried but NEVER promoted to a DO_MORE directive.`
+    `\n> n<${MIN_SAMPLE} is "insufficient-sample". Such a bet may be carried but NEVER promoted to a DO_MORE directive.`
   );
 }
 

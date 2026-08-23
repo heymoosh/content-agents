@@ -180,7 +180,7 @@ export function formatControlCoverage(cells: Map<string, Cell>, cfg: RoutingConf
   }
   const lines = [
     `## Spin-control coverage\n`,
-    `Deliberate --no-spin control runs (card f444f440) on already-assigned pillar/platform pairs — ` +
+    `Deliberate --no-spin control runs (card f444f440) on already-assigned pillar/platform pairs, ` +
       `tracked separately from, and never folded into, the pillar/platform resonance figures route.ts ` +
       `and the routing drift flag use. Surfaced only once a pair has reached n>=${COVERAGE_MIN_N} control runs.\n`,
   ];
@@ -213,14 +213,14 @@ function main() {
   const dryRun = args.includes("--dry-run");
   const entries = readControlLedger();
 
-  console.log(`\nspin-control${dryRun ? " [DRY RUN — no ledger write]" : ""}`);
+  console.log(`\nspin-control${dryRun ? " [DRY RUN, no ledger write]" : ""}`);
   console.log("=".repeat(50));
 
   const pick = nextControlRun(cfg, entries, Date.now());
   if (!pick) {
     const pairs = assignedPairs(cfg);
     const reason = pairs.length === 0 ? "no assigned pairs in config/routing.yaml" : "already ran a control this calendar month";
-    console.log(`skip — ${reason}`);
+    console.log(`skip, ${reason}`);
   } else {
     console.log(`control run this month: "${pick.pillar}" on ${pick.platform}`);
     if (!dryRun) {
@@ -230,11 +230,11 @@ function main() {
   }
 
   if (dryRun) {
-    console.log("\nDry-run complete — no ledger entry written.");
+    console.log("\nDry-run complete, no ledger entry written.");
   } else if (pick) {
     console.log(
       `\nNext: on this pillar's next /atomize run, draft ONLY the ${pick.platform} derivative verbatim\n` +
-        `(no spin: true, no angle — .claude/skills/atomize/SKILL.md step 3.5; NOT a full /atomize --no-spin\n` +
+        `(no spin: true, no angle. See .claude/skills/atomize/SKILL.md step 3.5; NOT a full /atomize --no-spin\n` +
         `invocation, which would strip spin from every routed platform, not just this one), then stamp\n` +
         `that one derivative's frontmatter control_run: true before it reaches review-queue.md.`
     );

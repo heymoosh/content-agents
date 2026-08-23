@@ -83,14 +83,14 @@ export function divergencesOnly(comparisons: AngleComparison[]): AngleComparison
 // Divergences only — a matching channel stays silent, never restated.
 export function formatDriftReport(comparisons: AngleComparison[]): string {
   if (comparisons.length === 0) {
-    return "No approved channel angles found in config/platforms.yaml (spin_angles is empty) — nothing to compare.";
+    return "No approved channel angles found in config/platforms.yaml (spin_angles is empty), so there is nothing to compare.";
   }
   const drifted = divergencesOnly(comparisons);
   if (drifted.length === 0) {
     return `No drift: all ${comparisons.length} channel angle(s) still match the approved angles in config/platforms.yaml.`;
   }
   const lines = [
-    `Angle drift on ${drifted.length}/${comparisons.length} channel(s) — config/platforms.yaml is unchanged; Muxin re-approves any of these by hand:`,
+    `Angle drift on ${drifted.length}/${comparisons.length} channel(s). config/platforms.yaml is unchanged; Muxin re-approves any of these by hand:`,
     "",
   ];
   for (const c of drifted) {
@@ -127,7 +127,7 @@ export function parseCandidates(text: string): AngleCandidate[] {
     }
     const key = normalizeChannel(channel);
     if (seen.has(key)) {
-      throw new Error(`duplicate channel "${channel}" in candidates JSON — one candidate per channel`);
+      throw new Error(`duplicate channel "${channel}" in candidates JSON. One candidate per channel`);
     }
     seen.add(key);
   }

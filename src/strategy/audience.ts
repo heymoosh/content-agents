@@ -41,7 +41,7 @@ function main() {
   const cur = all.filter((r) => r.captured_at === latest[r.platform]);
   const platforms = [...new Set(cur.map((r) => r.platform))].sort();
 
-  console.log(`# Audience — who you're reaching — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Audience, who you're reaching, ${new Date().toISOString().slice(0, 10)}\n`);
 
   console.log(`## Reach\n`);
   console.log(`| Platform | Followers/subs | Recent net growth | Demographics |`);
@@ -52,7 +52,7 @@ function main() {
     const hasDemo = cur.some((r) => r.platform === pl && r.metric_type === "demographic" && r.dimension !== "tier");
     const hasTier = cur.some((r) => r.platform === pl && r.dimension === "tier");
     const demoNote = hasDemo ? "yes" : hasTier ? "tier only" : "none";
-    console.log(`| ${pl} | ${total ?? "—"} | ${delta != null ? "+" + delta : "—"} | ${demoNote} |`);
+    console.log(`| ${pl} | ${total ?? "-"} | ${delta != null ? "+" + delta : "-"} | ${demoNote} |`);
   }
 
   const liRows = cur.filter((r) => r.platform === "linkedin" && r.metric_type === "demographic");
@@ -81,11 +81,11 @@ function main() {
   for (const pl of platforms) {
     const total = cur.find((r) => r.platform === pl && r.metric_type === "follower_total")?.value_count;
     if (total != null && total < 100) {
-      console.log(`> - ${pl}: only ${total} followers/subs — too small to read demographics into; treat as anecdote.`);
+      console.log(`> - ${pl}: only ${total} followers/subs. Too small to read demographics into; treat as anecdote.`);
     }
   }
   console.log(
-    `> - Demographics are LinkedIn-only (X & Bluesky expose none; Substack only free/paid). Use LinkedIn's audience as the proxy for who Muxin reaches professionally, and judge whether it matches the target reader for each pillar — a mismatch is a routing/positioning signal, not just trivia.`
+    `> - Demographics are LinkedIn-only (X & Bluesky expose none; Substack only free/paid). Use LinkedIn's audience as the proxy for who Muxin reaches professionally, and judge whether it matches the target reader for each pillar. A mismatch is a routing/positioning signal, not just trivia.`
   );
 }
 
