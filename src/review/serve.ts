@@ -92,7 +92,7 @@ import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
 import { buildStudioHome } from "./studio.js";
 import { getAnalyst } from "../providers/registry.js";
-import { readSignals, appendBacklogCard } from "./signals.js";
+import { readSignals, appendBacklogCard, readOutcomeFamilies, readResearchReport } from "./signals.js";
 import { readTreatment } from "./treatment.js";
 import {
   listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory,
@@ -1152,6 +1152,29 @@ const server = createServer(async (req, res) => {
     // sending an adjustment to the repo backlog as a card. Muxin decides; nothing self-adopts.
     if (req.method === "GET" && url.pathname === "/api/signals") {
       json(res, 200, readSignals());
+      return;
+    }
+    // Card D: the four outcome families, grouped at read time out of data/analytics.db
+    // (docs/venture-schema-contract.md §5.8). A separate route from /api/signals on purpose —
+    // this is a different read with a different shape, and nothing merges the two into a score.
+    if (req.method === "GET" && url.pathname === "/api/signals/outcomes") {
+      const db = openDb();
+      try {
+        json(res, 200, readOutcomeFamilies(db));
+      } finally {
+        db.close();
+      }
+      return;
+    }
+    // The redacted account-level research read (contract §5.4b), until now unreachable from the
+    // GUI. Aggregate counts and redacted text only; degrades to an honest empty read, never zeros.
+    if (req.method === "GET" && url.pathname === "/api/research/report") {
+      const db = openDb();
+      try {
+        json(res, 200, readResearchReport(db));
+      } finally {
+        db.close();
+      }
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/signals/backlog") {
