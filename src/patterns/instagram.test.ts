@@ -18,6 +18,7 @@ import {
   creatorFor,
   describeGraphError,
   engagementOf,
+  fieldState,
   graphError,
   isReel,
   isUnknownFieldError,
@@ -29,6 +30,9 @@ import {
   parseInstagramArgs,
   postedDate,
   readCredentials,
+  seededHandles,
+  smoke,
+  summariseAccount,
   toBaselineSample,
   toStagedEntries,
   toStagedEntry,
@@ -549,5 +553,140 @@ describe("collectAccount", () => {
       () => collectAccount(client, "@somebody", args, config, Date.now(), () => {}),
       /not an Instagram professional \(Business or Creator\) account/,
     );
+  });
+});
+
+describe("fieldState", () => {
+  test("tells apart a value, an empty, and a field that never came back", () => {
+    assert.equal(fieldState({ caption: "words" }, "caption"), "value");
+    assert.equal(fieldState({ caption: "" }, "caption"), "empty");
+    assert.equal(fieldState({ caption: "   " }, "caption"), "empty");
+    assert.equal(fieldState({ caption: null }, "caption"), "empty");
+    assert.equal(fieldState({}, "caption"), "absent");
+  });
+
+  test("a zero count is a value, not an empty, because 0 likes is a real answer", () => {
+    assert.equal(fieldState({ like_count: 0 }, "like_count"), "value");
+  });
+
+  test("the children edge is read through its data list", () => {
+    assert.equal(fieldState({ children: { data: [{ id: "a" }] } }, "children"), "value");
+    assert.equal(fieldState({ children: { data: [] } }, "children"), "empty");
+    assert.equal(fieldState({}, "children"), "absent");
+  });
+});
+
+describe("summariseAccount", () => {
+  test("counts each field's three states across the posts read", () => {
+    const result = summariseAccount("fixturecreator", account, window);
+    assert.equal(result.professional, true);
+    assert.equal(result.followers, 400000);
+    assert.equal(result.mediaRead, 7);
+    assert.equal(result.reels, 2);
+    // Only one of the two fixture Reels carries a view_count, which is exactly the distinction
+    // this report exists to surface.
+    assert.equal(result.reelsWithViews, 1);
+    assert.equal(result.fields.get("view_count")?.value, 1);
+    assert.equal(result.fields.get("view_count")?.absent, 6);
+    assert.equal(result.fields.get("caption")?.value, 6);
+    assert.equal(result.fields.get("caption")?.absent, 1);
+    assert.equal(result.fields.get("alt_text")?.value, 1);
+    assert.equal(result.fields.get("children")?.value, 1);
+  });
+
+  test("a null account is reported as not readable rather than as an empty account", () => {
+    const result = summariseAccount("somebody", null, []);
+    assert.equal(result.professional, false);
+    assert.equal(result.followers, null);
+  });
+});
+
+describe("seededHandles", () => {
+  test("returns the instagram seeds only, normalised and deduped", () => {
+    assert.deepEqual(seededHandles(config), ["fixturecreator"]);
+    assert.deepEqual(seededHandles({ ...config, accounts: [] }), []);
+  });
+});
+
+describe("smoke", () => {
+  function smokeClient(body: unknown): InstagramClient {
+    const fetchImpl = async () => new Response(JSON.stringify(body), { status: 200 });
+    return new InstagramClient(creds, { fetchImpl, politenessMs: 0 });
+  }
+
+  test("reports value, empty and absent counts separately for every field", async () => {
+    const lines: string[] = [];
+    const page = JSON.parse(JSON.stringify(discovery)) as { business_discovery: { media: { paging?: unknown } } };
+    delete page.business_discovery.media.paging;
+    const code = await smoke(smokeClient(page), ["@fixturecreator"], (line) => lines.push(line));
+    const out = lines.join("\n");
+    assert.equal(code, 0);
+    assert.match(out, /READABLE: YES/);
+    assert.match(out, /field\s+value\s+empty\s+absent/);
+    // view_count on one of the five read, absent on the other four, which is the split the whole
+    // report exists to make visible.
+    assert.match(out, /view_count\s+1\s+0\s+4/);
+    assert.match(out, /body_is_complete: false/);
+  });
+
+  test("a field absent from every post read is called out as never returned", async () => {
+    const lines: string[] = [];
+    const page = JSON.parse(JSON.stringify(discovery)) as {
+      business_discovery: { media: { data: Record<string, unknown>[]; paging?: unknown } };
+    };
+    delete page.business_discovery.media.paging;
+    for (const item of page.business_discovery.media.data) delete item.alt_text;
+    await smoke(smokeClient(page), ["@fixturecreator"], (line) => lines.push(line));
+    assert.match(lines.join("\n"), /alt_text\s+0\s+0\s+5\s+<- never returned for this account/);
+  });
+
+  test("a field present but blank everywhere is called out as returned but always empty", async () => {
+    const lines: string[] = [];
+    const page = JSON.parse(JSON.stringify(discovery)) as {
+      business_discovery: { media: { data: Record<string, unknown>[]; paging?: unknown } };
+    };
+    delete page.business_discovery.media.paging;
+    for (const item of page.business_discovery.media.data) item.alt_text = "";
+    await smoke(smokeClient(page), ["@fixturecreator"], (line) => lines.push(line));
+    assert.match(lines.join("\n"), /alt_text\s+0\s+5\s+0\s+<- returned but always empty/);
+  });
+
+  test("an unreadable handle names all three causes and never calls it an API failure", async () => {
+    const lines: string[] = [];
+    const code = await smoke(smokeClient({ id: "17841400000000999" }), ["@somebody"], (line) => lines.push(line));
+    const out = lines.join("\n");
+    assert.equal(code, 1);
+    assert.match(out, /READABLE: NO/);
+    assert.match(out, /personal account/);
+    assert.match(out, /age-gated/);
+    assert.match(out, /handle in config\/pattern-mining.yaml is wrong/);
+    assert.equal(out.includes("API failed"), false);
+  });
+
+  test("one bad handle does not stop the others being checked", async () => {
+    const lines: string[] = [];
+    let call = 0;
+    const fetchImpl = async () => {
+      const good = JSON.parse(JSON.stringify(discovery)) as { business_discovery: { media: { paging?: unknown } } };
+      delete good.business_discovery.media.paging;
+      const body = call++ === 0 ? { error: { code: 110, message: "cannot be loaded" } } : good;
+      return new Response(JSON.stringify(body), { status: call === 1 ? 400 : 200 });
+    };
+    const client = new InstagramClient(creds, { fetchImpl, politenessMs: 0 });
+    const code = await smoke(client, ["@broken", "@fixturecreator"], (line) => lines.push(line));
+    const out = lines.join("\n");
+    assert.equal(code, 1);
+    assert.match(out, /1 of 2 account\(s\) readable/);
+    assert.match(out, /Not readable: @broken/);
+  });
+
+  test("nothing the smoke check prints contains the token, on any path", async () => {
+    const lines: string[] = [];
+    const failing = async () => new Response(JSON.stringify({ error: { code: 190, message: "Session has expired" } }), { status: 400 });
+    const client = new InstagramClient(creds, { fetchImpl: failing, politenessMs: 0, log: (line) => lines.push(line) });
+    await smoke(client, ["@one", "@two"], (line) => lines.push(line));
+    const out = lines.join("\n");
+    assert.equal(out.includes(creds.accessToken), false);
+    assert.equal(out.includes("access_token"), false);
   });
 });

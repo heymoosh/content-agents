@@ -20,6 +20,22 @@
 // tell us either way. Upgrading an entry to body-complete is human work through the existing
 // `transcript_source: "manual"` path. There is no API route to it.
 //
+// WHAT THIS ROUTE PERMANENTLY DOES NOT RETURN. These are facts about Business Discovery, not
+// gaps in this file, and none of them is worth re-investigating:
+//
+//   saved_count        Meta: "Only accessible by the media owner or an accepted collaborator. Not
+//                      accessible through Business Discovery."
+//   shares_count       Meta: "Not accessible through Business Discovery or hashtag API endpoints."
+//                      This is why `metrics.shares` is null on every entry and never 0. A 0 would
+//                      be a claim that nobody shared the post; null is the truth, which is that
+//                      the number was never offered.
+//   total_views_count  Meta: "Not accessible through Business Discovery or hashtag API endpoints.
+//                      For Business Discovery, use `view_count` instead."
+//   insights of any    Owner-only. Nothing on another creator's account exposes reach,
+//   kind               impressions, saves, or watch time.
+//   duration, width,   No field exists, so media.duration_seconds and media.aspect are null rather
+//   height             than estimated from a thumbnail or a caption.
+//
 // Never fetched through a model-backed tool. A model-backed fetch once silently rewrote 14 of 15
 // post bodies and attributed a stranger's comment to the author. This file reads Meta's JSON and
 // copies fields across without touching them.
@@ -586,6 +602,18 @@ export function nicheFor(config: PatternMiningConfig, handle: string): string | 
   return null;
 }
 
+// Every instagram handle seeded in config/pattern-mining.yaml, so `--smoke` with no --account
+// checks the whole seed list rather than whichever account someone happened to type.
+export function seededHandles(config: PatternMiningConfig): string[] {
+  const handles: string[] = [];
+  for (const account of config.accounts ?? []) {
+    if (account.platform !== "instagram" || !account.handle) continue;
+    const handle = normalizeHandle(account.handle);
+    if (handle !== "" && !handles.includes(handle)) handles.push(handle);
+  }
+  return handles;
+}
+
 export function creatorFor(config: PatternMiningConfig, handle: string): string | null {
   const wanted = normalizeHandle(handle);
   for (const account of config.accounts ?? []) {
@@ -716,45 +744,165 @@ export async function collectAccount(
   return { entries: staged.entries, baseline };
 }
 
-// A deliberately tiny live check, kept separate from collection and from the tests. It runs ONE
-// business_discovery query and prints which fields actually came back, which is the only way to
-// settle three things the documentation cannot: whether the account is a professional account,
-// whether view_count really arrives for its Reels, and whether the children edge expands here.
+// Three states a field can be in, and they are three because two of them get confused constantly.
 //
-// It never prints the token and never writes a file.
-export async function smoke(client: InstagramClient, handleInput: string, log: (line: string) => void): Promise<number> {
-  const handle = normalizeHandle(handleInput);
-  const { account, media } = await client.recentMedia(handle, 5);
-  if (account === null) {
-    log(`@${handle}: no business_discovery object came back. Not a professional account, or age-gated.`);
-    return 1;
+//   "value"  - the field came back carrying something.
+//   "empty"  - the field came back and is null, an empty string, or an empty list. The API DOES
+//              return it for this account; there is simply nothing in it.
+//   "absent" - the key is not in the response at all. The API did not return this field here.
+//
+// "empty" and "absent" are different problems with different fixes. An empty alt_text means the
+// creator never wrote one. An absent alt_text means the route does not serve it, and no amount of
+// picking different accounts will change that. Anything that collapses the two sends the reader
+// off to debug the wrong thing.
+export type FieldState = "value" | "empty" | "absent";
+
+export function fieldState(record: Record<string, unknown>, key: string): FieldState {
+  if (!(key in record)) return "absent";
+  const value = record[key];
+  if (value === null || value === undefined) return "empty";
+  if (typeof value === "string" && value.trim() === "") return "empty";
+  if (Array.isArray(value) && value.length === 0) return "empty";
+  // The children edge arrives as { data: [...] }, so an edge with no rows is empty, not a value.
+  if (typeof value === "object") {
+    const data = (value as { data?: unknown }).data;
+    if (Array.isArray(data)) return data.length === 0 ? "empty" : "value";
   }
-  log(`@${handle}: followers_count ${account.followers_count ?? "ABSENT"}, media_count ${account.media_count ?? "ABSENT"}, ${media.length} media returned.`);
-  log(`optional fields (alt_text, children) accepted inside business_discovery: ${client.extrasAvailable ? "yes" : "no"}`);
-  for (const [index, item] of media.entries()) {
-    const present = [
-      typeof item.caption === "string" && item.caption !== "" ? "caption" : null,
-      typeof item.like_count === "number" ? "like_count" : null,
-      typeof item.comments_count === "number" ? "comments_count" : null,
-      typeof item.view_count === "number" ? "view_count" : null,
-      typeof item.permalink === "string" ? "permalink" : null,
-      typeof item.timestamp === "string" ? "timestamp" : null,
-      typeof item.alt_text === "string" && item.alt_text !== "" ? "alt_text" : null,
-      Array.isArray(item.children?.data) ? `children(${item.children!.data!.length})` : null,
-    ].filter((name): name is string => name !== null);
-    log(`  ${index + 1}. ${item.media_type ?? "?"}/${item.media_product_type ?? "?"} fields returned: ${present.join(", ") || "none"}`);
+  return "value";
+}
+
+// Every field the smoke check reports on, in the order a reader wants them.
+const SMOKE_FIELDS = [
+  "caption",
+  "like_count",
+  "comments_count",
+  "view_count",
+  "media_type",
+  "media_product_type",
+  "permalink",
+  "timestamp",
+  "media_url",
+  "thumbnail_url",
+  "alt_text",
+  "children",
+] as const;
+
+export interface SmokeAccountResult {
+  handle: string;
+  // False means business_discovery returned nothing for this handle. That has three causes and
+  // the report names all three, because "the collector is broken" is not one of them.
+  professional: boolean;
+  followers: number | null;
+  mediaRead: number;
+  reels: number;
+  reelsWithViews: number;
+  // Per field: how many of the posts read returned a value, an empty, or nothing at all.
+  fields: Map<string, { value: number; empty: number; absent: number }>;
+  // Meta's own words when a handle could not be read, so a wrong handle is never reported as an
+  // API fault.
+  error: string | null;
+}
+
+export function summariseAccount(handle: string, account: IgAccount | null, media: IgMedia[]): SmokeAccountResult {
+  const fields = new Map<string, { value: number; empty: number; absent: number }>();
+  for (const field of SMOKE_FIELDS) fields.set(field, { value: 0, empty: 0, absent: 0 });
+  for (const item of media) {
+    for (const field of SMOKE_FIELDS) {
+      const counts = fields.get(field)!;
+      counts[fieldState(item as unknown as Record<string, unknown>, field)]++;
+    }
   }
-  log("\nNo transcript field exists on this route, for any of the above. Every entry the collector writes will be body_is_complete: false.");
-  return 0;
+  return {
+    handle,
+    professional: account !== null,
+    followers: typeof account?.followers_count === "number" ? account.followers_count : null,
+    mediaRead: media.length,
+    reels: media.filter(isReel).length,
+    reelsWithViews: media.filter((m) => isReel(m) && fieldState(m as unknown as Record<string, unknown>, "view_count") === "value").length,
+    fields,
+    error: null,
+  };
+}
+
+// A deliberately tiny live check, kept separate from collection and from the tests. It runs one
+// business_discovery query per account and prints exactly what came back, which is the only way to
+// settle three things the documentation cannot: whether each seeded handle is a professional
+// account at all, whether view_count really arrives for its Reels, and whether the children edge
+// expands here.
+//
+// It never prints the token, on any path, and never writes a file.
+export async function smoke(client: InstagramClient, handles: string[], log: (line: string) => void): Promise<number> {
+  const results: SmokeAccountResult[] = [];
+  for (const input of handles) {
+    const handle = normalizeHandle(input);
+    try {
+      const { account, media } = await client.recentMedia(handle, 5);
+      results.push(summariseAccount(handle, account, media));
+    } catch (err) {
+      results.push({
+        handle,
+        professional: false,
+        followers: null,
+        mediaRead: 0,
+        reels: 0,
+        reelsWithViews: 0,
+        fields: new Map(),
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  log(`Optional fields (alt_text, children) accepted inside business_discovery this run: ${client.extrasAvailable ? "yes" : "no"}`);
+
+  for (const result of results) {
+    log(`\n@${result.handle}`);
+    if (!result.professional) {
+      // Never "the API failed". A seeded handle is not evidence the account exists or is the right
+      // one: this project has already been burned by a handle that resolved to a different channel
+      // and by two impostor accounts whose titles matched the real creator exactly.
+      log("  READABLE: NO. business_discovery returned nothing for this handle.");
+      log("  That means one of three things, and the API cannot tell them apart:");
+      log("    1. the account is a personal account, not a Business or Creator account");
+      log("    2. the account is age-gated, which Meta excludes from this route by design");
+      log("    3. the handle in config/pattern-mining.yaml is wrong or belongs to someone else");
+      log("  Check the profile by hand before treating this as a collector fault.");
+      if (result.error) log(`  Meta said: ${result.error.split("\n")[0]}`);
+      continue;
+    }
+    log(`  READABLE: YES, so it is an Instagram professional (Business or Creator) account.`);
+    log(`  followers_count ${result.followers === null ? "NOT RETURNED" : result.followers.toLocaleString("en-US")}, ${result.mediaRead} recent post(s) read, ${result.reels} of them Reels.`);
+    log(`  view_count returned on ${result.reelsWithViews} of ${result.reels} Reel(s).`);
+    log("  field                 value  empty  absent");
+    for (const field of SMOKE_FIELDS) {
+      const counts = result.fields.get(field)!;
+      const note =
+        counts.absent === result.mediaRead && result.mediaRead > 0
+          ? "  <- never returned for this account"
+          : counts.empty > 0 && counts.value === 0
+            ? "  <- returned but always empty"
+            : "";
+      log(`  ${field.padEnd(20)} ${String(counts.value).padStart(5)}  ${String(counts.empty).padStart(5)}  ${String(counts.absent).padStart(6)}${note}`);
+    }
+  }
+
+  const unreadable = results.filter((r) => !r.professional);
+  log(`\n${results.length - unreadable.length} of ${results.length} account(s) readable through business_discovery.`);
+  if (unreadable.length > 0) {
+    log(`Not readable: ${unreadable.map((r) => "@" + r.handle).join(", ")}. See the three causes above; none of them is an API failure.`);
+  }
+  log("\nNo transcript, caption track, on-screen text or slide text appears anywhere above, because no such field exists on this route.");
+  log("Every entry the collector writes will therefore be body_is_complete: false. That is the honest value, not a gap in the run.");
+  return unreadable.length > 0 ? 1 : 0;
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = parseInstagramArgs(argv);
   const log = (line: string) => console.log(line);
 
-  if (args.accounts.length === 0) {
+  if (args.accounts.length === 0 && !args.smoke) {
     console.error("Usage: npm run patterns:instagram -- --account @adriennemareebrown [--account @sharonsaysso] [--limit 25]");
-    console.error("       npm run patterns:instagram -- --smoke --account @adriennemareebrown   (one live query, prints which fields came back)");
+    console.error("       npm run patterns:instagram -- --smoke   (checks every seeded instagram account: readable or not, and which fields came back)");
+    console.error("       npm run patterns:instagram -- --smoke --account @someone   (just this one)");
     return 1;
   }
 
@@ -769,8 +917,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const client = new InstagramClient(creds, { log });
 
   if (args.smoke) {
+    // With no --account, check the whole seed list. A seeded handle is not evidence the account
+    // exists or is the right one, and this is the cheapest place to find that out.
+    const handles = args.accounts.length > 0 ? args.accounts : seededHandles(loadConfig());
+    if (handles.length === 0) {
+      console.error("No instagram accounts are seeded in config/pattern-mining.yaml, and none were passed with --account.");
+      return 1;
+    }
     try {
-      return await smoke(client, args.accounts[0], log);
+      return await smoke(client, handles, log);
     } catch (err) {
       console.error((err as Error).message);
       return 1;
