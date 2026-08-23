@@ -1011,12 +1011,15 @@ const server = createServer(async (req, res) => {
       try {
         const slug = url.searchParams.get("series") ?? "";
         // listChapters runs the same slug gate resolveDoc does. Joining the raw query param onto
-        // stories/ here let "../.." walk out and list any chapters/ directory on the disk.
-        const chapters = listChapters(slug);
+        // stories/ here let "../.." walk out and list any chapters/ directory on the disk. Its
+        // result is unused now, but the gate is why the call stays.
+        listChapters(slug);
         const beats = readSceneBeats(slug);
         const asked = Number(url.searchParams.get("chapter") ?? "");
-        const latest = chapters.length ? (chapters[chapters.length - 1].chapter as number) : null;
-        const n = Number.isInteger(asked) && asked > 0 ? asked : beats?.chapter ?? latest;
+        // Only a chapter this room actually produced. Falling back to the newest chapter on disk
+        // handed back one Muxin wrote herself in /story, which the room then labelled "the scene,
+        // from your beats" and set in the AI purple. Her prose is never the AI register.
+        const n = Number.isInteger(asked) && asked > 0 ? asked : beats?.chapter ?? null;
         const chapter = n ? readFictionChapter(slug, n) : null;
         json(res, 200, {
           ok: true,

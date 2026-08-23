@@ -284,6 +284,18 @@ export function fictionStatusWord(jobs: JobView[], hasScene: boolean): FictionSt
   return hasScene ? "scene waiting on you" : "unwritten";
 }
 
+// "A scene exists" means one was written FROM her saved beats, never "some chapter file sits in
+// stories/". Without this gate a series she wrote herself in /story reads back as the room's own
+// output: the header says "scene waiting on you", the composer still asks for beats, and her
+// chapter renders under "The scene, from your beats" in the AI purple. Georgia is her voice,
+// purple is the machine's, and her prose never wears the machine's colour.
+export function fictionHasScene(
+  beats: string | null | undefined,
+  chapter: { body?: string } | null | undefined,
+): boolean {
+  return !!(String(beats ?? "").trim() && chapter && String(chapter.body ?? "").trim());
+}
+
 export function fictionStatusTone(word: FictionStatus): { fg: string; bg: string; bd: string } {
   if (word === "nothing written") return { fg: JOB_COLORS.red, bg: "#fdf1ef", bd: "#ecc9c0" };
   if (word === "drafting") return { fg: JOB_COLORS.ai, bg: "#efeafd", bd: "#ded5e9" };
@@ -2656,6 +2668,9 @@ function ficStatusWord(hasScene){
   if(mine.some(j=>j.status==="queued"||j.status==="running") && !hasScene) return "drafting";
   return hasScene ? "scene waiting on you" : "unwritten";
 }
+function ficHasScene(beats, chapter){
+  return !!(String(beats||"").trim() && chapter && String(chapter.body||"").trim());
+}
 function ficStatusTone(w){
   if(w==="nothing written") return {fg:JC.red, bg:"#fdf1ef", bd:"#ecc9c0"};
   if(w==="drafting") return {fg:JC.ai, bg:"#efeafd", bd:"#ded5e9"};
@@ -2703,7 +2718,7 @@ function renderFiction(){
   const chapter = sc.chapter || null;
   const beats = (sc.beats||"").trim();
   const rep = sc.continuity || null;
-  const hasScene = !!(chapter && (chapter.body||"").trim());
+  const hasScene = ficHasScene(beats, chapter);
   const word = ficStatusWord(hasScene);
   const tone = ficStatusTone(word);
   const passJob = ficPassJob();
