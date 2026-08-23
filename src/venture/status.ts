@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { deriveState, checkpointPhaseStatus, type CheckpointBlocker, type CheckpointState, type Phase4State } from "./state.js";
+import { computeState, deriveState, checkpointPhaseStatus, type CheckpointBlocker, type CheckpointState, type Phase4State, type VentureState } from "./state.js";
 import { getResponseGateState } from "./responses.js";
 import { clusterAnalysisPath } from "./paths.js";
 import { loadRules } from "./rules.js";
@@ -26,7 +26,20 @@ export function formatStatus(slug: string): string {
   const rules = loadRules();
   maybeCompletePhase4(slug, rules);
 
-  const state = deriveState(slug);
+  return renderStatus(slug, deriveState(slug));
+}
+
+// The same render with no lazy write and no state.md refresh, for read-only HTTP callers (the
+// Venture room's GET /api/venture/:slug/state). The rendered text is identical: deriveState's own
+// derivePhase4State recomputes the completion predicate directly rather than trusting the canon
+// event, so skipping maybeCompletePhase4 changes only whether the LEDGER catches up -- which is
+// precisely the side effect a GET must not have. A status read never repairs the ledger; running
+// `venture:status` (or any real phase command) still does.
+export function formatStatusReadOnly(slug: string): string {
+  return renderStatus(slug, computeState(slug));
+}
+
+function renderStatus(slug: string, state: VentureState): string {
   const lines: string[] = [`${slug} -- Phase ${state.current_phase}`];
 
   // Only the phase Muxin is actually in gets rendered -- once current_phase moves past a phase,
