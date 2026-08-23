@@ -31,7 +31,10 @@ import {
   parseYoutubeArgs,
   pickCaptionTrack,
   rewriteCorpus,
+  sameWords,
+  selectBackfillTargets,
   subscribersFromAbout,
+  transcriptBearingYoutubeEntries,
   upgradeEntry,
   videoIdFromUrl,
   watchUrl,
@@ -246,12 +249,30 @@ describe("buildEntry", () => {
     assert.equal(entry.metrics.comments, null);
   });
 
-  test("a real transcript, if one ever arrives, flips the flags to captions plural and complete", () => {
+  test("a real transcript flips the flags to captions plural and complete, and says ASR out loud", () => {
     const page = parseWatchPage(fixture("youtube-watch-asr.html"));
-    const entry = buildEntry({ ...base, page, transcript: "the spoken words" });
+    const entry = buildEntry({
+      ...base,
+      page,
+      transcript: { text: "the spoken words", isAsr: true, languageCode: "en-orig" },
+    });
     assert.equal(entry.transcript_source, "captions");
     assert.equal(entry.media?.body_is_complete, true);
     assert.equal(entry.body, "the spoken words");
+    // The corpus may hold machine wording, but never without saying that is what it is.
+    assert.match(entry.notes ?? "", /MACHINE-GENERATED \(ASR\)/);
+    assert.match(entry.notes ?? "", /never be quoted as the creator's exact phrasing/);
+  });
+
+  test("a human-authored track is labelled quotable, and an ASR one never is", () => {
+    const page = parseWatchPage(fixture("youtube-watch-asr.html"));
+    const human = buildEntry({
+      ...base,
+      page,
+      transcript: { text: "the spoken words", isAsr: false, languageCode: "en" },
+    });
+    assert.match(human.notes ?? "", /HUMAN-AUTHORED/);
+    assert.doesNotMatch(human.notes ?? "", /MACHINE-GENERATED/);
   });
 
   test("a /shorts url is recorded as short-video on YouTube's own classification", () => {
@@ -328,7 +349,11 @@ describe("upgradeEntry", () => {
 
   test("WITH a transcript it flips all three together", () => {
     const page = parseWatchPage(fixture("youtube-watch-asr.html"));
-    const { entry } = upgradeEntry(existing(), page, "2026-08-23T15:00:00.000Z", "the spoken words");
+    const { entry } = upgradeEntry(existing(), page, "2026-08-23T15:00:00.000Z", {
+      text: "the spoken words",
+      isAsr: true,
+      languageCode: "en-orig",
+    });
     assert.equal(entry.media?.body_is_complete, true);
     assert.equal(entry.transcript_source, "captions");
     assert.equal(entry.body, "the spoken words");
@@ -358,6 +383,129 @@ describe("upgradeEntry", () => {
     const { entry } = upgradeEntry(existing(), page, "2026-08-23T15:00:00.000Z");
     assert.match(entry.notes ?? "", /Retrieved 2026-08-23 via curl\./);
     assert.match(entry.notes ?? "", /youtube re-fetch/);
+  });
+});
+
+describe("re-verifying a transcript that is already stored", () => {
+  // The hazard this whole block exists for: three bodies in this corpus were retrieved by a
+  // model-backed page-fetch API. Those rows look finished. Nothing in the old backfill would ever
+  // have gone back and checked them against the caption track.
+  const stored = (body: string): CorpusEntry =>
+    ({
+      id: "youtube-x-1",
+      platform: "youtube",
+      handle: "@x",
+      creator: "X",
+      niche: "n",
+      url: "https://www.youtube.com/watch?v=oXwujuphEMc",
+      kind: "video",
+      body,
+      transcript_source: "captions",
+      metrics: { views: null, likes: null, comments: null, shares: null, followers: null },
+      media: { form: "video", body_is_complete: true },
+      notes: "Retrieved via a page-fetch API.",
+    }) as unknown as CorpusEntry;
+
+  test("a stored body that disagrees with the caption track is replaced and the difference reported", () => {
+    const page = parseWatchPage(fixture("youtube-watch-asr.html"));
+    const result = upgradeEntry(stored("what a model said the video said"), page, "2026-08-23T15:00:00.000Z", {
+      text: "what the caption track actually says",
+      isAsr: true,
+      languageCode: "en-orig",
+    });
+    assert.equal(result.entry.body, "what the caption track actually says");
+    assert.equal(result.replacedBody?.before, "what a model said the video said");
+    // Reported, not silently healed: a body that was wrong is evidence about the tool that wrote it.
+    assert.match(result.entry.notes ?? "", /has been REPLACED/);
+    assert.match(result.entry.notes ?? "", /should not be trusted where the two disagree/);
+  });
+
+  test("line wrapping is not disagreement", () => {
+    // A caption file wraps where YouTube renders it; an earlier route may have joined those lines
+    // with spaces. Same words, so nothing is flagged as a bad body.
+    const page = parseWatchPage(fixture("youtube-watch-asr.html"));
+    const result = upgradeEntry(stored("the same words exactly"), page, "2026-08-23T15:00:00.000Z", {
+      text: "the same\nwords   exactly",
+      isAsr: true,
+      languageCode: "en-orig",
+    });
+    assert.equal(result.replacedBody, undefined);
+    assert.doesNotMatch(result.entry.notes ?? "", /has been REPLACED/);
+  });
+
+  test("a body that matched is recorded as CHECKED, not left looking unchecked", () => {
+    // Without this the row that was cleared and the row nobody ever looked at read identically.
+    const page = parseWatchPage(fixture("youtube-watch-asr.html"));
+    const result = upgradeEntry(stored("the same words exactly"), page, "2026-08-23T15:00:00.000Z", {
+      text: "the same words exactly",
+      isAsr: true,
+      languageCode: "en-orig",
+    });
+    assert.equal(result.verifiedBody, true);
+    assert.match(result.entry.notes ?? "", /RE-VERIFIED/);
+    assert.match(result.entry.notes ?? "", /matched it word for word/);
+  });
+
+  test("an entry that never had a transcript is filled in, not 'verified'", () => {
+    const page = parseWatchPage(fixture("youtube-watch-asr.html"));
+    const wordless = { ...stored("the written description"), transcript_source: "caption" } as CorpusEntry;
+    const { entry, verifiedBody } = upgradeEntry(wordless, page, "2026-08-23T15:00:00.000Z", {
+      text: "the spoken words",
+      isAsr: true,
+      languageCode: "en-orig",
+    });
+    assert.equal(verifiedBody, undefined);
+    assert.doesNotMatch(entry.notes ?? "", /RE-VERIFIED/);
+  });
+
+  test("sameWords compares words, not whitespace", () => {
+    assert.ok(sameWords("a b\nc", "a  b c"));
+    assert.ok(!sameWords("a b c", "a b d"));
+  });
+});
+
+describe("selectBackfillTargets", () => {
+  const entries = [
+    { id: "incomplete", platform: "youtube", url: "https://www.youtube.com/watch?v=aaaaaaaaaaa", transcript_source: "caption", media: { body_is_complete: false } },
+    { id: "has-words", platform: "youtube", url: "https://www.youtube.com/shorts/oXwujuphEMc", transcript_source: "captions", media: { body_is_complete: true } },
+    { id: "other-platform", platform: "tiktok", url: "https://www.tiktok.com/@a/video/1", transcript_source: "caption", media: { body_is_complete: false } },
+  ] as unknown as CorpusEntry[];
+
+  test("--backfill takes the wordless rows and --reverify takes the ones that claim to have words", () => {
+    assert.deepEqual(selectBackfillTargets(entries, { backfill: true, reverify: false, ids: [] }).map((e) => e.id), ["incomplete"]);
+    assert.deepEqual(selectBackfillTargets(entries, { backfill: false, reverify: true, ids: [] }).map((e) => e.id), ["has-words"]);
+  });
+
+  test("--id reaches a row no flag would select, matched on the video id not the url form", () => {
+    // The entry is stored as /shorts/<id>; the id is what joins them, which is the same reason the
+    // backfill matches on id rather than on the url string.
+    const found = selectBackfillTargets(entries, { backfill: false, reverify: false, ids: ["oXwujuphEMc"] });
+    assert.deepEqual(found.map((e) => e.id), ["has-words"]);
+  });
+
+  test("the three selectors are a union and never return a row twice", () => {
+    const found = selectBackfillTargets(entries, { backfill: true, reverify: true, ids: ["oXwujuphEMc"] });
+    assert.deepEqual(found.map((e) => e.id), ["incomplete", "has-words"]);
+  });
+
+  test("never selects another platform's rows", () => {
+    const found = selectBackfillTargets(entries, { backfill: true, reverify: true, ids: [] });
+    assert.ok(!found.some((e) => e.platform !== "youtube"));
+  });
+
+  test("transcriptBearingYoutubeEntries is exactly what incompleteYoutubeEntries cannot see", () => {
+    const a = incompleteYoutubeEntries(entries).map((e) => e.id);
+    const b = transcriptBearingYoutubeEntries(entries).map((e) => e.id);
+    assert.ok(!a.some((id) => b.includes(id)));
+  });
+});
+
+describe("parseYoutubeArgs", () => {
+  test("--id is repeatable and --reverify is its own flag", () => {
+    const args = parseYoutubeArgs(["--reverify", "--id", "oXwujuphEMc", "--id", "YPo5yrry6nw"]);
+    assert.equal(args.reverify, true);
+    assert.deepEqual(args.ids, ["oXwujuphEMc", "YPo5yrry6nw"]);
+    assert.equal(args.backfill, false);
   });
 });
 

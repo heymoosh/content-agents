@@ -26,6 +26,7 @@ folder too. One window, one folder, that's the whole system.
    | `GEMINI_API_KEY` | quote-card backgrounds, video scene images, voice-memo transcription | when you want images |
    | `OPENROUTER_API_KEY` | Grok writes the hook-driven video script | when you want video |
    | *local video tools* | voiceover (Kokoro) + captions (whisper.cpp) — no API key, but installs | when you want video — see `docs/setup-kokoro.md` |
+   | *yt-dlp* | reading YouTube transcripts into the pattern corpus (no API key). Install with `brew install yt-dlp` | when you run `/patterns collect` on YouTube |
    | `TYPEFULLY_API_KEY` | scheduled posting to X + LinkedIn + Bluesky | when ready to publish — see `docs/setup-typefully.md` |
    | `YOUTUBE_*` | auto-upload Shorts | with video — see `docs/setup-youtube-oauth.md` |
    | `ELEVENLABS_API_KEY` + `ELEVENLABS_VOICE_ID` | *fallback* voiceover if you don't like Kokoro | only if you swap `tts: elevenlabs` in `config/providers.yaml` |

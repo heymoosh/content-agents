@@ -375,11 +375,14 @@ None of them is required for v1. Every platform below has a free route or an hon
   subscriber counts are public but rounded, so record the rounded number and do not pretend to
   precision. See the fetch caveat below before assuming you can get that number without a browser.
 - **View counts?** Yes, public.
-- **Raw-retrieval verdict: the numbers are minable, the SPOKEN WORDS ARE NOT (re-corrected
-  2026-08-23, later the same day).** The watch page yields a real view count, an exact like count,
-  the title, the description, the duration, the publish date and the channel handle. It does
-  **not** yield a transcript. The line that used to sit here said "the watch page yields a real
-  caption transcript"; that is now false, so it is struck rather than softened.
+- **Raw-retrieval verdict: the numbers are minable by plain HTTP, and the SPOKEN WORDS are minable
+  too, but only with yt-dlp (settled 2026-08-23, third and current reading).** The watch page
+  yields a real view count, an exact like count, the title, the description, the duration, the
+  publish date and the channel handle. It does **not** yield a transcript. Nothing that fetches the
+  page yields a transcript. **`yt-dlp` does**, because it runs YouTube's own player handshake and
+  mints the PO token a bare fetch cannot. This section has now said "transcripts work", then
+  "transcripts do not work", and now "transcripts work by exactly one route"; the earlier two
+  readings are left standing above so nobody re-derives them from scratch.
 - **The transcript wall, named.** The watch page still lists the caption TRACKS, so whether a video
   has captions, and whether they are human-authored or machine-generated, is retrievable and
   certain. The track CONTENT is gated behind a **proof-of-origin (PO) token** that only YouTube's
@@ -393,6 +396,26 @@ None of them is required for v1. Every platform below has a free route or an hon
   can edit the video, so it answers 403 on anyone else's video. That is the
   [documented contract](https://developers.google.com/youtube/v3/docs/captions/download), not a
   quota problem, and no scope or service account changes it.
+- **The route through the wall: `yt-dlp`.** Install it once with `brew install yt-dlp` (or
+  `python3 -m pip install --user -U yt-dlp`). Verified 2026-08-23 with yt-dlp 2026.08.19 against
+  `oXwujuphEMc`: **23,461 bytes of real `json3`** where every plain-HTTP format returned zero. No
+  PO-token provider plugin, no cookies, no login, no browser was needed. `--skip-download` plus one
+  of `--write-subs` / `--write-auto-subs` writes the caption file to disk and the collector parses
+  those bytes; **nothing summarizes or rewords it**, which is the whole reason this route is
+  allowed where a model-backed page fetch is not.
+  `src/patterns/youtube-transcript.ts` implements it and
+  `npm run patterns:youtube -- --backfill` uses it. If the binary is missing the command **stops
+  with an install message**, because a tooling gap recorded as "this video has no transcript" is a
+  lie about the video.
+  - **Pass one flag, never both.** `--write-subs` fetches human-authored tracks and
+    `--write-auto-subs` fetches machine ones. Passing both makes the downloaded file's provenance
+    something you have to guess at afterwards, and guessing wrong labels ASR wording as the
+    creator's own. The watch page's own track list already says which kind exists, so ask for that
+    one.
+  - **Prefer the `<lang>-orig` file.** YouTube also serves machine TRANSLATIONS of its machine
+    captions under the plain `en` key. For an English video that is a lossy round trip; for any
+    other video it is not the spoken words at all. The `-orig` track is the one transcribed off the
+    real audio.
 - **Subscriber counts ARE retrievable on `/about`, but NOT via `subscriberCountText`.** The rule
   that used to sit here said `/about` carries exactly one `subscriberCountText` and that it is the
   channel's own. **That is stale, and it fails dangerously.** On 2026-08-23
@@ -414,8 +437,10 @@ None of them is required for v1. Every platform below has a free route or an hon
   as one quietly corrupts every ratio computed from it.
 - **Fallback.** For the numbers, none needed. If `/about` is ambiguous or walled, either Muxin
   reads the rounded number off the channel page herself or `followers` stays null.
-- **Transcript. NOT free and NOT reliable, as of 2026-08-23.** The raw-fetch route is closed; see
-  the transcript wall above. What remains:
+- **Transcript. Free, scripted and reliable, as of 2026-08-23**, via `yt-dlp` and only via
+  `yt-dlp`. The raw-fetch route is still closed; see the transcript wall above. All 24 YouTube
+  entries in this corpus carry their spoken words by this route. What else remains, for the days it
+  breaks:
   - **In a browser, by hand.** Open the video, expand the description, click "Show transcript",
     copy the text. This still works, because a real browser mints the PO token as a side effect of
     being a real browser. Record `transcript_source: "manual"` when a person copied it, and
@@ -432,7 +457,8 @@ None of them is required for v1. Every platform below has a free route or an hon
     approximate and must never be quoted as exact. This corpus already holds ASR mis-transcriptions
     recorded verbatim: "sematic" for "somatic", "ruin your Safe". `src/patterns/youtube.ts` records
     the human-versus-ASR distinction on every entry from the track list, which IS retrievable even
-    when its content is not.
+    when its content is not. Every one of this corpus's 24 YouTube transcripts is ASR, and every
+    one of those entries says so in `notes`.
 
 ## instagram
 

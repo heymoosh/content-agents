@@ -7,10 +7,10 @@
 // `body_is_complete: false` because nobody had the spoken words. A YouTube video's substance is
 // what the person says, and a title and description are not a substitute.
 //
-// THE SPOKEN WORDS ARE NOT RETRIEVABLE HERE, and that is not a bug in this file. The watch page
-// still publishes the caption track LIST, so we can say with certainty whether a video has
-// captions and whether they are human-authored or machine-generated. The track CONTENT is gated
-// behind a proof-of-origin token: `https://www.youtube.com/api/timedtext?...` answers HTTP 200
+// THE SPOKEN WORDS ARE NOT REACHABLE BY PLAIN HTTP, and that is still true of every fetch in this
+// file. The watch page publishes the caption track LIST, so this file can say with certainty
+// whether a video has captions and whether they are human-authored or machine-generated. The
+// track CONTENT is gated behind a proof-of-origin token: `https://www.youtube.com/api/timedtext?...` answers HTTP 200
 // with a zero-byte body for every format (default, json3, vtt, srv3), with and without a browser
 // user-agent, a Referer, an Origin, or a shared cookie jar. `/youtubei/v1/get_transcript` answers
 // 400 FAILED_PRECONDITION even with the page's own INNERTUBE_CONTEXT and visitor id. The token is
@@ -22,8 +22,16 @@
 // from an account that can edit the video, so it answers 403 for anyone else's video. That is the
 // documented contract, not a quota problem, and no scope or service account changes it.
 //
-// So `parseTimedTextJson3` below is written and tested and currently unreachable. It exists so
-// that the day a route opens, the parsing half is already done and already correct.
+// WHAT CHANGED ON 2026-08-23: yt-dlp reaches the words, because it performs YouTube's own player
+// handshake and mints the token a bare fetch cannot. Verified with yt-dlp 2026.08.19 against
+// oXwujuphEMc: 23,461 bytes of real json3 where plain HTTP got zero. It runs as a subprocess and
+// owns its own file, src/patterns/youtube-transcript.ts, so this file keeps its plain-HTTP purity.
+// Everything above describes the HTTP route; it is not a claim that the corpus must stay wordless.
+// The binary is a real dependency: `brew install yt-dlp`. Without it the collector stops and says
+// so, rather than quietly recording a tooling gap as "this video has no transcript".
+//
+// So `parseTimedTextJson3` below, written and tested while it was unreachable, is now the
+// production parser for the caption file yt-dlp writes to disk.
 //
 // Never fetched through a model-backed tool. A model-backed fetch once silently rewrote 14 of 15
 // post bodies in this corpus and attributed a stranger's comment to the author. Every read here is
@@ -34,6 +42,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORPUS_PATH, INBOX_DIR, makeId, normalizeHandle, readCorpus } from "./corpus.js";
 import type { CorpusEntry, CorpusMedia, CorpusMetrics } from "./types.js";
+// The one import that runs a subprocess. youtube-transcript.ts imports parseTimedTextJson3 back
+// from here, which is a cycle; it is safe because both sides only reach across at call time, and
+// the reused parser is worth more than a copy of it living in two files.
+import { YtDlpMissingError, fetchTranscript } from "./youtube-transcript.js";
 
 // A real Chrome string. YouTube serves a stripped page to an unrecognised agent, and the stripped
 // page has no ytInitialPlayerResponse at all, so this is load-bearing rather than cosmetic.
@@ -336,21 +348,50 @@ export function parseTimedTextJson3(json: unknown): string | null {
 // Building an entry
 // ---------------------------------------------------------------------------
 
+// The spoken words as actually retrieved, with the one fact a reader must never lose: whether a
+// machine or a person produced them. Structurally the same shape yt-dlp's fetchTranscript returns,
+// declared here so this file owns the corpus-facing vocabulary.
+export interface RetrievedTranscript {
+  text: string;
+  // TRUE means the wording is a machine's guess at the audio. It is still the spoken words, so it
+  // may set body_is_complete, but nothing may ever quote it as the creator's exact phrasing.
+  isAsr: boolean;
+  // The track file actually read, e.g. "en-orig". "-orig" is the track transcribed off the real
+  // audio; a bare "en" alongside it can be a machine translation of that track.
+  languageCode: string;
+}
+
 // Plain words for what the caption situation actually is, written to go straight into `notes` so a
 // reader never has to work it out from a boolean.
-export function captionNote(choice: TrackChoice | null, tracks: CaptionTrack[] | null): string {
-  if (tracks === null) {
+export function captionNote(
+  choice: TrackChoice | null,
+  tracks: CaptionTrack[] | null,
+  transcript: RetrievedTranscript | null = null,
+): string {
+  if (tracks === null && transcript === null) {
     return "The watch page published no caption track list at all, so whether this video has captions is unknown.";
   }
-  if (!choice) {
+  if (tracks !== null && tracks.length === 0 && transcript === null) {
     return "The channel disabled captions on this video: the page listed its caption tracks and there were none. This is the channel's own setting, not a retrieval failure, and it is why there is no transcript.";
+  }
+  if (transcript !== null) {
+    const kind = transcript.isAsr
+      ? "MACHINE-GENERATED (ASR). The words are what was said, but the wording is a machine's guess at the audio and must never be quoted as the creator's exact phrasing"
+      : "HUMAN-AUTHORED, so the wording is the creator's own and can be quoted as written";
+    return (
+      `The transcript in body is the spoken words, read off the ${transcript.languageCode} caption track, and that track is ${kind}. ` +
+      "Retrieved with yt-dlp, which runs YouTube's own player handshake and mints the proof-of-origin token that timedtext demands; the caption file it wrote to disk was parsed byte for byte. No model read this page and no model reworded it."
+    );
+  }
+  if (!choice) {
+    return "No caption track was usable for this video, so there is no transcript.";
   }
   const kind = choice.isAsr
     ? "machine-generated (ASR), so its wording is approximate and must never be quoted as exact"
     : "human-authored, so its wording is the creator's own";
   return (
     `A caption track exists in ${choice.track.languageCode} and it is ${kind}. ` +
-    "Its CONTENT could not be retrieved: YouTube gates timedtext behind a proof-of-origin token that only its own browser JavaScript can mint, and every fetch answers 200 with an empty body."
+    "Its CONTENT was not retrieved on this pass."
   );
 }
 
@@ -362,8 +403,8 @@ export interface BuildEntryInput {
   niche: string;
   followers: number | null;
   collectedAt: string;
-  // Present only where a real transcript was obtained. It is null in every live run today.
-  transcript?: string | null;
+  // Present only where a real transcript was obtained off the caption track by yt-dlp.
+  transcript?: RetrievedTranscript | null;
 }
 
 export function buildEntry(input: BuildEntryInput): CorpusEntry {
@@ -407,7 +448,7 @@ export function buildEntry(input: BuildEntryInput): CorpusEntry {
     posted_at: page.publishedAt,
     collected_at: collectedAt,
     kind: "video",
-    body: transcript ?? page.description ?? page.title ?? "",
+    body: transcript?.text ?? page.description ?? page.title ?? "",
     // "captions" plural is the spoken words. "caption" singular is NOT: it is the creator's written
     // description standing in because the transcript could not be retrieved. One letter apart and
     // opposite meanings, so this line is written out rather than computed inline.
@@ -443,10 +484,10 @@ function mediaDescription(page: WatchPage, choice: TrackChoice | null, url: stri
   return parts.join(" ");
 }
 
-function buildNotes(page: WatchPage, choice: TrackChoice | null, transcript: string | null): string {
+function buildNotes(page: WatchPage, choice: TrackChoice | null, transcript: RetrievedTranscript | null): string {
   const lines = [
     "Retrieved by plain HTTP against the real YouTube watch page. Title, description, duration, publish date, view count and like count come from ytInitialPlayerResponse.videoDetails and .microformat; the like count is YouTube's exact integer, not a rounded display. No model-backed fetch anywhere in the path.",
-    captionNote(choice, page.captionTracks),
+    captionNote(choice, page.captionTracks, transcript),
   ];
   if (transcript === null) {
     lines.push(
@@ -513,9 +554,22 @@ export class YoutubeClient {
 export interface UpgradeResult {
   entry: CorpusEntry;
   changed: string[];
+  // Set when the entry ALREADY held a transcript and the freshly retrieved one differs by more
+  // than whitespace. This is how a body written by an earlier, untrustworthy route gets caught,
+  // and the old text is handed back so the difference can be reported rather than silently healed.
+  replacedBody?: { before: string; after: string };
+  // Set when the entry already held a transcript and it MATCHED the caption track word for word.
+  // Clearing a suspicion is a finding too: a row collected by a route nobody trusts stays suspect
+  // forever unless the check that cleared it is written down next to it.
+  verifiedBody?: boolean;
 }
 
-export function upgradeEntry(entry: CorpusEntry, page: WatchPage, collectedAt: string, transcript: string | null = null): UpgradeResult {
+export function upgradeEntry(
+  entry: CorpusEntry,
+  page: WatchPage,
+  collectedAt: string,
+  transcript: RetrievedTranscript | null = null,
+): UpgradeResult {
   const changed: string[] = [];
   const next: CorpusEntry = { ...entry, metrics: { ...entry.metrics }, media: entry.media ? { ...entry.media } : undefined };
 
@@ -550,23 +604,61 @@ export function upgradeEntry(entry: CorpusEntry, page: WatchPage, collectedAt: s
   // A transcript is the only thing that can flip body_is_complete on a video entry, and only a
   // REAL one. Without it the body stays the description and the flag stays false, however much
   // other metadata this pass filled in.
+  let replacedBody: { before: string; after: string } | undefined;
+  let verifiedBody: boolean | undefined;
   if (transcript !== null) {
-    next.body = transcript;
-    next.transcript_source = "captions";
-    if (next.media) next.media.body_is_complete = true;
-    changed.push("body", "transcript_source", "body_is_complete");
+    // An entry already sourced "captions" is being RE-VERIFIED, not filled in. If the retrieved
+    // words differ from what is stored, the stored ones came from somewhere untrustworthy and the
+    // difference is evidence, so it is captured rather than quietly overwritten.
+    const hadTranscript = entry.transcript_source === "captions";
+    const before = entry.body ?? "";
+    if (hadTranscript && !sameWords(before, transcript.text)) {
+      replacedBody = { before, after: transcript.text };
+    } else if (hadTranscript) {
+      verifiedBody = true;
+    }
+    if (before !== transcript.text) {
+      next.body = transcript.text;
+      changed.push("body");
+    }
+    if (entry.transcript_source !== "captions") {
+      next.transcript_source = "captions";
+      changed.push("transcript_source");
+    }
+    if (next.media && next.media.body_is_complete !== true) {
+      next.media.body_is_complete = true;
+      changed.push("body_is_complete");
+    }
   }
 
-  if (changed.length > 0) {
+  // A verification that changed nothing is still worth writing down, so the note is appended on
+  // `verifiedBody` as well as on `changed`. Otherwise a row that was checked and cleared looks
+  // exactly like a row nobody ever checked.
+  if (changed.length > 0 || verifiedBody) {
+    const what = changed.length > 0 ? `${changed.join(", ")} refreshed` : "nothing needed changing";
     next.notes = appendNote(
       entry.notes,
-      `UPDATE ${collectedAt.slice(0, 10)} (youtube re-fetch): ${changed.join(", ")} refreshed by plain HTTP off the watch page. ${captionNote(choice, page.captionTracks)}` +
+      `UPDATE ${collectedAt.slice(0, 10)} (youtube re-fetch): ${what}. Metadata by plain HTTP off the watch page. ${captionNote(choice, page.captionTracks, transcript)}` +
         (transcript === null
           ? " The spoken transcript is still NOT in this record, so body_is_complete stays false and body remains the written description."
+          : "") +
+        (replacedBody
+          ? ` The body stored before this pass differed from the caption track and has been REPLACED: ${replacedBody.before.length} characters before, ${transcript!.text.length} after. The earlier text was not retrieved from the caption file and should not be trusted where the two disagree.`
+          : "") +
+        (verifiedBody
+          ? " RE-VERIFIED: the transcript already stored here was compared against YouTube's own caption file and matched it word for word, so whatever route recorded it did not alter the words. Any earlier note above doubting this body is settled by that check."
           : ""),
     );
   }
-  return { entry: next, changed };
+  return { entry: next, changed, replacedBody, verifiedBody };
+}
+
+// Whitespace-only differences are line wrapping, not disagreement: a caption file wraps at the
+// width YouTube renders it, and an earlier route may have joined those lines with spaces. Only a
+// difference in the WORDS means the two sources actually disagree.
+export function sameWords(a: string, b: string): boolean {
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+  return norm(a) === norm(b);
 }
 
 function appendNote(existing: string | undefined, addition: string): string {
@@ -602,6 +694,38 @@ export function incompleteYoutubeEntries(entries: CorpusEntry[]): CorpusEntry[] 
   );
 }
 
+// The YouTube entries that already claim to hold the spoken words. These are the rows `--reverify`
+// exists for, and they are exactly the rows `incompleteYoutubeEntries` will never return: an entry
+// whose body came from a route that cannot be trusted looks complete, so nothing would ever go
+// back and check it. Three of this corpus's bodies were retrieved by a model-backed page-fetch
+// API, which is the failure class that rewrote 14 of 15 post bodies elsewhere in this corpus.
+export function transcriptBearingYoutubeEntries(entries: CorpusEntry[]): CorpusEntry[] {
+  return entries.filter((e) => e.platform === "youtube" && e.transcript_source === "captions");
+}
+
+// Which rows a backfill run should touch, as one decision in one place.
+//
+// The three selectors are a union, not a precedence chain: `--id` names rows explicitly, and a row
+// named that way is included whether or not it also matches one of the flags. Order follows the
+// corpus so a run reads top to bottom, and duplicates are collapsed by entry id.
+export function selectBackfillTargets(
+  entries: CorpusEntry[],
+  opts: { backfill: boolean; reverify: boolean; ids: string[] },
+): CorpusEntry[] {
+  const wanted = new Set<string>();
+  if (opts.backfill) for (const e of incompleteYoutubeEntries(entries)) wanted.add(e.id);
+  if (opts.reverify) for (const e of transcriptBearingYoutubeEntries(entries)) wanted.add(e.id);
+  if (opts.ids.length > 0) {
+    const byVideo = new Set(opts.ids);
+    for (const e of entries) {
+      if (e.platform !== "youtube") continue;
+      const videoId = videoIdFromUrl(e.url);
+      if (videoId && byVideo.has(videoId)) wanted.add(e.id);
+    }
+  }
+  return entries.filter((e) => wanted.has(e.id));
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -612,6 +736,11 @@ export interface YoutubeArgs {
   creator: string | null;
   niche: string | null;
   backfill: boolean;
+  // Re-check entries that already hold a transcript, against the caption track itself.
+  reverify: boolean;
+  // Explicit video ids to re-fetch, repeatable. Needed because a row whose body came from a bad
+  // route looks complete and no flag would otherwise select it.
+  ids: string[];
   dryRun: boolean;
   limit: number | null;
   outPath: string | null;
@@ -626,6 +755,8 @@ export function parseYoutubeArgs(argv: string[]): YoutubeArgs {
     creator: null,
     niche: null,
     backfill: false,
+    reverify: false,
+    ids: [],
     dryRun: false,
     limit: null,
     outPath: null,
@@ -640,6 +771,8 @@ export function parseYoutubeArgs(argv: string[]): YoutubeArgs {
     else if (arg === "--creator") args.creator = next();
     else if (arg === "--niche") args.niche = next();
     else if (arg === "--backfill") args.backfill = true;
+    else if (arg === "--reverify") args.reverify = true;
+    else if (arg === "--id") args.ids.push(next());
     else if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--limit") args.limit = Number.parseInt(next(), 10);
     else if (arg === "--out") args.outPath = next();
@@ -655,13 +788,21 @@ const USAGE = [
   "  npm run patterns:youtube -- --backfill [--dry-run] [--limit N]",
   "      Re-fetch every YouTube entry whose body is not the spoken words and upgrade it in place.",
   "",
+  "  npm run patterns:youtube -- --reverify [--dry-run]",
+  "      Re-check entries that ALREADY hold a transcript against the caption track itself, and",
+  "      report every place the stored body and the real track disagree.",
+  "",
+  "  npm run patterns:youtube -- --id <videoId> [--id <videoId> ...]",
+  "      Re-fetch named videos, whatever state their entries are in.",
+  "",
   "  npm run patterns:youtube -- --url <video url> --handle <@handle> --creator <name> --niche <niche>",
   "      Collect one video into a staged inbox file for patterns:collect to validate and append.",
   "",
-  "The spoken transcript is NOT retrievable by this route. YouTube gates caption content behind a",
-  "proof-of-origin token minted by its own browser JavaScript, and the Data API's captions.download",
-  "requires OAuth as the video's owner. This collector records the caption track's EXISTENCE and",
-  "whether it is human-authored or machine-generated, and says plainly that the words are missing.",
+  "REQUIRES yt-dlp for transcripts:  brew install yt-dlp",
+  "Plain HTTP cannot reach caption CONTENT; YouTube gates it behind a proof-of-origin token minted",
+  "by its own browser JavaScript, and the Data API's captions.download requires OAuth as the",
+  "video's owner. yt-dlp performs the player handshake that mints the token. Without the binary",
+  "installed this command stops with an install message rather than recording empty transcripts.",
 ].join("\n");
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -670,7 +811,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const client = new YoutubeClient({ politenessMs: args.politenessMs });
   const collectedAt = new Date().toISOString();
 
-  if (args.backfill) return runBackfill(args, client, collectedAt, log);
+  if (args.backfill || args.reverify || args.ids.length > 0) return runBackfill(args, client, collectedAt, log);
 
   if (args.urls.length === 0) {
     console.error(USAGE);
@@ -704,6 +845,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
     try {
       const page = parseWatchPage(await client.getText(url));
+      const choice = pickCaptionTrack(page.captionTracks);
+      const transcript = await transcriptFor(videoId, choice);
       const entry = buildEntry({
         page,
         url,
@@ -712,10 +855,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         niche: args.niche,
         followers,
         collectedAt,
+        transcript,
       });
       staged.push(entry);
-      const choice = pickCaptionTrack(page.captionTracks);
-      log(`${url}: ${page.views ?? "no"} views, ${page.likes ?? "no"} likes, captions ${page.captionTracks === null ? "unknown" : page.captionTracks.length === 0 ? "OFF" : choice?.isAsr ? "on (machine-generated)" : "on (human-authored)"}, transcript NOT retrievable.`);
+      log(`${url}: ${page.views ?? "no"} views, ${page.likes ?? "no"} likes, captions ${page.captionTracks === null ? "unknown" : page.captionTracks.length === 0 ? "OFF" : choice?.isAsr ? "on (machine-generated)" : "on (human-authored)"}, transcript ${transcript ? `${transcript.text.length} chars from ${transcript.languageCode}` : "NOT retrieved"}.`);
     } catch (err) {
       if (err instanceof YoutubeBlockedError) {
         console.error(err.message);
@@ -745,18 +888,21 @@ async function runBackfill(
 ): Promise<number> {
   const corpusPath = args.corpusPath ?? CORPUS_PATH;
   const all = readCorpus(corpusPath);
-  let targets = incompleteYoutubeEntries(all);
+  let targets = selectBackfillTargets(all, { backfill: args.backfill, reverify: args.reverify, ids: args.ids });
   if (args.limit !== null) targets = targets.slice(0, args.limit);
 
   if (targets.length === 0) {
-    log("No YouTube entries are missing their spoken words. Nothing to do.");
+    log("No YouTube entries matched. Nothing to do.");
     return 0;
   }
-  log(`${targets.length} YouTube entries have a body that is not the spoken words. Re-fetching each one.\n`);
+  log(`${targets.length} YouTube entries selected. Re-fetching each one.\n`);
 
   const updated: CorpusEntry[] = [];
   let blocked = 0;
   let stillIncomplete = 0;
+  let gotTranscript = 0;
+  let verified = 0;
+  const disagreements: { id: string; before: string; after: string }[] = [];
 
   for (const entry of targets) {
     const videoId = videoIdFromUrl(entry.url);
@@ -766,16 +912,25 @@ async function runBackfill(
     }
     try {
       const page = parseWatchPage(await client.getText(watchUrl(videoId)));
-      // No transcript is passed, because none is obtainable. This is the honest call, not a
-      // placeholder: see the header of this file for exactly what was tried and what answered.
-      const result = upgradeEntry(entry, page, collectedAt, null);
-      stillIncomplete++;
-      if (result.changed.length === 0) {
+      const choice = pickCaptionTrack(page.captionTracks);
+      const transcript = await transcriptFor(videoId, choice);
+      const result = upgradeEntry(entry, page, collectedAt, transcript);
+      if (transcript === null) stillIncomplete++;
+      else gotTranscript++;
+      if (result.replacedBody) {
+        disagreements.push({ id: entry.id, before: result.replacedBody.before, after: result.replacedBody.after });
+      }
+      if (result.verifiedBody) verified++;
+      if (result.changed.length === 0 && !result.verifiedBody) {
         log(`${entry.id}: nothing changed.`);
         continue;
       }
       updated.push(result.entry);
-      log(`${entry.id}: ${result.changed.join(", ")}. Transcript still missing.`);
+      const words = transcript
+        ? `transcript ${transcript.text.length} chars, ${transcript.isAsr ? "ASR" : "human-authored"}, track ${transcript.languageCode}`
+        : "transcript still missing";
+      const fields = result.changed.length > 0 ? result.changed.join(", ") : "unchanged";
+      log(`${entry.id}: ${fields}${result.verifiedBody ? " (stored transcript VERIFIED against the caption track)" : ""}. ${words}.`);
     } catch (err) {
       if (err instanceof YoutubeBlockedError) {
         console.error(`\n${err.message}`);
@@ -783,7 +938,29 @@ async function runBackfill(
         blocked++;
         break;
       }
+      if (err instanceof YtDlpMissingError) {
+        console.error(`\n${err.message}`);
+        blocked++;
+        break;
+      }
       console.error(`${entry.id}: ${(err as Error).message}`);
+    }
+  }
+
+  if (verified > 0) {
+    log(
+      `\n${verified} entries already held a transcript and it MATCHED YouTube's own caption file word for word. ` +
+        "Those bodies were not altered by whatever route recorded them.",
+    );
+  }
+
+  if (disagreements.length > 0) {
+    log(
+      `\n${disagreements.length} entries already held a transcript that DISAGREED with the caption track. ` +
+        "Each stored body has been replaced by the track's own words:",
+    );
+    for (const d of disagreements) {
+      log(`  ${d.id}: ${d.before.length} chars stored, ${d.after.length} chars on the track.`);
     }
   }
 
@@ -792,12 +969,26 @@ async function runBackfill(
     return blocked > 0 ? 1 : 0;
   }
   const replaced = rewriteCorpus(updated, corpusPath);
-  log(`\nRewrote ${replaced} entries in ${corpusPath}.`);
-  log(
-    `${stillIncomplete} of them still have body_is_complete false, because the spoken words are not retrievable by this route. ` +
-      "That is the honest state of those rows, not a failure of this run.",
-  );
+  log(`\nRewrote ${replaced} entries in ${corpusPath}. ${gotTranscript} now carry the spoken words.`);
+  if (stillIncomplete > 0) {
+    log(
+      `${stillIncomplete} still have body_is_complete false: no caption track was retrievable for them. ` +
+        "That is the honest state of those rows.",
+    );
+  }
   return blocked > 0 ? 1 : 0;
+}
+
+// The transcript for one video, or null where the page says there is no track to fetch.
+//
+// The watch page decides ASR-vs-human, not yt-dlp: the page's own track list is authoritative and
+// already parsed and already tested here, and asking yt-dlp for exactly one kind keeps the
+// downloaded file's provenance unambiguous. Skipping the subprocess entirely when the page listed
+// no tracks also avoids spending a request to learn what the page already said.
+async function transcriptFor(videoId: string, choice: TrackChoice | null): Promise<RetrievedTranscript | null> {
+  if (!choice) return null;
+  const language = choice.track.languageCode.split("-")[0] || "en";
+  return fetchTranscript(watchUrl(videoId), { isAsr: choice.isAsr, language });
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
