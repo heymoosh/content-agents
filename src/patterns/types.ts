@@ -49,7 +49,17 @@ export interface CorpusEntry {
   transcript_source: TranscriptSource;
   metrics: CorpusMetrics;
   notes?: string;
+  // Phase 2 additions. Both optional, so every Phase 1 record already on disk stays valid.
+  // How the entry got here: hand-staged into data/patterns/inbox (phase 1), or pulled by a
+  // collector adapter (phase 2). Absent means it predates the field, which means manual.
+  collection_method?: CollectionMethod;
+  // Which adapter wrote it, as "<name>@<version>", e.g. "x-public-profile@1". Audit trail: when a
+  // platform changes its page and a batch of records turns out to be wrong, this is how you find
+  // exactly which records to throw away.
+  collected_by?: string;
 }
+
+export type CollectionMethod = "manual" | "auto";
 
 // Per-platform bars from config/pattern-mining.yaml. Either bar clearing makes an outlier.
 export interface OutlierThresholds {
@@ -77,7 +87,9 @@ export interface PatternMiningConfig {
   niches: string[];
   accounts: AccountSeed[];
   outlier_thresholds: Record<string, OutlierThresholds>;
-  targets: { corpus_size_min: number; corpus_size_max: number };
+  // How many OUTLIERS are worth reading in one synthesize pass. NOT a cap on the corpus, which is
+  // uncapped and should keep growing. See the comment in config/pattern-mining.yaml.
+  analysis_sample: { min_outliers: number; max_outliers: number };
 }
 
 export interface AccountSeed {

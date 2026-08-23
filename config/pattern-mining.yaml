@@ -6,11 +6,22 @@
 # The collected corpus itself (data/patterns/) is gitignored. Other creators' full post text and
 # transcripts never reach git. Only the distilled patterns get committed.
 
-# The three niches already covered by .claude/skills/atomize/references/hook-patterns.md.
+# The three niches already covered by .claude/skills/atomize/references/hook-patterns.md, plus a
+# fourth added 2026-08-22.
+#
+# virality-growth is Muxin's call, in her words: "I wouldn't limit it to my niche either, civic
+# topics are notoriously bad as a market, so I'd also want us to focus on accounts that teach you
+# how to go viral as well since human psychology is more universal and can be applied across
+# domains." It may end up the most valuable niche here.
+#
+# What belongs in it: creators who TEACH audience growth, hooks, retention and short-form craft.
+# What does not: creators who merely happen to be big inside a topic. Being large is not the
+# qualification, teaching the mechanics is.
 niches:
   - building-solopreneur
   - inner-journey
   - civic-democracy
+  - virality-growth
 
 # Seeded from the creators cited in hook-patterns.md, on the platforms that file actually cites
 # them on. A handle left null means it was not verifiable at seed time. Fill it in before
@@ -78,10 +89,17 @@ accounts:
 
   - handle: "@AnandWrites"
     creator: Anand Giridharadas
-    # Verified indirectly: x.com blocks direct fetch (HTTP 402), so this was confirmed from the
-    # search-indexed profile x.com/AnandWrites, whose display name is "The.Ink, from Anand
-    # Giridharadas", plus the exact hook pattern 8 quote sitting at
+    # Verified indirectly: an UNAUTHENTICATED direct fetch of x.com answers HTTP 402, so this was
+    # confirmed instead from the search-indexed profile x.com/AnandWrites, whose display name is
+    # "The.Ink, from Anand Giridharadas", plus the exact hook pattern 8 quote sitting at
     # x.com/AnandWrites/status/1763575873687724519. Checked 2026-08-22.
+    #
+    # READ THIS BEFORE CONCLUDING x IS UNREACHABLE. That 402 is recorded history about how this
+    # HANDLE was checked. It does NOT describe how the collector reaches x. A live pass on
+    # 2026-08-22 using the saved logged-in Chrome session (launchPlatform in src/pull/browser.ts)
+    # fetched x.com/search?q=<term>&f=top at HTTP 200 and read real public per-post labels off it,
+    # view counts included. x is reachable on the session route, and it is the only text platform
+    # here that shows a non-owner real views.
     platform: x   # cited separately by hook pattern 9
     niche: civic-democracy
     followers: null
@@ -154,11 +172,14 @@ accounts:
 
   - handle: "@ericpliu"
     creator: Eric Liu
-    # Verified indirectly: x.com blocks direct fetch (HTTP 402), so this was confirmed from the
-    # search-indexed profile x.com/ericpliu, whose bio names him CEO of Citizen University,
-    # founding ED of the Aspen Citizen, and author of "Become America". That combination is
-    # unique to him. Checked 2026-08-22. His Citizen University bio page links only the org
-    # account @CitizenUniv, which is not him.
+    # Verified indirectly: an UNAUTHENTICATED direct fetch of x.com answers HTTP 402, so this was
+    # confirmed instead from the search-indexed profile x.com/ericpliu, whose bio names him CEO of
+    # Citizen University, founding ED of the Aspen Citizen, and author of "Become America". That
+    # combination is unique to him. Checked 2026-08-22. His Citizen University bio page links only
+    # the org account @CitizenUniv, which is not him.
+    #
+    # Same caveat as the @AnandWrites entry above: that 402 describes an unauthenticated fetch, not
+    # the collector's route. The logged-in session reached x fine on 2026-08-22.
     platform: x
     niche: civic-democracy
     followers: null
@@ -577,6 +598,71 @@ accounts:
     niche: civic-democracy
     followers: null
 
+  # ---------------------------------------------------------------------------------------------
+  # VIRALITY-GROWTH, added 2026-08-22 with the niche itself.
+  #
+  # Deliberately short. Every row below was verified the same way the rest of this file was: the
+  # creator's own site links the handle, or the profile page itself was retrieved. Nobody was
+  # added from memory or from a search snippet. A wrong handle is worse than a blank one, so the
+  # candidates that could not be confirmed are either absent or carry handle: null.
+  #
+  # Only x, linkedin and substack are seeded here, because those are the platforms phase 2
+  # automates. The video half of this niche (shorts retention, hook craft on tiktok and youtube)
+  # is a real gap and belongs to the video pass.
+  # ---------------------------------------------------------------------------------------------
+
+  - handle: "@jayclouse"
+    creator: Jay Clouse
+    # Verified from his own site creatorscience.com, which links https://x.com/jayclouse,
+    # retrieved 2026-08-22. Creator Science studies how creators grow, which is the teaching
+    # register this niche is for.
+    platform: x
+    niche: virality-growth
+    followers: null
+
+  - handle: "@harrydry"
+    creator: Harry Dry
+    # Verified from his own site marketingexamples.com, which links https://twitter.com/harrydry,
+    # retrieved 2026-08-22. Marketing Examples breaks down why specific copy and hooks worked.
+    platform: x
+    niche: virality-growth
+    followers: null
+
+  - handle: "@harrydry"
+    creator: Harry Dry
+    # Verified from the same page, which links https://www.linkedin.com/in/harrydry/, retrieved
+    # 2026-08-22. Same person on a second platform, kept as a separate row because the collector
+    # is keyed on platform.
+    platform: linkedin
+    niche: virality-growth
+    followers: null
+
+  - handle: "@chenell"   # verified: substack.com/@chenell, retrieved 2026-08-22
+    creator: Chenell Basilio
+    # Growth In Reverse. Her profile bio reads "I reverse engineer how newsletter creators grow to
+    # 50k+ subscribers", which is exactly this niche: the mechanics, not the topic.
+    platform: substack
+    niche: virality-growth
+    followers: 41000   # profile shows "41K+ subscribers", retrieved 2026-08-22
+
+  - handle: "@sarahfay"   # verified: substack.com/@sarahfay, retrieved 2026-08-22
+    creator: Sarah Fay
+    # Substack Writers at Work. Her profile bio opens "Substack Growth Strategist", and the
+    # publication teaches Substack growth directly.
+    platform: substack
+    niche: virality-growth
+    followers: 41000   # profile shows "41K+ subscribers", retrieved 2026-08-22
+
+  - handle: null   # TODO: confirm handle
+    creator: Lara Acosta
+    # LinkedIn growth teacher, and the obvious second linkedin row for this niche. Her own site
+    # laraacosta.com was retrieved 2026-08-22 and names her program "Literally LinkedIn" but
+    # links no profile URL at all, so there is nothing to cite. Left null on purpose rather than
+    # guessing a slug. linkedin is the thinnest platform in this niche as a result: one row.
+    platform: linkedin
+    niche: virality-growth
+    followers: null
+
 # Either bar clearing marks a post as an outlier worth studying.
 #
 # view_follower_ratio: views divided by the account's follower count. Views only. A post with no
@@ -600,35 +686,148 @@ accounts:
 # them is noisier, and a post at 8 likes against a median of 2 clears a 3x bar on almost nothing.
 # If real data shows engagement-scored accounts producing junk outliers, split the bar then.
 outlier_thresholds:
+  # THE VIEW-TO-FOLLOWER BAR IS NOW MEASURED ON x, AND STILL A GUESS EVERYWHERE ELSE.
+  # The difference is marked per platform below, so an unmeasured number never looks like a
+  # measured one.
+  #
+  # Measured 2026-08-22 by the first live collection run (npm run patterns:auto), 24 posts from
+  # three x accounts of very different sizes (@SahilBloom 1.1M followers, @levelsio 935k,
+  # @arvidkahl 208k). Observed view/follower ratios:
+  #     max 0.61, p75 0.18, median 0.047, min 0.013
+  # The old 5.0 demanded 5.5M views on a single post for a 1.1M-follower account. Nothing came
+  # within an order of magnitude of it, so the bar was dead: every outlier that run found, five of
+  # them, fired on the baseline bar alone.
+  #
+  # Muxin's decision, 2026-08-22: drop it to 1.0, provisionally. A post reaching more people than
+  # the account has followers is a real signal. It correctly catches NONE of those five, which were
+  # good posts rather than breakouts, and the baseline bar is the right instrument for those.
+  # Against a median of 0.047, 1.0 is roughly a 20x-above-median event. Retune at roughly n=200.
+
   x:
-    view_follower_ratio: 5.0    # starting guess, tune once real data lands
+    view_follower_ratio: 1.0    # MEASURED, see above. Fires on 0 of the 24 posts observed so far.
     baseline_multiple: 3.0      # starting guess, tune once real data lands
+
+  # views is NEVER public to a non-owner on these two, confirmed live 2026-08-22 (0 of 8 linkedin
+  # entries and 0 of 12 substack entries carried a view count). So the view-to-follower bar cannot
+  # fire here at all, whatever number sits in it, and these values are inert. They are left alone
+  # rather than set to something that would imply the bar might one day fire. The baseline bar is
+  # the only instrument that works on these platforms.
   linkedin:
-    view_follower_ratio: 3.0    # starting guess, tune once real data lands
-    baseline_multiple: 3.0      # starting guess, tune once real data lands
-  bluesky:
-    view_follower_ratio: 3.0    # starting guess, tune once real data lands
-    baseline_multiple: 3.0      # starting guess, tune once real data lands
-  mastodon:
-    view_follower_ratio: 3.0    # starting guess, tune once real data lands
-    baseline_multiple: 3.0      # starting guess, tune once real data lands
-  threads:
-    view_follower_ratio: 4.0    # starting guess, tune once real data lands
+    view_follower_ratio: 3.0    # INERT: impressions on linkedin are owner-only, so views is always null
     baseline_multiple: 3.0      # starting guess, tune once real data lands
   substack:
-    view_follower_ratio: 1.5    # starting guess, tune once real data lands; reach here is mostly subscribers
+    view_follower_ratio: 1.5    # INERT: substack publishes no public per-post view count, so views is always null
     baseline_multiple: 2.5      # starting guess, tune once real data lands
-  tiktok:
-    view_follower_ratio: 20.0   # starting guess, tune once real data lands; feed reach ignores follower count
-    baseline_multiple: 5.0      # starting guess, tune once real data lands
-  youtube:
-    view_follower_ratio: 15.0   # starting guess, tune once real data lands; shorts reach ignores subscriber count
-    baseline_multiple: 5.0      # starting guess, tune once real data lands
-  instagram:
-    view_follower_ratio: 12.0   # starting guess, tune once real data lands; reels reach ignores follower count
-    baseline_multiple: 4.0      # starting guess, tune once real data lands
 
-# How big a corpus is worth analyzing. Muxin's stated range.
-targets:
-  corpus_size_min: 20
-  corpus_size_max: 50
+  # UNMEASURED. No collector exists for these yet, so no run has ever produced a ratio for them and
+  # nothing below is grounded in data the way x now is.
+  bluesky:
+    view_follower_ratio: 3.0    # UNMEASURED starting guess
+    baseline_multiple: 3.0      # UNMEASURED starting guess
+  mastodon:
+    view_follower_ratio: 3.0    # UNMEASURED starting guess
+    baseline_multiple: 3.0      # UNMEASURED starting guess
+  threads:
+    view_follower_ratio: 4.0    # UNMEASURED starting guess
+    baseline_multiple: 3.0      # UNMEASURED starting guess
+
+  # UNMEASURED, and deliberately NOT moved to 1.0 with x. These are set high on the reasoning that
+  # feed-driven reach ignores follower count entirely, which is a different distribution mechanism
+  # from x's follower-graph reach, not merely a different number. Lowering them on x's evidence
+  # would be extrapolating across that difference. They stay put until a video collector actually
+  # measures them, which is the second pass.
+  tiktok:
+    view_follower_ratio: 20.0   # UNMEASURED starting guess; feed reach ignores follower count
+    baseline_multiple: 5.0      # UNMEASURED starting guess
+  youtube:
+    view_follower_ratio: 15.0   # UNMEASURED starting guess; shorts reach ignores subscriber count
+    baseline_multiple: 5.0      # UNMEASURED starting guess
+  instagram:
+    view_follower_ratio: 12.0   # UNMEASURED starting guess; reels reach ignores follower count
+    baseline_multiple: 4.0      # UNMEASURED starting guess
+
+# HOW MANY WINNERS TO ANALYZE. This is a SAMPLE SIZE, not a ceiling on the corpus.
+#
+# Muxin's original ask was "aim for 20 to 50 strong examples", meaning how many OUTLIERS are worth
+# reading in one synthesize pass. It was previously spelled corpus_size_min / corpus_size_max,
+# which read like a cap on the archive and is the opposite of what the feature wants.
+#
+# THE CORPUS ITSELF IS UNCAPPED AND SHOULD KEEP GROWING. Nothing anywhere refuses to collect
+# because the archive got big, and nothing should. The reason is MIN_BASELINE_SAMPLE in
+# src/patterns/outliers.ts: the baseline bar needs at least 3 OTHER scored entries for an account
+# before it can say anything about that account at all, and its median gets more trustworthy the
+# more entries sit behind it. A ceiling on the archive would actively degrade outlier detection.
+# For scale, one bounded six-account run on 2026-08-22 collected 44 entries.
+analysis_sample:
+  min_outliers: 20
+  max_outliers: 50
+
+# Account discovery, phase 2.
+#
+# `npm run patterns:discover` runs the search terms below on each platform's own public search,
+# the way a non-owner looking for top creators in a niche would, and proposes the accounts behind
+# the posts that come back. It then walks the public activity of the accounts listed above as a
+# second pass. It writes proposals to data/patterns/account-proposals.jsonl and it NEVER writes to
+# this file.
+#
+# The one and only path that adds an account to the list above is Muxin running
+#   npm run patterns:discover -- --approve <handle> [--platform <name>]
+# which appends the entry at the end of the accounts list with a comment citing the proposal's
+# evidence and the date, the same citation habit every hand-written account above already carries.
+# Rejecting one (--reject <handle>) does not touch this file either. It only stops that account
+# being proposed again next week.
+#
+# Auto-adding was considered and refused on purpose: one bad account silently poisons the corpus
+# and every pattern built on it, and nothing downstream would show which account did it.
+discovery:
+  # Text platforms first, matching the rest of phase 2. Video discovery is a later pass.
+  platforms:
+    - substack
+    - linkedin
+    - x
+
+  # THE PRIMARY MECHANISM. What a non-owner would type into each platform's own search box to
+  # find the top creators in a niche. Discovery runs these searches and ranks what comes back by
+  # the public numbers on the posts that matched.
+  #
+  # Muxin edits these freely. They are seed terms, not a taxonomy. A term that returns noise is
+  # worth deleting, and a term that keeps surfacing good accounts is worth keeping. A niche with
+  # no terms here is simply not searched.
+  search_terms:
+    building-solopreneur:
+      - solopreneur
+      - build in public
+      - one person business
+      - audience first business
+    inner-journey:
+      - burnout recovery
+      - nervous system regulation
+      - self trust
+      - inner work
+    civic-democracy:
+      - civic engagement
+      - local organizing
+      - joyful activism
+      - democracy toolkit
+    virality-growth:
+      - how to write a hook
+      - newsletter growth
+      - short form retention
+      - audience growth strategy
+      - why this post went viral
+
+  # THE SECONDARY MECHANISM, kept because it is cheap: after searching, walk the public activity
+  # of the accounts listed above and surface the accounts they themselves point at. Set to false
+  # to run search only.
+  crawl_configured_accounts: true
+
+  # Politeness, not preference. Public pages only, a real wait between requests, a hard cap per
+  # run, and a full stop for a platform the moment it signals a block. Nothing here ever tries to
+  # get around a block or a captcha.
+  request_delay_ms: 4000
+  # Raise this if a niche's list grows. Terms past the cap are never run.
+  max_terms_per_niche: 5
+  max_results_per_term: 10
+  max_seed_accounts_per_platform: 8
+  max_candidates_per_seed: 10
+  max_proposals_per_run: 15

@@ -1,8 +1,9 @@
 # Pattern mining: implementation plan
 
 **Date:** 2026-08-22
-**Status:** Phase 1 BUILT on branch `feat/pattern-mining`. Phases 2 and 3 are backlog cards, not
-code.
+**Status:** Phase 1 BUILT on branch `feat/pattern-mining`. Phase 2's TEXT half BUILT on
+2026-08-22, branch `feat/patterns-auto-collect`. Phase 2's video half and Phase 3 are backlog
+cards, not code.
 
 Muxin first asked for this to be logged, not built ("log everythign I've shared ... and make a note
 of it so I can follow up on it later"). Five minutes later, in a new session the same day, she said
@@ -22,10 +23,27 @@ out with `rehook: false`, so it is no longer X and LinkedIn only. Quote-card is 
 opted out, because its own style rule is verbatim quotable lines. A Notes-sourced folder still
 never gets the pass, on any platform.
 
-**What does NOT work yet.** Nothing is collected automatically. Every corpus entry is staged by
-hand as a JSON file, and a video entry carries a transcript Muxin pastes in. There is no scraper,
-no automatic transcript pull, and no GUI. Those are Phase 2 and Phase 3 (§10), filed as backlog
-cards in `docs/content-agents-backlog.md`.
+**What works after Phase 2's text half (2026-08-22).** Automatic collection on three text
+platforms, x, linkedin and substack, through the same logged-in Chrome session `src/pull/` already
+used for Muxin's own analytics. A search-based discovery pass that runs per-niche search terms from
+the config against each platform's public search and proposes new accounts into
+`data/patterns/account-proposals.jsonl`, adding none of them without an explicit approve command. A
+fourth niche, `virality-growth`. A weekly job that chains collection and discovery, shipped as code
+and NOT installed on any schedule. See §13.
+
+**What does NOT work yet.** Video collection is not built: TikTok, YouTube and Instagram entries
+are still staged by hand with a pasted or captions-copied transcript, and no collector is stubbed
+for them. Bluesky, Mastodon and Threads have no collector either. There is no automatic transcript
+pull and no GUI. Those are the rest of Phase 2 and all of Phase 3 (§10), filed as backlog cards in
+`docs/content-agents-backlog.md`.
+
+**One thing automatic collection did NOT change: what a non-owner can see.** It differs per
+platform and there is no blanket rule. X shows a public view count on every post, so the
+view-to-follower rule works there. LinkedIn keeps impressions author-only, and a non-owner sees
+reactions, comments and reposts. Substack has no public view count either, and shows likes,
+restacks and comments. Entries from those two carry `views: null`, so only the baseline bar can
+fire on them, scored on engagement rather than views. See §9 for what that bar does and does not
+promise.
 
 **What this extends, and does not replace.** `.claude/skills/atomize/references/hook-patterns.md`
 shipped on 2026-08-18 with 23 cited hook patterns. This build adds full-post structure next to it
@@ -100,8 +118,9 @@ and closing sentence are all hers:
 for them. That constraint shapes the whole build. Phase 1 buys nothing.
 
 **Cheapest starting point:** Typefully is already an integration in this repo
-(`src/publish/typefully.ts`), so its "top posts of any account" surface costs nothing extra when
-Phase 2 automates X collection. The two columns those paid tools really sell are outlier detection
+(`src/publish/typefully.ts`), so its "top posts of any account" surface costs nothing extra. Phase
+2 did not end up needing it: X collection reuses the logged-in Chrome session in `src/pull/`, which
+was already free. The two columns those paid tools really sell are outlier detection
 and structure analysis. `src/patterns/outliers.ts` does the first from recorded numbers, and the
 `/patterns` skill (`.claude/skills/patterns/`) does the second on
 Muxin's Claude subscription, so neither needs a subscription to a third party.
@@ -192,7 +211,7 @@ until then), and `civic-adaptation.md` holds this rubric.
 | The drafting hook-in | `appliesRehook(platform, sourceKind)` in `src/atomize/spin.ts:32` | The single gate that decides when a re-hook pass runs. Before this build it was X and LinkedIn only, and never on a Substack Note repost. |
 | Browsing copy of the swipe file | `/Users/Muxin/Documents/Personal Obsidian/Branding/Content/Hooks Bank.md` | Muxin's condensed reading copy with a "New hooks (add below as I find them)" section. **This build leaves it untouched on purpose.** The request is a pipeline, not a hook, so nothing here belongs in that file. The path is recorded so the link is not lost. |
 | Discovery agent | `/scout` (`.claude/skills/scout/SKILL.md`) | Already finds `content-example` candidates, real-world examples worth writing about. The obvious feeder for reference accounts later. |
-| A real Chrome session | `src/pull/**` | Already drives a logged-in Chrome for analytics pulls. The obvious engine for Phase 2 collection. Unused in Phase 1. |
+| A real Chrome session | `src/pull/**` | Already drives a logged-in Chrome for analytics pulls. Unused in Phase 1, and it did become the engine for Phase 2's text collection: `launchPlatform()` plus the `PullError` vocabulary, pointed at other people's public pages instead of Muxin's own analytics exports. |
 | Per-platform knobs | `config/platforms.yaml` | Where platform settings live by convention, so pattern-mining thresholds follow the same habit in their own file. |
 
 ---
@@ -208,6 +227,22 @@ Recorded in this batch's build brief and not reopened during the build:
 3. > Reference accounts seed from the creators already cited in hook-patterns.md, as an editable
    > config list she can change.
 4. > Build it in phases. Not everything in one pass.
+
+**A fifth decision, same day, made during the Phase 2 build.** A fourth niche, `virality-growth`,
+for creators who TEACH audience growth (hooks, retention, short-form craft) rather than creators
+who are merely big in a topic. Her reasoning, in her words:
+
+> civic topics are notoriously bad as a market, so I'd also want us to focus on accounts that teach
+> you how to go viral as well since human psychology is more universal and can be applied across
+> domains.
+
+The point of the niche is TRANSFER. A shape mined from a growth teacher is general audience
+psychology, so it is expected to apply across her other niches, which is the entire reason it is in
+the list. Transfer does not skip a step: a `virality-growth` shape applied to civic material still
+passes through the civic adaptation rubric in §3, and `config/voice.yaml` still governs the
+wording. This is recorded in `.claude/skills/patterns/SKILL.md` as instruction a synthesizing agent
+reads, not as a code check. Nothing validates a niche assignment beyond `collect.ts` rejecting a
+niche that is not in the config list.
 
 ---
 
@@ -258,7 +293,7 @@ the rewrite mode, which restructures a piece that already exists rather than cre
 | What she asked for | Mode that delivers it | What it does | What it does not do |
 |---|---|---|---|
 | 1. Ideas on the next post | `/patterns ideas` | Proposes net-new post ideas from the synthesized winning patterns, and each idea points at which of Muxin's OWN existing material could fill it. Output: `data/patterns/ideas.md` | Does not write the post. An idea with no material of hers behind it is marked `NEEDS HER INPUT` and says what is missing, rather than being filled in with invented content |
-| 2. Sourcing patterns and applying them | `/patterns collect`, `analyze`, `synthesize`, `rewrite` | The original pipeline: collect real winners, flag outliers, extract structure, synthesize the 5 to 7 patterns that repeat per platform, then rewrite her own material into the strongest of them | Does not collect automatically yet (Phase 2) |
+| 2. Sourcing patterns and applying them | `/patterns collect`, `analyze`, `synthesize`, `rewrite` | The original pipeline: collect real winners, flag outliers, extract structure, synthesize the 5 to 7 patterns that repeat per platform, then rewrite her own material into the strongest of them | Collects automatically on x, linkedin and substack since 2026-08-22. Every other platform is still hand-staged, and video is not automated at all |
 | 3. Turning something she gave the system into a series | `/patterns series` | Takes one thing she already gave the system and proposes a 3 to 7 piece arc across formats and platforms. This is her civic table 1 rows "High volume + repurposing" and "Series / ongoing arcs" made real. Output: proposal cards in that content folder's `develop/advice.json`, with the run logged to `develop/log.md` | Does not cut the pieces. v1 proposes the arc; she accepts pieces through the existing paths. Automatic scaffolding is Phase 2 |
 | 4. Editorial suggestions that CREATE new posts | `/patterns ideas` and `/patterns series` | Both produce new pieces rather than edits to an existing one. `rewrite` stays what it always was, a restructure of the piece in front of it | Neither drafts body copy |
 | 5. ASAP benefits that can be done right now, as part of the post | `/patterns asap` | Brainstorms ranked candidate micro-actions for a piece, each carrying a required `Verify:` line in its card summary, against the table 2 bar in §3 | Does not verify the link, form or deadline itself. The `Verify:` line is a to-do for a human, and the skill's own rule is that an unverified action never ships |
@@ -296,38 +331,66 @@ One collected post per line, JSONL, at `data/patterns/corpus.jsonl`. Never commi
 recorded on an entry, and never fetches anything.
 
 - **`viewFollowerRatio(entry)`** returns views divided by followers, or null when either number is
-  missing.
-- **`baselineMultiple(entry, accountEntries)`** returns views divided by the median views of that
-  same account's other entries. It returns null when there are fewer than 3 other entries with
-  views, because a median off one or two posts is not a baseline.
-- **`classifyOutlier(entry, accountEntries, thresholds)`** returns
-  `{ isOutlier, ratio, multiple, reason }`. An entry counts as an outlier when EITHER the ratio
-  clears its platform threshold OR the baseline multiple clears its threshold. `reason` records
-  which of the two fired, so a later reader can tell "reached far past its follower count" from
+  missing. It is views-only and stays that way, deliberately: a like-to-follower ratio is a
+  different quantity with a different meaning, so it is not a stand-in. This bar simply does not
+  exist on a platform without public views.
+- **`entryScore(entry)`** returns `{ value, kind }` or null. Views win when present; otherwise it
+  sums the recorded `likes`, `comments` and `shares`, and returns null when none of those were
+  recorded. **`engagementScore(entry)`** is the number half of the same thing, for a caller that
+  only needs "how far did this travel".
+- **`baselineMultiple(entry, accountEntries)`** compares a post to its own account's typical post
+  using that score, which is what lets a LinkedIn or Substack entry be flagged at all. It returns
+  `{ multiple, metric }` or null, not a bare number. That return-shape change is a real breaking
+  change against Phase 1, worth knowing if anything else ever calls it.
+- **A baseline never mixes metric kinds, and the mismatched entries drop OUT of the sample.** They
+  are not converted and not averaged in. So a mixed account can fall below the 3-comparable-entry
+  floor and return null despite holding plenty of entries. That is deliberate. A reader who does
+  not know it will file it as a bug.
+- **`classifyOutlier`'s verdict carries `baselineMetric`**, typed `BaselineMetric | null`, whose
+  values are `"views"` and `"engagement"`, and which is null exactly when `multiple` is null. So a
+  4x is never ambiguous about 4x of what. Anything relaying a multiple has to relay what it was a
+  multiple of; that is the difference between a real number and a misleading one.
+- **An entry counts as an outlier when EITHER bar clears its platform threshold**, and the verdict
+  records which one fired, so a later reader can tell "reached far past its follower count" from
   "beat its own author's usual numbers."
+
+**Phase 1 shipped this wrong and it was found on 2026-08-22, during the Phase 2 build.** Both bars
+were computed from views alone, so LinkedIn and Substack entries could never be outliers, silently.
+The generalization above is the fix, committed the same day. Recording it here because a corpus
+collected before the fix may have been read as "no winners on LinkedIn" when the truth was "the
+scorer could not see any."
 
 Thresholds live in `config/pattern-mining.yaml`, per platform. Video platforms get a higher ratio
 bar than text platforms, because video reach is not capped by follower count the way a text feed
 mostly is. Every number in that file is a starting guess with a comment saying so. They get tuned
 once real data lands (§11).
 
-The config also holds the niches from `hook-patterns.md` (building-solopreneur, inner-journey,
-civic-democracy), the seeded account list, and Muxin's stated corpus target of 20 to 50 entries.
-The account list is hers to edit freely.
+Video platforms all show public view counts, TikTok and YouTube on every video and Instagram on
+Reels, so they are the STRONGEST targets for the view-to-follower rule, not the weakest. That is a
+point in favour of the video pass, and it is the opposite of what an earlier framing here implied.
+
+The config also holds the four niches (building-solopreneur, inner-journey, civic-democracy, and
+virality-growth added 2026-08-22, see §5), the seeded account list, the discovery search terms, and
+Muxin's stated corpus target of 20 to 50 entries. The account list and the search terms are hers to
+edit freely.
 
 ---
 
 ## 10. Phase 2 and Phase 3, and why each waits
 
-**Phase 2: automated collection, video transcripts, and series scaffolding.** Reuse `src/pull`'s
-Chrome session for per-platform collection, and Typefully for X. Pull video transcripts
-automatically instead of pasting them. Scaffold an accepted series into real cuts: v1 only proposes
-the arc, and Muxin accepts pieces one at a time through the existing paths.
+**Phase 2, text half: BUILT 2026-08-22.** Muxin made the product-direction call this section was
+waiting on, and it is written up in §13. Automated collection on x, linkedin and substack, plus a
+discovery pass that proposes new accounts, plus a weekly job that is shipped but not scheduled.
 
-Why it waits: this is the part that reads other people's posts at scale, and that is a product
-direction call and possibly a legal one. Terms of service differ per platform, and transcript
-sourcing differs again. Phase 1 works fine on hand-staged entries, so nothing is blocked by
-waiting. Muxin decides this one before anyone builds it.
+**Phase 2, the rest: still waits.** Video collection (tiktok, youtube, instagram), automatic video
+transcripts, and series scaffolding are not built. Series scaffolding is unchanged from Phase 1:
+`/patterns series` proposes the arc and Muxin accepts pieces one at a time through the existing
+paths.
+
+Why the video half still waits: transcript sourcing is a different question per platform, legally
+and technically, and it is open question 3 in §11. Muxin's decision was explicitly text first,
+video as a second pass. Nothing is blocked by waiting, because hand-staging with a pasted
+transcript still works.
 
 **Phase 3: a pattern-library GUI surface in the review page.** A room where Muxin can browse the
 corpus, see which entries cleared the outlier bar, and read the synthesized patterns.
@@ -396,3 +459,89 @@ deliberately does not take one.
 
 So the boundary is: shapes in, words out. A pattern may decide HOW a specific detail she already
 wrote gets led with. It may never be the reason a new fact appears.
+
+---
+
+## 13. Phase 2, text half: what was built on 2026-08-22
+
+### Muxin's decisions, locked before and during the build
+
+1. **Text platforms first, video second.** x, linkedin and substack get collectors. tiktok,
+   youtube and instagram are a deliberate second pass. No video collector is stubbed, because a
+   stub that returns nothing is indistinguishable from an adapter that is silently broken.
+2. **Propose, never auto-add.** The system both pulls the known accounts AND proposes new ones. A
+   discovered account is a proposal she approves or rejects. Nothing writes
+   `config/pattern-mining.yaml` except an approve command she runs herself.
+3. **Weekly cadence**, riding the existing scheduled-job pattern in `src/cron/`.
+4. **A fourth niche, `virality-growth`**, added mid-build. Her full reasoning is in §5. Short
+   version: accounts that teach growth craft, because the psychology transfers across domains and
+   civic alone is a weak market to mine from.
+
+### What that produced
+
+| Piece | Where | What it does |
+|---|---|---|
+| Collector adapters | `src/patterns/collectors/` | One per automated platform. Reads another creator's PUBLIC posts through `launchPlatform()`, the same logged-in Chrome session `src/pull/` uses, and reuses its `PullError` vocabulary. Fills what the platform actually exposes publicly and records null for the rest. |
+| The collect runner | `src/patterns/auto-collect.ts`, `npm run patterns:auto` | Walks the configured accounts, dedupes by url against the existing corpus using Phase 1's `appendEntries`, appends, and prints per account what was fetched, what was new, and every failure with its reason. `--dry-run` fetches nothing. |
+| Discovery | `src/patterns/discover.ts`, `npm run patterns:discover` | Primarily SEARCH-based: per-niche `search_terms` from the `discovery:` block of `config/pattern-mining.yaml`, run against each platform's own public search, with walking the configured accounts' public activity kept as a secondary mechanism behind `crawl_configured_accounts`. Proposes accounts into `data/patterns/account-proposals.jsonl`, each carrying a real cited post and its numbers. `--approve <handle>` is the only path into the config; `--reject <handle>` stops a proposal coming back; `--list` shows what is pending. The search terms are Muxin's to edit and are the main lever on what gets found. |
+| The weekly job | `npm run patterns:weekly`, `src/cron/patterns-weekly.ts` | Runs the three collectors then discovery, one child process at a time, isolating failures so one blocked platform does not stop the rest, and appends a run report to `data/patterns/weekly-runs.jsonl`. The sequencing is load-bearing, see below. |
+| Enabling it | `docs/setup-patterns-weekly.md` | The launchd steps, following the same convention as `docs/setup-weekly-pull.md` and `docs/setup-notes-daily-launchd.md`. |
+| The one schema change | `collection_method` and `collected_by` on `CorpusEntry` | Both optional, so every Phase 1 record already on disk stays valid. `collected_by` names the adapter and version, which is how a batch of records written by a since-broken selector gets found later. |
+
+**The weekly job is shipped, not scheduled.** The plist is committed at
+`config/launchd/com.content-agents.patterns-weekly.plist`, but committing a file installs nothing.
+The job runs when Muxin copies it into `~/Library/LaunchAgents/` and loads it, or when she runs it
+by hand.
+
+**Its steps must stay sequential, and that is a real constraint rather than a style choice.**
+`launchPersistentContext` takes an EXCLUSIVE lock on a Chrome profile directory, and `src/pull/`
+keeps one profile per platform. Two steps touching the same platform at once fail on that lock with
+an unhelpful error. `spawnSync` blocks until the child exits, so the four steps are sequenced by
+construction, and discovery, which walks all three platforms itself, runs last. Tests in
+`patterns-weekly.test.ts` assert the ordering and that the run stays synchronous, so a later
+"let us parallelize this" change fails there instead of at 3am in a launchd log.
+
+**A live run also needs the sandbox off**, because Chrome writes its `SingletonLock` under
+`~/.content-agents/` and a sandboxed shell refuses that with "Operation not permitted". Environment,
+not code. A dry run never launches a browser and is unaffected.
+
+### What is enforced by code, and what is only skill prose
+
+This doc was corrected once for calling skill prose "enforced", so the split is stated plainly.
+
+**Enforced by code:** url dedupe on append, so a repeat run is a no-op. `--dry-run` fetching
+nothing. Discovery writing only to the proposals file unless `--approve` runs. The per-run caps and
+the delay between requests. A platform's failure being isolated to that platform. The validation
+that rejects a malformed hand-staged entry, including a niche that is not in the config list. The
+baseline refusing to mix metric kinds, dropping the mismatched entries out of the sample rather
+than converting them, and the verdict recording which metric it used in `baselineMetric`.
+
+**Skill prose only, read by a Claude session and enforced by nobody:** every honesty instruction in
+`.claude/skills/patterns/SKILL.md` about what a non-owner can see, the instruction to report a
+judgment pick as a judgment pick, the instruction to always say what a baseline multiple is a
+multiple OF, the expectation that a `virality-growth` pattern transfers across niches and still
+passes through civic adaptation, and the propose-not-compose rules. No TypeScript checks any of it,
+and `npm run validate` does not fail anything for breaking it.
+
+### Politeness, as actually built
+
+Public pages only, nothing behind a paywall or a DM. A configured delay between requests and a
+per-run cap on accounts, candidates and proposals. A platform that blocks or rate limits ends for
+that run and the failure is recorded. Nothing attempts to defeat a block or a captcha.
+
+### The honesty limit worth repeating
+
+Automating collection did not make more numbers visible. What a non-owner sees is set by each
+platform and did not change. Observed against live pages on 2026-08-22: X publishes a view count
+(its public "Views" figure, which is not the owner-only analytics number and does not always agree
+with it) plus likes, replies, reposts and a rounded follower count; LinkedIn gives reactions,
+comments and reposts but no views ever, and no real date either, only a relative age, so
+`posted_at` is null there; Substack gives likes, comments and an exact date, but no views and no
+public restack count, so `shares` is null. LinkedIn and Substack entries carry
+`views: null`, the view-to-follower bar cannot fire on them, and their baseline is built on
+engagement, which is a coarser signal than one built on views. Treat those verdicts as weaker
+evidence than an X verdict, and always say which metric a baseline multiple was a multiple of.
+
+The corpus is also still small and every threshold in `config/pattern-mining.yaml` is a starting
+guess with a comment saying so (§11, open question 2). A verdict is only as good as the bar it
+cleared.

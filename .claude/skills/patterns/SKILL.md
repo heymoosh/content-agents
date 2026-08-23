@@ -1,13 +1,13 @@
 ---
 name: patterns
-description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into the strongest shapes. Proven structures only, never anyone's wording, and it proposes rather than composes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>.
+description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus (automatically on x, linkedin and substack; hand-staged elsewhere, and video is not automated), proposes new accounts for Muxin to approve or reject, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into the strongest shapes. Proven structures only, never anyone's wording, and it proposes rather than composes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>.
 ---
 
 # /patterns: the pattern mining pipeline
 
-Reverse-engineer what the paid analytics tools sell, by hand and for free: gather posts that
-already worked in Muxin's niches, find the genuine outliers, read what they have in common, write
-that down as reusable structure, and then use that structure on her own work.
+Reverse-engineer what the paid analytics tools sell, for free and without buying any of them:
+gather posts that already worked in Muxin's niches, find the genuine outliers, read what they have
+in common, write that down as reusable structure, and then use that structure on her own work.
 
 Seven modes in three jobs:
 
@@ -111,6 +111,37 @@ sounds like a working PM thinking out loud. Read every rewrite aloud before hand
 The em-dash rule applies to the pattern libraries too. A mined shape written with an em dash in it
 gets copied into a real post later.
 
+## The four niches, and why the fourth one exists
+
+`config/pattern-mining.yaml` holds the niche list and it is Muxin's to edit. As of 2026-08-22 there
+are four:
+
+| Niche | What gets collected there |
+|---|---|
+| `building-solopreneur` | creators building in public, solo business, the work itself |
+| `inner-journey` | reflective and personal-growth material |
+| `civic-democracy` | civic, local government, voting, democracy |
+| `virality-growth` | creators who TEACH audience growth: hooks, retention, short-form craft |
+
+The fourth is new and it is a different KIND of account from the other three. Muxin added it on
+2026-08-22 with this reasoning, and it is worth keeping in her framing: "civic topics are
+notoriously bad as a market, so I'd also want us to focus on accounts that teach you how to go
+viral as well since human psychology is more universal and can be applied across domains."
+
+Two consequences:
+
+- **Collect teachers, not just big accounts.** A `virality-growth` account earns its place by
+  teaching growth craft, not by being large in some topic. A huge creator who never explains what
+  they are doing belongs in whichever topic niche fits them, if any.
+- **Its patterns are expected to TRANSFER.** That is the whole reason the niche is in the list. A
+  shape mined from `virality-growth` is a general audience-psychology shape, so it is fair game for
+  her other niches. That transfer is licensed; it is not a loophole around anything.
+
+What transfer does NOT do is skip a step. A `virality-growth` shape applied to civic material still
+passes through the civic adaptation rubric below, exactly like any other mined shape, and it still
+answers to `config/voice.yaml`. Universal psychology is a reason the shape travels, never a reason
+to ship it raw.
+
 ## The civic layer
 
 Muxin's civic adaptation rubric lives in
@@ -138,12 +169,20 @@ reads as useful rather than partisan. And local plus specific beating national p
 
 ## Scripts count, Claude judges (CLAUDE.md rule 4)
 
-Two npm scripts exist and they are both deterministic:
+Five npm scripts exist and they are all deterministic:
 
-- `npm run patterns:collect` validates staged entries, dedupes by url, appends to the corpus, and
-  prints a per-account summary. It never judges, analyzes, or calls a model.
+- `npm run patterns:auto` collects public posts from the configured accounts on x, linkedin, and
+  substack through the logged-in Chrome session, dedupes by url, and appends. It records only what
+  the page actually showed. It never judges, analyzes, or calls a model.
+- `npm run patterns:discover` searches for new accounts and proposes them into
+  `data/patterns/account-proposals.jsonl`, and `--approve` is the only path that writes one into
+  `config/pattern-mining.yaml`. It decides nothing on Muxin's behalf.
+- `npm run patterns:collect` validates hand-staged entries, dedupes by url, appends to the corpus,
+  and prints a per-account summary. Still the path for every platform without an adapter.
 - `npm run patterns:outliers` is the same script's `outliers` subcommand. It scores the corpus off
   recorded numbers and prints the report. It appends nothing and fetches nothing.
+- `npm run patterns:weekly` (`src/cron/patterns-weekly.ts`) chains the first two into a weekly run
+  Muxin installs herself (`docs/setup-patterns-weekly.md`). It adds no judgment of its own.
 
 Everything else here is Claude judgment done inline while running this skill. There is no
 `patterns:analyze`, `patterns:synthesize`, `patterns:ideas`, `patterns:series`,
@@ -157,9 +196,11 @@ Everything else here is Claude judgment done inline while running this skill. Th
 | Muxin's civic rubric (read only, never written here) | `.claude/skills/atomize/references/civic-adaptation.md` | yes |
 | Hook shapes | `.claude/skills/atomize/references/hook-patterns.md` | yes |
 | Full-post shapes (this skill writes these) | `.claude/skills/atomize/references/post-patterns.md` | yes |
-| Staged entries waiting to be collected | `data/patterns/inbox/*.json` | no |
+| Staged entries waiting to be collected (fallback path) | `data/patterns/inbox/*.json` | no |
 | The corpus of collected posts | `data/patterns/corpus.jsonl` | no |
 | Per-outlier structural analyses | `data/patterns/analyses.jsonl` | no |
+| Proposed new accounts, awaiting her approval | `data/patterns/account-proposals.jsonl` | no |
+| Weekly run reports (what ran, what failed) | `data/patterns/weekly-runs.jsonl` | no |
 | Proposed post ideas | `data/patterns/ideas.md` | no |
 | Series and micro-action proposal cards | `<content-folder>/develop/advice.json` + `develop/log.md` | yes |
 
@@ -168,7 +209,9 @@ never reach git, same treatment as `data/analytics.db`. Say this to Muxin the fi
 where the corpus went.
 
 `config/pattern-mining.yaml` is Muxin's to edit freely. Read it, never rewrite it on her behalf.
-If she wants a new account or a tuned threshold, tell her which key to change.
+If she wants a new account or a tuned threshold, tell her which key to change. The one exception is
+`npm run patterns:discover -- --approve <handle>`, which she runs herself and which writes only the
+account she named, with the proposal's evidence cited next to it.
 
 ### The three reference files in `.claude/skills/atomize/references/`
 
@@ -194,11 +237,14 @@ two-platform scope, it is stale.
 
 ## Mode dispatch
 
-- **`/patterns collect`** gathers winners into the corpus. Read
+- **`/patterns collect`** gathers winners into the corpus. Automatic on x, linkedin and substack
+  (`npm run patterns:auto`), hand-staged on the other six. Read
   `references/platform-collection.md` first, every time.
 - **`/patterns analyze`** extracts structure from the outliers.
 - **`/patterns synthesize`** turns repeated structure into a committed pattern library.
 - **`/patterns ideas`** proposes net-new posts from those patterns and her existing material.
+  `--niche` takes one of the four niches, `virality-growth` included, and that one's patterns
+  transfer into the others on purpose.
 - **`/patterns series`** proposes a multi-piece arc from one thing she already gave the system.
 - **`/patterns rewrite`** restructures her own source material three ways.
 - **`/patterns asap`** proposes ranked, verifiable civic CTA candidates for a piece, in either
@@ -215,18 +261,181 @@ Goal: 20-50 real winners in the corpus (`targets.corpus_size_min` / `corpus_size
 `config/pattern-mining.yaml`). Quality beats volume. Twenty genuinely strong posts across three
 accounts is a better corpus than fifty mediocre ones.
 
-**There is no scraper in v1. Say so plainly.** Muxin does the gathering with her eyes and her
-clipboard; you do the sorting, structuring, and bookkeeping. Do not imply anything is being pulled
-automatically, and do not pretend a number was fetched when she read it off a screen.
+**Collection is automatic on three platforms and by hand on the other six.** Since 2026-08-22 the
+normal path is `npm run patterns:auto`, which drives the same logged-in Chrome session
+`src/pull/` already uses, reads the configured accounts' PUBLIC posts, and appends them to the
+corpus. The hand-staging path from Phase 1 is not gone; it is the fallback for every platform an
+adapter cannot reach.
 
-### Steps
+| Platform | How it collects | Public views? |
+|---|---|---|
+| x | automatic | yes |
+| linkedin | automatic | no |
+| substack | automatic | no |
+| bluesky, mastodon, threads | by hand | no |
+| tiktok, youtube, instagram | by hand, and the body is a pasted transcript | tiktok and youtube yes, instagram Reels only |
 
-1. **Read the config and the platform guide.** `config/pattern-mining.yaml` for the niches and the
-   seeded account list. `references/platform-collection.md` for the platform she named (or for
-   every covered platform if she named none). Then tell her, per platform, the FREE way to sort
-   that creator's posts by performance, what numbers she will actually be able to see, and what to
-   do when views do not exist there. That guide is the substance of this step; do not paraphrase
-   it from memory.
+**Video is not automated in this build, and no collector is stubbed for it.** A TikTok, YouTube, or
+Instagram entry still needs a transcript Muxin pastes or copies from captions, staged by hand
+through the fallback path below. Say that plainly rather than implying the whole corpus now fills
+itself.
+
+### What each platform actually shows a non-owner
+
+There is no blanket rule here, so do not give Muxin one. What is public differs per platform, and
+the difference decides which outlier bar can fire on that platform's entries.
+
+- **x shows a public view count**, and the follower count is public too, so both numbers the scorer
+  wants are there. Confirmed live on 2026-08-22 in a logged-in session, with real view counts in the
+  hundreds of thousands read off search result cards. If you see an HTTP 402 quoted anywhere, that
+  is about unauthenticated direct fetches, not the session route this uses. Two caveats to keep:
+  the public "Views" figure is what X chooses to publish and does not always agree with the
+  owner-only analytics number, and it is absent on some posts and post types, where the field is
+  null rather than guessed. The follower count is rounded for display ("12.3K"), so treat it as
+  approximate.
+- **LinkedIn keeps impressions author-only**, so views really are null on a LinkedIn entry and
+  always will be. Reactions, comments and reposts all read fine. Two LinkedIn quirks worth knowing
+  before you explain a thin entry: **`posted_at` is null on every LinkedIn entry**, because the
+  activity feed shows a relative age ("2w") and no machine-readable date, and turning that into a
+  date would be inventing one; and the follower count is only sometimes in the capture, so it falls
+  back to the seed number in `config/pattern-mining.yaml` with the provenance recorded in `notes`.
+- **Substack has no public view count either.** Likes and comments read fine, `posted_at` is exact,
+  and **`shares` is null** because Substack publishes no public restack count on the archive record.
+  A paid-subscriber post yields only the public preview, recorded as the preview with a note saying
+  so. Nothing reads past a paywall, ever.
+- **The video platforms all show public view counts**, TikTok and YouTube on every video and
+  Instagram on Reels. They are the strongest targets for the view-to-follower rule, not the
+  weakest. None of them is collected in this build, so that strength is currently unused.
+- **A missing number stays missing.** No adapter estimates, rounds up, or fills a gap. Null is the
+  correct recorded answer, and it never gets substituted with a different metric: a like count is
+  not a view count and is never written into `views`.
+- **Each adapter's own header block is the record of what it reads off a page and how sure that
+  is.** Read the adapter in `src/patterns/collectors/` before telling Muxin what a platform yields,
+  rather than repeating this page. Page layouts move, and an adapter whose selector stops matching
+  returns nothing rather than a wrong number, which shows up as a thin or empty collect run.
+- **A field arriving null is not automatically a platform limit.** It can also be a selector that
+  stopped matching. The adapter headers distinguish the two, and they are the place to check before
+  you tell Muxin a platform hides something. A permanent platform fact reads the same as a
+  regression in the output, and only the code tells you which one you are looking at.
+
+### Which outlier bar can fire, per platform
+
+`src/patterns/outliers.ts` has two bars and they do not have the same reach.
+
+- **The view-to-follower ratio is views-only and stays that way.** A like-to-follower ratio is a
+  different quantity with a different meaning, so it is not a substitute. That bar fires on x, and
+  on the video platforms once they are collected. It can never fire on LinkedIn or Substack.
+- **The baseline bar compares a post to its own account's typical post**, using views where views
+  exist and the recorded public engagement numbers where they do not. So LinkedIn and Substack
+  entries CAN clear the baseline bar even with no views.
+- **A baseline never mixes metric kinds.** An account's baseline is built only from entries scored
+  the same way, and returns null rather than comparing a views number against an engagement number.
+- **Entries scored on the other metric DROP OUT of the sample.** They are not converted and not
+  averaged in. So an account holding a mix can fall under the three-comparable-entries floor and
+  return no baseline at all, even though it has plenty of entries. That is deliberate. If you see
+  it, explain it that way rather than reporting it as a bug or as "no winners here".
+- **The verdict says which metric the baseline used**, in `baselineMetric` on the verdict:
+  `"views"`, `"engagement"`, or null exactly when there is no multiple. So "4x baseline" is never
+  ambiguous. When you relay a multiple to Muxin, relay what it was a multiple OF. An unqualified
+  "4x" is a misleading number, not a shorter one.
+- **Read `outliers.ts` before you describe the scoring to her.** These are its rules as designed;
+  the file is the authority on what it currently computes, and this skill's prose is not.
+
+So: on x both bars are live. On LinkedIn and Substack only the baseline bar is, and
+`/patterns analyze` judgment still carries real weight there, because a baseline built on engagement
+is a coarser signal than one built on views.
+
+### Steps, automatic path
+
+1. **Read the config.** `config/pattern-mining.yaml` for the niches and the account list. Honor
+   `--platform` and `--account` when Muxin gave them; otherwise the run covers every configured
+   account on the three automated platforms.
+
+2. **Show her the plan first.** Run `npm run patterns:auto -- --dry-run` (adding
+   `--platform` / `--account` / `--limit` when given). It fetches nothing at all and prints which
+   accounts it would walk. Relay that, then run it for real.
+
+3. **Run `npm run patterns:auto`.** It walks the configured accounts, calls the adapter for each,
+   dedupes by url against the existing corpus, appends what is new, and prints per account how many
+   posts it fetched, how many were new, how many cleared the outlier bar, and every failure with
+   its reason. Relay that summary as is.
+   - It is safe to run twice. The corpus dedupes on url (`appendEntries` in
+     `src/patterns/corpus.ts`), so a repeat run over the same week appends nothing.
+   - **Its printed note about no-views platforms is computed, not written down.** The runner asks
+     the scoring in the tree what it currently does, by running the real `classifyOutlier` against
+     synthetic views-null entries, and prints what it finds. So the note stays true as the scorer
+     changes. The one thing it states unconditionally is that the view-to-follower bar can never
+     fire without views, because that is a permanent platform fact rather than a property of the
+     code. Relay that note as it comes out.
+   - Automatically collected entries carry `collection_method: "auto"` and `collected_by`, naming
+     the adapter and its version. That is the audit trail: when a platform changes its page and a
+     batch of records turns out to be wrong, `collected_by` is how you find which ones to throw
+     away.
+
+4. **When a platform fails, say which one and why, and stop there.** A block, a rate limit, or a
+   lapsed session ends that platform for the run. The other platforms still collect. Never retry
+   around a block, never work past a captcha, and never suggest a way to look like a different
+   visitor. If the session lapsed, the fix is a one-time headed login:
+   `npm run pull:login -- <linkedin|x|substack>`.
+
+5. **Report honestly.** Corpus size against the 20-50 target, which accounts are still thin, which
+   platforms had no visible view numbers (so only the baseline bar can fire there, on engagement
+   rather than views), and what failed. If a platform collected nothing at all, say so rather than
+   letting a quiet zero read as "nothing worth collecting".
+
+Muxin can also let this run itself weekly: `npm run patterns:weekly` does the three collector runs
+plus a discovery pass, and `docs/setup-patterns-weekly.md` covers enabling it on a schedule. It is
+not scheduled unless she loads the LaunchAgent herself.
+
+### The discovery loop: new accounts are proposed, never added
+
+`npm run patterns:discover` proposes NEW accounts worth watching. It writes to
+`data/patterns/account-proposals.jsonl` and **never edits `config/pattern-mining.yaml`**. Muxin
+decides, every time.
+
+**Search is the primary mechanism.** Each niche has its own search terms under `search_terms` in
+the `discovery:` block of `config/pattern-mining.yaml`, and discovery runs them against the
+platform's own public search. Those terms are Muxin's to edit, and they are the main lever on what
+gets found: a niche with weak terms produces weak proposals, and the fix is better terms, not a
+looser bar. Read the terms before telling her why a run found nothing.
+
+Walking the public activity of accounts already in the config is the SECONDARY mechanism, gated by
+`crawl_configured_accounts` in the same block. When she asks how an account was found, the proposal
+itself says, and search is the usual answer.
+
+Every proposal carries a handle, a platform, a guessed niche, why it was proposed, and a real cited
+post with its real numbers. A proposal with no post to cite is not made. Text platforms only, same
+three as collection.
+
+| What she wants | Command |
+|---|---|
+| See what has been proposed | `npm run patterns:discover -- --list` |
+| **Approve** one (the ONLY path that writes the config) | `npm run patterns:discover -- --approve <handle>` |
+| **Reject** one, so it stops coming back | `npm run patterns:discover -- --reject <handle> [--reason "..."]` |
+| Look for new accounts now | `npm run patterns:discover` (add `--dry-run` to print which accounts and search terms it would use, fetching nothing) |
+
+- Approving writes the account into `config/pattern-mining.yaml` with a comment citing the
+  proposal's evidence url and the date it was approved. Nothing else in that file is touched.
+- Rejecting marks the proposal `rejected` in the proposals file and touches the config not at all.
+  Its whole job is to stop a weekly run re-proposing something she already said no to. It does not
+  lock her out: she can approve a rejected proposal later if she changes her mind. Rejecting an
+  already approved account is refused, and the message tells her to remove it from the config by
+  hand instead.
+- If the same handle was proposed on two platforms, both commands ask her to add
+  `--platform <name>`. Pass it through rather than guessing which one she meant.
+- Read the proposals to her with the evidence attached, so she is approving a real post's numbers
+  and not a name. Never approve on her behalf, and never present a proposal as though it were
+  already collecting.
+
+### Steps, hand-staging fallback
+
+This is the Phase 1 path, unchanged, and it is the right path for bluesky, mastodon, threads,
+tiktok, youtube, instagram, and for anything on an automated platform that the adapter missed.
+
+1. **Read `references/platform-collection.md` for the platform she named.** Tell her the FREE way
+   to sort that creator's posts by performance, what numbers she will actually be able to see, and
+   what to do when views do not exist there. That guide is the substance of this step; do not
+   paraphrase it from memory.
 
 2. **Narrow the target.** Honor `--platform` and `--account` when given. Otherwise run
    `npm run patterns:outliers` (it prints per-account counts and writes nothing) and propose the
@@ -277,6 +486,9 @@ automatically, and do not pretend a number was fetched when she read it off a sc
      lowercased with the `@` stripped and every run of other characters turned into one dash), and
      `collected_at` as the moment it ran. Only set them by hand when re-staging an entry that
      already has one.
+   - **Leave `collection_method` and `collected_by` out too.** They are the Phase 2 audit fields
+     that the automatic adapters fill. An entry with neither field is a hand-staged one, which is
+     exactly what a fallback entry is.
    - **Keep the leading `@` in `handle`.** That is what the config seeds use and what the corpus
      stores. The `@` is stripped only when building the id slug and the account grouping key, so
      `@Someone` and `someone` already group as one account.
@@ -287,7 +499,8 @@ automatically, and do not pretend a number was fetched when she read it off a sc
      (`quote-card`, `video-script`, `community`) are not places another creator posts and are
      rejected.
    - `niche` must be one of the niches in `config/pattern-mining.yaml`
-     (`building-solopreneur`, `inner-journey`, `civic-democracy`). Do not invent one.
+     (`building-solopreneur`, `inner-journey`, `civic-democracy`, `virality-growth`). Do not invent
+     one, and read the config rather than this list if the two ever disagree.
    - `kind` is `"text"` or `"video"`. A video entry MUST carry `transcript_source` (`"manual"` or
      `"captions"`), and a text entry MUST leave it `null`. Validation enforces both directions.
    - `posted_at` is an ISO date string or null. `notes` is an optional string.
@@ -307,10 +520,21 @@ automatically, and do not pretend a number was fetched when she read it off a sc
      one-off file outside the inbox can be passed with `--entry <file>`.
 
 7. **Report honestly.** Corpus size against the 20-50 target, which accounts are still thin, which
-   platforms had no visible numbers and are therefore leaning on judgment rather than scoring, and
-   anything that failed validation and why. If she collected on a platform where views do not
-   exist, tell her that platform's entries will only ever be outliers by engagement baseline, not
-   by view ratio.
+   platforms had no visible numbers, and anything that failed validation and why. If she collected
+   on a platform where views do not exist, tell her that platform's entries can only ever clear the
+   baseline bar, scored on engagement rather than views, and that a baseline on engagement is a
+   coarser signal, so `/patterns analyze` judgment carries more of the weight there.
+
+### Politeness is a rule here, not a preference
+
+It binds the automatic path and it binds anything Muxin is told to do by hand:
+
+- Public pages only. Never anything behind a paywall, a login wall that is not her own session, or
+  a DM.
+- A real delay between requests and a per-run cap, both configured, neither to be raised to make a
+  run finish faster.
+- A platform that signals rate limiting or blocks the session ends for that run. Record the
+  failure. Never attempt to defeat a block or a captcha, and never suggest a workaround for one.
 
 ---
 
@@ -331,6 +555,16 @@ gitignored, same as the corpus.
    cannot compute), or a platform with no public views. Name the actual cause and recommend either
    more collecting or a threshold tune in the config. Do not lower the bar yourself to manufacture
    an outlier set.
+   - **A linkedin or substack entry can only ever clear the baseline bar**, never the
+     view-to-follower one, because views are owner-only on both platforms. Its baseline is built on
+     recorded engagement rather than views, which is a coarser signal, so treat those verdicts as
+     weaker evidence than an x verdict and say so when you relay them. Always name `baselineMetric`
+     when you relay a multiple; an unqualified "4x baseline" is misleading when it is 4x engagement.
+   - **A mixed account can return no baseline at all.** Entries scored on the other metric drop out
+     of the sample rather than being converted, which can push it under the three-entry floor. Say
+     that is what happened, rather than reporting it as nothing having performed.
+   - Where the baseline has too few comparable entries to fire, picking a post is judgment. Say so
+     in the output, and never write a judgment pick up as though `patterns:outliers` returned it.
 
 3. **Pull each outlier's actual text.** The outliers report prints ids and urls, not bodies. Look
    each id up in `data/patterns/corpus.jsonl` and read that entry's `body`, which is the full post
@@ -412,7 +646,13 @@ for thin data.
    posts, not one clever post you liked. Aim for 5 to 7 per platform. Fewer is fine and honest.
    More than 7 usually means you are describing individual posts instead of patterns.
 
-3. **Adapt every civic pattern through the rubric before writing it down.** A mined viral pattern
+3. **A `virality-growth` pattern is written to travel.** Patterns mined from the growth-teaching
+   accounts are general audience-psychology shapes, so write them without a topic baked in and note
+   on the record that they are expected to apply across her niches. That transfer is the reason the
+   niche exists. It does not exempt anything: a transferred shape applied to civic material still
+   goes through step 4 below, and `config/voice.yaml` still governs the wording wherever it lands.
+
+4. **Adapt every civic pattern through the rubric before writing it down.** A mined viral pattern
    is rarely civic-native, and **a raw viral shape is not shipped unadapted for civic material.**
    When a pattern is being written for the `civic-democracy` niche, or when it will plausibly be
    applied to Muxin's `civic-tech` pillar, run it through
@@ -428,7 +668,7 @@ for thin data.
    - Record the unadapted viral shape you started from in the pattern's Mechanism line, so a
      reader can see where it came from. Then never ship that raw form for civic use.
 
-4. **Write each pattern in its destination file's own record format.** Do not invent a third
+5. **Write each pattern in its destination file's own record format.** Do not invent a third
    format. Both files already specify theirs, and both carry the same guardrails.
    - **A full-post pattern** uses the record block defined under "Record format" in
      `post-patterns.md`: Platform, Mechanism, Structure / arc, Emotional trigger, Immediate
@@ -459,7 +699,7 @@ for thin data.
      by inventing something, rewrite the shape until it cannot. **Real example** is a citation:
      creator, platform, and enough context to find the post, never the wording.
 
-5. **Route each pattern to the right library so the two never fork:**
+6. **Route each pattern to the right library so the two never fork:**
    - A pattern about **how a post OPENS** goes to
      `.claude/skills/atomize/references/hook-patterns.md`.
    - A pattern about **the whole post's structure** goes to
@@ -474,7 +714,7 @@ for thin data.
    - **Never write to `civic-adaptation.md`, and never create a fourth library file.** It is
      Muxin's rubric, not a mining output. Every mined shape has a home in one of the other two.
 
-6. **Propose, do not write.** Show Muxin the proposed additions in full, in chat, grouped by
+7. **Propose, do not write.** Show Muxin the proposed additions in full, in chat, grouped by
    platform and by destination file, with the citation for each and the civic adaptation shown
    next to the raw shape it came from. Say plainly which are new, which overlap something already
    in hook-patterns.md, and which platforms you skipped for thin data.
@@ -483,7 +723,7 @@ for thin data.
    content-generation logic change under CLAUDE.md rule 7, which is exactly the thing that needs
    her eyes every time.
 
-7. **On approval, write the edit**, keeping both files' existing structure, numbering, and
+8. **On approval, write the edit**, keeping both files' existing structure, numbering, and
    verification-caveat sections intact. Add a short provenance line naming the corpus size and the
    date the synthesis ran, so a future reader knows what evidence sat behind these rows.
 
@@ -502,7 +742,12 @@ that could fill it. It never writes the post.
 
 1. **Read the inputs.** The synthesized patterns in `post-patterns.md` and `hook-patterns.md`,
    `config/pillars.yaml` for Muxin's pillars, and `config/brand.yaml` for the brand frame. Honor
-   `--platform` and `--niche` when given. **Run the cold-start check before you write a card.** If
+   `--platform` and `--niche` when given. `--niche` takes one of the four in
+   `config/pattern-mining.yaml`, and `virality-growth` behaves differently from the other three:
+   its patterns are general audience psychology, so they are in scope for ideas in ANY niche, while
+   `--niche civic-democracy` means civic ideas specifically. Say which niche a pattern came from on
+   the card when it came from a different one than the idea targets, so she can see the transfer
+   rather than having to trust it. **Run the cold-start check before you write a card.** If
    that platform's `post-patterns.md` section still reads "Not yet mined", or the corpus is empty,
    say so in the output ahead of the cards: these ideas came from the August hook library, not from
    mined patterns, and the fix is `/patterns collect`, then `analyze`, then `synthesize`. Then work
@@ -706,7 +951,7 @@ license and there is nothing else in it.
    `spin_angles` entry in `config/platforms.yaml` instead. An empty section is never permission to
    invent a structure and call it proven. Pick three that are genuinely DIFFERENT from each other,
    so Muxin is choosing between real alternatives rather than three shades of one idea. For civic
-   or social-issues material, use the ADAPTED form of each pattern (mode 3, step 3) and follow
+   or social-issues material, use the ADAPTED form of each pattern (mode 3, step 4) and follow
    hook-patterns.md's joyful-activism register default unless the source itself is genuinely grief
    or anger toned.
 
@@ -836,8 +1081,15 @@ points at is real. Ranking a fabricated link first is worse than proposing nothi
 
 Say these plainly rather than working around them:
 
-- **No scrapers.** Collection is paste-driven. Automated per-platform pulls are a later phase.
+- **No automated collection outside x, linkedin and substack.** Those three have adapters as of
+  2026-08-22. Bluesky, Mastodon, Threads, TikTok, YouTube and Instagram are hand-staged, and no
+  collector is stubbed for them.
 - **No automatic video transcripts.** Paste or captions, and record which in `transcript_source`.
+  Video collection as a whole is a later pass, deliberately not in this build.
+- **No view-to-follower score where views are not public.** That bar is views-only by design, so
+  on linkedin and substack only the baseline bar can fire, built on recorded engagement. Report
+  which bar fired and which metric the baseline used; never report a baseline multiple bare.
+- **No account added automatically.** Discovery proposes; Muxin approves with an explicit command.
 - **No automatic series scaffolding.** `/patterns series` proposes; accepting a piece goes through
   the GUI's existing accept and `/atomize --continue`. Scaffolding a whole accepted arc in one step
   is Phase 2.

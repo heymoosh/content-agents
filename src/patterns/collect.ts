@@ -153,9 +153,15 @@ export function parseArgs(argv: string[]): Args {
 // them cleared the outlier bar.
 function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig): void {
   const groups = groupByAccount(corpus);
-  console.log(`\nCorpus: ${corpus.length} entries across ${groups.size} accounts (target ${config.targets.corpus_size_min}-${config.targets.corpus_size_max}).`);
-  if (corpus.length < config.targets.corpus_size_min) {
-    console.log(`Below the ${config.targets.corpus_size_min}-entry floor. Collect more before running the analysis step.`);
+  console.log(`\nCorpus: ${corpus.length} entries across ${groups.size} accounts.`);
+  // Deliberately NOT printed as "target 20-50". That range is how many outliers are worth reading
+  // in one synthesize pass, not a size the corpus should stop at. The corpus is uncapped and a
+  // bigger one makes the baseline bar more reliable, never less.
+  const floor = config.analysis_sample.min_outliers;
+  if (corpus.length < floor) {
+    // Corpus size as a proxy for "is there enough here to analyze yet". It is a proxy, not the
+    // real quantity, so it says so rather than implying the corpus itself is undersized.
+    console.log(`Only ${corpus.length} entries collected. The analysis pass aims to read ${floor}-${config.analysis_sample.max_outliers} outliers, and there may not be enough material behind that yet. Keep collecting.`);
   }
 
   console.log("\nAccount                              Platform    Entries  Outliers");
