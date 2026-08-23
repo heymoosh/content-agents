@@ -6,6 +6,35 @@ All 3 measurement-scaffolding cards shipped — `7e550e48` (routing drift flag),
 
 ---
 
+**`VALID_COMBINATIONS` still allows `discarded:live_confirmed`, which the contract says is invalid**
+- ORIGIN: found while building the Venture write routes (PR #370, 2026-08-23). `artifacts.ts:82`
+  lists `discarded:live_confirmed` as a legal editorial x delivery pair, and its comment claims that
+  pair is the retract path. `docs/venture-schema-contract.md` contradicts this in four places: §2.1
+  states the transition as `live_confirmed -> cancelled`; §2.2's table has no
+  `discarded x live_confirmed` row and says off-table combinations are invalid; §2.2 states that a
+  retracted and a discarded artifact are BOTH `discarded x cancelled`, separated only by the
+  presence of the `retraction` object; and the §1467 API row agrees. #370 built retract per the
+  contract (`discarded:cancelled`), so the allowed pair is now unreachable by any code path and the
+  comment beside it describes a mechanism that does not exist.
+- WHY IT WAS LEFT: removing the pair TIGHTENS a refusal — `transitionArtifact` would begin throwing
+  `InvalidTransitionError` on a combination it currently accepts. `artifacts.test.ts:53` asserts the
+  pair explicitly, so the test changes too. That is a deliberate narrowing of allowed venture state,
+  not a cleanup, and it was out of scope for a PR adding routes.
+- WHAT TO DECIDE: whether the contract or the code is right. If the contract (most likely, since it
+  is the stated authority and #370 already followed it), delete the pair from `VALID_COMBINATIONS`,
+  update the stale comment, and rewrite `artifacts.test.ts:53` to assert the pair is now refused.
+  If the code, the contract needs amending in all four places instead.
+- ALSO WORTH FOLDING IN: `serve.ts`'s venture write block consumes the request body (`await
+  readBody`) for ANY venture POST reaching it, including ones it does not match. Inert today (the
+  intake-draft routes sit above it and nothing else reads a venture POST body), but a new venture
+  POST route added BELOW that block would hang on a second `readBody`. Either add new venture POSTs
+  above the block or thread the already-read body through.
+- STATUS: Backlog
+- DECISION: none yet — needs Muxin's call on contract-vs-code before anyone narrows the state machine
+<!-- card-id: ccf7817e-2a6c-49ad-a60e-ed30b6d63efa -->
+
+---
+
 **Dependabot sweep (2026-08-11) — 10 routine minor/patch bumps merged**
 - ORIGIN: backlog + open-PR review, 2026-08-18. 10 Dependabot PRs opened 2026-08-11 (`playwright`
   1.62.0→1.62.1 #306, `remotion` 4.0.505→4.0.507 #305, `better-sqlite3` 13.0.1→13.0.3 #304,
