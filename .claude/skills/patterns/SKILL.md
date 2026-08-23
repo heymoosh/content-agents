@@ -1,6 +1,6 @@
 ---
 name: patterns
-description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into the strongest shapes. Proven structures only, never anyone's wording, and it proposes rather than composes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>.
+description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into the strongest shapes, and remixes a proven opener onto her own material. Proven structures only and never anyone's wording, with one scoped 2026-08-22 exception in remix mode covering two elements: a proven opener and its on-screen title, copied verbatim, with everything after them hers. It proposes rather than composes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>, /patterns remix <content-folder | topic> [--platform X].
 ---
 
 # /patterns: the pattern mining pipeline
@@ -9,13 +9,13 @@ Reverse-engineer what the paid analytics tools sell, by hand and for free: gathe
 already worked in Muxin's niches, find the genuine outliers, read what they have in common, write
 that down as reusable structure, and then use that structure on her own work.
 
-Seven modes in three jobs:
+Eight modes in three jobs:
 
 | Job | Modes | What it touches |
 |---|---|---|
 | **Learn** what works | `collect`, `analyze`, `synthesize` | other creators, studied for structure |
 | **Propose** new work | `ideas`, `series`, `asap` | proposal cards Muxin accepts or dismisses |
-| **Apply** to her material | `rewrite` | her own source, restructured |
+| **Apply** to her material | `rewrite`, `remix` | her own source, restructured or given a proven opener |
 
 **Scope:** `/patterns` never produces a publishable asset. `/atomize` still owns derivatives, the
 review queue, and everything that reaches `/publish`. Nothing here publishes, queues, renders, or
@@ -59,6 +59,14 @@ that file's "How to use this" section before you synthesize, propose, or rewrite
   lines. A near match reads as plagiarism, not inspiration.
 - **Never copy a creator's body text into a committed file.** The corpus holds their full text
   locally and stays out of git for exactly this reason. Only distilled shapes get committed.
+
+**One scoped exception, added 2026-08-22: `/patterns remix`.** Muxin handed over Sabrina Ramonov's
+playbook and said to do it, and its rule is the opposite of this one for two elements: the opener
+and the on-screen title get copied word for word, because the exact wording is the proven part.
+That reversal is deliberate, it is scoped to those two elements, and it lives entirely in
+`references/remix-mode.md`. Read that file before running remix. Everything after the opener is
+still governed by the four bullets above, and `hook-patterns.md` and `post-patterns.md` stay
+shapes-only libraries that remix neither changes nor writes to. Every other mode is unaffected.
 
 ### 2. The system proposes. It does not compose.
 
@@ -145,9 +153,14 @@ Two npm scripts exist and they are both deterministic:
 - `npm run patterns:outliers` is the same script's `outliers` subcommand. It scores the corpus off
   recorded numbers and prints the report. It appends nothing and fetches nothing.
 
+- `node --import tsx src/patterns/openers.ts` builds the verbatim opener bank from the corpus and
+  prints it ranked. It derives, dedupes, and appends. It never judges or calls a model, and it
+  skips any entry whose opener cannot be known rather than guessing. A `patterns:openers` npm
+  script is pending, so use the command as written until it lands.
+
 Everything else here is Claude judgment done inline while running this skill. There is no
 `patterns:analyze`, `patterns:synthesize`, `patterns:ideas`, `patterns:series`,
-`patterns:rewrite`, or `patterns:asap` script. Do not invent one.
+`patterns:rewrite`, `patterns:asap`, or `patterns:remix` script. Do not invent one.
 
 ## Where things live
 
@@ -155,12 +168,15 @@ Everything else here is Claude judgment done inline while running this skill. Th
 |---|---|---|
 | Config: niches, accounts, thresholds, targets | `config/pattern-mining.yaml` | yes |
 | Muxin's civic rubric (read only, never written here) | `.claude/skills/atomize/references/civic-adaptation.md` | yes |
+| The remix rule and its scoped verbatim exception | `.claude/skills/patterns/references/remix-mode.md` | yes |
 | Hook shapes | `.claude/skills/atomize/references/hook-patterns.md` | yes |
 | Full-post shapes (this skill writes these) | `.claude/skills/atomize/references/post-patterns.md` | yes |
 | Staged entries waiting to be collected | `data/patterns/inbox/*.json` | no |
 | The corpus of collected posts | `data/patterns/corpus.jsonl` | no |
 | Per-outlier structural analyses | `data/patterns/analyses.jsonl` | no |
+| The verbatim opener bank (remix mode only) | `data/patterns/openers.jsonl` | no |
 | Proposed post ideas | `data/patterns/ideas.md` | no |
+| Remix drafts for her review | `<content-folder>/pattern-remixes.md` | yes |
 | Series and micro-action proposal cards | `<content-folder>/develop/advice.json` + `develop/log.md` | yes |
 
 `data/patterns/**` is gitignored on purpose. Other creators' full post text and video transcripts
@@ -203,9 +219,12 @@ two-platform scope, it is stale.
 - **`/patterns rewrite`** restructures her own source material three ways.
 - **`/patterns asap`** proposes ranked, verifiable civic CTA candidates for a piece, in either
   accepted form: a micro-action, or value-aligned matching.
+- **`/patterns remix`** copies one proven opener and its on-screen title verbatim, then builds the
+  rest of the post out of her own material. Read `references/remix-mode.md` first, every time.
 
-`ideas`, `series`, and `asap` all run under rule 2. `rewrite` runs under rule 3. Nothing runs
-without rules 1 and 4.
+`ideas`, `series`, and `asap` all run under rule 2. `rewrite` runs under rule 3. `remix` runs under
+rule 1's one scoped exception for the opener and the on-screen title, and under rule 3's
+source-only constraint for every line after them. Nothing runs without rules 1 and 4.
 
 ---
 
@@ -902,6 +921,62 @@ points at is real. Ranking a fabricated link first is worse than proposing nothi
 5. **Stop.** Report the ranking in one short paragraph, and say plainly how many candidates need
    verification before they can be used. That number is the useful headline, not the count of
    candidates.
+
+---
+
+## Mode 8: `/patterns remix <content-folder | topic> [--platform X]`
+
+Goal: one post that opens with a proven opener, copied word for word, and then says something that
+is entirely Muxin's.
+
+**Read `references/remix-mode.md` before running this, every time.** It carries the full rule, the
+two honest cautions, and the refuse conditions. The short version is here so nothing important is
+only in one place.
+
+### What this mode reverses, and how far
+
+This is the one mode where exact reuse is intended, and it is scoped to TWO elements: the opener
+(the first thing said on a video, or the first two lines on a text platform) and the on-screen
+title. Muxin decided this on 2026-08-22 off Sabrina Ramonov's playbook, reversing the 2026-08-18
+shapes-not-lines rule for those two elements only.
+
+Everything after the opener is still hers and still governed by rule 1, `civic-adaptation.md`, and
+`config/voice.yaml`. `hook-patterns.md` and `post-patterns.md` are untouched shapes-only libraries
+here. A copied opener over a copied body is not a remix, and this mode does not produce one.
+
+### Steps
+
+1. **Show her the ranked opener bank for the target platform.** Build or refresh it first with
+   `node --import tsx src/patterns/openers.ts [--platform X]`. Each row shows the verbatim opener,
+   its on-screen title where one is known, the creator, the measured multiple and its metric, and
+   whether `verbatim_ok` is set. She picks one. `verbatim_ok: false` is shown, not hidden, and it
+   does not block the pick. It is her call with the fact in front of her.
+
+2. **Keep the opener and the on-screen title EXACTLY.** No tightening, no rephrasing for voice, no
+   swapped nouns. Editing it discards the only thing being borrowed.
+
+3. **Write the rest out of her material.** Her list, her picks, her examples, her take. Use
+   `post-patterns.md` for that platform where a shape has been mined, run the cold-start disclosure
+   if that section still reads "Not yet mined", and apply `config/voice.yaml` throughout.
+
+4. **Civic material still clears the CTA gate.** Mode 6 step 4 applies here unchanged. The remix
+   rule relaxes nothing about the close, and rule 4 binds it exactly as hard.
+
+5. **Write to `<content-folder>/pattern-remixes.md`**, or `<file-stem>-pattern-remixes.md` next to
+   a bare file. **Never into `derivatives/`.** Nothing here publishes or queues.
+
+6. **State the provenance in the file itself**, not only in the chat: which opener was copied, from
+   which creator and handle, its url, its multiple, and its `verbatim_ok` status. This is what
+   keeps the borrowing visible to her at review time.
+
+### Refuse, in plain language, when
+
+- **there is no opener bank yet.** Point her at `/patterns collect` then the openers build. Never
+  write an opener that merely sounds proven as a substitute.
+- **the chosen opener came from a `"caption"` entry or a truncated body.** The real opener is
+  unknown, so there is nothing honest to copy.
+- **the body she wants to remix is not her own material.** Route her to `/patterns ideas` when
+  there is no source yet.
 
 ---
 

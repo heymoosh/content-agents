@@ -100,3 +100,40 @@ export interface AccountSeed {
   niche: string;
   followers: number | null;
 }
+
+// One verbatim opener, kept separately from the shape libraries because it is stored WORD FOR
+// WORD. That is the deliberate 2026-08-22 exception described in
+// `.claude/skills/patterns/references/remix-mode.md`, and it is scoped to two elements: the
+// opener and the on-screen title. Everything after the opener stays shapes-only.
+//
+// Stored one JSON object per line in data/patterns/openers.jsonl, gitignored like the rest of
+// data/patterns/**, because this is another creator's exact text.
+export interface Opener {
+  // Stable: opener-<corpus_entry_id>. Same corpus entry, same id, every rebuild.
+  id: string;
+  corpus_entry_id: string;
+  platform: Platform;
+  creator: string;
+  handle: string;
+  url: string;
+  // The verbatim first line or first two lines of a text post, or the first spoken sentences of a
+  // video. Never a paraphrase, never a summary. If it cannot be captured exactly, it is not
+  // captured at all and no record is written.
+  opener_text: string;
+  // The big text on the video, verbatim. Null when the post has none, and also null when it was
+  // simply not retrievable, because CorpusEntry has nowhere to record it today. A null here means
+  // "unknown", so a remix run says so rather than inventing a title.
+  onscreen_title: string | null;
+  kind: PostKind;
+  performance: {
+    multiple: number | null;
+    metric: BaselineMetric | null;
+    // Plain-language reading of the two numbers above, including why they are null when they are.
+    note: string;
+  };
+  // True ONLY where the creator has publicly granted permission to remix their work. False is the
+  // default and the honest answer for almost everyone. This is a fact shown to Muxin at pick
+  // time, not a gate the code enforces.
+  verbatim_ok: boolean;
+  collected_at: string;
+}
