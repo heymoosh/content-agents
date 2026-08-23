@@ -34,7 +34,7 @@ afterEach(() => {
   if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
 });
 
-function seedApprovedPost(kind: "substack-post" | "text-post-note", id = "p1-a") {
+function seedApprovedPost(kind: "substack-post" | "text-post-note" | "welcome-email", id = "p1-a") {
   createArtifact(SLUG, rules, {
     artifact_id: id,
     phase: 1,
@@ -83,7 +83,7 @@ describe("confirmManualDelivery", () => {
   test("moves handed_off -> live_confirmed with url evidence", async () => {
     seedApprovedPost("substack-post");
     await deliverVenture(SLUG);
-    confirmManualDelivery(SLUG, "p1-a", "https://humaninference.substack.com/p/test", "t2");
+    confirmManualDelivery(SLUG, "p1-a", { type: "url", value: "https://humaninference.substack.com/p/test" }, "t2");
     const a = readArtifact(SLUG, "p1-a");
     assert.equal(a?.delivery_status, "live_confirmed");
     assert.equal(a?.evidence?.type, "url");
@@ -92,7 +92,44 @@ describe("confirmManualDelivery", () => {
 
   test("refuses to confirm a post that hasn't been handed off yet", () => {
     seedApprovedPost("substack-post");
-    assert.throws(() => confirmManualDelivery(SLUG, "p1-a", "https://x", "t1"), /not handed_off/);
+    assert.throws(() => confirmManualDelivery(SLUG, "p1-a", { type: "url", value: "https://x" }, "t1"), /not handed_off/);
+  });
+
+  // The bug this fixes: confirm hardcoded type "url", so welcome-email (min_evidence: attestation,
+  // schema contract §4's example of a thing with no addressable trace) could never be confirmed in
+  // a way its own minimum accepts. It is one of checkpoint 2's four required kinds, so checkpoint 2
+  // could not clear at all. Muxin's only way through was to invent a link.
+  test("an attestation is a real confirmation for a kind whose minimum is an attestation", async () => {
+    seedApprovedPost("welcome-email");
+    await deliverVenture(SLUG);
+    confirmManualDelivery(SLUG, "p1-a", { type: "attestation", value: "The welcome sequence is live in Substack." }, "t2");
+    const a = readArtifact(SLUG, "p1-a");
+    assert.equal(a?.delivery_status, "live_confirmed");
+    assert.equal(a?.evidence?.type, "attestation");
+    assert.equal(a?.evidence?.value, "The welcome sequence is live in Substack.");
+    assert.equal(a?.evidence?.confirmed_by, "muxin");
+    assert.equal(a?.evidence?.confirmed_at, "t2");
+  });
+
+  // Refused rather than written: confirm needs handed_off and there is no second confirm, so an
+  // attestation on a url-minimum kind would strand the artifact behind a retraction it never
+  // earned. The message names the minimum so she knows what to bring instead.
+  test("an attestation is refused for a kind that needs a checkable url", async () => {
+    seedApprovedPost("substack-post");
+    await deliverVenture(SLUG);
+    assert.throws(
+      () => confirmManualDelivery(SLUG, "p1-a", { type: "attestation", value: "I pasted it." }, "t2"),
+      /needs "url" evidence/
+    );
+    assert.equal(readArtifact(SLUG, "p1-a")?.delivery_status, "handed_off", "nothing was written");
+  });
+
+  // §4: never synthesize an attestation on her behalf. An empty one states nothing.
+  test("an empty confirmation is never recorded", async () => {
+    seedApprovedPost("welcome-email");
+    await deliverVenture(SLUG);
+    assert.throws(() => confirmManualDelivery(SLUG, "p1-a", { type: "attestation", value: "   " }, "t2"), /needs a value/);
+    assert.equal(readArtifact(SLUG, "p1-a")?.delivery_status, "handed_off");
   });
 });
 

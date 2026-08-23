@@ -3,7 +3,7 @@ import { readArtifact, readArtifacts, type VentureArtifact } from "./artifacts.j
 import { hasCanonEvent, findCanonEvent } from "./canon.js";
 import { readDecision, readDecisions } from "./decisions.js";
 import { statePath, ventureDir } from "./paths.js";
-import { loadRules, artifactKindRule, type CheckpointRule, type VentureRules } from "./rules.js";
+import { loadRules, artifactKindRule, evidenceMeetsMinimum, type CheckpointRule, type VentureRules } from "./rules.js";
 import { phase4CompletionSatisfied } from "./phase4.js";
 
 export type PhaseStatus = "drafting" | "awaiting_you" | "checkpoint_ready" | "blocked" | "complete";
@@ -82,8 +82,9 @@ function checkpointArtifactState(
   let requiredCount: number;
 
   // docs/venture-schema-contract.md §3-4: each kind declares a minimum evidence type (e.g.
-  // substack-post requires a real "url", not a bare attestation). A truthy evidence object
-  // alone isn't enough -- it must exactly match that kind's minimum.
+  // substack-post requires a real "url", not a bare attestation). A truthy evidence object alone
+  // isn't enough -- it must clear that kind's floor. evidenceMeetsMinimum (rules.ts) owns what
+  // clears what; this read used to be exact equality, which no `attestation` kind could ever pass.
   //
   // §5.2's derivation rule: "an artifact is complete when editorial_status === approved AND
   // delivery_status is live_confirmed (modes app/manual) OR not_applicable (mode none)." A
@@ -102,7 +103,7 @@ function checkpointArtifactState(
       blocking.push({ artifact_id: a.artifact_id, reason: `${a.editorial_status}/${a.delivery_status}` });
       return false;
     }
-    if (kindRule.min_evidence && a.evidence!.type !== kindRule.min_evidence) {
+    if (kindRule.min_evidence && !evidenceMeetsMinimum(a.evidence!.type, kindRule.min_evidence)) {
       blocking.push({
         artifact_id: a.artifact_id,
         reason: labelKind

@@ -236,11 +236,14 @@ describe("deriveState -- Checkpoint 2", () => {
   });
 
   test("all 4 kinds live but one has the wrong evidence type -- blocking names the mismatch", () => {
+    // CHANGED with the min_evidence floor fix: this used to give welcome-email a url and expect a
+    // block. A url clears an attestation floor, so that is now the correct pass. The mismatch this
+    // test is named for still exists in the other direction -- lead-magnet wants a checkable url
+    // and a bare attestation cannot stand in for one (schema contract §4).
     for (const kind of KINDS) seedCp2Artifact(kind, kind);
     for (const kind of KINDS) {
-      if (kind === "welcome-email") {
-        // wrong evidence: welcome-email wants "attestation", give it "url" instead.
-        makeLiveWithEvidence(kind, "url");
+      if (kind === "lead-magnet") {
+        makeLiveWithEvidence(kind, "attestation");
       } else {
         makeLiveWithEvidence(kind, correctEvidenceFor(kind));
       }
@@ -251,10 +254,26 @@ describe("deriveState -- Checkpoint 2", () => {
     assert.equal(state.checkpoints["checkpoint-2"]!.cleared, false);
     assert.ok(
       state.checkpoints["checkpoint-2"]!.blocking.some(
-        (b) => /does not meet this kind's minimum \("attestation"\)/.test(b.reason) && /"welcome-email"/.test(b.reason)
+        (b) => /does not meet this kind's minimum \("url"\)/.test(b.reason) && /"lead-magnet"/.test(b.reason)
       )
     );
   });
+
+  // The bug: min_evidence read as exact equality, so welcome-email (min "attestation") only counted
+  // for an evidence type nothing could write -- confirmManualDelivery hardcoded "url". welcome-email
+  // is one of checkpoint 2's four required kinds, so checkpoint 2 could not clear at all. Both
+  // proofs must count now: the attestation it declares, and the stronger url that clears its floor.
+  for (const proof of ["attestation", "url"] as const) {
+    test(`checkpoint 2 clears with welcome-email confirmed by ${proof}`, () => {
+      for (const kind of KINDS) seedCp2Artifact(kind, kind);
+      for (const kind of KINDS) {
+        makeLiveWithEvidence(kind, kind === "welcome-email" ? proof : correctEvidenceFor(kind));
+      }
+      const state = deriveState(SLUG);
+      assert.equal(state.checkpoints["checkpoint-2"]!.complete_count, 4);
+      assert.deepEqual(state.checkpoints["checkpoint-2"]!.blocking, []);
+    });
+  }
 
   test("all 4 kinds correctly live reads checkpoint_ready on checkpoint2 with no pace requirement", () => {
     for (const kind of KINDS) seedCp2Artifact(kind, kind);
