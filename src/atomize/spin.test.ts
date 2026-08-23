@@ -1,6 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { loadSpinAngles, resolveAngle, isSpinDefault, appliesRehook } from "./spin.js";
+import { loadPlatforms } from "../config/platforms.js";
 
 describe("config/platforms.yaml spin_angles: the Muxin-approved angles (2026-06-30, mastodon/threads added 2026-08-20)", () => {
   const angles = loadSpinAngles();
@@ -77,24 +78,45 @@ describe("isSpinDefault: spin is the always-on default, --no-spin is the only op
   });
 });
 
-describe("appliesRehook: storytelling re-hook/re-order latitude (Muxin, 2026-07-04), scoped to X/LinkedIn only", () => {
-  test("x and linkedin get the re-hook/re-order pass", () => {
+describe("appliesRehook: storytelling re-hook/re-order latitude (Muxin, 2026-07-04), widened to every platform 2026-08-22", () => {
+  test("x and linkedin still get the re-hook/re-order pass", () => {
     assert.equal(appliesRehook("x", undefined), true);
     assert.equal(appliesRehook("linkedin", undefined), true);
   });
 
-  test("bluesky never gets it, even from a normal essay source", () => {
-    assert.equal(appliesRehook("bluesky", undefined), false);
+  test("every other publishing channel now gets it too (widened 2026-08-22)", () => {
+    for (const platform of [
+      "bluesky",
+      "threads",
+      "mastodon",
+      "substack",
+      "tiktok",
+      "youtube",
+      "community",
+      "video-script",
+    ]) {
+      assert.equal(appliesRehook(platform, undefined), true, platform);
+    }
+  });
+
+  test("a platform absent from config/platforms.yaml defaults to true", () => {
+    assert.equal(appliesRehook("instagram", undefined), true);
+  });
+
+  test("config/platforms.yaml `rehook: false` opts a channel out; quote-card is the only one today", () => {
+    assert.equal(appliesRehook("quote-card", undefined), false);
+    const optedOut = Object.entries(loadPlatforms().platforms)
+      .filter(([, rule]) => (rule as { rehook?: unknown }).rehook === false)
+      .map(([name]) => name);
+    assert.deepEqual(optedOut, ["quote-card"]);
   });
 
   test("a Notes-sourced derivative stays near-verbatim on every platform, including x/linkedin", () => {
     assert.equal(appliesRehook("x", "substack-note"), false);
     assert.equal(appliesRehook("linkedin", "substack-note"), false);
     assert.equal(appliesRehook("bluesky", "substack-note"), false);
-  });
-
-  test("other platforms (community, quote-card) never get it", () => {
-    assert.equal(appliesRehook("community", undefined), false);
-    assert.equal(appliesRehook("quote-card", undefined), false);
+    assert.equal(appliesRehook("tiktok", "substack-note"), false);
+    assert.equal(appliesRehook("youtube", "substack-note"), false);
+    assert.equal(appliesRehook("instagram", "substack-note"), false);
   });
 });

@@ -33,3 +33,10 @@ docs/*.lock
 
 # design-sync capture output (regenerate with npm run design:capture)
 .design-sync/build/
+
+# mined pattern corpus: other creators' full post text and video transcripts never reach git,
+# same privacy treatment as data/analytics.db. Only the distilled patterns get committed.
+data/patterns/**
+!data/patterns/.gitkeep
+!data/patterns/inbox/
+!data/patterns/inbox/.gitkeep

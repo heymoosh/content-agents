@@ -22,6 +22,13 @@
 # and publish:cards before claiming slots).
 min_reuse_days: 30
 
+# REHOOK (Muxin, 2026-08-22): the storytelling re-hook/re-order pass now runs on EVERY platform.
+# It used to be hard-coded to X and LinkedIn only in src/atomize/spin.ts; Muxin widened it to all
+# platforms on 2026-08-22. Optional per-platform `rehook: false` opts a channel back out. Absent
+# means true, so a platform only needs the key when it has a real reason to skip the pass. The
+# source-side carve-out is separate and still absolute: a Notes-sourced folder (source_kind:
+# substack-note) is a near-verbatim cross-post by design and never gets the pass, on any platform.
+
 platforms:
   x:
     min_reuse_days: 14      # moves fast; a shorter reuse window is acceptable
@@ -98,6 +105,7 @@ platforms:
   quote-card:
     min_reuse_days: 30
     max_chars: 180
+    rehook: false          # a card's own style rule below is "pulled verbatim from the source"; a re-hook pass would contradict it (CLAUDE.md rule 1)
     # Card cadence for the unified scheduler (publish:cards). A card fans out to several platforms
     # at once, so it gets its own midday weekday window; it also de-conflicts against (and counts
     # toward) each target platform's cap, so a card series never pushes e.g. LinkedIn past its 2/wk.

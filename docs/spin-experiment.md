@@ -122,13 +122,21 @@ Built in response (ship now, no guardrail change, pure upside):
    derivative scoring `<= 3` on any of the three gets a note appended to its review-queue.md row
    suggesting a Spin pass — never a block. `native`/`brand`/`cta` low scores still mean "discard
    it yourself"; storytelling low scores mean "flag it, Muxin still decides."
-2. **The re-hook/re-order latitude was made concrete and applied**, scoped to X and LinkedIn only
+2. **The re-hook/re-order latitude was made concrete and applied**, originally scoped to X and
+   LinkedIn only
    (`appliesRehook()` in `src/atomize/spin.ts`; worked example in
    `.claude/skills/atomize/references/spin-mode.md`). Bluesky and any Notes-sourced derivative
    (`source_kind: substack-note`) stay near-verbatim — this is not a broader invent-latitude, it's
    the SAME reframe-never-invent guardrail from guardrail #1, just actually used on the two
    platforms where audience-fit data (the 2026-06-24 finding, "Why" section above) says flavor
    matters most.
+   **WIDENED (Muxin, 2026-08-22):** the platform gate is no longer X and LinkedIn only. The pass
+   now runs on every platform, driven by an optional `rehook` key in `config/platforms.yaml`, where
+   an absent key means true. `quote-card` is the only channel opted out, because its own style rule
+   is verbatim quotable lines, so a re-hook pass would contradict it. Bluesky now gets the pass.
+   The SOURCE exclusion is unchanged and still absolute: a Notes-sourced derivative
+   (`source_kind: substack-note`) never gets the pass, on any platform. Context:
+   `docs/pattern-mining-plan.md`.
 
 No schema change to review-queue.md's table (native/brand/cta stay a fixed 9-column layout —
 `src/publish/queue.ts`, `src/video/render.ts`, and `src/review/serve.ts` all parse it by column

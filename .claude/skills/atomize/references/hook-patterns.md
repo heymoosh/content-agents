@@ -20,10 +20,22 @@ These are named, identifiable creators with audiences who know their own lines �
 as plagiarism, not inspiration, and undermines the extraction-first rule this whole pipeline runs
 on (CLAUDE.md rule 1).
 
-**When this applies:** the same scope as the storytelling re-hook pass it extends —
-`appliesRehook(platform, sourceKind)` in `src/atomize/spin.ts` (X/LinkedIn only, never a Notes
-repost). Use a pattern to decide HOW to reorder/lead with a specific already pulled from the
-source — never as a reason to add a claim, statistic, or detail that isn't already there.
+**When this applies:** the same scope as the storytelling re-hook pass it extends,
+`appliesRehook(platform, sourceKind)` in `src/atomize/spin.ts`. Muxin widened that gate on
+2026-08-22 from X/LinkedIn only to EVERY platform, so hook patterns are in scope wherever the
+re-hook pass runs. A platform can opt back out with `rehook: false` in `config/platforms.yaml`
+(only `quote-card` does today, because a card is pulled verbatim), and a Notes repost
+(`source_kind: substack-note`) is still excluded everywhere. Use a pattern to decide HOW to
+reorder/lead with a specific already pulled from the source, never as a reason to add a claim,
+statistic, or detail that isn't already there.
+
+**Companion libraries:** `references/post-patterns.md` covers FULL-POST structure (arc, emotional
+trigger, CTA, length) the way this file covers the opening line; both are populated and maintained
+by the `/patterns` skill. `references/civic-adaptation.md` is Muxin's own decided rubric for civic
+and social-issues material (what a piece must deliver, and the two-form bar every civic CTA has to
+clear, a micro-action or neutral record-based value-aligned matching); it stacks with the joyful-activism default below rather than competing with it, and
+`/patterns` never rewrites it. The three are one system. If you need a shape this file doesn't
+have, check those before starting a fourth library.
 
 **Niche default:** for civic/activism material specifically, Muxin's explicit preference
 (2026-08-18) is the joyful-activism register (patterns 16–23) over the outrage/moral-clarity

@@ -69,3 +69,20 @@ describe("platformRuleSchema: max_slots_per_day", () => {
     assert.throws(() => platformRuleSchema.parse({ max_slots_per_day: 1.5 }));
   });
 });
+
+describe("platformRuleSchema: rehook", () => {
+  test("parses an explicit rehook as a typed boolean", () => {
+    assert.equal(platformRuleSchema.parse({ rehook: false }).rehook, false);
+    assert.equal(platformRuleSchema.parse({ rehook: true }).rehook, true);
+  });
+
+  test("leaves rehook undefined when absent (the default-of-true is applied by appliesRehook, not the schema)", () => {
+    assert.equal(platformRuleSchema.parse({}).rehook, undefined);
+  });
+
+  test("rejects a non-boolean rehook instead of silently passing it through (a string 'false' is truthy against appliesRehook's !== false check, so a typo would leave the pass ON)", () => {
+    assert.throws(() => platformRuleSchema.parse({ rehook: "false" }));
+    assert.throws(() => platformRuleSchema.parse({ rehook: 0 }));
+    assert.throws(() => platformRuleSchema.parse({ rehook: "no" }));
+  });
+});

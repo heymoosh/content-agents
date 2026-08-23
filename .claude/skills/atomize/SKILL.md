@@ -250,14 +250,29 @@ to the same `source.md` and the same platform-fit decision.
      records it as a control run (see `src/publish/queue.ts`'s `appendBetPlacement`) and it gets
      excluded from the pillar/platform resonance figures instead of counted as a normal spin-on or
      verbatim post.
-   - **X and LinkedIn additionally get the storytelling re-hook/re-order pass** (Muxin,
-     2026-07-04) — still inside the same never-invent guardrail, not a new license: lead with the
-     strongest existing line (drop throat-clearing like "What I described in my essay..."),
-     re-order for a narrative arc instead of a list of facts, and do NOT trim concrete personal
-     specifics that ARE the story. Bluesky and any Notes-sourced derivative (`source_kind:
-     substack-note` in source.md) stay near-verbatim — no extra re-hook/re-order latitude there.
-     See `references/spin-mode.md` for the worked before/after and `appliesRehook()` in
-     `src/atomize/spin.ts` for the platform/source gate.
+   - **Every platform gets the storytelling re-hook/re-order pass** (Muxin, 2026-07-04, widened
+     from X/LinkedIn-only to all platforms 2026-08-22), still inside the same never-invent
+     guardrail, not a new license: lead with the strongest existing line (drop throat-clearing like
+     "What I described in my essay..."), re-order for a narrative arc instead of a list of facts,
+     and do NOT trim concrete personal specifics that ARE the story. A platform can opt back out
+     with `rehook: false` in `config/platforms.yaml` (only `quote-card` does today). Any
+     Notes-sourced derivative (`source_kind: substack-note` in source.md) stays near-verbatim on
+     every platform; that source carve-out is unchanged. See `references/spin-mode.md` for the
+     worked before/after and `appliesRehook()` in `src/atomize/spin.ts` for the platform/source
+     gate.
+   - **The full-post shape library is `references/post-patterns.md`**, the arc-after-the-hook
+     companion to `references/hook-patterns.md`, filed by platform and written by
+     `/patterns synthesize`. It ships EMPTY: until a synthesis run has landed, every platform
+     section there reads "Not yet mined", and while a section is empty drafting falls back to
+     `references/hook-patterns.md` and the channel's `spin_angles` entry. An empty section is never
+     permission to invent a structure and call it proven.
+   - **Civic and social-issues material additionally follows
+     `references/civic-adaptation.md`** (Muxin's own rubric, 2026-08-22): concrete pain-or-outcome
+     hook, an immediate personal payoff the reader gets or avoids right now, everyday local
+     language over abstract "democracy" talk, and one specific next action. It says WHAT the piece
+     must deliver; `references/hook-patterns.md`'s joyful-activism default (patterns 16-23) says in
+     WHICH REGISTER. They stack. Both still sit under the extraction-first rule: the rubric's
+     example lines are shapes, never copy.
    - Text derivatives are ALWAYS Claude-authored and extraction-first. Do NOT pass them
      through `text-polish` — that provider (Grok) is reserved for video scripts, which now live
      in the `/video` skill.
@@ -323,6 +338,24 @@ to the same `source.md` and the same platform-fit decision.
      `cta: <voting-tool-url>` (+ `cta_label`) directly and skip `content_type` — an explicit `cta`
      always wins over a `content_type` classification. Same for a derivative that shouldn't carry
      a "go read" invite at all (`cta: none`), or any other literal-url case.
+     - **Civic CTAs now have to clear a bar (`references/civic-adaptation.md`, Muxin 2026-08-22).**
+       The mechanics above are unchanged; what goes in them is stricter. A civic CTA has TWO
+       accepted forms, and this is the first of them: a SPECIFIC micro-action the reader can
+       finish in under 5 to 10 minutes (check
+       registration status, look up one race on the next ballot, find a polling place, read one
+       local measure in plain English), not "vote," "get involved," or "stay informed." It must
+       point at something REAL: never invent a link, form, deadline, race, or ballot measure. If
+       the specific thing can't be verified, fall back to the plain voting-tool default rather than
+       fabricating a specific one. Same never-invent guardrail as the `project_url` rule above.
+     - **Belief- or value-aligned matching is the other accepted civic CTA form** (same rubric,
+       table 2). Muxin's words for it: "Based on what you said you care about, here's how these
+       candidates actually voted on X." It clears the bar the same way a micro-action does, and it
+       carries one extra requirement: it must be NEUTRAL and RECORD-BASED, built on an actual vote
+       or an actual position on the record, never a partisan characterization of a candidate, a
+       party, or a side. If the record can't be verified, don't write it at all, don't write it
+       with a caveat, and fall back to the plain voting-tool default. That harder rule is
+       deliberate, not an oversight: a wrong claim about how someone voted is a factual assertion
+       about a real person, not a soft guess, and it's exactly the invented proof rule 1 forbids.
    - **Never write the link into the post body** — `/publish` places it per platform from
      `cta.yaml` `placement` (X → first reply, LinkedIn → first comment, Bluesky/community →
      inline), so the body stays clean and dodges the in-post link penalty. Stacked CTA lines
