@@ -3093,7 +3093,7 @@ function vChoice(m){
     // Only a decision still awaiting her is clickable. A settled one is a record, not a control:
     // decisions.ts refuses a second selection outright (rules.md §11 item 15, immutability).
     const pick = m.live ? ' pick" data-vpick="'+esc(m.decisionId)+'" data-vcand="'+esc(it.candidateId)+'"' : '"';
-    return '<div class="vchoice-row'+(m.live?pick:'"')+'><span class="mark">'+mark+'</span><span>'
+    return '<div class="vchoice-row'+pick+'><span class="mark">'+mark+'</span><span>'
       + '<span class="n">'+esc(it.title)+'</span>'
       + (it.why ? '<span class="w">'+esc(it.why)+'</span>' : "")
       + (it.scoreLine ? '<span class="sc">'+esc(it.scoreLine)+'</span>' : "")

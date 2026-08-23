@@ -402,7 +402,6 @@ test("no route can leak a raw quote or a respondent hash", () => {
       const real = path.replace(":slug", "private");
       seen[real] = JSON.stringify(body(real));
     }
-    void REDACTED_SENTINEL;
 
     for (const [path, text] of Object.entries(seen)) {
       assert.ok(!text.includes(EXACT_SENTINEL), `${path} leaked a raw quote`);
