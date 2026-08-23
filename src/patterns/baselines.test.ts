@@ -277,6 +277,39 @@ describe("a shares-bearing platform", () => {
     assert.equal(honest.metric, "engagement");
   });
 
+  test("a shares count of 0 and a shares of null are not the same statement", () => {
+    // Zero claims nobody shared the post. Null says the platform never offered the number. They
+    // must not be interchangeable, because one belongs in the median and the other cannot.
+    const zeroed = doc.window.map((post) => ({ ...post, metrics: { ...post.metrics, shares: 0 } }));
+    const withZeros = buildBaseline(doc.account, zeroed, {
+      followers: null,
+      method: "fixture window",
+      collected_at: "2026-08-23T12:00:00.000Z",
+    });
+    const nulled = doc.window.map((post) => ({ ...post, metrics: { ...post.metrics, shares: null } }));
+    const withNulls = buildBaseline(doc.account, nulled, {
+      followers: null,
+      method: "fixture window",
+      collected_at: "2026-08-23T12:00:00.000Z",
+    });
+    assert.ok(withZeros);
+    assert.ok(withNulls);
+
+    // A real zero counts: shares stays a term, and it adds nothing because it genuinely was
+    // nothing. A null drops the term entirely.
+    assert.deepEqual(withZeros.terms, ["likes", "comments", "shares"]);
+    assert.deepEqual(withNulls.terms, ["likes", "comments"]);
+    // Same median either way here, which is exactly why the term list has to carry the difference:
+    // the number alone cannot tell you what was counted.
+    assert.equal(withZeros.median, 36);
+    assert.equal(withNulls.median, 36);
+
+    // And the difference lands where it matters, on the numerator. The winner shared 2400 times.
+    const winner = winnerEntry();
+    assert.equal(recordedBaselineMultiple(winner, withZeros)?.multiple, 6000 / 36);
+    assert.equal(recordedBaselineMultiple(winner, withNulls)?.multiple, 3600 / 36);
+  });
+
   test("a sample where only some posts carry shares drops that term from both sides", () => {
     // All-or-nothing per term. A median built from some posts' shares and other posts' silence is
     // not a median of anything, so shares leaves the term list and the numerator loses it too.
