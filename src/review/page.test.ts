@@ -10,7 +10,7 @@ import {
   JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
-  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
+  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -491,8 +491,8 @@ test("stripJobFor: a job only shows in the room it lands in", () => {
 });
 
 test("stripJobFor: a Fiction failure suppresses the strip, so only Fiction's own failure card shows", () => {
-  // No job kind maps to Fiction yet (PR 6 adds the /story draft job), so the rule is exercised
-  // through the injectable resolver. One failure card per screen, never two.
+  // Fiction kinds map for real now, but job() here builds a Content-kind job, so the rule is
+  // exercised through the injectable resolver. One failure card per screen, never two.
   const toFiction = () => "Fiction" as const;
   const failed = [job({ id: "f", status: "failed", finishedAt: 1_000_000 })];
   assert.equal(stripJobFor(failed, "Fiction", 1_000_000, toFiction), null);
@@ -1088,11 +1088,38 @@ test("every route that enqueues a job arms the poll", () => {
     "/api/develop/start", "/api/develop/format", "/api/strategy/refresh-brief", "/api/strategy/insights",
     "/api/strategy/ask-insights", "/api/strategy/pull", "/api/outreach/scout", "/api/outreach/draft",
     "/api/outreach/message/revise", "/api/charles/draft", "/api/followups/draft-follow-up",
+    "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check",
   ]) {
     assert.equal(enqueuesJob(route), true, route + " queues a job, so it must arm the poll");
   }
   assert.equal(enqueuesJob("/api/status"), false, "a status write queues nothing");
   assert.equal(enqueuesJob("/api/outreach/mark-sent"), false);
+});
+
+// The Fiction room shipped its three buttons without adding their routes to the arming list, so
+// from an idle desk jobsPollDue stayed false and pressing Draft it, Second pass or Check the canon
+// showed no progress at all. Fiction does not self-heal either: its refresh only reloads the room,
+// never the jobs. Named on their own so a future edit cannot quietly drop them again.
+test("the Fiction room's three buttons arm the poll, so a scene it is writing is visible", () => {
+  for (const route of ["/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check"]) {
+    assert.equal(enqueuesJob(route), true, route + " enqueues a Fiction job, so it must arm the poll");
+    assert.ok(JOB_ENQUEUE_ROUTES.includes(route), route + " must be in the exported list");
+  }
+  // Reading a scene enqueues nothing, so it must not arm the poll.
+  assert.equal(enqueuesJob("/api/fiction/scene"), false, "a read queues nothing");
+  assert.equal(enqueuesJob("/api/fiction/doc"), false);
+});
+
+// The mirror convention again: the browser has its own copy of this list, and only the copy that
+// ships decides whether Muxin sees the strip.
+test("client <script> output: the Fiction routes reach the browser's arming list too", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+  const list = script.slice(script.indexOf("const JOB_ENQUEUE_ROUTES = ["));
+  const mirrored = list.slice(0, list.indexOf("]"));
+  for (const route of ["/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check"]) {
+    assert.ok(mirrored.includes('"' + route + '"'), route + " must ship in the client mirror");
+  }
 });
 
 // Finding 9: "Update it" on an Outreach thread showed up under Content as the Formatter, because
