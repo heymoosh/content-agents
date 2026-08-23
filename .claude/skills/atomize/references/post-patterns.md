@@ -62,9 +62,12 @@ Three measured contrasts sit behind it:
 - **Shorter than their own average, in 7 of the 10 accounts** with two or more scored posts. Six of
   those are dramatic, from 0.03x to 0.62x of the creator's own mean length. **Two of the seven come
   with a caveat that changes their meaning:** on one LinkedIn account and one Instagram account the
-  short winner was a CAPTION over an image the corpus never captured, so the brevity is a property
-  of the caption, not of the post. Those two are not evidence that short text wins. They are
-  evidence that a visual did work the text did not have to.
+  short winner was a CAPTION over a visual, so the brevity is a property of the caption, not of the
+  post. Those two are not evidence that short text wins. They are evidence that a visual did work
+  the text did not have to. The LinkedIn one is now confirmed: that image was recovered and it
+  carries a full compressed argument, so the post was never short in substance, only in text. The
+  Instagram carousel's slides were still never collected. See the media section below, which turns
+  this caveat into the corpus's strongest measured result.
 - **No link.** In all 4 accounts that had both linked and unlinked posts, the top post was the one
   with no link. **The honest counterexample:** one creator links on all five of his posts and still
   records the highest raw engagement in his platform's set. So this is about relative performance
@@ -87,13 +90,87 @@ short, and the ones that were not are the most instructive:
 
 So "shorter wins" is the wrong lesson and this file does not teach it. The right question to ask of
 a draft is: **what does this give the reader that my ordinary posts do not?** Brevity is one answer.
-A specific person is another. Original labour is another. Having no answer is the failure the
-losing posts in this corpus share.
+A specific person is another. Original labour is another. **A real image is a fourth, and it is the
+only one of the four the corpus can prove**, which is the subject of the next section. Having no
+answer is the failure the losing posts in this corpus share.
 
 **One honest limit.** These are engagement comparisons within a single creator's feed, mostly on
 raw like counts, on posts of different ages, and on platforms where view counts are not public.
 They show relative performance inside an account. They are not controlled experiments, and no
 causal claim here has been tested.
+
+## What form the post takes, and the one thing the corpus can prove about it
+
+**A second run-level finding from the 2026-08-22 mining pass, not a pattern record.** Like the
+section above it, this is something to ask of a draft before reaching for a skeleton. It comes from
+a `media.form` classification on 56 of the 58 corpus entries.
+
+The control that matters here is `body_is_complete`. Some entries are posts whose substance sat in
+something never collected, an image, a carousel, a thread, being scored on engagement that
+substance earned. Dropping those is what separates a real result from an artifact.
+
+| form | all scorable | body-complete only |
+|---|---|---|
+| mixed | 2.74x on 12 | 2.63x on 11 |
+| image | 2.18x on 17 | **2.19x on 13** |
+| text-only | 0.62x on 8 | **0.62x on 8** |
+| carousel | 6.34x on 2 | nothing left |
+| thread | 23.84x on 1 | nothing left |
+| video | 7.69x on 1 | nothing left |
+| short-video | 5.89x on 1 | nothing left |
+
+**There are exactly two defensible claims here. Do not extract a third.**
+
+### 1. A post carrying an image outperforms a text-only post, and this survives every control
+
+2.19x on 13 body-complete entries against 0.62x on 8. It is the most trustworthy result in this
+corpus, and three independent things back it up:
+
+- **Within one account, holding audience and period constant.** One LinkedIn creator's five posts:
+  his four image posts run 5.06x, 1.68x, 0.88x and 0.63x, and his single text-only post is his worst
+  at 0.53x. The gradient inside that is worth as much as the ranking. The more the image carried and
+  the less the caption said, the better the post did.
+- **Convergent professional practice.** 14 of 15 LinkedIn posts in the corpus, from three separate
+  creators who do this for a living, carry an image. They arrived at that independently.
+- **It is not one account's artifact.** The 8 text-only entries span 4 creators on 4 platforms.
+  Excluding the two search-biased X entries, the remaining 6 average 0.78x, still far below the
+  image figure. Bluesky points the same way but weakly, image 8.35x against text-only 0.69x at
+  n=2 per side, which is directional only.
+
+**Where this does NOT apply: Substack.** The Substack numbers look like a win for illustration,
+2.74x on 12 illustrated posts against 0.91x on 3 plain-text ones, and **you should not believe
+them.** All three plain-text posts belong to one author whose absolute numbers dwarf every other
+account in the corpus. That is an account effect wearing a form effect's clothes. **The corpus
+cannot tell whether illustrating a Substack essay helps.** Treat it as an open question.
+
+### 2. Every other form is unmeasured, and that is a collection gap, not a verdict
+
+Carousel, thread, video and short video all lose their entire body-complete sample. Whatever their
+rows say in the left column, the corpus has no controlled evidence about any of them.
+
+**This matters most for short video, so say it plainly: the absence of short video from the
+evidence above is a failure of collection, not a finding about short video.** Short video is the
+second most common form in the corpus at 15 of 58 entries, and only ONE of those 15 is scorable at
+all. The other 14 returned no usable metrics, because the platforms hide play counts and like counts
+from a logged-out reader. All 11 YouTube entries are Shorts, confirmed against the platform's own
+classification at 24 to 159 seconds, vertical and captioned, four of them behind ordinary watch URLs
+that disguised it.
+
+Nothing in this file says short video does not work. This corpus simply cannot see it. A reader who
+concludes otherwise has misread the table, and a future collection run that fixes the metrics
+problem for short video would be the single highest-value improvement to this corpus.
+
+### What to do with this
+
+Ask of any draft: **is this carrying an image, and is the image doing real work?** On LinkedIn the
+answer should almost always be yes, and the corpus's strongest single instance is a post where the
+image carried the whole argument and the text was a lead-in. On Substack the honest answer is that
+nobody knows. On short video there is no answer here at all.
+
+One measure of how far this goes: the single highest-engagement post in the entire corpus, at 38,442
+likes, is 331 characters whose body ends on a photo credit and stops. The photograph is the post.
+Note that this entry is flagged body-incomplete and therefore sits outside the controlled figures
+above, so it illustrates the point rather than proving it.
 
 ## Record format
 
@@ -315,21 +392,27 @@ here rather than repeated in each record.
 - **Mechanism:** a one-line caption carries no information and exists only to frame an attached
   image, which carries every claim the post makes. Seen in 2 posts from 1 creator, and they are that
   creator's top two by a wide margin.
-- **THE WARNING, READ IT BEFORE USING THIS.** The 5.1x outlier behind this pattern is a
-  22-character caption over an image the corpus does not hold. **The corpus cannot show what made
-  the image work.** Anyone who reads this as "write four words and win" will omit the thing that
-  actually did the work and publish an empty post. This record exists to describe a FORM, the
-  caption-plus-visual division of labour, and to warn that its most important half was never
-  captured. It is not a licence to post fragments.
+- **READ THIS BEFORE USING THE TEMPLATE.** The 5.1x outlier behind this pattern is a 22-character
+  caption over an image, and **the image has since been recovered and read**, so this record no
+  longer describes something invisible. What is now known: the image is a vertical quote card,
+  light sans-serif text on a solid dark field, carrying a compressed argument built from one unit of
+  time repeated across four short parallel lines and closing on how that unit compounds over a year.
+  The caption is a lead-in and carries no argument at all. **What is still unknown is why that
+  particular card worked**, because the corpus holds exactly two posts of this form from one
+  creator, with no variants to compare against. So the FORM is evidenced and the craft inside the
+  image is not. Anyone who reads this as "write four words and win" will omit the half that did the
+  work and publish an empty post. This is not a licence to post fragments.
 - **Structure / arc:**
   1. The image carries the entire substance: the claim, the framework, the list, the argument.
   2. The caption does one job only, and it is not summary. In the two collected examples it is
      either a bare plea, or a line asserting that the image matters more than it appears to.
   3. Nothing else. No explanation, no link, no list.
-- **Emotional trigger:** unreadable from the collected text. Whatever the reader felt was produced
-  by the image. The caption's only contribution is a referential gap that gives them a reason to
-  look down.
-- **Immediate personal payoff:** unreadable for the same reason. Any payoff was in the visual.
+- **Emotional trigger:** produced by the image, not the caption. In the recovered example it is the
+  relief of a very small commitment: a unit of effort stated so low that refusing it feels
+  unreasonable, then compounded to make it feel consequential. The caption's only contribution is a
+  referential gap that gives the reader a reason to look down.
+- **Immediate personal payoff:** delivered by the image. In the recovered example, permission to
+  start at an amount the reader cannot argue is too much, plus a reason to believe it adds up.
 - **CTA style:** none in either collected post, and neither carries a link. That is consistent with
   the corpus-wide observation that within an account, the post without a link tends to be the top
   one, but here it may simply be that a caption has no room for one. Do not over-read it.
@@ -343,11 +426,16 @@ here rather than repeated in each record.
   [Nothing else. No explanation, no link.]
   ```
   **Do not use this shape unless the image is genuinely strong enough to carry the post by itself.**
-  The corpus offers no evidence about what makes that image good, so that judgment is entirely
-  Muxin's and nothing here informs it.
+  The corpus can now show one image that worked and what it contained, but two posts from one
+  creator is not enough to say what makes such an image good in general. That judgment is still
+  largely Muxin's.
+  The measured backing for the form itself is in the media section above: image posts run 2.19x
+  against 0.62x for text-only across 13 and 8 body-complete entries.
 - **Real example:** Dan Koe, LinkedIn, his two highest-engagement posts in this corpus, both
-  one-line captions over attached images. The images were not collected. Citation only, do not reuse
-  the wording.
+  one-line captions over attached images. The higher of the two is a dark quote card whose text
+  repeats a single unit of time across four parallel lines. Citation only: describe the shape, never
+  reproduce his lines, and this applies to the text inside the image exactly as it applies to post
+  copy.
 
 ### substack
 
