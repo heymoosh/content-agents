@@ -434,7 +434,7 @@ test("an empty research table reads as unmeasured, but a populated one with no c
 // print one). If this test fails, do not just delete the dash: rewrite the sentence with a period,
 // a comma, a colon, or parentheses, whichever sounds right read aloud.
 const EM_DASH = "—";
-const SIGNALS_READ_MODULES = ["signals.ts", "treatment.ts"];
+const SIGNALS_READ_MODULES = ["signals.ts", "treatment.ts", "fixtures.ts"];
 
 test("no string the Signals read layer can print carries an em dash", () => {
   for (const file of SIGNALS_READ_MODULES) {
