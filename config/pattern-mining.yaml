@@ -2641,6 +2641,31 @@ accounts:
   # collecting voting-poster aesthetics rather than a civic audience. Do not pad them with rows
   # that would collect the wrong thing. Rows here cover adhd, productivity, solopreneur and the
   # lifestyle decay control, which are the four where the archive is real.
+  #
+  # VERIFIED AND AVAILABLE, deliberately not seeded. These eleven were curl-verified during the
+  # 2026-08-23 probe and left out because none of them is a clean fit for the four niches above,
+  # not because anything is wrong with them. Recorded so a future pass can pick one up without
+  # re-fetching all 66 profiles to rediscover it. Every count below was read off that handle's own
+  # profile payload on the date above; a row added from this list still needs its niche chosen and
+  # its board slugs read off the profile.
+  #
+  #   lemonlimeadv      94,142   Dayna | Lemon Lime Adventures      7 boards  (sensory, ADHD-adjacent parenting)
+  #   takecontroladhd    6,794   Take Control ADHD                  8 boards  (ADHD coaching, small but on-topic)
+  #   kidbloggers       85,571   Kid Blogger Network                9 boards  (parenting, ADHD-adjacent)
+  #   mommyevolution   58,957   Mommy Evolution                     9 boards  (parenting)
+  #   sharlajk         373,358   Sharla | The Chaos and the Clutter  0 boards  (no boards surfaced logged out)
+  #   createcultivate  176,668   Create & Cultivate                 9 boards  (women in business)
+  #   careercontessa    80,467   Career Contessa                    7 boards  (careers, not solopreneur)
+  #   classycareer      80,360   Classy Career Girl                 5 boards  (careers)
+  #   hermoney           9,586   HerMoney Media                     8 boards  (personal finance)
+  #   moneycrashers     31,146   Money Crashers                     0 boards  (personal finance)
+  #   prepary            5,673   The Prepary                        7 boards  (job search)
+  #
+  # The last two lines are also the worked example behind the expansion rule. Pinterest's
+  # related-user graph reported careercontessa AND prepary as 80,467 from a third party's page.
+  # Their own pages say 80,467 and 5,673: the graph copied one account's number onto its
+  # neighbour. That is why `patterns:pinterest expand` re-fetches every candidate and why
+  # relatedHandlesFromProps returns names with no number in them at all.
   # ------------------------------------------------------------------------------------------
   - handle: "@additudemag"
     creator: "ADDitude Magazine"

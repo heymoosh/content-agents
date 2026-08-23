@@ -8,7 +8,8 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   PinterestBlockedError,
@@ -33,6 +34,7 @@ import {
   type EntryContext,
 } from "./pinterest.js";
 import { validateEntry, loadConfig } from "./collect.js";
+import { appendEntries, readCorpus } from "./corpus.js";
 import { classifyOutlier } from "./outliers.js";
 import type { CorpusEntry } from "./types.js";
 
@@ -458,6 +460,40 @@ describe("the on-image text this collector deliberately does not have", () => {
     const entry = toStagedEntry({ ...pin, imageUrl: null }, CTX)!;
     assert.equal(entry.media?.asset_url, null);
     assert.match(entry.notes!, /cannot recover its words/);
+  });
+
+  // The whole point of asset_url is that a transcription pass run weeks from now finds the image
+  // urls waiting for it. That only holds if the field survives every hop between here and the
+  // corpus file, so this walks the real one: stage as JSON, validate, append, read back off disk.
+  test("asset_url survives the full stage, validate, append and read-back round trip", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pinterest-roundtrip-"));
+    try {
+      const corpusPath = join(dir, "corpus.jsonl");
+      const staged = [archivePin, recentPin].map((html, index) => {
+        const entry = toStagedEntry(parsePin(html, `pin-${index}`)!, { ...CTX, rank: index + 1 });
+        assert.ok(entry);
+        return entry;
+      });
+      // Through JSON, the way a staged inbox file reaches the collect step.
+      const reread = JSON.parse(JSON.stringify(staged)) as unknown[];
+      const validated = reread.map((raw) => {
+        const { entry, errors } = validateEntry(raw, loadConfig());
+        assert.deepEqual(errors, []);
+        assert.ok(entry);
+        return entry;
+      });
+      appendEntries(validated, corpusPath);
+      const fromDisk = readCorpus(corpusPath);
+      assert.equal(fromDisk.length, 2);
+      for (const entry of fromDisk) {
+        assert.match(entry.media?.asset_url ?? "", /^https:\/\/i\.pinimg\.com\/originals\//);
+        // And the two facts that must never be promoted along the way.
+        assert.equal(entry.media?.onscreen_text, null);
+        assert.equal(entry.media?.body_is_complete, false);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("asset_url survives the corpus validator", () => {
