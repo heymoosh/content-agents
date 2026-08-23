@@ -386,3 +386,39 @@ test("none of the design prototype's invented numbers appear in the signals sour
     );
   }
 });
+
+test("an empty research table reads as unmeasured, but a populated one with no conversation reads as a real zero", () => {
+  // schema.sql always creates research_observations, so its existence proves nothing about whether
+  // capture ever ran. Empty means we never looked; populated-but-nonconversational means nobody
+  // replied, which is a genuine measurement of zero.
+  const empty = fixtureDb();
+  try {
+    seedPost(empty, { id: 1, platform: "bluesky", posted_at: "2026-07-01T00:00:00Z" }, { likes: 1 });
+    const read = readOutcomeFamilies(empty, { generatedAt: "2026-08-12T00:00:00Z" }).conversation;
+    assert.equal(read.research_observations.state, "not_measured");
+    assert.match((read.research_observations as { reason: string }).reason, /unmeasured, not zero replies/);
+  } finally {
+    empty.close();
+  }
+
+  const populated = fixtureDb();
+  try {
+    seedPost(populated, { id: 1, platform: "bluesky", posted_at: "2026-07-01T00:00:00Z" }, { likes: 1 });
+    populated
+      .prepare(
+        `INSERT INTO research_observations (
+           observation_id, source, source_platform, observed_at, captured_at, privacy_class
+         ) VALUES ('o-1', 'creator_observation', 'substack', '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z', 'public')`
+      )
+      .run();
+    const read = readOutcomeFamilies(populated, { generatedAt: "2026-08-12T00:00:00Z" }).conversation;
+    assert.deepEqual(read.research_observations, {
+      state: "measured",
+      value: 0,
+      posts_measured: 0,
+      posts_unmeasured: 0,
+    });
+  } finally {
+    populated.close();
+  }
+});

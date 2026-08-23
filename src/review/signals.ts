@@ -336,6 +336,26 @@ function conversationResearch(db: Database.Database): { total: MetricRead; bySou
       bySource: {},
     };
   }
+  // The table almost always EXISTS on the real database — schema.sql creates it and openDb() execs
+  // schema.sql — so its existence proves nothing about whether capture ever ran. An empty table is
+  // "we never looked", not "nobody replied", and reporting it as a measured zero would be exactly
+  // the collapse this read exists to prevent. Once ANY observation exists, capture has run, and a
+  // zero conversational count is then a real measurement.
+  const observations = (
+    db.prepare("SELECT COUNT(*) AS count FROM research_observations").get() as { count: number }
+  ).count;
+  if (observations === 0) {
+    const configured = Boolean(process.env.RESEARCH_HASH_KEY && process.env.RESEARCH_HASH_KEY.trim());
+    return {
+      total: {
+        state: "not_measured",
+        reason: configured
+          ? "the research_observations table is empty — capture is configured but has not recorded anything yet, so this is unmeasured, not zero replies"
+          : "RESEARCH_HASH_KEY is not set, so research capture cannot write observations (src/research/store.ts:26) and the table is empty — unmeasured, not zero replies",
+      },
+      bySource: {},
+    };
+  }
   const placeholders = CONVERSATION_RESEARCH_SOURCES.map(() => "?").join(", ");
   const rows = db
     .prepare(
