@@ -38,7 +38,7 @@ export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): str
 
 // Pure, DOM-free mirror of the inline logic the client <script> below uses to clear its
 // storyboardSlugs in-flight registry once a piece's real "Generate storyboard" video job actually
-// resolves (done or failed) — not the instant the click fires (card fbfea28b: the old row.storyboardQueued
+// resolves (done, failed, or stopped by Muxin) — not the instant the click fires (card fbfea28b: the old row.storyboardQueued
 // flag lived until the NEXT full /api/queue refresh, with nothing clearing it on the job's own
 // completion). True once at least one video job exists for the slug and none of that slug's video
 // jobs are still queued/running; false while the queue hasn't caught up yet (no job for the slug
@@ -46,7 +46,7 @@ export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): str
 export function storyboardJobDone(jobs: { kind: string; slugs?: string[]; status: string }[], slug: string): boolean {
   const forSlug = jobs.filter((j) => j.kind === "video" && (j.slugs || []).includes(slug));
   if (!forSlug.length) return false;
-  return forSlug.every((j) => j.status === "done" || j.status === "failed");
+  return forSlug.every((j) => j.status === "done" || j.status === "failed" || j.status === "stopped");
 }
 
 // Pure, DOM-free mirror of the inline fmtElapsed(ms) helper the client <script> below uses. It is
@@ -104,7 +104,7 @@ export interface JobView {
   id: string;
   kind: string;
   label: string;
-  status: string; // "queued" | "running" | "blocked" | "done" | "failed"
+  status: string; // "queued" | "running" | "blocked" | "done" | "failed" | "stopped"
   error?: string | null;
   elapsedMs?: number | null;
   lastStdoutLine?: string | null;
@@ -128,7 +128,7 @@ export const JOB_COLORS = {
   red: "#9a2f2f",
   grey: "#d8d2c6", // dot grey
   greyFg: "#a89a80", // the muted text that goes with it
-  blue: "#2f5d9a", // Muxin's own words (the "You said:" line)
+  blue: "#2f5d9a", // Muxin's own hand: the "You said:" line, and the Stop she pressed herself
 } as const;
 
 // Which room a job lands in. Drives the rail label on `done`, the "Watch it in <Room>" link, the
@@ -171,6 +171,9 @@ export function jobRailLabel(job: JobView): { text: string; color: string } {
   if (job.status === "blocked") return job.answer
     ? { text: "You answered", color: JOB_COLORS.green }
     : { text: "Needs you", color: JOB_COLORS.amber };
+  // She pressed Stop. That is neither a break nor work in flight, so it wears neither the red nor
+  // the AI purple: blue is her own hand on this screen (see jobAnswerEcho), and this run ended by it.
+  if (job.status === "stopped") return { text: "You stopped it", color: JOB_COLORS.blue };
   if (job.status === "done") return { text: jobRoom(job.kind), color: JOB_COLORS.green };
   if (job.status === "queued") return { text: "Waiting its turn", color: JOB_COLORS.greyFg };
   return { text: "Working", color: JOB_COLORS.ai };
@@ -180,6 +183,9 @@ export function jobRailLabel(job: JobView): { text: string; color: string } {
 export function jobClockText(job: JobView, ahead: number): string {
   if (job.status === "queued") return `${ahead} ahead of it`;
   if (job.status === "failed") return `stopped after ${jobElapsedText(job.elapsedMs)}`;
+  // Frozen at finishedAt like every other landed job, and measured: a job stopped while queued
+  // never started, so it has no elapsed time to show and says exactly that.
+  if (job.status === "stopped") return job.elapsedMs == null ? "not started" : `ran for ${jobElapsedText(job.elapsedMs)}`;
   if (job.status === "done") return `took ${jobElapsedText(job.elapsedMs)}`;
   return jobElapsedText(job.elapsedMs); // running ticks, blocked is frozen by jobElapsedMs itself
 }
@@ -214,6 +220,11 @@ export function jobStepDots(job: JobView): { text: string; state: DotState }[] {
     const at = Math.min(step, steps.length - 1);
     return steps.map((text, i) => ({ text, state: i === at ? "blocked" : i < at ? "done" : "pending" }));
   }
+  if (job.status === "stopped") {
+    // The completed steps are real. The one it was inside never finished, so it is not "current"
+    // (nothing is in flight) and not "failed" either (nothing broke). It is simply not done.
+    return steps.map((text, i) => ({ text, state: (i < step ? "done" : "pending") as DotState }));
+  }
   return steps.map((text, i) => ({ text, state: i < step ? "done" : i === step ? "current" : "pending" }));
 }
 
@@ -240,6 +251,11 @@ export function jobProgressPct(job: JobView): number | null {
 // flipping the same job to done.
 export const ANSWERED_FOOTER = "You answered. A fresh job is running it from the start.";
 
+// Muxin pressed Stop it. It names her as the one who ended the run, and it refuses to guess what
+// reached disk: a subprocess killed mid-run may well have written something, so the failure copy's
+// "Nothing was written." is a claim this screen cannot make about a stop.
+export const STOPPED_FOOTER = "You stopped this one. It did not finish.";
+
 // The echo of Muxin's own choice, set in her blue rather than the AI purple.
 export function jobAnswerEcho(job: JobView): string {
   return job.answer ? `You said: ${job.answer}` : "";
@@ -247,6 +263,7 @@ export function jobAnswerEcho(job: JobView): string {
 
 export function jobFooter(job: JobView): string {
   if (job.status === "failed") return "It stopped where the red dot is. Nothing was written.";
+  if (job.status === "stopped") return STOPPED_FOOTER;
   if (job.status === "blocked") return job.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
   if (job.status === "done") return jobLandingSentence(jobRoom(job.kind));
   if (job.status === "queued") return "One job runs at a time, so this starts when the one above finishes.";
@@ -257,6 +274,7 @@ export function jobFooter(job: JobView): string {
 export function jobLogLine(job: JobView): string {
   const path = job.logPath || "";
   if (job.status === "failed") return `> stopped at ${path}`;
+  if (job.status === "stopped") return "> stopped, you ended it";
   if (job.status === "blocked") return job.answer ? "> stopped, you answered it" : "> stopped, waiting on your answer";
   if (job.status === "queued") return "> waiting for a slot";
   if (job.status === "done") return `> wrote to ${path}`;
@@ -264,6 +282,9 @@ export function jobLogLine(job: JobView): string {
 }
 
 export function jobOpenLabel(job: JobView): string {
+  // "Watch it" would promise motion a stopped job no longer has, and "Read it" would promise an
+  // artifact it may never have written. The room is still worth opening. That is the whole claim.
+  if (job.status === "stopped") return `Open ${jobRoom(job.kind)}`;
   return `${job.status === "done" ? "Read it in" : "Watch it in"} ${jobRoom(job.kind)}`;
 }
 
@@ -389,9 +410,20 @@ export function jobAwaitingAnswer(job: JobView): boolean {
   return job.status === "blocked" && !job.answer;
 }
 
-// Finished as far as every surface is concerned: a clean `done`, or an answered ask.
+// Finished as far as every surface is concerned: a clean `done`, a job Muxin stopped, or an
+// answered ask. `stopped` belongs here for the same reason jobs.ts lets Clear finished sweep it —
+// it is finished work by her own decision, with nothing left for her to act on. `failed` is still
+// deliberately absent: it holds its strip until she has seen it.
 export function jobSettled(job: JobView): boolean {
-  return job.status === "done" || (job.status === "blocked" && !!job.answer);
+  return job.status === "done" || job.status === "stopped" || (job.status === "blocked" && !!job.answer);
+}
+
+// Where "Stop it" is offered. stopJob() no-ops on anything already settled (it hands back
+// `stopped: false` and changes nothing), so a control on those rows would do nothing at all. A
+// blocked job is settled too, and stopping it would throw away a question she has not answered
+// yet, which is a decision nobody has made. Queued and running work only.
+export function jobStopOffered(job: JobView): boolean {
+  return job.status === "queued" || job.status === "running";
 }
 
 // Whether the job poll should fire this beat. Queued or running work obviously needs it, but so
@@ -452,6 +484,7 @@ export function stripRailLabel(job: JobView): { text: string; color: string } {
   if (job.status === "blocked") return job.answer
     ? { text: "You answered", color: JOB_COLORS.green }
     : { text: "Stopped, needs you", color: JOB_COLORS.amber };
+  if (job.status === "stopped") return { text: "You stopped it", color: JOB_COLORS.blue };
   if (job.status === "done") return { text: "Just finished", color: JOB_COLORS.green };
   if (job.status === "queued") return { text: "Waiting its turn", color: JOB_COLORS.greyFg };
   return { text: "Working now", color: JOB_COLORS.ai };
@@ -460,12 +493,14 @@ export function stripRailLabel(job: JobView): { text: string; color: string } {
 export function stripClockText(job: JobView): string {
   if (job.status === "queued") return "not started";
   if (job.status === "failed") return `stopped after ${jobElapsedText(job.elapsedMs)}`;
+  if (job.status === "stopped") return job.elapsedMs == null ? "not started" : `ran for ${jobElapsedText(job.elapsedMs)}`;
   if (job.status === "done") return `took ${jobElapsedText(job.elapsedMs)}`;
   return jobElapsedText(job.elapsedMs);
 }
 
 export function stripFooter(job: JobView): string {
   if (job.status === "failed") return "It stopped where the red dot is. Nothing was written.";
+  if (job.status === "stopped") return STOPPED_FOOTER;
   if (job.status === "blocked") return job.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
   if (job.status === "done") return jobLandingSentence(jobRoom(job.kind));
   if (job.status === "queued") return "One job runs at a time. This starts when the current one finishes.";
@@ -1180,6 +1215,10 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     overflow-wrap:anywhere; }
   .jrow-tail .grow { flex:1; }
   .jrow-tail a { font-size:12.5px; color:#7a7266; border-bottom:1px solid #d8cfbb; text-decoration:none; white-space:nowrap; }
+  .jrow-tail button.jstop { border:1px solid #d8cfbb; background:var(--card); color:#7a7266; border-radius:6px;
+    padding:4px 12px; font-size:12.5px; white-space:nowrap; cursor:pointer; }
+  .jrow-tail button.jstop:hover { border-color:#b9ada0; color:var(--ink); }
+  .room-strip .jrow-tail { border-top:none; padding-top:6px; margin-top:8px; }
   /* The destination room's progress strip: same data, its own shorter strings. */
   .room-strip { border-top:1px solid #dfd4bb; border-bottom:1px solid #efe7d6; padding:15px 0 17px;
     margin-bottom:28px; max-width:600px; }
@@ -3246,10 +3285,14 @@ function fmtElapsed(ms){
 const JC = { ai:"#5b46b8", amber:"#9a6b12", green:"#2f7d46", red:"#9a2f2f", grey:"#d8d2c6", greyFg:"#a89a80", blue:"#2f5d9a" };
 const STRIP_LINGER_MS = 9000;
 const JOBS_POLL_MS = 3000;
-// Mirrors jobAwaitingAnswer/jobSettled/jobsPollDue/enqueuesJob in this file's Node-side export,
-// kept in sync by hand. An answered ask is settled work: it stops reading as "waiting on you".
+// Mirrors jobAwaitingAnswer/jobSettled/jobStopOffered/jobsPollDue/enqueuesJob in this file's
+// Node-side export, kept in sync by hand. An answered ask is settled work: it stops reading as
+// "waiting on you". So is a job she stopped herself: it is finished, by her decision.
 function jobAwaitingAnswer(j){ return j.status==="blocked" && !j.answer; }
-function jobSettled(j){ return j.status==="done" || (j.status==="blocked" && !!j.answer); }
+function jobSettled(j){ return j.status==="done" || j.status==="stopped" || (j.status==="blocked" && !!j.answer); }
+// Stop is offered only where it can act: queued or running. Everything else has already settled,
+// where the route no-ops, and a blocked job's stop would discard a question she has not answered.
+function jobStopOffered(j){ return j.status==="queued" || j.status==="running"; }
 function jobsPollDue(jobs, now, armedUntil){
   if(now < (armedUntil||0)) return true;
   if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
@@ -3276,6 +3319,7 @@ function jobElapsedText(ms){ return ms==null ? "not started" : fmtElapsed(ms); }
 function jobRail(j){
   if(j.status==="failed") return {text:"Did not work", color:JC.red};
   if(j.status==="blocked") return j.answer ? {text:"You answered", color:JC.green} : {text:"Needs you", color:JC.amber};
+  if(j.status==="stopped") return {text:"You stopped it", color:JC.blue};
   if(j.status==="done") return {text:jobRoom(j.kind), color:JC.green};
   if(j.status==="queued") return {text:"Waiting its turn", color:JC.greyFg};
   return {text:"Working", color:JC.ai};
@@ -3287,6 +3331,7 @@ function jobsAhead(jobs, j){
 function jobClock(j, ahead){
   if(j.status==="queued") return ahead+" ahead of it";
   if(j.status==="failed") return "stopped after "+jobElapsedText(j.elapsedMs);
+  if(j.status==="stopped") return j.elapsedMs==null ? "not started" : "ran for "+jobElapsedText(j.elapsedMs);
   if(j.status==="done") return "took "+jobElapsedText(j.elapsedMs);
   return jobElapsedText(j.elapsedMs);
 }
@@ -3300,6 +3345,9 @@ function jobStepDots(j){
     return steps.map((t,i)=>({text:t,state: at==null?"pending" : i===at?"failed" : i<at?"done":"pending"})); }
   if(j.status==="blocked"){ const at=Math.min(step, steps.length-1);
     return steps.map((t,i)=>({text:t,state: i===at?"blocked" : i<at?"done":"pending"})); }
+  // Stopped: the completed steps are real, the one it was inside never finished. Nothing is in
+  // flight, so no dot is "current", and nothing broke, so none is "failed".
+  if(j.status==="stopped") return steps.map((t,i)=>({text:t,state: i<step?"done":"pending"}));
   return steps.map((t,i)=>({text:t,state: i<step?"done" : i===step?"current":"pending"}));
 }
 function dotColor(state){
@@ -3307,9 +3355,11 @@ function dotColor(state){
 }
 function jobProgressPct(j){ return !j.stepTotal ? null : Math.round((Math.min(j.step||0, j.stepTotal)/j.stepTotal)*100); }
 const ANSWERED_FOOTER = "You answered. A fresh job is running it from the start.";
+const STOPPED_FOOTER = "You stopped this one. It did not finish.";
 function jobAnswerEcho(j){ return j.answer ? "You said: "+j.answer : ""; }
 function jobFooter(j){
   if(j.status==="failed") return "It stopped where the red dot is. Nothing was written.";
+  if(j.status==="stopped") return STOPPED_FOOTER;
   if(j.status==="blocked") return j.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
   if(j.status==="done") return jobLanding(jobRoom(j.kind));
   if(j.status==="queued") return "One job runs at a time, so this starts when the one above finishes.";
@@ -3318,12 +3368,22 @@ function jobFooter(j){
 function jobLogLine(j){
   const path = j.logPath||"";
   if(j.status==="failed") return "> stopped at "+path;
+  if(j.status==="stopped") return "> stopped, you ended it";
   if(j.status==="blocked") return j.answer ? "> stopped, you answered it" : "> stopped, waiting on your answer";
   if(j.status==="queued") return "> waiting for a slot";
   if(j.status==="done") return "> wrote to "+path;
   return "> reading "+path+" ...";
 }
-function jobOpenLabel(j){ return (j.status==="done" ? "Read it in " : "Watch it in ") + jobRoom(j.kind); }
+function jobOpenLabel(j){
+  // "Watch it" would promise motion a stopped job no longer has; "Read it" would promise an
+  // artifact it may never have written. Opening the room is all this one claims.
+  if(j.status==="stopped") return "Open " + jobRoom(j.kind);
+  return (j.status==="done" ? "Read it in " : "Watch it in ") + jobRoom(j.kind);
+}
+// The per-job Stop control, on the two surfaces a live job appears on. Same button, same handler.
+function stopBtnHtml(j){
+  return jobStopOffered(j) ? '<button class="jstop" data-id="'+esc(j.id)+'">Stop it</button>' : "";
+}
 function stepsHtml(dots){
   return dots.map(d=>'<div class="jstep '+d.state+'"><i style="background:'+dotColor(d.state)+'"></i><span>'+esc(d.text)+'</span></div>').join("");
 }
@@ -3343,7 +3403,8 @@ function askBoxHtml(j){
 function renderJobs(){
   const box = $("#jobs"); box.innerHTML = "";
   if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above. 🌱</div>'; return; }
-  const clearable = JOBS.some(j=>j.status==="done"||j.status==="failed");
+  // Matches jobIsSweepable in jobs.ts, which takes a stopped job too: it is finished work.
+  const clearable = JOBS.some(j=>j.status==="done"||j.status==="failed"||j.status==="stopped");
   let html = '<div class="jobs-head"><h3>Queue</h3>'+(clearable?'<button id="clearJobsBtn">Clear queue</button>':'')+'</div>';
   for(const j of [...JOBS].reverse()){
     const rail = jobRail(j), pct = jobProgressPct(j), dots = jobStepDots(j);
@@ -3362,6 +3423,7 @@ function renderJobs(){
       '<div class="jrow-tail">'+
         (j.status!=="queued" ? '<span class="jpath">'+esc(jobLogLine(j))+'</span>' : "")+
         '<span class="grow"></span>'+
+        stopBtnHtml(j)+
         (j.startedAt ? '<a href="/api/jobs/'+encodeURIComponent(j.id)+'/log" target="_blank">Open the log</a>' : "")+
         '<a href="#" class="jopen" data-room="'+esc(jobRoom(j.kind).toLowerCase())+'"'+(j.slugs&&j.slugs.length?' data-slug="'+esc(j.slugs[0])+'"':'')+'>'+esc(jobOpenLabel(j))+'</a>'+
       '</div></div>';
@@ -3376,6 +3438,7 @@ function renderJobs(){
   }));
   box.querySelectorAll("button.jans").forEach(b=>b.addEventListener("click",()=>answerJob(b.dataset.id, b.dataset.opt)));
   box.querySelectorAll("button.jretry").forEach(b=>b.addEventListener("click",()=>retryJob(b.dataset.id)));
+  box.querySelectorAll("button.jstop").forEach(b=>b.addEventListener("click",()=>stopJob(b.dataset.id)));
 }
 async function answerJob(id, answer){
   const r = await post("/api/jobs/"+encodeURIComponent(id)+"/answer",{answer});
@@ -3384,6 +3447,16 @@ async function answerJob(id, answer){
 async function retryJob(id){
   const r = await post("/api/jobs/"+encodeURIComponent(id)+"/retry",{});
   if(r.ok) loadJobs(); else flash(r.error || "Could not run it again");
+}
+// Stop ONE job. The response's status field is deliberately NOT read: for a running subprocess the
+// route answers the instant SIGTERM goes out, and the job settles a beat later in its own close
+// handler, so any status this toast quoted could already be stale. The next poll renders the truth.
+// A false "stopped" means it had already settled and nothing changed, which is not a success to claim.
+async function stopJob(id){
+  const r = await post("/api/jobs/"+encodeURIComponent(id)+"/stop",{});
+  if(!r.ok){ flash(r.error || "Could not stop it"); return; }
+  flash(r.stopped ? "Stopping it." : "Too late, it had already stopped on its own.");
+  loadJobs();
 }
 // The destination room's progress strip. Lingers STRIP_LINGER_MS after a job finishes so arriving
 // late still shows what happened; a blocked or failed job holds it until it is acted on. Fiction
@@ -3404,6 +3477,7 @@ function stripJobFor(jobs, room, now, roomOf){
 function stripRail(j){
   if(j.status==="failed") return {text:"Did not work", color:JC.red};
   if(j.status==="blocked") return j.answer ? {text:"You answered", color:JC.green} : {text:"Stopped, needs you", color:JC.amber};
+  if(j.status==="stopped") return {text:"You stopped it", color:JC.blue};
   if(j.status==="done") return {text:"Just finished", color:JC.green};
   if(j.status==="queued") return {text:"Waiting its turn", color:JC.greyFg};
   return {text:"Working now", color:JC.ai};
@@ -3411,11 +3485,13 @@ function stripRail(j){
 function stripClock(j){
   if(j.status==="queued") return "not started";
   if(j.status==="failed") return "stopped after "+jobElapsedText(j.elapsedMs);
+  if(j.status==="stopped") return j.elapsedMs==null ? "not started" : "ran for "+jobElapsedText(j.elapsedMs);
   if(j.status==="done") return "took "+jobElapsedText(j.elapsedMs);
   return jobElapsedText(j.elapsedMs);
 }
 function stripFooter(j){
   if(j.status==="failed") return "It stopped where the red dot is. Nothing was written.";
+  if(j.status==="stopped") return STOPPED_FOOTER;
   if(j.status==="blocked") return j.answer ? ANSWERED_FOOTER : "It stops here until you answer. Nothing is written in the meantime.";
   if(j.status==="done") return jobLanding(jobRoom(j.kind));
   if(j.status==="queued") return "One job runs at a time. This starts when the current one finishes.";
@@ -3438,9 +3514,12 @@ function renderRoomStrips(){
         (j.answer ? '<div class="jstep done"><i style="background:'+JC.blue+'"></i><span style="font-family:Georgia,serif">'+esc(jobAnswerEcho(j))+'</span></div>' : "")+
         '</div>' : "")+
       askBoxHtml(j)+
-      '<div class="jfoot">'+esc(stripFooter(j))+'</div></div>';
+      '<div class="jfoot">'+esc(stripFooter(j))+'</div>'+
+      (jobStopOffered(j) ? '<div class="jrow-tail"><span class="grow"></span>'+stopBtnHtml(j)+'</div>' : "")+
+      '</div>';
     box.querySelectorAll("button.jans").forEach(b=>b.addEventListener("click",()=>answerJob(b.dataset.id, b.dataset.opt)));
     box.querySelectorAll("button.jretry").forEach(b=>b.addEventListener("click",()=>retryJob(b.dataset.id)));
+    box.querySelectorAll("button.jstop").forEach(b=>b.addEventListener("click",()=>stopJob(b.dataset.id)));
   }
 }
 // Studio's team rail. Live rows come from the jobs themselves, named for the room each lands in;
@@ -3501,13 +3580,13 @@ async function loadJobs(){
     renderJobs();
     renderRoomStrips();
     renderTeamRail();
-    // Clear a slug's "generating storyboard…" hint once its real video job actually resolves (done
-    // or failed) — inline mirror of storyboardJobDone() in this file's exported section (client
+    // Clear a slug's "generating storyboard…" hint once its real video job actually resolves (done,
+    // failed, or stopped by Muxin) — inline mirror of storyboardJobDone() in this file's exported section (client
     // script can't import it; kept in sync by hand, card fbfea28b). Runs before load() below so the
     // rebuilt review rows already reflect the cleared state instead of racing it.
     for(const slug of [...storyboardSlugs]){
       const forSlug = JOBS.filter(j=>j.kind==="video" && (j.slugs||[]).includes(slug));
-      if(forSlug.length && forSlug.every(j=>j.status==="done"||j.status==="failed")) storyboardSlugs.delete(slug);
+      if(forSlug.length && forSlug.every(j=>j.status==="done"||j.status==="failed"||j.status==="stopped")) storyboardSlugs.delete(slug);
     }
     if(before !== JSON.stringify(JOBS.map(j=>[j.id,j.status]))){
       load(); // a job moved → refresh review rows
