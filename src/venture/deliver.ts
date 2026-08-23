@@ -7,7 +7,7 @@ import { claimSlots, readLedger, releaseClaims, fmtLa, type Claim } from "../pub
 import { checkReuse } from "../publish/reuse-guard.js";
 import { postNoteToSubstack, type PostContext, type PostFn } from "../publish/substack.js";
 import { PullError } from "../pull/errors.js";
-import { loadRules, requireRulesVersionMatch } from "./rules.js";
+import { loadRules, artifactKindRule, evidenceMeetsMinimum, requireRulesVersionMatch } from "./rules.js";
 
 // The ONLY place venture content leaves the repo. Two paths, per rules.md §5.4/§5.5 + the
 // artifact-kind table (venture/rules.yaml):
@@ -142,25 +142,56 @@ export async function deliverVenture(slug: string, opts: DeliverOptions = {}): P
   return results;
 }
 
-// Muxin's confirmation after pasting a manual (essay) artifact herself. The one place a `url`
-// evidence type gets written for a manual-kind artifact.
-export function confirmManualDelivery(slug: string, artifactId: string, url: string, at: string): void {
-  requireRulesVersionMatch(slug, loadRules());
+// What Muxin states when she confirms a manual artifact herself. venture-schema-contract.md §2.2
+// offers "Confirm live (URL or attestation)" on every manual row, and §4 reserves `attestation` for
+// things with no addressable trace at all -- an email sequence being active, a note sent by hand.
+// Both `welcome-email` and `thank-you-note` are exactly that, so a url-only confirm path could
+// never satisfy them without her inventing a link.
+export type ManualProof = { type: "url" | "attestation"; value: string };
+
+// Muxin's confirmation after putting a manual artifact live herself. The one place a manual-kind
+// artifact's evidence gets written.
+//
+// It refuses a proof that cannot clear the kind's floor rather than writing it. Confirming requires
+// `handed_off` and there is no second confirm, so an attestation on a url-minimum kind would strand
+// the artifact: the only way out is a retraction, which records "this was public and came down" in
+// canon -- a false entry written to undo a typing mistake. Same rule the checkpoint enforces,
+// applied while it is still correctable.
+export function confirmManualDelivery(slug: string, artifactId: string, proof: ManualProof, at: string): void {
+  const rules = loadRules();
+  requireRulesVersionMatch(slug, rules);
   const a = readArtifact(slug, artifactId);
   if (!a) throw new Error(`no such artifact: ${artifactId}`);
   if (a.delivery_mode !== "manual") throw new Error(`${artifactId} is not a manual-delivery artifact`);
   if (a.delivery_status !== "handed_off") {
     throw new Error(`${artifactId} is ${a.delivery_status}, not handed_off -- run deliver first`);
   }
+  if (!proof.value.trim()) {
+    throw new Error(`a ${proof.type} confirmation needs a value -- never confirm on Muxin's behalf`);
+  }
+  const min = artifactKindRule(rules, a.artifact_kind).min_evidence;
+  if (!evidenceMeetsMinimum(proof.type, min)) {
+    throw new Error(
+      `${artifactId} is a ${a.artifact_kind}, which needs "${min}" evidence -- a ${proof.type} cannot stand in for it. ` +
+        (min === "url"
+          ? "Put it live, then confirm it with --url <live-url>: a link can be re-checked later, a sentence cannot."
+          : "This kind is confirmed by the delivery agent, not by hand.")
+    );
+  }
   transitionArtifact(
     slug,
     artifactId,
-    { delivery_status: "live_confirmed", evidence: { type: "url", value: url, confirmed_by: "muxin", confirmed_at: at } },
+    {
+      delivery_status: "live_confirmed",
+      evidence: { type: proof.type, value: proof.value, confirmed_by: "muxin", confirmed_at: at },
+    },
     at
   );
 }
 
-const USAGE = "usage: tsx src/venture/deliver.ts <slug> | tsx src/venture/deliver.ts confirm <slug> <artifact_id> --url <live-url>";
+const USAGE =
+  "usage: tsx src/venture/deliver.ts <slug> | " +
+  'tsx src/venture/deliver.ts confirm <slug> <artifact_id> (--url <live-url> | --attestation "<what you state>")';
 
 function main() {
   const [, , first, ...rest] = process.argv;
@@ -172,14 +203,19 @@ function main() {
   if (first === "confirm") {
     const [slug, artifactId] = rest;
     const urlIdx = process.argv.indexOf("--url");
+    const attIdx = process.argv.indexOf("--attestation");
     const url = urlIdx >= 0 ? process.argv[urlIdx + 1] : undefined;
-    if (!slug || !artifactId || !url) {
+    const attestation = attIdx >= 0 ? process.argv[attIdx + 1] : undefined;
+    // Exactly one. Both at once is ambiguous about which fact is being recorded, and §4 keeps a
+    // checkable link and Muxin's own sentence deliberately distinct.
+    if (!slug || !artifactId || (!url && !attestation) || (url && attestation)) {
       console.error(USAGE);
       process.exit(1);
     }
     try {
-      confirmManualDelivery(slug, artifactId, url!, new Date().toISOString());
-      console.log(`${artifactId} confirmed live: ${url}`);
+      const proof: ManualProof = url ? { type: "url", value: url } : { type: "attestation", value: attestation! };
+      confirmManualDelivery(slug, artifactId, proof, new Date().toISOString());
+      console.log(`${artifactId} confirmed live by ${proof.type}: ${proof.value}`);
     } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exit(1);

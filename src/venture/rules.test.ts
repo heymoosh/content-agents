@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { loadRules, assertRulesVersion, artifactKindRule, requireRulesVersionMatch, RulesVersionMismatchError } from "./rules.js";
+import { loadRules, assertRulesVersion, artifactKindRule, evidenceMeetsMinimum, requireRulesVersionMatch, RulesVersionMismatchError } from "./rules.js";
 import { appendCanonEvent } from "./canon.js";
 import { SCORECARD_FIXED } from "./intake.js";
 import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
@@ -402,5 +402,47 @@ describe("artifactKindRule", () => {
 
   test("throws on an unknown artifact kind rather than returning undefined", () => {
     assert.throws(() => artifactKindRule(rules, "bogus-kind" as never), /no artifact_kinds entry/);
+  });
+});
+
+// venture-schema-contract.md §4 calls min_evidence a MINIMUM. It was read as exact equality, which
+// made "attestation" a minimum nothing could satisfy: the only confirm path wrote "url", so
+// welcome-email and thank-you-note could never be complete and checkpoint 2 could never clear.
+describe("evidenceMeetsMinimum -- min_evidence is a floor, not an exact type", () => {
+  test("an attestation minimum is cleared by anything that leaves at least as much trace", () => {
+    assert.equal(evidenceMeetsMinimum("attestation", "attestation"), true);
+    assert.equal(evidenceMeetsMinimum("url", "attestation"), true, "a link is checkable, a sentence is not");
+    assert.equal(evidenceMeetsMinimum("agent", "attestation"), true);
+  });
+
+  test("an attestation alone never stands in for a checkable proof", () => {
+    assert.equal(evidenceMeetsMinimum("attestation", "url"), false);
+    assert.equal(evidenceMeetsMinimum("attestation", "agent"), false);
+  });
+
+  // §4: "An agent confirmation and Muxin's own word are not the same fact and must not look the
+  // same." So the order is partial. url and agent both clear an attestation floor and neither
+  // stands in for the other.
+  test("url and agent are not interchangeable with each other", () => {
+    assert.equal(evidenceMeetsMinimum("url", "url"), true);
+    assert.equal(evidenceMeetsMinimum("agent", "agent"), true);
+    assert.equal(evidenceMeetsMinimum("agent", "url"), false, "the system posting is not her pasting");
+    assert.equal(evidenceMeetsMinimum("url", "agent"), false, "her word is not a provider post id");
+  });
+
+  test("a kind that declares no minimum takes any evidence", () => {
+    for (const t of ["url", "agent", "attestation"] as const) {
+      assert.equal(evidenceMeetsMinimum(t, null), true);
+    }
+  });
+
+  // The two kinds the bug made unsatisfiable, read straight off rules.yaml so a future rubric edit
+  // has to face this test.
+  test("every kind's declared minimum is satisfiable by a proof the confirm path can write", () => {
+    for (const kind of ["welcome-email", "thank-you-note"] as const) {
+      const min = artifactKindRule(rules, kind).min_evidence;
+      assert.equal(min, "attestation");
+      assert.equal(evidenceMeetsMinimum("attestation", min), true, `${kind} must accept an attestation`);
+    }
   });
 });

@@ -32,6 +32,31 @@ export interface ArtifactKindRule {
   phase: number;
 }
 
+// venture-schema-contract.md §4 calls min_evidence a MINIMUM, so this is a floor, not an exact
+// type. `attestation` is the weakest proof -- Muxin's word with no addressable trace -- and both
+// `url` and `agent` clear it, because each leaves something checkable later.
+//
+// `url` and `agent` are NOT interchangeable with each other. §4: "An agent confirmation and Muxin's
+// own word are not the same fact and must not look the same." A kind that wants a provider's post
+// id is not satisfied by her saying she pasted a link, and a kind she pastes herself is not
+// satisfied by the system claiming it posted. So the order is partial, not total:
+//
+//   min "attestation" -> attestation, url or agent
+//   min "url"         -> url
+//   min "agent"       -> agent
+//
+// Read exact equality before this existed, which made `welcome-email` (min_evidence: attestation,
+// the one kind with no addressable trace at all) impossible to satisfy: the only confirm path
+// writes `url`, `url !== "attestation"`, and it blocked checkpoint 2 forever.
+export function evidenceMeetsMinimum(
+  type: "url" | "agent" | "attestation",
+  minimum: ArtifactKindRule["min_evidence"],
+): boolean {
+  if (!minimum) return true;
+  if (type === minimum) return true;
+  return minimum === "attestation";
+}
+
 // checkpoint-1 style: N of any required-checkpoint_id artifact (required_artifact_count).
 // checkpoint-2/checkpoint-3 style: exactly one live artifact per named kind (required_artifact_kinds).
 // A checkpoint rule uses exactly one of the two count shapes, never both.
