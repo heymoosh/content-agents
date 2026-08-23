@@ -197,8 +197,8 @@ with real before/after samples is at the session scratchpad's `pr-body.md`.
 
 ## Related docs
 
-- `docs/pattern-mining-plan.md` — the original captured request.
-- `.claude/skills/patterns/SKILL.md` — the 8 modes.
-- `.claude/skills/patterns/references/platform-collection.md` — per-platform routes, corrected
+- `docs/pattern-mining-plan.md`: the original captured request.
+- `.claude/skills/patterns/SKILL.md`: the 8 modes.
+- `.claude/skills/patterns/references/platform-collection.md`: per-platform routes, corrected
   2026-08-23. Its "Follower and audience counts, in one place" section exists because a correct
   route filed in the wrong section is functionally undocumented.
