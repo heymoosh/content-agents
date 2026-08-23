@@ -257,9 +257,15 @@ without rules 1 and 4.
 
 ## Mode 1: `/patterns collect [--platform X] [--account @handle]`
 
-Goal: 20-50 real winners in the corpus (`targets.corpus_size_min` / `corpus_size_max` in
-`config/pattern-mining.yaml`). Quality beats volume. Twenty genuinely strong posts across three
-accounts is a better corpus than fifty mediocre ones.
+Goal: enough collected posts that the outlier bars have something to say. The 20 to 50 figure in
+`config/pattern-mining.yaml` is `analysis_sample.min_outliers` / `max_outliers`, and it is a SAMPLE
+SIZE for one analysis pass, meaning how many OUTLIERS `/patterns analyze` is worth pointing at
+once. **It is not a
+corpus target and not a cap.** The corpus is uncapped and should keep growing: `MIN_BASELINE_SAMPLE`
+in `src/patterns/outliers.ts` needs at least 3 other scored entries for an account before the
+baseline bar can say anything about that account at all, and the median behind it gets more
+trustworthy the more entries sit under it. Quality still beats volume when choosing WHICH accounts
+to collect from, but there is no point at which the archive is full.
 
 **Collection is automatic on three platforms and by hand on the other six.** Since 2026-08-22 the
 normal path is `npm run patterns:auto`, which drives the same logged-in Chrome session
@@ -334,6 +340,12 @@ the difference decides which outlier bar can fire on that platform's entries.
   averaged in. So an account holding a mix can fall under the three-comparable-entries floor and
   return no baseline at all, even though it has plenty of entries. That is deliberate. If you see
   it, explain it that way rather than reporting it as a bug or as "no winners here".
+- **An engagement score is only roughly comparable to another engagement score.** It sums whichever
+  of likes, comments and shares were recorded, so an entry scored on likes alone and one scored on
+  all three are both `"engagement"` and get compared. The code takes that trade knowingly. It bites
+  where a field comes and goes: LinkedIn omits the repost count on low-engagement posts, so one
+  account can hold both shapes. Treat an engagement multiple as directional. Do not read a 3.2x
+  against a 3.0x as a real difference.
 - **The verdict says which metric the baseline used**, in `baselineMetric` on the verdict:
   `"views"`, `"engagement"`, or null exactly when there is no multiple. So "4x baseline" is never
   ambiguous. When you relay a multiple to Muxin, relay what it was a multiple OF. An unqualified
@@ -341,7 +353,9 @@ the difference decides which outlier bar can fire on that platform's entries.
 - **Read `outliers.ts` before you describe the scoring to her.** These are its rules as designed;
   the file is the authority on what it currently computes, and this skill's prose is not.
 
-So: on x both bars are live. On LinkedIn and Substack only the baseline bar is, and
+So: on x both bars have their inputs and can fire, though "can fire" is not "has fired", and the
+one measured threshold in the config cleared on none of the posts observed so far. On LinkedIn and
+Substack only the baseline bar can fire at all, and
 `/patterns analyze` judgment still carries real weight there, because a baseline built on engagement
 is a coarser signal than one built on views.
 
@@ -378,9 +392,9 @@ is a coarser signal than one built on views.
    visitor. If the session lapsed, the fix is a one-time headed login:
    `npm run pull:login -- <linkedin|x|substack>`.
 
-5. **Report honestly.** Corpus size against the 20-50 target, which accounts are still thin, which
-   platforms had no visible view numbers (so only the baseline bar can fire there, on engagement
-   rather than views), and what failed. If a platform collected nothing at all, say so rather than
+5. **Report honestly.** How many entries each account now has, and which are still under the three
+   other-entries floor the baseline bar needs, which platforms had no visible view numbers (so only
+   the baseline bar can fire there, on engagement rather than views), and what failed. If a platform collected nothing at all, say so rather than
    letting a quiet zero read as "nothing worth collecting".
 
 Muxin can also let this run itself weekly: `npm run patterns:weekly` does the three collector runs
@@ -519,8 +533,9 @@ tiktok, youtube, instagram, and for anything on an automated platform that the a
      Muxin can clear `data/patterns/inbox/` whenever she wants (it is gitignored either way). A
      one-off file outside the inbox can be passed with `--entry <file>`.
 
-7. **Report honestly.** Corpus size against the 20-50 target, which accounts are still thin, which
-   platforms had no visible numbers, and anything that failed validation and why. If she collected
+7. **Report honestly.** How many entries each account now has, which are still under the three
+   other-entries floor the baseline bar needs, which platforms had no visible numbers, and anything
+   that failed validation and why. If she collected
    on a platform where views do not exist, tell her that platform's entries can only ever clear the
    baseline bar, scored on engagement rather than views, and that a baseline on engagement is a
    coarser signal, so `/patterns analyze` judgment carries more of the weight there.
@@ -563,6 +578,9 @@ gitignored, same as the corpus.
    - **A mixed account can return no baseline at all.** Entries scored on the other metric drop out
      of the sample rather than being converted, which can push it under the three-entry floor. Say
      that is what happened, rather than reporting it as nothing having performed.
+   - **Engagement multiples are directional, not precise**, because the sum uses whichever of
+     likes, comments and shares each entry actually recorded. Rank with them; do not split hairs
+     between two close ones.
    - Where the baseline has too few comparable entries to fire, picking a post is judgment. Say so
      in the output, and never write a judgment pick up as though `patterns:outliers` returned it.
 

@@ -749,7 +749,7 @@ outlier_thresholds:
 # HOW MANY WINNERS TO ANALYZE. This is a SAMPLE SIZE, not a ceiling on the corpus.
 #
 # Muxin's original ask was "aim for 20 to 50 strong examples", meaning how many OUTLIERS are worth
-# reading in one synthesize pass. It was previously spelled corpus_size_min / corpus_size_max,
+# reading in one analysis pass. It was previously spelled corpus_size_min / corpus_size_max,
 # which read like a cap on the archive and is the opposite of what the feature wants.
 #
 # THE CORPUS ITSELF IS UNCAPPED AND SHOULD KEEP GROWING. Nothing anywhere refuses to collect

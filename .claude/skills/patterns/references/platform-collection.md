@@ -69,8 +69,9 @@ three automated ones reuse the logged-in Chrome session this repo already had.
   402 as a current limitation of the collector.
 - **Fallback.** Not needed. If search is rate limited while logged out, log in and retry.
 - **Cheapest starting point overall**, because views plus a public follower count means the
-  view-to-follower ratio works here with no guessing. This is the one platform where both outlier
-  bars genuinely fire.
+  view-to-follower ratio has its inputs here with no guessing. This is the only platform where both
+  bars CAN fire. That is not the same as both having fired: x's ratio threshold is the one measured
+  number in the config, and at its current value it cleared on 0 of the 24 posts observed so far.
 
 ## linkedin
 
@@ -221,8 +222,14 @@ Three rules that come with that, and all three matter when you relay a number:
 - **A baseline never mixes metric kinds.** An account's baseline is built only from entries scored
   the same way, or it returns null. A views number is never compared against an engagement number.
 - **Entries scored on the other metric drop out of the sample.** They are not converted. So a
-  mixed account can fall under the three-comparable-entries floor and return no baseline at all
-  despite having plenty of entries. Deliberate, not a bug, and worth saying out loud when it bites.
+  mixed account can fall under the three-comparable-entries floor (`MIN_BASELINE_SAMPLE`, which is
+  3) and return no baseline at all despite having plenty of entries. Deliberate, not a bug, and
+  worth saying out loud when it bites.
+- **An engagement score sums whichever of likes, comments and shares were recorded**, so two
+  engagement scores can rest on different field sets and are only roughly comparable. This is a
+  known, deliberate softness. It matters most where a field is intermittently absent: LinkedIn
+  omits the repost count on low-engagement posts, and Substack has no public share count at all, so
+  a Substack score is always likes plus comments. Treat an engagement multiple as directional.
 - **The verdict records which metric the baseline used**, as `baselineMetric`: `"views"`,
   `"engagement"`, or null when there is no multiple. "4x baseline" means nothing on its own. Say 4x
   views or 4x engagement. An unqualified multiple is a misleading number, not a shorter one.

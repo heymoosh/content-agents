@@ -14,7 +14,8 @@ note to self.
 outside git. A deterministic collect step that validates staged entries, drops duplicates, and
 appends them. Pure outlier scoring off recorded numbers (view-to-follower ratio and a post's
 multiple over its own account's baseline). A committed config holding the niches, the seeded
-reference accounts, the per-platform outlier thresholds, and the 20 to 50 corpus target. The
+reference accounts, the per-platform outlier thresholds, and the 20 to 50 analysis sample size
+(renamed from a "corpus target", which it never was; see §9). The
 `/patterns` skill, with seven modes: collect, analyze, synthesize, rewrite, plus ideas, series and
 asap. Muxin's civic adaptation rubric, committed and pointed at from the atomize skill's drafting
 and CTA steps as instruction a drafting agent reads (§3). A re-hook
@@ -334,18 +335,27 @@ recorded on an entry, and never fetches anything.
   missing. It is views-only and stays that way, deliberately: a like-to-follower ratio is a
   different quantity with a different meaning, so it is not a stand-in. This bar simply does not
   exist on a platform without public views.
-- **`entryScore(entry)`** returns `{ value, kind }` or null. Views win when present; otherwise it
-  sums the recorded `likes`, `comments` and `shares`, and returns null when none of those were
-  recorded. **`engagementScore(entry)`** is the number half of the same thing, for a caller that
-  only needs "how far did this travel".
+- **`entryScore(entry)`**, module-private, returns `{ value, kind }` or null. Views win when
+  present; otherwise it sums whichever of `likes`, `comments` and `shares` were recorded, and
+  returns null when none of them were. **`engagementScore(entry)`** is its exported number half,
+  for a caller that only needs "how far did this travel". Note there is no `reposts` field on
+  `CorpusMetrics`; `shares` is that number.
 - **`baselineMultiple(entry, accountEntries)`** compares a post to its own account's typical post
   using that score, which is what lets a LinkedIn or Substack entry be flagged at all. It returns
   `{ multiple, metric }` or null, not a bare number. That return-shape change is a real breaking
   change against Phase 1, worth knowing if anything else ever calls it.
 - **A baseline never mixes metric kinds, and the mismatched entries drop OUT of the sample.** They
   are not converted and not averaged in. So a mixed account can fall below the 3-comparable-entry
-  floor and return null despite holding plenty of entries. That is deliberate. A reader who does
-  not know it will file it as a bug.
+  floor (`MIN_BASELINE_SAMPLE`) and return null despite holding plenty of entries. That is
+  deliberate. A reader who does not know it will file it as a bug.
+- **Inside `"engagement"`, the field sets can still differ, and that is a known softness.** The sum
+  adds whichever of the three fields are present, so an entry scored on likes alone and one scored
+  on likes plus comments plus shares are both `"engagement"` and are compared to each other. They
+  are only roughly comparable. The code says so and takes the trade deliberately, because splitting
+  engagement into per-field-set buckets would recreate the same dead end the fallback exists to
+  remove. It bites hardest where a field is intermittently absent: LinkedIn omits the repost count
+  on low-engagement posts, so one LinkedIn account can hold both shapes. Treat an engagement
+  multiple as directional, not precise.
 - **`classifyOutlier`'s verdict carries `baselineMetric`**, typed `BaselineMetric | null`, whose
   values are `"views"` and `"engagement"`, and which is null exactly when `multiple` is null. So a
   4x is never ambiguous about 4x of what. Anything relaying a multiple has to relay what it was a
@@ -360,10 +370,18 @@ The generalization above is the fix, committed the same day. Recording it here b
 collected before the fix may have been read as "no winners on LinkedIn" when the truth was "the
 scorer could not see any."
 
-Thresholds live in `config/pattern-mining.yaml`, per platform. Video platforms get a higher ratio
-bar than text platforms, because video reach is not capped by follower count the way a text feed
-mostly is. Every number in that file is a starting guess with a comment saying so. They get tuned
-once real data lands (§11).
+Thresholds live in `config/pattern-mining.yaml`, per platform, and **every one of them is now
+labelled MEASURED, INERT or UNMEASURED so a guess never reads like a reading.** Quote the config
+rather than a number from this doc; these move.
+
+- **MEASURED** is x's `view_follower_ratio` alone, set from 24 observed posts. Worth knowing: at
+  its current value it fires on 0 of those 24, so the ratio bar being available on x is not the
+  same as it having flagged anything yet.
+- **INERT** marks a ratio threshold on a platform where views are always null, so the number is
+  configured but can never be reached. LinkedIn and Substack.
+- **UNMEASURED** is everything else, a starting guess. The video platforms carry higher ratio bars
+  than the text ones on the reasoning that feed reach is not capped by follower count the way a
+  text feed mostly is. That reasoning is untested, because no collector has ever run on them.
 
 Video platforms all show public view counts, TikTok and YouTube on every video and Instagram on
 Reels, so they are the STRONGEST targets for the view-to-follower rule, not the weakest. That is a
@@ -371,8 +389,14 @@ point in favour of the video pass, and it is the opposite of what an earlier fra
 
 The config also holds the four niches (building-solopreneur, inner-journey, civic-democracy, and
 virality-growth added 2026-08-22, see §5), the seeded account list, the discovery search terms, and
-Muxin's stated corpus target of 20 to 50 entries. The account list and the search terms are hers to
-edit freely.
+Muxin's stated 20 to 50 figure, which lives under `analysis_sample` as `min_outliers` /
+`max_outliers`. That is a SAMPLE SIZE for one analysis pass, not a corpus target: it says how many
+OUTLIERS `/patterns analyze` is worth pointing at once. **The corpus itself is uncapped and should keep growing**,
+because `MIN_BASELINE_SAMPLE` needs at least 3 other scored entries per account before the baseline
+bar can say anything, and its median improves with more behind it. A ceiling on the archive would
+actively degrade outlier detection. The keys were previously spelled `corpus_size_min` /
+`corpus_size_max`, which read like a cap and was the opposite of the intent. The account list and
+the search terms are hers to edit freely.
 
 ---
 
@@ -408,9 +432,12 @@ Recorded, not answered.
 1. **Which accounts make the reference set.** Phase 1 seeds from the creators already cited in
    `hook-patterns.md`. Muxin's own workflow says 5 to 10 strong accounts per niche. Who fills the
    gap between the seeded list and that target, and on what basis, is undecided.
-2. **How outlier thresholds get tuned.** Today's numbers are guesses. Once 20 to 50 real entries
-   land, the thresholds need a real pass. Open: what counts as evidence that a threshold is wrong,
-   and whether tuning is a manual edit or a computed suggestion.
+2. **How outlier thresholds get tuned.** PARTLY ANSWERED on 2026-08-22. The x view-to-follower bar
+   is now measured rather than guessed, off 24 posts from three x accounts of very different sizes,
+   and the config marks every threshold MEASURED, INERT or UNMEASURED so a guess never reads like a
+   reading. The rest are still guesses. Open: what counts as evidence that a threshold is wrong,
+   and whether tuning is a manual edit or a computed suggestion. Quote the config rather than a
+   number from this doc; the numbers move.
 3. **Whether video transcripts can be pulled legally and cheaply, per platform.** The rules and the
    cost are not the same for YouTube, TikTok, and Reels. This gates Phase 2.
 4. **How a per-platform pattern set interacts with `config/voice.yaml`.** A winning shape must
