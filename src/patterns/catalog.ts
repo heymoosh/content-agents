@@ -13,6 +13,7 @@ type LooseRecord = Record<string, unknown>;
 const FORMAT_ENUMS = new Set([
   "audio", "carousel", "image", "link-preview", "mixed", "text", "text-only", "video",
 ]);
+const RESEARCH_POOL_ENUMS = new Set(["niche", "broad", "format"]);
 
 export interface CatalogAudience {
   size: number | null;
@@ -23,6 +24,8 @@ export interface CatalogAudience {
 
 export interface CatalogRow {
   key: string;
+  accountId: string;
+  accountIdStatus: "derived";
   platform: string;
   handle: string | null;
   creator: string | null;
@@ -31,9 +34,13 @@ export interface CatalogRow {
   collected: boolean;
   audience: CatalogAudience;
   topics: string[];
+  focus: string[];
+  researchPools: string[];
   formats: string[];
   mediaForms: string[];
   popularityScopes: string[];
+  sampleScopes: string[];
+  baselineSources: string[];
   evidenceCount: number;
   admissibleCount: number;
   bodyCompleteCount: number;
@@ -79,10 +86,19 @@ function maxDate(values: unknown[]): string | null {
   return dates.length ? dates[dates.length - 1] : null;
 }
 
+function explicitValues(rows: LooseRecord[], field: string): unknown[] {
+  return rows.map((row) => row[field]).filter((value) => value !== undefined && value !== null);
+}
+
 function popularityScopes(posts: LooseRecord[], analyses: LooseRecord[]): string[] {
+  const explicit = [...explicitValues(posts, "popularity_scope"), ...explicitValues(analyses, "popularity_scope")];
+  return nonEmptyStrings(explicit);
+}
+
+function sampleScopes(posts: LooseRecord[], analyses: LooseRecord[]): string[] {
   const explicit = [
-    ...posts.flatMap((row) => [row.popularity_scope, row.sample_scope]),
-    ...analyses.flatMap((row) => [row.popularity_scope, row.sample_scope, row.baseline_source]),
+    ...explicitValues(posts, "sample_scope"),
+    ...explicitValues(analyses, "sample_scope"),
   ];
   const textScopes = [...posts, ...analyses]
     .flatMap((row) => [row.notes, row.provenance, row.provenance_flag])
@@ -90,6 +106,22 @@ function popularityScopes(posts: LooseRecord[], analyses: LooseRecord[]): string
     .filter((value): value is string => value !== null)
     .flatMap((value) => /search[- ]biased sample/i.test(value) ? ["search-biased"] : []);
   return nonEmptyStrings([...explicit, ...textScopes]);
+}
+
+function baselineSources(posts: LooseRecord[], analyses: LooseRecord[]): string[] {
+  return nonEmptyStrings([
+    ...explicitValues(posts, "baseline_source"),
+    ...explicitValues(analyses, "baseline_source"),
+  ]);
+}
+
+function researchPools(seed: AccountSeed | undefined, posts: LooseRecord[], analyses: LooseRecord[]): string[] {
+  const values = [
+    ...(seed?.research_pools ?? []),
+    ...posts.flatMap((row) => [row.research_pool, row.research_pools]),
+    ...analyses.flatMap((row) => [row.research_pool, row.research_pools]),
+  ];
+  return nonEmptyStrings(values).filter((value) => RESEARCH_POOL_ENUMS.has(value.toLowerCase()));
 }
 
 function keyFor(platform: unknown, handle: unknown, creator: unknown): string {
@@ -156,6 +188,8 @@ export function buildCatalog(config: PatternMiningConfig, corpus: unknown[] = []
     const bodyIncomplete = analysis.filter((row) => row.body_complete === false).length;
     return {
       key,
+      accountId: key,
+      accountIdStatus: "derived",
       platform,
       handle,
       creator: seed?.creator ?? text(post?.creator) ?? text(analysis[0]?.creator),
@@ -163,7 +197,17 @@ export function buildCatalog(config: PatternMiningConfig, corpus: unknown[] = []
       configured: seed !== undefined,
       collected: state.posts.length > 0,
       audience: audienceFrom(seed, state.posts),
-      topics: nonEmptyStrings([seed?.niche, ...state.posts.map((row) => row.niche), ...analysis.map((row) => row.niche)]),
+      topics: nonEmptyStrings([
+        seed?.niche, ...(seed?.topics ?? []),
+        ...state.posts.flatMap((row) => [row.niche, row.topics]),
+        ...analysis.flatMap((row) => [row.niche, row.topics]),
+      ]),
+      focus: nonEmptyStrings([
+        ...(seed?.focus ?? []),
+        ...state.posts.flatMap((row) => row.focus),
+        ...analysis.flatMap((row) => row.focus),
+      ]),
+      researchPools: researchPools(seed, state.posts, analysis),
       formats: nonEmptyStrings([
         ...state.posts.map((row) => normalizedFormat(row.kind)),
         ...state.posts.map((row) => normalizedFormat(record(row.media).form)),
@@ -171,6 +215,8 @@ export function buildCatalog(config: PatternMiningConfig, corpus: unknown[] = []
       ]),
       mediaForms: nonEmptyStrings(state.posts.map((row) => normalizedFormat(record(row.media).form))),
       popularityScopes: popularityScopes(state.posts, analysis),
+      sampleScopes: sampleScopes(state.posts, analysis),
+      baselineSources: baselineSources(state.posts, analysis),
       evidenceCount: state.posts.length,
       admissibleCount: analysis.filter((row) => row.admissible === true).length,
       bodyCompleteCount: bodyComplete,
@@ -211,12 +257,12 @@ export function renderCatalogMarkdown(catalog: PatternCatalog): string {
   };
   const lines = [
     "# Pattern source catalog", "", `Configured targets: ${catalog.summary.configuredTargets} | Collected sources: ${catalog.summary.collectedSources}`,
-    "", "| Source | Platform | Status | Audience (size/type/as-of) | Popularity scope(s) | Topics | Formats | Media | Evidence/admissible/complete/incomplete | Last collected | Last analyzed | Caveats |", "|---|---|---|---|---|---|---|---|---:|---|---|---|",
+    "", "| Source | Account ID | Platform | Status | Audience (size/type/as-of) | Focus | Research pool(s) | Popularity scope(s) | Sample scope(s) | Baseline source(s) | Topics | Formats | Media | Evidence/admissible/complete/incomplete | Last collected | Last analyzed | Caveats |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|",
   ];
   for (const row of catalog.rows) {
     const status = row.configured ? (row.collected ? "configured + collected" : "configured, uncollected") : "collected only";
     const completeness = `${row.evidenceCount} / ${row.admissibleCount} / ${row.bodyCompleteCount} / ${row.bodyIncompleteCount}`;
-    lines.push(`| ${cell(row.handle ?? row.creator ?? row.key)} | ${cell(row.platform)} | ${status} | ${cell(audience(row))} | ${cell(list(row.popularityScopes))} | ${cell(list(row.topics))} | ${cell(list(row.formats))} | ${cell(list(row.mediaForms))} | ${completeness} | ${row.lastCollectedAt ?? "unknown"} | ${row.lastAnalyzedAt ?? "unknown"} | ${cell(list(row.caveats))} |`);
+    lines.push(`| ${cell(row.handle ?? row.creator ?? row.key)} | ${cell(row.accountId)} | ${cell(row.platform)} | ${status} | ${cell(audience(row))} | ${cell(list(row.focus))} | ${cell(list(row.researchPools))} | ${cell(list(row.popularityScopes))} | ${cell(list(row.sampleScopes))} | ${cell(list(row.baselineSources))} | ${cell(list(row.topics))} | ${cell(list(row.formats))} | ${cell(list(row.mediaForms))} | ${completeness} | ${row.lastCollectedAt ?? "unknown"} | ${row.lastAnalyzedAt ?? "unknown"} | ${cell(list(row.caveats))} |`);
   }
   return `${lines.join("\n")}\n`;
 }

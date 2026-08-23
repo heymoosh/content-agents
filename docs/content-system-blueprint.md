@@ -1,79 +1,157 @@
 # Content system blueprint
 
-**Status:** Directional architecture, 2026-08-23
+**Status:** Directional architecture and execution contract, 2026-08-23
+**North star:** Grow-this is one conversation that turns Muxin's raw thought into a reviewed,
+learnable set of platform treatments. It is not an autopilot, a universal virality engine, or a
+claim that the current corpus is comprehensive.
 
-## What this system is
+## 1. What the system must do
 
-Content-agents is an evidence-backed, multi-platform content operating system. It is not only a
-pattern library and it is not an autopilot. Muxin supplies the claims, observations, judgment, and
-voice. The system organizes research, produces useful cuts and platform treatments, records what
-happened, and turns tested signals into better Venture decisions.
+Muxin supplies the insight, claims, observations, taste, and final yes. The system handles the
+repetitive work: finding relevant examples, recommending lenses, cutting the message, selecting
+platform and format treatments, generating visuals, recording provenance, collecting outcomes, and
+surfacing decisions. Every meaningful transition leaves an inspectable artifact.
 
-The core path is:
+The target user flow is:
 
 ```text
-raw thought / essay / Substack
-  -> message cuts
-  -> per-platform, per-format variants
-  -> human review
-  -> approved publish
-  -> metrics and comments
-  -> experiments and signals
-  -> Venture learning
+raw thought / URL / essay / Substack / note
+  -> capture and source record
+  -> advisor conversation: claim, audience, lane, lens, CTA recommendation
+  -> message cut(s) that Muxin can edit
+  -> Format for platforms: platform x medium x format variants
+  -> human review queue: approve, edit, reject, or request another pass
+  -> approved scheduling/publishing
+  -> post, comment, funnel, and business outcome records
+  -> Signals: qualified observations and proposed experiments
+  -> human adopt/decline decision
+  -> Venture inputs only when its evidence gate permits
 ```
 
-Every meaningful step should leave an inspectable artifact. Nothing publishes without human
-approval. Metrics can inform a decision, but they do not silently rewrite the voice, routing, or
-strategy.
+The UI calls the production step **Format for platforms**. The internal engine may remain named
+`atomize`. The user should see the message, why a treatment was suggested, what still needs her
+judgment, and what will be measured. Routing notes, line citations, pattern IDs, and model traces
+stay behind the conversation but remain available for audit.
 
-## Research and evidence model
+## 2. Shared vocabulary and lineage
 
-The source and account catalog is the shared index for external examples and internal learning.
-Each record should carry:
+Use these normalized terms in records, prompts, and screens. Do not create near-synonyms for the
+same object.
 
-- creator or account, platform, and handle
-- source kind, such as post, thread, essay, video, comment, or account profile
-- audience size, audience type, date, and provenance
-- granular multi-label topics
-- formats and media
-- popularity scope: niche, platform-wide, format, account-relative, or community
-- evidence quality, collection date, and caveats
+| Term | Meaning and required identity |
+|---|---|
+| Source | The original input Muxin supplied or an external item collected for research. Stable `source_id`, kind, URL/path, author/account, date, and provenance. |
+| Account | A creator, publication, organization, or channel. Stable `account_id`, platform, handle/URL, audience notes, and collection provenance. |
+| Evidence | A bounded observation supporting a statement: source record, metric snapshot, comment, response, or business event. It carries date, denominator, scope, quality, and caveats. |
+| Claim | A proposition being made or tested. It must point to source lines, an evidence record, or a clearly marked hypothesis. |
+| Cut | A message-level treatment before platform formatting. It may select, order, and lightly trim Muxin's words; it is not a raw working file or a platform post. |
+| Variant | A cut formatted for one platform, medium, and format, with its experiment variables and lineage intact. |
+| Pattern | A structural description of an observed mechanism: hook family, sequence, pacing, tension, CTA shape, or visual treatment. It is not creator-copy substitution. |
+| Experiment | A declared comparison with a question, variable(s), unit, audience/platform scope, success observations, sample size, and end date or review rule. |
+| Comment | A conversation observation linked to a published variant and date. It may propose a question or follow-up test; it is not automatically evidence of demand. |
+| Funnel event | A measurable transition such as profile visit, landing visit, opt-in, reply, call inquiry, or sale, linked to the originating variant where possible. |
+| Venture lineage | A non-destructive link from a content item or signal to a Venture project, phase, decision, artifact, or gate. Content origin does not bypass Venture approval. |
 
-Popularity is always scoped. A post that is strong within one account is not automatically a
-platform-wide winner. The catalog should preserve the denominator, the comparison group, and the
-reason a record was included so later analysis can distinguish observation from inference.
+Minimum lineage is `source -> claim/cut -> variant -> approval -> publish -> outcome ->
+experiment/signal`. A Venture-originated item adds `venture_project/phase/decision` at the source
+or claim node and still enters Content's normal cut, format, review, and publish path.
 
-Research stays in three separate pools:
+### Current-to-target account identity plan
 
-1. **Niche winners:** examples that perform unusually well for the relevant subject or audience.
-2. **Broad platform-wide winners:** examples that help us understand wider platform behavior,
-   even when the topic is unrelated.
-3. **Format or medium winners:** examples selected for the mechanics of a medium, such as a
-   short video, quote card, carousel, thread, or newsletter opening.
+The current corpus groups an account with the composite key `platform|normalizeHandle(handle)`:
+the platform is part of identity, the handle has its leading `@` removed, surrounding whitespace
+trimmed, and letters lowercased. This is intentionally platform-local. The same person on two
+platforms is two current accounts because reach and baselines are not comparable. Existing post
+IDs remain the current `platform-handle-short-hash-of-url` form and are not silently rewritten.
 
-These pools can contribute different hypotheses. They must not be blended into one universal
-ranking or treated as interchangeable evidence.
+Phase 1 maps each distinct current composite key to a future stable `account_id`. The mapping is
+an explicit, reviewable artifact with at least `current_account_key`, `account_id`, platform,
+normalized handle, display creator, mapping status, evidence links, and a human-review note. The
+future ID is opaque and stable across handle changes; the composite key remains as a historical
+alias and deduplication key. Do not merge accounts across platforms, or merge renamed handles,
+without evidence and a human decision.
 
-## Adaptation boundary
+The mapping audit must identify and preserve the currently missing normalized fields: `topics`,
+`focus`, `research_pool`, `popularity_scope`, `sample_scope`, and `baseline_source`. These are
+account or record attributes as appropriate, not guesses inferred from a creator's name. `topics`
+are the observed subject labels; `focus` is the account's stated or observed editorial focus;
+`research_pool` is one or more of `niche`, `broad`, or `format` (the `broad` label is displayed as
+broad platform); `popularity_scope` is the declared comparison scope for the relevant evidence;
+`sample_scope` describes how the item was selected; and `baseline_source` identifies the comparison
+denominator. None is a general account ranking.
 
-It is valid to reuse a popular hook family, opener shape, rhythm, or mad-lib-style template when
-the new copy is materially original and uses Muxin's own claims and voice. The system can learn
-that a pattern such as a tension opener followed by a concrete example and a soft invitation often
-helps a format. It cannot turn a creator's words into a noun-swapped phrase bank.
+Null/unknown policy is explicit: use `null` for not collected, not applicable, or not yet
+normalized; use `unknown` only when the field was checked or considered but cannot be determined;
+never replace either with an inferred value, empty string, or zero. A missing field blocks a
+winner claim or a pool-specific comparison that requires it, but does not block retaining the
+source or mapping it for later review. Existing current-state caveats remain attached to the
+mapping and are not converted into target-state certainty.
 
-Exact creator text remains analysis material, quoted material, or licensed material. It is not
-drafting material for substitution. Research outputs should describe the structure, trigger,
-sequence, pacing, and conditions of success, with short quotations only when needed for analysis.
-Internal candidates must be checked for originality, source traceability, and fit with Muxin's
-voice before review.
+**Phase 1 acceptance predicate:** the phase is complete only when every current account composite
+key has exactly one reviewed mapping row or an explicit `unmapped` disposition, every row has a
+stable target `account_id` or a recorded reason it cannot yet receive one, the four missing fields
+are present with the null/unknown policy applied, and no target pool, scope, or identity claim is
+presented as complete beyond the available evidence.
 
-## Human Inference and testable lanes
+## 3. Research and evidence architecture
+
+The catalog is a shared index, not a promise of representative coverage. A source/account record
+should preserve creator/account, platform and handle, source kind, URL, collection date, original
+date, audience size/type when known, topics, lane, medium, format, exact evidence location,
+provenance, and caveats. Metrics must preserve the numerator, denominator, observation window, and
+comparison group.
+
+Keep three research pools separate, with separate labels and retrieval/ranking:
+
+1. **Niche pool:** unusually strong examples for the relevant topic, audience, or community.
+2. **Broad platform pool:** examples selected to understand platform-wide behavior, even when the
+   topic is unrelated.
+3. **Format pool:** examples selected for mechanics of a medium or format, such as short video,
+   quote card, carousel, thread, or newsletter opening.
+
+A record can appear in more than one pool only with an explicit reason. Pool membership is not a
+quality score, and evidence from one pool cannot silently stand in for another.
+
+### Popularity and winner claims
+
+Use **winner** only with a declared scope: niche, broad platform, format, account-relative,
+community, or time window. A winner claim must include:
+
+- the comparison set and denominator, or an explicit `unknown`;
+- the metric and observation window, including whether it is raw or normalized by audience;
+- source date and collection date;
+- minimum sample or selection rule, if one exists;
+- caveats such as reposts, paid distribution, missing impressions, survivorship bias, or an
+  unusually large account; and
+- whether the record is an observation, an inference, or a hypothesis.
+
+Without those fields, say “selected example” or “observed signal,” never “most popular,” “viral,”
+or “proven.” Account-relative performance is never platform-wide performance. Small samples may
+generate experiments, but cannot establish a general rule.
+
+### Exact-hook and mad-lib boundary
+
+The system may abstract a hook family, opener shape, rhythm, sequence, tension, or CTA pattern and
+adapt that structure to Muxin's own claim and voice. A generated variant must be materially
+original, traceable to Muxin's source or a declared Venture exception, and checked for voice and
+originality before review.
+
+Live verbatim opener storage and remix mode may retain exact creator text for internal analysis or
+licensed/attributed exceptions, but Grow's default generation path is mad-lib-originality: copy is
+structurally inspired and materially original.
+
+It may not turn an identifiable creator's wording into a noun-swapped template, preserve a
+distinctive phrase sequence, or draft from exact creator text. Exact text is analysis, quotation,
+or licensed material only. Pattern records describe structure, trigger, pacing, context, and
+conditions of success. They do not store substitution-ready copy banks.
+
+## 4. Human Inference and brand hypotheses
 
 Human Inference is the positioning center: making human judgment, meaning, and responsibility
-legible in an AI-shaped world. It is a lens for deciding which claims are worth testing, not a
-license to force every post into one slogan.
+legible in an AI-shaped world. It is a lens for deciding what is worth testing, not a requirement
+that every item repeat one slogan.
 
-Adjacent lanes are hypotheses to test, not settled brand pillars:
+Adjacent lanes from Human Inference are hypotheses, not settled pillars:
 
 - AI building
 - product thinking for social problems
@@ -83,65 +161,147 @@ Adjacent lanes are hypotheses to test, not settled brand pillars:
 - civic systems and power
 - founder sustainability and meaning
 
-The system should record which lane, claim, audience, platform, format, and experiment variable a
-piece addresses. It should also make it easy to say that the evidence is too thin to generalize.
+Every test should record the lane, claim, audience, platform, format, CTA, and experiment variable.
+The system must be able to conclude that evidence is too thin to generalize or that a lane should
+remain exploratory.
 
-## Shared path and skill architecture
+## 5. Lightweight skills and orchestration boundaries
 
-The common path should be lightweight and called **Grow-this** at the surface. It should help a
-person move from an idea to a reviewed, learnable content experiment without exposing every
-specialized engine or requiring a taxonomy lesson.
+**Grow-this** is the surface contract. It coordinates one conversation and exposes only the next
+decision. It does not replace the engines below it.
 
-Under that path, keep the engines and simplify the surface:
+- `develop` is the advisor and cut engine. It recommends angles and assembles cuts from source
+  material; it is not an invisible author.
+- `brand-lens` checks fit and identifies gaps. It recommends; it does not rewrite prose into the
+  pipeline.
+- `patterns` researches, normalizes, and summarizes patterns with source links and scope labels.
+- `atomize` remains the internal platform-format engine, surfaced as Format for platforms.
+- `video`, `publish`, `strategy`, `signals`, and `venture` remain specialized layers with
+  their existing artifacts and gates.
+- `story`, `outreach`, `charles`, and other separate systems remain walled off. Fiction may
+  share social promotion only; Outreach never sends; Charles is not Muxin's voice.
 
-- develop and brand-lens are lenses that recommend or check, not hidden authors
-- atomize remains the internal format engine, surfaced as formatting for platforms
-- patterns provide background intelligence for research and adaptation
-- video, publish, Venture, strategy, and signals remain specialized layers
-- story, outreach, Charles, and other separate systems remain separate
+The orchestrator owns sequencing, retries, artifact links, elapsed-time visibility, and presenting
+judgment points. It does not make the final content, brand, routing, publish, or strategy decision.
+Each skill owns one bounded output and its validation. No skill should silently call a downstream
+skill with a new claim or bypass review.
 
-The surface should show the message being shaped, why a treatment was suggested, what needs human
-judgment, and what evidence will be collected. Plumbing such as routing notes, line citations, and
-internal pattern IDs belongs behind the conversation, while remaining available for audit.
+## 6. Model and subagent responsibilities
 
-## Experiment and feedback loop
+Use the cheapest acceptable subscription or local route by default, and log paid calls and model
+identity. Deterministic scripts handle parsing, IDs, schema validation, joins, scheduling, and
+metric calculations. Models handle bounded judgment:
 
-High-volume experimentation happens internally. The system generates candidate variants, attaches
-explicit experiment variables, and presents reviewed variants for approval. Variables may include
-the opener family, claim angle, format, medium, audience lane, CTA, length, or platform treatment.
-The publish record must preserve those variables so outcomes can be compared later.
+- **Primary Claude/subscription route:** extraction, claim/source alignment, pattern abstraction,
+  cut recommendations, voice checks, evidence caveats, and synthesis for review.
+- **Cheap local or subscription media route:** deterministic rendering, image/layout generation,
+  transcription, and other repeatable media work where quality is sufficient.
+- **Specialist or paid model:** only an explicit opt-in when it adds value the default route cannot;
+  record why, model, cost, input artifact, and output artifact.
+- **Subagents:** run isolated, read-only research, corpus normalization, originality checks, or
+  review passes with a bounded brief and structured evidence output. They may not publish, send,
+  approve, alter the canonical voice/config, or invent missing facts.
 
-The system must not call weak samples universal. It should report sample size, comparison scope,
-collection date, missing data, and caveats. Signals should keep attention, conversation, audience,
-and business outcomes distinct. A comment is an observation that may inform Venture, not proof that
-clears a Venture evidence gate. Comments can suggest a question, a problem, or a follow-up test;
-Venture still requires its own documented evidence and human decisions.
+Human review remains authoritative for the claim, cut, voice, lane, CTA, platform treatment,
+visual, publish timing, and any proposed strategic change. AI prose is visibly distinct from
+Muxin's words during review. Apply `config/voice.yaml`: plain verbs, no em dashes, no “here's the
+thing,” no rhetorical-question hooks, no generic brand voice, and read it aloud. Any AI tell or
+unsupported claim is a reject or rewrite, not a cosmetic warning.
 
-## Phased roadmap
+## 7. Review, approval, and delivery gates
 
-**Phase 1, blueprint and inventory.** Document the shared vocabulary, source catalog, three
-research pools, adaptation rules, current skill boundaries, and evidence caveats. Connect the
-existing seeded material without broad scraping.
+The queue must make these states explicit: `draft`, `needs-human-judgment`, `approved`,
+`rejected`, `scheduled`, `published`, and `measured`. Approval is per artifact or declared
+bundle, never implied by generation or a prior approval. Nothing publishes or sends without Muxin's
+explicit decision. Text posts schedule as drafts; outreach stays manual; browser posting requires
+the same approval.
 
-**Phase 2, evidence-aware research.** Normalize catalog records, preserve provenance, separate
-popularity scopes, and make pattern summaries cite their source records. Add lightweight review
-surfaces for research quality and originality.
+Before approval, a variant must show its source/claim lineage, platform/format reason, experiment
+variables, CTA or `none`, evidence status, and any exact-text/originality concern. After
+publishing, append immutable publish and outcome records. Signals may recommend an adjustment, but
+Muxin adopts or declines it before routing, voice, pillars, or strategy change.
 
-**Phase 3, Grow-this experiments.** Route one source through cuts, platform and format variants,
-review, approved publishing, and outcome capture. Store explicit experiment variables and make
-signals readable without collapsing them into one score.
+## 8. Experiments, comments, funnel, and Venture feedback
 
-**Phase 4, Venture learning.** Feed qualified patterns, audience observations, and business
-signals into Venture as inputs. Keep comments and engagement as observations until Venture's own
-evidence gates are met. Let Muxin adopt or reject strategic changes.
+An experiment has one question and a declared comparison. Candidate variables include opener
+family, claim angle, lane, audience, platform, medium, format, length, CTA, timing, and visual
+treatment. Preserve them on every variant and publish record. Signals report attention,
+conversation, audience, and business separately. Do not collapse them into one score.
 
-## Current state and boundaries
+Comments are linked observations with author/context, date, theme, and response status. They can
+suggest a problem, language, objection, or next test. They do not by themselves prove willingness
+to pay, audience fit, or a Venture gate.
 
-The branch currently has 352 seeded target rows across 13 configured platforms, 292 corpus entries
-across 13 corpus platforms, 31 hook patterns, and 47 full-post records. Coverage is incomplete.
-These counts are inventory facts, not proof that the research is representative or that any pattern
-is universally effective.
+Funnel events link content to profile visits, landing visits, opt-ins, replies, calls, inquiries,
+and sales when attribution is known. A quiet post with a lead is a business win; a high-reach post
+with no downstream movement is not automatically a success. Missing attribution is recorded as
+missing, not guessed.
 
-This slice does not include a repo-wide rewrite, a universal virality score, automatic publishing
-or replies, or broad scraping. It does not replace the existing specialized builds, weaken human
-review, or make exact creator text reusable. Those boundaries are part of the architecture.
+Venture receives qualified patterns, audience observations, and business signals as inputs with
+scope, sample size, provenance, and caveats. It does not receive a universalized engagement claim.
+Venture's own response, decision, artifact, and approval gates remain authoritative. A content item
+can carry `from-venture` or `from-studio`, but both use the same Content pipeline.
+
+## 9. Phases and acceptance criteria
+
+### Phase 1: blueprint and inventory
+
+**Ship when:** the vocabulary, lineage, three pools, popularity rules, adaptation boundary, skill
+boundaries, model policy, approval states, Human Inference hypotheses, and current-vs-target matrix
+are documented; existing seeded material is connected by stable IDs or an explicit mapping plan;
+coverage caveats are visible.
+
+**Not in scope:** broad scraping, a repo-wide rewrite, a universal score, auto-publishing,
+auto-replies, or claiming corpus completeness.
+
+### Phase 2: evidence-aware research
+
+**Ship when:** normalized source/account/evidence records preserve provenance; every winner or
+pattern summary cites its source records and scope; pool membership is queryable; selection rules,
+denominators, dates, caveats, and originality checks are reviewable; weak evidence is labeled as a
+hypothesis.
+
+**Not in scope:** training on exact creator text, replacing human judgment with ranking, or
+generalizing from a single account or small sample.
+
+### Phase 3: Grow-this experiments
+
+**Ship when:** one raw input can produce a readable cut, multiple platform/format variants, a
+review bundle, an approved publish record, and outcome records; each artifact has lineage and
+experiment variables; the UI explains treatment rationale and pending decisions; Signals preserves
+the four outcome classes separately.
+
+**Not in scope:** silent platform selection, publishing without approval, auto-replies, or changing
+voice/pillars/routing from metrics alone.
+
+### Phase 4: Venture learning
+
+**Ship when:** qualified patterns, comments, funnel events, and business outcomes can be handed to
+Venture with provenance and caveats; comments and engagement remain observations until Venture's
+gate opens; a human can adopt or decline each proposed change; Venture-originated content returns
+through the same Content review path.
+
+**Not in scope:** turning content engagement into proof of demand, bypassing Venture decisions, or
+making Venture the owner of every Studio idea.
+
+## 10. Coverage matrix: current facts versus target state
+
+Current figures are inventory facts from this branch, not a completeness claim or performance
+claim. “Partial” means some supporting material exists, not that the architecture is implemented.
+
+| Area | Current fact | Target state | Status |
+|---|---|---|---|
+| Seeded targets | 352 rows across 13 configured platforms | Stable, provenance-aware target records with explicit scope and caveats | Partial |
+| Corpus | 292 entries across 13 corpus platforms | Normalized source/account/evidence catalog with queryable pool membership | Partial |
+| Patterns | 31 hook patterns | Structural patterns with source citations, originality review, and no substitution copy | Partial |
+| Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
+| Source-to-publish path | Existing extraction, review, and publish engines | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
+| Review gate | Human review and publish approval already required | Explicit per-artifact states, rationale, lineage, and no-AI-smell check | Partial |
+| Research pools | Niche, broad, and format distinction documented | Separate ingestion, ranking, retrieval, and reporting | Target |
+| Experiment lineage | Metrics and bets exist in specialized systems | Variant-level variables linked to comments, funnel events, Signals, and Venture | Target |
+| Venture handoff | Venture has its own phases and gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
+| Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
+| Model boundaries | Subscription-first and human approval rules exist | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
+
+This blueprint does not authorize implementation by itself. Each future change should name the
+phase, artifacts, acceptance predicate, human decision, and explicit non-goals it satisfies.

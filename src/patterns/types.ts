@@ -360,6 +360,9 @@ export interface AccountSeed {
   platform: Platform;
   niche: string;
   followers: number | null;
+  topics?: string[];
+  focus?: string[];
+  research_pools?: string[];
   // Board slugs to collect from, pinterest only. Absent everywhere else, and absent on a pinterest
   // row means "read the account's boards off its profile page". It exists because pinterest has no
   // logged-out discovery at all: /search/pins/, /ideas/ and /today/ all answer 200 with zero pins,
