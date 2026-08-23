@@ -7,6 +7,11 @@ import {
   fixturePanelHtml,
   fixtureScriptHtml,
 } from "./fixtures.js";
+// The 25 intake questions, serialized into the client below. Imported rather than retyped: this is
+// venture/rules.md §4.2's fixed list and src/venture/intake.ts is the one place it lives. A second
+// copy on this screen would be a content-generation change hiding inside a GUI diff (root
+// CLAUDE.md rule 7) the first time the two drifted.
+import { INTAKE_QUESTIONS } from "../venture/intake.js";
 
 // Pure, DOM-free mirror of the inline "replying to" context line the client <script> below renders
 // for a "reply to mention" row (backend origin — carries reply_to_url/reply_to_text frontmatter
@@ -162,6 +167,77 @@ export function ventureDotColor(tone: string): string {
 export function ventureDayLine(elapsedDays: number | null | undefined): string {
   if (elapsedDays === null || elapsedDays === undefined) return "";
   return elapsedDays === 0 ? "started today" : "day " + (elapsedDays + 1) + " since kickoff";
+}
+
+// ── the intake interview ─────────────────────────────────────────────────────────────────────────
+//
+// Four pure helpers, all mirrored into the browser script below (Rule 5). Every one of them is
+// about saying only what was actually counted or actually written:
+//
+//   intakeProgressLine  — "Question 7 of 25" is measured (the list is 25 long, she is on 7). There
+//                          is no time-to-complete anywhere on this screen, because nothing in this
+//                          repo measures how long an interview takes.
+//   intakeUnanswered    — which boxes are empty, so the server's refusal and the marked boxes agree.
+//   intakeSaveLine      — the autosave indicator, driven by the SERVER's savedAt and nothing else.
+//   intakeSlugError     — a convenience mirror of intake-draft.ts's own slug rule. The server still
+//                          refuses; this only saves her a round trip.
+
+/**
+ * Where she is. The two panels after the 25 are named steps, not questions 26 and 27 — they are a
+ * different kind of thing (voice evidence, then the Day 14 scorecard), and numbering them past the
+ * end of the interview would misreport how much interview is left.
+ */
+export function intakeProgressLine(step: number, total: number): string {
+  if (step >= 1 && step <= total) return "Question " + step + " of " + total;
+  if (step === total + 1) return "Voice evidence";
+  if (step === total + 2) return "Day 14 scorecard";
+  return "";
+}
+
+/**
+ * The 1-based question numbers with nothing in them, straight off the draft list.
+ *
+ * This is the screen's copy of the same emptiness test src/review/intake-commit.ts runs before the
+ * commit. intake-commit.test.ts asserts the two agree on every vector, so the screen can never mark
+ * one set of boxes while the server's refusal names another.
+ */
+export function intakeUnanswered(drafts: { n: number; text: string }[], total: number): number[] {
+  const filled = new Set<number>();
+  for (const d of drafts) if (d.text && d.text.trim()) filled.add(d.n);
+  const out: number[] = [];
+  for (let n = 1; n <= total; n++) if (!filled.has(n)) out.push(n);
+  return out;
+}
+
+/**
+ * The autosave indicator.
+ *
+ * "saved" is only ever said about a write the server confirmed, and the time shown is the server's
+ * own `draft.savedAt` — not a client clock, and never a bare setTimeout pretending
+ * (docs/prototype-port-rules.md Rule 2's last row bans exactly that). A failed save says so and
+ * keeps saying so, because the alternative is her walking away from text that is not stored.
+ */
+export function intakeSaveLine(s: { state: string; savedAt?: string; error?: string }): string {
+  if (s.state === "saving") return "saving…";
+  if (s.state === "failed") return "NOT SAVED — " + (s.error || "the server did not answer");
+  if (s.state === "saved") {
+    // The word is about the write, which the server confirmed. The TIME is about the server's
+    // clock, so it only appears when the server sent one that parses — never filled in locally.
+    const d = s.savedAt ? new Date(s.savedAt) : null;
+    if (!d || isNaN(d.getTime())) return "saved";
+    return "saved " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  return "";
+}
+
+/**
+ * A mirror of intake-draft.ts's slugError, word for word, so a typo is caught before a round trip.
+ * Convenience only: every draft route and the commit route re-check it server-side, and the
+ * server's answer is what renders if the two ever disagree.
+ */
+export function intakeSlugError(slug: string): string | null {
+  if (typeof slug !== "string" || !/^[a-z0-9][\w-]*$/.test(slug)) return "bad venture name";
+  return null;
 }
 
 export function jobRoom(kind: string): JobRoom {
@@ -1731,6 +1807,55 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     border-radius:7px; background:#fff; color:var(--ink); resize:vertical; }
   .vchoice-row.pick { cursor:pointer; }
   .vchoice-row.pick:hover .n { text-decoration:underline; }
+  /* ── The intake interview ──────────────────────────────────────────────────────────────────────
+     One question at a time, the same register rules as the rest of the room. The box she types in
+     is Georgia + the blue rule, because what goes in it is HER words and nothing else on this
+     screen may wear that pair (docs/prototype-port-rules.md Rule 3). The question above it is the
+     app asking, so it is sans. Nothing here is purple: no AI writes a single character of an
+     intake answer. */
+  .iv { max-width:660px; display:flex; flex-direction:column; gap:0; }
+  .iv-head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  .iv-block { font-size:13px; line-height:1.5; color:#8a7f6d; margin-top:10px; }
+  .iv-bar { height:3px; background:#eae2ce; border-radius:2px; margin-top:10px; max-width:420px; overflow:hidden; }
+  .iv-bar span { display:block; height:3px; background:#2f5d9a; }
+  .iv-q { font-size:19px; line-height:1.5; color:var(--ink); margin-top:20px; max-width:600px; }
+  .iv-hint { font-size:12.5px; line-height:1.5; color:#8a7f6d; margin-top:8px; max-width:520px; }
+  /* HER register. Same Georgia + blue rule as .vmine, because it is the same thing: her words. */
+  .iv-in { width:100%; box-sizing:border-box; margin-top:14px; min-height:132px;
+    font:400 18px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); padding:12px 14px 12px 16px;
+    border:1px solid #d8cfbb; border-left:2px solid var(--blue); border-radius:0 7px 7px 0;
+    background:#fff; resize:vertical; }
+  .iv-in:focus { outline:none; border-color:#b9c9dd; border-left-color:var(--blue); }
+  .iv-save { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em;
+    color:#a89a80; margin-top:8px; min-height:14px; }
+  .iv-save.bad { color:var(--red); }
+  .iv-nav { display:flex; gap:8px; margin-top:18px; flex-wrap:wrap; align-items:center; }
+  .iv-nav button { border:1px solid #e7e1d6; background:var(--card); color:var(--ink); border-radius:7px;
+    padding:7px 13px; font-size:13.5px; cursor:pointer; }
+  .iv-nav button.primary { border-color:var(--ink); background:var(--ink); color:#faf8f3; font-weight:600; }
+  .iv-nav button:disabled { opacity:.5; cursor:default; }
+  .iv-nav .grow { flex:1; }
+  /* The jump grid. Answered and unanswered are visibly different, and both are counted, never
+     estimated. */
+  .iv-jump { display:flex; flex-wrap:wrap; gap:6px; margin-top:22px; padding-top:16px;
+    border-top:1px solid var(--line); }
+  .iv-jump button { width:29px; height:29px; padding:0; border-radius:6px; cursor:pointer;
+    font:10.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; border:1px solid #e2d8c1;
+    background:var(--card); color:#a89a80; }
+  .iv-jump button.done { border-color:#c3d3e8; background:#eef2f8; color:#2f5d9a; }
+  .iv-jump button.here { border-color:var(--ink); color:var(--ink); font-weight:700; }
+  .iv-panel { margin-top:18px; }
+  .iv-field { margin-top:17px; }
+  .iv-field .lbl { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.06em; color:#a89a80; }
+  .iv-field .sub { font-size:12.5px; line-height:1.5; color:#8a7f6d; margin-top:4px; max-width:520px; }
+  .iv-field input, .iv-field textarea { width:100%; box-sizing:border-box; margin-top:8px;
+    font:400 16px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); padding:9px 11px 9px 13px;
+    border:1px solid #d8cfbb; border-left:2px solid var(--blue); border-radius:0 7px 7px 0;
+    background:#fff; resize:vertical; }
+  .iv-field input[type=number] { max-width:120px; }
+  .iv-field .lo { border:1px solid #e2d8c1; background:var(--card); color:#7a7266; border-radius:6px;
+    padding:3px 9px; font:10.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; cursor:pointer; margin-top:7px; }
   /* The destination room's progress strip: same data, its own shorter strings. */
   .room-strip { border-top:1px solid #dfd4bb; border-bottom:1px solid #efe7d6; padding:15px 0 17px;
     margin-bottom:28px; max-width:600px; }
@@ -1973,12 +2098,16 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="sheet-head"><h2>Venture</h2><span class="grow"></span>
         <select id="ventureSlug"></select>
         <span class="src" id="ventureDay"></span>
+        <button id="ventureStartBtn">Start a venture</button>
       </div>
       <div class="sheet-sub">The 14-day build, read straight out of canon. Nothing on this screen is stored as a conversation: every line below is derived from the ledger, the decisions, the artifacts and your own intake answers.</div>
     </div>
-    <div class="sheet vroom">
+    <div class="sheet vroom" id="ventureRead">
       <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
       <div class="vrail"><div class="vrail-in" id="ventureRail"></div></div>
+    </div>
+    <div class="sheet" id="ventureIntake" hidden style="padding:26px 40px 34px">
+      <div id="intakeBox"></div>
     </div>
   </section>
   <section class="view" id="roomSignals" hidden>
@@ -3731,7 +3860,7 @@ async function loadVentureList(){
     ventureSlug = null;
     sel.hidden = true;
     $("#ventureDay").textContent = "";
-    $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. Start one with /venture new &lt;slug&gt; in a terminal.</div>';
+    $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. "Start a venture" above runs the whole intake interview here — 25 questions, one at a time.</div>';
     $("#ventureRail").innerHTML = "";
     return;
   }
@@ -4140,6 +4269,416 @@ document.addEventListener("click", e=>{
       else if(res.result && res.result.reason) { ventureOpen = { key:"checkpoint:"+cp.checkpointId, kind:"error", value:"", error: res.result.reason }; renderVenture(); }
     });
   }
+});
+
+// ── the intake interview ─────────────────────────────────────────────────────────────────────────
+//
+// The 25-question interview from venture/rules.md §4.2, conducted here instead of in a terminal.
+// One question at a time (SKILL.md step 1: "not a form dump"), autosaved to the scratch buffer
+// behind /api/venture/:slug/intake/..., then the two panels kickoffVenture cannot write without --
+// voice evidence and the Day 14 scorecard -- and then the commit.
+//
+// Four things this screen refuses to do:
+//   * carry its own copy of the questions. IV_QUESTIONS is serialized from src/venture/intake.ts.
+//   * say "saved" on a timer. The word only appears after the server answered, and the time shown
+//     is the server's own savedAt (see intakeSaveLine).
+//   * estimate anything. "Question 7 of 25" is counted. There is no minutes-remaining, because
+//     nothing here measures how long an interview takes.
+//   * decide what complete means. It marks the empty boxes for her convenience; the commit route
+//     is what refuses, and its sentence is what renders.
+const IV_QUESTIONS = ${JSON.stringify(INTAKE_QUESTIONS)};
+const IV_TOTAL = IV_QUESTIONS.length;
+const IV_RESUME_KEY = "venture-intake-in-progress";
+const IV_VOICE_STEP = IV_TOTAL + 1;
+const IV_SCORE_STEP = IV_TOTAL + 2;
+
+// Rule 5 mirrors of intakeProgressLine / intakeUnanswered / intakeSaveLine / intakeSlugError in
+// page.ts. Change one, change both.
+function ivProgressLine(step, total){
+  if(step >= 1 && step <= total) return "Question "+step+" of "+total;
+  if(step === total + 1) return "Voice evidence";
+  if(step === total + 2) return "Day 14 scorecard";
+  return "";
+}
+function ivUnanswered(drafts, total){
+  const filled = new Set();
+  for(const d of drafts) if(d.text && d.text.trim()) filled.add(d.n);
+  const out = [];
+  for(let n=1; n<=total; n++) if(!filled.has(n)) out.push(n);
+  return out;
+}
+function ivSaveLine(s){
+  if(s.state === "saving") return "saving…";
+  if(s.state === "failed") return "NOT SAVED — "+(s.error || "the server did not answer");
+  if(s.state === "saved"){
+    const d = s.savedAt ? new Date(s.savedAt) : null;
+    if(!d || isNaN(d.getTime())) return "saved";
+    return "saved "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  }
+  return "";
+}
+function ivSlugError(slug){
+  if(typeof slug !== "string" || !/^[a-z0-9][\\w-]*$/.test(slug)) return "bad venture name";
+  return null;
+}
+// ── end of the intake mirror ──
+
+let ivSlug = null;              // null = not in the interview
+let ivStep = 1;
+let ivAnswers = new Map();      // question number -> text, as last seen by the server or typed here
+let ivSave = { state:"", savedAt:"", error:"" };
+let ivTimer = null;             // the debounce
+let ivFlight = null;            // the save in the air, so a commit can wait for it
+let ivDirty = 0;                // question number with text the debounce has not sent yet, or 0
+let ivVoice = { samples:"", worldview:"", natural:"", refused:"" };
+let ivScore = { posts:"", pace:"", views:"", optin:"", quality:"", sustain:"" };
+let ivRefusal = "";             // the server's sentence, verbatim
+let ivMissing = [];             // question numbers it named, for marking the grid
+let ivBusy = false;
+const IV_DEBOUNCE_MS = 600;
+
+// Which venture is mid-interview, so a reload lands back in it instead of on a slug field. The
+// answers themselves are on the server -- this remembers only the name, and losing it costs one
+// retype.
+function ivRemember(slug){ try { if(slug) localStorage.setItem(IV_RESUME_KEY, slug); else localStorage.removeItem(IV_RESUME_KEY); } catch(e){} }
+function ivRemembered(){ try { return localStorage.getItem(IV_RESUME_KEY); } catch(e){ return null; } }
+// A remembered name is only worth offering while it is still an unfinished interview. Once the
+// venture exists its drafts have been cleared, so resuming it would open 25 empty boxes for a
+// venture that is already on the desk.
+function ivResumable(){
+  const s = ivRemembered();
+  if(!s || ivSlugError(s)) return null;
+  if((VENTURE_SLUGS||[]).includes(s)){ ivRemember(null); return null; }
+  return s;
+}
+
+function ivShow(on){
+  $("#ventureRead").hidden = on;
+  $("#ventureIntake").hidden = !on;
+  $("#ventureStartBtn").textContent = on ? "Back to the venture" : "Start a venture";
+}
+function ivDraftList(){
+  const out = [];
+  ivAnswers.forEach((text,n)=>out.push({ n:n, text:text }));
+  return out;
+}
+function ivApi(path){ return "/api/venture/"+encodeURIComponent(ivSlug)+path; }
+
+async function ivLoadAll(){
+  const r = await fetch(ivApi("/intake/drafts"));
+  const j = await r.json();
+  ivAnswers = new Map();
+  if(j.ok) for(const d of (j.drafts||[])) ivAnswers.set(d.n, d.text);
+}
+// Re-read the one question she just landed on. Cheap (a local file) and it means the box always
+// shows what is actually stored, including a save that failed in another tab. Only ever called
+// after a flush, so it can never overwrite text the debounce still owed.
+async function ivLoadOne(n){
+  try {
+    const r = await fetch(ivApi("/intake/"+n+"/draft"));
+    const j = await r.json();
+    if(j.ok) ivAnswers.set(n, j.draft ? j.draft.text : (ivAnswers.get(n) || ""));
+  } catch(e){ /* keep what is on screen; the save line already says if a write failed */ }
+}
+
+function ivPaintSave(){
+  const el = $("#ivSave");
+  if(!el) return;
+  el.textContent = ivSaveLine(ivSave);
+  el.className = "iv-save" + (ivSave.state === "failed" ? " bad" : "");
+}
+function ivPaintJump(){
+  const el = $("#ivJump");
+  if(el) el.innerHTML = ivJumpHtml();
+}
+
+async function ivSaveNow(n, text){
+  ivSave = { state:"saving", savedAt:"", error:"" };
+  ivPaintSave();
+  const p = (async ()=>{
+    try {
+      const r = await fetch(ivApi("/intake/"+n+"/draft"), {
+        method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ text: text })
+      });
+      const j = await r.json();
+      // "saved" is the server's word, and savedAt is the server's clock. Nothing here invents it.
+      if(j.ok && j.draft){ ivSave = { state:"saved", savedAt: j.draft.savedAt, error:"" }; ivAnswers.set(n, j.draft.text); }
+      else ivSave = { state:"failed", savedAt:"", error: j.error || "the server refused the save" };
+    } catch(e){
+      ivSave = { state:"failed", savedAt:"", error: String(e && e.message || e) };
+    }
+    ivPaintSave();
+    ivPaintJump();
+  })();
+  ivFlight = p;
+  await p;
+  if(ivFlight === p) ivFlight = null;
+}
+
+function ivQueue(n, text){
+  ivAnswers.set(n, text);
+  ivDirty = n;
+  ivPaintJump();
+  if(ivTimer) clearTimeout(ivTimer);
+  ivTimer = setTimeout(()=>{ ivTimer = null; ivDirty = 0; ivSaveNow(n, ivAnswers.get(n) || ""); }, IV_DEBOUNCE_MS);
+}
+
+// Everything that leaves a question -- next, back, a jump, the commit -- goes through here first.
+// Without it the last thing she typed sits in the debounce and the commit reads a stale buffer.
+async function ivFlush(){
+  if(ivTimer){ clearTimeout(ivTimer); ivTimer = null; }
+  const n = ivDirty;
+  ivDirty = 0;
+  if(n) await ivSaveNow(n, ivAnswers.get(n) || "");
+  else if(ivFlight) await ivFlight;
+}
+
+async function ivGo(step){
+  if(step < 1 || step > IV_SCORE_STEP) return;
+  await ivFlush();
+  ivRefusal = "";
+  ivStep = step;
+  if(step <= IV_TOTAL) await ivLoadOne(step);
+  renderIntake();
+  const box = $("#ivIn");
+  if(box) box.focus();
+}
+
+async function ivEnter(slug){
+  ivSlug = slug;
+  ivStep = 1;
+  ivRefusal = "";
+  ivMissing = [];
+  ivSave = { state:"", savedAt:"", error:"" };
+  ivRemember(slug);
+  await ivLoadAll();
+  // Open on the first unanswered question, so resuming picks up where she stopped rather than
+  // making her page through what she already wrote.
+  const gaps = ivUnanswered(ivDraftList(), IV_TOTAL);
+  ivStep = gaps.length ? gaps[0] : IV_VOICE_STEP;
+  ivShow(true);
+  renderIntake();
+  const box = $("#ivIn");
+  if(box) box.focus();
+}
+
+function ivExit(){
+  ivSlug = null;
+  ivShow(false);
+}
+
+function ivLines(s){ return String(s||"").split("\\n").map(x=>x.trim()).filter(Boolean); }
+
+async function ivCommit(){
+  if(ivBusy) return;
+  await ivFlush();
+  ivBusy = true;
+  ivRefusal = "";
+  renderIntake();
+  const body = {
+    voice: {
+      writing_samples: ivLines(ivVoice.samples),
+      worldview_statement: ivVoice.worldview,
+      natural_phrases: ivLines(ivVoice.natural),
+      refused_phrases_tones: ivLines(ivVoice.refused),
+    },
+    scorecard: {
+      required_live_posts: Number(ivScore.posts),
+      ongoing_pace: ivScore.pace,
+      views_or_clicks_target: ivScore.views,
+      opt_in_target: ivScore.optin,
+      response_quality_test: ivScore.quality,
+      sustainability_test: ivScore.sustain,
+    },
+  };
+  let res = null;
+  try {
+    const r = await fetch(ivApi("/intake/commit"), { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(body) });
+    res = await r.json();
+  } catch(e){
+    res = { ok:false, error: String(e && e.message || e) };
+  }
+  ivBusy = false;
+  const out = (res && res.result) || res || {};
+  if(!out.ok){
+    // Verbatim. kickoffVenture's refusals name the qids that are missing and what the scorecard
+    // still needs; rewording them here would throw away the useful half.
+    ivRefusal = out.error || (res && res.error) || "the commit was refused";
+    ivMissing = out.missing || [];
+    renderIntake();
+    return;
+  }
+  // Only now is the scratch buffer safe to drop -- the real answers are in intake.md.
+  const newSlug = ivSlug;
+  try { await fetch(ivApi("/intake/drafts/clear"), { method:"POST", headers:{"content-type":"application/json"}, body:"{}" }); } catch(e){}
+  ivRemember(null);
+  ivExit();
+  flash(out.alreadyKickedOff ? (newSlug + " was already kicked off") : ("intake.md written — " + newSlug + " is on the desk"));
+  ventureSlug = newSlug;
+  await loadVentureList();
+}
+
+// ── render ───────────────────────────────────────────────────────────────────────────────────────
+
+function ivJumpHtml(){
+  const gaps = new Set(ivUnanswered(ivDraftList(), IV_TOTAL));
+  let out = "";
+  for(let n=1; n<=IV_TOTAL; n++){
+    const cls = (gaps.has(n) ? "" : "done") + (n === ivStep ? " here" : "");
+    out += '<button class="'+cls+'" data-ivgo="'+n+'" title="'+esc(IV_QUESTIONS[n-1].question)+'">'+n+'</button>';
+  }
+  return out;
+}
+
+function ivHeadHtml(){
+  const answered = IV_TOTAL - ivUnanswered(ivDraftList(), IV_TOTAL).length;
+  const pct = Math.round(answered / IV_TOTAL * 100);
+  return '<div class="iv-head"><div class="vmono">'+esc(ivProgressLine(ivStep, IV_TOTAL))+'</div>'
+    + '<span class="grow" style="flex:1"></span>'
+    + '<div class="vmono">'+answered+' of '+IV_TOTAL+' answered</div></div>'
+    + '<div class="iv-bar"><span style="width:'+pct+'%"></span></div>';
+}
+
+function ivField(key, label, sub, value, multiline){
+  const tag = multiline
+    ? '<textarea data-ivf="'+key+'" rows="'+(multiline===true?3:multiline)+'">'+esc(value)+'</textarea>'
+    : '<input data-ivf="'+key+'" value="'+esc(value)+'">';
+  return '<div class="iv-field"><div class="lbl">'+esc(label)+'</div>'
+    + '<div class="sub">'+esc(sub)+'</div>'+tag+'</div>';
+}
+
+function ivRefusalHtml(){
+  return ivRefusal ? '<div class="vrefusal">'+esc(ivRefusal)+'</div>' : "";
+}
+
+function ivQuestionHtml(){
+  const q = IV_QUESTIONS[ivStep-1];
+  return ivHeadHtml()
+    + '<div class="iv-block">'+esc("Block "+q.block)+'</div>'
+    + '<div class="iv-q">'+esc(q.question)+'</div>'
+    + '<div class="iv-hint">Your words, stored exactly as you type them. Nothing here gets paraphrased, and nothing is drafted for you.</div>'
+    + '<textarea class="iv-in" id="ivIn" data-ivq="'+ivStep+'">'+esc(ivAnswers.get(ivStep) || "")+'</textarea>'
+    + '<div class="iv-save" id="ivSave">'+esc(ivSaveLine(ivSave))+'</div>'
+    + '<div class="iv-nav">'
+    + '<button id="ivBack"'+(ivStep===1?" disabled":"")+'>Back</button>'
+    + '<button class="primary" id="ivNext">'+(ivStep===IV_TOTAL?"On to voice evidence":"Next")+'</button>'
+    + '<span class="grow"></span>'
+    + '<button id="ivLeave">Leave it for now</button>'
+    + '</div>'
+    + ivRefusalHtml()
+    + '<div class="iv-jump" id="ivJump">'+ivJumpHtml()+'</div>';
+}
+
+function ivVoiceHtml(){
+  return ivHeadHtml()
+    + '<div class="iv-q">What your writing sounds like.</div>'
+    + '<div class="iv-hint">Phase 1 drafts in your voice off this, so it is written into intake.md alongside the 25. One per line where a list is asked for.</div>'
+    + '<div class="iv-panel">'
+    + ivField("samples", "Writing samples", "One to three things you have written that sound like you. A link or the text itself.", ivVoice.samples, 3)
+    + ivField("worldview", "Worldview statement", "The thing you believe that the drafts have to keep believing.", ivVoice.worldview, 3)
+    + ivField("natural", "Phrases you use", "Words that are actually yours. One per line.", ivVoice.natural, 3)
+    + ivField("refused", "Phrases and tones you refuse", "What you never want to see under your name. One per line.", ivVoice.refused, 3)
+    + '</div>'
+    + '<div class="iv-nav"><button id="ivBack">Back</button>'
+    + '<button class="primary" id="ivNext">On to the Day 14 scorecard</button>'
+    + '<span class="grow"></span><button id="ivLeave">Leave it for now</button></div>'
+    + ivRefusalHtml();
+}
+
+function ivScoreHtml(){
+  const disabled = ivBusy ? " disabled" : "";
+  return ivHeadHtml()
+    + '<div class="iv-q">What Day 14 gets scored against.</div>'
+    + '<div class="iv-hint">Fixed now, not after the fact (venture/rules.md §4.4). Two of the fields are set by the rule itself and are not asked here: the eligible-response target (minimum 20, target 30) and the five final-decision options.</div>'
+    + '<div class="iv-panel">'
+    + ivField("posts", "Required live Phase 1 posts", "How many have to actually be live to count the phase as run.", ivScore.posts, false)
+    + ivField("pace", "Ongoing posting pace", "In your own words. Nothing measures this for you.", ivScore.pace, false)
+    + ivField("views", "Qualified views or clicks target", "If you have no baseline to set one from, say learning_only rather than picking a number.", ivScore.views, false)
+    + '<button class="lo" data-ivlo="views">use learning_only</button>'
+    + ivField("optin", "Landing-page opt-in target", "Same rule: learning_only if there is nothing to base a number on.", ivScore.optin, false)
+    + '<button class="lo" data-ivlo="optin">use learning_only</button>'
+    + ivField("quality", "Response-quality test", "How you will tell a useful response from a polite one.", ivScore.quality, 2)
+    + ivField("sustain", "Sustainability test", "Measured against the time budget you gave in question 20.", ivScore.sustain, 2)
+    + '</div>'
+    + '<div class="iv-nav"><button id="ivBack"'+disabled+'>Back</button>'
+    + '<button class="primary" id="ivCommit"'+disabled+'>'+(ivBusy?"Writing…":"Write intake.md")+'</button>'
+    + '<span class="grow"></span><button id="ivLeave"'+disabled+'>Leave it for now</button></div>'
+    + '<div class="iv-hint">This is the write. It creates venture/'+esc(ivSlug||"")+'/, renders intake.md from your 25 answers verbatim, and records the kickoff in canon. Nothing publishes.</div>'
+    + ivRefusalHtml()
+    + (ivMissing.length ? '<div class="iv-hint">Unanswered: '+ivMissing.join(", ")+'</div><div class="iv-jump" id="ivJump">'+ivJumpHtml()+'</div>' : "");
+}
+
+function ivStartHtml(){
+  // The resume offer sits BESIDE the name field, never in front of it. Making it automatic would
+  // mean that once one interview is half-finished there is no way to start a second: every click
+  // of "Start a venture" would drop straight back into the first.
+  const resume = ivResumable();
+  return '<div class="vmono">START A VENTURE</div>'
+    + (resume
+        ? '<div class="iv-panel"><div class="iv-q">You left one unfinished.</div>'
+          + '<div class="iv-hint">Your answers to '+esc(resume)+' are still on the server, exactly where you stopped.</div>'
+          + '<div class="iv-nav"><button class="primary" id="ivResume">Pick up '+esc(resume)+'</button>'
+          + '<button id="ivForget">Forget it</button></div></div>'
+        : "")
+    + '<div class="iv-q" style="margin-top:'+(resume?"26px":"0")+'">'+(resume?"Or start a new one.":"What should it be called?")+'</div>'
+    + '<div class="iv-hint">Lowercase letters, numbers and dashes. This becomes venture/&lt;name&gt;/ on disk. Typing a name you already started brings those answers back too.</div>'
+    + '<div class="iv-field"><input id="ivSlugIn" placeholder="voter-choice"></div>'
+    + '<div class="iv-nav"><button class="primary" id="ivBegin">Begin the interview</button>'
+    + '<span class="grow"></span><button id="ivLeave">Cancel</button></div>'
+    + ivRefusalHtml();
+}
+
+function renderIntake(){
+  const box = $("#intakeBox");
+  if(!box) return;
+  if(!ivSlug){ box.innerHTML = ivStartHtml(); const s = $("#ivSlugIn"); if(s) s.focus(); return; }
+  const body = ivStep <= IV_TOTAL ? ivQuestionHtml() : ivStep === IV_VOICE_STEP ? ivVoiceHtml() : ivScoreHtml();
+  box.innerHTML = '<div class="iv"><div class="vmono">INTAKE — '+esc(ivSlug)+'</div>'+body+'</div>';
+}
+
+// One delegated listener each, like the Venture thread above: renderIntake() replaces the whole
+// subtree, so per-node handlers would be rebound on every navigation.
+document.addEventListener("input", e=>{
+  const t = e.target;
+  if(!t || !t.closest || !t.closest("#ventureIntake")) return;
+  if(t.id === "ivIn") return ivQueue(Number(t.dataset.ivq), t.value);
+  const f = t.dataset && t.dataset.ivf;
+  // The voice and scorecard panels are one sitting, not autosaved: the draft store holds question
+  // numbers 1..25 and nothing else, and widening that contract to carry ten loose fields is a
+  // bigger change than this screen needs. They live in memory until the commit.
+  if(f && Object.prototype.hasOwnProperty.call(ivVoice, f)) ivVoice[f] = t.value;
+  else if(f && Object.prototype.hasOwnProperty.call(ivScore, f)) ivScore[f] = t.value;
+});
+document.addEventListener("click", e=>{
+  const t = e.target;
+  if(!t || !t.closest) return;
+  if(t.id === "ventureStartBtn"){
+    if(ivSlug){ ivShow(false); ivSlug = null; return; }
+    ivShow(true);
+    ivRefusal = "";
+    return renderIntake();
+  }
+  if(!t.closest("#ventureIntake")) return;
+
+  if(t.id === "ivResume"){ const s = ivResumable(); return s ? ivEnter(s) : renderIntake(); }
+  if(t.id === "ivForget"){ ivRemember(null); return renderIntake(); }
+
+  if(t.id === "ivBegin"){
+    const el = $("#ivSlugIn");
+    const slug = (el ? el.value : "").trim();
+    const bad = ivSlugError(slug);
+    if(bad){ ivRefusal = bad + " — lowercase letters, numbers and dashes, starting with a letter or a number"; return renderIntake(); }
+    if((VENTURE_SLUGS||[]).includes(slug)){ ivRefusal = slug + " already exists. Pick another name, or open it from the picker above."; return renderIntake(); }
+    return ivEnter(slug);
+  }
+  if(t.id === "ivLeave"){ ivRemember(ivSlug); return ivExit(); }
+  if(t.id === "ivBack") return ivGo(ivStep - 1);
+  if(t.id === "ivNext") return ivGo(ivStep + 1);
+  if(t.id === "ivCommit") return ivCommit();
+  const lo = t.dataset && t.dataset.ivlo;
+  if(lo){ ivScore[lo] = "learning_only"; return renderIntake(); }
+  const go = t.closest("[data-ivgo]");
+  if(go) return ivGo(Number(go.dataset.ivgo));
 });
 
 async function loadFiction(){

@@ -18,6 +18,24 @@ export const INTAKE_DRAFT_DIR = join(homedir(), ".content-agents", "venture-inta
 // hardcoding the count, so this guard tracks it if the interview ever changes.
 export const MAX_QUESTION = INTAKE_QUESTIONS.length;
 
+// The three routes in serve.ts that wrap this module, declared here for the wiring guard.
+//
+// They were invisible to BOTH of page.test.ts's guards, which is worse than it sounds. The first
+// guard finds routes by scanning serve.ts for `url.pathname === "..."` literals, and these three
+// are regex-dispatched (they carry a slug and a question number), so it never saw them. The second
+// guard reads its route list from venture-reads.ts/venture-writes.ts, and these are written
+// straight into serve.ts rather than through either dispatcher, so it never saw them either. A
+// route in neither list is a route no test can notice has no caller.
+//
+// So the list is declared next to the functions it exposes, the same way VENTURE_WRITE_PATHS is,
+// and page.test.ts asserts BOTH directions: every path here has a caller in the page, and every
+// regex route literal in serve.ts is declared in one of these lists — so the next regex route
+// added straight into serve.ts fails the guard until it is declared too.
+export const INTAKE_DRAFT_PATHS = [
+  "/api/venture/:slug/intake/:n/draft", // POST save one answer, GET restore one answer
+  "/api/venture/:slug/intake/drafts", // GET restore the whole in-progress interview
+];
+
 export interface IntakeDraft {
   n: number; // 1-based question number
   text: string;
@@ -111,8 +129,9 @@ export function readIntakeDraft(slug: string, n: number, root: string = INTAKE_D
 }
 
 // Drop a venture's scratch buffer once its real answers are committed, so stale drafts never
-// shadow the saved intake. No route calls this yet; the Venture room will, right after the
-// interview's final write.
+// shadow the saved intake. Called by the room right after a successful commit — deliberately from
+// the client rather than folded into the commit route, so the clear is one visible step and a
+// failed clear cannot be mistaken for a failed kickoff.
 export function clearIntakeDrafts(slug: string, root: string = INTAKE_DRAFT_DIR): { ok: boolean; error?: string; cleared: boolean } {
   const bad = slugError(slug);
   if (bad) return { ok: false, error: bad, cleared: false };

@@ -1,4 +1,4 @@
-// The Venture room's write side: the eleven POSTs behind its buttons.
+// The Venture room's write side: the twelve POSTs behind its buttons.
 //
 // Sibling of venture-reads.ts and the same shape — one dispatcher, serve.ts wires it in five
 // lines. What is different, and what this file is really about, is that every one of these
@@ -33,6 +33,7 @@ import { day14Decide } from "../venture/phase4.js";
 import { loadRules } from "../venture/rules.js";
 import { ventureDir } from "../venture/paths.js";
 import { clearIntakeDrafts } from "./intake-draft.js";
+import { commitIntake } from "./intake-commit.js";
 import { existsSync } from "node:fs";
 
 export interface VentureWriteResult {
@@ -215,6 +216,22 @@ const ROUTES: Route[] = [
     requiresVenture: false,
     handler: (slug) => ({ result: clearIntakeDrafts(slug) }),
   },
+  // The end of the interview: the one route that turns 25 scratch drafts into a real venture. Also
+  // requiresVenture:false, and for the strongest form of that reason — this route is what CREATES
+  // venture/<slug>/. See src/review/intake-commit.ts: it reads the answers back off the draft
+  // store, adds the voice-evidence rule kickoffVenture does not carry, and hands everything else
+  // to kickoffVenture unchanged.
+  //
+  // Answers a refusal as 200 with {ok:false} inside `result`, unlike every route above it. That is
+  // deliberate: an unfinished interview is a fact about the drafts, not a bad request, and the
+  // body carries the `missing` question numbers the screen marks its boxes from. A 400 would make
+  // a normal half-finished interview read as an error.
+  {
+    method: "POST",
+    pattern: /^\/api\/venture\/([^/]+)\/intake\/commit$/,
+    requiresVenture: false,
+    handler: (slug, _params, body) => ({ result: commitIntake(slug, { voice: body.voice, scorecard: body.scorecard }) }),
+  },
 ];
 
 function requireArtifact(slug: string, artifactId: string): VentureArtifact {
@@ -266,6 +283,7 @@ export const VENTURE_WRITE_PATHS = [
   "/api/venture/:slug/checkpoint/:id/clear",
   "/api/venture/:slug/pace",
   "/api/venture/:slug/intake/drafts/clear",
+  "/api/venture/:slug/intake/commit",
 ];
 
 // Asserted by venture-writes.test.ts: the dispatch table has exactly this many routes, so a route
