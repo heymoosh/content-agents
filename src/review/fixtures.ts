@@ -689,11 +689,11 @@ const FX_RETRACTED = fxArtifact({
 // one Muxin has been through herself. Without a fixture for the second, the only way to review that
 // register is to have a real venture with a real edit in it.
 const FX_AI_DRAFT = fxArtifact({
-  artifact_id: "p1-essay-04", title: "FIXTURE — still my draft, and it says so",
+  artifact_id: "p1-essay-04", title: "FIXTURE: still my draft, and it says so",
   body_path: "phase-1-attention/p1-essay-04.md",
 });
 const FX_EDITED_BY_MUXIN = fxArtifact({
-  artifact_id: "p1-essay-05", title: "FIXTURE — the one you rewrote",
+  artifact_id: "p1-essay-05", title: "FIXTURE: the one you rewrote",
   body_path: "phase-1-attention/p1-essay-05.md",
   body_edited_by_muxin_at: FX_NOW,
 });

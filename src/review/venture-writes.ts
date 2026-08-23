@@ -250,7 +250,11 @@ const ROUTES: Route[] = [
   //
   // The field names are the response-ingest CLI's own JSON keys (src/venture/phase3.ts), not a
   // second dialect: the same body works on both surfaces, and the required-field list below is the
-  // same one the CLI's requireNonEmpty checks. Everything past shape is ingestResponse's, including
+  // same one the CLI's requireNonEmpty checks -- received_at included, deliberately. Defaulting it
+  // to the ingest clock would stamp "arrived today" on an email that arrived a week ago, which is a
+  // date nobody supplied written down as though someone had. The form pre-fills today so it is one
+  // keystroke when today is right, but the value that gets stored is hers either way.
+  // Everything past shape is ingestResponse's, including
   // requireRulesVersionMatch and requireResearchHashKey (which fires only when an identifier is
   // actually supplied, and whose sentence names the env var to set).
   //
@@ -279,6 +283,7 @@ const ROUTES: Route[] = [
         );
       }
       const required = {
+        received_at: str(body, "received_at"),
         exact_quote: str(body, "exact_quote"),
         redacted_quote: str(body, "redacted_quote"),
         stuck_point: str(body, "stuck_point"),
@@ -305,7 +310,7 @@ const ROUTES: Route[] = [
         slug,
         {
           source: source as ResponseSource,
-          receivedAt: str(body, "received_at")?.trim() || at,
+          receivedAt: required.received_at!.trim(),
           rawIdentifier: platform ? { platform, stableUserId } : null,
           targetAudienceEligible: body.target_audience_eligible,
           exactQuote: required.exact_quote!,

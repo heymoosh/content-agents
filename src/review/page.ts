@@ -4065,8 +4065,11 @@ function vSubmitReason(choice, item){
 // SERVER just computed and then, on the refetch, the gate it computes again from the log. This
 // screen has no arithmetic of its own about who counts, which is the only way "20 of 30" can be
 // trusted to mean what ingestResponse decided rather than what a form hoped.
-const V_RESPONSE_FIELDS = ["source","exact_quote","redacted_quote","stuck_point","desired_outcome",
+const V_RESPONSE_FIELDS = ["source","received_at","exact_quote","redacted_quote","stuck_point","desired_outcome",
   "emotional_intensity","target_audience_eligible","id_platform","id_value","exclusion_reason"];
+// The browser's own clock, and the only thing it is used for: pre-filling a box she can change.
+// Nothing derives a stored date from it.
+function vToday(){ const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function vOpenResponse(){
   ventureOpen = { key:"gate:response", kind:"response", value:"", error:"", fields:{} };
   renderVenture();
@@ -4083,6 +4086,7 @@ function vSubmitResponse(){
   const f = vCaptureResponse();
   const body = {
     source: f.source,
+    received_at: f.received_at,
     exact_quote: f.exact_quote,
     redacted_quote: f.redacted_quote,
     stuck_point: f.stuck_point,
@@ -4324,6 +4328,13 @@ function vResponseForm(o){
   return '<div class="lbl">ONE RESPONSE, IN THEIR WORDS AND YOUR JUDGMENT</div>'
     + '<div class="ask">Nothing you type here is read back to you later. The log answers in counts only, and it stays out of git.</div>'
     + vRespSelect("source", "WHERE IT CAME FROM", "", o, V_RESP_SOURCES, "pick one")
+    // Pre-filled with today because most transcribing happens the day it lands, and left editable
+    // because plenty of it does not. The date that gets stored is whichever one is in this box when
+    // she sends it -- the server requires the field rather than reading its own clock, so an email
+    // from last week never gets today written on it just because today is when she typed it up.
+    + '<div style="margin-top:14px"><div class="lbl">WHEN IT REACHED YOU</div>'
+    + '<div class="sub">Today unless you change it. Nothing here can tell when it actually arrived.</div>'
+    + '<input type="date" id="vr-received_at" value="'+esc((o.fields && o.fields.received_at) || vToday())+'" /></div>'
     + vRespField("exact_quote", "WHAT THEY ACTUALLY SAID", "Their words, not yours and not mine. Paste or type them as they came.", o, { textarea:true, rows:4, other:true })
     + vRespField("redacted_quote", "THE SAME THING, WITH IDENTIFYING BITS TAKEN OUT", "This is the only version that ever leaves the log, so it is the one a cluster quotes. I do not redact it for you.", o, { textarea:true, rows:4, other:true })
     + vRespField("stuck_point", "WHERE THEY ARE STUCK", "One line, in your words.", o, {})

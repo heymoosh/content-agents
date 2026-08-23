@@ -723,6 +723,7 @@ function withHashKey<T>(fn: () => T): T {
 function baseResponse(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     source: "survey",
+    received_at: "2026-08-19",
     exact_quote: "I keep rewriting the same brief and it never gets shorter",
     redacted_quote: "I keep rewriting the same brief and it never gets shorter",
     stuck_point: "cannot cut a brief down",
@@ -782,6 +783,18 @@ test("responses: a string 'true' is not a judgment, and neither is a missing one
     kickoff();
     assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ target_audience_eligible: "true" })), /say whether this person is in the audience/);
     assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ target_audience_eligible: null })), /say whether this person is in the audience/);
+  });
+});
+
+test("responses: the day it arrived is required, never taken off the ingest clock", () => {
+  withRoot(() => {
+    kickoff();
+    // A response transcribed today may have arrived a fortnight ago, and the server has no way to
+    // know which. So it asks rather than stamping now() and calling that a fact.
+    const { received_at, ...withoutIt } = baseResponse();
+    void received_at;
+    assert.equal(refusal(`/api/venture/${SLUG}/responses`, withoutIt), "still needs: received at");
+    assert.equal(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ received_at: "  " })), "still needs: received at");
   });
 });
 
