@@ -1869,7 +1869,7 @@ test("metricLine: measured, measured-as-zero and never-measured are three differ
 
   // measured-as-zero prints the zero AND says how many posts it was measured on
   assert.equal(zero.value, "0");
-  assert.match(zero.note, /measured on 12 posts/);
+  assert.match(zero.note, /measured on 12 records/);
   assert.equal(zero.tone, "ink");
 
   // a sum over no posts is not the same claim, and is not toned like a measurement
@@ -2078,10 +2078,19 @@ const TREATMENT_VECTORS: { t: TreatmentView; cuts: { lens: string; sourceLines?:
   },
   {
     t: { slug: "s", pillars: ["civic-tech", "human-ai"], pillarSource: "routing.md", floor: 0.25,
-         channels: [CHANNEL_VECTORS[0]], scoredBelowFloorButEnabled: [] },
+         channels: [CHANNEL_VECTORS[0]], scoredBelowFloorButEnabled: ["threads", "mastodon"] },
     cuts: [{ lens: "a", sourceLines: [1] }, { lens: "b", sourceLines: [2] }, { lens: "c" }],
   },
 ];
+
+test("readsFromCells: one channel and one cut read as singular, several read as plural", () => {
+  const one = readsFromCells(TREATMENT_VECTORS[0].t, TREATMENT_VECTORS[0].cuts);
+  const many = readsFromCells(TREATMENT_VECTORS[2].t, TREATMENT_VECTORS[2].cuts);
+  assert.match(one[2].v, /threads scores under the floor of 0\.6 and stays on\./);
+  assert.match(many[2].v, /threads, mastodon score under the floor of 0\.25 and stay on\./);
+  assert.match(one[3].v, /The cut below carries the source lines it was built from,/);
+  assert.match(many[3].v, /All 2 cuts below carry the source lines they were built from,/);
+});
 
 test("readsFromCells: four cells, each standing on a read rather than on the prototype's copy", () => {
   const [withPillar, noPillar] = TREATMENT_VECTORS.map((v) => readsFromCells(v.t, v.cuts));

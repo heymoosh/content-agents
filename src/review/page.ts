@@ -965,9 +965,12 @@ export function metricLine(m: MetricReadView): { value: string; note: string; to
       tone: "grey",
     };
   }
-  const on = m.posts_measured === 1 ? "1 post" : m.posts_measured + " posts";
+  // "record", not "post": the audience rolls come off capture rows and the research count off
+  // observation sources, so calling every one of them a post would be a claim about the shape of
+  // the data that is not true of half of them.
+  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured + " records";
   const missing = m.posts_unmeasured
-    ? ", " + m.posts_unmeasured + (m.posts_unmeasured === 1 ? " post carried no number" : " posts carried no number")
+    ? ", " + m.posts_unmeasured + (m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
     : "";
   return { value: groupDigits(m.value), note: "measured on " + on + missing, tone: "ink" };
 }
@@ -1090,7 +1093,7 @@ export function floorNote(ch: ChannelTreatmentView, floor: number): string {
  */
 export function reuseLine(ch: ChannelTreatmentView): { text: string; tone: ReadTone } {
   if (!ch.reuse) return { text: ch.reuseNote ?? "no reuse check runs for this channel", tone: "grey" };
-  const window = "this channel's own " + fmtDays(ch.reuse.minDays) + " window";
+  const window = "this channel's own window of " + fmtDays(ch.reuse.minDays);
   if (!ch.reuse.everPlaced) return { text: "Never placed here, so " + window + " is holding nothing.", tone: "ink" };
   const ago = ch.reuse.daysSince == null ? "at an unrecorded time" : fmtDays(ch.reuse.daysSince) + " ago";
   if (ch.reuse.allowed) return { text: "Last placed " + ago + ", which is past " + window + ".", tone: "ink" };
@@ -1138,7 +1141,7 @@ export function readsFromCells(
         k: "REUSE WINDOWS",
         v:
           held
-            .map((c) => c.channel + " carried this " + fmtDays(c.reuse!.daysSince ?? 0) + " ago, against its own " + fmtDays(c.reuse!.minDays) + " window")
+            .map((c) => c.channel + " carried this " + fmtDays(c.reuse!.daysSince ?? 0) + " ago, against its own window of " + fmtDays(c.reuse!.minDays))
             .join(". ") + ". Every channel carries its own window, so there is no single number here.",
         tone: "amber" as ReadTone,
       }
@@ -1153,8 +1156,9 @@ export function readsFromCells(
         k: "NOTHING SKIPPED",
         v:
           below.join(", ") +
-          (below.length === 1 ? " scores" : " score") +
-          " under the floor of " + t.floor + " and stay on. A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.",
+          (below.length === 1 ? " scores under the floor of " : " score under the floor of ") + t.floor +
+          (below.length === 1 ? " and stays on. " : " and stay on. ") +
+          "A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.",
         tone: "ink" as ReadTone,
       }
     : {
@@ -1170,8 +1174,10 @@ export function readsFromCells(
     ? {
         k: "YOUR WORDS",
         v:
-          (traced.length === 1 ? "The cut" : "All " + traced.length + " cuts") +
-          " below carry the source lines they were built from, so every draft is your text, trimmed. Nothing composed.",
+          (traced.length === 1
+            ? "The cut below carries the source lines it was built from"
+            : "All " + traced.length + " cuts below carry the source lines they were built from") +
+          ", so every draft is your text, trimmed. Nothing composed.",
         tone: "ink" as ReadTone,
       }
     : {
@@ -3302,7 +3308,7 @@ function floorNote(ch, floor){
 }
 function reuseLine(ch){
   if(!ch.reuse) return { text: ch.reuseNote || "no reuse check runs for this channel", tone:"grey" };
-  const window = "this channel's own "+fmtDays(ch.reuse.minDays)+" window";
+  const window = "this channel's own window of "+fmtDays(ch.reuse.minDays);
   if(!ch.reuse.everPlaced) return { text:"Never placed here, so "+window+" is holding nothing.", tone:"ink" };
   const ago = ch.reuse.daysSince == null ? "at an unrecorded time" : fmtDays(ch.reuse.daysSince)+" ago";
   if(ch.reuse.allowed) return { text:"Last placed "+ago+", which is past "+window+".", tone:"ink" };
@@ -3315,7 +3321,7 @@ function readsFromCells(t, cuts){
     : { k:"PILLAR", v:"None. This piece has no routing.md, so nothing below was fit scored and every call is yours.", tone:"grey" };
   const reuse = held.length
     ? { k:"REUSE WINDOWS",
-        v: held.map(c=>c.channel+" carried this "+fmtDays(c.reuse.daysSince == null ? 0 : c.reuse.daysSince)+" ago, against its own "+fmtDays(c.reuse.minDays)+" window").join(". ")+
+        v: held.map(c=>c.channel+" carried this "+fmtDays(c.reuse.daysSince == null ? 0 : c.reuse.daysSince)+" ago, against its own window of "+fmtDays(c.reuse.minDays)).join(". ")+
            ". Every channel carries its own window, so there is no single number here.",
         tone:"amber" }
     : { k:"REUSE WINDOWS",
@@ -3324,8 +3330,9 @@ function readsFromCells(t, cuts){
   const below = t.scoredBelowFloorButEnabled;
   const skipped = below.length
     ? { k:"NOTHING SKIPPED",
-        v: below.join(", ")+(below.length === 1 ? " scores" : " score")+" under the floor of "+t.floor+
-           " and stay on. A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.",
+        v: below.join(", ")+(below.length === 1 ? " scores under the floor of " : " score under the floor of ")+t.floor+
+           (below.length === 1 ? " and stays on. " : " and stay on. ")+
+           "A score never skips a channel here, config/routing.yaml's defaults list decides that on its own.",
         tone:"ink" }
     : { k:"NOTHING SKIPPED",
         v: t.pillarSource === "routing.md"
@@ -3335,8 +3342,10 @@ function readsFromCells(t, cuts){
   const traced = cuts.filter(c=>c.sourceLines && c.sourceLines.length);
   const words = traced.length
     ? { k:"YOUR WORDS",
-        v:(traced.length === 1 ? "The cut" : "All "+traced.length+" cuts")+
-          " below carry the source lines they were built from, so every draft is your text, trimmed. Nothing composed.",
+        v:(traced.length === 1
+            ? "The cut below carries the source lines it was built from"
+            : "All "+traced.length+" cuts below carry the source lines they were built from")+
+          ", so every draft is your text, trimmed. Nothing composed.",
         tone:"ink" }
     : { k:"YOUR WORDS",
         v:"No cut here records the lines it came from, so this screen makes no claim about how the drafts were built.",
@@ -3414,7 +3423,8 @@ function cwStepsHtml(step){
 function cwSourceMeta(s){
   const bits = [];
   if(s.date) bits.push("on the desk since "+fmtDay(s.date));
-  if(s.publishedAt) bits.push("published "+esc(s.publishedAt));
+  // published_at is a full ISO timestamp for a Note and a plain date for an essay. Show the day.
+  if(s.publishedAt) bits.push("published "+fmtDay(String(s.publishedAt).slice(0,10)));
   bits.push(s.tagBasis);
   if(s.pending) bits.push(s.pending+" draft"+(s.pending===1?"":"s")+" waiting for your yes");
   return bits.join(" · ");
@@ -4545,9 +4555,10 @@ function metricLine(m){
       note:"no post on record carried this number, so this is a sum over nothing rather than a measured zero",
       tone:"grey" };
   }
-  const on = m.posts_measured === 1 ? "1 post" : m.posts_measured+" posts";
+  // "record", not "post": half of these come off capture rows and observation sources, not posts.
+  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured+" records";
   const missing = m.posts_unmeasured
-    ? ", "+m.posts_unmeasured+(m.posts_unmeasured === 1 ? " post carried no number" : " posts carried no number")
+    ? ", "+m.posts_unmeasured+(m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
     : "";
   return { value:groupDigits(m.value), note:"measured on "+on+missing, tone:"ink" };
 }
