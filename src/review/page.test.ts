@@ -10,7 +10,7 @@ import {
   JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
-  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOBS_POLL_MS,
+  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -1146,4 +1146,116 @@ test("the copy this fix adds carries no em dash", () => {
     assert.ok(html.includes(copy), "missing: " + copy);
     assert.ok(!copy.includes("\u2014"), "no em dash in: " + copy);
   }
+});
+
+// ── Fiction room (v7 §2) ─────────────────────────────────────────────────────────────────────────
+
+const fjob = (over: Record<string, unknown> = {}) =>
+  ({ id: "j1", kind: "fiction-draft", label: "Draft a scene", status: "running", ...over }) as never;
+
+test("the fiction job kinds land in the Fiction room, so its strip and Co-writer rail come alive", () => {
+  assert.equal(jobRoom("fiction-draft"), "Fiction");
+  assert.equal(jobRoom("fiction-continuity"), "Fiction");
+  assert.equal(teamRoomName(jobRoom("fiction-draft")), "Co-writer");
+  // Unchanged for every other kind.
+  assert.equal(jobRoom("charles-draft"), "Charles");
+  assert.equal(jobRoom("video"), "Content");
+});
+
+test("the header tracks unwritten, drafting, waiting, and scene waiting on you", () => {
+  assert.equal(fictionStatusWord([], false), "unwritten");
+  assert.equal(fictionStatusWord([fjob({ status: "queued" })], false), "drafting");
+  assert.equal(fictionStatusWord([fjob({ status: "running" })], false), "drafting");
+  assert.equal(fictionStatusWord([fjob({ status: "blocked" })], false), "waiting on your answer");
+  assert.equal(fictionStatusWord([fjob({ status: "done" })], true), "scene waiting on you");
+  // A job in another room never moves Fiction's header.
+  assert.equal(fictionStatusWord([{ id: "x", kind: "video", label: "v", status: "running" } as never], false), "unwritten");
+});
+
+test("a failure reads as nothing written only when nothing was in fact written", () => {
+  assert.equal(fictionStatusWord([fjob({ status: "failed" })], false), "nothing written");
+  // A failed SECOND pass leaves the first pass on disk and on screen, so the header must not
+  // claim nothing was written while the scene is right there.
+  assert.equal(fictionStatusWord([fjob({ status: "done" }), fjob({ id: "j2", status: "failed" })], true), "scene waiting on you");
+  assert.equal(fictionStatusTone("nothing written").fg, JOB_COLORS.red);
+  assert.equal(fictionStatusTone("drafting").fg, JOB_COLORS.ai);
+});
+
+test("Fix the line is offered only on a conflict the check can actually patch", () => {
+  const base = { kind: "conflict", rule: "Eli's left hand", note: "The draft sweeps a whole hand.", span: "his gloved hand", replacement: "his two remaining fingers", fixable: true };
+  assert.equal(fictionCheckRow(base, false).canFix, true);
+  assert.equal(fictionCheckRow(base, false).word, "conflict");
+  assert.equal(fictionCheckRow({ ...base, fixable: false }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, span: "" }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, replacement: "" }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, kind: "hold" }, false).canFix, false);
+  assert.equal(fictionCheckRow({ ...base, kind: "hold" }, false).word, "holds");
+  const fixed = fictionCheckRow(base, true);
+  assert.equal(fixed.word, "fixed");
+  assert.equal(fixed.canFix, false);
+  assert.match(fixed.text, /his two remaining fingers/);
+});
+
+
+// A conflict the check cannot patch loses the BUTTON and keeps the SEVERITY. Losing the severity
+// too is how the rail could show a chapter as green while it still broke canon.
+test("an unfixable conflict stays a conflict on the rail, and only the button goes away", () => {
+  const base = { kind: "conflict", rule: "Eli's left hand", note: "The draft sweeps a whole hand.", span: "his gloved hand", replacement: "", fixable: false };
+  const fixableColor = fictionCheckRow({ ...base, replacement: "his two remaining fingers", fixable: true }, false).color;
+  for (const reason of ["span-missing", "span-repeats", "no-replacement"]) {
+    const row = fictionCheckRow({ ...base, unfixableReason: reason, occurrences: reason === "span-repeats" ? 2 : 1 }, false);
+    assert.equal(row.word, "conflict", `an unfixable conflict must never render as "${row.word}"`);
+    assert.equal(row.color, fixableColor, "same treatment as a fixable conflict");
+    assert.equal(row.canFix, false);
+    assert.match(row.text, /The draft sweeps a whole hand\./, "the finding itself is still said");
+    assert.match(row.text, /I cannot fix this one for you/, `no reason given for ${reason}`);
+    assert.ok(!row.text.includes("\u2014"), "no em dash in copy Muxin reads");
+  }
+});
+
+test("each unfixable reason says plainly which thing blocked the fix", () => {
+  assert.match(unfixableLine("span-missing"), /could not find that exact wording/);
+  assert.match(unfixableLine("span-repeats", 2), /appears 2 times/);
+  assert.match(unfixableLine("span-repeats"), /appears more than once/);
+  assert.match(unfixableLine("no-replacement"), /nothing safe to put in its place/);
+  assert.equal(unfixableLine(""), "", "a fixable conflict says nothing extra");
+  for (const line of [unfixableLine("span-missing"), unfixableLine("span-repeats", 2), unfixableLine("no-replacement")]) {
+    assert.ok(!line.includes("\u2014"));
+    assert.ok(!/atomize/i.test(line));
+  }
+});
+
+test("the canon stamp only counts what came back, and shows nothing before a check", () => {
+  assert.equal(fictionCanonStamp(null), "");
+  assert.equal(
+    fictionCanonStamp({ checkedAt: "2026-08-22T10:00:00.000Z", holds: [1, 2], conflicts: [1] } as never),
+    "checked 2026-08-22 · 2 holding · 1 breaking",
+  );
+});
+
+// The exact failure the audit named: the model flags two genuine contradictions whose spans each
+// appear twice. They used to be rewritten into holds, so the stamp read "2 holding, 0 breaking"
+// while the chapter still broke canon, and Muxin read that as cleared.
+test("the stamp counts an unfixable conflict as breaking, never as holding", () => {
+  const unfixable = { kind: "conflict", rule: "r", note: "n", span: "s", replacement: "", fixable: false, unfixableReason: "span-repeats", occurrences: 2 };
+  const stamp = fictionCanonStamp({ checkedAt: "2026-08-22T10:00:00.000Z", holds: [], conflicts: [unfixable, unfixable] } as never);
+  assert.equal(stamp, "checked 2026-08-22 · 0 holding · 2 breaking");
+  assert.ok(!stamp.includes("2 holding"), "two broken rules must never read as holding");
+});
+
+test("the client rail carries the same unfixable copy the server helper does", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  for (const copy of [unfixableLine("span-missing"), unfixableLine("no-replacement"), "so there is no single line to change."]) {
+    assert.ok(html.includes(copy), "the browser mirror drifted from the server helper: " + copy);
+    assert.ok(!copy.includes("\u2014"), "no em dash in the copy this PR adds: " + copy);
+  }
+});
+
+test("the scene renders as paragraphs, while the file keeps one sentence per line", () => {
+  const body = "The airlock was quiet.\nNo klaxons, no amber strobe.\n\nHe did not speak into the comms.";
+  assert.deepEqual(fictionSceneParagraphs(body), [
+    "The airlock was quiet. No klaxons, no amber strobe.",
+    "He did not speak into the comms.",
+  ]);
+  assert.deepEqual(fictionSceneParagraphs(""), []);
 });

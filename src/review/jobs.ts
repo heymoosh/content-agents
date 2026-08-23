@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { repoRoot } from "../db/db.js";
 import { appendRow, readQueue, stampOrigin } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
@@ -22,6 +22,9 @@ import { roundCount } from "./develop.js";
 import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { runDraft, draftModel, type DraftResult } from "../outreach/draft.js";
 import { CHARLES_DIR, listCharlesPosts, readCharlesPost, type CharlesPost } from "./charles.js";
+import { saveSceneBeats } from "./fiction.js";
+import { resolveSeriesDir, chapterNumbers, readChapter } from "../fiction/_series.js";
+import { continuityReportPath, readContinuityReport } from "../fiction/continuity.js";
 
 // Per-job stdout/stderr logs for the atomize job queue (see the Job interface below) — persisted
 // to disk so a job's real output survives past the 40MB in-memory buffer execFile used to impose,
@@ -345,7 +348,8 @@ export type JobKind =
   | "develop" | "develop-reply"
   | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up"
   | "outreach-revise"
-  | "pull" | "strategy" | "scout" | "charles-draft";
+  | "pull" | "strategy" | "scout" | "charles-draft"
+  | "fiction-draft" | "fiction-continuity";
 
 // Kinds whose stdout IS the deliverable, not a progress channel. `runDraft` takes the spawn's
 // stdout as the outreach message body, and `ask-insights` returns it as the answer Muxin reads.
@@ -356,6 +360,7 @@ export type JobKind =
 // Note which kinds are NOT here: `charles-draft` and `revise` both verify by artifact (a new
 // review-queue row, an edited file), so their stdout is free to carry markers.
 export const MARKER_EXEMPT_KINDS: ReadonlySet<JobKind> = new Set<JobKind>(["draft-follow-up", "ask-insights"]);
+
 interface Job {
   id: string;
   kind: JobKind;
@@ -385,6 +390,11 @@ interface Job {
   // (retryable?) and tell a deliberate ask apart from a broken run, without threading the result
   // back out of five different run functions. Internal, omitted from publicJob like `task`.
   lastSpawn?: { code: number | null; timedOut: boolean; enoent: boolean };
+  // Fiction jobs only: the free text a fiction run needs (her beats, or her second-pass note) plus
+  // which chapter it targets. Kept OFF `arg` on purpose — `arg` is a shell-ish token every other
+  // kind treats as one word, and a paragraph of beats does not belong there. Internal, and omitted
+  // from publicJob() like `task` and `lastSpawn`.
+  payload?: { mode?: "draft" | "repass"; beats?: string; note?: string; series?: string; chapter?: number };
 }
 
 // The fields every enqueue site initializes identically. Kept in one place so a new job kind can't
@@ -983,6 +993,289 @@ async function runContinueJob(job: Job): Promise<void> {
     `formatting ran but added no new rows or derivatives in ${parsed?.folder ?? job.arg} — check the view-log link${logTailSuffix(job.id)}`;
 }
 
+
+// ── Fiction: draft a scene, check it against canon (Build 2) ─────────────────────────────────────
+// Two job kinds, both landing in the Fiction room.
+//
+// WHY "Draft it" DISPATCHES THE /story SKILL RATHER THAN story:draft. src/fiction/draft.ts is inert
+// for the common case: whenever a series' series.yaml says `prose: claude-native` (the default, and
+// what the only series here uses) it exits 1 with "chapters are composed by the /story skill (Opus
+// plans, sonnet writes), not by this script". It is also a guardrail path. So the composer routes
+// through `/story <series>` headlessly, the same way addJob dispatches `/atomize <arg>`, and
+// draft.ts is left untouched.
+//
+// TWO THINGS THE DISPATCH PROMPT CONSTRAINS, both stated in place rather than by editing the skill:
+// 1. The skill's step 2 is a beat-sheet approval gate that posts the beats and STOPS for Muxin's
+//    sign-off. In the studio she typed the beats herself and pressed "Draft it", so the sign-off on
+//    direction already happened; a headless run that waited for it would just time out. The chapter
+//    itself still waits for her: nothing here approves, locks or publishes anything.
+// 2. The skill's step 7 commits the chapter on a branch and opens a draft PR. A GUI button doing
+//    git work in the live checkout is not something this room should do on its own, and the design
+//    is explicit that "line editing and the commit history stay in your GitHub flow". So the run is
+//    told to stop after validate.
+const FICTION_TIMEOUT_MS = 20 * 60_000;
+const CONTINUITY_TIMEOUT_MS = 10 * 60_000;
+
+// Pure prompt assembly, exported so the two constraints above are directly readable in a test.
+export function fictionDraftPrompt(slug: string, beats: string): string {
+  return [
+    `/story ${slug}`,
+    ``,
+    `Muxin typed these beats in the studio's Fiction room and pressed "Draft it". They are her`,
+    `direction for this scene:`,
+    `"""`,
+    beats.trim(),
+    `"""`,
+    ``,
+    `This run is headless, so three things differ from the interactive skill:`,
+    `- Her beats above ARE her sign-off on the direction, so do not post a beat sheet and wait.`,
+    `  Plan from them and draft the chapter now.`,
+    `- Write chapters/chapter-NN.md and run story:validate. Stop there.`,
+    `- Do NOT commit, branch, push or open a pull request, and do not lock or publish anything.`,
+    `  She reads the scene in the studio first, and the GitHub flow stays hers.`,
+  ].join("\n");
+}
+
+// The second pass. `/story --revise` normally reads Muxin's GitHub PR review comments, and there is
+// no PR here, so the note is handed over as the one review comment it should work from.
+export function fictionRepassPrompt(slug: string, chapter: number, note: string): string {
+  return [
+    `/story --revise ${slug} ${chapter}`,
+    ``,
+    `There is no GitHub pull request for this chapter yet, so there are no review comments to read.`,
+    `Muxin's note, typed in the studio, is the one comment. It covers the whole chapter:`,
+    `"""`,
+    note.trim(),
+    `"""`,
+    ``,
+    `Apply it the way the skill's revise rules say: edits in the direction she asked for, and leave`,
+    `everything her note does not reach. Re-run story:validate when you are done.`,
+    `Do NOT commit, branch, push, open a pull request or reply on any thread. She reads the result`,
+    `in the studio.`,
+  ].join("\n");
+}
+
+// Every chapter's prose, keyed by number — the before/after artifact check for a fiction run.
+// "Finished" is not "worked": a /story run can exit 0 having written nothing, and the only honest
+// proof is a chapter file that appeared or changed.
+export function chapterSnapshot(dir: string): Map<number, string> {
+  const snap = new Map<number, string>();
+  for (const n of chapterNumbers(dir)) {
+    try {
+      snap.set(n, readChapter(dir, n).body);
+    } catch {
+      /* unreadable mid-write — counts as absent */
+    }
+  }
+  return snap;
+}
+
+// Pure: what a fiction run actually produced, from the two snapshots. Returns the chapter number a
+// draft created, or null when nothing landed. Exported so the artifact check is unit-testable
+// without spawning anything.
+export function fictionRunProduced(
+  before: Map<number, string>,
+  after: Map<number, string>,
+  mode: "draft" | "repass",
+  target?: number,
+): number | null {
+  if (mode === "draft") {
+    const fresh = [...after.keys()].filter((n) => !before.has(n)).sort((a, b) => a - b);
+    return fresh.length ? fresh[fresh.length - 1] : null;
+  }
+  if (!target) return null;
+  const was = before.get(target);
+  const now = after.get(target);
+  if (now === undefined || was === undefined) return null;
+  return now !== was ? target : null;
+}
+
+// Which queued-or-running fiction job a new request is a duplicate of. Pure over the list so the
+// identity rule is unit-testable without pushing a job (a pushed job starts a real `claude` spawn).
+//
+// Identity is the WHOLE request, not the series. Matching on kind and series alone meant a queued
+// first-pass draft swallowed a chapter-3 second pass, and a chapter-3 second pass swallowed a
+// chapter-5 one: the route answered ok with somebody else's job and the run Muxin asked for never
+// happened.
+export function findFictionDupe(
+  list: Job[],
+  want: { kind: Job["kind"]; series: string; mode?: string; chapter?: number },
+): Job | undefined {
+  return list.find((j) => {
+    if (j.kind !== want.kind) return false;
+    if (j.status !== "queued" && j.status !== "running") return false;
+    const p = j.payload ?? {};
+    if (p.series !== want.series) return false;
+    if (want.mode !== undefined && (p.mode ?? "draft") !== want.mode) return false;
+    if (want.chapter !== undefined && p.chapter !== want.chapter) return false;
+    return true;
+  });
+}
+
+export function addFictionDraftJob(seriesArg: string, beats: string): { job: Job; queued: boolean } {
+  const dir = resolveSeriesDir(seriesArg); // throws on an unknown series before anything is queued
+  const slug = basename(dir);
+  if (!beats.trim()) throw new Error("say the beats first");
+  const existing = findFictionDupe(jobs, { kind: "fiction-draft", series: slug, mode: "draft" });
+  // Idempotent against a double-click, like addVideoJob. `queued: false` tells the route this run
+  // is somebody else's already in flight, so it must not overwrite the beats anchor with beats the
+  // running job never received.
+  if (existing) return { job: existing, queued: false };
+  const job: Job = {
+    id: nextJobId(), kind: "fiction-draft", label: `Draft a scene: ${slug}`, arg: slug, ...freshJobFields(),
+    payload: { mode: "draft", series: slug, beats: beats.trim() },
+  };
+  jobs.push(job);
+  void drain();
+  return { job, queued: true };
+}
+
+export function addFictionRepassJob(seriesArg: string, chapter: number, note: string): Job {
+  const dir = resolveSeriesDir(seriesArg);
+  const slug = basename(dir);
+  if (!note.trim()) throw new Error("say what to change first");
+  if (!chapterNumbers(dir).includes(chapter)) throw new Error(`there is no chapter ${chapter} to run again`);
+  const existing = findFictionDupe(jobs, { kind: "fiction-draft", series: slug, mode: "repass", chapter });
+  if (existing) return existing;
+  const job: Job = {
+    id: nextJobId(), kind: "fiction-draft", label: `Second pass: ${slug} chapter ${chapter}`, arg: slug, ...freshJobFields(),
+    payload: { mode: "repass", series: slug, chapter, note: note.trim() },
+  };
+  jobs.push(job);
+  void drain();
+  return job;
+}
+
+export function addFictionCheckJob(seriesArg: string, chapter: number): Job {
+  const dir = resolveSeriesDir(seriesArg);
+  const slug = basename(dir);
+  if (!chapterNumbers(dir).includes(chapter)) throw new Error(`there is no chapter ${chapter} to check`);
+  const existing = findFictionDupe(jobs, { kind: "fiction-continuity", series: slug, chapter });
+  if (existing) return existing;
+  const job: Job = {
+    id: nextJobId(), kind: "fiction-continuity", label: `Check the canon: ${slug} chapter ${chapter}`,
+    arg: slug, ...freshJobFields(), payload: { series: slug, chapter },
+  };
+  jobs.push(job);
+  void drain();
+  return job;
+}
+
+// ── The "do not touch git" rule, enforced rather than asked for ─────────────────────────────────
+// The /story skill's step 7 commits the chapter on a branch and opens a draft PR, and the dispatch
+// prompt tells the headless run not to. A prompt is a request. The run holds `acceptEdits` and it
+// legitimately needs Bash for `npm run story:validate`, so no tool filter can take git away from it
+// without also taking the validate step away. What CAN be enforced is the outcome: read where git
+// stands before the run and again after, and fail the job loudly if anything moved. That covers
+// every route to the same damage (a commit, a checkout, a new branch) instead of naming commands.
+//
+// It never reverts. Rewinding somebody's checkout to clean up after a bad run is a worse failure
+// than the one it fixes; the job reports exactly what moved and leaves it to Muxin.
+export interface GitState {
+  head: string; // HEAD commit sha
+  branch: string; // current branch name, or "HEAD" when detached
+  branches: string; // every local branch, newline joined
+}
+
+export function readGitState(cwd: string = repoRoot): GitState | null {
+  const run = (args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8", timeout: 15_000 }).trim();
+  try {
+    return {
+      head: run(["rev-parse", "HEAD"]),
+      branch: run(["rev-parse", "--abbrev-ref", "HEAD"]),
+      branches: run(["for-each-ref", "--format=%(refname)", "refs/heads"]),
+    };
+  } catch {
+    return null; // not a git checkout, or git is unavailable: there is nothing to compare
+  }
+}
+
+// Pure: what moved, in Muxin's words. Null when git stands exactly where it did.
+export function gitStateDrift(before: GitState | null, after: GitState | null): string | null {
+  if (!before || !after) return null;
+  const moved: string[] = [];
+  if (before.branch !== after.branch) moved.push(`it switched the branch from ${before.branch} to ${after.branch}`);
+  if (before.head !== after.head) moved.push("it committed something");
+  const fresh = after.branches.split("\n").filter((b) => b && !before.branches.split("\n").includes(b));
+  if (fresh.length) moved.push(`it created ${fresh.map((b) => b.replace("refs/heads/", "")).join(", ")}`);
+  if (!moved.length) return null;
+  return `the run was told to leave git alone and did not: ${moved.join(", ")}. Nothing was undone for you, so check \`git status\` and \`git log\` before you carry on.`;
+}
+
+async function runFictionDraftJob(job: Job): Promise<void> {
+  const p = job.payload ?? {};
+  const mode = p.mode === "repass" ? "repass" : "draft";
+  const dir = resolveSeriesDir(p.series ?? job.arg);
+  const before = chapterSnapshot(dir);
+  const gitBefore = readGitState();
+  const prompt =
+    mode === "repass"
+      ? fictionRepassPrompt(p.series ?? job.arg, p.chapter ?? 0, p.note ?? "")
+      : fictionDraftPrompt(p.series ?? job.arg, p.beats ?? "");
+
+  const result = await runClaudeSpawn(job, prompt, {
+    timeoutMs: FICTION_TIMEOUT_MS,
+    permissionMode: ATOMIZE_PERMISSION_MODE,
+  });
+  const failure = decodeSpawnFailure(result, job.id, {
+    timeoutVerb: mode === "repass" ? "the second pass" : "the scene draft",
+    timeoutLabel: `${FICTION_TIMEOUT_MS / 60000} min`,
+    exitVerb: mode === "repass" ? "the second pass" : "the scene draft",
+    includeTailOnTimeout: true,
+  });
+  const produced = fictionRunProduced(before, chapterSnapshot(dir), mode, p.chapter);
+  const drift = gitStateDrift(gitBefore, readGitState());
+  job.status = !failure && produced !== null && !drift ? "done" : "failed";
+  if (produced === null || job.status !== "done") {
+    // A chapter that landed AND git that moved is both facts at once, and the run still failed.
+    const landed = produced === null ? "" : ` Chapter ${produced} was written, so the prose is on disk.`;
+    job.error =
+      failure ??
+      (drift
+        ? `${drift}${landed}${logTailSuffix(job.id)}`
+        : mode === "repass"
+          ? `the second pass ran but chapter ${p.chapter} did not change, so nothing was written${logTailSuffix(job.id)}`
+          : `it ran but wrote no new chapter file, so nothing was written${logTailSuffix(job.id)}`);
+    return;
+  }
+  const chapter: number = produced;
+  job.payload = { ...p, chapter };
+  // Keep the anchor pointing at the scene it produced, so a reload still shows her beats above it.
+  try {
+    if (mode === "draft" && p.beats) saveSceneBeats(p.series ?? job.arg, p.beats, chapter);
+  } catch {
+    /* the anchor is a convenience; a scene that exists is still a scene */
+  }
+  // "It writes a first pass and checks the canon while it goes." The queue is serial, so this
+  // simply runs next.
+  try {
+    addFictionCheckJob(p.series ?? job.arg, chapter);
+  } catch {
+    /* a check that cannot be queued must not fail the draft that already landed */
+  }
+}
+
+async function runFictionCheckJob(job: Job): Promise<void> {
+  const p = job.payload ?? {};
+  const slug = p.series ?? job.arg;
+  const chapter = p.chapter ?? 0;
+  const before = readContinuityReport(slug, chapter)?.checkedAt ?? null;
+  const result = await runCommandSpawn(job, "npx", ["tsx", "src/fiction/continuity.ts", slug, "--chapter", String(chapter)], {
+    timeoutMs: CONTINUITY_TIMEOUT_MS,
+  });
+  const failure = decodeSpawnFailure(result, job.id, {
+    timeoutVerb: "the canon check", timeoutLabel: `${CONTINUITY_TIMEOUT_MS / 60000} min`,
+    exitVerb: "the canon check", includeTailOnTimeout: true, command: "npx",
+  });
+  // Artifact, not exit code: a fresh report actually on disk.
+  const after = readContinuityReport(slug, chapter);
+  const wrote = Boolean(after) && after!.checkedAt !== before;
+  job.status = !failure && wrote ? "done" : "failed";
+  if (job.status === "failed") {
+    job.error = failure ?? `the canon check ran but wrote no findings to ${continuityReportPath(slug, chapter)}${logTailSuffix(job.id)}`;
+  }
+}
+
 // The ONE place a job stops running. Every branch of drain() below routes through this instead of
 // repeating the finishedAt/draining/drain() dance, so the three cross-cutting rules hold everywhere:
 //
@@ -1056,6 +1349,18 @@ async function drain(): Promise<void> {
     return;
   }
 
+  if (job.kind === "fiction-draft") {
+    await runFictionDraftJob(job);
+    settleJob(job);
+    return;
+  }
+
+  if (job.kind === "fiction-continuity") {
+    await runFictionCheckJob(job);
+    settleJob(job);
+    return;
+  }
+
   if (job.kind === "develop" || job.kind === "develop-reply") {
     await runDevelopJob(job);
     settleJob(job);
@@ -1122,6 +1427,7 @@ export function answerJob(id: string, answer: string): { error: string } | { job
     label: original.label,
     arg: original.arg,
     task: original.task,
+    payload: original.payload,
     answer,
   };
   jobs.push(job);
