@@ -205,6 +205,23 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
   }
 });
 
+// Read-only routes whose backend half landed before the screen that calls them. Each entry is a
+// temporary exemption from the reverse ("orphan route") check below.
+//
+// The exemption is SELF-DELETING, not a comment asking nicely. The block right below the reverse
+// check asserts, for every entry, that its route (a) still exists in serve.ts and (b) still has NO
+// caller in the page. So the moment someone wires the fetch into page.ts, the entry itself goes
+// red and the only way back to green is deleting it. A comment is not a mechanism; this is. It
+// catches the other rot direction too — an entry naming a route that has since been removed.
+//
+// To add one: append the path and a comment in this format saying what it is and why its UI is
+// not here yet. Keep the list at or near zero.
+const PENDING_UI_ROUTES = new Set([
+  // The Content room's "decide the treatment" read layer (fit label per channel, that channel's
+  // own reuse window, next free slot). Backend shipped separately from the page.ts surface.
+  "/api/content/treatment",
+]);
+
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
   const script = emittedScripts().join("\n");
   const serveSrc = readFileSync(join(HERE, "serve.ts"), "utf8");
@@ -228,9 +245,22 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
   }
 
   // reverse: every route is reachable from the page (exact ref, or via a "/api/foo/"+x concat)
+  const hasCaller = (route: string): boolean =>
+    refs.has(route) || [...refs].some((ref) => ref.endsWith("/") && route.startsWith(ref));
   for (const route of routes) {
-    const ok = refs.has(route) || [...refs].some((ref) => ref.endsWith("/") && route.startsWith(ref));
-    assert.ok(ok, `serve.ts route ${route} has no caller in the page (orphan route)`);
+    if (PENDING_UI_ROUTES.has(route)) continue;
+    assert.ok(hasCaller(route), `serve.ts route ${route} has no caller in the page (orphan route)`);
+  }
+
+  // the exemptions expire on their own: an entry survives only while its route still exists AND
+  // still has no caller, so wiring the UI turns the entry itself red instead of leaving a
+  // permanent hole in the reverse check above
+  for (const route of PENDING_UI_ROUTES) {
+    assert.ok(routes.has(route), `PENDING_UI_ROUTES lists ${route}, which is no longer a serve.ts route — delete the entry`);
+    assert.ok(
+      !hasCaller(route),
+      `${route} now has a caller in the page — delete its PENDING_UI_ROUTES entry, the exemption has done its job`
+    );
   }
 });
 

@@ -93,6 +93,7 @@ import { renderPage } from "./page.js";
 import { buildStudioHome } from "./studio.js";
 import { getAnalyst } from "../providers/registry.js";
 import { readSignals, appendBacklogCard } from "./signals.js";
+import { readTreatment } from "./treatment.js";
 import {
   listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory,
   readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats, listChapters,
@@ -1174,6 +1175,19 @@ const server = createServer(async (req, res) => {
     // advisor rounds, each cut as a readable message with provenance, pending review count.
     if (req.method === "GET" && url.pathname === "/api/content") {
       json(res, 200, { sessions: listContentSessions() });
+      return;
+    }
+    // Read-only: everything the Content room's "decide the treatment" step renders for one piece —
+    // per-channel fit label, that channel's OWN reuse window (never a global constant), and the
+    // next free slot computed with claimSlots({ dryRun: true }) so nothing is claimed. No ledger
+    // write, no queue mutation.
+    if (req.method === "GET" && url.pathname === "/api/content/treatment") {
+      const slug = (url.searchParams.get("slug") ?? "").trim();
+      try {
+        json(res, 200, readTreatment(slug, { folder: safeFolder(slug) }));
+      } catch (e) {
+        json(res, 400, { error: String((e as Error)?.message ?? e) });
+      }
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/develop/start") {
