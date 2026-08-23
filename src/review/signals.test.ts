@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
+import ts from "typescript";
 import { repoRoot } from "../db/db.js";
 import {
   parseBriefSignals,
@@ -420,5 +421,41 @@ test("an empty research table reads as unmeasured, but a populated one with no c
     });
   } finally {
     populated.close();
+  }
+});
+
+// ── rule 5: no em dash reaches the screen ────────────────────────────────────────────────────────
+// Root CLAUDE.md rule 5 and config/voice.yaml ban the em dash from every word a human reads. The
+// Signals room renders these two modules' `reason` and `source` strings verbatim, and it fetches
+// them at runtime, so no static page test ever sees them. This is a source-level guard instead: it
+// parses each file with the TypeScript scanner and looks inside string and template literals only.
+// Comments keep their em dashes (nobody reads those on screen), and treatment.ts's routing-heading
+// regex keeps its em dashes too (it MATCHES a heading Muxin's own files already carry, it does not
+// print one). If this test fails, do not just delete the dash: rewrite the sentence with a period,
+// a comma, a colon, or parentheses, whichever sounds right read aloud.
+const EM_DASH = "—";
+const SIGNALS_READ_MODULES = ["signals.ts", "treatment.ts"];
+
+test("no string the Signals read layer can print carries an em dash", () => {
+  for (const file of SIGNALS_READ_MODULES) {
+    const path = join(repoRoot, "src", "review", file);
+    const source = ts.createSourceFile(file, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
+    const offenders: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isStringLiteralLike(node) ||
+        ts.isTemplateHead(node) ||
+        ts.isTemplateMiddle(node) ||
+        ts.isTemplateTail(node)
+      ) {
+        if (node.text.includes(EM_DASH)) {
+          const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
+          offenders.push(`${file}:${line + 1} ${node.text.trim()}`);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    assert.deepEqual(offenders, [], `em dash in a string a reader can see:\n${offenders.join("\n")}`);
   }
 });
