@@ -142,9 +142,21 @@ export type MetricRead =
   | {
       state: "measured";
       value: number;
-      /** Rows whose latest metrics row carried a non-null value for this field. */
+      /**
+       * Records the value was actually read from, NOT always posts, despite the name. What one
+       * record is depends on which producer built this read:
+       *   sumColumn()           one post whose latest metrics row carried a non-null value here.
+       *   conversationResearch() one observation SOURCE (comment, dm, follow_up_question, reply)
+       *                         that returned a row, not one observation and not one post.
+       *   audienceTotals()      one audience capture row carrying a non-null value_count.
+       * The GUI calls these "records" on screen for that reason. Renaming the field is the honest
+       * fix and is deliberately deferred: it would have to land with its GUI consumer.
+       */
       posts_measured: number;
-      /** Rows with no metrics row, or a null in this column: counted, never silently zeroed. */
+      /**
+       * Records counted but unreadable: no metrics row, or a null in this column. Counted so a
+       * missing value is never silently zeroed. Same record definition as posts_measured above.
+       */
       posts_unmeasured: number;
     }
   | { state: "not_measured"; reason: string };
@@ -252,7 +264,7 @@ const SAMPLE_RULE: SampleRule = {
   kind: "weeks_of_data",
   threshold_weeks: THRESHOLD_WEEKS,
   source:
-    "the repo's existing INSUFFICIENT rule (root CLAUDE.md; computed in src/strategy/snapshot.ts:84) — under four weeks of data on a channel is directional only",
+    "the repo's existing INSUFFICIENT rule (root CLAUDE.md; computed in src/strategy/snapshot.ts:84). Under four weeks of data on a channel is directional only",
 };
 
 // Mirrors src/strategy/snapshot.ts:7-11. `metrics` holds one row per capture per post, so a plain
@@ -307,7 +319,7 @@ function platformConfidence(rows: FamilyPostRow[], now: number): PlatformConfide
       platform,
       posts: dates.length,
       weeks,
-      status: sufficient ? "OK" : `INSUFFICIENT (<${THRESHOLD_WEEKS} wks) — directional only`,
+      status: sufficient ? "OK" : `INSUFFICIENT (<${THRESHOLD_WEEKS} wks), directional only`,
       sufficient,
     };
   });
@@ -331,7 +343,7 @@ function conversationResearch(db: Database.Database): { total: MetricRead; bySou
       total: {
         state: "not_measured",
         reason:
-          "no research_observations table in this database — the Substack reply-signal capture has never run here",
+          "no research_observations table in this database, so the Substack reply-signal capture has never run here",
       },
       bySource: {},
     };
@@ -350,8 +362,8 @@ function conversationResearch(db: Database.Database): { total: MetricRead; bySou
       total: {
         state: "not_measured",
         reason: configured
-          ? "the research_observations table is empty — capture is configured but has not recorded anything yet, so this is unmeasured, not zero replies"
-          : "RESEARCH_HASH_KEY is not set, so research capture cannot write observations (src/research/store.ts:26) and the table is empty — unmeasured, not zero replies",
+          ? "the research_observations table is empty. Capture is configured but has not recorded anything yet, so this is unmeasured, not zero replies"
+          : "RESEARCH_HASH_KEY is not set, so research capture cannot write observations (src/research/store.ts:26) and the table is empty. That is unmeasured, not zero replies",
       },
       bySource: {},
     };
@@ -380,14 +392,14 @@ function conversationResearch(db: Database.Database): { total: MetricRead; bySou
 // repo — no source writes a visit, an opt-in or a survey response into data/analytics.db — so those
 // three read not_measured while follower growth reads as the real number it is.
 const NO_LANDING_INGEST =
-  "no landing-page analytics ingest exists in this repo — nothing writes visits, opt-ins or survey responses to data/analytics.db, so this is unmeasured, not zero";
+  "no landing-page analytics ingest exists in this repo. Nothing writes visits, opt-ins or survey responses to data/analytics.db, so this is unmeasured, not zero";
 
 // Why business is entirely empty: src/strategy/cta-fit.ts:10 and :166 (echoed at
 // src/strategy/frame-fit.ts:10) record that no click or conversion metric survives ingest — clicks
 // sums to about forty across 1,229 metric rows and is NULL on linkedin and bluesky. There is no
 // funnel-events record anywhere in the codebase to read a purchase or an inquiry from.
 const NO_FUNNEL_SOURCE =
-  "no funnel record exists — nothing in this repo captures a qualified inquiry, a call, an opportunity or a purchase, and no click/conversion metric survives ingest (src/strategy/cta-fit.ts:10)";
+  "no funnel record exists. Nothing in this repo captures a qualified inquiry, a call, an opportunity or a purchase, and no click/conversion metric survives ingest (src/strategy/cta-fit.ts:10)";
 
 const BUSINESS_EMPTY_STATE =
   "Until the landing page is live and taking payment there is nothing to measure here. It stays this way, not a zero.";
@@ -399,7 +411,7 @@ const BUSINESS_EMPTY_STATE =
  */
 function audienceTotals(db: Database.Database): { followerTotal: MetricRead; followerDelta: MetricRead } {
   if (!tableExists(db, "audience")) {
-    const reason = "no audience table in this database — no follower export has been ingested here";
+    const reason = "no audience table in this database, so no follower export has been ingested here";
     return { followerTotal: { state: "not_measured", reason }, followerDelta: { state: "not_measured", reason } };
   }
   const totals = db
@@ -466,12 +478,12 @@ export function readOutcomeFamilies(
       reposts: sumColumn(rows, "reposts"),
       saves: {
         state: "not_measured",
-        reason: "the metrics table has no saves column (src/db/schema.sql) — no platform export ingests saves",
+        reason: "the metrics table has no saves column (src/db/schema.sql), because no platform export ingests saves",
       },
       comments: {
         state: "not_measured",
         reason:
-          "the metrics table has no comments column (src/db/schema.sql) — per-post comments are not ingested; replies are a separate column and are reported above",
+          "the metrics table has no comments column (src/db/schema.sql), so per-post comments are not ingested; replies are a separate column and are reported above",
       },
       research_observations: research.total,
       research_observations_by_source: research.bySource,
@@ -555,7 +567,7 @@ export function readResearchReport(
     return {
       state: "unavailable",
       capture_configured: captureConfigured,
-      reason: "no research_observations table in this database — research capture has never run here",
+      reason: "no research_observations table in this database, so research capture has never run here",
       report: null,
     };
   }
@@ -567,7 +579,7 @@ export function readResearchReport(
       state: "unavailable",
       capture_configured: captureConfigured,
       reason: captureConfigured
-        ? "the research_observations table is empty — capture is configured but has not recorded anything yet"
+        ? "the research_observations table is empty. Capture is configured but has not recorded anything yet"
         : "RESEARCH_HASH_KEY is not set, so research capture cannot write observations (src/research/store.ts:26) and the table is empty",
       report: null,
     };
