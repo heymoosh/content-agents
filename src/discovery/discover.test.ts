@@ -15,6 +15,7 @@ import {
 import { parseStepMarker, ingestMarkerChunk } from "../review/jobs.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { checkLeadShape } from "../outreach/validate.js";
+import { parseEvidence } from "../outreach/qualify.js";
 
 const CLIENT_CANDIDATE = {
   name: "Acme Co",
@@ -22,7 +23,7 @@ const CLIENT_CANDIDATE = {
   profile: "Acme makes widgets.",
   evidenceBlock: "",
   evidence: [
-    { id: "E1", signal: "worldview-match", person: "", source: "https://acme.co/blog", quote: '"we believe in people"', description: "founder blog post" },
+    { id: "E1", signal: "worldview-match", person: "", source: "https://acme.co/blog", quote: '"we believe in people"', description: "founder blog post", captured_at: null },
   ],
   disconfirmation: "Nothing found against it.",
   classification: "greenfield",
@@ -35,7 +36,7 @@ const CE_CANDIDATE = {
   url: "https://acme.co/blog/pricing",
   why: "They bet usage-based pricing would grow revenue without churn.",
   evidence: [
-    { id: "E1", signal: "source-quote", person: "", source: "https://acme.co/blog/pricing", quote: '"we are betting on usage-based pricing"', description: "company blog" },
+    { id: "E1", signal: "source-quote", person: "", source: "https://acme.co/blog/pricing", quote: '"we are betting on usage-based pricing"', description: "company blog", captured_at: null },
   ],
   angle: "the riskiest belief is that switching pricing models won't spike churn",
 };
@@ -70,6 +71,19 @@ describe("buildClientPlatformLeadFile", () => {
     assert.deepEqual(checkLeadShape("lead.md", fm, body), []);
   });
 });
+
+  // A scout run IS the capture, so a scaffolded lead.md carries a real date from the start —
+  // the same clock the decision log already reads, and a measured fact rather than a guess. It
+  // round-trips through qualify.ts's parser, which is the only thing that ever reads it back.
+  test("stamps the evidence with the day this discovery run gathered it", () => {
+    const text = buildClientPlatformLeadFile("client", CLIENT_CANDIDATE, "career-work");
+    const { body } = splitFrontmatter(text);
+    const today = new Date().toISOString().slice(0, 10);
+    assert.match(body, new RegExp("\\| captured: " + today + "$", "m"));
+    const [item] = parseEvidence(body);
+    assert.equal(item.captured_at, today);
+    assert.equal(item.description, "founder blog post", "the note must survive the new segment");
+  });
 
 describe("buildContentExampleLeadFile", () => {
   test("produces a lead.md whose frontmatter/body pass checkLeadShape (kind: content-example)", () => {

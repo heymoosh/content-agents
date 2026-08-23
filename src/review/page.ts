@@ -694,6 +694,8 @@ export interface OutreachEvidenceView {
   source?: string;
   quote?: string;
   description?: string;
+  /** src/outreach/qualify.ts's EvidenceItem.captured_at. null/absent = no date was ever recorded. */
+  captured_at?: string | null;
 }
 
 export interface OutreachMessageView {
@@ -820,13 +822,36 @@ export function isEvidenceSourceValid(source: string | undefined): boolean {
 
 export const NO_SOURCE_RECORDED = "no source recorded";
 
-// What the evidence rail shows under a quote. There is no timestamp anywhere in EvidenceItem, so
-// there is no date to fall back on: an item with nothing valid behind it says it has nothing.
+// What the evidence rail shows under a quote. An item with nothing valid behind it says it has
+// nothing — the date below is a separate fact and is never a stand-in for a missing source.
 export function evidenceSourceView(source: string | undefined): { kind: "link" | "text" | "none"; text: string } {
   const trimmed = (source ?? "").trim();
   if (!isEvidenceSourceValid(trimmed)) return { kind: "none", text: NO_SOURCE_RECORDED };
   if (/^https?:\/\//i.test(trimmed)) return { kind: "link", text: trimmed };
   return { kind: "text", text: trimmed };
+}
+
+export const NO_CAPTURE_DATE_RECORDED = "no capture date recorded";
+
+// When the evidence was gathered. THREE states, not two (docs/prototype-port-rules.md Rule 3), and
+// the third one is the whole reason this exists:
+//
+//   dated    a real YYYY-MM-DD, stamped by the run that wrote the line
+//   undated  the line was written before qualify.ts recorded dates, and never will have one
+//   (absent) the lead has no evidence at all — handled by the rail's own empty state, not here
+//
+// An undated item says so in its own words and in a visibly quieter register. It is never filled
+// from the file's mtime, never from today, and never left blank in a way that reads like a date is
+// coming. The prototype's hardcoded "observed Aug 6" was refused before this shipped for exactly
+// this reason; a silent backfill would be the same lie with a real-looking number on it.
+//
+// Anything that is not a plain YYYY-MM-DD reads as undated rather than being echoed back: the
+// parser only ever produces that shape, so a different string means the field was set by something
+// that does not know what it holds.
+export function evidenceCapturedView(capturedAt: string | null | undefined): { dated: boolean; text: string } {
+  const trimmed = (capturedAt ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return { dated: false, text: NO_CAPTURE_DATE_RECORDED };
+  return { dated: true, text: "captured " + trimmed };
 }
 
 // Locked and sent are two different states and never collapse into one check. Locking readies the
@@ -1468,6 +1493,10 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .ev-quote { font:italic 400 13px/1.55 Georgia,serif; color:#3a352c; }
   .ev-src { font-size:12px; color:#7a7266; border-bottom:1px solid #d8cfbb; width:fit-content; text-decoration:none; }
   .ev-nosrc { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; }
+  /* A recorded capture date and no recorded capture date are the same line in two registers, so
+     the pair is legible at a glance: dated reads as a fact, undated reads as an admission. */
+  .ev-cap { font:10.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#8b8272; letter-spacing:.03em; margin-top:3px; }
+  .ev-nocap { font:10.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b3a894; font-style:italic; letter-spacing:.03em; margin-top:3px; }
   /* Outreach triage: the queue grouped by why, one row per lead, one click into the thread */
   .tri-cap { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em;
     color:#a89a80; text-transform:uppercase; margin-bottom:20px; }
@@ -2821,6 +2850,15 @@ function evidenceSourceView(source){
   if(/^https?:\\/\\//i.test(t)) return { kind:"link", text:t };
   return { kind:"text", text:t };
 }
+// ── begin the capture-date mirror ──
+// Mirror of evidenceCapturedView: dated, or undated and saying so. Never a backfilled day.
+const NO_CAPTURE_DATE_RECORDED = "no capture date recorded";
+function evidenceCapturedView(capturedAt){
+  const t = (capturedAt||"").trim();
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(t)) return { dated:false, text:NO_CAPTURE_DATE_RECORDED };
+  return { dated:true, text:"captured "+t };
+}
+// ── end of the capture-date mirror ──
 // Message status only: the tracker's lastTouch is keyed lead:person, never message, so it can
 // never say WHICH message went. The logged send is reported below as the lead-level fact it is.
 function outreachSendState(msg){
@@ -2892,14 +2930,16 @@ function outreachMarginHtml(l){
   const items = evs.slice(0,5).map(e=>{
     const quote = e.quote && e.quote!=="(none)" ? '<div class="ev-quote">"'+esc(e.quote)+'"</div>'
       : (e.description ? '<div class="d">'+esc(e.description)+'</div>' : "");
-    // No date fallback: EvidenceItem carries no timestamp, so an item with nothing valid behind it
-    // says it has no source rather than showing a day nobody recorded.
+    // No fallback anywhere on this row: an item with nothing valid behind it says it has no
+    // source, and an item nobody dated says it has no date. Neither borrows from the other.
     const sv = evidenceSourceView(e.source);
     const src = sv.kind==="link" ? '<a class="ev-src" href="'+esc(sv.text)+'" target="_blank" rel="noopener">source ↗</a>'
       : sv.kind==="text" ? '<div class="ev-src">'+esc(sv.text)+'</div>'
       : '<div class="ev-nosrc">'+esc(sv.text)+'</div>';
+    const cv = evidenceCapturedView(e.captured_at);
+    const cap = '<div class="'+(cv.dated?"ev-cap":"ev-nocap")+'">'+esc(cv.text)+'</div>';
     const cls = e.signal==="worldview-match" ? "green" : "sand";
-    return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+src+'</div>';
+    return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+src+cap+'</div>';
   }).join("");
   const stats = (l.jsaStats||[]).slice(0,3).map(s=>'<div class="d" style="font-size:12.5px;color:#5a5346;">'+esc(s.label)+': '+esc(s.value)+'</div>').join("");
   const profile = (l.profileRest||l.profile) ? '<details class="lead-details"><summary>Full profile</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.profileRest||l.profile)+'</div></details>' : "";

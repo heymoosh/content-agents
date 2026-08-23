@@ -220,6 +220,7 @@ describe("mergeResearchIntoLead", () => {
         source: "https://acme.co/blog/pivot",
         quote: "we shipped before we checked the assumption",
         description: "founder blog post",
+        captured_at: null,
       },
     ],
     disconfirmation: "Searched for locked-roadmap language, found none.",
@@ -266,6 +267,35 @@ describe("mergeResearchIntoLead", () => {
     const evidenceSection = body.split("## Classification")[0];
     assert.ok(evidenceSection.includes("- E1 | signal: person-fit"));
     assert.ok(evidenceSection.includes("- E2 | signal: worldview-match"));
+  });
+
+  // ── captured_at on a merge ──────────────────────────────────────────────────────────────────
+  //
+  // The merge re-writes the WHOLE ## Evidence section on every pass, old items included, so this is
+  // the exact place a well-meaning formatter would stamp today's date onto evidence gathered months
+  // ago. It must not: only the items this pass brought in get a date, and only the caller's.
+  test("stamps the run's date on the evidence this pass brought in", () => {
+    const { body } = mergeResearchIntoLead({ header: HEADER, body: FRESH_BODY, parsed: PARSED, capturedAt: "2026-08-23" });
+    assert.ok(body.includes("- E1 | signal: worldview-match"));
+    assert.ok(body.includes("| captured: 2026-08-23"), "new evidence carries the date the run captured it");
+  });
+
+  test("leaves evidence that was already in the file undated, on a pass that dates its own", () => {
+    const bodyWithEvidence = FRESH_BODY.replace(
+      "(none yet)",
+      '- E1 | signal: person-fit | person: Jane Doe | source: https://acme.co/team/jane | quote: "prior quote" | prior note',
+    );
+    const { body } = mergeResearchIntoLead({ header: HEADER, body: bodyWithEvidence, parsed: PARSED, capturedAt: "2026-08-23" });
+    const lines = body.split("## Classification")[0].split("\n").filter((l) => l.startsWith("- E"));
+    assert.equal(lines.length, 2);
+    assert.ok(lines[0].startsWith("- E1 | signal: person-fit"));
+    assert.ok(!lines[0].includes("captured:"), "an item that arrived undated stays undated forever: " + lines[0]);
+    assert.ok(lines[1].endsWith("| captured: 2026-08-23"), lines[1]);
+  });
+
+  test("omitting capturedAt leaves even the new evidence undated, rather than reading a clock here", () => {
+    const { body } = mergeResearchIntoLead({ header: HEADER, body: FRESH_BODY, parsed: PARSED });
+    assert.ok(!body.includes("captured:"), "the merge is pure; the caller owns the date");
   });
 
   test("Evidence section stays (none yet) when no evidence was found and none pre-existed", () => {
@@ -348,6 +378,7 @@ describe("mergeResearchIntoLead: kind: platform sets fit, not classification", (
         source: "https://pod.example.com/about",
         quote: "we think the real risk is the systems we build without checking them",
         description: "host mission statement",
+        captured_at: null,
       },
     ],
     disconfirmation: "Searched for closed-to-outside-guests language, found none.",

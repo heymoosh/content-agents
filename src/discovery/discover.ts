@@ -12,7 +12,7 @@ import { slugify } from "../util/slug.js";
 import { logCost } from "../util/cost-log.js";
 import { loadOutreachConfig } from "../outreach/config.js";
 import { listLeads } from "../outreach/status.js";
-import { runQualify } from "../outreach/qualify.js";
+import { runQualify, formatEvidenceLine } from "../outreach/qualify.js";
 import { buildResearchSettings } from "../outreach/research.js";
 import {
   buildClientPlatformDiscoveryPrompt,
@@ -60,10 +60,16 @@ function existingNamesForKind(kind: DiscoveryKind): string[] {
     .map((l) => l.name);
 }
 
-function formatEvidenceLines(evidence: EvidenceItem[]): string {
+// Reuses qualify.ts's own serializer rather than a second copy of the line format -- the reader
+// (EVIDENCE_LINE_RE) and both writers are one format or they are not a format at all.
+//
+// `capturedAt` is the day this discovery run gathered the evidence, so a scaffolded lead.md carries
+// its own capture dates from the start. Same clock as decisionLogLine below, and equally a real
+// measurement rather than a guess: the run IS the capture.
+function formatEvidenceLines(evidence: EvidenceItem[], capturedAt: string): string {
   if (evidence.length === 0) return "(none yet)";
   return evidence
-    .map((item, i) => `- E${i + 1} | signal: ${item.signal} | person: ${item.person} | source: ${item.source} | quote: ${item.quote} | ${item.description}`)
+    .map((item, i) => formatEvidenceLine(item.captured_at ? item : { ...item, captured_at: capturedAt }, i + 1))
     .join("\n");
 }
 
@@ -72,9 +78,12 @@ function yamlQuote(value: string): string {
   return `"${oneLine.replace(/"/g, '\\"')}"`;
 }
 
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function decisionLogLine(note: string): string {
-  const date = new Date().toISOString().slice(0, 10);
-  return `- ${date}: ${note}`;
+  return `- ${today()}: ${note}`;
 }
 
 function scaffoldReviewQueue(dir: string, name: string): void {
@@ -117,7 +126,7 @@ export function buildClientPlatformLeadFile(
   const disconfirmation = candidate.disconfirmation ? `\n\nDisconfirmation pass: ${candidate.disconfirmation}` : "";
   const body =
     `\n## Profile\n\n${candidate.profile || "(no profile summary returned)"}\n` +
-    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence)}\n` +
+    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence, today())}\n` +
     `\n## Classification\n\n${candidate.classificationNote || "(no rationale provided)"}${disconfirmation}\n` +
     `\n## Pitch\n\n${candidate.pitchAngle || "(not yet drafted)"}\n` +
     `\n## Decision log\n\n${decisionLogLine(`discovered via /scout (theme: "${theme}")`)}\n`;
@@ -143,7 +152,7 @@ export function buildContentExampleLeadFile(candidate: ContentExampleDiscoveryCa
 
   const body =
     `\n## Profile\n\n${candidate.why || "(no summary returned)"}\n` +
-    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence)}\n` +
+    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence, today())}\n` +
     `\n## Classification\n\n${candidate.why || "(no rationale provided)"}\n` +
     `\n## Pitch\n\n${candidate.angle || "(not yet drafted)"}\n` +
     `\n## Decision log\n\n${decisionLogLine(`discovered via /scout (theme: "${theme}")`)}\n`;
