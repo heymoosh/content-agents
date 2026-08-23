@@ -41,7 +41,9 @@ youtube-transcript}.ts`, `src/pull/platforms/threads.ts`, plus `baselines.ts` an
 npm run patterns:collect                      # validate an inbox file into the corpus
 npm run patterns:outliers                     # score the corpus
 npm run patterns:reddit -- --sub r/ADHD       # needs REDDIT_ keys (Muxin declined these)
-npm run patterns:reddit-rss                   # no credentials, works today
+npm run patterns:reddit-rss -- --feeds <dir>  # no credentials, works today (bodies, no numbers)
+npm run patterns:reddit-backfill -- --staged <inbox.json> --measurements data/patterns/browser
+bash scripts/reddit-rss-fetch.sh <dir> ADHD civictech ...   # paced RSS fetch, 45s apart
 npm run patterns:youtube -- --backfill        # transcripts, works today
 npm run patterns:pinterest -- --all           # no credentials, works today
 npm run patterns:instagram -- --smoke         # needs IG_GRAPH_ keys
@@ -59,7 +61,8 @@ npm run pull:login -- threads                 # one-time human login
 
 ## In flight when this was written
 
-- `reddit-browser`: collecting all 9 subreddits through Muxin's real Chrome. r/ADHD done.
+- `reddit-browser`: FINISHED its pass and stopped cleanly. See "Reddit collection state" below for
+  exactly what is collected and what is not. Nothing is mid-flight and no browser tab is left open.
 - `top-creators`: finding top creators all-time per niche, and flagging music/entertainment
   accounts already seeded under `general-viral` for removal.
 
@@ -174,6 +177,123 @@ is cheap.
 It changes `/atomize` drafting inputs, which is content-generation logic under CLAUDE.md rule 7, so
 it must open as a **draft PR with old-vs-new content samples**, never auto-merge. A drafted PR body
 with real before/after samples is at the session scratchpad's `pr-body.md`.
+
+## Reddit collection state, exactly
+
+### Is the staged file ready to collect? Yes. It has NOT been run.
+
+`data/patterns/inbox/reddit-rss-top-year-2026-08-23.json` holds **225 entries, 25 from each of 9
+subreddits, and every one carries a real upvote count, comment count and upvote ratio.** No entry
+is left with null metrics. All 225 pass `validateEntry` with zero errors, and 18 of them dedupe
+against posts already in the corpus, so a collect run appends about 207.
+
+Nobody has run `npm run patterns:collect` on it. That was deliberate, not an oversight: the file
+was left for a human to admit, and admitting it is now safe because the scores are in. **A fresh
+session may run `npm run patterns:collect` on it.**
+
+Do NOT re-run `npm run patterns:reddit-rss` before collecting unless you also re-run the backfill.
+Re-staging regenerates the entries with null metrics, and the numbers only come back by running:
+
+```
+npm run patterns:reddit-backfill -- --staged <inbox.json> --measurements data/patterns/browser
+```
+
+That command is idempotent. Running it twice corrects numbers in place rather than stacking a
+second provenance paragraph, which it did do before it was fixed.
+
+### Collected, per subreddit
+
+Top-of-year, 25 posts each, bodies plus real numbers, all staged: **r/ADHD, r/civictech,
+r/Entrepreneur, r/SideProject, r/ClaudeAI, r/LocalLLaMA, r/microsaas, r/YouShouldKnow,
+r/LifeProTips.** That is all 9 of the priority list.
+
+| community | top post | median of its top 25 | measured baseline | multiple |
+|---|---|---|---|---|
+| r/LifeProTips | 42,483 | 12,306 | not measured | 61x, hand-lifted median 691 |
+| r/YouShouldKnow | 33,892 | 10,247 | not measured | none, no baseline exists |
+| r/ClaudeAI | 20,419 | 6,892 | not measured | 10,210x, hand-lifted median 2 |
+| r/ADHD | 12,283 | 4,583 | **3, n=192** | **4,094x, measured** |
+| r/SideProject | 5,778 | 2,326 | not measured | 5,778x, hand-lifted median 1 |
+| r/LocalLLaMA | 5,150 | 3,279 | not measured | none, no baseline exists |
+| r/Entrepreneur | 3,968 | 932 | not measured | none, no baseline exists |
+| r/microsaas | 806 | 331 | not measured | none, no baseline exists |
+| r/civictech | 27 | 12 | not measured | 7x, hand-lifted median 4 |
+
+**Only r/ADHD's baseline was measured in this pass.** 453 posts loaded off `/new`, filtered to the
+192 at least 3 days old, stickied and pinned excluded, no filter on score or topic. True median 3
+upvotes, which is what the hand pass got on 163 posts five months earlier. Every other multiple in
+that table divides by a hand-lifted median and is provisional until re-measured the same way. Four
+communities have no baseline at all and were given no multiple.
+
+Raw scores for that window are in `data/patterns/browser/adhd-new-baseline.txt`, all 192
+`score,comment` pairs, so the median can be rechecked without recollecting.
+
+### Not collected, in priority order for whoever picks this up
+
+1. **`/new` baselines for the other 8.** This is the gating item for honest multiples and the only
+   reason four communities above have no number at all. Expensive: r/ADHD needed 453 posts loaded
+   to yield 192 settled because it publishes about 100 a day. Quieter subs settle far cheaper.
+   100+ settled posts is plenty for a median; cap the window and record the size on the baseline
+   rather than grinding for more.
+2. **`/top/?t=all` for the other 8.** Collected for r/ADHD only, where it produced one of the two
+   headline findings. Worth checking whether the disjointness generalises: if some communities are
+   era-stable and others are not, that split is itself the finding.
+3. `top/.rss?t=all` returns HTTP 200 and 101KB for r/ADHD, so all-time bodies are available the
+   same way top-year bodies were. **The join was never actually run on that side.** Verify it
+   before trusting it.
+
+### The body-join design, so nobody pulls bodies through the browser
+
+Two routes, each supplying only what it is good at, joined on the post id:
+
+- **RSS supplies the full text.** `www.reddit.com/r/<sub>/top/.rss?t=year`, fetched with curl
+  straight to disk. Carries titles, bodies, authors, dates and Reddit's own ordering. No numbers.
+- **The browser supplies compact numbers only.** `score`, `comment-count`, `upvote-ratio`,
+  `post-type`, `flair-text`, read off `shreddit-post` attributes.
+
+**Do not try to pull post bodies through `javascript_tool`.** The tool result truncates at roughly
+1,100 characters. One subreddit's top 103 posts is about 107KB of body text, so that route would
+take hundreds of calls and was abandoned after measuring it. Numbers are small enough to come back
+in two slices of 13 rows per listing.
+
+The join key is the base36 post id, which RSS publishes in `<id>t3_xxxxxxx</id>`, the browser
+reports as the element id, and the corpus url contains after `/comments/`. **Never join on the url
+string**, since RSS gives `www.reddit.com` and the corpus stores `old.reddit.com`. Measured result:
+225 of 225 matched, zero misses, across all 9 communities.
+
+Neither side passes post text through a model-read channel, and the join is exact rather than
+fuzzy. That is the property worth preserving if this gets rebuilt.
+
+### Pacing and cost, so the remaining work can be sized
+
+- **RSS:** 45s between feeds, exponential backoff from 60s on each HTTP 429, doubling, capped at
+  480s, 6 attempts per feed. All 9 retrieved. At least one needed a backoff retry. Reddit
+  rate-limits this surface hard; do not lower the 45s without re-measuring.
+  `scripts/reddit-rss-fetch.sh` does this.
+- **Browser:** about 4 calls per subreddit for a top window (navigate, unlock plus rows 1 to 13,
+  rows 14 to 25). r/ADHD's full pass including both windows and the `/new` baseline took about 18
+  calls. The `/new` baseline dominates the cost everywhere.
+- Pagination advances about 25 posts per `loadContent()` call, roughly 2.2s each: 3, 28, 53, 78,
+  103. Keep any in-page loop under about 6 rounds; the CDP call times out at 45s.
+
+### Subscriber count is NOT available on this route. Do not re-attempt it.
+
+It is not an attribute on any element, no "N members" string appears in the listing page text, and
+`about.json` is walled like every other `.json` route. `followers` is null on all 225 reddit
+entries, which matches every reddit row in `config/pattern-mining.yaml`. It was not parsed out of
+the feed subtitle's marketing prose, which really does say "nearly two million users" for r/ADHD.
+Reddit is post-ranked rather than follower-ranked, so the community median is the denominator that
+matters and it does not need a subscriber count.
+
+### One open judgment call, deliberately not decided
+
+**18 of the 225 entries have a form disagreement** between the RSS feed and the rendered page. The
+page reports a vocabulary the feed cannot express (`multi_media`, `crosspost`), so 16 posts the
+feed called `text-only` the page calls `multi_media`. Neither side was overwritten: the recorded
+form keeps the method that produced it, and `npm run patterns:reddit-backfill` prints every
+disagreement by id for a human to settle. The rendered page is probably the more accurate source,
+because the feed infers form from its `[link]` anchor and that misses posts with inline media, but
+that is a judgment nobody has made yet.
 
 ## Findings worth keeping
 
