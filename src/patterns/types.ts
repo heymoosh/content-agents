@@ -56,10 +56,13 @@ export type VisualForm = (typeof VISUAL_FORMS)[number];
 // Absent on an entry nobody has examined for a visual yet. Present means someone looked.
 export interface CorpusVisual {
   form: VisualForm;
-  // The text rendered ON the image, frame or slide, word for word. This is Sabrina Ramonov's
-  // "on-screen title", and remix mode copies it into Muxin's own post VERBATIM. So a guess here
-  // does not degrade gracefully: it puts words she never verified into her feed under a claim
-  // they were market-tested. Null means "not retrievable", never "probably something like this".
+  // The text the creator typeset ONTO the image, frame or slide as its hook, word for word. This
+  // is Sabrina Ramonov's "on-screen title", and remix mode copies it into Muxin's own post
+  // VERBATIM. So a guess here does not degrade gracefully: it puts words she never verified into
+  // her feed under a claim they were market-tested.
+  //
+  // Null when the post has no such title, and also null when one was simply not retrievable.
+  // `description` is what tells those two apart. Never "probably something like this".
   onscreen_text: string | null;
   // What the visual depicts, in plain words. An observation of what was actually seen, e.g. "a
   // slide of stacked text on a plain background". Never a guess at text that could not be read.
