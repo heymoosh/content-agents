@@ -459,6 +459,16 @@ export function isUnknownFieldError(error: GraphError | null): boolean {
 // the generic "calls to this api have exceeded the rate limit".
 const THROTTLE_CODES = new Set([4, 17, 32, 613]);
 
+// True when the failure is about the CALLER, not about the account being looked up: a dead token,
+// a throttled app, a missing permission. This distinction is load-bearing in the smoke check.
+// Without it a single expired token makes every seeded account report as "not a professional
+// account", which sends the reader off to audit handles when the only thing wrong is a credential.
+export function isCallerError(error: GraphError | null): boolean {
+  if (!error) return false;
+  const code = error.code ?? 0;
+  return code === 190 || code === 10 || code === 200 || THROTTLE_CODES.has(code);
+}
+
 // Turns a Graph error into a message a person can act on, and never echoes the token. Meta's
 // error text is included because it names the field or permission at fault, and it never contains
 // the credential.
@@ -839,6 +849,17 @@ export async function smoke(client: InstagramClient, handles: string[], log: (li
       const { account, media } = await client.recentMedia(handle, 5);
       results.push(summariseAccount(handle, account, media));
     } catch (err) {
+      const error = (err as { graph?: GraphError }).graph ?? null;
+      // A dead token or a throttled app is not a fact about this account, and marching on would
+      // print "not a professional account" against every remaining handle. Stop and say what is
+      // actually wrong, which is the same misattribution rule the unreadable-handle report follows,
+      // pointed the other way.
+      if (isCallerError(error)) {
+        log("\nStopped before checking the rest. This failure is about the CALLER, not about any of these accounts:");
+        log((err as Error).message);
+        log("\nNothing above says anything about whether these handles are professional accounts. Fix the credential or wait out the throttle, then run the check again.");
+        return 1;
+      }
       results.push({
         handle,
         professional: false,

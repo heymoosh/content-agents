@@ -20,6 +20,7 @@ import {
   engagementOf,
   fieldState,
   graphError,
+  isCallerError,
   isReel,
   isUnknownFieldError,
   isVideo,
@@ -355,6 +356,12 @@ describe("graph errors", () => {
     assert.match(message, /age-gated/);
   });
 
+  test("caller errors are told apart from account errors", () => {
+    for (const code of [190, 10, 200, 4, 17, 32, 613]) assert.equal(isCallerError({ code }), true);
+    for (const code of [110, 100, 0]) assert.equal(isCallerError({ code }), false);
+    assert.equal(isCallerError(null), false);
+  });
+
   test("a permissions refusal names the scopes and the id mix-up", () => {
     const message = describeGraphError({ code: 200, message: "Permissions error" }, "somebody");
     assert.match(message, /instagram_manage_insights/);
@@ -680,13 +687,48 @@ describe("smoke", () => {
     assert.match(out, /Not readable: @broken/);
   });
 
+  test("a dead token stops the run instead of calling every account non-professional", async () => {
+    const lines: string[] = [];
+    let calls = 0;
+    const failing = async () => {
+      calls++;
+      return new Response(JSON.stringify({ error: { code: 190, type: "OAuthException", message: "Session has expired" } }), { status: 400 });
+    };
+    const client = new InstagramClient(creds, { fetchImpl: failing, politenessMs: 0, log: (line) => lines.push(line) });
+    const code = await smoke(client, ["@one", "@two", "@three"], (line) => lines.push(line));
+    const out = lines.join("\n");
+    assert.equal(code, 1);
+    // It stopped on the first handle rather than mislabelling the other two.
+    assert.equal(calls, 1);
+    assert.match(out, /about the CALLER, not about any of these accounts/);
+    assert.match(out, /rejected the access token/);
+    assert.equal(out.includes("READABLE: NO"), false);
+  });
+
+  test("a throttle stops the run the same way", async () => {
+    const lines: string[] = [];
+    const failing = async () =>
+      new Response(JSON.stringify({ error: { code: 4, message: "Application request limit reached" } }), { status: 400 });
+    const client = new InstagramClient(creds, { fetchImpl: failing, politenessMs: 0, log: (line) => lines.push(line) });
+    const code = await smoke(client, ["@one", "@two"], (line) => lines.push(line));
+    assert.equal(code, 1);
+    assert.match(lines.join("\n"), /throttled/);
+  });
+
   test("nothing the smoke check prints contains the token, on any path", async () => {
     const lines: string[] = [];
     const failing = async () => new Response(JSON.stringify({ error: { code: 190, message: "Session has expired" } }), { status: 400 });
     const client = new InstagramClient(creds, { fetchImpl: failing, politenessMs: 0, log: (line) => lines.push(line) });
     await smoke(client, ["@one", "@two"], (line) => lines.push(line));
+    const good = JSON.parse(JSON.stringify(discovery)) as { business_discovery: { media: { paging?: unknown } } };
+    delete good.business_discovery.media.paging;
+    await smoke(smokeClient(good), ["@fixturecreator"], (line) => lines.push(line));
     const out = lines.join("\n");
+    // The credential value itself must never appear anywhere.
     assert.equal(out.includes(creds.accessToken), false);
-    assert.equal(out.includes("access_token"), false);
+    // Nor may a query string carrying one. The re-auth instructions mention the /oauth/access_token
+    // ENDPOINT by name, which is a documentation string and not a credential, so the check is for
+    // an assigned value rather than for the word.
+    assert.equal(/access_token=\S/.test(out), false);
   });
 });
