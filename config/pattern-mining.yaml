@@ -871,12 +871,19 @@ accounts:
   #             either way.
   #   substack  substack.com/api/v1/user/<handle>/public_profile. Returns the profile handle, the
   #             name, the publications with their subdomains, and a rounded subscriber string.
-  #   reddit    www.reddit.com/r/<sub>/.rss, which is the only reddit surface still answering a
-  #             plain fetch (about.json, api.reddit.com and old.reddit.com all return a wall). The
-  #             feed's <category label="r/Name"> confirms the community and its exact casing.
-  #             Reddit exposes NO subscriber count through it, so every reddit row is
-  #             followers: null. It is not an estimate withheld; it is a number this route cannot
-  #             see.
+  #   reddit    SUPERSEDED 2026-08-23 by the API. What follows describes the anonymous route as it
+  #             was, and is kept because the followers: null on every reddit row below came from
+  #             it: www.reddit.com/r/<sub>/.rss was the only reddit surface still answering a plain
+  #             fetch (about.json, api.reddit.com and old.reddit.com all returned a wall), the
+  #             feed's <category label="r/Name"> confirmed the community and its exact casing, and
+  #             RSS carries no subscriber count.
+  #             The route now is Reddit's own OAuth JSON API, run by `npm run patterns:reddit`
+  #             with a free script app (REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET /
+  #             REDDIT_USER_AGENT in .env, see .env.example). It returns the subscriber count, the
+  #             score, the upvote ratio and the comment count on every post, so a reddit
+  #             `followers` is a number this route CAN see. The rows below still say null because
+  #             nobody has run it with credentials yet: fill each one in by hand from what that
+  #             run prints, and never from an estimate.
   # ===============================================================================================
 
   # ---------------------------------------------------------------------------------------------
@@ -2238,15 +2245,19 @@ accounts:
   # what decides what a post has to look like. Seeding individual redditors would be modelling the
   # platform wrong.
   #
-  # `followers` is null on EVERY row and it is not an omission. The only reddit surface still
-  # answering a plain fetch is the RSS feed, and RSS carries no subscriber count. about.json,
-  # api.reddit.com and old.reddit.com all return a wall. So the number exists on the platform but
-  # not on this route, and the rule is to record null rather than borrow a figure from anywhere
-  # else.
+  # `followers` is null on EVERY row below, and as of 2026-08-23 that is a job not yet done rather
+  # than a fact about the platform. It was written when the RSS feed was the only reddit surface
+  # answering a plain fetch, and RSS carries no subscriber count. The collector now goes through
+  # Reddit's own OAuth JSON API (`npm run patterns:reddit`), which returns the subscriber count for
+  # every community here. Nobody has run it with credentials yet, so nothing has been filled in.
+  # When someone does, copy each number off that run by hand, one row at a time, and never edit
+  # this file with a YAML tool: about two thousand lines of it are comments that carry the
+  # provenance of every row, and a serializer would delete them.
   #
   # Verified by fetching www.reddit.com/r/<sub>/top/.rss?t=year and reading the feed's own
   # <category label="r/Name">, which also confirms exact casing (r/yimby is lowercase; r/AskReddit
-  # is not). Retrieved 2026-08-23.
+  # is not). Retrieved 2026-08-23. The API's own display_name_prefixed says the same thing, and the
+  # collector reads the handle off it rather than off the argument someone typed.
   #
   # WHAT WINS HERE SPLITS HARD BY SUBREDDIT, AND IT WAS MEASURED. For each community below the top
   # ten posts of the past year were pulled and the media thumbnails counted. The split is not
