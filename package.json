@@ -92,7 +92,8 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck",
     "test:e2e": "tsx e2e/run-all.ts",
-    "patterns:reddit-rss": "tsx src/patterns/reddit-rss.ts"
+    "patterns:reddit-rss": "tsx src/patterns/reddit-rss.ts",
+    "patterns:reddit-backfill": "tsx src/patterns/reddit-backfill.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.20.38",
