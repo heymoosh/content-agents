@@ -364,6 +364,115 @@ cases where **the artifact IS the micro-action**. Nobody appended an ask to an a
 shipped the thing and the shipping was the post. That is the shape of civic work this corpus
 actually rewards, and it is a build instruction rather than a writing one.
 
+## How much reach is actually behind the evidence, platform by platform
+
+**A run-level section, new on 2026-08-23.** Muxin asked for the corpus to be weighted by virality
+rather than by post count, and she was right that nothing in this file said how big any pattern's
+evidence was. This section, plus the **Reach behind it** line now carried by every record below, is
+that weighting. It **changes no gate, admits nothing new, demotes nothing and re-ranks nothing.**
+The floors above are settled and untouched. What follows is information for the reader, so a pattern
+resting on hundreds of engagements cannot be mistaken for one resting on hundreds of thousands.
+
+**Why there is no single virality score, and there will not be one.** A composite would let a
+9,700,000 view TikTok and a 171 favourite Mastodon post be ranked on one axis, and the axis would be
+a lie, because those are not the same measurement. Views count how many people were shown a thing.
+Engagement counts how many of them pressed something. Only TikTok, X and YouTube publish a view
+count at all, on 38 of 38, 22 of 33 and 18 of 24 of their entries respectively; the other ten
+platforms publish none. A single number would also hide which metric it came from, which is exactly
+the false precision the rest of this file spends its length arguing against. So every number here
+and in every record carries its unit, and views are never averaged with engagements.
+
+**Engagement is the only column that spans all thirteen platforms**, so it is the one to read across
+rows. It is likes plus comments plus shares, whichever of the three the platform published, the same
+sum `entryScore` in `src/patterns/outliers.ts` falls back to. Views are reported alongside it, in
+their own column, for the three platforms that have them.
+
+| platform | collected | admitted as evidence | floor | median engagement, all collected | median engagement, admitted | max engagement, admitted | views |
+|---|---|---|---|---|---|---|---|
+| instagram | 13 | 0 | 10,000 engagement | 32,596 (on 10 of 13) | none admitted | none admitted | not published |
+| tiktok | 38 | 24 | 100,000 views | 29,691 | 59,804 | 822,900 | 38 of 38, median 343,950, max 9,700,000 |
+| substack-notes | 12 | 8 | 150 engagement | 9,315 | 20,391 | 46,541 | not published |
+| youtube | 24 | 5 | 25,000 views | 6,900 (on 4 of 24) | 6,900 | 12,100 | 18 of 24, median 39,024, max 183,600 |
+| reddit | 25 | 18 | 250 engagement | 5,969 | 6,402 | 43,342 | not published |
+| linkedin | 21 | 15 | 250 engagement | 1,800 | 1,800 | 8,212 | not published |
+| hackernews | 9 | 4 | 250 engagement | 963 | 1,978 | 3,295 | not published |
+| x | 33 | 9 | 250 engagement | 540 | 1,970 | 16,119 | 22 of 33, median 59,054, max 710,381 |
+| substack | 22 | 15 | 150 engagement | 408 | 716 | 18,369 | not published |
+| devto | 4 | 4 | 150 engagement | 354 | 354 | 457 | not published |
+| threads | 15 | 5 | 150 engagement | 199 | 727 | 1,237 | not published |
+| bluesky | 22 | 7 | 150 engagement | 180 | 380 | 11,598 | not published |
+| mastodon | 54 | 18 | 150 engagement | 128 | 540 | 4,051 | not published |
+
+Computed over all 292 entries in `data/patterns/corpus.jsonl` on 2026-08-23. YouTube's engagement
+column rests on 4 of its 24 entries, because YouTube exposes a like count on a Short inconsistently;
+read that row on views. Instagram's rests on 10 of 13.
+
+### The two columns that disagree, and why that is the whole point
+
+**Read column two against column five.** Sample size and evidence strength run in opposite
+directions across this table, and the gap is roughly two orders of magnitude at its widest.
+
+- **Mastodon is the largest single sample in the corpus, 54 posts, and has the smallest posts in
+  it,** at a median of 128 engagements across everything collected and 540 across the 18 admitted.
+- **TikTok contributed 38 posts at a median of 29,691 engagements**, 232 times Mastodon's median on
+  the same unit, before its view counts are considered at all.
+- **Instagram contributed 13 posts at the highest median in the corpus, 32,596 engagements, and
+  carries no patterns**, because every one of the 13 is body-incomplete. Big numbers and zero
+  evidence, which is the cleanest demonstration in this file that popularity and usefulness are
+  different quantities.
+
+**Why Mastodon is over-collected, stated as the two-sided thing it is rather than as a complaint.**
+Mastodon is the only platform in this corpus sampled without cherry-picking: an unbiased window of
+about 40 posts per account, which is why every within-account multiple measured there is worth more
+than a within-account multiple measured anywhere else, and why the file leans on it for the length
+finding and the no-link finding. It is also the platform that was easiest to collect honestly, which
+is why there are 54 of them. Those two facts have the same cause and pull in opposite directions:
+
+- **For baselines, this is a virtue.** A real median from a real window is the only kind of
+  denominator that means anything, and Mastodon supplies the corpus's best ones. Its 37.3x is the
+  largest clean multiple measured here precisely because the denominator is trustworthy.
+- **For pattern weight, this is a distortion.** Volume of posts collected is a fact about how
+  reachable a platform's API was, not a fact about how far its posts travelled. Counting posts gives
+  Mastodon 18 percent of the corpus and TikTok 13 percent, while the reach behind those posts runs
+  the other way by a factor of hundreds.
+
+**Neither correction cancels the other, and neither is applied as a gate.** A Mastodon pattern with
+three sightings at 171 to 873 favourites is a real pattern, honestly sampled, and Muxin can use it.
+It is not the same size of evidence as a TikTok record standing on 8,400,000 views. Both statements
+are true and this file now says both.
+
+**The cherry-picking caveat is sharper here, not softer.** X, LinkedIn, Substack, Instagram and
+Threads-in-part were reached by searching for famous posts, so their engagement columns are inflated
+relative to what those creators normally do, and they have no honest baseline at all. Mastodon,
+Bluesky's cleanest account, Threads' one real window, Reddit and Hacker News' true medians, and
+Substack Notes' 96-note median are the sampled-honestly set. **A big number from a cherry-picked
+platform tells you the post was popular. It does not tell you the shape caused it.** That is why raw
+reach is being added as a second axis rather than as a replacement for the sampling line each
+section already carries.
+
+### How to read a "Reach behind it" line on a record
+
+Every numbered record below now carries one, placed directly after **Mechanism**. It states the real
+numbers of the posts behind that record, with the unit named. Three conventions, so the line can be
+trusted:
+
+1. **Raw values are listed, not summarised, whenever there are five or fewer of them.** A median of
+   two posts is not a median, and this file has enough false precision in its history already.
+   Medians appear only where there are three or more values and every one is identified.
+2. **Where the post-level mapping was never recorded, the line says so and gives a band instead.**
+   `data/patterns/analyses.jsonl` records a gate, a popularity and a multiple per post; it does not
+   record which posts a synthesized pattern was built from. Where a record names a count without
+   naming its posts ("seen in 5 posts across 3 creators"), the exact posts cannot be recovered
+   without guessing, and guessing an engagement number into an evidence line is the failure mode
+   this file exists to prevent. Those lines read **section band** and quote the range and median of
+   that platform's admitted posts. A band is a ceiling on the evidence, not a measurement of it.
+3. **The unit is always named, and the gate metric leads.** TikTok and YouTube records lead with
+   views, because views are what their floor is measured on; engagement follows in brackets where it
+   was collected. Everywhere else the number is engagement.
+
+Where a record's supporting posts include one that does not clear the floor, or one that is
+body-incomplete, the line says so rather than quietly reporting the survivors. Several do.
+
 ## Record format
 
 Every pattern `/patterns synthesize` writes into a platform section below uses exactly these
@@ -374,6 +483,10 @@ fields, in this order:
 
 - **Platform:** the platform this was mined on (one of the section headings below)
 - **Mechanism:** one sentence on why this structure holds attention
+- **Reach behind it:** the real size of the evidence, in the metric the platform publishes, named
+  every time. Raw values listed where there are five or fewer of them, median added only where
+  there are three or more and every one is identified, and the word "section band" plus a range
+  where the post-level mapping was never recorded. See "How to read a Reach behind it line" above
 - **Structure / arc:** the ordered beats, one per line, each with what the beat has to do
 - **Emotional trigger:** what the reader feels, and where in the arc they feel it
 - **Immediate personal payoff:** what the reader gets or avoids RIGHT NOW (time, money, power,
@@ -407,7 +520,10 @@ Rules for a written record:
    inventing a link, form, deadline, race, ballot measure, or voting record
    (`references/civic-adaptation.md`).
 5. No em dashes anywhere in a record (CLAUDE.md rule 5).
-6. **A record built on one post is presumptively contaminated with that creator's wording.** Before
+6. Every record carries a **Reach behind it** line, and it never rounds up. If the supporting posts
+   include one below the platform floor or one that is body-incomplete, the line names that rather
+   than quoting only the survivors. A band is written as a band and never as a measurement.
+7. **A record built on one post is presumptively contaminated with that creator's wording.** Before
    committing an n=1 record, compare its Shape block AND its numbered beats against the source
    entry's `body` by word sequence, not by eye. See "How that rule gets enforced" above for the
    method and the reason. This is where 88 percent of rule 1 violations in this file have come from.
@@ -447,6 +563,10 @@ a quoted post, so they are not behind any template here.
   as something measurable, so the reader can lift whichever version fits their own sentence. Seen in
   2 posts by 1 creator, at 16,119 and 1,008 engagements, and the construction is visible in 2 more
   posts by 2 other creators. The 16,119 post is the largest single result in the X set.
+- **Reach behind it:** 2 posts by 1 creator, at 16,119 and 1,008 engagements. X publishes a view
+  count on both: 224,946 and 39,847 views. The 16,119 is the largest engagement result in the X
+  set. The 2 further posts where the construction is visible are not identified in the analysis
+  file.
 - **Structure / arc:**
   1. A two word label that classifies the post, of the sort that flags it as advice, or as a
      position the writer expects disagreement with.
@@ -486,6 +606,7 @@ a quoted post, so they are not behind any template here.
 - **Mechanism:** a numbered list of specific things, where the final numbered item is not a thing but
   a question, so the reader completes the list themselves. It converts readers into commenters
   without asking them anything. Seen in 1 post by 1 creator, at 2,261 engagements.
+- **Reach behind it:** 1 post, at 2,261 engagements and 83,983 views.
 - **Structure / arc:**
   1. A framing verb with no object yet, ending in a colon.
   2. Three or four numbered items, each one or two words, each a specific named group or thing.
@@ -516,6 +637,8 @@ a quoted post, so they are not behind any template here.
 - **Mechanism:** two words naming what is about to be shown, then the procedure itself in bullets,
   with no claim, no credential, no promise and no link. Seen in 2 posts across 2 creators, at 1,970
   and 1,502 engagements, and both are the best body-complete post on their account.
+- **Reach behind it:** 2 posts by 2 creators, at 1,970 and 1,502 engagements. A view count exists
+  for one of the two only, 383,540 views on the 1,970.
 - **Structure / arc:**
   1. A two or three word label plus a colon, naming what is about to be shown. A process, a data
      update, a teardown.
@@ -590,6 +713,9 @@ here rather than repeated in each record.
   the offer at the end is positioned as more of the same rather than the missing piece, so the
   reader never feels the body was a toll gate. Seen in 5 posts across all 3 creators, the most
   repeated arc on this platform in the corpus.
+- **Reach behind it:** 5 posts across 3 creators, post-level mapping not recorded. Section band:
+  LinkedIn's 15 admitted posts run 543 to 8,212 engagements, median 1,800. LinkedIn publishes no
+  public view count, so engagement is the only reach number available on this platform.
 - **Structure / arc:**
   1. A claim or a promise stated in one line, usually counted.
   2. A short concession that it is hard, which pre-empts the obvious objection.
@@ -635,6 +761,8 @@ here rather than repeated in each record.
   the rest of the post supplies the version that fits their real life, so the reader who felt
   cowardly is handed a defensible position instead of a push. Seen in 3 posts across 2 creators.
   Related hook shape: pattern 27 in `hook-patterns.md`.
+- **Reach behind it:** 3 posts across 2 creators, post-level mapping not recorded. Section band:
+  543 to 8,212 engagements, median 1,800.
 - **Structure / arc:**
   1. The forced choice or the received advice, stated in the reader's own terms, then rejected flat.
   2. The reader's real constraints, listed one per line, concrete and unglamorous.
@@ -681,6 +809,8 @@ here rather than repeated in each record.
   either by listing their own unremarkable origins, by listing what the success cost them, or by
   saying the successful people they know lack the credentials the reader assumes are required. In
   all three the reader loses their reason to feel disqualified. Seen in 3 posts across 2 creators.
+- **Reach behind it:** 3 posts across 2 creators, post-level mapping not recorded. Section band:
+  543 to 8,212 engagements, median 1,800.
 - **Structure / arc:**
   1. The status fact, stated plainly and briefly, with no dwelling on it.
   2. The deflation, immediate, stacked one item per line: ordinary origins, real costs, or absent
@@ -731,6 +861,10 @@ here rather than repeated in each record.
   creator, with no variants to compare against. So the FORM is evidenced and the craft inside the
   image is not. Anyone who reads this as "write four words and win" will omit the half that did the
   work and publish an empty post. This is not a licence to post fragments.
+- **Reach behind it:** 2 posts from 1 creator, that creator's top two, at 3,688 and 1,222
+  engagements. **Both are body-incomplete entries**, which is inherent to what the pattern
+  describes: the argument is in the image. Neither counts as admitted body-structure evidence, and
+  the section band for comparison is 543 to 8,212 engagements, median 1,800.
 - **Structure / arc:**
   1. The image carries the entire substance: the claim, the framework, the list, the argument.
   2. The caption does one job only, and it is not summary. In the two collected examples it is
@@ -794,6 +928,8 @@ on the shape, not something the mined creators were doing.
   item and spends the piece unpacking it. Seen in 2 posts, both from one creator, and both are that
   account's outliers at 10.3x and 9.4x its baseline. One creator, so treat this as promising rather
   than proven.
+- **Reach behind it:** 2 posts from 1 creator, at 3,283 and 2,975 engagements, the two largest
+  engagement counts on that account. Substack publishes no per-post view count.
 - **Structure / arc:**
   1. Series marker, if this belongs to one, so the reader knows it is an instalment.
   2. The question or anomaly, in one sentence, phrased as something the writer noticed.
@@ -844,6 +980,10 @@ on the shape, not something the mined creators were doing.
   viral shape it came from: the framework post, where a creator brands a method and teaches it.
   Seen in 4 posts, all from one creator, whose top two posts both use it and whose best is a 3.5x
   outlier. One creator, so the count shows consistency, not cross-creator proof.
+- **Reach behind it:** 4 posts from 1 creator, at 245, 147, 71 and 48 engagements. **Only the 245
+  clears this platform's 150 floor.** The count of four is one creator's entire collected set
+  rather than four independent sightings, and in raw terms this is the smallest evidence base of
+  any Substack record here. The section band, for scale, is 197 to 18,369 engagements, median 716.
 - **Structure / arc:**
   1. The offer in one sentence: what this is, who it is for, and the named tool it uses.
   2. Permission, up front, to use only the parts that apply to them. This is load-bearing.
@@ -892,6 +1032,8 @@ on the shape, not something the mined creators were doing.
   observation rather than an established pattern. It is recorded because that one post is a 7.7x
   outlier and beats its own account's next post by nearly five times, and because the same move
   produced the corpus's single largest multiple on another platform.
+- **Reach behind it:** 1 post, at 1,514 engagements. It is a **body-incomplete** entry, so its arc
+  is described from what was collected rather than from a complete text.
 - **Structure / arc:**
   1. A one-line principle, stated flat, that the person about to be introduced proves.
   2. The person named, with an explicit promise that the reader will be glad to know of them.
@@ -937,6 +1079,8 @@ on the shape, not something the mined creators were doing.
   the answer as coming from someone who did not understand them. Raw viral shape it came from: the
   steelman essay. Seen in 2 posts across 2 creators, one an outlier and one an underperformer, so
   this is recorded as structurally strong rather than performance-proven.
+- **Reach behind it:** 2 posts across 2 creators, post-level mapping not recorded. Section band:
+  Substack's 15 admitted posts run 197 to 18,369 engagements, median 716.
 - **Structure / arc:**
   1. The objection or fear, quoted at length in its own voice, with permission noted if it is real.
   2. Why it is being shared: because the person holding it is not alone.
@@ -983,6 +1127,10 @@ on the shape, not something the mined creators were doing.
   account in the corpus, not what outperformed. Its three uses there sit at that account's 2nd, 3rd
   and 4th ranks, and the post that beat them was nothing like it. Use it as a workhorse, not a
   swing.
+- **Reach behind it:** 4 posts across 2 creators. Three are identified as ranks 2, 3 and 4 on the
+  largest Substack account in the corpus, at 18,369, 10,573 and 7,883 engagements, median 10,573.
+  The fourth, on the second creator, is not identified. That account's rank 1 sits at 42,376 and
+  uses nothing like this shape, which is the point the record already makes.
 - **Structure / arc:**
   1. A self-interrupting or urgency line saying why this is being written now.
   2. The anchor fact, dated, with the outlet and reporters named.
@@ -1028,6 +1176,9 @@ on the shape, not something the mined creators were doing.
   and personal, and the break itself is the event. Raw viral shape it came from: the pattern
   interrupt. Seen in 2 posts across 2 creators, and one of them is the single highest-engagement
   post in the entire corpus at roughly a fortieth of its author's normal length.
+- **Reach behind it:** 2 posts across 2 creators. One is identified as the largest Substack post
+  in the corpus at 42,376 engagements, and it is a **body-incomplete** entry. The second is not
+  identified; section band for it, 197 to 18,369 engagements, median 716.
 - **Structure / arc:**
   1. A callback to something the audience already saw, now resolved.
   2. The disclosure, one line, personal rather than topical.
@@ -1091,6 +1242,11 @@ and no body patterns.
   both body-complete. **This is the mastodon section's pattern 1 appearing on a second platform**,
   which is the only cross-platform confirmation of a full-post pattern in this file, so read that
   record alongside this one.
+- **Reach behind it:** 2 posts from 1 creator, at 577 and 87 engagements. **The 87 sits below this
+  platform's 150 floor**, so only one of the two is admitted evidence. Bluesky publishes no view
+  count. Read this beside the Mastodon record it confirms, which stands on 171 to 873
+  favourites-plus-boosts: the file's one cross-platform full-post confirmation is built on
+  hundreds of engagements, not thousands.
 - **Structure / arc:**
   1. Who published it and what it is, with the one adjective that matters. Detailed, new, big.
   2. The verdict, given as the poster's own reaction rather than a summary of the piece.
@@ -1127,6 +1283,7 @@ and no body patterns.
   choice, which is simultaneously the joke and the accurate description. Seen in 1 post by 1 creator
   at 4.0x that account's own baseline, and it is the top post on the cleanest account in the corpus.
   `(thin evidence, single sighting)`
+- **Reach behind it:** 1 post, at 380 engagements.
 - **Structure / arc:**
   1. A stretched interjection of mock dismay.
   2. The self-indictment, phrased as a discovered requirement rather than a decision: she now
@@ -1158,6 +1315,8 @@ and no body patterns.
   been told to do, then shows that having all of it changes nothing. It refutes an entire genre in
   five lines. Seen in 1 post by 1 creator at 2.0x that account's own baseline. `(thin evidence,
   single sighting)`
+- **Reach behind it:** 1 post, at 192 engagements, 42 above this platform's floor. That is the
+  smallest number behind any single-sighting record in this file.
 - **Structure / arc:**
   1. The setup, ending on a colon, promising a list of things she already knows.
   2. Three or four ticked items, each short, each one of the things advice-givers ask for.
@@ -1235,6 +1394,8 @@ highest-value fix available for this platform.
   reader gets a finish line they can actually recognise instead of a number they have to trust. Seen
   in 1 post by 1 creator, at 1,237 engagements including 119 reshares, the largest post on its
   account and the highest reshare count in the Threads set.
+- **Reach behind it:** 1 post, at 1,237 engagements including 119 reshares, the largest in the
+  Threads set.
 - **Structure / arc:**
   1. A superlative claim about method, naming the outcome it produces.
   2. The method, stated as an end condition rather than an amount. Do the thing until [the state
@@ -1268,6 +1429,7 @@ highest-value fix available for this platform.
   grammar, so the claim arrives as a pattern rather than an argument. There is no detail to disagree
   with because there is no detail. Seen in 1 post by 1 creator, at 969 engagements including 99
   reshares, second on its account.
+- **Reach behind it:** 1 post, at 969 engagements including 99 reshares.
 - **Structure / arc:**
   1. Name the era or the shift, in a clause that sets up a list.
   2. Swap one: the new thing stated in place of the old one.
@@ -1304,6 +1466,8 @@ highest-value fix available for this platform.
   account's five. **Both are the account's weakest admitted posts**, which is stated because it
   matters: this shape clears the popularity floor and sits at the bottom of its own creator's range,
   so treat it as usable rather than as a winner.
+- **Reach behind it:** 2 posts from 1 creator, at 473 and 331 engagements, the two smallest
+  admitted posts on this platform.
 - **Structure / arc:**
   1. The reassurance, stated as a refusal of the standard advice: the thing they blame is not
      broken and does not need fixing.
@@ -1411,6 +1575,10 @@ across 5 creators measured against unbiased baselines.
   creators, all three of them outliers, all three body-complete, at 19.0x, 10.2x and 9.3x. The
   counter-evidence is unusually strong: bare headline-plus-link shares are the single most common
   form in this sample and they cluster at the bottom of every account that uses them.
+- **Reach behind it:** 3 posts across 3 creators, at 873, 514 and 171 favourites-plus-boosts,
+  median 514. Those are the three quoted multiples written as raw numbers. Mastodon publishes no
+  view count. This is the file's only cross-platform-confirmed full-post pattern and it rests on
+  hundreds of engagements; its confirming Bluesky sibling rests on 577 and 87.
 - **Structure / arc:**
   1. Your own words first. The link never leads.
   2. One of three fills, all evidenced here: a short verdict plus the lifted sentence that earned
@@ -1469,6 +1637,9 @@ across 5 creators measured against unbiased baselines.
   a 6.2x post at 117 engagements, fell below this platform's popularity floor when the gate changed
   on 2026-08-23 and is now named as context rather than counted as evidence. Its multiple was real
   and its raw numbers were not big.
+- **Reach behind it:** 2 posts from 1 creator, at 841 and 205 favourites-plus-boosts. The third
+  post the record was originally written on, at 117, is below the floor and is named above as
+  context rather than counted.
 - **Structure / arc:**
   1. The uncomfortable fact, first, with an exact number in it where one exists.
   2. The honest reaction, in the words actually used privately rather than in status-update
@@ -1518,6 +1689,11 @@ across 5 creators measured against unbiased baselines.
   in the entire corpus at 37.3x; its sibling at 8.8x is a self-thread head whose continuations were
   never collected, and both are from one creator. Recorded because of the size of that one result,
   not because it repeats.
+- **Reach behind it:** 2 posts from 1 creator, at 896 and 212 favourites-plus-boosts. The 896
+  carries the corpus's largest clean multiple at 37.3x, and in raw terms it is 896 engagements
+  against an admitted median of 59,804 on TikTok and 20,391 on Substack Notes. Both readings are
+  honest and they measure different things: the multiple is trustworthy because Mastodon has the
+  corpus's only unbiased denominator, and the raw number is how far the post actually went.
 - **Structure / arc:**
   1. Build a counterfactual world in one long sentence, with the harm concrete and its scale pinned
      to something specific.
@@ -1605,6 +1781,9 @@ below as a claim about the SCRIPT and about nothing else.
   is the single best-evidenced TikTok record in this file: **896,100 views**, nine times this file's
   floor for the platform. Its six siblings, at 248 to 2,805 views, all open by addressing founders,
   and the account's own collection notes record a 782 view median across the seven.
+- **Reach behind it:** 1 post, at 896,100 views and 69,295 engagements, nine times this platform's
+  floor. Its six siblings on the same account run 248 to 2,805 views against an account median of
+  782, so one post carries this record entirely.
 - **Structure / arc:**
   1. The blunt universal fact, three to six words, second person, no preamble.
   2. A consequence of it, made concrete with real units of time or number.
@@ -1645,6 +1824,10 @@ below as a claim about the SCRIPT and about nothing else.
   performs, re-enacts or delivers, while the text supplies the premise, the count and the labels.
   Seen in 9 posts across 4 creators. **This is a craft record, not a performance claim:** on-screen
   text does not predict rank in this corpus, so use this for legibility, never as a reach tactic.
+- **Reach behind it:** 9 posts across 4 creators, post-level mapping not recorded. Section band:
+  TikTok's 24 admitted posts run 105,500 to 9,700,000 views, median 577,750, with an admitted
+  engagement median of 59,804. This is a craft record and not a performance claim, so read the
+  band as scale rather than as evidence for reach.
 - **Structure / arc:**
   1. On-screen line 1: the frame. What the viewer is about to watch, and why.
   2. On-screen line 2, optional: the count, the promise, or the fix.
@@ -1679,6 +1862,8 @@ below as a claim about the SCRIPT and about nothing else.
   prerequisite, until the chain has consumed the original intention entirely. The absurdity is
   visible only from outside. Seen in 1 post by 1 creator, ranked 2 of 6 on its account at 460,100
   views.
+- **Reach behind it:** 1 post, at 460,100 views and 61,053 engagements, ranked 2 of 6 on its
+  account.
 - **Structure / arc:**
   1. The intention, stated plainly. Small and ordinary.
   2. Prerequisite 1, offered as an improvement rather than an obstacle.
@@ -1716,6 +1901,9 @@ below as a claim about the SCRIPT and about nothing else.
 - **Mechanism:** the source material plays before any narration, so the viewer forms the reaction
   themselves and the creator arrives to confirm it rather than to install it. Seen in 3 posts across
   2 creators, at 8.4M, 7.9M and 1.1M views.
+- **Reach behind it:** 3 posts across 2 creators, at 8,400,000, 7,900,000 and 1,100,000 views,
+  median 7,900,000, carrying 680,200, 540,681 and 55,351 engagements. In raw reach this is the
+  largest evidence base behind any record in this file.
 - **Structure / arc:**
   1. The raw clip or the primary detail, first, with no framing.
   2. The minimum orientation: where, who, what they were doing. Two sentences at most.
@@ -1756,6 +1944,8 @@ below as a claim about the SCRIPT and about nothing else.
   audience already jokes about, and the closing line lands the ruling on the viewer's own street.
   Seen in 1 post by 1 creator, at **4,000,000 views**, the second largest in the TikTok set.
   `(thin evidence, single sighting)`
+- **Reach behind it:** 1 post, at 4,000,000 views and 822,900 engagements, the single largest
+  engagement count anywhere in the corpus.
 - **Structure / arc:**
   1. Two words of news framing, then the specific outcome in the same sentence.
   2. The scale, in counted units the viewer can picture.
@@ -1798,6 +1988,8 @@ below as a claim about the SCRIPT and about nothing else.
 - **Mechanism:** the on-screen title names a counted list AND the remedy at once, so the viewer knows
   the length of the commitment and the reward before a word is spoken. Seen in 3 posts across 2
   creators, ranked 1, 3 and 5 on their accounts.
+- **Reach behind it:** 3 posts across 2 creators, identified only by their ranks of 1, 3 and 5 on
+  their accounts. Section band: 105,500 to 9,700,000 views, median 577,750.
 - **Structure / arc:**
   1. On-screen title: the count, then the fix, in one line each.
   2. Straight into the list, no preamble, items delivered fast and surface-level so each is
@@ -1872,6 +2064,9 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
   and repeat to someone else, and handing it over in the first seconds removes any reason to leave.
   Seen in 6 of 11 posts across 3 of the 4 creators, which makes it by a wide margin the most
   repeated structure in this corpus on any platform.
+- **Reach behind it:** 6 of 11 posts across 3 creators, post-level mapping not recorded. Section
+  band: YouTube's 5 admitted posts run 26,700 to 183,600 views, median 73,400. A like count was
+  collected on only 4 of the 24 YouTube entries, so this section is read on views.
 - **Structure / arc:**
   1. The tool named in the first sentence, given a label that can be repeated.
   2. The whole mechanic handed over immediately, in one or two sentences. Nothing is withheld.
@@ -1914,6 +2109,8 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
 - **Mechanism:** one grammatical frame repeated across several everyday scenarios, each resolving
   to the same closing phrase, so the viewer is hit personally by at least one rung and has
   memorised the phrase by the end without being asked to. Seen in 4 posts across 2 creators.
+- **Reach behind it:** 4 posts across 2 creators, post-level mapping not recorded. Section band:
+  26,700 to 183,600 views, median 73,400.
 - **Structure / arc:**
   1. The frame established, usually attached to a named tool.
   2. Rung one, the most trivial scenario, so nobody is excluded at the start.
@@ -1956,6 +2153,8 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
   being asked of them and exactly what they get, and each spoken number afterwards acts as a
   chapter marker that makes every retention decision small. Seen in 2 posts from 1 creator, so
   thin, and recorded mainly because the count is doing visible structural work.
+- **Reach behind it:** 2 posts from 1 creator, post-level mapping not recorded. Section band:
+  26,700 to 183,600 views, median 73,400.
 - **Structure / arc:**
   1. The count plus a category label, inside three seconds, with no preamble.
   2. Item one: flat principle, then a concrete physical analogy, then the instruction.
@@ -1998,6 +2197,8 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
   performance pressure that stops people trying a technique they just watched an expert nail. Seen
   in 2 posts across 2 creators, one of them truncated in retrieval, so the evidence is thin even by
   this section's standards.
+- **Reach behind it:** 2 posts across 2 creators, one truncated in retrieval, post-level mapping
+  not recorded. Section band: 26,700 to 183,600 views, median 73,400.
 - **Structure / arc:**
   1. Start the procedure immediately, in the first person plural: we are doing this now.
   2. Defuse the jargon the moment it is introduced.
@@ -2045,6 +2246,8 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
   resistance sits between the principle and the instruction so the push comes from someone who has
   just admitted they did not want to either. Seen in 2 posts across 2 creators, one of them
   truncated, so thin.
+- **Reach behind it:** 2 posts across 2 creators, one truncated, post-level mapping not recorded.
+  Section band: 26,700 to 183,600 views, median 73,400.
 - **Structure / arc:**
   1. A relational self-introduction that establishes the creator as a peer, not an authority.
   2. The viewer's state named precisely, including their excuses, in the order they would give them.
@@ -2179,6 +2382,9 @@ bearing, because those four are the biggest posts in two of the six subreddits.
 - **Mechanism:** the title carries the complete, usable tip, so a reader who never opens the post
   still gets the value. The body exists only to prove the title. Seen in 5 posts across 5 posters,
   all 5 in r/LifeProTips, running 61x, 36x, 33x, 19x and 16x that community's true median of 691.
+- **Reach behind it:** 5 posts across 5 posters, at 43,342, 25,742, 23,294, 13,622 and 11,922
+  engagements, median 23,294. Reddit engagement here is upvotes plus comments; Reddit publishes no
+  view count.
 - **Structure / arc:**
   1. Title: the whole instruction, in the imperative, specific enough to act on.
   2. Body beat 1: the occasion it came from, or the source it was read in. Concrete and dated where
@@ -2228,6 +2434,9 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   discussion subreddits rather than the tip subreddits. Seen in 3 posts across 3 posters in 3
   different subreddits, at 1859x (r/ADHD, true median 3), 33x (r/ProductManagement, true median 12)
   and 943x (r/SideProject, true median 1).
+- **Reach behind it:** 3 posts across 3 posters, at 6,377, 1,122 and 455 engagements, median
+  1,122. The quoted multiples span 33x to 1,859x, which is a spread of community medians and not a
+  spread of reach: the 1,859x post drew 6,377 and the 33x post drew 455.
 - **Structure / arc:**
   1. Title: two to twelve words. A subject and a verb, or a superlative with the noun missing.
   2. Body beat 1: the mundane setup, stated flatly. The more ordinary this is, the better the turn
@@ -2274,6 +2483,8 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   the right to make the point without lecturing. Seen in 3 posts across 3 posters in 3 different
   subreddits, at 4095x, 10207x and 992x their community medians. **Note the middle one is a
   screenshot post, admitted here as TITLE evidence only.**
+- **Reach behind it:** 3 posts across 3 posters, at 20,873, 13,625 and 1,287 engagements, median
+  13,625. The 20,873 is the screenshot post, admitted as TITLE evidence only.
 - **Structure / arc:**
   1. Title: first person, past tense, admitting the thing.
   2. Body beat 1: the apology or the admission, addressed to the group, before any content.
@@ -2317,6 +2528,8 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   argues for a different one. The rejection is what earns the attention, because the reader has
   already had the obvious thought. Seen in 3 posts across 3 posters in 3 different subreddits, at
   3065x, 26x and 943x their community medians.
+- **Reach behind it:** 3 posts across 3 posters, at 7,133, 1,122 and 422 engagements, median
+  1,122.
 - **Structure / arc:**
   1. The subject, one line, stated neutrally.
   2. The obvious framing named and refused in one clause.
@@ -2362,6 +2575,8 @@ bearing, because those four are the biggest posts in two of the six subreddits.
 - **Mechanism:** a named anxiety, then a procedure short and concrete enough that not doing it
   becomes a choice. Seen in 3 posts across 3 posters in 2 subreddits, at 45x, 19x and 16x their
   community medians.
+- **Reach behind it:** 3 posts across 3 posters, at 13,622, 11,922 and 647 engagements, median
+  11,922.
 - **Structure / arc:**
   1. Solidarity, two or three words. The reader's situation named, not their failure.
   2. The comparison that stings: what the better-resourced version of them has.
@@ -2409,6 +2624,8 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   cannot resolve alone, and the comment count rather than the upvote count is what carries it. Seen
   in 5 posts across 5 posters in 2 subreddits, at 2219x, 1583x and 1859x (r/ADHD) and 33x and 26x
   (r/ProductManagement).
+- **Reach behind it:** 5 posts across 5 posters, at 7,062, 6,377, 5,969, 455 and 422 engagements,
+  median 5,969. Comment counts are what this record turns on and they sit inside those sums.
 - **Structure / arc:**
   1. The question, in the title, aimed at the group rather than at the world.
   2. Body beat 1: the poster's own legwork. What they already checked, so the question is not lazy.
@@ -2451,6 +2668,7 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   swapped. Every beat rewards knowledge only that community has. Seen in 1 post by 1 poster, at
   3120x r/ClaudeAI's true median, and it is the FIRST text post in that subreddit's top-of-year
   listing, at position 20 behind nineteen screenshots.
+- **Reach behind it:** 1 post, at 6,428 engagements, 3,120x its community's true median of 3.
 - **Structure / arc:**
   1. The swap established in one line, using the community's own veteran-poster formula.
   2. A baseline: it used to be fine, with two or three specific competences named.
@@ -2539,6 +2757,8 @@ the clearest cross-platform signal in this pass for what her civic work should s
   refuses to be a product pitch, opening on a person instead. Seen in 1 post by 1 submitter at 978x
   the site median, 2,935 points, the highest-scoring text submission collected. `(thin evidence,
   single sighting)`
+- **Reach behind it:** 1 post, at 3,295 engagements, 2,935 points plus 360 comments, the
+  highest-scoring text submission collected.
 - **Structure / arc:**
   1. Title: the community's own prefix, then the outcome with both numbers in it. The reader does
      the division themselves.
@@ -2582,6 +2802,8 @@ the clearest cross-platform signal in this pass for what her civic work should s
   should arrive in, so replies are comparable and the low-effort ones are ruled out before they are
   typed. Seen in 2 posts across 2 submitters at 439x and 41x the site median, producing 563 and 149
   comments off bodies of about 230 and 900 characters.
+- **Reach behind it:** 2 posts across 2 submitters, at 1,881 and 273 engagements. Comments are
+  most of both sums, 563 and 149 against 1,318 and 124 points, which is the record's own point.
 - **Structure / arc:**
   1. Title: the whole question, aimed at practitioners, naming the specific things being compared.
   2. Body beat 1: the scope tightener. Fully, as the main tool, not as a side experiment.
@@ -2625,6 +2847,7 @@ the clearest cross-platform signal in this pass for what her civic work should s
   about something new. Seen in 1 post by 1 submitter at 362x the site median, with 988 comments
   against 1,086 points, the highest comment-to-point ratio in the set. `(thin evidence, single
   sighting)`
+- **Reach behind it:** 1 post, at 2,074 engagements, 1,086 points plus 988 comments.
 - **Structure / arc:**
   1. Title: a fact about the writer, then the claim, in two short sentences.
   2. Body beat 1: the counter-position. What the writer was about to do instead.
@@ -2721,6 +2944,8 @@ a principle, with no number, no name and no event in it, and it draws a quarter 
   own start, so the structure itself argues that the thing is self-sustaining. Seen in 1 post by 1
   creator at 13.4x that account's true 96-note median, with 6,472 restacks, the most in the set.
   `(thin evidence, single sighting)`
+- **Reach behind it:** 1 post, at 46,541 engagements including 6,472 restacks, the largest note in
+  the set.
 - **Structure / arc:**
   1. One framing sentence promising a mechanism, not an opinion. This is how X works.
   2. Four numbered steps, each under ten words, each an action by a named kind of actor.
@@ -2760,6 +2985,8 @@ a principle, with no number, no name and no event in it, and it draws a quarter 
 - **Mechanism:** two checkable numbers are placed beside each other and the argument happens in the
   gap between them. The verdict just names what the reader already concluded. Seen in 2 posts across
   1 creator at 8.7x and 5.1x that account's true median, with 6,016 and 3,355 restacks.
+- **Reach behind it:** 2 posts from 1 creator, at 32,127 and 18,619 engagements, including 6,016
+  and 3,355 restacks.
 - **Structure / arc:**
   1. Fact one: a promise made, with the incentive or the claim quantified and the place named.
   2. Fact two: what actually happened, quantified, placed against fact one with no connective
@@ -2796,6 +3023,9 @@ a principle, with no number, no name and no event in it, and it draws a quarter 
   recommending it, and immediately qualifies the recommendation for people who cannot afford it.
   Seen in 1 post by 1 creator at 4.9x that account's true median, the best body-complete note on
   that account. `(thin evidence, single sighting)`
+- **Reach behind it:** 1 post, at 690 engagements. The other three records in this section rest on
+  notes of 18,619 to 46,541. This one is the only record here built on the second account, and it
+  is roughly forty times smaller.
 - **Structure / arc:**
   1. The action, first person, dated to yesterday, with a count.
   2. The recommendation, followed immediately by the affordability qualification in the same
@@ -2831,6 +3061,8 @@ a principle, with no number, no name and no event in it, and it draws a quarter 
 - **Mechanism:** a contested claim is presented as something everybody already knows and merely
   needs reminding of, which skips the argument entirely. Seen in 2 posts across 1 creator at 10.3x
   and 6.2x that account's true median, with 4,917 and 3,437 restacks.
+- **Reach behind it:** 2 posts from 1 creator, at 35,909 and 22,163 engagements, including 4,917
+  and 3,437 restacks.
 - **Structure / arc:**
   1. The frame: present the claim as something the reader is merely being reminded of.
   2. The claim, stated as settled history or as a list of settled charges.
