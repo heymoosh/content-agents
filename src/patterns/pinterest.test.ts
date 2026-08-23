@@ -23,6 +23,8 @@ import {
   parsePinterestArgs,
   parseProfileSnippet,
   pinIdsFromBoard,
+  relatedHandlesFromProps,
+  expandFromAccount,
   profileFromProps,
   rankReport,
   readProfile,
@@ -181,6 +183,8 @@ describe("pin parsing", () => {
     assert.equal(pin.headline, "Free Handout: How to Manage Your Time at Work");
     assert.equal(pin.author, "additudemag");
     assert.match(pin.sharedUrl ?? "", /additudemag\.com/);
+    // The image file, which is where the pin's actual substance lives.
+    assert.match(pin.imageUrl ?? "", /^https:\/\/i\.pinimg\.com\/originals\/.+\.jpg$/);
   });
 
   test("the same account's recent pin carries the collapse", () => {
@@ -414,10 +418,130 @@ describe("the era-scoped ranking, which is how a downstream consumer asks for 20
   });
 });
 
+// The 2026-08-23 correction, after the winning images were downloaded and looked at: `headline` is
+// an SEO title, not the words on the graphic. These tests exist so that can never quietly be
+// undone by a later change that finds `headline` convenient.
+describe("the on-image text this collector deliberately does not have", () => {
+  test("the image url is recorded on the entry, so a later transcription pass has the file", () => {
+    const entry = toStagedEntry(parsePin(archivePin, "158540849367875270")!, CTX);
+    assert.match(entry?.media?.asset_url ?? "", /^https:\/\/i\.pinimg\.com\/originals\//);
+  });
+
+  test("recording an image url does not promote onscreen_text", () => {
+    const entry = toStagedEntry(parsePin(archivePin, "158540849367875270")!, CTX)!;
+    assert.equal(typeof entry.media?.asset_url, "string");
+    // Having the file is not having read it. These two facts are independent and stay that way.
+    assert.equal(entry.media!.onscreen_text, null);
+    assert.equal(entry.media!.body_is_complete, false);
+  });
+
+  test("the entry says in words that its text is SEO metadata, not the creator's words", () => {
+    const entry = toStagedEntry(parsePin(archivePin, "158540849367875270")!, CTX)!;
+    assert.match(entry.notes ?? "", /TEXT PROVENANCE/);
+    assert.match(entry.notes!, /SEO-GENERATED/);
+    // The description a reader of media sees must not claim the words were read.
+    assert.match(entry.media?.description ?? "", /were NOT read/);
+  });
+
+  test("comments stays null: the page's commentCount is a cross-copy aggregate", () => {
+    // commentCount sits inside aggregatedPinData beside the cross-copy save total, so it counts
+    // comments on every copy of the image. Putting it in metrics.comments would inflate every
+    // engagement score built from this entry.
+    const entry = toStagedEntry(parsePin(archivePin, "158540849367875270")!, CTX)!;
+    assert.equal(entry.metrics.comments, null);
+    assert.equal(entry.metrics.likes, null);
+    assert.equal(entry.metrics.views, null);
+  });
+
+  test("a pin with no image url says so, rather than leaving a silent null", () => {
+    const pin = parsePin(archivePin, "1")!;
+    const entry = toStagedEntry({ ...pin, imageUrl: null }, CTX)!;
+    assert.equal(entry.media?.asset_url, null);
+    assert.match(entry.notes!, /cannot recover its words/);
+  });
+
+  test("asset_url survives the corpus validator", () => {
+    const entry = toStagedEntry(parsePin(archivePin, "158540849367875270")!, CTX);
+    const { entry: validated, errors } = validateEntry(JSON.parse(JSON.stringify(entry)), loadConfig());
+    assert.deepEqual(errors, []);
+    assert.match(validated?.media?.asset_url ?? "", /i\.pinimg\.com/);
+  });
+});
+
+// Discovery. Pinterest's search surfaces answer 200 with zero pins, so the related-user graph on a
+// profile page is the only route that works logged out.
+describe("related-user graph", () => {
+  test("harvests neighbour usernames off a profile, excluding the account itself", () => {
+    const handles = relatedHandlesFromProps(parseInitialProps(pwsProfile), "additudemag");
+    assert.ok(handles.length > 5);
+    assert.ok(!handles.some((handle) => handle.toLowerCase() === "additudemag"));
+    assert.equal(new Set(handles).size, handles.length);
+  });
+
+  test("it returns names and nothing else, so no wrong follower number can be recorded", () => {
+    // The graph's counts misattribute across adjacent user objects: careercontessa and prepary
+    // both read 80,467 off a third party's page while prepary's own page says 5,673. The function
+    // has no number in its return type at all, which is how that stays impossible.
+    const handles = relatedHandlesFromProps(parseInitialProps(pwsProfile), "additudemag");
+    for (const handle of handles) assert.equal(typeof handle, "string");
+  });
+
+  test("expansion re-fetches each candidate's own profile for its count", async () => {
+    const fetched: string[] = [];
+    const client = new PinterestClient({
+      politenessMs: 0,
+      fetchImpl: async (url) => {
+        fetched.push(url);
+        // The root profile answers with the graph; every candidate re-fetch answers with a
+        // profile whose own record says 189,600. A candidate reported at that number therefore
+        // proves the count came from the re-fetch and not from the graph.
+        return new Response(fetched.length === 1 ? pwsProfile : ldjsonProfile, { status: 200 });
+      },
+    });
+    const first = relatedHandlesFromProps(parseInitialProps(pwsProfile), "additudemag")[0].toLowerCase();
+    const candidates = await expandFromAccount(client, "additudemag", { limit: 3, seeded: new Set([first]) });
+    assert.equal(candidates.length, 3);
+    // One fetch for the root profile plus one per candidate. The per-candidate fetch is the point.
+    assert.equal(fetched.length, 4);
+    for (const candidate of candidates) assert.equal(candidate.followers, 189600);
+    assert.equal(candidates.filter((candidate) => candidate.alreadySeeded).length, 1);
+  });
+
+  test("expansion collects nothing and proposes nothing into config", async () => {
+    const client = new PinterestClient({ politenessMs: 0, fetchImpl: async () => new Response(pwsProfile, { status: 200 }) });
+    const candidates = await expandFromAccount(client, "additudemag", { limit: 2 });
+    // The return type carries no entries, no niche and no creator: a config row needs an expected
+    // creator name to check identity against, and the graph cannot supply one.
+    for (const candidate of candidates) {
+      assert.deepEqual(Object.keys(candidate).sort(), [
+        "alreadySeeded",
+        "boardCount",
+        "displayName",
+        "followers",
+        "followersSource",
+        "handle",
+      ]);
+    }
+  });
+
+  test("a block during expansion stops it rather than returning a short list", async () => {
+    let calls = 0;
+    const client = new PinterestClient({
+      politenessMs: 0,
+      fetchImpl: async () => {
+        calls++;
+        return new Response(calls === 1 ? pwsProfile : "", { status: calls === 1 ? 200 : 429 });
+      },
+    });
+    await assert.rejects(() => expandFromAccount(client, "additudemag", { limit: 3 }), PinterestBlockedError);
+  });
+});
+
 describe("argument parsing", () => {
   test("collect is the default and rank is opt-in", () => {
     assert.equal(parsePinterestArgs([]).command, "collect");
     assert.equal(parsePinterestArgs(["rank"]).command, "rank");
+    assert.equal(parsePinterestArgs(["expand"]).command, "expand");
   });
 
   test("flags carry through", () => {

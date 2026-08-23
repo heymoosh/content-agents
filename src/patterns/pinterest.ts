@@ -25,9 +25,17 @@
 //
 // WHAT IT CANNOT DO, stated here rather than discovered later:
 //
-//   - It cannot read the words ON the graphic. Pinterest publishes the pin's headline and a
-//     keyword blob, not the text typeset into the image. Every entry is therefore
-//     body_is_complete: false and onscreen_text: null. No heuristic promotes either.
+//   - It cannot read the words ON the graphic, and the fields that look like they might are SEO
+//     metadata. CORRECTED 2026-08-23 after the winning images were downloaded and looked at:
+//     `headline` is Pinterest's SEO-generated title and is frequently unrelated to the words
+//     printed on the image. Pin 197736239865673673 carries the headline "Entrepreneurship Chart
+//     Ideas For Students" over a graphic that reads "MARK CUBAN'S 12 RULES FOR STARTUPS"; pin
+//     420453315189959306 carries "Productivity Process Flow Chart" over "HOW TO BE PRODUCTIVE by
+//     Anna Vital". So the JSON text fields cannot deliver the on-image text at all, and no field
+//     on a pinterest entry may be read as the creator's words. Every entry is body_is_complete
+//     false with onscreen_text null, and `media.asset_url` carries the image url so a later
+//     transcription pass has the file. That pass is NOT built here: reading words off an image is
+//     its own decision, with its own cost and its own provenance rules.
 //   - It cannot tell an original from a repin. `author.alternateName` names whoever owns THIS
 //     copy, so a board's biggest pin is often someone else's work saved by the board owner. The
 //     probe's single largest lifestyle pin, 93,185 saves, is exactly that. Every entry says so in
@@ -69,15 +77,22 @@ export const DEFAULT_MAX_PINS_PER_BOARD = 25;
 // Parsing. Every function here is pure: HTML string in, plain data out, no fetching.
 // ------------------------------------------------------------------------------------------
 
-// The profile page's ld+json identity card. NOTE the attribute: it is data-test-id, not id.
-// Matching on id="profile-snippet" finds nothing, which already cost one wasted pass.
-const PROFILE_SNIPPET_RE = /<script[^>]*data-test-id="profile-snippet"[^>]*>([\s\S]*?)<\/script>/;
+// The profile page's ld+json identity card. The profile block is served with BOTH id= and
+// data-test-id= forms, so either matches; the pin page below carries only data-test-id, and
+// matching id="leaf-snippet" there finds nothing, which already cost one wasted pass.
+const PROFILE_SNIPPET_RE = /<script[^>]*(?:data-test-)?id="profile-snippet"[^>]*>([\s\S]*?)<\/script>/;
 
 // Same attribute trap on the pin page.
 const LEAF_SNIPPET_RE = /<script[^>]*data-test-id="leaf-snippet"[^>]*>([\s\S]*?)<\/script>/;
 
-// The page's server-rendered redux state. Pinterest has shipped this blob under two ids; both are
-// tried because a page that uses the other one is not a page with no data on it.
+// The page's server-rendered redux state: follower records, board index and the related-user
+// graph all live here.
+//
+// The id matters and is easy to get wrong. Several handoff notes call this blob `__PWS_DATA__`.
+// A profile page DOES carry a script with that id, but it is an 82KB client config blob with no
+// user objects in it at all: walking it for a username finds zero matches. The data is under
+// `__PWS_INITIAL_PROPS__`. Both ids are tried, first match wins, so a page that really does use
+// the other one still parses.
 const PROPS_BLOB_IDS = ["__PWS_INITIAL_PROPS__", "__PWS_DATA__"] as const;
 
 // A handle can carry an underscore and a digit but nothing regex-special. Escaped anyway, because
@@ -282,6 +297,41 @@ export function boardSlugsFromHtml(html: string, handle: string): string[] {
   return [...slugs].sort();
 }
 
+// Usernames of OTHER accounts named on a profile page: Pinterest's related-user graph.
+//
+// This is the one discovery route that works logged out, and it is why a seeded crawl is possible
+// at all. The search surfaces are dead: /search/pins/?q=, /ideas/<slug>/ and /today/ all answer
+// 200 with zero pins. A profile page instead names its neighbourhood, 46 accounts on additudemag
+// and 78 on kiddiematters, so one hand-picked handle per topic fans out.
+//
+// USERNAMES ONLY, and that limit is not a style choice. The graph's follower numbers are wrong:
+// proximity parsing misattributes counts across adjacent user objects, and careercontessa and
+// prepary both read 80,467 off a third party's page while a direct fetch of prepary returns
+// 5,673. This function therefore returns names and nothing else, so there is no number here for a
+// caller to record by accident. Every count must come from re-fetching that handle's own profile.
+export function relatedHandlesFromProps(props: unknown, excluding: string): string[] {
+  const skip = normalizeHandle(excluding);
+  const names = new Set<string>();
+  const seen = new Set<unknown>();
+  const visit = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      for (const child of node) visit(child);
+      return;
+    }
+    if (typeof node !== "object" || node === null) return;
+    if (seen.has(node)) return;
+    seen.add(node);
+    const record = node as Record<string, unknown>;
+    const username = record.username;
+    if (typeof username === "string" && username.trim() !== "" && normalizeHandle(username) !== skip) {
+      names.add(username.trim());
+    }
+    for (const child of Object.values(record)) visit(child);
+  };
+  visit(props);
+  return [...names].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+
 // Pin ids off a board page, in payload order, deduped. Order is preserved because it is the only
 // positional information the page gives, and it is recorded as `sample.rank`.
 export function pinIdsFromBoard(html: string): string[] {
@@ -298,13 +348,16 @@ export function pinIdsFromBoard(html: string): string[] {
 export interface PinterestPin {
   id: string;
   url: string;
-  // The on-screen pin title. Reliable: present on 452 of 466 captured pins, and never carrying the
-  // boilerplate that pollutes articleBody. This is the text this collector trusts.
+  // Pinterest's SEO-GENERATED TITLE. Present on 452 of 466 captured pins and free of the
+  // boilerplate that pollutes articleBody, so it is the most reliable STRING available. It is not
+  // the most reliable FACT: it frequently has nothing to do with the words printed on the image
+  // (see the module header for two confirmed cases). Treat it as metadata about the pin, never as
+  // the creator's words and never as the graphic's text.
   headline: string | null;
-  // Pinterest's description field, and it is NOT reliably the creator's copy. On many pins it is a
-  // machine-built keyword blob ("Adhd management, Adhd strategies, Adhd executive"), on about 18
-  // percent it arrives with a date prefix, and on a handful it is pure boilerplate. Cleaned by
-  // cleanArticleBody before it is used at all.
+  // Pinterest's description field. Also SEO metadata, and even less reliable than the headline. On
+  // many pins it is a machine-built keyword blob ("Adhd management, Adhd strategies, Adhd
+  // executive"), on about 18 percent it arrives with a date prefix, and on a handful it is pure
+  // boilerplate. Cleaned by cleanArticleBody before it is used at all.
   articleBody: string | null;
   // Pinterest's own published date for the image. Kept exactly as served, including the one pin
   // that claims a date in the future.
@@ -313,6 +366,10 @@ export interface PinterestPin {
   author: string | null;
   // Where the pin points, when it points anywhere.
   sharedUrl: string | null;
+  // The image file itself, full resolution, off the ld+json `image` field. THIS is where the pin's
+  // actual substance lives, and recording it is what makes a later transcription pass possible
+  // without re-fetching every pin page.
+  imageUrl: string | null;
   // Global aggregate saves across every copy of this image on Pinterest.
   aggregateSaves: number | null;
   // This copy's own repins. The number attributable to the account that posted it.
@@ -368,6 +425,7 @@ export function parsePin(html: string, id: string): PinterestPin | null {
     datePublished: str(snippet.datePublished),
     author: typeof author === "object" && author !== null ? str((author as Record<string, unknown>).alternateName) : null,
     sharedUrl: typeof shared === "object" && shared !== null ? str((shared as Record<string, unknown>).url) : null,
+    imageUrl: str(snippet.image),
     aggregateSaves: savesFromInteractionStatistic(snippet.interactionStatistic),
     repinCount: repin ? Number(repin[1]) : null,
     copyCreatedAt: created ? created[1] : null,
@@ -488,14 +546,22 @@ export interface EntryContext {
 
 // Why some of these choices are what they are, since each one could plausibly be the other way:
 //
-//   body        Pinterest publishes no on-image text, so the headline is the closest thing to the
-//               post's words and it goes in both `title` and `body`, following the convention the
-//               reddit entries already use for a titled post with no body of its own. The cleaned
-//               articleBody is appended only when it survived cleaning and is not a duplicate.
+//   body        Pinterest publishes no on-image text at all, and the two fields it does publish
+//               are SEO metadata rather than the creator's words. They still go in `title` and
+//               `body`, following the convention the reddit entries use for a titled post with no
+//               body of its own, because a validated entry needs a non-empty body and the only
+//               alternative is inventing one. What keeps that honest is labelling:
+//               body_is_complete is false, onscreen_text is null, and the notes say in words that
+//               this text is Pinterest's metadata and not the graphic.
 //   metrics     `shares` gets repinCount, this copy's own saves, because that is the number this
 //               account earned. The global aggregate goes in `aggregate_saves`, which nothing
-//               scores against. `views`, `likes` and `comments` stay null: logged out, Pinterest
-//               publishes none of the three, and a zero would read as a measurement.
+//               scores against. `views` and `likes` stay null: logged out, Pinterest publishes
+//               neither, and a zero would read as a measurement. `comments` stays null too, which
+//               is a deliberate refusal rather than a gap: the page does carry a commentCount, but
+//               it sits inside `aggregatedPinData` next to the cross-copy save total, so it counts
+//               comments on every copy of the image and is not this post's number. Recording it in
+//               `metrics.comments` would put a cross-copy aggregate into a per-post field and
+//               inflate every engagement score built from it.
 //   role        "unranked". A board's first page is not a top list and not an unbiased sample.
 export function toStagedEntry(pin: PinterestPin, ctx: EntryContext): CorpusEntry | null {
   const cleaned = cleanArticleBody(pin.articleBody);
@@ -509,6 +575,7 @@ export function toStagedEntry(pin: PinterestPin, ctx: EntryContext): CorpusEntry
   const era = eraFor(pin.datePublished);
   const notes: string[] = [
     "Pinterest, logged out. The words ON the graphic are not published and were not collected, which is why body_is_complete is false and media.onscreen_text is null.",
+    "TEXT PROVENANCE: title and body hold Pinterest's SEO-GENERATED title and description. They are not the creator's words and they are frequently unrelated to the words printed on the image. One measured pin's headline reads \"Entrepreneurship Chart Ideas For Students\" over a graphic that reads \"MARK CUBAN'S 12 RULES FOR STARTUPS\". Never quote this text as the post.",
     `Saves: ${pin.aggregateSaves ?? "unknown"} aggregate across every copy of this image on Pinterest, ${pin.repinCount ?? "unknown"} repins of this copy. Both are lifetime running totals with no window, so an older pin has had longer to accrue them.`,
     "Authorship: author.alternateName names whoever owns THIS copy, so this may be a repin of someone else's image. The route cannot separate an original from a repin, and a board's biggest pin often is one.",
     `Sample: position ${ctx.rank} on the first server-rendered page of /${ctx.handle}/${ctx.boardSlug}/. Logged out that page carries roughly 21 to 25 pins and cannot be paged, so this is the board's first page, not its top pins.`,
@@ -523,6 +590,9 @@ export function toStagedEntry(pin: PinterestPin, ctx: EntryContext): CorpusEntry
     notes.push(`Identity ${ctx.identity.status}: ${ctx.identity.reason}. Observed display name ${JSON.stringify(ctx.identity.observedName)}, followers ${ctx.followers ?? "unknown"}.`);
   }
   if (pin.sharedUrl !== null) notes.push(`Pin links to ${pin.sharedUrl}`);
+  if (pin.imageUrl === null) {
+    notes.push("No image url was published for this pin, so a later transcription pass cannot recover its words from this record.");
+  }
 
   const entry: CorpusEntry = {
     id: makeId("pinterest", ctx.handle, pin.url),
@@ -548,16 +618,22 @@ export function toStagedEntry(pin: PinterestPin, ctx: EntryContext): CorpusEntry
     title,
     media: {
       form: "image",
-      // Null, always. The pin's substance is text typeset into the image and Pinterest does not
-      // publish it. The headline is the pin's title, which is a different thing, and letting it
-      // stand in here would put unverified words into a remix as if they had been market-tested.
+      // Null, always, and the correction of 2026-08-23 makes it more clearly right rather than
+      // less. The pin's substance is text typeset into the image, Pinterest does not publish it,
+      // and `headline` is an SEO title that is frequently unrelated to it. Letting the headline
+      // stand in here would put words the creator never wrote into a remix as if they had been
+      // market-tested. Only a real reading of the image may fill this, and whatever fills it must
+      // record in `description` how it was read.
       onscreen_text: null,
       description:
-        "A pinterest pin: one image, usually text typeset onto a graphic. The words on the image were not retrievable logged out. Form determined from the route, which serves only single-image pins.",
+        "A pinterest pin: one image, usually text typeset onto a graphic. The words on the image were NOT read: no transcription pass has run over this record, and the pin's headline is an SEO-generated title rather than the graphic's text. media.asset_url holds the image file for a later pass. Form determined from the route, which serves only single-image pins.",
       duration_seconds: null,
       media_count: null,
       has_captions: null,
       aspect: null,
+      // The whole point of the 2026-08-23 correction. The words are in this file and nowhere else,
+      // so a later transcription pass needs nothing but this url.
+      asset_url: pin.imageUrl,
       // False, always, and not a judgement call. `body` holds the pin's headline and Pinterest's
       // description field. The graphic is what carried the pin, and it was not collected.
       body_is_complete: false,
@@ -749,6 +825,62 @@ export async function collectAccount(
   return { handle, profile, boards, entries, emptyBoards };
 }
 
+export interface ExpansionCandidate {
+  handle: string;
+  // Re-fetched from the candidate's OWN profile page. Never the number the graph reported.
+  followers: number | null;
+  followersSource: ProfileReading["followersSource"];
+  displayName: string | null;
+  boardCount: number;
+  // True when this handle is already a pinterest row in config, so a run does not re-propose it.
+  alreadySeeded: boolean;
+}
+
+// Discovery, and it deliberately stops short of collecting.
+//
+// It reads one seeded profile's related-user graph, then RE-FETCHES each named handle's own
+// profile for its real follower count, display name and board count, and prints the result. It
+// adds nothing to config and collects no pins, for three reasons worth stating rather than
+// leaving as an omission:
+//
+//   1. A config row needs an expected creator name, and that is what makes the identity check
+//      able to refuse an impostor. The graph supplies a handle and nothing to check it against.
+//   2. Which niche a handle belongs to is a judgement, and this project's rule is to never guess
+//      a handle into a seed list.
+//   3. A handle being adjacent to a good account is not evidence it is a good account.
+//
+// So the output is a list for a person to read and choose from.
+export async function expandFromAccount(
+  client: PinterestClient,
+  handle: string,
+  opts: { limit?: number; seeded?: Set<string> } = {},
+): Promise<ExpansionCandidate[]> {
+  const seeded = opts.seeded ?? new Set<string>();
+  const root = normalizeHandle(handle);
+  const names = relatedHandlesFromProps(parseInitialProps(await client.profile(root)), root);
+  const candidates: ExpansionCandidate[] = [];
+  for (const name of names.slice(0, opts.limit ?? names.length)) {
+    const normalized = normalizeHandle(name);
+    let reading: ProfileReading | null = null;
+    try {
+      // The re-fetch. This is the ONLY number that may be recorded for this handle.
+      reading = readProfile(await client.profile(normalized), normalized, null);
+    } catch (err) {
+      if (err instanceof PinterestBlockedError) throw err;
+      reading = null;
+    }
+    candidates.push({
+      handle: normalized,
+      followers: reading?.followers ?? null,
+      followersSource: reading?.followersSource ?? "none",
+      displayName: reading?.identity.observedName ?? null,
+      boardCount: reading?.boards.length ?? 0,
+      alreadySeeded: seeded.has(normalized),
+    });
+  }
+  return candidates;
+}
+
 export function pinterestSeeds(config: PatternMiningConfig): AccountSeed[] {
   return (config.accounts ?? []).filter((seed) => seed.platform === "pinterest" && typeof seed.handle === "string");
 }
@@ -758,7 +890,7 @@ export function pinterestSeeds(config: PatternMiningConfig): AccountSeed[] {
 // ------------------------------------------------------------------------------------------
 
 export interface PinterestArgs {
-  command: "collect" | "rank";
+  command: "collect" | "rank" | "expand";
   account: string | null;
   boards: string[];
   all: boolean;
@@ -774,7 +906,7 @@ export interface PinterestArgs {
 
 export function parsePinterestArgs(argv: string[]): PinterestArgs {
   const args: PinterestArgs = {
-    command: argv[0] === "rank" ? "rank" : "collect",
+    command: argv[0] === "rank" ? "rank" : argv[0] === "expand" ? "expand" : "collect",
     account: null,
     boards: [],
     all: false,
@@ -847,6 +979,43 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
 
   const config = args.configPath ? loadConfig(args.configPath) : loadConfig();
   let seeds = pinterestSeeds(config);
+
+  if (args.command === "expand") {
+    if (args.account === null) {
+      console.error("Pass --account <handle> to expand from. Discovery starts from a handle you already trust.");
+      return 1;
+    }
+    const seeded = new Set(seeds.map((seed) => normalizeHandle(seed.handle ?? "")));
+    const client = new PinterestClient({ politenessMs: args.politenessMs });
+    let candidates: ExpansionCandidate[];
+    try {
+      candidates = await expandFromAccount(client, args.account, { limit: args.limit, seeded });
+    } catch (err) {
+      if (err instanceof PinterestBlockedError) {
+        console.error(`\n${err.message}`);
+        return 2;
+      }
+      console.error((err as Error).message);
+      return 1;
+    }
+    console.log(`Related accounts named on @${normalizeHandle(args.account)}'s profile: ${candidates.length}.`);
+    console.log("Every follower number below was re-fetched from that handle's OWN profile. The graph's own");
+    console.log("numbers are wrong (careercontessa and prepary both read 80,467 from a third party's page while");
+    console.log("prepary's own page says 5,673), so none of them were used.\n");
+    console.log("handle                          followers  route          boards  display name");
+    for (const candidate of candidates) {
+      const followers = candidate.followers === null ? "no data" : String(candidate.followers);
+      const mark = candidate.alreadySeeded ? " (already seeded)" : "";
+      console.log(
+        `${candidate.handle.padEnd(31)} ${followers.padStart(9)}  ${candidate.followersSource.padEnd(13)}  ${String(candidate.boardCount).padStart(6)}  ${candidate.displayName ?? "?"}${mark}`,
+      );
+    }
+    console.log("\nNothing was collected and nothing was added to config. These are candidates for a person to");
+    console.log("choose from: a config row needs an expected creator name to check identity against, and a niche,");
+    console.log("and neither is something the graph can supply. Being next to a good account is not evidence.");
+    return 0;
+  }
+
   if (args.account !== null) {
     const wanted = normalizeHandle(args.account);
     seeds = seeds.filter((seed) => normalizeHandle(seed.handle ?? "") === wanted);

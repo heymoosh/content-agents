@@ -2633,12 +2633,23 @@ accounts:
   # None came from a creator's website. `creator` is not decoration either: the collector refuses
   # to collect when the page's display name conflicts with it, which is what catches a vanity
   # handle belonging to someone else. /jasminestar/ resolves to "Sharon Stewart", 36 followers.
+  #
+  # THREE OF MUXIN'S NICHES ARE GENUINELY EMPTY HERE and are deliberately not represented below.
+  # This was checked by downloading the top pins and looking at them, not inferred from counts:
+  # product-thinking has nothing on Pinterest; ai-building has nothing native (the AI boards are
+  # news clippings and stock art, not built content); and the civic boards are graphic designers
+  # collecting voting-poster aesthetics rather than a civic audience. Do not pad them with rows
+  # that would collect the wrong thing. Rows here cover adhd, productivity, solopreneur and the
+  # lifestyle decay control, which are the four where the archive is real.
   # ------------------------------------------------------------------------------------------
   - handle: "@additudemag"
     creator: "ADDitude Magazine"
     platform: pinterest
     niche: adhd
-    followers: 96671   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    followers: 96671   # approximate. Read off the profile's own server-rendered payload on
+                       # pinterest.com, 2026-08-23, where it is stable across every occurrence. A
+                       # second, drifting candidate around 90,500 also appears on the page and
+                       # there is no way to break the tie logged out.
     boards:
       - tips-for-adhd-adults
       - executive-functions-at-school-2026
@@ -2740,76 +2751,6 @@ accounts:
       - business-tips-for-small-business-owners
       - small-business-now-report-2025
       - email-marketing
-  - handle: "@ladair82"
-    creator: "Lawrence Adair"
-    platform: pinterest
-    niche: product-thinking
-    followers: 3421   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - product-management
-  - handle: "@jmnickey"
-    creator: "John Nickey"
-    platform: pinterest
-    niche: product-thinking
-    followers: 239   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - product-management
-  - handle: "@wired"
-    creator: "WIRED"
-    platform: pinterest
-    niche: ai-building
-    followers: 189600   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - artificial-intelligence
-  - handle: "@f5th"
-    creator: "Colleen"
-    platform: pinterest
-    niche: ai-building
-    followers: 20271   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - ai-artificial-intelligence
-  - handle: "@sabriman096"
-    creator: "SabriMan"
-    platform: pinterest
-    niche: ai-building
-    followers: 1   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - ai-agents
-  - handle: "@tinashemakwande"
-    creator: "tmak"
-    platform: pinterest
-    niche: civic-tech
-    followers: 0   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - voter-education
-  - handle: "@allison_dupuis"
-    creator: "Allison Dupuis"
-    platform: pinterest
-    niche: civic-tech
-    followers: 5352   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - go-vote-voting-design-illustration-inspiration
-  - handle: "@palmtopinedesign"
-    creator: "Nicole | Palm to Pine Design"
-    platform: pinterest
-    niche: civic-tech
-    followers: 2513   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - social-justice-political-and-vote-yard-signs
-  - handle: "@jenna7996"
-    creator: "Jenna Miller"
-    platform: pinterest
-    niche: civic-tech
-    followers: 28   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - vote-poster-inspiration
-  - handle: "@ginferrara"
-    creator: "Gin Ferrara"
-    platform: pinterest
-    niche: civic-tech
-    followers: 333   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
-    boards:
-      - election-design
   - handle: "@marthastewart"
     creator: "Martha Stewart"
     platform: pinterest

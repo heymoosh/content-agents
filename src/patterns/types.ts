@@ -158,6 +158,18 @@ export interface CorpusMedia {
   // a non-video post, and null where it could not be determined.
   has_captions: boolean | null;
   aspect: MediaAspect | null;
+  // The URL of the media FILE itself, where the platform publishes one, so a later transcription
+  // pass has the image or video without re-fetching the post. Absent on an entry collected before
+  // this field existed, and null where the platform published no such url.
+  //
+  // Deliberately generic rather than pinterest-only. The same failure has now been hit on three
+  // platforms: an Instagram carousel, a Threads image post and a Pinterest tip-graphic all keep
+  // their substance in the picture, and on all three the caption or title is not a substitute.
+  // This is the field that makes the picture recoverable later.
+  //
+  // Recording a url here says NOTHING about `onscreen_text`. That stays null until someone
+  // actually reads the words off the image and records how they read them.
+  asset_url?: string | null;
   // READ THIS ONE TWICE. False means the post's substance is NOT in `body` - it sits in an
   // attached image, in slides 2..n of a carousel, in a video, or in reply tweets, none of which
   // were collected. A 22-character caption over an image that earned 3,536 likes has

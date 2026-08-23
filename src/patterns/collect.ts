@@ -161,7 +161,7 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
       if (typeof m.body_is_complete !== "boolean") {
         errors.push("media.body_is_complete must be true or false, so nothing downstream has to guess");
       }
-      for (const key of ["onscreen_text", "description"] as const) {
+      for (const key of ["onscreen_text", "description", "asset_url"] as const) {
         const value = m[key] ?? null;
         if (value !== null && typeof value !== "string") errors.push(`media.${key} must be a string or null`);
       }
@@ -191,6 +191,10 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
           aspect: aspect as MediaAspect | null,
           body_is_complete: m.body_is_complete as boolean,
         };
+        // Assigned only when the staged entry actually carried the key. An absent asset_url means
+        // "nobody recorded whether this post has a media file", which is a different fact from a
+        // recorded null, and stamping a null onto every older media block would erase that.
+        if (m.asset_url !== undefined) media.asset_url = (m.asset_url as string | null) ?? null;
       }
     }
   }
