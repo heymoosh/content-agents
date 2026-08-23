@@ -89,6 +89,15 @@ function appendLine(slug: string, record: ResponseRecord): void {
 // The gate's exact predicate (rules.md §7.3, venture-schema-contract.md §5.4): eligible unique
 // respondents, never a row count. Pure and file-I/O-free on purpose so it's directly testable in
 // isolation -- this is the required-test-area item the build plan calls out by name.
+//
+// It takes responses.jsonl records and NOTHING else, and that is the enforcement, not an accident
+// of what happened to be wired up. rules.md §5.6 and venture-schema-contract.md §5.4a/§5.4b are
+// explicit that no research observation counts toward this gate "for every evidence_role,
+// historical and current alike" -- a `historical_prior` link is not merely down-weighted here, it
+// has no path in at all. evidence-links.ts states the same rule as code
+// (OBSERVATION_ROLES_CLEARING_CONTROLLED_GATES, deliberately empty), and evidence-links.test.ts
+// pins it: writing pre-kickoff links into a venture moves this count by zero. Do not add an
+// observation-derived input to this function.
 export function countEligibleUnique(records: ResponseRecord[]): number {
   const eligible = records.filter((r) => r.target_audience_eligible && r.included_in_gate);
   return new Set(eligible.map((r) => r.respondent_hash)).size;

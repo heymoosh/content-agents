@@ -23,6 +23,13 @@ export interface Evidence {
   provider?: string;
   confirmed_by?: "muxin" | "agent";
   confirmed_at?: string;
+  // When the thing this evidence points at went public, if that differs from when it was
+  // confirmed -- i.e. confirming a post Muxin had ALREADY published before this venture began
+  // (v5 handoff §9.9). Absent means "it went live when it was confirmed", which is what every
+  // delivery path in this repo does. This is the only input the evidence-role derivation needs
+  // that the artifact does not already carry; the role itself is never stored, it is computed on
+  // read by evidence-links.ts's deriveArtifactEvidenceRole (§9.6: never let a caller declare it).
+  published_at?: string;
 }
 
 export interface Failure {

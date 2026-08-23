@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { readArtifact, readArtifacts, type VentureArtifact } from "./artifacts.js";
 import { hasCanonEvent, findCanonEvent } from "./canon.js";
+import { describeEvidenceRole, deriveArtifactEvidenceRole, ventureKickoffAt } from "./evidence-links.js";
 import { readDecision, readDecisions } from "./decisions.js";
 import { statePath, ventureDir } from "./paths.js";
 import { loadRules, artifactKindRule, evidenceMeetsMinimum, type CheckpointRule, type VentureRules } from "./rules.js";
@@ -93,6 +94,11 @@ function checkpointArtifactState(
   // stamps it "not_applicable" at draft time and it can never reach "live_confirmed", so requiring
   // live_confirmed unconditionally would block such an artifact's checkpoint forever. This is a
   // general rule about the artifact kind, not specific to any one checkpoint.
+  // Resolved once per checkpoint, and only for a checkpoint that asks -- reading canon.md for
+  // every artifact of every checkpoint would be three ledger reads per deriveState call for a
+  // fact that never changes mid-derivation.
+  const kickoffAt = cfg.require_current_evidence ? ventureKickoffAt(slug) : null;
+
   function checkArtifact(a: VentureArtifact, labelKind?: string): boolean {
     const kindRule = artifactKindRule(rules, a.artifact_kind);
     const deliverySatisfied =
@@ -102,6 +108,24 @@ function checkpointArtifactState(
     if (a.editorial_status !== "approved" || !deliverySatisfied) {
       blocking.push({ artifact_id: a.artifact_id, reason: `${a.editorial_status}/${a.delivery_status}` });
       return false;
+    }
+    // venture/rules.md §5.6, venture-schema-contract.md §5.4b, v5 handoff §9.6: a checkpoint that
+    // requires controlled collection does not count evidence that points at something published
+    // before this venture existed. Only a role the derivation actually DETERMINED excludes -- an
+    // artifact we merely cannot date is not thereby historical, and calling it one would be the
+    // same "collapsing not-measured into a claim" the honesty rules forbid. The reason carries the
+    // basis, so the role never appears bare.
+    if (cfg.require_current_evidence) {
+      const verdict = deriveArtifactEvidenceRole(a, kickoffAt);
+      if (verdict.role === "historical_prior") {
+        blocking.push({
+          artifact_id: a.artifact_id,
+          reason: labelKind
+            ? `evidence for "${labelKind}" is ${describeEvidenceRole(verdict)} -- this checkpoint counts only what went live through this venture`
+            : `evidence is ${describeEvidenceRole(verdict)} -- this checkpoint counts only what went live through this venture`,
+        });
+        return false;
+      }
     }
     if (kindRule.min_evidence && !evidenceMeetsMinimum(a.evidence!.type, kindRule.min_evidence)) {
       blocking.push({

@@ -147,7 +147,16 @@ export async function deliverVenture(slug: string, opts: DeliverOptions = {}): P
 // things with no addressable trace at all -- an email sequence being active, a note sent by hand.
 // Both `welcome-email` and `thank-you-note` are exactly that, so a url-only confirm path could
 // never satisfy them without her inventing a link.
-export type ManualProof = { type: "url" | "attestation"; value: string };
+export type ManualProof = {
+  type: "url" | "attestation";
+  value: string;
+  // When the thing being confirmed actually went public, if that is not now -- i.e. Muxin is
+  // confirming a post she had ALREADY published before this venture kicked off (v5 handoff §9.9).
+  // Recorded on the evidence, never a role: the role is derived from it (§9.6, §5.4b), and a
+  // pre-kickoff publication is what makes an artifact `historical_prior` and stops it counting
+  // toward Checkpoint 1. Omitted means it went live when it was confirmed.
+  publishedAt?: string;
+};
 
 // Muxin's confirmation after putting a manual artifact live herself. The one place a manual-kind
 // artifact's evidence gets written.
@@ -183,7 +192,13 @@ export function confirmManualDelivery(slug: string, artifactId: string, proof: M
     artifactId,
     {
       delivery_status: "live_confirmed",
-      evidence: { type: proof.type, value: proof.value, confirmed_by: "muxin", confirmed_at: at },
+      evidence: {
+        type: proof.type,
+        value: proof.value,
+        confirmed_by: "muxin",
+        confirmed_at: at,
+        ...(proof.publishedAt ? { published_at: proof.publishedAt } : {}),
+      },
     },
     at
   );
@@ -191,7 +206,8 @@ export function confirmManualDelivery(slug: string, artifactId: string, proof: M
 
 const USAGE =
   "usage: tsx src/venture/deliver.ts <slug> | " +
-  'tsx src/venture/deliver.ts confirm <slug> <artifact_id> (--url <live-url> | --attestation "<what you state>")';
+  'tsx src/venture/deliver.ts confirm <slug> <artifact_id> (--url <live-url> | --attestation "<what you state>") ' +
+  "[--published-at <ISO8601>]";
 
 function main() {
   const [, , first, ...rest] = process.argv;
@@ -213,7 +229,11 @@ function main() {
       process.exit(1);
     }
     try {
-      const proof: ManualProof = url ? { type: "url", value: url } : { type: "attestation", value: attestation! };
+      const pubIdx = process.argv.indexOf("--published-at");
+      const publishedAt = pubIdx >= 0 ? process.argv[pubIdx + 1] : undefined;
+      const proof: ManualProof = url
+        ? { type: "url", value: url, publishedAt }
+        : { type: "attestation", value: attestation!, publishedAt };
       confirmManualDelivery(slug, artifactId, proof, new Date().toISOString());
       console.log(`${artifactId} confirmed live by ${proof.type}: ${proof.value}`);
     } catch (err) {
