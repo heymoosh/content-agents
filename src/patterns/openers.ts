@@ -17,7 +17,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORPUS_PATH, PATTERNS_DIR, accountKey, groupByAccount, normalizeHandle, readCorpus } from "./corpus.js";
 import { baselineMultiple, engagementScore } from "./outliers.js";
-import type { CorpusEntry, Opener, Platform } from "./types.js";
+import type { CorpusEntry, Opener, OpenerWarning, Platform } from "./types.js";
 
 export const OPENERS_PATH = join(PATTERNS_DIR, "openers.jsonl");
 
@@ -38,6 +38,17 @@ const SHORT_FIRST_SENTENCE = 40;
 // costs one skipped opener, while a false positive would put a broken line into a post word for
 // word. An ellipsis after the opener span is ignored, because the opening is still intact.
 const TRUNCATION_MARKERS = ["…", "...", "[truncated]", "[…]", "[...]"];
+
+// A body this short is probably a caption sitting over an image, a carousel, or a video, none of
+// which the corpus collects. Dan Koe's strongest LinkedIn post in the current corpus is a
+// 22-character caption over an image, and its numbers were earned by the image. A genuinely short
+// post that worked on its own words looks identical from here, so this is a warning shown to Muxin
+// rather than a rule the code applies on her behalf.
+const SHORT_BODY_CHARS = 80;
+
+// Platforms where slide text, frame text, and on-screen text carry the post, and where none of
+// that is collected today. An Instagram carousel's likes were earned by images nobody retrieved.
+const MEDIA_FIRST_PLATFORMS: ReadonlySet<Platform> = new Set<Platform>(["instagram", "tiktok", "youtube"]);
 
 function isTruncated(span: string): boolean {
   const lower = span.toLowerCase();
@@ -63,17 +74,26 @@ function sentences(text: string): string[] {
 
 // The verbatim opener of one entry, or null when there is no honest way to know it.
 //
-// Null happens in three cases, and each one matters:
+// Null happens in four cases, and each one matters:
 //   - `transcript_source: "caption"`. The body is the creator's WRITTEN caption, not the words
 //     they said. A caption is not the spoken opener, and a remix that copies it would be copying
 //     the wrong thing. Same for a video entry with no transcript source recorded at all.
 //   - the opener span carries a truncation marker, so the opening was not captured whole.
+//   - the whole body ends on a colon. That is the thread-opener tell: the post promises what comes
+//     next and the substance is in reply posts the corpus never collected. A colon in the MIDDLE
+//     of a post is ordinary writing and is left alone, so the check is on the whole trimmed body,
+//     not on the opener span.
 //   - the body is empty.
+//
+// What is NOT null here, on purpose: a short body, a media-first platform, and a body cut off
+// after the opener. Those come back as warnings from `openerWarnings`, because the opener itself
+// is knowable and the doubt is Muxin's to weigh. See remix-mode.md.
 export function extractOpener(entry: CorpusEntry): string | null {
   if (entry.transcript_source === "caption") return null;
 
   const lines = nonEmptyLines(entry.body);
   if (lines.length === 0) return null;
+  if (entry.body.trim().endsWith(":")) return null;
 
   if (entry.kind === "video") {
     // "manual" and "captions" are both the spoken words. Anything else on a video is not speech.
@@ -87,6 +107,44 @@ export function extractOpener(entry: CorpusEntry): string | null {
 
   const span = lines.slice(0, TEXT_OPENER_LINES).join("\n");
   return isTruncated(span) ? null : span;
+}
+
+// Reasons to doubt an opener whose text is still knowable. Order is deliberate: the two that
+// decide a refusal in `/patterns remix` come first, so the first line Muxin reads is the one that
+// might stop the pick.
+export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
+  const warnings: OpenerWarning[] = [];
+  const body = entry.body.trim();
+
+  if (body.length < SHORT_BODY_CHARS) {
+    warnings.push({
+      code: "short-body",
+      note: `The whole body is ${body.length} characters, short enough to be a caption over an image, a carousel, or a video that was never collected. If it is, its numbers were earned by something outside this text.`,
+    });
+  }
+
+  if (MEDIA_FIRST_PLATFORMS.has(entry.platform)) {
+    warnings.push({
+      code: "media-first-platform",
+      note: `On ${entry.platform} the slide, frame, and on-screen text usually carry the post, and none of that is collected. The body alone may not be what worked.`,
+    });
+  }
+
+  if (entry.kind === "video") {
+    warnings.push({
+      code: "missing-onscreen-title",
+      note: "No on-screen title on record. Sabrina's method copies the title as well as the opener, so read it off the original and supply it by hand.",
+    });
+  }
+
+  if (TRUNCATION_MARKERS.some((marker) => body.toLowerCase().endsWith(marker))) {
+    warnings.push({
+      code: "truncated-body",
+      note: "The opener is intact but the body was cut off later, so the rest of the post is not fully known.",
+    });
+  }
+
+  return warnings;
 }
 
 export interface BuildOpenersOptions {
@@ -139,6 +197,7 @@ export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOption
         note: performanceNote(multiple, entry),
       },
       verbatim_ok: verbatimOk.has(normalizeHandle(entry.handle)),
+      warnings: openerWarnings(entry),
       collected_at: entry.collected_at,
     });
   }
@@ -239,7 +298,7 @@ export function main(argv: string[] = process.argv.slice(2)): number {
   const skipped = corpus.filter((e) => extractOpener(e) === null).length;
 
   console.log(`Corpus entries: ${corpus.length}. Openers derived: ${built.length}.`);
-  console.log(`Skipped (caption, truncated, or empty body): ${skipped}.`);
+  console.log(`Skipped (caption, truncated opening, thread opener, or empty body): ${skipped}.`);
   console.log(`Appended: ${appended.length}. Already in the bank: ${duplicates.length}.`);
 
   const ranked = rankOpeners(readOpeners(args.openersPath));
@@ -252,6 +311,7 @@ export function main(argv: string[] = process.argv.slice(2)): number {
     console.log(indented(opener.opener_text));
     console.log(`  on-screen title: ${opener.onscreen_title ?? "unknown"}`);
     console.log(`  ${permission} | ${opener.url}`);
+    for (const warning of opener.warnings) console.log(`  WARNING (${warning.code}): ${warning.note}`);
   }
   return 0;
 }

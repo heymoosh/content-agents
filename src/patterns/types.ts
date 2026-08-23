@@ -173,5 +173,38 @@ export interface Opener {
   // default and the honest answer for almost everyone. This is a fact shown to Muxin at pick
   // time, not a gate the code enforces.
   verbatim_ok: boolean;
+  // Reasons to doubt this opener, shown at pick time. Empty is the good case.
+  warnings: OpenerWarning[];
   collected_at: string;
+}
+
+// Why an opener is doubtful. Coded rather than freeform, because two of these four decide a
+// refusal in `/patterns remix` and the other two only decide what Muxin is told.
+//
+// Refuse the pick on either of these two. Both mean the post's substance probably sat OUTSIDE the
+// body the corpus holds, so copying its opener copies a fragment and misses the thing that worked:
+//
+//   "short-body"           - the body is short enough to be a caption over an image, a carousel,
+//                            or a video that was never collected. It can also be a genuinely short
+//                            post that worked on its own words. The corpus cannot tell those apart,
+//                            which is exactly why this is surfaced to Muxin instead of guessed at.
+//   "media-first-platform" - the post lives on a platform where slide text, frame text, and
+//                            on-screen text carry the post, and none of that is collected.
+//
+// Do NOT refuse on these two. They are context, not disqualification:
+//
+//   "missing-onscreen-title" - a video opener with no on-screen title on record. Muxin supplies it
+//                              by hand; see remix-mode.md.
+//   "truncated-body"         - the opener is intact but the body was cut off later, so the rest of
+//                              the post is not fully known.
+export type OpenerWarningCode =
+  | "short-body"
+  | "media-first-platform"
+  | "missing-onscreen-title"
+  | "truncated-body";
+
+export interface OpenerWarning {
+  code: OpenerWarningCode;
+  // Plain-language version of the code, written to be read straight out to Muxin.
+  note: string;
 }

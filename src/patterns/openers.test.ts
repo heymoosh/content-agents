@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendOpeners, buildOpeners, extractOpener, rankOpeners, readOpeners } from "./openers.js";
-import type { CorpusEntry, Opener } from "./types.js";
+import { appendOpeners, buildOpeners, extractOpener, openerWarnings, rankOpeners, readOpeners } from "./openers.js";
+import type { CorpusEntry, Opener, OpenerWarningCode } from "./types.js";
 
 let dir: string;
 let openersPath: string;
@@ -51,6 +51,7 @@ function opener(overrides: Partial<Opener> = {}): Opener {
     kind: "text",
     performance: { multiple: null, metric: null, note: "no baseline" },
     verbatim_ok: false,
+    warnings: [],
     collected_at: "2026-08-22T00:00:00.000Z",
     ...overrides,
   };
@@ -122,6 +123,55 @@ describe("extractOpener, the cases that must return null", () => {
     const text = extractOpener(entry({ body: "First line.\nSecond line.\nThird line runs on and then gets cut…" }));
     assert.equal(text, "First line.\nSecond line.");
   });
+
+  test("a body ending on a colon is a thread opener, and its substance was never collected", () => {
+    assert.equal(extractOpener(entry({ body: "I read 40 books this year. The 6 that changed how I work:" })), null);
+  });
+
+  test("a colon in the middle of a post is ordinary writing and keeps its opener", () => {
+    const text = extractOpener(entry({ body: "Here is what I learned:\nMost of it was obvious.\nThe rest was not." }));
+    assert.equal(text, "Here is what I learned:\nMost of it was obvious.");
+  });
+});
+
+describe("openerWarnings", () => {
+  function codes(e: CorpusEntry): OpenerWarningCode[] {
+    return openerWarnings(e).map((w) => w.code);
+  }
+
+  test("a body long enough to be the whole post carries no warnings", () => {
+    const long = entry({
+      body: "I spent six months building the wrong thing, and the tell was there in week two.\nHere is what I should have measured instead of what I did measure.",
+    });
+    assert.deepEqual(codes(long), []);
+  });
+
+  test("a short body is flagged, because it may be a caption over media nobody collected", () => {
+    const warning = openerWarnings(entry({ body: "the best advice I ever got" })).find((w) => w.code === "short-body");
+    assert.ok(warning);
+    assert.match(warning.note, /caption over an image/);
+  });
+
+  test("a media-first platform is flagged, because slide and frame text are never collected", () => {
+    assert.ok(codes(entry({ platform: "instagram" })).includes("media-first-platform"));
+    assert.ok(!codes(entry({ platform: "linkedin" })).includes("media-first-platform"));
+  });
+
+  test("every video opener is flagged as missing its on-screen title", () => {
+    assert.ok(codes(entry({ kind: "video", transcript_source: "manual" })).includes("missing-onscreen-title"));
+    assert.ok(!codes(entry()).includes("missing-onscreen-title"));
+  });
+
+  test("a body cut off after the opener is flagged without losing the opener", () => {
+    const cut = entry({ body: "First line.\nSecond line.\nThird line runs on and then gets cut…" });
+    assert.ok(codes(cut).includes("truncated-body"));
+    assert.equal(extractOpener(cut), "First line.\nSecond line.");
+  });
+
+  test("the two warnings that decide a refusal come first", () => {
+    const both = entry({ platform: "instagram", kind: "video", transcript_source: "manual", body: "short one" });
+    assert.deepEqual(codes(both).slice(0, 2), ["short-body", "media-first-platform"]);
+  });
 });
 
 describe("buildOpeners", () => {
@@ -176,6 +226,11 @@ describe("buildOpeners", () => {
 
   test("onscreen_title is null on every derived opener, because the corpus does not capture it", () => {
     assert.ok(buildOpeners(account()).every((o) => o.onscreen_title === null));
+  });
+
+  test("each opener carries its own warnings, so the doubt reaches the pick", () => {
+    const [built] = buildOpeners([entry({ platform: "instagram", body: "short one" })]);
+    assert.deepEqual(built.warnings.map((w) => w.code), ["short-body", "media-first-platform"]);
   });
 
   test("the platform filter narrows the output but not the baseline", () => {

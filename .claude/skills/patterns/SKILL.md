@@ -1,6 +1,6 @@
 ---
 name: patterns
-description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into the strongest shapes, and remixes a proven opener onto her own material. Proven structures only and never anyone's wording, with one scoped 2026-08-22 exception in remix mode covering two elements: a proven opener and its on-screen title, copied verbatim, with everything after them hers. It proposes rather than composes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>, /patterns remix <content-folder | topic> [--platform X].
+description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into the strongest shapes, and remixes a proven opener onto her own material. Proven structures only and never anyone's wording, with one scoped 2026-08-22 exception in remix mode covering two elements: a proven opener and, where it was captured, its on-screen title, copied verbatim, with everything after them hers. It proposes rather than composes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>, /patterns remix <content-folder | topic> [--platform X].
 ---
 
 # /patterns: the pattern mining pipeline
@@ -944,13 +944,19 @@ Everything after the opener is still hers and still governed by rule 1, `civic-a
 `config/voice.yaml`. `hook-patterns.md` and `post-patterns.md` are untouched shapes-only libraries
 here. A copied opener over a copied body is not a remix, and this mode does not produce one.
 
+**Only the opener half of the method works today.** The corpus stores post bodies and no on-screen
+text from images, video frames, or carousel slides, so `onscreen_title` is null on essentially
+every opener and null means unknown. On text platforms the opener IS the body's first lines and
+nothing is missing. On video and image posts, ask Muxin to read the title off the original and
+paste it, per remix-mode.md's manual step, and never write a title the system did not capture.
+
 ### Steps
 
 1. **Show her the ranked opener bank for the target platform.** Build or refresh it first with
    `node --import tsx src/patterns/openers.ts [--platform X]`. Each row shows the verbatim opener,
    its on-screen title where one is known, the creator, the measured multiple and its metric, and
-   whether `verbatim_ok` is set. She picks one. `verbatim_ok: false` is shown, not hidden, and it
-   does not block the pick. It is her call with the fact in front of her.
+   whether `verbatim_ok` is set, plus any warnings on it. She picks one. `verbatim_ok: false` is
+   shown, not hidden, and it does not block the pick. It is her call with the fact in front of her.
 
 2. **Keep the opener and the on-screen title EXACTLY.** No tightening, no rephrasing for voice, no
    swapped nouns. Editing it discards the only thing being borrowed.
@@ -975,6 +981,10 @@ here. A copied opener over a copied body is not a remix, and this mode does not 
   write an opener that merely sounds proven as a substitute.
 - **the chosen opener came from a `"caption"` entry or a truncated body.** The real opener is
   unknown, so there is nothing honest to copy.
+- **the chosen opener's post won on something outside its body** (a `short-body` or
+  `media-first-platform` warning). Say it plainly: this post won on an image we did not collect, so
+  copying its 22-character opener would copy the caption and miss the post. She can override with
+  eyes on the original; the system does not hand her a fragment on its own.
 - **the body she wants to remix is not her own material.** Route her to `/patterns ideas` when
   there is no source yet.
 

@@ -4,6 +4,29 @@ Read this before running `/patterns remix`. It is the only mechanism in this rep
 another creator's words verbatim, and the scope of that is narrow enough to state in one sentence:
 the opener and the on-screen title, nothing else.
 
+## Muxin gets the opener half of this method today, not the title half
+
+Sabrina's rule names two things to copy exactly: the opener and the on-screen title. **This
+implementation can supply the first. It cannot supply the second.**
+
+The corpus stores post bodies. It does not store on-screen text from images, video frames, or
+carousel slides, and there is no collection route that captures any of it today. So
+`onscreen_title` is null on essentially every opener in the bank, and null here means unknown, not
+absent. Never write a title the system did not capture, and never imply she can copy one that was
+never collected.
+
+The working half is real and it is the bigger half. On text platforms, Substack, LinkedIn, Bluesky,
+and X, the opener IS the body's first lines, and those are exactly the platforms the corpus is
+strongest on. Build confidently there. On video and image posts, hand her the opener and the manual
+title step below, and say plainly which half she is getting.
+
+**The same gap makes some collected winners bad remix sources.** Three of the corpus's
+highest-engaging posts earned their numbers outside the text that was collected: a 22-character
+LinkedIn caption over an image, two Instagram carousels whose likes came from slide images nobody
+retrieved, and an X thread opener whose substance sits in reply posts. The corpus is best at posts
+whose value is entirely in their words, which biases it against exactly the kind of post that is
+winning. The bank flags what it can, and the refuse conditions below stop the worst case.
+
 ## This reverses an earlier rule, on purpose, for exactly two elements
 
 On **2026-08-18** Muxin set the guardrail that governs every other part of this skill, written down
@@ -67,9 +90,24 @@ What the builder does and does not do:
 
 - One opener per corpus entry whose opening can be known. Text posts give the first two lines,
   videos give the first spoken sentences.
-- **It skips rather than guesses.** An entry recorded as `transcript_source: "caption"` is the
-  creator's written caption, not the words they said, so it produces no opener. Neither does an
-  entry whose opening carries a truncation marker, because the real opener is unknown.
+- **It skips rather than guesses.** No opener is produced when the entry is recorded as
+  `transcript_source: "caption"` (the creator's written caption, not the words they said), when the
+  opening carries a truncation marker, or when the whole body ends on a colon. That last one is the
+  thread-opener tell: the post promises what comes next and the substance sits in reply posts the
+  corpus never collected. A colon in the middle of a post is ordinary writing and is left alone.
+- **What it cannot decide, it flags instead of guessing.** Each opener carries typed `warnings`,
+  and the ranked listing prints them. Two of the four mean the post's substance probably sat
+  outside the collected body, and they are the ones that decide a refusal below:
+  - `short-body`, a body under 80 characters, short enough to be a caption over an image, a
+    carousel, or a video that was never collected. It can also be a genuinely short post that
+    worked on its own words. Nothing in the corpus can tell those apart, which is why this reaches
+    Muxin as a flag rather than being decided for her.
+  - `media-first-platform`, an Instagram, TikTok, or YouTube post, where slide text, frame text,
+    and on-screen text carry the post and none of it is collected.
+
+  The other two are context, not disqualification: `missing-onscreen-title` on every video opener,
+  which triggers the manual step below, and `truncated-body`, where the opener is intact but the
+  post was cut off later.
 - `performance.multiple` comes from the same `baselineMultiple` scoring the outlier report uses,
   and it is null when the account has fewer than three other comparably scored posts. Null means
   not measured, not weak, so unmeasured openers rank last rather than as zeroes.
@@ -130,9 +168,35 @@ Say which one applies, in plain language, and stop.
 - **The chosen opener came from a `"caption"` entry or a truncated body.** The builder skips those,
   so this only comes up when a hand-written record slipped through. The real opener is unknown, and
   copying a written caption or a clipped line word for word copies the wrong thing.
+- **The chosen opener's post won on something outside its body.** This is the `short-body` and
+  `media-first-platform` case, and it is a refusal, not a warning to read past. Say it in her
+  words, not in code names: "this post won on an image we did not collect, so copying its
+  22-character opener would copy the caption and miss the post." If she wants it anyway, she can
+  open the original, confirm the opener really is the whole hook, and say so. That is her call
+  made with the facts, which is different from the system quietly handing her a fragment.
 - **The body she wants to remix is not her own material.** A copied opener over a copied body is
   not a remix. Route her to `/patterns ideas` if there is no source yet, or ask for her own source
   file or content folder.
+
+## What a complete remix needs, and the manual step in the middle of it
+
+Sabrina's method assumes both halves. For a video or image post, the on-screen title is a **manual
+step** today, and the flow should say so rather than quietly dropping it:
+
+1. The bank shows the opener with `on-screen title: unknown` and a `missing-onscreen-title`
+   warning.
+2. **Ask her for it, by name.** "This one is a video. Open the original at <url>, read the big text
+   off the first frame, and paste it here exactly as it appears. If there is no on-screen text,
+   say so and the remix runs on the opener alone."
+3. Use whatever she pastes **verbatim**, the same as the opener. If she says there is none, run on
+   the opener alone and say in the output that the title half was not part of this remix.
+4. **Offer to persist it.** A title she read by hand can be written into that opener's record in
+   `data/patterns/openers.jsonl` as its `onscreen_title`, so the next run does not ask her twice.
+   The builder never overwrites a title, it only ever derives null.
+
+For a text post on Substack, LinkedIn, Bluesky, or X, there is no on-screen title at all and none
+is needed. The opener is the whole of what gets copied, and this step does not apply. Do not invent
+a title for a text post to make the method feel complete.
 
 ## The daily cadence this came from
 
