@@ -186,6 +186,7 @@ import { renderPage } from "./page.js";
 import { repoRoot } from "../db/db.js";
 import { VENTURE_READ_PATHS } from "./venture-reads.js";
 import { VENTURE_WRITE_PATHS } from "./venture-writes.js";
+import { CARD_ACTION_IDS } from "./venture-thread.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -294,25 +295,7 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
 // asserts its route is STILL uncalled, so wiring the room turns the entry red and the only way
 // back to green is deleting it. Keep the list at or near zero.
 const PENDING_UI_VENTURE: { route: string; reason: string }[] = [
-  { route: "/api/venture/:slug/state", reason: "Venture room phase + checkpoint header" },
-  { route: "/api/venture/:slug/artifacts", reason: "Venture room artifact list" },
-  { route: "/api/venture/:slug/decisions", reason: "Venture room decision list" },
-  { route: "/api/venture/:slug/canon", reason: "Venture room ledger thread" },
-  { route: "/api/venture/:slug/gate", reason: "Venture room response-gate counter" },
-  { route: "/api/venture/:slug/clusters", reason: "Venture room problem clusters" },
-  { route: "/api/venture/:slug/rules", reason: "Venture room rules-version stamp" },
-  { route: "/api/venture/:slug/intake/answers", reason: "Venture room YOUR WORDS / quotes panel" },
-  { route: "/api/venture/:slug/decisions/:id/select", reason: "Venture room decision picker" },
-  { route: "/api/venture/:slug/artifacts/:id/approve", reason: "Venture room approve button" },
-  { route: "/api/venture/:slug/artifacts/:id/discard", reason: "Venture room discard button" },
-  { route: "/api/venture/:slug/artifacts/:id/restore", reason: "Venture room restore-to-draft button" },
-  { route: "/api/venture/:slug/artifacts/:id/retract", reason: "Venture room retract button" },
-  { route: "/api/venture/:slug/artifacts/:id/confirm-live", reason: "Venture room confirm-live form" },
-  { route: "/api/venture/:slug/artifacts/:id/failed", reason: "Venture room report-failed form" },
-  { route: "/api/venture/:slug/artifacts/:id/findings/:findingId", reason: "Venture room research-read finding toggles" },
-  { route: "/api/venture/:slug/checkpoint/:id/clear", reason: "Venture room clear-checkpoint button" },
-  { route: "/api/venture/:slug/pace", reason: "Venture room posting-pace field" },
-  { route: "/api/venture/:slug/intake/drafts/clear", reason: "Venture intake, on the final write" },
+  { route: "/api/venture/:slug/intake/drafts/clear", reason: "the intake interview screen, which is not built yet" },
 ];
 
 // A parameterised route counts as called when the emitted script both reaches into /api/venture/
@@ -322,11 +305,25 @@ const PENDING_UI_VENTURE: { route: string; reason: string }[] = [
 function venturePathIsCalled(script: string, route: string): boolean {
   if (!route.includes(":")) return script.includes(route);
   if (!script.includes("/api/venture/")) return false;
+  // An artifact-lifecycle route is dispatched from the SERVER-supplied action id, not from a
+  // literal path in the client ("/artifacts/"+id+"/"+action.id), so its verb never appears as text.
+  // Checking for the literal would force the client to hardcode a second copy of the state machine,
+  // which is the thing venture-thread.ts's cardActions() exists to prevent. Instead: the dispatch
+  // expression must ship, and the verb must be one CardAction can actually emit.
+  const verb = /^\/api\/venture\/:slug\/artifacts\/:id\/([a-z-]+)$/.exec(route)?.[1];
+  if (verb && (CARD_ACTION_IDS as readonly string[]).includes(verb)) {
+    return script.includes('"/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id');
+  }
   return route
     .split("/")
     .filter((seg) => seg && !seg.startsWith(":") && seg !== "api" && seg !== "venture")
     .every((seg) => script.includes("/" + seg));
 }
+
+test("every artifact-lifecycle route has a CardAction id, and every id has a route", () => {
+  const lifecycle = VENTURE_WRITE_PATHS.map((p) => /^\/api\/venture\/:slug\/artifacts\/:id\/([a-z-]+)$/.exec(p)?.[1]).filter(Boolean);
+  assert.deepEqual([...lifecycle].sort(), [...CARD_ACTION_IDS].sort(), "the action id union and the artifact routes must be the same set");
+});
 
 const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS];
 

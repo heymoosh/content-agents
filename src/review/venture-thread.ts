@@ -84,6 +84,46 @@ export interface CardMsg {
   retraction: RetractionView | null;
   failure: { message: string; retryable: boolean; at: string } | null;
   claimRefs: { claim: string; ref: string }[];
+  /** What Muxin may actually do to this card right now. Server-decided; see cardActions(). */
+  actions: CardAction[];
+  /**
+   * A phase_1_research_read's EMERGENT findings, the only ones Muxin rules on
+   * (updateResearchReadFinding refuses a planned one by name, since muxin_confirmed_emergent means
+   * nothing there). null on every other artifact kind, so the panel is absent rather than empty.
+   */
+  findings: CardFinding[] | null;
+}
+
+export interface CardFinding {
+  findingId: string;
+  label: string;
+  note: string;
+  /** null = she has not ruled on it yet. Three states: accepted, declined, not yet asked. */
+  confirmed: boolean | null;
+  signalQuality: string | null;
+}
+
+/**
+ * One control on a card. The list is decided HERE rather than in the browser, which is stronger
+ * than page.ts mirroring the state machine: the client renders what the server says is legal, so
+ * there is only ever one copy of "what may happen next".
+ *
+ * Every id maps to a route that exists. venture-schema-contract.md §2.2 lists three actions that do
+ * NOT, and they are deliberately absent rather than drawn dead:
+ *   Edit  — no route; editing an artifact body is not built.
+ *   Retry — no route; re-delivery goes through deliverVenture, which is out of scope by decision.
+ *   Cancel / Give up — these ARE the discard route, so they render as discard under their own label
+ *                      rather than as a fourth verb with nothing behind it.
+ */
+export const CARD_ACTION_IDS = ["approve", "discard", "restore", "retract", "confirm-live", "failed"] as const;
+
+export interface CardAction {
+  id: (typeof CARD_ACTION_IDS)[number];
+  label: string;
+  /** confirm-live only: which proof this artifact kind's evidence floor actually demands. */
+  proof?: "url" | "attestation";
+  /** Asks before firing. Both of these throw away work or say something went public. */
+  destructive?: boolean;
 }
 
 export interface EvidenceView {
@@ -116,6 +156,23 @@ export interface ChoiceMsg {
   /** Echoed in her register when she overrode the recommendation. */
   overrideReason: string | null;
   rationale: string | null;
+  /**
+   * Whether selectWithOverride's discipline applies to this kind: picking anything not in
+   * `recommended_candidate_ids` needs a written reason. The client mirrors this to raise the reason
+   * field BEFORE the request, but the server is what refuses — the field is a courtesy, never a gate.
+   *
+   * Two prototype divergences are avoided by reading it from the record rather than from source
+   * order: an EMPTY recommendation set makes every item `recommended: false`, which is exactly how
+   * selectWithOverride treats it (every selection is an override); and a decision with no record at
+   * all cannot reach here, so the prototype's "demand a reason when nothing exists" case is gone.
+   */
+  overrideDiscipline: boolean;
+  /** day-14-decision only: rules.md §8.5 requires a reason for every option, recommended or not. */
+  reasonAlwaysRequired: boolean;
+  /** How many candidates this decision takes. 3 for idea-ranking, 1 everywhere else. */
+  requiredCount: number;
+  /** Synthetic panels have no record yet, so the room must not offer "already decided" affordances. */
+  recordExists: boolean;
 }
 
 export interface ChoiceItem {
@@ -162,6 +219,12 @@ export interface CheckpointMsg {
   rows: CheckpointRow[];
   decisions: { kind: string; selected: boolean }[];
   footNote: string;
+  /** True while every row is live and any required decision is made -- clearCheckpoint still refuses
+   *  if this is wrong, and its refusal is what the screen shows. This only decides whether the
+   *  button starts enabled. */
+  canClear: boolean;
+  /** Set when this checkpoint requires a posting pace and none is recorded: rules.md §5.5. */
+  needsPace: boolean;
 }
 
 export interface CheckpointRow {
@@ -233,6 +296,18 @@ export interface ThreadInput {
   clusters: ClusterAnalysis | null;
   answers: IntakeAnswers | null;
   rulesVersion: string;
+  /**
+   * artifact_kind -> its evidence floor, from rules.yaml. Passed IN rather than read here: this
+   * module value-imports nothing (see the header), because a value import of rules.ts would drag
+   * the filesystem module in, and fixtures.ts could no longer run the real builder. (Spelled out
+   * rather than named: fixtures.test.ts greps this file for that module's name, and being dumb
+   * enough to catch a comment is what makes that guard unfoolable.)
+   */
+  minEvidence: Record<string, "url" | "agent" | "attestation" | null>;
+  /** decision_kind -> how many candidates it takes. Same reason: rules.yaml data, passed in. */
+  selectCounts: Record<string, number>;
+  /** rules.day_14_decision.candidates, for the Phase 4 panel that has no record until it is used. */
+  day14Candidates: string[];
   /** "now", for the elapsed-day count. Passed in so the result is deterministic in tests. */
   now: string;
 }
@@ -372,6 +447,54 @@ export function cardState(a: Pick<VentureArtifact, "editorial_status" | "deliver
   return { text: `${ed} / ${dl}`, dot: "grey" };
 }
 
+/**
+ * The controls this artifact may actually offer, from venture-schema-contract.md §2.2's Actions
+ * column, filtered to the ones with a route behind them.
+ *
+ * The subtlest case, and the one that would have shipped a dead button: §2.2's app-mode
+ * `approved × handed_off` row lists "Confirm live", but confirmManualDelivery refuses anything whose
+ * delivery_mode is not "manual" ("is not a manual-delivery artifact"). For an app artifact the
+ * delivery AGENT confirms, not Muxin, so the control is absent rather than drawn and guaranteed to
+ * be refused.
+ */
+export function cardActions(
+  a: Pick<VentureArtifact, "editorial_status" | "delivery_status" | "delivery_mode" | "artifact_kind">,
+  minEvidence: Record<string, "url" | "agent" | "attestation" | null>
+): CardAction[] {
+  const { editorial_status: ed, delivery_status: dl } = a;
+  if (ed === "discarded") return [{ id: "restore", label: "Put it back in drafts" }];
+  if (ed === "draft") {
+    return [
+      { id: "approve", label: "Approve it" },
+      { id: "discard", label: "Put it aside", destructive: true },
+    ];
+  }
+  // approved
+  if (dl === "live_confirmed") return [{ id: "retract", label: "It came down", destructive: true }];
+  if (dl === "failed") {
+    // "Retry" has no route -- re-delivery runs through deliverVenture, deliberately out of scope.
+    // §2.2's "Give up" is the discard route wearing the label this state calls for.
+    return [{ id: "discard", label: "Give up on it", destructive: true }];
+  }
+  if (dl === "handed_off") {
+    const out: CardAction[] = [];
+    if (a.delivery_mode === "manual") {
+      // A url floor needs a link; an attestation floor takes her sentence (a URL would also clear
+      // it after #365, but asking for a link that may not exist is the thing not to do).
+      const min = minEvidence[a.artifact_kind] ?? null;
+      if (min === "url" || min === "attestation") out.push({ id: "confirm-live", label: "It is live", proof: min });
+      out.push({ id: "failed", label: "It did not work" });
+    }
+    out.push({ id: "discard", label: "Cancel it", destructive: true });
+    return out;
+  }
+  // approved x ready / not_applicable
+  return [
+    { id: "discard", label: "Put it aside", destructive: true },
+    { id: "restore", label: "Back to drafts" },
+  ];
+}
+
 /** The tone of a live row's dot. Her own word never renders as the same green as a checked fact. */
 function liveDot(ev: EvidenceView | null): DotTone {
   return ev?.tone === "word" ? "amber" : "green";
@@ -427,6 +550,20 @@ function scoreLine(c: Candidate): string {
   return entries.map(([k, v]) => `${k.replace(/_/g, " ")} ${v}`).join(" · ");
 }
 
+// decisions.ts's OVERRIDE_SELECT_KINDS, duplicated on purpose: importing the real constant would be
+// a VALUE import of decisions.ts, which reaches the filesystem -- and this module's whole contract is that
+// it imports nothing but types, so fixtures.ts can run the real builder. venture-thread.test.ts
+// imports the real list (a test may import anything) and asserts the two are identical, so a change
+// on either side goes red rather than drifting.
+const OVERRIDE_DISCIPLINE_KINDS = new Set([
+  "platform-recommendation",
+  "phase-1-research-continuation",
+  "lead-magnet-concept",
+  "problem-selection",
+  "product-format-and-price",
+  "daily-operating-plan-choice",
+]);
+
 const DECISION_RAIL: Record<string, { rail: string; sub: string }> = {
   "platform-recommendation": { rail: "ONE DECISION · WHERE THIS GETS POSTED", sub: "One platform, not a spread. The rest of Phase 1 is written for whichever this is." },
   "idea-ranking": { rail: "ONE DECISION · WHICH IDEAS GET DRAFTED", sub: "Ranked on the four factors in the rules. The ones you do not pick are banked, not deleted." },
@@ -439,7 +576,7 @@ const DECISION_RAIL: Record<string, { rail: string; sub: string }> = {
   "day-14-decision": { rail: "ONE DECISION · IT GOES IN CANON", sub: "Whichever you pick gets written down with the numbers beside it." },
 };
 
-export function choiceFor(d: DecisionRecord): ChoiceMsg {
+export function choiceFor(d: DecisionRecord, selectCounts: Record<string, number> = {}): ChoiceMsg {
   const copy = DECISION_RAIL[d.decision_kind] ?? { rail: `ONE DECISION · ${d.decision_kind.toUpperCase()}`, sub: "" };
   const selected = new Set(d.selected_candidate_ids);
   const recommended = new Set(d.recommended_candidate_ids);
@@ -460,6 +597,10 @@ export function choiceFor(d: DecisionRecord): ChoiceMsg {
     })),
     overrideReason: d.override_reason,
     rationale: d.rationale,
+    overrideDiscipline: OVERRIDE_DISCIPLINE_KINDS.has(d.decision_kind),
+    reasonAlwaysRequired: d.decision_kind === "day-14-decision",
+    requiredCount: selectCounts[d.decision_kind] ?? 1,
+    recordExists: true,
   };
 }
 
@@ -542,14 +683,14 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
   // 4. Decisions, settled ones first and the live one last so it sits closest to her.
   const settled = decisions.filter((d) => d.status !== "awaiting_user");
   const live = decisions.filter((d) => d.status === "awaiting_user");
-  for (const d of settled) messages.push(choiceFor(d));
+  for (const d of settled) messages.push(choiceFor(d, input.selectCounts));
 
   // 5. The artifacts of the current phase. Earlier phases' cards stay in the ledger above rather
   //    than being redrawn here, so the thread does not grow without bound.
   const phaseArtifacts = artifacts.filter((a) => a.venture_phase === state.current_phase);
   if (phaseArtifacts.length) {
     messages.push({ kind: "rail", text: `PHASE ${state.current_phase} · WHAT IS DRAFTED` });
-    for (const a of phaseArtifacts) messages.push(cardFor(a));
+    for (const a of phaseArtifacts) messages.push(cardFor(a, input.minEvidence));
   }
 
   // 6. The response gate, in Phase 3 ONLY. Counts, never answers — and while it is closed there
@@ -576,7 +717,18 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
     }
   }
 
-  for (const d of live) messages.push(choiceFor(d));
+  for (const d of live) messages.push(choiceFor(d, input.selectCounts));
+
+  // The Day 14 decision is the one panel with no record to render from. phase4.ts creates the
+  // decision lazily inside day14Decide(), so the loop above will never emit it before the first
+  // click and the room would simply never offer the decision Phase 4 ends on. Synthesised here from
+  // the same two facts the server gates on -- the review approved, the decision not yet made -- with
+  // its options passed in from rules.yaml rather than hardcoded, so the five never drift from the
+  // set day14Decide() validates against.
+  const p4 = state.phase4;
+  if (state.current_phase === 4 && p4.day_14_review.approved && !p4.day_14_decision.made) {
+    messages.push(day14Choice(input.day14Candidates, input.rulesVersion));
+  }
 
   // 7. The open checkpoint, last, because it is the thing that is actually blocking.
   const openId = openCheckpointId(state);
@@ -602,7 +754,37 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
   };
 }
 
-function cardFor(a: VentureArtifact): CardMsg {
+export function day14Choice(candidates: string[], rulesVersion: string): ChoiceMsg {
+  const copy = DECISION_RAIL["day-14-decision"];
+  return {
+    kind: "choice",
+    decisionId: "p4-day-14-decision",
+    rail: copy.rail,
+    sub: copy.sub,
+    live: true,
+    rulesVersion,
+    // No scores and no recommendation: rules.md §8.5 is explicit that the system never recommends
+    // one of these ("Muxin makes one final decision"), so every item renders equal.
+    items: candidates.map((c) => ({
+      candidateId: c,
+      title: c.replace(/_/g, " "),
+      why: "",
+      recommended: false,
+      selected: false,
+      scoreLine: "",
+    })),
+    overrideReason: null,
+    rationale: null,
+    // Not an override-discipline kind -- there is no recommendation to override. The reason is
+    // required anyway, by §8.5's "Record the decision and reason".
+    overrideDiscipline: false,
+    reasonAlwaysRequired: true,
+    requiredCount: 1,
+    recordExists: false,
+  };
+}
+
+function cardFor(a: VentureArtifact, minEvidence: ThreadInput["minEvidence"]): CardMsg {
   const st = cardState(a);
   const ev = evidenceView(a.evidence);
   return {
@@ -622,7 +804,27 @@ function cardFor(a: VentureArtifact): CardMsg {
     retraction: retractionView(a.retraction),
     failure: a.failure ? { message: a.failure.message, retryable: a.failure.retryable, at: a.failure.at } : null,
     claimRefs: a.claim_refs ?? [],
+    actions: cardActions(a, minEvidence),
+    findings: emergentFindings(a),
   };
+}
+
+// Read off fields.findings[] rather than from a route of its own -- a finding lives inside exactly
+// one artifact and has no independent identity, which is also why the write route is nested under
+// its artifact.
+function emergentFindings(a: VentureArtifact): CardFinding[] | null {
+  if (a.artifact_kind !== "phase_1_research_read") return null;
+  const raw = (a.fields?.findings as Record<string, unknown>[] | undefined) ?? [];
+  const emergent = raw.filter((f) => f.finding_origin === "emergent");
+  if (!emergent.length) return null;
+  return emergent.map((f) => ({
+    findingId: String(f.finding_id),
+    label: String(f.emergent_description ?? f.finding_id),
+    // Never invented: the implications line is what the read itself wrote, or nothing.
+    note: typeof f.lead_magnet_implications === "string" ? f.lead_magnet_implications : "",
+    confirmed: typeof f.muxin_confirmed_emergent === "boolean" ? f.muxin_confirmed_emergent : null,
+    signalQuality: typeof f.signal_quality === "string" ? f.signal_quality : null,
+  }));
 }
 
 function gateMsg(gate: ResponseGateState): GateMsg {
@@ -666,7 +868,26 @@ function checkpointMsg(checkpointId: string, cp: CheckpointState, byId: Map<stri
     footNote: cp.cleared
       ? "Canon first, then the next phase opened."
       : "Nothing after this gets written until every row above reports live.",
+    // A MIRROR of clearCheckpoint's predicate, never a replacement for it: this only decides whether
+    // the button starts enabled, and the server's own refusal (with its reason) is what the screen
+    // shows if the mirror is ever wrong.
+    canClear:
+      !cp.cleared &&
+      rows.length > 0 &&
+      rows.every((r) => r.isLive) &&
+      cp.decisions_complete_count === cp.decisions_required_count &&
+      (!needsPace(cp) || cp.pace_recorded),
+    needsPace: !cp.cleared && needsPace(cp) && !cp.pace_recorded,
   };
+}
+
+// rules.yaml declares require_pace_recorded on checkpoint-1 only today. CheckpointState does not
+// carry the flag, but it carries the fact the flag produces: a checkpoint that never required a
+// pace reports pace_recorded false forever and would otherwise show the control on every phase. The
+// blocking list is the honest signal -- clearCheckpoint puts "posting pace not recorded" there, and
+// only for a checkpoint that actually demands it.
+function needsPace(cp: CheckpointState): boolean {
+  return cp.blocking.some((b) => /posting pace not recorded/.test(b.reason));
 }
 
 function decisionRows(cp: CheckpointState): { kind: string; selected: boolean }[] {

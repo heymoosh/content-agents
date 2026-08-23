@@ -385,6 +385,37 @@ const FX_DECISION: DecisionRecord = {
   rationale: null, status: "selected", created_at: FX_AT, decided_at: FX_AT,
 };
 
+// Awaiting her, with a recommendation -- clicking the NON-recommended row is what raises the
+// override-reason field. A fixture cannot pre-open that field (it is client state, not server
+// data), so the scenario's job is to make the interrupt reachable in one click.
+const FX_AWAITING: DecisionRecord = {
+  ...FX_DECISION,
+  decision_id: "p1-platform-02",
+  selected_candidate_ids: [],
+  selected_by: null,
+  override_reason: null,
+  status: "awaiting_user",
+  decided_at: null,
+};
+
+// One live row short of clearing, so the Clear button starts disabled and the server's own refusal
+// is one click away.
+const FX_NOT_LIVE = fxArtifact({
+  artifact_id: "p1-essay-04", title: "FIXTURE — approved, still not live",
+  editorial_status: "approved", delivery_status: "handed_off",
+});
+
+// A manual hand-off with a url floor: the confirm-live form asks for a link.
+const FX_HANDED_OFF = fxArtifact({
+  artifact_id: "p1-essay-05", title: "FIXTURE — waiting on you to put it live",
+  editorial_status: "approved", delivery_status: "handed_off",
+});
+const FX_FAILED = fxArtifact({
+  artifact_id: "p1-essay-06", title: "FIXTURE — the one that did not go up",
+  editorial_status: "approved", delivery_status: "failed",
+  failure: { provider: null, message: "FIXTURE — Substack rejected the paste.", retryable: true, at: FX_NOW },
+});
+
 const FX_ANSWERS = {
   q1: "FIXTURE — help people vote on the local measures that actually change their street.",
   q2: "FIXTURE — people who already vote in the big races and skip everything under them.",
@@ -408,10 +439,59 @@ function fxThread(over: Partial<ThreadInput>) {
     clusters: null,
     answers: FX_ANSWERS,
     rulesVersion: "fixture-rules",
+    minEvidence: { "substack-post": "url", "text-post-note": "agent", "welcome-email": "attestation", "product-outline": null, "phase_1_research_read": null, "day-14-review": null, "daily-operating-plan": null },
+    selectCounts: { "idea-ranking": 3, "lead-magnet-concept": 1 },
+    day14Candidates: ["continue", "revise_positioning", "revise_lead_magnet", "collect_more_evidence", "stop"],
     now: FX_NOW,
     ...over,
   });
 }
+
+const VENTURE_WRITE_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "venture-awaiting-decision",
+    group: "Venture",
+    label: "a decision waiting on you",
+    room: "venture",
+    note: "Click the non-recommended row to reach the override-reason interrupt — a fixture cannot pre-open client state.",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": { ok: true, thread: fxThread({ decisions: [FX_AWAITING], artifacts: [] }) },
+    },
+  },
+  {
+    id: "venture-one-short",
+    group: "Venture",
+    label: "checkpoint one row short",
+    room: "venture",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": {
+        ok: true,
+        thread: fxThread({
+          artifacts: [FX_LIVE_URL, FX_LIVE_AGENT, FX_NOT_LIVE],
+          state: fxState(1, { "checkpoint-1": fxCheckpoint([FX_LIVE_URL, FX_LIVE_AGENT, FX_NOT_LIVE]) }),
+        }),
+      },
+    },
+  },
+  {
+    id: "venture-confirm-live",
+    group: "Venture",
+    label: "confirm-live and report-failed forms",
+    room: "venture",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": {
+        ok: true,
+        thread: fxThread({
+          artifacts: [FX_HANDED_OFF, FX_FAILED],
+          state: fxState(1, { "checkpoint-1": fxCheckpoint([FX_HANDED_OFF, FX_FAILED]) }),
+        }),
+      },
+    },
+  },
+];
 
 const VENTURE_SCENARIOS: FixtureScenario[] = [
   {
@@ -493,6 +573,7 @@ export const FIXTURE_SCENARIOS: FixtureScenario[] = [
     overrides: { ...FIC_BASE, "/api/fiction/scene": f.scene },
   })),
   ...VENTURE_SCENARIOS,
+  ...VENTURE_WRITE_SCENARIOS,
   ...Object.entries(EMPTY_BY_ROOM).map(([tab, overrides]) => ({
     id: `empty-${tab}`, group: "Empty", label: tab, room: tab, overrides,
   })),

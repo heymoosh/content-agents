@@ -1325,6 +1325,25 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .vrail-item a.jump { font:10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.04em;
     color:var(--blue); border-bottom:1px solid #c9d6e6; text-decoration:none; align-self:flex-start; }
   .vnote { font-size:12.5px; line-height:1.5; color:#8a7f6d; max-width:420px; }
+  .vacts { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; align-items:center; }
+  .vacts button { border:1px solid #e7e1d6; background:var(--card); color:var(--ink); border-radius:7px;
+    padding:7px 13px; font-size:13.5px; cursor:pointer; }
+  .vacts button.primary { border-color:var(--ink); background:var(--ink); color:#faf8f3; font-weight:600; }
+  .vacts button:disabled { opacity:.5; cursor:default; }
+  /* A server refusal renders next to the control that caused it, verbatim. It is not a toast:
+     these sentences say what to bring instead, and a toast that vanishes takes the instruction
+     with it. Confirmations are the toast (Muxin's decision). */
+  .vrefusal { font-size:12.5px; line-height:1.55; color:var(--red); background:#fdf1ef;
+    border:1px solid #ecc9c0; border-radius:7px; padding:9px 12px; margin-top:10px; max-width:520px; }
+  .vform { margin-top:12px; padding:13px 15px; background:#fdf8ec; border:1px solid #e8d5a8; border-radius:8px; max-width:560px; }
+  .vform .lbl { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.06em; color:#9a6b12; }
+  .vform .ask { font-size:13.5px; line-height:1.55; color:var(--ink); margin-top:7px; }
+  .vform input, .vform textarea { width:100%; box-sizing:border-box; margin-top:9px;
+    font:400 15px/1.5 Georgia,"Times New Roman",serif; padding:8px 10px; border:1px solid #d8cfbb;
+    border-radius:7px; background:#fff; color:var(--ink); resize:vertical; }
+  .vchoice-row.pick { cursor:pointer; }
+  .vchoice-row.pick:hover .n { text-decoration:underline; }
   /* The destination room's progress strip: same data, its own shorter strings. */
   .room-strip { border-top:1px solid #dfd4bb; border-bottom:1px solid #efe7d6; padding:15px 0 17px;
     margin-bottom:28px; max-width:600px; }
@@ -2873,6 +2892,97 @@ async function loadVenture(){
   VENTURE_THREAD = j.thread;
   renderVenture();
 }
+// ── writes ───────────────────────────────────────────────────────────────────────────────────────
+//
+// Two rules, and everything below follows from them.
+//
+// 1. REFETCH THE WHOLE THREAD after every successful write; never patch a panel from a response.
+//    One write moves several panels at once -- approving an artifact changes its card, moves the
+//    checkpoint's completion count, and can append a canon receipt. Patching one of them would put
+//    a fresh card beside a stale checkpoint stamp: a half-updated state presented as a whole one.
+//    Rebuilding from /thread makes that unrepresentable, which is why the eight fine-grained read
+//    routes were folded away.
+//
+// 2. THE CLIENT NEVER AUTHORIZES. selectWithOverride refuses a blank override reason,
+//    confirmManualDelivery refuses a below-floor proof and names what to bring instead,
+//    clearCheckpoint refuses a partial pass with its reason, transitionArtifact refuses an illegal
+//    pair. Where the UI raises a field early or starts a button disabled, that is a MIRROR of the
+//    server rule for her convenience -- never a replacement, and never allowed to hide a refusal.
+//    Every refusal renders verbatim, next to the control that caused it.
+let ventureBusy = false;
+// Which control is showing a form or an error, so a rerender does not lose it. Cleared on success.
+let ventureOpen = null; // { key, kind, value, error }
+
+function vOpen(key, kind, value){ ventureOpen = { key, kind, value: value || "", error: "" }; renderVenture(); }
+function vClose(){ ventureOpen = null; renderVenture(); }
+function vErr(msg){ if(ventureOpen) ventureOpen.error = msg; renderVenture(); }
+
+// One write. On success: toast, drop any open form, refetch the whole thread. On refusal: keep the
+// form open and show the server's own sentence under it, because that sentence is the useful part.
+async function ventureWrite(path, body, okMsg, key){
+  if(ventureBusy) return false;
+  ventureBusy = true;
+  try {
+    const r = await fetch("/api/venture/"+encodeURIComponent(ventureSlug)+path, {
+      method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(body||{})
+    });
+    let j; try { j = await r.json(); } catch(e) { j = { ok:false, error: "the server answered "+r.status }; }
+    if(!j.ok){
+      if(ventureOpen && ventureOpen.key === key) ventureOpen.error = j.error || "refused";
+      else ventureOpen = { key, kind:"error", value:"", error: j.error || "refused" };
+      ventureBusy = false;
+      renderVenture();
+      return false;
+    }
+    ventureOpen = null;
+    ventureBusy = false;
+    await loadVenture();
+    if(okMsg) flash(okMsg);
+    return j;
+  } catch(e){
+    ventureBusy = false;
+    if(ventureOpen) ventureOpen.error = String(e && e.message || e);
+    renderVenture();
+    return false;
+  }
+}
+
+function vCardAction(artifactId, action){
+  const key = "card:"+artifactId+":"+action.id;
+  if(action.id === "confirm-live") return vOpen(key, "confirm:"+action.proof, "");
+  if(action.id === "failed") return vOpen(key, "failed", "");
+  if(action.id === "retract") return vOpen(key, "retract", "");
+  if(action.destructive && !confirm(action.label + " — " + artifactId + "?")) return;
+  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id, {}, (action.label+" — done"), key);
+}
+
+// The reason field the override discipline raises. Rendered from the server's own
+// recommended_candidate_ids (via choice.items[].recommended), never from source order: an empty
+// recommendation set makes every option an override, which is exactly how selectWithOverride
+// treats it, and the prototype got both of those wrong.
+function vNeedsReason(choice, item){
+  if(choice.reasonAlwaysRequired) return true;
+  return !!choice.overrideDiscipline && !item.recommended;
+}
+function vPick(choice, item){
+  const key = "choice:"+choice.decisionId+":"+item.candidateId;
+  if(vNeedsReason(choice, item)){
+    vOpen(key, "reason", "");
+    ventureOpen.reasonAlways = !!choice.reasonAlwaysRequired;
+    return renderVenture();
+  }
+  ventureWrite("/decisions/"+encodeURIComponent(choice.decisionId)+"/select", { candidateIds:[item.candidateId] }, "Recorded in canon", key);
+}
+function vSubmitReason(choice, item){
+  const key = "choice:"+choice.decisionId+":"+item.candidateId;
+  const text = (ventureOpen && ventureOpen.value || "").trim();
+  // Deliberately NOT blocked here when empty: selectWithOverride owns that refusal and its wording
+  // is better than anything this layer would invent. Sending it through is how she sees it.
+  const body = { candidateIds:[item.candidateId] };
+  if(choice.reasonAlwaysRequired) body.rationale = text; else body.overrideReason = text;
+  ventureWrite("/decisions/"+encodeURIComponent(choice.decisionId)+"/select", body, "Recorded in canon", key);
+}
+
 function vBadge(ev){
   if(!ev) return "";
   return '<span class="vbadge '+esc(ev.tone)+'">'+esc(ev.glyph)+' '+esc(ev.badge)+'</span>';
@@ -2910,12 +3020,80 @@ function vCard(m){
     h += '<div class="vmono" style="margin-top:11px">'+m.claimRefs.length+' CLAIM'+(m.claimRefs.length===1?"":"S")+' TRACED · '
       + esc(m.claimRefs.map(c=>c.ref).join(", "))+'</div>';
   }
+  if(m.findings){
+    h += '<div style="margin-top:15px"><div class="vmono">WHAT THE PROBES TURNED UP THAT NOBODY ASKED FOR</div>'
+      + m.findings.map(f=>'<div style="padding:14px 16px;border:1px solid var(--line);border-radius:9px;background:var(--card);margin-top:10px">'
+        + '<div class="vtitle" style="font-size:15px;font-weight:600;margin-top:0">'+esc(f.label)+'</div>'
+        + (f.note ? '<div class="vnote" style="margin-top:5px">'+esc(f.note)+'</div>' : "")
+        + (f.signalQuality ? '<div class="vmono" style="margin-top:8px">SIGNAL '+esc(f.signalQuality.toUpperCase())+'</div>' : "")
+        // Three states, not two: accepted, declined, and not yet asked.
+        + (f.confirmed === null
+          ? '<div class="vacts"><button class="primary" data-vfind="'+esc(m.artifactId)+'" data-vfid="'+esc(f.findingId)+'" data-vyes="1">Let it shape Phase 2</button>'
+            + '<button data-vfind="'+esc(m.artifactId)+'" data-vfid="'+esc(f.findingId)+'" data-vyes="0">Note it, change nothing</button></div>'
+          : '<div class="vmono" style="margin-top:9px">'+(f.confirmed?"YOU LET THIS SHAPE PHASE 2":"YOU NOTED IT AND CHANGED NOTHING")+'</div>')
+        + '</div>').join("")
+      + '</div>';
+  }
+  // The action list comes from the SERVER (venture-thread.ts's cardActions), so the browser never
+  // holds a second copy of the state machine and can never draw a control the routes would refuse.
+  if(m.actions && m.actions.length){
+    h += '<div class="vacts">'
+      + m.actions.map((a,i)=>'<button data-vcard="'+esc(m.artifactId)+'" data-vact="'+i+'"'
+        + (i===0?' class="primary"':'')+'>'+esc(a.label)+'</button>').join("")
+      + '</div>';
+  }
+  h += vSlot("card:"+m.artifactId, m);
   return h+'</div>';
+}
+// The open form or the standing refusal for one control, if it belongs to this panel. Both live in
+// the same slot on purpose: a refusal is the answer to the thing she just tried, so it belongs where
+// she tried it, not in a toast that takes the instruction away with it.
+function vSlot(prefix, m){
+  const o = ventureOpen;
+  if(!o || o.key.indexOf(prefix) !== 0) return "";
+  let form = "";
+  if(o.kind && o.kind.indexOf("confirm:") === 0){
+    const proof = o.kind.slice("confirm:".length);
+    form = '<div class="lbl">'+(proof==="url"?"THE LIVE LINK":"WHAT YOU PUT LIVE")+'</div>'
+      + '<div class="ask">'+(proof==="url"
+        ? "Paste the link. Nothing here will open it, and the row will say so, but a link can be re-checked later."
+        : "Say what you did, in your own words. Nothing here can check it, and the row will always say that.")+'</div>'
+      + (proof==="url"
+        ? '<input id="vFormVal" value="'+esc(o.value)+'" placeholder="https://" />'
+        : '<textarea id="vFormVal" rows="3">'+esc(o.value)+'</textarea>')
+      + vFormButtons("It is live");
+  } else if(o.kind === "failed"){
+    form = '<div class="lbl">WHAT WENT WRONG</div>'
+      + '<div class="ask">Your words, not the provider&#39;s. This is what the failure row will show.</div>'
+      + '<textarea id="vFormVal" rows="3">'+esc(o.value)+'</textarea>' + vFormButtons("Record it");
+  } else if(o.kind === "retract"){
+    form = '<div class="lbl">WHAT HAPPENED TO IT</div>'
+      + '<div class="ask">Taken down, unpublished, link dead. The record that it was live is kept either way, and this sits beside it.</div>'
+      + '<textarea id="vFormVal" rows="3">'+esc(o.value)+'</textarea>' + vFormButtons("It came down");
+  } else if(o.kind === "reason"){
+    form = '<div class="lbl">'+(o.reasonAlways?"YOUR REASON":"REASON FOR OVERRIDING THE RECOMMENDATION")+'</div>'
+      + '<div class="ask">One line is enough. It goes in the audit trail beside the choice.</div>'
+      + '<input id="vFormVal" value="'+esc(o.value)+'" placeholder="One line is enough" />' + vFormButtons("Record it");
+  } else if(o.kind === "pace"){
+    form = '<div class="lbl">YOUR ONGOING POSTING PACE</div>'
+      + '<div class="ask">In your own words. Checkpoint 1 does not clear without it.</div>'
+      + '<input id="vFormVal" value="'+esc(o.value)+'" placeholder="three a week" />' + vFormButtons("Record it");
+  }
+  void m;
+  return (form ? '<div class="vform">'+form+'</div>' : "")
+    + (o.error ? '<div class="vrefusal">'+esc(o.error)+'</div>' : "");
+}
+function vFormButtons(label){
+  return '<div class="vacts"><button class="primary" id="vFormOk">'+esc(label)+'</button>'
+    + '<button id="vFormCancel">Never mind</button></div>';
 }
 function vChoice(m){
   const rows = m.items.map(it=>{
     const mark = it.selected ? "●" : it.recommended ? "○" : "·";
-    return '<div class="vchoice-row"><span class="mark">'+mark+'</span><span>'
+    // Only a decision still awaiting her is clickable. A settled one is a record, not a control:
+    // decisions.ts refuses a second selection outright (rules.md §11 item 15, immutability).
+    const pick = m.live ? ' pick" data-vpick="'+esc(m.decisionId)+'" data-vcand="'+esc(it.candidateId)+'"' : '"';
+    return '<div class="vchoice-row'+(m.live?pick:'"')+'><span class="mark">'+mark+'</span><span>'
       + '<span class="n">'+esc(it.title)+'</span>'
       + (it.why ? '<span class="w">'+esc(it.why)+'</span>' : "")
       + (it.scoreLine ? '<span class="sc">'+esc(it.scoreLine)+'</span>' : "")
@@ -2935,8 +3113,17 @@ function vChoice(m){
       + '<div class="vmine" style="margin-top:5px">'+esc(m.rationale)+'</div></div>';
   }
   h += '<div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;align-items:baseline">'
-    + (m.live ? '<span class="vmono" style="color:'+vDot("amber")+'">WAITING ON YOU</span>' : '<span class="vmono">DECIDED</span>')
+    + (m.live
+      ? '<span class="vmono" style="color:'+vDot("amber")+'">'+(m.requiredCount>1?"PICK "+m.requiredCount:"PICK ONE")+'</span>'
+      : '<span class="vmono">DECIDED</span>')
     + '<span class="vmono" style="color:#b0a488">'+esc(m.rulesVersion)+'</span></div>';
+  // A multi-pick decision (idea-ranking takes three) has no control here yet: one click cannot
+  // express a set, and inventing a selection UI that the server would then reject on count is worse
+  // than saying so. It is the one decision kind this PR leaves read-only, and it says why.
+  if(m.live && m.requiredCount > 1){
+    h += '<div class="vnote" style="margin-top:9px">This one takes '+m.requiredCount+' together. Pick them with the venture CLI for now.</div>';
+  }
+  h += vSlot("choice:"+m.decisionId, m);
   return h+'</div>';
 }
 function vGate(m){
@@ -2969,7 +3156,19 @@ function vCheckpoint(m){
     + '<span class="vmono" style="font-size:9.5px;color:#b0a488">CONDITION, AND WHETHER IT IS LIVE</span>'
     + '<span class="vmono" style="font-size:9.5px;color:#b0a488">YOUR APPROVAL</span></div>'
     + rows + decisions
-    + '<div class="vnote" style="margin-top:15px;padding-top:15px;border-top:1px solid #e2d8c1">'+esc(m.footNote)+'</div></div>';
+    + '<div class="vnote" style="margin-top:15px;padding-top:15px;border-top:1px solid #e2d8c1">'+esc(m.footNote)+'</div>'
+    + (m.cleared ? "" :
+        '<div class="vacts">'
+        + (m.needsPace ? '<button id="vPace">Record your pace</button>' : "")
+        // Disabled is a MIRROR of clearCheckpoint's predicate, not a gate: if the mirror is ever
+        // wrong the server refuses with its own reason, and that reason renders right below.
+        + '<button class="primary" id="vClear"'+(m.canClear?"":" disabled")+'>'+esc(m.checkpointId === "checkpoint-3" ? "Record it and open Phase 4" : "Clear it and open the next phase")+'</button>'
+        + '<span class="vnote">'+(m.canClear
+            ? "Canon first, then the next phase opens."
+            : "Every row above has to report live first. Nothing after this gets written until then.")+'</span>'
+        + '</div>')
+    + vSlot("checkpoint:"+m.checkpointId, m)
+    + '</div>';
 }
 function vQuotes(m){
   return '<div class="vblock" style="border-bottom:none"><div class="vmono">'+esc(m.rail)+'</div>'
@@ -3023,6 +3222,68 @@ function renderVenture(){
 }
 document.addEventListener("change", e=>{
   if(e.target && e.target.id === "ventureSlug"){ ventureSlug = e.target.value; loadVenture(); }
+});
+// One delegated listener: renderVenture() replaces the whole subtree on every refetch, so per-node
+// handlers would be re-bound constantly and a stale one could fire against a rebuilt thread.
+document.addEventListener("click", e=>{
+  const t = e.target;
+  if(!t || !t.closest || !t.closest("#roomVenture")) return;
+  const val = ()=> { const el = $("#vFormVal"); return el ? el.value : ""; };
+
+  if(t.id === "vFormCancel") return vClose();
+  if(t.id === "vFormOk"){
+    const o = ventureOpen; if(!o) return;
+    if(o.kind === "reason"){
+      const c = (VENTURE_THREAD.messages||[]).find(m=>m.kind==="choice" && o.key.indexOf("choice:"+m.decisionId+":")===0);
+      const cand = o.key.slice(o.key.lastIndexOf(":")+1);
+      if(c){ ventureOpen.value = val(); return vSubmitReason(c, { candidateId: cand }); }
+      return;
+    }
+    const id = o.key.split(":")[1];
+    if(o.kind && o.kind.indexOf("confirm:")===0){
+      return ventureWrite("/artifacts/"+encodeURIComponent(id)+"/confirm-live",
+        { type: o.kind.slice("confirm:".length), value: val() }, "Recorded as live", o.key);
+    }
+    if(o.kind === "failed") return ventureWrite("/artifacts/"+encodeURIComponent(id)+"/failed", { message: val() }, "Recorded", o.key);
+    if(o.kind === "retract") return ventureWrite("/artifacts/"+encodeURIComponent(id)+"/retract", { attestation: val() }, "Recorded as taken down", o.key);
+    if(o.kind === "pace") return ventureWrite("/pace", { postsPerWeek: val() }, "Pace recorded", o.key);
+    return;
+  }
+
+  const card = t.closest("[data-vcard]");
+  if(card){
+    const m = (VENTURE_THREAD.messages||[]).find(x=>x.kind==="card" && x.artifactId===card.dataset.vcard);
+    if(m) return vCardAction(m.artifactId, m.actions[Number(card.dataset.vact)]);
+  }
+  const find = t.closest("[data-vfind]");
+  if(find){
+    return ventureWrite("/artifacts/"+encodeURIComponent(find.dataset.vfind)+"/findings/"+encodeURIComponent(find.dataset.vfid),
+      { accepted: find.dataset.vyes === "1" }, "Recorded", "card:"+find.dataset.vfind);
+  }
+  const pick = t.closest("[data-vpick]");
+  if(pick){
+    const c = (VENTURE_THREAD.messages||[]).find(x=>x.kind==="choice" && x.decisionId===pick.dataset.vpick);
+    const it = c && c.items.find(i=>i.candidateId===pick.dataset.vcand);
+    // A multi-pick decision has no single-click meaning; the panel says so instead of guessing.
+    if(c && it && c.requiredCount === 1) return vPick(c, it);
+    return;
+  }
+  if(t.id === "vPace"){
+    const cp = (VENTURE_THREAD.messages||[]).find(x=>x.kind==="checkpoint");
+    if(cp) return vOpen("checkpoint:"+cp.checkpointId+":pace", "pace", "");
+  }
+  if(t.id === "vClear"){
+    const cp = (VENTURE_THREAD.messages||[]).find(x=>x.kind==="checkpoint");
+    if(!cp) return;
+    // clearCheckpoint answers 200 even when it declines -- {cleared:false, reason}. The reason is
+    // the sentence the screen owes her, so a declined clear is surfaced like a refusal rather than
+    // silently doing nothing, and the thread is refetched either way (the attempt refreshed state).
+    ventureWrite("/checkpoint/"+encodeURIComponent(cp.checkpointId)+"/clear", {}, "", "checkpoint:"+cp.checkpointId).then(res=>{
+      if(!res) return;
+      if(res.result && res.result.cleared) flash("Cleared, and written to canon");
+      else if(res.result && res.result.reason) { ventureOpen = { key:"checkpoint:"+cp.checkpointId, kind:"error", value:"", error: res.result.reason }; renderVenture(); }
+    });
+  }
 });
 
 async function loadFiction(){

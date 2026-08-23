@@ -30,7 +30,7 @@ import { existsSync } from "node:fs";
 import { readArtifacts } from "../venture/artifacts.js";
 import { readCanonEvents } from "../venture/canon.js";
 import { readDecisions } from "../venture/decisions.js";
-import { INTAKE_QUESTIONS, readIntakeAnswers } from "../venture/intake.js";
+import { readIntakeAnswers } from "../venture/intake.js";
 import { listVentures, ventureDir } from "../venture/paths.js";
 import { readClusterAnalysis } from "../venture/phase3.js";
 import { getResponseGateState } from "../venture/responses.js";
@@ -86,46 +86,32 @@ export function handleVentureRead(method: string, pathname: string): VentureRead
   return { status: 200, body: { ok: true, ...VENTURE_READS[rest](slug) } };
 }
 
+// TWO reads, deliberately. There were ten: one per underlying file, plus the composed thread. The
+// eight fine-grained ones are gone, and the reason is honesty rather than tidiness.
+//
+// A single write can change several panels at once -- approving an artifact moves the checkpoint's
+// completion count, can append a canon event, and changes the card, all in one action. With
+// granular reads the room could refetch one of those and render a fresh artifact beside a stale
+// checkpoint stamp: a half-updated state presented as a whole one, which is the exact class of lie
+// the three-states rule exists to prevent. Rebuilding the WHOLE thread after every write makes that
+// unrepresentable. These are local file reads; the cost of doing it that way is nothing.
+//
+// The secondary reason is that all eight sat parked in page.test.ts's PENDING_UI_VENTURE with no
+// caller, which is the accumulation the self-deleting mechanism exists to stop.
+//
+// `list` stays because the picker genuinely needs it before any slug is known. Everything the
+// deleted eight returned is inside the thread: `rules_version` on the thread itself, the intake
+// answers in the quotes panel, the gate counts in the gate panel, the clusters panel absent
+// entirely when the analysis is null.
 const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> = {
-  // The derived phase/checkpoint model plus the plain-language render of it. Both come from the
-  // write-free pair; see property 1 above.
-  state: (slug) => ({ state: computeState(slug), status: formatStatusReadOnly(slug) }),
-
-  // Append-only logs, folded to latest-line-wins by their own readers. A venture with no
-  // artifacts/decisions/events yet gets [], which is the honest "nothing has happened".
-  artifacts: (slug) => ({ artifacts: readArtifacts(slug) }),
-  decisions: (slug) => ({ decisions: readDecisions(slug) }),
-  canon: (slug) => ({ events: readCanonEvents(slug) }),
-
-  // Counts only. See property 2 — ResponseGateState is the entire legal read model for Phase 3's
-  // response log, and `have` being 0 is a measured zero, not an absence.
-  gate: (slug) => ({ gate: getResponseGateState(slug) }),
-
-  // null before the gate opens and the clustering runs. Passed through as null rather than an
-  // empty cluster list so the room renders nothing at all instead of "0 problems found" —
-  // not-measured-at-all is not measured-as-zero.
-  clusters: (slug) => ({ clusters: readClusterAnalysis(slug) }),
-
-  // The provenance triple only. rules.yaml is the full runtime rubric; the room needs to show
-  // which version and which sources a venture is being run against, and nothing else from it.
-  rules: () => {
-    const rules = loadRules();
-    return {
-      rules_version: rules.rules_version,
-      sources: {
-        starter_kit_sha256: rules.sources.starter_kit_sha256,
-        welsh_note_sha256: rules.sources.welsh_note_sha256,
-      },
-    };
-  },
-
   // The whole room in one read: the derived thread (src/review/venture-thread.ts) over every read
   // below it. A tenth route rather than the client assembling it from the other nine, because the
   // builder is several hundred lines of honesty-critical derivation and page.ts's Rule 5 mirror
   // convention would mean maintaining two hand-synced copies of it. Composed from the SAME pure
   // reads as the routes above, so it inherits their no-write and no-response-content guarantees.
-  thread: (slug) => ({
-    thread: buildVentureThread({
+  thread: (slug) => {
+    const rules = loadRules();
+    return { thread: buildVentureThread({
       slug,
       state: computeState(slug),
       statusText: formatStatusReadOnly(slug),
@@ -135,18 +121,17 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
       gate: getResponseGateState(slug),
       clusters: readClusterAnalysis(slug),
       answers: readIntakeAnswers(slug) ?? null,
-      rulesVersion: loadRules().rules_version,
+      rulesVersion: rules.rules_version,
+      minEvidence: Object.fromEntries(Object.entries(rules.artifact_kinds).map(([k, v]) => [k, v.min_evidence])),
+      selectCounts: {
+        "idea-ranking": rules.idea_ranking.select_count,
+        "lead-magnet-concept": rules.lead_magnet_concept.select_count,
+      },
+      day14Candidates: rules.day_14_decision.candidates,
       now: new Date().toISOString(),
-    }),
-  }),
+    }) };
+  },
 
-  // Muxin's own 25 answers, verbatim. `answers: null` means there is no intake.md yet — the room
-  // must not draw 25 blank rows for a venture that was never interviewed. The question text rides
-  // along because the answers are keyed q1..q25 and the client has no other copy of the wording.
-  "intake/answers": (slug) => ({
-    answers: readIntakeAnswers(slug) ?? null,
-    questions: INTAKE_QUESTIONS,
-  }),
 };
 
 /** Every venture read path this module answers, for the wiring guard. */
