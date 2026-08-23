@@ -4,28 +4,33 @@ Read this before running `/patterns remix`. It is the only mechanism in this rep
 another creator's words verbatim, and the scope of that is narrow enough to state in one sentence:
 the opener and the on-screen title, nothing else.
 
-## Muxin gets the opener half of this method today, not the title half
+## The opener half always works. The title half depends on what was collected.
 
-Sabrina's rule names two things to copy exactly: the opener and the on-screen title. **This
-implementation can supply the first. It cannot supply the second.**
+Sabrina's rule names two things to copy exactly: the opener and the on-screen title.
 
-The corpus stores post bodies. It does not store on-screen text from images, video frames, or
-carousel slides, and there is no collection route that captures any of it today. So
-`onscreen_title` is null on essentially every opener in the bank, and null here means unknown, not
-absent. Never write a title the system did not capture, and never imply she can copy one that was
-never collected.
+**The opener is always there.** It comes out of the post body, which is the thing the corpus has
+always stored.
 
-The working half is real and it is the bigger half. On text platforms, Substack, LinkedIn, Bluesky,
-and X, the opener IS the body's first lines, and those are exactly the platforms the corpus is
-strongest on. Build confidently there. On video and image posts, hand her the opener and the manual
-title step below, and say plainly which half she is getting.
+**The on-screen title is there only when a collector recorded it.** A corpus entry can carry a
+`visual` block (added 2026-08-22, validated in `collect.ts`), and its `onscreen_text` field holds
+the words rendered on the image, frame, or slide, verbatim. That field is what fills
+`onscreen_title`. Entries collected before it existed do not have it, so the bank is **sparse on
+titles, not incapable of them**. Null means unknown, never absent and never "probably something
+like this". Where it is null, use the manual step below and never write a title the system did not
+capture.
 
-**The same gap makes some collected winners bad remix sources.** Three of the corpus's
-highest-engaging posts earned their numbers outside the text that was collected: a 22-character
-LinkedIn caption over an image, two Instagram carousels whose likes came from slide images nobody
-retrieved, and an X thread opener whose substance sits in reply posts. The corpus is best at posts
-whose value is entirely in their words, which biases it against exactly the kind of post that is
-winning. The bank flags what it can, and the refuse conditions below stop the worst case.
+**The same `visual` block is what keeps a bad remix source out.** Its `body_is_complete` flag says
+whether the body is the whole post. Three of the corpus's highest-engaging posts earned their
+numbers outside the text that was collected: a 22-character LinkedIn caption over an image, two
+Instagram carousels whose likes came from slide images nobody retrieved, and an X thread opener
+whose substance sits in reply posts. The corpus is best at posts whose value is entirely in their
+words, which biases it against exactly the kind of post that is winning. Where a collector recorded
+`body_is_complete: false`, the bank says so as a fact rather than a guess, and the refuse
+conditions below stop the pick.
+
+On text platforms, Substack, LinkedIn, Bluesky, and X, none of this bites. The opener IS the body's
+first lines, there is no on-screen title to miss, and those are the platforms the corpus is
+strongest on. Build confidently there, and be careful on video and image posts.
 
 ## This reverses an earlier rule, on purpose, for exactly two elements
 
@@ -80,11 +85,16 @@ for word.
 Build or refresh it from the corpus:
 
 ```
-node --import tsx src/patterns/openers.ts [--platform x] [--verbatim-ok @handle,@handle]
+npm run patterns:openers -- [--platform x] [--verbatim-ok @handle,@handle]
 ```
 
-It prints the bank ranked, strongest first. A `patterns:openers` npm script is pending; until it
-lands, use the command above rather than inventing a script name.
+It prints the bank ranked, strongest first.
+
+**The bank is derived, so never hand-edit it.** A newly recorded on-screen title, a corrected
+`body_is_complete`, or a new grant in `config/pattern-mining.yaml` reaches the bank by fixing the
+CORPUS entry and rebuilding: delete `data/patterns/openers.jsonl` and run the command again. The
+builder only ever appends openers it has not seen, so without the delete an already-banked opener
+keeps its old facts.
 
 What the builder does and does not do:
 
@@ -96,26 +106,37 @@ What the builder does and does not do:
   thread-opener tell: the post promises what comes next and the substance sits in reply posts the
   corpus never collected. A colon in the middle of a post is ordinary writing and is left alone.
 - **What it cannot decide, it flags instead of guessing.** Each opener carries typed `warnings`,
-  and the ranked listing prints them. Two of the four mean the post's substance probably sat
-  outside the collected body, and they are the ones that decide a refusal below:
-  - `short-body`, a body under 80 characters, short enough to be a caption over an image, a
-    carousel, or a video that was never collected. It can also be a genuinely short post that
-    worked on its own words. Nothing in the corpus can tell those apart, which is why this reaches
-    Muxin as a flag rather than being decided for her.
-  - `media-first-platform`, an Instagram, TikTok, or YouTube post, where slide text, frame text,
-    and on-screen text carry the post and none of it is collected.
+  and the ranked listing prints them. Three of the five say the post's substance sat outside the
+  collected body, and those are the ones that decide a refusal below:
+  - `substance-outside-body`, the recorded one. The entry's `visual.body_is_complete` is false,
+    meaning a collector looked at the post and confirmed the body is not the whole of it. Trust
+    this one; it is an observation, not a prior.
+  - `short-body`, a guess, used only where **no `visual` was recorded**. A body under 80
+    characters is short enough to be a caption over an image, a carousel, or a video that was never
+    collected, and it is also what a genuinely short post that worked on its own words looks like.
+    Nothing in the corpus tells those apart, which is why this reaches Muxin as a flag rather than
+    being decided for her.
+  - `media-first-platform`, the same kind of guess from the platform, also used only where no
+    `visual` was recorded: on Instagram, TikTok, and YouTube the slide, frame, and on-screen text
+    usually carry the post.
 
-  The other two are context, not disqualification: `missing-onscreen-title` on every video opener,
-  which triggers the manual step below, and `truncated-body`, where the opener is intact but the
-  post was cut off later.
+  A recorded `visual` replaces both guesses rather than stacking on top of them, so a short post
+  someone confirmed is the whole post carries no doubt at all.
+
+  The other two are context, not disqualification: `missing-onscreen-title`, where the post has a
+  visual that could carry a title and none was captured, which triggers the manual step below, and
+  `truncated-body`, where the opener is intact but the post was cut off later.
 - `performance.multiple` comes from the same `baselineMultiple` scoring the outlier report uses,
   and it is null when the account has fewer than three other comparably scored posts. Null means
   not measured, not weak, so unmeasured openers rank last rather than as zeroes.
 - **`onscreen_title` is always null on a derived opener**, because `CorpusEntry` has nowhere to
   record the big text on a video. A real title has to be added to `openers.jsonl` by hand until
   collection captures it. Null means unknown, so say unknown rather than inventing a title.
-- `verbatim_ok` is false for everyone except the handles passed to `--verbatim-ok`. There is no
-  config home for that list yet.
+- `verbatim_ok` comes from the `verbatim_ok:` list in `config/pattern-mining.yaml`, where each
+  entry cites the public grant it rests on. Sabrina Ramonov is on it. `--verbatim-ok @handle` adds
+  one ad hoc on top for a one-off run. Everyone not on that list is false, which is the honest
+  default. Adding a handle there is Muxin's call and needs a real citable grant, so tell her which
+  key to add rather than adding it.
 
 ## The mode
 
@@ -162,37 +183,43 @@ What the builder does and does not do:
 Say which one applies, in plain language, and stop.
 
 - **No opener bank yet.** `data/patterns/openers.jsonl` is missing or empty. The fix is
-  `/patterns collect`, then `node --import tsx src/patterns/openers.ts`. Do not fall back to
+  `/patterns collect`, then `npm run patterns:openers`. Do not fall back to
   writing an opener that sounds like a proven one. An invented opener has none of the proof this
   mode exists to borrow.
 - **The chosen opener came from a `"caption"` entry or a truncated body.** The builder skips those,
   so this only comes up when a hand-written record slipped through. The real opener is unknown, and
   copying a written caption or a clipped line word for word copies the wrong thing.
-- **The chosen opener's post won on something outside its body.** This is the `short-body` and
-  `media-first-platform` case, and it is a refusal, not a warning to read past. Say it in her
-  words, not in code names: "this post won on an image we did not collect, so copying its
-  22-character opener would copy the caption and miss the post." If she wants it anyway, she can
-  open the original, confirm the opener really is the whole hook, and say so. That is her call
-  made with the facts, which is different from the system quietly handing her a fragment.
+- **The chosen opener's post won on something outside its body.** Any of
+  `substance-outside-body`, `short-body`, or `media-first-platform`, and it is a refusal, not a
+  warning to read past. Say it in her words, not in code names: "this post won on an image we did
+  not collect, so copying its 22-character opener would copy the caption and miss the post."
+  `substance-outside-body` is a recorded observation, so it is the strongest form of this and the
+  hardest to argue with. The two guesses she can settle in a minute: she opens the original,
+  confirms the opener really is the whole hook, and says so, ideally recording what she saw in that
+  entry's `visual` block so nobody has to guess again. That is her call made with the facts, which
+  is different from the system quietly handing her a fragment.
 - **The body she wants to remix is not her own material.** A copied opener over a copied body is
   not a remix. Route her to `/patterns ideas` if there is no source yet, or ask for her own source
   file or content folder.
 
 ## What a complete remix needs, and the manual step in the middle of it
 
-Sabrina's method assumes both halves. For a video or image post, the on-screen title is a **manual
-step** today, and the flow should say so rather than quietly dropping it:
+Sabrina's method assumes both halves. Where an opener has a `missing-onscreen-title` warning, the
+title is a **manual step**, and the flow should say so rather than quietly dropping it:
 
-1. The bank shows the opener with `on-screen title: unknown` and a `missing-onscreen-title`
-   warning.
+1. The bank shows the opener with `on-screen title: unknown, read it off the original` and a
+   `missing-onscreen-title` warning.
 2. **Ask her for it, by name.** "This one is a video. Open the original at <url>, read the big text
    off the first frame, and paste it here exactly as it appears. If there is no on-screen text,
    say so and the remix runs on the opener alone."
 3. Use whatever she pastes **verbatim**, the same as the opener. If she says there is none, run on
    the opener alone and say in the output that the title half was not part of this remix.
-4. **Offer to persist it.** A title she read by hand can be written into that opener's record in
-   `data/patterns/openers.jsonl` as its `onscreen_title`, so the next run does not ask her twice.
-   The builder never overwrites a title, it only ever derives null.
+4. **Offer to persist it, into the CORPUS.** A title she read by hand belongs in that entry's
+   `visual.onscreen_text` in `data/patterns/corpus.jsonl`, not in the opener bank. The bank is
+   derived, so the way to see it there is to delete `data/patterns/openers.jsonl` and rebuild. Put
+   the fact where facts live and the next run stops asking her twice. While editing that entry,
+   also set `visual.form` and `visual.body_is_complete` honestly, since those are what decide the
+   refusal below.
 
 For a text post on Substack, LinkedIn, Bluesky, or X, there is no on-screen title at all and none
 is needed. The opener is the whole of what gets copied, and this step does not apply. Do not invent

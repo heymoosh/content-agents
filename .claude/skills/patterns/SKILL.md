@@ -146,17 +146,16 @@ reads as useful rather than partisan. And local plus specific beating national p
 
 ## Scripts count, Claude judges (CLAUDE.md rule 4)
 
-Two npm scripts exist and they are both deterministic:
+Three npm scripts exist and they are all deterministic:
 
 - `npm run patterns:collect` validates staged entries, dedupes by url, appends to the corpus, and
   prints a per-account summary. It never judges, analyzes, or calls a model.
 - `npm run patterns:outliers` is the same script's `outliers` subcommand. It scores the corpus off
   recorded numbers and prints the report. It appends nothing and fetches nothing.
 
-- `node --import tsx src/patterns/openers.ts` builds the verbatim opener bank from the corpus and
-  prints it ranked. It derives, dedupes, and appends. It never judges or calls a model, and it
-  skips any entry whose opener cannot be known rather than guessing. A `patterns:openers` npm
-  script is pending, so use the command as written until it lands.
+- `npm run patterns:openers` builds the verbatim opener bank from the corpus and prints it ranked.
+  It derives, dedupes, and appends. It never judges or calls a model, and it skips any entry whose
+  opener cannot be known rather than guessing.
 
 Everything else here is Claude judgment done inline while running this skill. There is no
 `patterns:analyze`, `patterns:synthesize`, `patterns:ideas`, `patterns:series`,
@@ -944,16 +943,18 @@ Everything after the opener is still hers and still governed by rule 1, `civic-a
 `config/voice.yaml`. `hook-patterns.md` and `post-patterns.md` are untouched shapes-only libraries
 here. A copied opener over a copied body is not a remix, and this mode does not produce one.
 
-**Only the opener half of the method works today.** The corpus stores post bodies and no on-screen
-text from images, video frames, or carousel slides, so `onscreen_title` is null on essentially
-every opener and null means unknown. On text platforms the opener IS the body's first lines and
-nothing is missing. On video and image posts, ask Muxin to read the title off the original and
-paste it, per remix-mode.md's manual step, and never write a title the system did not capture.
+**The opener half always works. The title half depends on what was collected.** An entry's
+`visual.onscreen_text` holds the on-screen title verbatim when a collector recorded one, and
+`onscreen_title` is null when nobody did. Null means unknown, so on those, ask Muxin to read the
+title off the original and paste it, per remix-mode.md's manual step, and never write a title the
+system did not capture. On text platforms there is no title to miss at all. The same `visual` block
+carries `body_is_complete`, which is what tells the bank, as a recorded fact rather than a guess,
+that a post won on something outside the words that were collected.
 
 ### Steps
 
 1. **Show her the ranked opener bank for the target platform.** Build or refresh it first with
-   `node --import tsx src/patterns/openers.ts [--platform X]`. Each row shows the verbatim opener,
+   `npm run patterns:openers -- [--platform X]`. Each row shows the verbatim opener,
    its on-screen title where one is known, the creator, the measured multiple and its metric, and
    whether `verbatim_ok` is set, plus any warnings on it. She picks one. `verbatim_ok: false` is
    shown, not hidden, and it does not block the pick. It is her call with the fact in front of her.
@@ -981,10 +982,10 @@ paste it, per remix-mode.md's manual step, and never write a title the system di
   write an opener that merely sounds proven as a substitute.
 - **the chosen opener came from a `"caption"` entry or a truncated body.** The real opener is
   unknown, so there is nothing honest to copy.
-- **the chosen opener's post won on something outside its body** (a `short-body` or
-  `media-first-platform` warning). Say it plainly: this post won on an image we did not collect, so
-  copying its 22-character opener would copy the caption and miss the post. She can override with
-  eyes on the original; the system does not hand her a fragment on its own.
+- **the chosen opener's post won on something outside its body** (a `substance-outside-body`,
+  `short-body`, or `media-first-platform` warning). Say it plainly: this post won on an image we
+  did not collect, so copying its 22-character opener would copy the caption and miss the post. She
+  can override with eyes on the original; the system does not hand her a fragment on its own.
 - **the body she wants to remix is not her own material.** Route her to `/patterns ideas` when
   there is no source yet.
 

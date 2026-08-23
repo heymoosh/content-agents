@@ -8,16 +8,22 @@
 //
 // The derivation functions are pure. Only the read/append helpers and the CLI touch disk.
 //
-// Run it with `node --import tsx src/patterns/openers.ts` (a `patterns:openers` npm script is
-// pending). It rebuilds the bank from the corpus and prints it ranked. Rebuilding twice is a
-// no-op, the same way `patterns:collect` is, because opener ids are derived from corpus ids.
+// Run it with `npm run patterns:openers`. It rebuilds the bank from the corpus and prints it
+// ranked. Rebuilding twice appends nothing, the same way `patterns:collect` is a no-op the second
+// time, because opener ids are derived from corpus ids.
+//
+// Everything here is DERIVED. To pick up a newly recorded on-screen title, a corrected
+// `body_is_complete`, or a new `verbatim_ok` grant, delete data/patterns/openers.jsonl and rebuild.
+// Never hand-edit the bank: the corpus entry is where a fact belongs, and a hand-edit there is
+// silently overwritten by nothing and silently ignored by everything.
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORPUS_PATH, PATTERNS_DIR, accountKey, groupByAccount, normalizeHandle, readCorpus } from "./corpus.js";
+import { loadConfig } from "./collect.js";
 import { baselineMultiple, engagementScore } from "./outliers.js";
-import type { CorpusEntry, Opener, OpenerWarning, Platform } from "./types.js";
+import type { CorpusEntry, Opener, OpenerWarning, PatternMiningConfig, Platform } from "./types.js";
 
 export const OPENERS_PATH = join(PATTERNS_DIR, "openers.jsonl");
 
@@ -115,22 +121,39 @@ export function extractOpener(entry: CorpusEntry): string | null {
 export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
   const warnings: OpenerWarning[] = [];
   const body = entry.body.trim();
+  const visual = entry.visual;
 
-  if (body.length < SHORT_BODY_CHARS) {
-    warnings.push({
-      code: "short-body",
-      note: `The whole body is ${body.length} characters, short enough to be a caption over an image, a carousel, or a video that was never collected. If it is, its numbers were earned by something outside this text.`,
-    });
+  // A recorded observation beats both guesses. `visual` present means someone looked at the post,
+  // so the body-length and platform priors below have nothing left to add and are skipped.
+  if (visual) {
+    if (!visual.body_is_complete) {
+      const title = visual.onscreen_text === null ? "and its on-screen text was not captured" : "though its on-screen text WAS captured";
+      warnings.push({
+        code: "substance-outside-body",
+        note: `Someone looked at this post: its form is ${visual.form}, and its substance is not in the collected body, ${title}. Copying this opener copies a fragment of what actually worked.`,
+      });
+    }
+  } else {
+    if (body.length < SHORT_BODY_CHARS) {
+      warnings.push({
+        code: "short-body",
+        note: `Nobody has recorded what this post looked like, and the whole body is ${body.length} characters, short enough to be a caption over an image, a carousel, or a video that was never collected. If it is, its numbers were earned by something outside this text.`,
+      });
+    }
+
+    if (MEDIA_FIRST_PLATFORMS.has(entry.platform)) {
+      warnings.push({
+        code: "media-first-platform",
+        note: `Nobody has recorded what this post looked like, and on ${entry.platform} the slide, frame, and on-screen text usually carry the post. The body alone may not be what worked.`,
+      });
+    }
   }
 
-  if (MEDIA_FIRST_PLATFORMS.has(entry.platform)) {
-    warnings.push({
-      code: "media-first-platform",
-      note: `On ${entry.platform} the slide, frame, and on-screen text usually carry the post, and none of that is collected. The body alone may not be what worked.`,
-    });
-  }
-
-  if (entry.kind === "video") {
+  // Sabrina's method copies the title as well as the opener, so a post that HAS a visual and no
+  // captured on-screen text is missing half the method. Form "none" means someone looked and found
+  // no visual at all, which is not a gap.
+  const visualCarriesTitle = visual ? visual.form !== "none" && visual.form !== "thread" : entry.kind === "video";
+  if (visualCarriesTitle && (visual?.onscreen_text ?? null) === null) {
     warnings.push({
       code: "missing-onscreen-title",
       note: "No on-screen title on record. Sabrina's method copies the title as well as the opener, so read it off the original and supply it by hand.",
@@ -149,8 +172,9 @@ export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
 
 export interface BuildOpenersOptions {
   // Handles whose creator has PUBLICLY granted permission to remix their work. Everyone else gets
-  // verbatim_ok: false, which is the honest default. There is no config home for this list yet;
-  // it is passed in, or given to the CLI as --verbatim-ok @handle,@handle.
+  // verbatim_ok: false, which is the honest default. The durable list lives in
+  // config/pattern-mining.yaml under `verbatim_ok`, each entry citing its grant; the CLI reads it
+  // from there and `--verbatim-ok @handle` adds one ad hoc on top.
   verbatimOkHandles?: string[];
   // Only build openers for this platform, when set.
   platform?: Platform;
@@ -166,9 +190,9 @@ function performanceNote(multiple: number | null, entry: CorpusEntry): string {
 // Builds one Opener per entry that has a knowable opener. Entries whose opener cannot be known
 // are skipped rather than guessed at.
 //
-// `onscreen_title` is always null here. CorpusEntry has no field for it, so a derived opener
-// cannot carry one. A record with a real title has to be written into openers.jsonl by hand until
-// collection captures it.
+// `onscreen_title` comes from the entry's `visual.onscreen_text` and is null when no visual was
+// recorded or its on-screen text was not retrievable. Null means unknown, never "probably
+// something like this", so a remix says unknown rather than inventing a title.
 export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOptions = {}): Opener[] {
   const verbatimOk = new Set((options.verbatimOkHandles ?? []).map(normalizeHandle));
   const accounts = groupByAccount(entries);
@@ -189,7 +213,9 @@ export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOption
       handle: entry.handle,
       url: entry.url,
       opener_text,
-      onscreen_title: null,
+      // Verbatim, straight off the entry, and null when nobody captured it. Never derived, never
+      // guessed: this text gets copied into Muxin's own post word for word.
+      onscreen_title: entry.visual?.onscreen_text ?? null,
       kind: entry.kind,
       performance: {
         multiple,
@@ -258,8 +284,15 @@ export function appendOpeners(openers: Opener[], path: string = OPENERS_PATH): A
 interface Args {
   corpusPath: string;
   openersPath: string;
+  configPath?: string;
   verbatimOkHandles: string[];
   platform?: Platform;
+}
+
+// The durable grant list, from config/pattern-mining.yaml. Absent means nobody, which is the
+// honest default: no grant on record, no verbatim reuse.
+export function grantedHandles(config: PatternMiningConfig): string[] {
+  return (config.verbatim_ok ?? []).map((grant) => grant.handle);
 }
 
 function parseArgs(argv: string[]): Args {
@@ -269,6 +302,7 @@ function parseArgs(argv: string[]): Args {
     if (argv[i] === "--corpus" && next) args.corpusPath = next;
     if (argv[i] === "--openers" && next) args.openersPath = next;
     if (argv[i] === "--platform" && next) args.platform = next as Platform;
+    if (argv[i] === "--config" && next) args.configPath = next;
     if (argv[i] === "--verbatim-ok" && next) {
       args.verbatimOkHandles = next.split(",").map((h) => h.trim()).filter((h) => h.length > 0);
     }
@@ -285,6 +319,14 @@ function indented(text: string): string {
     .join("\n");
 }
 
+// "unknown" and "there is no title" are different facts, and only the first one asks Muxin to go
+// look. The missing-onscreen-title warning is what separates them.
+function onscreenTitleLine(opener: Opener): string {
+  if (opener.onscreen_title !== null) return opener.onscreen_title;
+  const missing = opener.warnings.some((w) => w.code === "missing-onscreen-title");
+  return missing ? "unknown, read it off the original" : "none on this post";
+}
+
 export function main(argv: string[] = process.argv.slice(2)): number {
   const args = parseArgs(argv);
   const corpus = readCorpus(args.corpusPath);
@@ -293,11 +335,16 @@ export function main(argv: string[] = process.argv.slice(2)): number {
     return 0;
   }
 
-  const built = buildOpeners(corpus, { verbatimOkHandles: args.verbatimOkHandles, platform: args.platform });
+  const granted = grantedHandles(loadConfig(args.configPath));
+  const built = buildOpeners(corpus, {
+    verbatimOkHandles: [...granted, ...args.verbatimOkHandles],
+    platform: args.platform,
+  });
   const { appended, duplicates } = appendOpeners(built, args.openersPath);
   const skipped = corpus.filter((e) => extractOpener(e) === null).length;
 
   console.log(`Corpus entries: ${corpus.length}. Openers derived: ${built.length}.`);
+  console.log(`Public remix grants on record: ${granted.length === 0 ? "none" : granted.join(", ")}.`);
   console.log(`Skipped (caption, truncated opening, thread opener, or empty body): ${skipped}.`);
   console.log(`Appended: ${appended.length}. Already in the bank: ${duplicates.length}.`);
 
@@ -309,7 +356,7 @@ export function main(argv: string[] = process.argv.slice(2)): number {
     console.log(`\n  ${opener.performance.note}${metric} - ${opener.creator} (${opener.handle}), ${opener.platform}`);
     console.log("  opener, copied word for word:");
     console.log(indented(opener.opener_text));
-    console.log(`  on-screen title: ${opener.onscreen_title ?? "unknown"}`);
+    console.log(`  on-screen title: ${onscreenTitleLine(opener)}`);
     console.log(`  ${permission} | ${opener.url}`);
     for (const warning of opener.warnings) console.log(`  WARNING (${warning.code}): ${warning.note}`);
   }

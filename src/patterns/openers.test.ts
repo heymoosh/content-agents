@@ -5,8 +5,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendOpeners, buildOpeners, extractOpener, openerWarnings, rankOpeners, readOpeners } from "./openers.js";
-import type { CorpusEntry, Opener, OpenerWarningCode } from "./types.js";
+import { appendOpeners, buildOpeners, extractOpener, grantedHandles, openerWarnings, rankOpeners, readOpeners } from "./openers.js";
+import type { CorpusEntry, CorpusVisual, Opener, OpenerWarningCode, PatternMiningConfig } from "./types.js";
 
 let dir: string;
 let openersPath: string;
@@ -139,6 +139,10 @@ describe("openerWarnings", () => {
     return openerWarnings(e).map((w) => w.code);
   }
 
+  function visual(overrides: Partial<CorpusVisual> = {}): CorpusVisual {
+    return { form: "image", onscreen_text: null, description: null, slide_count: null, thread_length: null, body_is_complete: false, ...overrides };
+  }
+
   test("a body long enough to be the whole post carries no warnings", () => {
     const long = entry({
       body: "I spent six months building the wrong thing, and the tell was there in week two.\nHere is what I should have measured instead of what I did measure.",
@@ -168,9 +172,40 @@ describe("openerWarnings", () => {
     assert.equal(extractOpener(cut), "First line.\nSecond line.");
   });
 
-  test("the two warnings that decide a refusal come first", () => {
+  test("the guessed warnings come before the ones that only add context", () => {
     const both = entry({ platform: "instagram", kind: "video", transcript_source: "manual", body: "short one" });
     assert.deepEqual(codes(both).slice(0, 2), ["short-body", "media-first-platform"]);
+  });
+
+  test("a recorded visual saying the body is not the whole post is flagged as recorded, not guessed", () => {
+    const koe = entry({ platform: "linkedin", body: "the best advice I ever got", visual: visual({ form: "image" }) });
+    assert.ok(codes(koe).includes("substance-outside-body"));
+    assert.match(openerWarnings(koe)[0].note, /Someone looked at this post/);
+  });
+
+  test("a recorded visual replaces the guesses instead of piling on top of them", () => {
+    const looked = entry({ platform: "instagram", body: "short one", visual: visual({ form: "image" }) });
+    assert.ok(!codes(looked).includes("short-body"));
+    assert.ok(!codes(looked).includes("media-first-platform"));
+  });
+
+  test("a short post someone confirmed is the whole post carries no doubt at all", () => {
+    const confirmed = entry({ body: "short but complete", visual: visual({ form: "none", body_is_complete: true }) });
+    assert.deepEqual(codes(confirmed), []);
+  });
+
+  test("a visual with no captured on-screen text is missing half the method", () => {
+    assert.ok(codes(entry({ visual: visual({ form: "carousel" }) })).includes("missing-onscreen-title"));
+  });
+
+  test("a captured on-screen title closes that gap", () => {
+    const titled = entry({ visual: visual({ form: "image", onscreen_text: "THE BEST ADVICE I EVER GOT" }) });
+    assert.ok(!codes(titled).includes("missing-onscreen-title"));
+  });
+
+  test("a thread has no on-screen title to be missing", () => {
+    const thread = entry({ body: "one of two", visual: visual({ form: "thread", thread_length: 7 }) });
+    assert.ok(!codes(thread).includes("missing-onscreen-title"));
   });
 });
 
@@ -224,8 +259,18 @@ describe("buildOpeners", () => {
     assert.equal(permitted.verbatim_ok, true);
   });
 
-  test("onscreen_title is null on every derived opener, because the corpus does not capture it", () => {
+  test("onscreen_title is null when nobody recorded what the post looked like", () => {
     assert.ok(buildOpeners(account()).every((o) => o.onscreen_title === null));
+  });
+
+  test("a captured on-screen title reaches the opener verbatim", () => {
+    const [built] = buildOpeners([
+      entry({
+        body: "the best advice I ever got",
+        visual: { form: "image", onscreen_text: "THE BEST ADVICE I EVER GOT", description: "stacked text on plain background", slide_count: null, thread_length: null, body_is_complete: false },
+      }),
+    ]);
+    assert.equal(built.onscreen_title, "THE BEST ADVICE I EVER GOT");
   });
 
   test("each opener carries its own warnings, so the doubt reaches the pick", () => {
@@ -238,6 +283,24 @@ describe("buildOpeners", () => {
     const built = buildOpeners(entries, { platform: "linkedin" });
     assert.equal(built.length, 1);
     assert.equal(built[0].platform, "linkedin");
+  });
+});
+
+describe("grantedHandles", () => {
+  function config(overrides: Partial<PatternMiningConfig> = {}): PatternMiningConfig {
+    return { niches: [], accounts: [], outlier_thresholds: {}, targets: { corpus_size_min: 20, corpus_size_max: 50 }, ...overrides };
+  }
+
+  test("a config with no grant list grants nobody", () => {
+    assert.deepEqual(grantedHandles(config()), []);
+  });
+
+  test("reads the handles off the recorded grants", () => {
+    const granted = grantedHandles(
+      config({ verbatim_ok: [{ handle: "@sabrinaramonov", creator: "Sabrina Ramonov", grant: "public blanket grant" }] }),
+    );
+    assert.deepEqual(granted, ["@sabrinaramonov"]);
+    assert.equal(buildOpeners([entry({ handle: "@SabrinaRamonov" })], { verbatimOkHandles: granted })[0].verbatim_ok, true);
   });
 });
 

@@ -129,6 +129,18 @@ export interface PatternMiningConfig {
   accounts: AccountSeed[];
   outlier_thresholds: Record<string, OutlierThresholds>;
   targets: { corpus_size_min: number; corpus_size_max: number };
+  // Creators who have PUBLICLY granted permission to remix their content verbatim. Absent on a
+  // config written before remix mode existed, so every reader treats absent as "nobody".
+  verbatim_ok?: VerbatimGrant[];
+}
+
+// One public grant. `grant` is the citation, and it is required for the same reason every other
+// claim in this repo needs a source: a wrong entry here puts someone else's words in Muxin's feed
+// under a permission she does not have.
+export interface VerbatimGrant {
+  handle: string;
+  creator: string;
+  grant: string;
 }
 
 export interface AccountSeed {
@@ -181,23 +193,29 @@ export interface Opener {
 // Why an opener is doubtful. Coded rather than freeform, because two of these four decide a
 // refusal in `/patterns remix` and the other two only decide what Muxin is told.
 //
-// Refuse the pick on either of these two. Both mean the post's substance probably sat OUTSIDE the
-// body the corpus holds, so copying its opener copies a fragment and misses the thing that worked:
+// Refuse the pick on any of these three. All three mean the post's substance sat OUTSIDE the body
+// the corpus holds, so copying its opener copies a fragment and misses the thing that worked:
 //
-//   "short-body"           - the body is short enough to be a caption over an image, a carousel,
-//                            or a video that was never collected. It can also be a genuinely short
-//                            post that worked on its own words. The corpus cannot tell those apart,
-//                            which is exactly why this is surfaced to Muxin instead of guessed at.
-//   "media-first-platform" - the post lives on a platform where slide text, frame text, and
-//                            on-screen text carry the post, and none of that is collected.
+//   "substance-outside-body" - RECORDED, not guessed: the entry's `visual.body_is_complete` is
+//                              false, meaning someone looked at the post and confirmed the body is
+//                              not the whole of it. This is the trustworthy one, and when it fires
+//                              the two guesses below are not used at all.
+//   "short-body"             - a guess, used only where no `visual` block was recorded. The body is
+//                              short enough to be a caption over an image, a carousel, or a video
+//                              that was never collected. It can also be a genuinely short post that
+//                              worked on its own words. Nothing in the corpus tells those apart,
+//                              which is why this reaches Muxin instead of being decided for her.
+//   "media-first-platform"   - the same kind of guess, from the platform: slide text, frame text,
+//                              and on-screen text usually carry the post there.
 //
 // Do NOT refuse on these two. They are context, not disqualification:
 //
-//   "missing-onscreen-title" - a video opener with no on-screen title on record. Muxin supplies it
-//                              by hand; see remix-mode.md.
+//   "missing-onscreen-title" - the post has a visual but no on-screen text on record. Muxin reads
+//                              it off the original and supplies it; see remix-mode.md.
 //   "truncated-body"         - the opener is intact but the body was cut off later, so the rest of
 //                              the post is not fully known.
 export type OpenerWarningCode =
+  | "substance-outside-body"
   | "short-body"
   | "media-first-platform"
   | "missing-onscreen-title"
