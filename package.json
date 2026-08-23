@@ -88,6 +88,8 @@
     "patterns:instagram": "tsx src/patterns/instagram.ts",
     "patterns:pinterest": "tsx src/patterns/pinterest.ts",
     "patterns:youtube": "tsx src/patterns/youtube.ts",
+    "patterns:account-mapping": "tsx src/patterns/account-mapping.ts",
+    "grow:plan": "tsx src/grow/cli.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
