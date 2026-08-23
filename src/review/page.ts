@@ -4342,6 +4342,15 @@ const IV_DEBOUNCE_MS = 600;
 // retype.
 function ivRemember(slug){ try { if(slug) localStorage.setItem(IV_RESUME_KEY, slug); else localStorage.removeItem(IV_RESUME_KEY); } catch(e){} }
 function ivRemembered(){ try { return localStorage.getItem(IV_RESUME_KEY); } catch(e){ return null; } }
+// A remembered name is only worth offering while it is still an unfinished interview. Once the
+// venture exists its drafts have been cleared, so resuming it would open 25 empty boxes for a
+// venture that is already on the desk.
+function ivResumable(){
+  const s = ivRemembered();
+  if(!s || ivSlugError(s)) return null;
+  if((VENTURE_SLUGS||[]).includes(s)){ ivRemember(null); return null; }
+  return s;
+}
 
 function ivShow(on){
   $("#ventureRead").hidden = on;
@@ -4600,9 +4609,19 @@ function ivScoreHtml(){
 }
 
 function ivStartHtml(){
+  // The resume offer sits BESIDE the name field, never in front of it. Making it automatic would
+  // mean that once one interview is half-finished there is no way to start a second: every click
+  // of "Start a venture" would drop straight back into the first.
+  const resume = ivResumable();
   return '<div class="vmono">START A VENTURE</div>'
-    + '<div class="iv-q">What should it be called?</div>'
-    + '<div class="iv-hint">Lowercase letters, numbers and dashes. This becomes venture/&lt;name&gt;/ on disk. If you already started this one, type the same name and your answers come back.</div>'
+    + (resume
+        ? '<div class="iv-panel"><div class="iv-q">You left one unfinished.</div>'
+          + '<div class="iv-hint">Your answers to '+esc(resume)+' are still on the server, exactly where you stopped.</div>'
+          + '<div class="iv-nav"><button class="primary" id="ivResume">Pick up '+esc(resume)+'</button>'
+          + '<button id="ivForget">Forget it</button></div></div>'
+        : "")
+    + '<div class="iv-q" style="margin-top:'+(resume?"26px":"0")+'">'+(resume?"Or start a new one.":"What should it be called?")+'</div>'
+    + '<div class="iv-hint">Lowercase letters, numbers and dashes. This becomes venture/&lt;name&gt;/ on disk. Typing a name you already started brings those answers back too.</div>'
     + '<div class="iv-field"><input id="ivSlugIn" placeholder="voter-choice"></div>'
     + '<div class="iv-nav"><button class="primary" id="ivBegin">Begin the interview</button>'
     + '<span class="grow"></span><button id="ivLeave">Cancel</button></div>'
@@ -4635,13 +4654,14 @@ document.addEventListener("click", e=>{
   if(!t || !t.closest) return;
   if(t.id === "ventureStartBtn"){
     if(ivSlug){ ivShow(false); ivSlug = null; return; }
-    const resume = ivRemembered();
     ivShow(true);
-    if(resume && !ivSlugError(resume)) return ivEnter(resume);
     ivRefusal = "";
     return renderIntake();
   }
   if(!t.closest("#ventureIntake")) return;
+
+  if(t.id === "ivResume"){ const s = ivResumable(); return s ? ivEnter(s) : renderIntake(); }
+  if(t.id === "ivForget"){ ivRemember(null); return renderIntake(); }
 
   if(t.id === "ivBegin"){
     const el = $("#ivSlugIn");

@@ -205,7 +205,7 @@ test("the drafts survive a refused commit, so nothing she typed is lost", () => 
 test("POST :slug/intake/commit is dispatched, and does not require the venture to exist first", () => {
   // The commit is what CREATES venture/<slug>/, so a requiresVenture check here would make it
   // impossible to ever run.
-  const res = handleVentureWrite("POST", "/api/venture/brand-new/intake/commit", {});
+  const res = handleVentureWrite("POST", "/api/venture/zz-intake-guard-commit/intake/commit", {});
   assert.ok(res, "the dispatcher must claim this path");
   assert.equal(res.status, 200, "a refusal is a fact about the drafts, not a 404 about the venture");
   const body = res.body as { ok: boolean; result: { ok: boolean; error?: string; missing?: number[] } };
@@ -234,7 +234,7 @@ test("every path the guards read is declared, and the commit route is one of the
   assert.deepEqual(INTAKE_DRAFT_PATHS, ["/api/venture/:slug/intake/:n/draft", "/api/venture/:slug/intake/drafts"]);
   // Every declared write path must actually be dispatched, or the guard is checking a fiction.
   for (const p of VENTURE_WRITE_PATHS) {
-    const concrete = p.replace(/:[a-zA-Z]+/g, "x");
+    const concrete = p.replace(/:[a-zA-Z]+/g, "zz-intake-guard-claims");
     assert.ok(handleVentureWrite("POST", concrete, {}), `${p} is declared but the dispatcher does not claim it`);
   }
 });
