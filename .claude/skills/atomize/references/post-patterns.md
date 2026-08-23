@@ -26,9 +26,69 @@ produces. Two things still disqualify a post, and both are about truthfulness ra
    image, a carousel, a video or later tweets cannot teach anyone what its words did. Entries flagged
    `body_is_complete: false` are never used as body-structure evidence. This rule has caught four
    real errors in this project, and it is why the two biggest Threads posts and the biggest Substack
-   Note in the corpus are not behind any pattern here.
+   Note in the corpus are not behind any pattern here. **Narrowed on 2026-08-23, because as written
+   it was one boolean covering three different situations and the file was quietly breaking it three
+   times.** See the subsection directly below, which states what the rule now covers, the two
+   carve-outs, and the conditions attached to each.
 2. **Trivial numbers disqualify.** A 9x on a median of 3 upvotes is noise dressed as a finding. This
    is the main thing the gate now does.
+
+### What "body-incomplete" actually covers, and the two carve-outs
+
+**Read this before deciding a record cannot exist.** Item 1 above used to read as a single flat
+prohibition keyed on one field, `body_is_complete: false`. Three records in this file rested on
+entries carrying that flag, so the file asserted a rule and violated it three times, which is worse
+than either honest option: a reader who trusts the rule over-trusts those three records, and a
+reader who spots the breach stops trusting the rule everywhere. It was settled on 2026-08-23 by
+reading the four entries involved rather than by deleting anything.
+
+**What the reading found.** The flag is set whenever the `body` field is not the whole post. That
+covers three situations which deserve different answers, and lumping them together is what caused
+the contradiction.
+
+- **Case A, the substance was collected, just not in `body`.** The words exist, in a named field,
+  read off the actual artifact. Both LinkedIn entries behind `linkedin` record 4 are this: the
+  `body` is a 22 and a 62 character caption, and the full quote-card text sits transcribed in
+  `media.onscreen_text`, read directly off the downloaded image at the post's own `ld+json` image
+  URL. Nothing about those posts is invisible.
+- **Case B, the body text was collected in full, and what is missing is a media object the text
+  points at.** Both Substack entries behind records 3 and 6 are this. Record 6's entry is a complete
+  331 character note plus an uncollected photograph that carries no typeset text at all. Record 3's
+  entry is a complete written introduction to a 2,149 second video interview that was never
+  collected.
+- **Case C, the substance was never collected in any field.** Nothing was read, nothing can be said.
+  This is what item 1 was written for, this is where the four caught errors came from, and **it is
+  unchanged and absolute.** It is still why the two biggest Threads posts and the biggest Substack
+  Note carry no pattern here.
+
+**The carve-out, stated as conditions so it cannot be widened by reading.** A record may rest on a
+Case A or Case B entry only when all three hold, and the record must say which case it is using:
+
+1. **The substance was actually collected, in a named field, and the record cites the field.** Not
+   inferred, not described from a thumbnail, not assumed from a caption. If nobody read it, it is
+   Case C.
+2. **Every beat the record writes stays inside what was collected.** A beat describing something
+   nobody read is invented, and it propagates into copy exactly as a template does. Where a beat is
+   only partly visible in the collected text, the record says which beat and how far.
+3. **The performance number is never attributed to the collected text alone.** An uncollected video
+   or photograph riding along in the post is an uncontrolled contributor to that post's result. The
+   number belongs to the whole post. A record built on a Case B entry may cite its multiple as
+   context and must not claim the shape earned it.
+
+**What this does NOT change, stated flatly so nobody reads it as a loophole.** The gate did not
+move. `gate` and `admissible` in `data/patterns/analyses.jsonl` mean exactly what they meant before,
+`admissible` is still true only when `gate` is `ADMITTED`, admission still requires clearing the
+platform floor AND having a complete body, and the arithmetic above is untouched: 132 admitted, 80
+below floor, 71 body-incomplete, 9 title-only. This subsection governs what a RECORD in this file
+may cite and what it must disclose when it does. It admits nothing, promotes nothing and re-ranks
+nothing. A Case A or Case B entry is still not admitted evidence, and the three records that use
+this carve-out say so on their own faces.
+
+**Why the narrowing is written as a narrowing.** Item 1 is a good rule and the temptation for the
+next person will be to tidy this back into one sentence. Do not. One boolean cannot separate "the
+words are in a different field" from "nobody read the words", and it was the conflation, not the
+rule, that let three records sit in contradiction with the method section for two passes without
+anyone noticing.
 
 **The popularity floors, stated so they can be argued with.** These are judgment calls, set from what
 each platform actually produces in this corpus. They are not sacred and they are visible on purpose.
@@ -471,7 +531,10 @@ trusted:
    was collected. Everywhere else the number is engagement.
 
 Where a record's supporting posts include one that does not clear the floor, or one that is
-body-incomplete, the line says so rather than quietly reporting the survivors. Several do.
+body-incomplete, the line says so rather than quietly reporting the survivors. Several do. The three
+records resting on body-incomplete entries carry a second line naming which carve-out they use and
+what they may therefore not claim; the carve-outs are defined in "What body-incomplete actually
+covers" near the top of this file.
 
 ## Record format
 
@@ -865,6 +928,12 @@ here rather than repeated in each record.
   engagements. **Both are body-incomplete entries**, which is inherent to what the pattern
   describes: the argument is in the image. Neither counts as admitted body-structure evidence, and
   the section band for comparison is 543 to 8,212 engagements, median 1,800.
+- **Body-incomplete basis: Case A**, under the carve-out in "What body-incomplete actually covers"
+  above. This record makes no body-structure claim at all, so item 1's prohibition was never
+  aimed at it. The substance of both posts was collected, in `media.onscreen_text`, transcribed off
+  the downloaded image files at each post's own `ld+json` image URL, and every beat below is written
+  from what was read there. What the record still cannot say is why one card outperformed, because
+  two posts from one creator give nothing to compare against.
 - **Structure / arc:**
   1. The image carries the entire substance: the claim, the framework, the list, the argument.
   2. The caption does one job only, and it is not summary. In the two collected examples it is
@@ -880,7 +949,9 @@ here rather than repeated in each record.
   the corpus-wide observation that within an account, the post without a link tends to be the top
   one, but here it may simply be that a caption has no room for one. Do not over-read it.
 - **Length and formatting:** 22 to 62 characters of caption. One line, no breaks, no list, no emoji,
-  no hashtag, no link. Plus an image, which is the actual post and which this corpus does not have.
+  no hashtag, no link. Plus an image, which is the actual post. The corpus does hold that image's
+  text for both posts, transcribed in `media.onscreen_text`; what it does not hold is any variant to
+  compare it against.
 - **Shape:**
   ```
   [The image: carries the entire substance. This is the post. Build it first and build it well.]
@@ -1034,6 +1105,16 @@ on the shape, not something the mined creators were doing.
   produced the corpus's single largest multiple on another platform.
 - **Reach behind it:** 1 post, at 1,514 engagements. It is a **body-incomplete** entry, so its arc
   is described from what was collected rather than from a complete text.
+- **Body-incomplete basis: Case B, and this record carries the heaviest disclosure in the file.**
+  The written post was collected in full, 1,532 characters. What was not collected is the 2,149
+  second video interview it introduces. Two consequences, both of which narrow what this record
+  claims. First, **the 7.7x belongs to the whole post and not to this shape.** A 36 minute video
+  interview sat inside it, uncollected and uncontrolled, and the multiple is context here rather
+  than evidence that the arc earned the result. Second, **beat 6 is the beat this record is named
+  after and it is the one the corpus can only half see.** The collected text sets up the handoff
+  three times and only one short quotation survives in it; the answers themselves ran in the video.
+  The MOVE is evidenced, the setup lines are visible and real, and what those lines hand off to is
+  not. Treat beat 6 as a structural instruction rather than as something the corpus watched work.
 - **Structure / arc:**
   1. A one-line principle, stated flat, that the person about to be introduced proves.
   2. The person named, with an explicit promise that the reader will be glad to know of them.
@@ -1174,11 +1255,23 @@ on the shape, not something the mined creators were doing.
 - **Platform:** substack
 - **Mechanism:** a writer with an established, predictable cadence publishes something very short
   and personal, and the break itself is the event. Raw viral shape it came from: the pattern
-  interrupt. Seen in 2 posts across 2 creators, and one of them is the single highest-engagement
-  post in the entire corpus at roughly a fortieth of its author's normal length.
+  interrupt. Seen in 2 posts across 2 creators, and one of them is the largest Substack post in the
+  corpus at roughly a fortieth of its author's normal length. It used to read "the single
+  highest-engagement post in the entire corpus", which the 292-entry corpus no longer supports: a
+  TikTok at 822,900 engagements, an Instagram post at 97,587 and a Substack Note at 46,541 are all
+  larger than its 42,376.
 - **Reach behind it:** 2 posts across 2 creators. One is identified as the largest Substack post
   in the corpus at 42,376 engagements, and it is a **body-incomplete** entry. The second is not
   identified; section band for it, 197 to 18,369 engagements, median 716.
+- **Body-incomplete basis: Case B.** The 331 character note was collected in full and all five beats
+  below are present in it. What was not collected is a photograph, and its collection record states
+  the photograph carries no typeset text, so no words were lost. Two disclosures follow anyway.
+  **The 42,376 belongs to the whole post**, and a wedding photograph is a plausible part of why a
+  political writer's personal note outperformed her archive, so the number is context here and not
+  proof the shape earned it. And **beat 5 says "Stop", but the mined post does not stop on words**,
+  it ends by naming a photograph and showing it. If Muxin uses this shape without an image, she is
+  using a smaller version of what was measured, and that is worth knowing before beat 5 reads as
+  permission to post four lines.
 - **Structure / arc:**
   1. A callback to something the audience already saw, now resolved.
   2. The disclosure, one line, personal rather than topical.

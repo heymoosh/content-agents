@@ -7,6 +7,17 @@ engagement, voting/democracy reform). Full source list and verification notes: s
 transcripts referenced in the 2026-08-18 session; every attributed example below was independently
 verified against a real source at research time.
 
+**Read this before the first table, because it is a property of the table and not of any one row.**
+**23 of the 31 rows here have no measured reach at all.** Rows 1 to 23 came from that 2026-08-18
+research pass, which ran before any corpus of collected posts existed. Each was verified as a real
+shape used by a real named person; none of them has a post with a recorded number behind it. Rows 24
+to 31 were mined later from `data/patterns/corpus.jsonl` and carry real numbers, with one exception:
+row 25's two posts had no retrievable view or like count, so it has no reach evidence either, which
+makes it 24 of 31 rows with nothing measured. That is what the "Reach behind it" column reports per
+row, and it is stated up here so no reader meets a shape before meeting how much is known about it.
+**Verified as real is not the same as measured as effective**, and no row in this file should ever
+be argued for on the grounds that it went viral when nothing behind it was counted.
+
 ## How to use this, read before drafting
 
 **These are proven sentence SHAPES, not text to copy.** Muxin confirmed (2026-08-18): the value
