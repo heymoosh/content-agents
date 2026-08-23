@@ -22,8 +22,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORPUS_PATH, PATTERNS_DIR, accountKey, groupByAccount, normalizeHandle, readCorpus } from "./corpus.js";
 import { loadConfig } from "./collect.js";
-import { baselineMultiple, engagementScore } from "./outliers.js";
-import type { CorpusEntry, Opener, OpenerWarning, PatternMiningConfig, Platform } from "./types.js";
+import { loadBaselineIndex } from "./baselines.js";
+import { baselineMultiple, engagementScore, isWinnersOnlySample, recordedBaselineMultiple } from "./outliers.js";
+import type { AccountBaseline, CorpusEntry, Opener, OpenerWarning, PatternMiningConfig, Platform } from "./types.js";
 
 export const OPENERS_PATH = join(PATTERNS_DIR, "openers.jsonl");
 
@@ -178,12 +179,28 @@ export interface BuildOpenersOptions {
   verbatimOkHandles?: string[];
   // Only build openers for this platform, when set.
   platform?: Platform;
+  // Measured baselines by account key, from data/patterns/baselines.jsonl. Where an account has
+  // one, the multiple shown next to its opener is measured against the account's true typical
+  // post instead of against the account's other collected entries. That matters most on reddit,
+  // where every collected entry is a top-of-year post, so the sibling number understates a winner
+  // by three orders of magnitude and Muxin would be picking openers off it.
+  baselines?: Map<string, AccountBaseline>;
 }
 
 // Reads the recorded numbers and says, in words, what the multiple means or why there is none.
-function performanceNote(multiple: number | null, entry: CorpusEntry): string {
-  if (multiple !== null) return `${multiple.toFixed(1)}x this account's median post`;
+// The wording names which denominator was used, because "12x an ordinary post in this community"
+// and "12x this account's other collected winners" are different claims and only one of them is
+// a fact about the platform.
+function performanceNote(multiple: number | null, entry: CorpusEntry, measured: boolean, winnersOnly: boolean): string {
+  if (multiple !== null) {
+    return measured
+      ? `${multiple.toFixed(1)}x an ordinary post on this account, measured against a real baseline`
+      : `${multiple.toFixed(1)}x this account's median COLLECTED post, which is not the same as a typical one`;
+  }
   if (engagementScore(entry) === null) return "No numbers were recorded on this post";
+  if (winnersOnly) {
+    return "No baseline yet: every collected post on this account was picked for having travelled, so their median is a median of winners";
+  }
   return "No baseline yet: this account needs at least 3 other comparably scored posts";
 }
 
@@ -203,7 +220,13 @@ export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOption
     const opener_text = extractOpener(entry);
     if (opener_text === null) continue;
 
-    const baseline = baselineMultiple(entry, accounts.get(accountKey(entry)) ?? []);
+    const accountEntries = accounts.get(accountKey(entry)) ?? [];
+    const measured = options.baselines?.get(accountKey(entry)) ?? null;
+    const winnersOnly = isWinnersOnlySample(accountEntries);
+    // Same order of preference as the outlier step: a measured baseline first, siblings only where
+    // the collection does not declare itself winners-only, and otherwise no number at all.
+    const recorded = measured ? recordedBaselineMultiple(entry, measured) : null;
+    const baseline = recorded ?? (winnersOnly ? null : baselineMultiple(entry, accountEntries));
     const multiple = baseline?.multiple ?? null;
     openers.push({
       id: `opener-${entry.id}`,
@@ -220,7 +243,7 @@ export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOption
       performance: {
         multiple,
         metric: baseline?.metric ?? null,
-        note: performanceNote(multiple, entry),
+        note: performanceNote(multiple, entry, recorded !== null, winnersOnly),
       },
       verbatim_ok: verbatimOk.has(normalizeHandle(entry.handle)),
       warnings: openerWarnings(entry),
@@ -339,6 +362,7 @@ export function main(argv: string[] = process.argv.slice(2)): number {
   const built = buildOpeners(corpus, {
     verbatimOkHandles: [...granted, ...args.verbatimOkHandles],
     platform: args.platform,
+    baselines: loadBaselineIndex(),
   });
   const { appended, duplicates } = appendOpeners(built, args.openersPath);
   const skipped = corpus.filter((e) => extractOpener(e) === null).length;

@@ -10,6 +10,8 @@ import { readFileSync } from "node:fs";
 import { appendBaseline, baselineIndex, buildBaseline, loadBaselineIndex, readBaselines } from "./baselines.js";
 import { baselineMultiple, classifyOutlier, isWinnersOnlySample, recordedBaselineMultiple } from "./outliers.js";
 import { isEligibleBaselinePost, parseListing, toBaselineSample, toStagedEntry } from "./reddit.js";
+import { buildOpeners } from "./openers.js";
+import { accountKey } from "./corpus.js";
 import type { AccountBaseline, CorpusEntry, OutlierThresholds } from "./types.js";
 
 const NOW = 1787000000;
@@ -162,5 +164,28 @@ describe("the multiple this change exists to fix", () => {
   test("a zero median never becomes an infinite multiple", () => {
     const baseline = { ...fixtureBaseline(), median: 0 };
     assert.equal(recordedBaselineMultiple(fixtureWinners(null)[0], baseline), null);
+  });
+});
+
+// The opener bank shows Muxin a multiple next to a proven opener at pick time, so it has to divide
+// by the same denominator the outlier step does.
+describe("the opener bank", () => {
+  test("shows the measured multiple and says it was measured", () => {
+    const baseline = fixtureBaseline();
+    const winners = fixtureWinners(baseline);
+    const openers = buildOpeners(winners, { baselines: new Map([[accountKey(winners[0]), baseline]]) });
+    const top = openers.find((opener) => opener.corpus_entry_id === winners[0].id);
+    assert.ok(top);
+    assert.equal(Math.round((top.performance.multiple ?? 0) * 10) / 10, 1946.4);
+    assert.match(top.performance.note, /measured against a real baseline/);
+  });
+
+  test("with no measured baseline it reports no multiple and explains why", () => {
+    const winners = fixtureWinners(null);
+    const openers = buildOpeners(winners, {});
+    const top = openers.find((opener) => opener.corpus_entry_id === winners[0].id);
+    assert.ok(top);
+    assert.equal(top.performance.multiple, null);
+    assert.match(top.performance.note, /median of winners/);
   });
 });
