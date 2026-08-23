@@ -167,10 +167,146 @@ is cheap.
 2. **Pinterest OCR.** `media.asset_url` is populated and verified live. `onscreen_text` is a claim
    of EXACT WORDS that remix mode copies verbatim under Muxin's byline, so a low-confidence read
    must stay null. ~310-370 pre-2020 images. Claude vision on the subscription is the $0 route.
-3. **Music/entertainment accounts** seeded under `general-viral` (cristiano, selenagomez, therock,
-   kyliejenner, mrbeast, zachking) are the wrong kind of big. Muxin has said to ignore them.
+3. **Accounts to remove.** The seeded music/entertainment rows under `general-viral` are the wrong
+   kind of big and Muxin has said to ignore them, but the list is longer than the six originally
+   named here. The full audited list, with a reason per account, is in "Accounts flagged for
+   removal" below. **Nothing has been removed. Executing that list is the next session's job, on
+   Muxin's word.**
 4. **Instagram admitted 0 of 13** posts, all body-incomplete, despite the highest median engagement
    in the corpus (32,596). Credentials fix this.
+
+## Accounts flagged for removal, audited 2026-08-23
+
+Produced by the top-creators pass. **No row was removed.** Removal is Muxin's call and the next
+session should execute it. Every count below was re-read off the platform on 2026-08-23.
+
+### Music, entertainment and celebrity-famous (17 rows)
+
+Their reach is real. None of their structure transfers to a person writing about AI, product
+thinking, ADHD and civic work, which is the only reason an account belongs in this corpus.
+
+| Platform | Handle | Followers | Reason |
+|---|---|---|---|
+| instagram | `@cristiano` | 679,697,682 | celebrity-famous (footballer) |
+| instagram | `@selenagomez` | 403,879,452 | music |
+| instagram | `@therock` | 381,828,592 | celebrity-famous (actor) |
+| instagram | `@kyliejenner` | 381,305,686 | celebrity-famous |
+| instagram | `@mrbeast` | 88,932,427 | entertainment (stunt) |
+| instagram | `@zachking` | 31,693,025 | entertainment (visual-effects magic) |
+| tiktok | `@khaby.lame` | 162,700,000 | entertainment (wordless comedy) |
+| tiktok | `@charlidamelio` | 159,300,000 | entertainment (dance) |
+| tiktok | `@mrbeast` | 138,300,000 | entertainment (stunt) |
+| tiktok | `@bellapoarch` | 91,800,000 | music |
+| tiktok | `@addisonre` | 87,900,000 | entertainment (dance) plus celebrity-famous |
+| tiktok | `@zachking` | 86,800,000 | entertainment (visual-effects magic) |
+| x | `@elonmusk` | 241,498,085 | celebrity-famous; the structure is unreplicable by anyone else |
+| x | `@Cristiano` | 113,603,668 | celebrity-famous (footballer) |
+| x | `@MrBeast` | 34,957,651 | entertainment (stunt) |
+| x | `@BarackObama` | 119,083,084 | celebrity-famous; reach is office and fame, not shape |
+| youtube | `@MrBeast` | 514,000,000 | entertainment (stunt) |
+
+### Too small to sample (3 rows)
+
+Real accounts, correctly verified, with too little material for any baseline to mean anything.
+
+| Platform | Handle | Followers | Reason |
+|---|---|---|---|
+| pinterest | `@pipshints` | 78 | too small to sample |
+| pinterest | `@martynamarmar` | 101 | too small to sample |
+| pinterest | `@freedomapp` | 143 | too small to sample. NOTE: this is a `productivity` seed, so removing it leaves that niche at three accounts |
+
+### Borderline, examined and recommended to KEEP (7 rows)
+
+Recorded so the judgement is visible rather than silent. All seven are entertainment-adjacent and
+all seven have a structure that genuinely transfers.
+
+| Platform | Handle | Followers | Why keep |
+|---|---|---|---|
+| youtube | `@MarkRober` | 81,400,000 | stunt-shaped, but every video is an engineering explainer with a real teaching spine |
+| youtube | `@kurzgesagt` | 25,500,000 | pure explainer |
+| youtube | `@veritasium` | 21,100,000 | pure explainer |
+| youtube | `@mkbhd` | 21,100,000 | review as argument |
+| bluesky | `theonion.com` | 1,353,564 | satire, but the headline is the most copyable single-line structure that exists |
+| bluesky | `catsofyore.bsky.social` | 341,445 | archival curation plus a caption; a real structure, just a soft topic |
+| bluesky | `artbutmakeitsports.bsky.social` | 205,828 | the whole account is one repeated juxtaposition structure |
+
+### Dormant
+
+**Nothing currently in the config is dormant** as far as the top-creators pass checked. Two
+dormancy findings came out of discovery and both were therefore NOT added:
+
+- `x.com/@doctorow` (451,229). His own display name reads "Cory Doctorow NO LONGER ON TWIT TER".
+  He is active on Mastodon (76,448) and Bluesky (29,432) and both of those WERE added.
+- `mastodon @kissane@mas.to` (15,613), last post 2026-07-13. Quiet for six weeks, not stopped. Added
+  with that date inline so the next reader re-checks rather than guesses.
+
+## Nine more impostors caught, 2026-08-23. Project total is fifteen.
+
+Six had been caught before this pass. **Nine more were caught here, and the follower count was
+again the only check that caught any of them.** None are in the config; they are recorded so
+nobody re-adds them.
+
+| Attempted | What it actually is |
+|---|---|
+| **`youtube.com/@aakashgupta`** | **A stand-up comedian with 4.72M subs.** Its own channel description says "stand up videos, comedy sketches, short films". NOT the product-thinking Aakash Gupta, who IS correctly in the config on `substack` at 253,000. This is the most dangerous catch of the fifteen: the handle looks right, the name matches exactly, and the size is plausible for the real person's peak. Only reading the description caught it after the count looked fine |
+| `youtube.com/@PracticalEngineering` | "Practical Engineering Australia", 208 subs. The real channel is `@PracticalEngineeringChannel` at 4.81M |
+| `x.com/@jzhuo` | "jun.zhuo", 0 followers, 0 posts. Julie Zhuo is `@joulee` at 351,734 |
+| `x.com/@pluralistic` | "Nizar Kheraj", 17 followers. Cory Doctorow is `@doctorow` |
+| `substack.com/@thebootstrappedfounder` | "Victory Chikasi", 61 subscribers. Not Arvid Kahl |
+| `substack.com/@jamesclear` | "Mobin heydari", 5 subscribers |
+| `substack.com/@thehonestbroker` | "Becky Quinby", 23 subscribers. Not Ted Gioia |
+| `bluesky levelsio.bsky.social` | "Jeramy", 72 followers, 2 posts. Not Pieter Levels |
+| `tiktok.com/@mattwolfe` | "Johnny", 0 followers, 0 videos. Not the AI-tools creator |
+
+**No follower count already in the config failed to reproduce.** Every existing row that was
+re-read on 2026-08-23 came back within normal drift of what the file says.
+
+**A second, quieter failure mode found this pass, and it needs its own rule.** A real person's real
+profile that is not their audience. `substack.com/@arvidkahl` (17 subscribers), `@caseynewton` (3),
+`@teresatorres` (3), `@danidonovan` (9), `@timurban` (299), `@mattyglesias` (186), `@marclou` (118)
+are all genuinely those people and all completely unusable. Their readers live on a publication
+handle (`@platformer` IS Casey Newton, at 176,000) or off Substack entirely. **"Is this them" and
+"is this usable" are separate checks even when the person is unambiguously real.**
+
+## Niches found genuinely EMPTY, by platform, 2026-08-23
+
+Searched and found empty. **Do not spend another pass rediscovering that nobody is there.** Padding
+these cells would be worse than the gap.
+
+| Platform | Niche | What was actually found |
+|---|---|---|
+| mastodon | `product-thinking` | Nobody worth naming. Mastodon's population is engineers, digital-rights people and open-source maintainers. There are no product managers with an audience there |
+| tiktok | `product-thinking` | Nobody. Product managers are not on TikTok |
+| instagram | `ai-building` | Every candidate was a parked handle: `@mattwolfe` 744 followers, `@thefutur` 92 |
+| instagram | `product-thinking` | Same: `@shreyasdoshi` 245 followers, `@lennyrachitsky` 404s. These people do not run Instagram |
+
+**Thin but not empty, so worth one more look later, not now:** `youtube/product-thinking` has only
+`@LennysPodcast` (629K) and `@chloeshih` (428K) and no verifiable third. Product thinking lives on
+Substack and X, which are both now well covered.
+
+**Platforms deliberately not extended, with the reason:**
+
+- **linkedin.** Walled again on 2026-08-23. `/in/joulee` returned HTTP 999 and `/in/thejustinwelsh`
+  a 301 with a zero-byte body, so the documented profile-then-post chain never starts. Two attempts
+  then stop, consistent with the 3-of-23 historical rate. Julie Zhuo, John Cutler, Jennifer Pahlka
+  and Teresa Torres would all be worth adding here and every one would carry a null count, so none
+  were added. **A blank is a wall, not a negative.**
+- **threads.** A logged-out fetch of `threads.com/@adhd_memetherapy` returns HTTP 200 and 262KB with
+  **zero** `follower_count` fields. Walled, not absent. The three ADHD rows already in the config
+  were captured under different conditions and could not be extended.
+- **reddit.** `reddit.com/r/<sub>/about.json` returned **HTTP 403** on the first request and the
+  sweep stopped there rather than working around it. One unverified lead for whoever gets through:
+  the config has `r/ProductMgmt` but not `r/ProductManagement`, which is far larger.
+- **hackernews.** Four query-shaped rows already cover it. HN has submissions, not creators, so a
+  "who is biggest" list does not apply.
+- **pinterest.** Not searched this pass. Three niches were already found empty there and 21 rows
+  exist.
+
+**Three named candidates that could not be verified and were therefore not added:**
+`youtube.com/@BeauoftheFifthColumn` returns HTTP 404 to curl although search results show the
+channel exists, so it is either regionally gated or renamed (his X, `@BeauTFC` at 109,811, IS
+verified and added). `youtube.com/@TheADHDGuy` and `youtube.com/@simonwillison` render a channel
+title but **zero** subscriber-count candidates, meaning the count is hidden or the channel is tiny.
 
 ## This branch is a HELD draft PR
 
