@@ -437,9 +437,9 @@ a quoted post, so they are not behind any template here.
   a question, so the reader completes the list themselves. It converts readers into commenters
   without asking them anything. Seen in 1 post by 1 creator, at 2,261 engagements.
 - **Structure / arc:**
-  1. A framing verb with no object yet, ending in a colon. So basically, we killed:
+  1. A framing verb with no object yet, ending in a colon.
   2. Three or four numbered items, each one or two words, each a specific named group or thing.
-  3. The final numbered item, in the same format, is the question. What is next.
+  3. The final numbered item, in the same format as the others, is a question rather than a thing.
 - **Emotional trigger:** accumulating recognition, then an open door.
 - **Immediate personal payoff:** none.
 - **CTA style:** none stated. The unfinished item is the ask, and it is the most efficient
@@ -454,7 +454,7 @@ a quoted post, so they are not behind any template here.
   2) [specific thing]
   3) [specific thing]
   4) [specific thing]
-  5) [What is next?]
+  5) [the question, in the same format as the items above]
   ```
   Items 1 to 4 must be specific and named. A list of abstractions gives the reader nothing to add to.
 - **Real example:** the general-viral account's five item list ending on an open question about what
@@ -547,7 +547,7 @@ here rather than repeated in each record.
   4. A signposted handoff into the list.
   5. N numbered or dashed plays, each with a short label and two to three sentences under it.
   6. A closing frame naming the plays as the writer's own.
-  7. A second concession, that getting them right is not easy, which opens the gap.
+  7. A second concession, that executing them well is the hard part, which opens the gap.
   8. One free resource named with its full title, and exactly one link.
 - **Emotional trigger:** competence within reach. Each labelled play is small enough to picture
   doing, and the two concessions at beats 2 and 7 stop the post reading as a pitch.
@@ -796,7 +796,7 @@ on the shape, not something the mined creators were doing.
   outlier. One creator, so the count shows consistency, not cross-creator proof.
 - **Structure / arc:**
   1. The offer in one sentence: what this is, who it is for, and the named tool it uses.
-  2. Permission, up front, to take what fits and leave the rest. This is load-bearing.
+  2. Permission, up front, to use only the parts that apply to them. This is load-bearing.
   3. A personal anchor from a comparable past moment, kept short.
   4. The bridge to the reader's present, naming what people have actually been asking.
   5. The practice itself, in named sections, each an instruction rather than an argument.
@@ -820,7 +820,7 @@ on the shape, not something the mined creators were doing.
 - **Shape:**
   ```
   [Beat 1: one sentence, "here is [named practice] for [the specific situation the reader is in]"]
-  [Beat 2: permission, in your own words, to use what fits and leave the rest]
+  [Beat 2: permission, in Muxin's own words, to use only the parts that apply]
   [Beat 3: your own anchor from a comparable moment, two or three sentences, no more]
   [Beat 4: what people have actually been asking you lately, stated plainly]
   [Beat 5: the practice as named steps, each a header plus a short instruction, not an argument]
@@ -844,7 +844,7 @@ on the shape, not something the mined creators were doing.
   produced the corpus's single largest multiple on another platform.
 - **Structure / arc:**
   1. A one-line principle, stated flat, that the person about to be introduced proves.
-  2. The person named, with an explicit promise that the reader will want to meet them.
+  2. The person named, with an explicit promise that the reader will be glad to know of them.
   3. The writer's own encounter, located and dated concretely.
   4. What the person does, in their own framing, not the writer's summary.
   5. Evidence of why they matter, in plain numbers.
@@ -866,7 +866,7 @@ on the shape, not something the mined creators were doing.
 - **Shape:**
   ```
   [Beat 1: one line, the principle this person proves, stated flat with no hedging]
-  [Beat 2: their name, and a direct promise that the reader will want to know them]
+  [Beat 2: their name, and a direct promise that knowing of them is worth the reader's time]
   [Beat 3: your own encounter, with a real place and a real date]
   [Beat 4: what they do, described the way they describe it]
   [Beat 5: one plain number showing the scale or the effect of what they do]
@@ -1079,8 +1079,8 @@ and no body patterns.
   `(thin evidence, single sighting)`
 - **Structure / arc:**
   1. A stretched interjection of mock dismay.
-  2. The self-indictment, phrased as a discovered requirement. Looks like I have to do X instead of
-     the thing I am avoiding.
+  2. The self-indictment, phrased as a discovered requirement rather than a decision: she now
+     apparently has to do the avoidance activity instead of the work.
   3. Stop. There is no third beat and no explanation.
 - **Emotional trigger:** recognition made safe. The poster is confessing rather than diagnosing the
   reader, so nobody has to get defensive.
@@ -1109,9 +1109,9 @@ and no body patterns.
   five lines. Seen in 1 post by 1 creator at 2.0x that account's own baseline. `(thin evidence,
   single sighting)`
 - **Structure / arc:**
-  1. The setup with a colon, promising a list. The thing about X is that I can know:
+  1. The setup, ending on a colon, promising a list of things she already knows.
   2. Three or four ticked items, each short, each one of the things advice-givers ask for.
-  3. The turn on a capitalised conjunction. AND STILL.
+  3. The turn, on a capitalised conjunction.
   4. The image: what actually happens instead, physical and specific.
 - **Emotional trigger:** the build of confident checkmarks and then the collapse, which the reader
   sees coming and which lands harder because of it.
@@ -1471,7 +1471,7 @@ across 5 creators measured against unbiased baselines.
 - **Structure / arc:**
   1. Build a counterfactual world in one long sentence, with the harm concrete and its scale pinned
      to something specific.
-  2. Put the choice to the reader personally: would YOU work inside it.
+  2. Put the choice to the reader personally: would they take part in that world.
   3. Voice the rationalisation in quotation marks, in the voice of someone who means it, made
      genuinely plausible rather than strawmanned.
   4. Snap to the real target in one short sentence.
@@ -1635,7 +1635,7 @@ below as a claim about the SCRIPT and about nothing else.
   3. Prerequisites 2 through 4, each triggered by the last, each defensible alone.
   4. A hard blocker appears that cannot be solved today.
   5. The solution defers everything to tomorrow.
-  6. The punchline: someone asks what we are doing now, and the answer is the original state,
+  6. The punchline: someone asks what is happening now, and the answer is the original state,
      unchanged.
 - **Emotional trigger:** recognition escalating into helpless laughter. The open question is whether
   they will ever get up, and it is withheld until the final line.
@@ -1669,7 +1669,7 @@ below as a claim about the SCRIPT and about nothing else.
 - **Structure / arc:**
   1. The raw clip or the primary detail, first, with no framing.
   2. The minimum orientation: where, who, what they were doing. Two sentences at most.
-  3. An invitation to verify, in the versions that have one: if you do not believe me, look.
+  3. An invitation to verify, in the versions that have one, pointing the viewer at the evidence.
   4. The creator's position, often posed as a question to the audience before being answered.
   5. The ask, which in the strongest version is the same act as sharing the post.
   6. A closing line that returns it to the audience as a group.
@@ -1951,7 +1951,7 @@ that: it establishes the creator as a peer in a few words and is doing work, whi
 - **Structure / arc:**
   1. Start the procedure immediately, in the first person plural: we are doing this now.
   2. Defuse the jargon the moment it is introduced.
-  3. Lower the stakes twice: this is not pretty, this is not for showing anyone.
+  3. Lower the stakes twice, naming two things the artifact does not have to be.
   4. The physical setup, given as a concrete instruction.
   5. The creator thinking aloud in real time, including genuinely mundane material.
   6. The creator's own completed artifact shown, with a real reaction to it.
@@ -2269,11 +2269,12 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   3065x, 26x and 943x their community medians.
 - **Structure / arc:**
   1. The subject, one line, stated neutrally.
-  2. The obvious framing named and refused. "The real story is not X."
+  2. The obvious framing named and refused in one clause.
   3. The alternative framing, stated as a claim rather than a question.
   4. The mechanics that support it, concrete and checkable.
   5. The concession: the strongest argument for the other side, granted honestly.
-  6. The concession withdrawn, narrowly. Not "you are wrong" but "stop pretending this is ordinary".
+  6. The concession withdrawn, narrowly. Not that the other side is wrong, but that the thing
+     should stop being treated as routine.
   7. A second supporting thread, usually about money or incentives.
   8. The sharpest version of the claim, labelled as an opinion.
 - **Emotional trigger:** the relief of having a shapeless unease turned into a sentence, plus a
@@ -2295,7 +2296,7 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   [Beat 3: the alternative reading, as a claim]
   [Beat 4: the mechanics that support it, checkable]
   [Beat 5: the concession. The best argument against Muxin, granted]
-  [Beat 6: the narrow withdrawal. What she still refuses]
+  [Beat 6: the narrow withdrawal. Not that they are wrong, but what she still refuses to accept]
   [Beat 7: a second thread, usually the money or the incentive]
   [Beat 8: the sharpest version, labelled an opinion]
   ```
@@ -2316,9 +2317,9 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   2. The comparison that stings: what the better-resourced version of them has.
   3. The fear named out loud, in the reader's own vocabulary.
   4. The refusal: it is not that hard.
-  5. The time and place. Put the kids to bed, or do this while you are sitting there.
+  5. The time and place. Name the moment in the reader's evening when they could actually start.
   6. The procedure. Concrete down to the folder name, the price, the angle, or the exact email.
-  7. The part most people miss, flagged as such.
+  7. The step that is most often skipped, flagged as the one people get wrong.
   8. The release: that is all, now use what you already know how to do.
 - **Emotional trigger:** anxiety about being behind, addressed directly and then dissolved by
   something finishable in one evening.
@@ -2342,7 +2343,7 @@ bearing, because those four are the biggest posts in two of the six subreddits.
   [Beat 4: the refusal. Say plainly that the feared thing is not difficult]
   [Beat 5: when and where. Tonight, after X]
   [Beat 6: the steps. Concrete to the folder name, the price, the angle, the exact wording]
-  [Beat 7: the part most people miss, flagged]
+  [Beat 7: the step most people skip, flagged as the one they get wrong]
   [Beat 8: the release. Now use what you already have]
   ```
   Beat 6 is the test. If a step cannot be written concretely enough that failing it would be
@@ -2781,7 +2782,7 @@ a principle, with no number, no name and no event in it, and it draws a quarter 
   needs reminding of, which skips the argument entirely. Seen in 2 posts across 1 creator at 10.3x
   and 6.2x that account's true median, with 4,917 and 3,437 restacks.
 - **Structure / arc:**
-  1. The frame: a random reminder, or the single word reminder followed by the subject.
+  1. The frame: present the claim as something the reader is merely being reminded of.
   2. The claim, stated as settled history or as a list of settled charges.
   3. In the list variant, three bulleted items, each one line, each a specific action.
   4. The verdict, one line.
@@ -2836,7 +2837,7 @@ carrying:
   of article she rejected and why. On a platform of interchangeable tutorials, that preamble is the
   differentiator.
 - **Reactions and comments are different currencies, and the shape chooses which.** Her article
-  admitting she does not know what to think about a shift in her own field draws her LOWEST
+  admitting her own uncertainty about a shift in her field draws her LOWEST
   reactions and by far her HIGHEST comments, 257 against her next best of 133. Admitting uncertainty
   converts readers into repliers rather than likers. Pick the shape for the response you want.
 
