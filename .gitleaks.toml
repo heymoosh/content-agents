@@ -8,3 +8,9 @@ description = "Verified false positive: src/pull/platforms/linkedin.ts only hold
 paths = [
   '''src/pull/platforms/linkedin\.ts''',
 ]
+
+[[allowlists]]
+description = "Verified false positive: the linkedin-client-secret rule matches the TYPE ANNOTATION on `export const linkedin: PatternCollector = {`, not a credential. src/patterns/collectors/linkedin.ts reads other people's public LinkedIn activity pages through the shared logged-in Chrome session in src/pull/browser.ts and holds no keys of its own -- full file checked 2026-08-22, no other secret-shaped content. Same rule and same cause as the src/pull/platforms/linkedin.ts entry above."
+paths = [
+  '''src/patterns/collectors/linkedin\.ts''',
+]
