@@ -10,6 +10,7 @@ import {
   readDecisions,
   type Candidate,
   type DecisionRecord,
+  selectOptionsFor,
 } from "./decisions.js";
 import { phase4Dir } from "./paths.js";
 import { hasCanonEvent, appendCanonEvent } from "./canon.js";
@@ -50,13 +51,12 @@ import {
 // not phase3.ts's exemption-list shape -- Phase 4 has no circular "gate depends on the gated
 // command" concern the way Phase 3's response-ingest does, so no exemption list is needed).
 
+const PHASE_4_LOCKED =
+  `refusing: phase-3-completed is not recorded yet -- Phase 4 opens only after Phase 3's ` +
+  `decisions are approved (rules.md §13 item 18). Complete Phase 3 (src/venture/phase3.ts) first.`;
+
 export function requirePhase4Unlocked(slug: string): void {
-  if (!hasCanonEvent(slug, `${slug}/phase-3-completed`)) {
-    fail(
-      `refusing: phase-3-completed is not recorded yet -- Phase 4 opens only after Phase 3's ` +
-        `decisions are approved (rules.md §13 item 18). Complete Phase 3 (src/venture/phase3.ts) first.`
-    );
-  }
+  if (!hasCanonEvent(slug, `${slug}/phase-3-completed`)) fail(PHASE_4_LOCKED);
 }
 
 // --- small shared helpers -------------------------------------------------------------------------
@@ -205,11 +205,7 @@ function cmdOperatingPlanDraft(slug: string) {
 
 function cmdOperatingPlanChoiceSelect(slug: string, candidateId: string) {
   const overrideReason = flag("--override-reason");
-  const d = selectWithOverride(slug, "p4-operating-plan-01", candidateId, overrideReason, {
-    requiredSelectCount: 1,
-    ruleCite: "rules.md §8.1",
-    candidateLabel: "operating-plan mode",
-  });
+  const d = selectWithOverride(slug, "p4-operating-plan-01", candidateId, overrideReason, selectOptionsFor("daily-operating-plan-choice", loadRules()));
   console.log(`operating-plan mode selected: ${d.selected_candidate_ids[0]}`);
 }
 
@@ -681,15 +677,11 @@ function cmdDay14ScorecardDraft(slug: string) {
 
 // --- day-14-decide: the day-14-decision decision, and Phase 4 completion (rules.md §8.5) ----------
 
-function requireDay14ReviewApproved(slug: string): VentureArtifact {
-  const a = readArtifact(slug, "p4-day-14-review");
-  if (!a || a.editorial_status !== "approved") {
-    fail(
-      `refusing: p4-day-14-review is not approved yet. Run "day-14-scorecard-draft" then ` +
-        `"approve ${slug} p4-day-14-review" first -- Muxin confirms the facts before deciding (rules.md §8.5).`
-    );
-  }
-  return a!;
+function day14ReviewNotApproved(slug: string): string {
+  return (
+    `refusing: p4-day-14-review is not approved yet. Run "day-14-scorecard-draft" then ` +
+    `"approve ${slug} p4-day-14-review" first -- Muxin confirms the facts before deciding (rules.md §8.5).`
+  );
 }
 
 // rules.md §8.5's checkpoint-completion check: reads phase4_completion's required kinds
@@ -753,18 +745,34 @@ export function maybeCompletePhase4(slug: string, rules: VentureRules): boolean 
   return true;
 }
 
-function cmdDay14Decide(slug: string, candidateId: string) {
+// The Day 14 decision carries FIVE rules that live nowhere else, so it deliberately does not go
+// through decisions.ts's generic selectByKind(): Phase 4 must be unlocked, the review must be
+// approved first (Muxin confirms the facts before deciding), a reason is required, the candidate
+// must be one of rules.yaml's options, and the decision record is created lazily here rather than
+// by an earlier command. Routing it generically would skip four of the five.
+//
+// Throws rather than fail()s, because the review server calls this too and fail() is
+// process.exit(1) -- fatal in a long-lived process. cmdDay14Decide below catches and fail()s with
+// the identical message, so the CLI's stderr and exit code are unchanged.
+export function day14Decide(
+  slug: string,
+  candidateId: string,
+  reason: string | undefined,
+  at: string
+): { decision: DecisionRecord; phase4Complete: boolean } {
   const rules = loadRules();
-  requireDay14ReviewApproved(slug);
-  const reason = flag("--reason");
-  if (!candidateId?.trim()) fail(`usage: tsx src/venture/phase4.ts day-14-decide <slug> <candidate_id> --reason "..."`);
+  requireRulesVersionMatch(slug, rules);
+  if (!hasCanonEvent(slug, `${slug}/phase-3-completed`)) throw new Error(PHASE_4_LOCKED);
+  const review = readArtifact(slug, "p4-day-14-review");
+  if (!review || review.editorial_status !== "approved") throw new Error(day14ReviewNotApproved(slug));
+  if (!candidateId?.trim()) throw new Error(`a Day 14 decision needs one of the options: ${rules.day_14_decision.candidates.join(", ")}`);
   // decisions.ts's day-14-decision comment: the system never recommends one, so selectDecision()
   // (unlike selectWithOverride()) never forces an override reason here -- rules.md §8.5's "Record
-  // the decision and reason" still has to be enforced somewhere, so this command requires --reason
+  // the decision and reason" still has to be enforced somewhere, so this path requires the reason
   // itself rather than relying on a mechanism that doesn't apply to this decision kind.
-  if (!reason?.trim()) fail(`refusing: --reason is required -- rules.md §8.5: "Record the decision and reason."`);
+  if (!reason?.trim()) throw new Error(`refusing: a reason is required -- rules.md §8.5: "Record the decision and reason."`);
   if (!rules.day_14_decision.candidates.includes(candidateId)) {
-    fail(`"${candidateId}" is not one of the Day 14 decision options (${rules.day_14_decision.candidates.join(", ")})`);
+    throw new Error(`"${candidateId}" is not one of the Day 14 decision options (${rules.day_14_decision.candidates.join(", ")})`);
   }
 
   if (!readDecision(slug, "p4-day-14-decision")) {
@@ -781,23 +789,34 @@ function cmdDay14Decide(slug: string, candidateId: string) {
         rationale: "",
       })),
       recommended_candidate_ids: [],
-      at: now(),
+      at,
     });
   }
 
   // selectDecision throws DecisionAlreadySelectedError on a second call -- immutability (rules.md
   // §11 item 15) comes for free from decisions.ts, no extra guard needed here.
-  const selected = selectDecision(slug, "p4-day-14-decision", {
+  const decision = selectDecision(slug, "p4-day-14-decision", {
     selectedCandidateIds: [candidateId],
     selectedBy: "muxin",
     rationale: reason,
     requiredSelectCount: 1,
-    at: now(),
+    at,
   });
-  console.log(`Day 14 decision recorded: ${selected.selected_candidate_ids[0]} -- ${reason}`);
+  return { decision, phase4Complete: maybeCompletePhase4(slug, rules) };
+}
 
-  const completed = maybeCompletePhase4(slug, rules);
-  if (!completed) {
+function cmdDay14Decide(slug: string, candidateId: string) {
+  const reason = flag("--reason");
+  if (!candidateId?.trim()) fail(`usage: tsx src/venture/phase4.ts day-14-decide <slug> <candidate_id> --reason "..."`);
+  if (!reason?.trim()) fail(`refusing: --reason is required -- rules.md §8.5: "Record the decision and reason."`);
+  let result;
+  try {
+    result = day14Decide(slug, candidateId, reason, now());
+  } catch (e) {
+    fail(e instanceof Error ? e.message : String(e));
+  }
+  console.log(`Day 14 decision recorded: ${result!.decision.selected_candidate_ids[0]} -- ${reason}`);
+  if (!result!.phase4Complete) {
     console.log(`Day 14 decision recorded, but Phase 4 is not yet complete -- other required items are still outstanding.`);
   }
 }

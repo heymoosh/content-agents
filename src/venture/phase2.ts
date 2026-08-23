@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch } from "./rules.js";
 import { createArtifact, readArtifact, updateArtifactFields, type ClaimRef } from "./artifacts.js";
-import { writeDecision, selectWithOverride, readDecision, type Candidate, type DecisionRecord } from "./decisions.js";
+import { writeDecision, selectWithOverride, readDecision, type Candidate, type DecisionRecord, selectOptionsFor} from "./decisions.js";
 import { phase2Dir } from "./paths.js";
 import { requirePhase2Unlocked } from "./phase1.js";
 import {
@@ -214,11 +214,7 @@ function cmdConcepts(slug: string) {
 function cmdConceptSelect(slug: string, candidateId: string) {
   const rules = loadRules();
   const overrideReason = flag("--override-reason");
-  const d = selectWithOverride(slug, "p2-concept-01", candidateId, overrideReason, {
-    requiredSelectCount: rules.lead_magnet_concept.select_count,
-    ruleCite: "rules.md §6.2",
-    candidateLabel: "concept",
-  });
+  const d = selectWithOverride(slug, "p2-concept-01", candidateId, overrideReason, selectOptionsFor("lead-magnet-concept", rules));
   console.log(`concept selected: ${d.selected_candidate_ids[0]}`);
 }
 

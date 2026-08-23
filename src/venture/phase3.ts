@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadRules, requireRulesVersionMatch, type VentureRules } from "./rules.js";
 import { createArtifact, readArtifact, type ClaimRef } from "./artifacts.js";
-import { writeDecision, selectWithOverride, selectDecision, readDecision, type Candidate, type DecisionRecord } from "./decisions.js";
+import { writeDecision, selectWithOverride, selectDecision, readDecision, type Candidate, type DecisionRecord, selectOptionsFor} from "./decisions.js";
 import { phase3Dir, clusterAnalysisPath, ventureDir } from "./paths.js";
 import {
   ingestResponse,
@@ -372,11 +372,7 @@ function cmdProblemScore(slug: string) {
 
 function cmdProblemSelect(slug: string, candidateId: string) {
   const overrideReason = flag("--override-reason");
-  const d = selectWithOverride(slug, "p3-problem-01", candidateId, overrideReason, {
-    requiredSelectCount: 1,
-    ruleCite: "rules.md §7.6",
-    candidateLabel: "problem cluster",
-  });
+  const d = selectWithOverride(slug, "p3-problem-01", candidateId, overrideReason, selectOptionsFor("problem-selection", loadRules()));
   console.log(`problem selected: ${d.selected_candidate_ids[0]}`);
 }
 
@@ -595,11 +591,7 @@ function cmdPrice(slug: string) {
 
 function cmdPriceSelect(slug: string, candidateId: string) {
   const overrideReason = flag("--override-reason");
-  const d = selectWithOverride(slug, "p3-price-01", candidateId, overrideReason, {
-    requiredSelectCount: 1,
-    ruleCite: "rules.md §7.9",
-    candidateLabel: "price/format option",
-  });
+  const d = selectWithOverride(slug, "p3-price-01", candidateId, overrideReason, selectOptionsFor("product-format-and-price", loadRules()));
   console.log(`price/format selected: ${d.selected_candidate_ids[0]}`);
 }
 

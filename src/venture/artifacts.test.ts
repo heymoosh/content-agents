@@ -197,6 +197,7 @@ describe("readyForDelivery -- each condition alone is insufficient", () => {
       editorial_status: "approved",
       delivery_status: "ready",
       evidence: null,
+      retraction: null,
       failure: null,
       origin_type: "venture",
       venture_id: SLUG,

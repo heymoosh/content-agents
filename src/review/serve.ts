@@ -37,6 +37,7 @@ import { lockOutreachMessageRow } from "../outreach/lock.js";
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
+import { handleVentureWrite } from "./venture-writes.js";
 import { buildFollowups, markResponded, markContacted, moveOn, markSent, latestLockedMessage, isBucket } from "../outreach/tracker.js";
 import { CHANNELS } from "../outreach/draft.js";
 import {
@@ -1893,6 +1894,17 @@ const server = createServer(async (req, res) => {
       const result = readIntakeDraft(parts[3], Number(parts[5]));
       json(res, result.ok ? 200 : 400, result);
       return;
+    }
+    // The Venture room's write side (eleven POSTs). Every one wraps the function that already
+    // owns the rule -- see src/review/venture-writes.ts. Placed before the read dispatcher below
+    // (they cannot collide: one is POST-only, the other GET-only) and after the intake-draft
+    // routes above, so POST :slug/intake/<n>/draft still reaches its own handler.
+    if (req.method === "POST" && url.pathname.startsWith("/api/venture/")) {
+      const ventureWrite = handleVentureWrite(req.method, url.pathname, await readBody(req));
+      if (ventureWrite) {
+        json(res, ventureWrite.status, ventureWrite.body);
+        return;
+      }
     }
     // The Venture room's read side (nine GETs). Every one wraps an existing src/venture/** read
     // and NOTHING here writes — see src/review/venture-reads.ts for the three properties that

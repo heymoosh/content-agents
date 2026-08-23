@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { decisionsPath, ventureDir } from "./paths.js";
+import { type VentureRules } from "./rules.js";
 
 export type DecisionStatus = "awaiting_user" | "selected" | "superseded";
 export type DecisionKind =
@@ -226,5 +227,118 @@ export function selectWithOverride(
     overrideReason: isOverride ? overrideReason : null,
     requiredSelectCount: opts.requiredSelectCount,
     at: new Date().toISOString(),
+  });
+}
+
+// --- one table for the per-kind select discipline -------------------------------------------------
+//
+// Each decision kind's SelectWithOverrideOptions used to be a literal at its own CLI command --
+// five near-identical objects in phase1/2/3/4.ts, each holding the rule citation and the noun the
+// refusal message uses. They stay identical only by luck, and a sixth caller (the review server's
+// write routes) would have made a sixth copy. This table is the one place they live; the CLI
+// commands now read it, so the refusal text a route produces and the refusal text the CLI produces
+// are the same text by construction, not by two people remembering the same string.
+//
+// The per-site variants are preserved EXACTLY, not homogenized -- continuation-select's
+// "overriding requires" phrasing is deliberate (see SelectWithOverrideOptions above), and the
+// tests and audit trails were written against these words.
+//
+// `rules` is a parameter because two counts are configuration, not constants: the concept and
+// idea select counts come from venture/rules.yaml.
+export const OVERRIDE_SELECT_KINDS = [
+  "platform-recommendation",
+  "phase-1-research-continuation",
+  "lead-magnet-concept",
+  "problem-selection",
+  "product-format-and-price",
+  "daily-operating-plan-choice",
+] as const;
+
+export type OverrideSelectKind = (typeof OVERRIDE_SELECT_KINDS)[number];
+
+export function isOverrideSelectKind(kind: DecisionKind): kind is OverrideSelectKind {
+  return (OVERRIDE_SELECT_KINDS as readonly string[]).includes(kind);
+}
+
+export function selectOptionsFor(kind: OverrideSelectKind, rules: VentureRules): SelectWithOverrideOptions {
+  switch (kind) {
+    case "platform-recommendation":
+      return { requiredSelectCount: 1, ruleCite: "rules.md §5.1", candidateLabel: "platform" };
+    case "phase-1-research-continuation":
+      return {
+        requiredSelectCount: 1,
+        ruleCite: "rules.md §5.6",
+        candidateLabel: "continuation candidate",
+        overridePhrase: "overriding requires",
+      };
+    case "lead-magnet-concept":
+      return { requiredSelectCount: rules.lead_magnet_concept.select_count, ruleCite: "rules.md §6.2", candidateLabel: "concept" };
+    case "problem-selection":
+      return { requiredSelectCount: 1, ruleCite: "rules.md §7.6", candidateLabel: "problem cluster" };
+    case "product-format-and-price":
+      return { requiredSelectCount: 1, ruleCite: "rules.md §7.9", candidateLabel: "price/format option" };
+    case "daily-operating-plan-choice":
+      return { requiredSelectCount: 1, ruleCite: "rules.md §8.1", candidateLabel: "operating-plan mode" };
+  }
+}
+
+// Select any decision by reading its own kind off the record, for a caller that does not know
+// which of the three select disciplines applies (the review server routes one URL for all of
+// them; the CLI has a separate command per kind and does not need this).
+//
+// Two guards live here rather than at the route, because a route-level check is a rule the domain
+// does not actually hold:
+//
+//   1. An override-discipline kind ALWAYS goes through selectWithOverride, and that function takes
+//      exactly one candidate. A caller sending two ids for such a kind would otherwise fall to
+//      plain selectDecision and skip the override-reason rule entirely -- a bypass, not a
+//      convenience. It is refused.
+//   2. Every selected id must name a real candidate. selectDecision does not check this today:
+//      it counts ids and looks for a shared unknown_id (findSharedUnknownId simply skips an id it
+//      cannot find), so a typo could be recorded as a selection of something that does not exist.
+//      cmdDay14Decide validates its candidate against rules.yaml itself, which is the same hole
+//      seen from the other side. Checked here for every kind this function serves; the existing
+//      per-kind CLI commands are untouched.
+export function selectByKind(
+  slug: string,
+  decisionId: string,
+  rules: VentureRules,
+  input: { candidateIds: string[]; overrideReason?: string; rationale?: string; at: string }
+): DecisionRecord {
+  const current = readDecision(slug, decisionId);
+  if (!current) throw new Error(`no such decision: ${decisionId}`);
+
+  const known = new Set(current.candidates.map((c) => c.candidate_id));
+  const unknown = input.candidateIds.filter((id) => !known.has(id));
+  if (unknown.length) {
+    throw new Error(
+      `decision ${decisionId} has no candidate ${unknown.map((u) => JSON.stringify(u)).join(", ")} -- ` +
+        `its candidates are: ${current.candidates.map((c) => c.candidate_id).join(", ")}`
+    );
+  }
+
+  if (isOverrideSelectKind(current.decision_kind)) {
+    const opts = selectOptionsFor(current.decision_kind, rules);
+    if (input.candidateIds.length !== 1) {
+      throw new Error(
+        `decision ${decisionId} is a single-pick ${opts.candidateLabel} decision -- send exactly one ` +
+          `candidate, got ${input.candidateIds.length}`
+      );
+    }
+    return selectWithOverride(slug, decisionId, input.candidateIds[0], input.overrideReason, opts);
+  }
+
+  // The three no-recommendation kinds: idea-ranking (multi-select, count from rules.yaml),
+  // transformation-choice and day-14-decision (one each). day-14-decision additionally carries
+  // four Phase 4 rules that only phase4.ts knows -- route it through day14Decide() there, never
+  // through here.
+  const requiredSelectCount = current.decision_kind === "idea-ranking" ? rules.idea_ranking.select_count : 1;
+  return selectDecision(slug, decisionId, {
+    selectedCandidateIds: input.candidateIds,
+    selectedBy: "muxin",
+    overrideReason: input.overrideReason ?? null,
+    rationale: input.rationale,
+    requiredSelectCount,
+    at: input.at,
   });
 }
