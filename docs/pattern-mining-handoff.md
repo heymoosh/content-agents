@@ -1,0 +1,161 @@
+# Pattern mining: handoff
+
+**Written 2026-08-23.** Everything a fresh session (Grok, Codex, or Claude) needs to continue
+without re-deriving anything. Read this top to bottom before touching the branch.
+
+## Where the work lives
+
+- **Worktree:** `/private/tmp/claude/wt-mine`, branch `feat/pattern-corpus-v1`, 46 commits off
+  `origin/main` at `cf5f559`. **Not pushed. No PR opened.**
+- **Tests:** 2102 passing, 0 failing. Run them **unsandboxed** (`npm test`). Under the sandbox
+  ~196 `src/venture/*` tests fail spuriously and are not real failures.
+- **A fresh worktree has no `node_modules`.** Run `npm run worktree:setup` once before testing.
+- `data/` is gitignored by design. Other creators' post text never enters git. Only distilled
+  patterns are committed.
+
+## What this branch does
+
+Finds what already works in Muxin's niches on each platform and turns it into reusable structures.
+Two halves: **collect** other creators' winners into a local corpus, then **distill** them into
+`.claude/skills/atomize/references/{hook-patterns,post-patterns}.md`, which `/atomize` reads when
+drafting.
+
+Her niches, her words: *"using AI, product thinking, and an ADHD brain to build a business solving
+for real social problems. I care about civic work. I'm a solopreneur building with AI. I have
+ADHD."* Plus generally-viral content whose STRUCTURE transfers.
+
+## Current state
+
+- **269 accounts** across 14 platforms. 211 with a follower count read off the platform itself.
+- **292 posts** in `data/patterns/corpus.jsonl`, 132 admitted as pattern evidence.
+- **Only 61 of 269 accounts have any mined content.** The rest are verified and seeded but
+  uncollected. That is the single biggest gap.
+- 31 hook patterns, 47 post-pattern records, every one carrying a `Reach behind it` line.
+
+Collectors built and committed: `src/patterns/{reddit,reddit-rss,instagram,pinterest,youtube,
+youtube-transcript}.ts`, `src/pull/platforms/threads.ts`, plus `baselines.ts` and `era.ts`.
+
+## Commands
+
+```
+npm run patterns:collect                      # validate an inbox file into the corpus
+npm run patterns:outliers                     # score the corpus
+npm run patterns:reddit -- --sub r/ADHD       # needs REDDIT_ keys (Muxin declined these)
+npm run patterns:reddit-rss                   # no credentials, works today
+npm run patterns:youtube -- --backfill        # transcripts, works today
+npm run patterns:pinterest -- --all           # no credentials, works today
+npm run patterns:instagram -- --smoke         # needs IG_GRAPH_ keys
+npm run pull:login -- threads                 # one-time human login
+```
+
+## Blocked on Muxin, not on code
+
+| Item | State |
+|---|---|
+| Reddit API key | **Declined.** Use the browser or RSS route instead. |
+| Instagram `IG_GRAPH_ACCESS_TOKEN`, `IG_GRAPH_USER_ID` | Not set. `.env.example` has the full walkthrough. |
+| Threads login | Not run. Field names are UNVERIFIED; expect `UI_CHANGED` on the first run and read the payload dump it names. |
+| PR #358 `feat/patterns-auto-collect` | **Merge it FIRST, then rebase this branch.** It is the recurring half (weekly cron, `discover.ts`, a `collectors/` registry) that this branch never built. It renames `targets` to `analysis_sample` and our `collect.ts` reads the old field, so whoever merges second eats that compile error. Only 7 files overlap. |
+
+## In flight when this was written
+
+- `reddit-browser`: collecting all 9 subreddits through Muxin's real Chrome. r/ADHD done.
+- `top-creators`: finding top creators all-time per niche, and flagging music/entertainment
+  accounts already seeded under `general-viral` for removal.
+
+Both write to `data/patterns/` and report rather than merging. Check `git log` for what landed.
+
+## Non-negotiable rules, every one learned by breaking it
+
+1. **NEVER use WebFetch or Exa or any model-backed fetch for post content.** WebFetch once
+   returned a different person's comment as the author's post with attribution stripped and
+   silently rewrote 14 of 15 bodies. Exa returned YouTube transcripts truncated mid-sentence and
+   corrupted 3 entries. Raw curl, yt-dlp, or a real browser reading DOM text verbatim. Reading a
+   DOM node's text is fine; asking a model what a page said is not.
+2. **Never compute a multiple against a search-discovered sample.** Comparing winners to winners
+   rated r/ADHD's best post of the year at 2.2x when the truth against a real community median is
+   4094x. Three orders of magnitude. Always collect an unselected window for the denominator.
+3. **`body_is_complete` is the most important field.** False means the substance was NOT collected.
+   Never let a caption, a title, or an SEO description stand in for it. Three platforms hide their
+   substance in images: Threads carousels, Instagram, and Pinterest, whose `headline` is an
+   SEO title that often does not match the words on the graphic at all.
+4. **Rule 1 (CLAUDE.md): never reuse a creator's wording.** Templates describe a MECHANISM; they
+   never supply the creator's sentence with their nouns bracketed out. Single-sighting patterns are
+   presumptively contaminated: 15 of 17 violations came from n=1 records. Verify by n-gram over the
+   WHOLE file including beats and Structure prose, not by scanning quoted strings. Bar is zero at
+   7-grams.
+5. **No em dashes anywhere** (CLAUDE.md rule 5), code comments included.
+6. **Follower counts:** never from a creator's own website. Seven were wrong that way; one moved
+   DOWN when re-read, which proves those sites publish cross-platform totals. `api.fxtwitter.com`
+   is allowed for X as a passthrough with an inline provenance note. A blank is not one thing: no
+   follower concept, a walled fetch, and a refused implausible figure are three different states.
+7. **A follower count is the only reliable impostor check.** Six accounts were caught fake or
+   unusable; two had metadata titles matching the real creator EXACTLY.
+8. **Shared worktree:** stage by EXPLICIT PATH only, never `git add -A`. An index race already
+   tangled two agents' commits.
+
+## Platform routes that work, and the traps
+
+- **Reddit:** `.json` endpoints are blocked even in a logged-in browser. The HTML page works:
+  `shreddit-post` elements carry `score`, `comment-count`, `post-type`, `upvote-ratio`,
+  `flair-text` as attributes. Reddit serves a JS challenge only a real browser solves, which is why
+  scripted Chrome gets 403. **The listing does NOT lazy-load on scroll**: the loader is
+  `loading="programmatic"` and only fires when `loadContent()` is called. RSS
+  (`/top/.rss?t=year`) works with no credentials but publishes no scores; pace at 45s.
+- **YouTube:** transcripts are SOLVED. Subscriber count comes from the page header
+  (`"content":"<n> subscribers"`), **never** `/about`'s `subscriberCountText`, which on
+  `@aliabdaal/about` carried four values, all sidebar recommendations, none his.
+- **TikTok:** profile pages work. The profile blob's `"id"` is the USER id, not a video id; using
+  it returns `10204 item doesn't exist`. **TikTok collection code was never committed** and must
+  be rewritten.
+- **Pinterest:** `data-test-id="leaf-snippet"`, not `id=`. Follower fallback is
+  `__PWS_INITIAL_PROPS__`, not `__PWS_DATA__` (which is an 82KB config blob with no user data).
+  Saves are a global cross-copy aggregate; `repinCount` is this copy's own.
+- **HTTP 200 means nothing** on Pinterest, Threads, and Reddit alike. Nonexistent boards and
+  handles all return 200 with empty payloads.
+
+## Open decisions
+
+1. **3 Exa-contaminated YouTube entries** were re-collected properly, so this may be resolved.
+   Verify `transcript_source` and the notes on the `@aliabdaal` and `DanKoeTalks` entries.
+2. **Pinterest OCR.** `media.asset_url` is populated and verified live. `onscreen_text` is a claim
+   of EXACT WORDS that remix mode copies verbatim under Muxin's byline, so a low-confidence read
+   must stay null. ~310-370 pre-2020 images. Claude vision on the subscription is the $0 route.
+3. **Music/entertainment accounts** seeded under `general-viral` (cristiano, selenagomez, therock,
+   kyliejenner, mrbeast, zachking) are the wrong kind of big. Muxin has said to ignore them.
+4. **Instagram admitted 0 of 13** posts, all body-incomplete, despite the highest median engagement
+   in the corpus (32,596). Credentials fix this.
+
+## This branch is a HELD draft PR
+
+It changes `/atomize` drafting inputs, which is content-generation logic under CLAUDE.md rule 7, so
+it must open as a **draft PR with old-vs-new content samples**, never auto-merge. A drafted PR body
+with real before/after samples is at the session scratchpad's `pr-body.md`.
+
+## Findings worth keeping
+
+- **r/civictech's entire top-of-year is Muxin's niche almost verbatim:** positions 1, 5, 7, 9, 13,
+  16 and 23 are all "I built a free tool to track your representatives / follow bills". Winning
+  form is a plain text post. A moderator proposal to ban project-feedback posts is live; check
+  before posting.
+- **Civic artifacts beat civic arguments** everywhere an honest baseline exists. A petition at 205x
+  and an open-source deliberation tool at 114x on HN. Nobody appended an ask to an opinion; they
+  shipped the thing and the shipping was the post.
+- **Format is decided by the subreddit, not the topic.** r/Entrepreneur is 25 of 25 text; its niche
+  twin r/SideProject is 25 of 25 video or image with NOT ONE body.
+- **All-time and top-of-year are nearly disjoint on Reddit.** Only 1 of 25 r/ADHD posts appears in
+  both; 17 of the all-time top 25 are from 2020-2021. Writing to the all-time list is writing for
+  2021.
+- **Completable CTAs do not correlate with reach** (2.31x vs 2.38x). The civic rubric stays anyway:
+  it exists so a persuaded reader has somewhere to go. Reach and consequence are different
+  outcomes.
+- **Withdrawn claims, do not resurrect:** "winners are shorter" (coin flip at n=292) and "images
+  beat text-only" (the comparison groups crossed once the sample grew).
+
+## Related docs
+
+- `docs/pattern-mining-plan.md` — the original captured request.
+- `.claude/skills/patterns/SKILL.md` — the 8 modes.
+- `.claude/skills/patterns/references/platform-collection.md` — per-platform routes, corrected
+  2026-08-23. Its "Follower and audience counts, in one place" section exists because a correct
+  route filed in the wrong section is functionally undocumented.
