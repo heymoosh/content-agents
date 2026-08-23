@@ -131,12 +131,12 @@ test("attention and conversation read real numbers from the latest metrics captu
     assert.deepEqual(families.attention.impressions, {
       state: "measured",
       value: 1840,
-      posts_measured: 2,
-      posts_unmeasured: 0,
+      records_measured: 2,
+      records_unmeasured: 0,
     });
-    assert.deepEqual(families.conversation.likes, { state: "measured", value: 12, posts_measured: 2, posts_unmeasured: 0 });
+    assert.deepEqual(families.conversation.likes, { state: "measured", value: 12, records_measured: 2, records_unmeasured: 0 });
     // A genuine zero is a measurement, not an absence.
-    assert.deepEqual(families.conversation.replies, { state: "measured", value: 4, posts_measured: 2, posts_unmeasured: 0 });
+    assert.deepEqual(families.conversation.replies, { state: "measured", value: 4, records_measured: 2, records_unmeasured: 0 });
     assert.equal(families.never_collapsed, true);
     assert.equal("total" in families, false);
   } finally {
@@ -153,8 +153,8 @@ test("a post with no metrics row counts as unmeasured rather than as a zero", ()
     assert.deepEqual(families.attention.impressions, {
       state: "measured",
       value: 500,
-      posts_measured: 1,
-      posts_unmeasured: 1,
+      records_measured: 1,
+      records_unmeasured: 1,
     });
   } finally {
     db.close();
@@ -199,8 +199,8 @@ test("conversation folds in the four conversational research sources, actives on
     assert.deepEqual(conversation.research_observations, {
       state: "measured",
       value: 5,
-      posts_measured: 4,
-      posts_unmeasured: 0,
+      records_measured: 4,
+      records_unmeasured: 0,
     });
     assert.deepEqual(conversation.research_observations_by_source, {
       comment: 1,
@@ -239,9 +239,9 @@ test("audience splits measured follower growth from unmeasurable visits and opt-
     aud.run("substack", "2026-08-01T00:00:00Z", "follower_delta", 11);
 
     const { audience } = readOutcomeFamilies(db, { generatedAt: "2026-08-12T00:00:00Z" });
-    assert.deepEqual(audience.new_follows, { state: "measured", value: 11, posts_measured: 2, posts_unmeasured: 0 });
-    assert.deepEqual(audience.follower_total, { state: "measured", value: 950, posts_measured: 1, posts_unmeasured: 0 });
-    assert.deepEqual(audience.follower_delta, { state: "measured", value: 11, posts_measured: 1, posts_unmeasured: 0 });
+    assert.deepEqual(audience.new_follows, { state: "measured", value: 11, records_measured: 2, records_unmeasured: 0 });
+    assert.deepEqual(audience.follower_total, { state: "measured", value: 950, records_measured: 1, records_unmeasured: 0 });
+    assert.deepEqual(audience.follower_delta, { state: "measured", value: 11, records_measured: 1, records_unmeasured: 0 });
     // The unmeasurable half stays unmeasurable, and the family is never rolled into one figure.
     assert.equal(audience.landing_visits.state, "not_measured");
     assert.equal(audience.opt_ins.state, "not_measured");
@@ -416,8 +416,8 @@ test("an empty research table reads as unmeasured, but a populated one with no c
     assert.deepEqual(read.research_observations, {
       state: "measured",
       value: 0,
-      posts_measured: 0,
-      posts_unmeasured: 0,
+      records_measured: 0,
+      records_unmeasured: 0,
     });
   } finally {
     populated.close();

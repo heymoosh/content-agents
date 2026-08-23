@@ -1013,7 +1013,7 @@ export type DeskRoom = "content" | "studio" | "outreach" | "fiction" | "charles"
 // (500 / 20 / 30 / 25) appear in no document in this repo. They are not rendered.
 
 export type MetricReadView =
-  | { state: "measured"; value: number; posts_measured: number; posts_unmeasured: number }
+  | { state: "measured"; value: number; records_measured: number; records_unmeasured: number }
   | { state: "not_measured"; reason: string };
 
 export type ReadTone = "ink" | "grey" | "green" | "amber";
@@ -1034,7 +1034,7 @@ export function groupDigits(n: number): string {
  */
 export function metricLine(m: MetricReadView): { value: string; note: string; tone: ReadTone } {
   if (m.state === "not_measured") return { value: "not measured", note: m.reason, tone: "grey" };
-  if (m.posts_measured === 0) {
+  if (m.records_measured === 0) {
     return {
       value: "0",
       note: "no record carried this number, so this is a sum over nothing rather than a measured zero",
@@ -1044,9 +1044,9 @@ export function metricLine(m: MetricReadView): { value: string; note: string; to
   // "record", not "post": the audience rolls come off capture rows and the research count off
   // observation sources, so calling every one of them a post would be a claim about the shape of
   // the data that is not true of half of them.
-  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured + " records";
-  const missing = m.posts_unmeasured
-    ? ", " + m.posts_unmeasured + (m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
+  const on = m.records_measured === 1 ? "1 record" : m.records_measured + " records";
+  const missing = m.records_unmeasured
+    ? ", " + m.records_unmeasured + (m.records_unmeasured === 1 ? " record carried no number" : " records carried no number")
     : "";
   return { value: groupDigits(m.value), note: "measured on " + on + missing, tone: "ink" };
 }
@@ -5109,15 +5109,15 @@ function groupDigits(n){
 }
 function metricLine(m){
   if(m.state === "not_measured") return { value:"not measured", note:m.reason, tone:"grey" };
-  if(m.posts_measured === 0){
+  if(m.records_measured === 0){
     return { value:"0",
       note:"no record carried this number, so this is a sum over nothing rather than a measured zero",
       tone:"grey" };
   }
   // "record", not "post": half of these come off capture rows and observation sources, not posts.
-  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured+" records";
-  const missing = m.posts_unmeasured
-    ? ", "+m.posts_unmeasured+(m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
+  const on = m.records_measured === 1 ? "1 record" : m.records_measured+" records";
+  const missing = m.records_unmeasured
+    ? ", "+m.records_unmeasured+(m.records_unmeasured === 1 ? " record carried no number" : " records carried no number")
     : "";
   return { value:groupDigits(m.value), note:"measured on "+on+missing, tone:"ink" };
 }

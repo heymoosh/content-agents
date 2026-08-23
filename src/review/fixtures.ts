@@ -271,7 +271,7 @@ const FXS_NOW = "2026-08-21T09:00:00.000Z";
 // with no source to measure it from.
 
 function fxMeasured(value: number, measured: number, unmeasured: number): Record<string, unknown> {
-  return { state: "measured", value, posts_measured: measured, posts_unmeasured: unmeasured };
+  return { state: "measured", value, records_measured: measured, records_unmeasured: unmeasured };
 }
 function fxUnmeasured(reason: string): Record<string, unknown> {
   return { state: "not_measured", reason: "FIXTURE: " + reason };

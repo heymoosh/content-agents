@@ -1924,12 +1924,12 @@ function signalsMirror(): SignalsMirror {
 }
 
 const METRIC_VECTORS: MetricReadView[] = [
-  { state: "measured", value: 4180, posts_measured: 12, posts_unmeasured: 0 },
-  { state: "measured", value: 0, posts_measured: 12, posts_unmeasured: 0 },   // a MEASURED zero
-  { state: "measured", value: 0, posts_measured: 0, posts_unmeasured: 11 },   // a sum over nothing
-  { state: "measured", value: 7, posts_measured: 1, posts_unmeasured: 1 },    // singular wording
-  { state: "measured", value: -3, posts_measured: 2, posts_unmeasured: 0 },   // a negative delta
-  { state: "measured", value: 1234567, posts_measured: 9, posts_unmeasured: 2 },
+  { state: "measured", value: 4180, records_measured: 12, records_unmeasured: 0 },
+  { state: "measured", value: 0, records_measured: 12, records_unmeasured: 0 },   // a MEASURED zero
+  { state: "measured", value: 0, records_measured: 0, records_unmeasured: 11 },   // a sum over nothing
+  { state: "measured", value: 7, records_measured: 1, records_unmeasured: 1 },    // singular wording
+  { state: "measured", value: -3, records_measured: 2, records_unmeasured: 0 },   // a negative delta
+  { state: "measured", value: 1234567, records_measured: 9, records_unmeasured: 2 },
   { state: "not_measured", reason: "the metrics table has no saves column" },
 ];
 
@@ -1963,6 +1963,33 @@ test("metricLine: measured, measured-as-zero and never-measured are three differ
 test("metricLine: the browser copy answers every vector identically", () => {
   const mirror = signalsMirror().metricLine;
   for (const v of METRIC_VECTORS) assert.deepEqual(mirror(v), metricLine(v), JSON.stringify(v));
+});
+
+// The `posts_measured`/`posts_unmeasured` -> `records_measured`/`records_unmeasured` rename (PR
+// #376 documented the mismatch at the declaration and deferred it until page.ts was free). It was
+// a rename and nothing else, so these are the exact sentences the screen shipped before it, pinned
+// byte for byte: if a later change to the field names moves a word, this is what says so.
+test("metricLine: the rename left every rendered sentence byte-identical", () => {
+  assert.deepEqual(metricLine({ state: "measured", value: 4180, records_measured: 12, records_unmeasured: 0 }), {
+    value: "4,180",
+    note: "measured on 12 records",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 7, records_measured: 1, records_unmeasured: 1 }), {
+    value: "7",
+    note: "measured on 1 record, 1 record carried no number",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 1234567, records_measured: 9, records_unmeasured: 2 }), {
+    value: "1,234,567",
+    note: "measured on 9 records, 2 records carried no number",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 0, records_measured: 0, records_unmeasured: 11 }), {
+    value: "0",
+    note: "no record carried this number, so this is a sum over nothing rather than a measured zero",
+    tone: "grey",
+  });
 });
 
 test("groupDigits: grouping is written out, not left to a locale, and both copies agree", () => {

@@ -149,15 +149,15 @@ export type MetricRead =
        *   conversationResearch() one observation SOURCE (comment, dm, follow_up_question, reply)
        *                         that returned a row, not one observation and not one post.
        *   audienceTotals()      one audience capture row carrying a non-null value_count.
-       * The GUI calls these "records" on screen for that reason. Renaming the field is the honest
-       * fix and is deliberately deferred: it would have to land with its GUI consumer.
+       * The GUI calls these "records" on screen for that reason, and the field now says the same
+       * word (PR #376 documented the mismatch and deferred the rename until page.ts was free).
        */
-      posts_measured: number;
+      records_measured: number;
       /**
        * Records counted but unreadable: no metrics row, or a null in this column. Counted so a
-       * missing value is never silently zeroed. Same record definition as posts_measured above.
+       * missing value is never silently zeroed. Same record definition as records_measured above.
        */
-      posts_unmeasured: number;
+      records_unmeasured: number;
     }
   | { state: "not_measured"; reason: string };
 
@@ -300,7 +300,7 @@ function sumColumn(rows: FamilyPostRow[], field: NumericPostField): MetricRead {
       measured += 1;
     }
   }
-  return { state: "measured", value, posts_measured: measured, posts_unmeasured: rows.length - measured };
+  return { state: "measured", value, records_measured: measured, records_unmeasured: rows.length - measured };
 }
 
 /** Weeks of data per platform, computed exactly as src/strategy/snapshot.ts:78-85 does it. */
@@ -383,7 +383,7 @@ function conversationResearch(db: Database.Database): { total: MetricRead; bySou
     total += row.count;
   }
   return {
-    total: { state: "measured", value: total, posts_measured: rows.length, posts_unmeasured: 0 },
+    total: { state: "measured", value: total, records_measured: rows.length, records_unmeasured: 0 },
     bySource,
   };
 }
@@ -436,7 +436,7 @@ function audienceTotals(db: Database.Database): { followerTotal: MetricRead; fol
         measured += 1;
       }
     }
-    return { state: "measured", value, posts_measured: measured, posts_unmeasured: source.length - measured };
+    return { state: "measured", value, records_measured: measured, records_unmeasured: source.length - measured };
   };
   return { followerTotal: roll(totals), followerDelta: roll(deltas) };
 }
