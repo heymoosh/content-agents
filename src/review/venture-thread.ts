@@ -78,8 +78,18 @@ export interface CardMsg {
   state: string;
   /** Set only when a body file exists. The room links to it; it does not inline a file it has not read. */
   bodyPath: string | null;
-  /** Purple + "I DRAFTED THIS" is the AI register. An artifact body is always AI-written. */
+  /**
+   * Purple + "I DRAFTED THIS" is the AI register, and it is true of a body until Muxin edits it.
+   * After that the words are hers and this goes false, because rendering her prose in the AI
+   * register is a real defect (docs/prototype-port-rules.md Rule 4, and PR #359 shipped exactly
+   * that bug once).
+   */
   drafted: boolean;
+  /** The day she rewrote it herself, or null. Read off the artifact; never derived from updated_at. */
+  editedAt: string | null;
+  /** Whether the body can still be edited at all, and the sentence saying why not when it cannot. */
+  editable: boolean;
+  editBlockedReason: string | null;
   evidence: EvidenceView | null;
   retraction: RetractionView | null;
   failure: { message: string; retryable: boolean; at: string } | null;
@@ -108,14 +118,16 @@ export interface CardFinding {
  * than page.ts mirroring the state machine: the client renders what the server says is legal, so
  * there is only ever one copy of "what may happen next".
  *
- * Every id maps to a route that exists. venture-schema-contract.md §2.2 lists three actions that do
- * NOT, and they are deliberately absent rather than drawn dead:
- *   Edit  — no route; editing an artifact body is not built.
+ * Every id maps to a route that exists. venture-schema-contract.md §2.2 lists three actions, and
+ * two of them still do not exist and are deliberately absent rather than drawn dead:
  *   Retry — no route; re-delivery goes through deliverVenture, which is out of scope by decision.
  *   Cancel / Give up — these ARE the discard route, so they render as discard under their own label
  *                      rather than as a fourth verb with nothing behind it.
+ * Edit used to sit in that list. It has a route now (POST :slug/artifacts/:id/body), and it is
+ * offered only where editArtifactBody would actually accept it — see `editable` above, whose
+ * predicate is a mirror of that function's, never a second copy of the decision.
  */
-export const CARD_ACTION_IDS = ["approve", "discard", "restore", "retract", "confirm-live", "failed"] as const;
+export const CARD_ACTION_IDS = ["approve", "discard", "restore", "retract", "confirm-live", "failed", "edit"] as const;
 
 export interface CardAction {
   id: (typeof CARD_ACTION_IDS)[number];
@@ -458,14 +470,16 @@ export function cardState(a: Pick<VentureArtifact, "editorial_status" | "deliver
  * be refused.
  */
 export function cardActions(
-  a: Pick<VentureArtifact, "editorial_status" | "delivery_status" | "delivery_mode" | "artifact_kind">,
+  a: Pick<VentureArtifact, "editorial_status" | "delivery_status" | "delivery_mode" | "artifact_kind" | "body_path">,
   minEvidence: Record<string, "url" | "agent" | "attestation" | null>
 ): CardAction[] {
   const { editorial_status: ed, delivery_status: dl } = a;
+  const edit: CardAction[] = a.body_path && editBlockedReason(a) === null ? [{ id: "edit", label: "Edit the words" }] : [];
   if (ed === "discarded") return [{ id: "restore", label: "Put it back in drafts" }];
   if (ed === "draft") {
     return [
       { id: "approve", label: "Approve it" },
+      ...edit,
       { id: "discard", label: "Put it aside", destructive: true },
     ];
   }
@@ -490,9 +504,26 @@ export function cardActions(
   }
   // approved x ready / not_applicable
   return [
+    ...edit,
     { id: "discard", label: "Put it aside", destructive: true },
     { id: "restore", label: "Back to drafts" },
   ];
+}
+
+/**
+ * A MIRROR of editArtifactBody's own refusals (src/venture/artifact-lifecycle.ts), so the room does
+ * not draw a control that function would decline. It is not the gate: that function still refuses,
+ * and its sentence is what the screen shows. Kept as one predicate feeding both the action list and
+ * the card's explanation, so an artifact can never be un-editable and still show the button.
+ *
+ * `null` means it can be edited.
+ */
+export function editBlockedReason(a: Pick<VentureArtifact, "editorial_status" | "delivery_status">): string | null {
+  if (a.editorial_status === "discarded") return "Put it back on the desk first, then you can edit it.";
+  if (a.delivery_status === "live_confirmed" || a.delivery_status === "handed_off") {
+    return "This already went out. Editing the file now would leave the record saying this text went live when a different one did.";
+  }
+  return null;
 }
 
 /** The tone of a live row's dot. Her own word never renders as the same green as a checked fact. */
@@ -795,11 +826,14 @@ function cardFor(a: VentureArtifact, minEvidence: ThreadInput["minEvidence"]): C
     dot: a.delivery_status === "live_confirmed" ? liveDot(ev) : st.dot,
     state: st.text,
     bodyPath: a.body_path,
-    // Every artifact body in a venture is composed by Claude (root CLAUDE.md rule 1's Build 3
-    // exception), so the AI register applies to all of them. The card TITLE is serif with no
-    // coloured rule: it is neither her words nor drafted prose, and the rule is what carries
-    // authorship.
-    drafted: Boolean(a.body_path),
+    // Every artifact body in a venture STARTS as Claude's (root CLAUDE.md rule 1's Build 3
+    // exception), so the AI register applies until she has been through it herself. The card TITLE
+    // is serif with no coloured rule: it is neither her words nor drafted prose, and the rule is
+    // what carries authorship.
+    drafted: Boolean(a.body_path) && !a.body_edited_by_muxin_at,
+    editedAt: a.body_edited_by_muxin_at,
+    editable: Boolean(a.body_path) && editBlockedReason(a) === null,
+    editBlockedReason: a.body_path ? editBlockedReason(a) : null,
     evidence: ev,
     retraction: retractionView(a.retraction),
     failure: a.failure ? { message: a.failure.message, retryable: a.failure.retryable, at: a.failure.at } : null,

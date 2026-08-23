@@ -1037,8 +1037,15 @@ test("evidenceCapturedView: the browser copy answers every vector identically (R
 test("the evidence rail renders the capture date in the browser, in its own two registers", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes("evidenceCapturedView(e.captured_at)"), "the rail must read the item's own date");
-  assert.ok(html.includes('cv.dated?"ev-cap":"ev-nocap"'), "dated and undated must be visually different");
-  assert.ok(html.includes(".ev-nocap {"), "the undated register needs its own style, or the two collapse");
+  assert.ok(html.includes('cv.dated?"ev-cap":"ev-nocap"'), "dated and undated must take different classes");
+  // ...and the two classes must actually LOOK different, or the distinction is only in the markup.
+  // Asserted against the emitted CSS because that is the only place it exists.
+  const cap = /\.ev-cap \{([^}]*)\}/.exec(html);
+  const nocap = /\.ev-nocap \{([^}]*)\}/.exec(html);
+  assert.ok(cap && nocap, "both registers need a rule of their own, or the two collapse");
+  assert.ok(/font-style:italic/.test(nocap![1]), "the undated register is set apart in style: " + nocap![1]);
+  assert.ok(!/font-style:italic/.test(cap![1]), "and the dated one is not");
+  assert.notEqual(/color:(#[0-9a-f]+)/.exec(cap![1])?.[1], /color:(#[0-9a-f]+)/.exec(nocap![1])?.[1], "and in colour");
 });
 
 test("outreachSendState: locking is the only per-message fact the repo measures", () => {
