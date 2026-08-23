@@ -915,6 +915,14 @@ export function captureVerdict(room: CaptureRoom): CaptureVerdictView {
   };
 }
 
+// The room the desk opens in. Muxin's decision, 2026-08-23: with the capture box moved to Studio,
+// booting into Content opens on a screen with no way to capture a thought. Studio opens on the
+// capture box, the job queue and "Needs you today", which is the front-door shape the design
+// intends and its room order already implies. The nav's resting `on` class, `currentTab` and the
+// boot `setRoom()` all read from here so the three cannot drift apart.
+export type DeskRoom = "content" | "studio" | "outreach" | "fiction" | "charles" | "venture" | "signals";
+export const BOOT_ROOM: DeskRoom = "studio";
+
 export const CAPTURE_RAIL_IDLE = "One place to say it";
 export const CAPTURE_RAIL_ASKING = "A link is two things · you say which";
 export const LINK_ASK_HEADING = "Where should this go?";
@@ -1505,8 +1513,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 <header>
   <h1>Content studio</h1>
   <nav class="rooms">
-    <button class="room on" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
-    <button class="room" data-room="studio">Studio</button>
+    <button class="room${BOOT_ROOM === "content" ? " on" : ""}" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
+    <button class="room${BOOT_ROOM === "studio" ? " on" : ""}" data-room="studio">Studio</button>
     <button class="room" data-room="outreach">Outreach</button>
     <button class="room" data-room="fiction">Fiction</button>
     <button class="room" data-room="charles">Charles</button>
@@ -1983,7 +1991,7 @@ function render(){
 // Six rooms on the desk (Content Studio Riff): Content, Studio, Outreach, Fiction, Charles, Signals.
 // Refresh stays room-aware: it only re-reads whatever the CURRENT room shows, labeled per room,
 // with a "last refreshed HH:MM" stamp so its effect is visible.
-let currentTab = "content";
+let currentTab = ${JSON.stringify(BOOT_ROOM)};
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
 function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
@@ -4534,7 +4542,7 @@ $("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="
 setInterval(()=>{ if(jobsPollDue(JOBS, Date.now(), jobsPollArmedUntil)) loadJobs(); }, JOBS_POLL_MS);
 
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
-setRoom("content");
+setRoom(${JSON.stringify(BOOT_ROOM)});
 // The desk header's live date ("Thursday · Jul 17").
 {
   const now = new Date();
@@ -4544,7 +4552,10 @@ setRoom("content");
 }
 // Match doRefresh()'s ordering: stamp "last refreshed" once the initial data has actually
 // landed, not the instant the page starts loading it (load()/loadJobs() are async).
-Promise.all([load(), loadJobs(), loadContent()]).finally(markRefreshed);
+// loadStudio() is in here because Studio is the boot room: without it the first paint of the desk
+// she actually opens on is an empty "Loading…". load() still runs at boot even though its sheet is
+// in another room, because the Content nav button's pending badge reads off it.
+Promise.all([loadStudio(), load(), loadJobs(), loadContent()]).finally(markRefreshed);
 </script>
 </body>
 </html>`;

@@ -12,7 +12,7 @@ import {
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
   jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
   classifyCapture, captureVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
-  LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE,
+  LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -1799,4 +1799,30 @@ test("Studio capture copy: no em dashes, and nothing claims a job was started", 
   for (const r of ["Outreach", "Venture"] as const) {
     assert.ok(/cannot start/.test(captureVerdict(r).line), r + " must say plainly that it cannot start one");
   }
+});
+
+// The desk boots into Studio (Muxin, 2026-08-23), because the capture box is there now and booting
+// into Content would open on a screen with no way to capture a thought. Three places have to agree,
+// and the first paint has to actually fetch what that room shows.
+test("boot room: Studio, with the nav highlight, currentTab and the first fetch all agreeing", () => {
+  assert.equal(BOOT_ROOM, "studio");
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const onButtons = [...html.matchAll(/<button class="room on" data-room="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(onButtons, [BOOT_ROOM], "exactly one nav room may rest highlighted, and it is the boot room");
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('let currentTab = "' + BOOT_ROOM + '";'), "currentTab must start on the boot room");
+  // Anchored at the boot call site itself: `setRoom("content")` is still legitimate elsewhere, as
+  // the Studio needs-you rows' click-through into the Content room.
+  assert.ok(
+    script.includes('setRoom("' + BOOT_ROOM + '");\n// The desk header'),
+    "the boot setRoom must name the boot room",
+  );
+  // setRoom(boot) fires the room's own reads, but "last refreshed" is stamped off this list, and an
+  // unfetched Studio first-paints as "Loading…". Both Studio reads have to be in it.
+  const boot = script.slice(script.indexOf("Promise.all(["), script.indexOf("finally(markRefreshed)"));
+  for (const fn of ["loadStudio()", "loadJobs()"]) {
+    assert.ok(boot.includes(fn), fn + " must be part of the first paint now that Studio is the boot room");
+  }
+  // The Content pending badge lives in the header rail, so its read still runs at boot.
+  assert.ok(boot.includes("load()"), "the pending-count badge's read must still run at boot");
 });
