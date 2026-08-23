@@ -425,37 +425,68 @@ test("an empty research table reads as unmeasured, but a populated one with no c
 });
 
 // ── rule 5: no em dash reaches the screen ────────────────────────────────────────────────────────
-// Root CLAUDE.md rule 5 and config/voice.yaml ban the em dash from every word a human reads. The
-// Signals room renders these two modules' `reason` and `source` strings verbatim, and it fetches
-// them at runtime, so no static page test ever sees them. This is a source-level guard instead: it
-// parses each file with the TypeScript scanner and looks inside string and template literals only.
-// Comments keep their em dashes (nobody reads those on screen), and treatment.ts's routing-heading
-// regex keeps its em dashes too (it MATCHES a heading Muxin's own files already carry, it does not
-// print one). If this test fails, do not just delete the dash: rewrite the sentence with a period,
-// a comma, a colon, or parentheses, whichever sounds right read aloud.
+// Root CLAUDE.md rule 5 and config/voice.yaml ban the em dash from every word a human reads, and
+// two separate routes had been carrying one to Muxin's screen. The Signals room renders the review
+// modules' `reason` and `source` strings verbatim, fetched at runtime, so no static page test ever
+// sees them. The strategy modules print the markdown reports she reads in her terminal and that
+// /strategy folds into briefs/YYYY-MM-DD-strategy-brief.md; snapshot.ts's data-confidence table is
+// then rendered verbatim by the Signals room on top of that, and route.ts's rationale strings land
+// in each content folder's routing.md, which she reads directly and which the Content room renders.
+//
+// This is a source-level guard over all of it: it parses each file with the TypeScript scanner and
+// looks inside string and template literals only. Comments keep their em dashes (nobody reads those
+// on screen), and treatment.ts's routing-heading regex keeps its em dashes too (it MATCHES a
+// heading Muxin's own files already carry, it does not print one). If this test fails, do not just
+// delete the dash: rewrite the sentence with a period, a comma, a colon, or parentheses, whichever
+// sounds right read aloud.
 const EM_DASH = "—";
-const SIGNALS_READ_MODULES = ["signals.ts", "treatment.ts", "fixtures.ts"];
+const READER_FACING_MODULES: { dir: string; files: string[] }[] = [
+  { dir: "review", files: ["signals.ts", "treatment.ts", "fixtures.ts"] },
+  {
+    dir: "strategy",
+    files: [
+      "angle-refresh.ts",
+      "audience.ts",
+      "cadence-fit.ts",
+      "cta-fit.ts",
+      "exploration.ts",
+      "frame-fit.ts",
+      "grade-bets.ts",
+      "lever-effectiveness.ts",
+      "media-fit.ts",
+      "origin-compare.ts",
+      "platform-fit.ts",
+      "resonance.ts",
+      "route.ts",
+      "routing-drift.ts",
+      "snapshot.ts",
+      "spin-control.ts",
+    ],
+  },
+];
 
-test("no string the Signals read layer can print carries an em dash", () => {
-  for (const file of SIGNALS_READ_MODULES) {
-    const path = join(repoRoot, "src", "review", file);
-    const source = ts.createSourceFile(file, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
-    const offenders: string[] = [];
-    const visit = (node: ts.Node): void => {
-      if (
-        ts.isStringLiteralLike(node) ||
-        ts.isTemplateHead(node) ||
-        ts.isTemplateMiddle(node) ||
-        ts.isTemplateTail(node)
-      ) {
-        if (node.text.includes(EM_DASH)) {
-          const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
-          offenders.push(`${file}:${line + 1} ${node.text.trim()}`);
+test("no string a reader-facing module can print carries an em dash", () => {
+  for (const { dir, files } of READER_FACING_MODULES) {
+    for (const file of files) {
+      const path = join(repoRoot, "src", dir, file);
+      const source = ts.createSourceFile(file, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
+      const offenders: string[] = [];
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isStringLiteralLike(node) ||
+          ts.isTemplateHead(node) ||
+          ts.isTemplateMiddle(node) ||
+          ts.isTemplateTail(node)
+        ) {
+          if (node.text.includes(EM_DASH)) {
+            const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
+            offenders.push(`${dir}/${file}:${line + 1} ${node.text.trim()}`);
+          }
         }
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-    assert.deepEqual(offenders, [], `em dash in a string a reader can see:\n${offenders.join("\n")}`);
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+      assert.deepEqual(offenders, [], `em dash in a string a reader can see:\n${offenders.join("\n")}`);
+    }
   }
 });
