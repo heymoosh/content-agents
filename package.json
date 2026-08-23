@@ -86,6 +86,7 @@
     "patterns:reddit": "tsx src/patterns/reddit.ts",
     "patterns:instagram": "tsx src/patterns/instagram.ts",
     "patterns:pinterest": "tsx src/patterns/pinterest.ts",
+    "patterns:youtube": "tsx src/patterns/youtube.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",

@@ -375,28 +375,64 @@ None of them is required for v1. Every platform below has a free route or an hon
   subscriber counts are public but rounded, so record the rounded number and do not pretend to
   precision. See the fetch caveat below before assuming you can get that number without a browser.
 - **View counts?** Yes, public.
-- **Raw-retrieval verdict: genuinely minable, and the hole is closed (corrected 2026-08-23).** The
-  watch page yields a real caption transcript, a real view count, and a real like count.
-  **Subscriber counts ARE retrievable, on the `/about` page and only there.**
-  `https://www.youtube.com/@<handle>/about` contains exactly one `"subscriberCountText"` string and
-  it is the channel's own. This produced counts for 30 YouTube rows here. So `followers` is no
-  longer null by default on a fetched YouTube entry, and the view-to-follower bar can run.
-- **Keep the old trap warning, pointed at the right page.** The main channel page really is a trap
-  and it is worse than a blank: *every* `subscriberCountText` in that markup belongs to a **sidebar
-  recommendation**, so a naive first-match read records a different channel's number as this
-  channel's. That is how the original "not retrievable" verdict was reached.
-  **Safety rule:** if `/about` ever returns more than one `subscriberCountText`, treat it as
-  ambiguous and record null rather than taking the first.
+- **Raw-retrieval verdict: the numbers are minable, the SPOKEN WORDS ARE NOT (re-corrected
+  2026-08-23, later the same day).** The watch page yields a real view count, an exact like count,
+  the title, the description, the duration, the publish date and the channel handle. It does
+  **not** yield a transcript. The line that used to sit here said "the watch page yields a real
+  caption transcript"; that is now false, so it is struck rather than softened.
+- **The transcript wall, named.** The watch page still lists the caption TRACKS, so whether a video
+  has captions, and whether they are human-authored or machine-generated, is retrievable and
+  certain. The track CONTENT is gated behind a **proof-of-origin (PO) token** that only YouTube's
+  own obfuscated browser JavaScript can mint. Verified 2026-08-23:
+  `https://www.youtube.com/api/timedtext?...` answers **HTTP 200 with a zero-byte body** for every
+  format (default, `json3`, `vtt`, `srv3`), with and without a browser user-agent, a `Referer`, an
+  `Origin`, or a shared cookie jar; `/youtubei/v1/get_transcript` answers **400
+  FAILED_PRECONDITION** even with the page's own `INNERTUBE_CONTEXT` and visitor id. Background:
+  the [yt-dlp PO Token Guide](https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide).
+  **The Data API is not a way around it:** `captions.download` requires OAuth from an account that
+  can edit the video, so it answers 403 on anyone else's video. That is the
+  [documented contract](https://developers.google.com/youtube/v3/docs/captions/download), not a
+  quota problem, and no scope or service account changes it.
+- **Subscriber counts ARE retrievable on `/about`, but NOT via `subscriberCountText`.** The rule
+  that used to sit here said `/about` carries exactly one `subscriberCountText` and that it is the
+  channel's own. **That is stale, and it fails dangerously.** On 2026-08-23
+  `youtube.com/@aliabdaal/about` carried **four** of them, reading 561 thousand, 92.2 thousand and
+  47.6 thousand, every one a **sidebar recommendation**, while the real answer was 6.67M and
+  appeared in none of them. A first-match read there records a stranger's number under this
+  creator's name, which is the exact failure the safety rule exists to prevent.
+  **Use the header route instead:** the single `"content":"<n> subscribers"` string the page header
+  renders. Checked against `@aliabdaal` (6.67M), `@melrobbins` (6.07M) and `@growproduct` (45.2K),
+  it returned exactly one candidate on each, and every one agreed with the count already recorded
+  here by hand. `subscribersFromAbout` in `src/patterns/youtube.ts` implements this.
+  **Safety rule, unchanged but pointed at the route that works:** more than one candidate means
+  record null, never the first.
+- **The main channel page is still a trap** and still worse than a blank, for the original reason:
+  *every* `subscriberCountText` in that markup belongs to a sidebar recommendation. That is how the
+  original "not retrievable" verdict was reached.
 - **Never substitute a creator's website figure for a subscriber count.** Creator sites publish a
   cross-platform total audience number. That is not a per-platform follower count, and recording it
   as one quietly corrupts every ratio computed from it.
 - **Fallback.** For the numbers, none needed. If `/about` is ambiguous or walled, either Muxin
   reads the rounded number off the channel page herself or `followers` stays null.
-- **Transcript.** Free and reliable: the real caption track off the watch page, or in a browser,
-  open the video, expand the description, click "Show transcript", copy the text. Either way record
-  `transcript_source: "captions"`, plural, because those are the spoken words. If the creator
-  disabled captions, type the first thirty seconds by hand at minimum, because the hook is what the
-  analysis step needs most, and set `transcript_source: "manual"`.
+- **Transcript. NOT free and NOT reliable, as of 2026-08-23.** The raw-fetch route is closed; see
+  the transcript wall above. What remains:
+  - **In a browser, by hand.** Open the video, expand the description, click "Show transcript",
+    copy the text. This still works, because a real browser mints the PO token as a side effect of
+    being a real browser. Record `transcript_source: "manual"` when a person copied it, and
+    `"captions"` when a caption track was read verbatim end to end.
+  - **If the creator disabled captions**, type the first thirty seconds by hand at minimum, because
+    the hook is what the analysis step needs most, and set `transcript_source: "manual"`.
+  - **Never let the description stand in for a transcript.** A YouTube description is marketing
+    copy, book links and affiliate URLs; it is not what the person said and it is not what won.
+    Where the spoken words are missing, the honest record is `body` = the description,
+    `transcript_source: "caption"` **singular**, and `media.body_is_complete: false`. One letter
+    separates `"caption"` from `"captions"` and they mean opposite things, so read twice.
+  - **Machine-generated (ASR) tracks count as the spoken words** and may set
+    `body_is_complete: true`, but the entry must say the track was ASR, because ASR wording is
+    approximate and must never be quoted as exact. This corpus already holds ASR mis-transcriptions
+    recorded verbatim: "sematic" for "somatic", "ruin your Safe". `src/patterns/youtube.ts` records
+    the human-versus-ASR distinction on every entry from the track list, which IS retrievable even
+    when its content is not.
 
 ## instagram
 
