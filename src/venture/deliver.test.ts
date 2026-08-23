@@ -111,6 +111,18 @@ describe("confirmManualDelivery", () => {
     assert.equal(a?.evidence?.confirmed_at, "t2");
   });
 
+  // The floor cuts both ways, and this is the direction that is easy to lose: a kind whose minimum
+  // is an attestation must still take a url through the same path. A url is the stronger proof, and
+  // refusing it would be the old exact-equality bug pointing the other way.
+  test("a url is still a real confirmation for a kind whose minimum is only an attestation", async () => {
+    seedApprovedPost("welcome-email");
+    await deliverVenture(SLUG);
+    confirmManualDelivery(SLUG, "p1-a", { type: "url", value: "https://humaninference.substack.com/welcome" }, "t2");
+    const a = readArtifact(SLUG, "p1-a");
+    assert.equal(a?.delivery_status, "live_confirmed");
+    assert.equal(a?.evidence?.type, "url", "what she brought is what gets recorded, not the floor");
+  });
+
   // Refused rather than written: confirm needs handed_off and there is no second confirm, so an
   // attestation on a url-minimum kind would strand the artifact behind a retraction it never
   // earned. The message names the minimum so she knows what to bring instead.
@@ -120,6 +132,12 @@ describe("confirmManualDelivery", () => {
     assert.throws(
       () => confirmManualDelivery(SLUG, "p1-a", { type: "attestation", value: "I pasted it." }, "t2"),
       /needs "url" evidence/
+    );
+    // The message has to be usable by someone mid-task without the contract open: what this kind
+    // needs, what to run instead, and why the two proofs are not the same.
+    assert.throws(
+      () => confirmManualDelivery(SLUG, "p1-a", { type: "attestation", value: "I pasted it." }, "t2"),
+      /confirm it with --url <live-url>: a link can be re-checked later, a sentence cannot/
     );
     assert.equal(readArtifact(SLUG, "p1-a")?.delivery_status, "handed_off", "nothing was written");
   });

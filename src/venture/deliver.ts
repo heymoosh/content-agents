@@ -172,8 +172,10 @@ export function confirmManualDelivery(slug: string, artifactId: string, proof: M
   const min = artifactKindRule(rules, a.artifact_kind).min_evidence;
   if (!evidenceMeetsMinimum(proof.type, min)) {
     throw new Error(
-      `${artifactId} is a ${a.artifact_kind}, which needs "${min}" evidence -- ` +
-        `a ${proof.type} confirmation cannot satisfy it`
+      `${artifactId} is a ${a.artifact_kind}, which needs "${min}" evidence -- a ${proof.type} cannot stand in for it. ` +
+        (min === "url"
+          ? "Put it live, then confirm it with --url <live-url>: a link can be re-checked later, a sentence cannot."
+          : "This kind is confirmed by the delivery agent, not by hand.")
     );
   }
   transitionArtifact(
