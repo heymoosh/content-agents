@@ -4,8 +4,10 @@ The structure library that sits alongside `references/hook-patterns.md` and
 `references/civic-adaptation.md`. Hook patterns cover the first line. This file covers the whole
 post: the arc after the hook, what it makes the reader feel, how it closes, and how long it runs.
 
-**Status: partly mined, synthesis run 2026-08-22.** `substack` (6 patterns), `youtube`
-(5 patterns) and `linkedin` (4 patterns) carry mined records. LinkedIn was withheld from the first
+**Status: partly mined, synthesis runs 2026-08-22 and 2026-08-23.** `substack` (6 patterns),
+`youtube` (5 patterns), `linkedin` (4 patterns) and `mastodon` (3 patterns) carry mined records.
+**Mastodon's are the best-evidenced in this file**, because it is the only platform sampled without
+cherry-picking; weight them accordingly. LinkedIn was withheld from the first
 pass pending a data-provenance check, then cleared and mined once its entries had been rebuilt from
 raw page markup and independently verified. **Every other platform section below is still a
 placeholder.** This file is populated by `/patterns synthesize`, the synthesis step of the pattern-mining
@@ -47,63 +49,99 @@ committed. If you want to change what gets mined, edit `config/pattern-mining.ya
 
 ## What separated the winners from the same creators' ordinary posts
 
-**This is a run-level finding from the 2026-08-22 mining pass, not a pattern record.** It is placed
-above the patterns because it is more useful than any single skeleton below: it tells you what to
-ask of a draft, rather than which shape to pour it into. It comes from a 58-post corpus in which
-most creators contributed 4 or 5 posts, so an outlier could be compared against the same person's
-ordinary work. That comparison is the thing a list of famous posts cannot give you.
+**A run-level finding from the mining pass, revised 2026-08-23 against a 100-post corpus, not a
+pattern record.** It is placed above the patterns because it is more useful than any single skeleton
+below: it tells you what to ask of a draft, rather than which shape to pour it into. Most creators
+contributed 4 to 6 posts, so an outlier could be compared against the same person's ordinary work.
+That comparison is the thing a list of famous posts cannot give you.
 
 **The finding:** the post that beats a creator's own baseline is the one that gives the reader
-something that creator's ordinary posts do not. Recycled and inward-facing material lost every time
-it appeared.
+something that creator's ordinary posts do not. Recycled, forwarded and inward-facing material lost
+almost every time it appeared.
 
-Three measured contrasts sit behind it:
+### The length claim died when better data arrived, and that is the useful part
 
-- **Shorter than their own average, in 7 of the 10 accounts** with two or more scored posts. Six of
-  those are dramatic, from 0.03x to 0.62x of the creator's own mean length. **Two of the seven come
-  with a caveat that changes their meaning:** on one LinkedIn account and one Instagram account the
-  short winner was a CAPTION over a visual, so the brevity is a property of the caption, not of the
-  post. Those two are not evidence that short text wins. They are evidence that a visual did work
-  the text did not have to. The LinkedIn one is now confirmed: that image was recovered and it
-  carries a full compressed argument, so the post was never short in substance, only in text. The
-  Instagram carousel's slides were still never collected. See the media section below, which turns
-  this caveat into the corpus's strongest measured result.
-- **No link.** In all 4 accounts that had both linked and unlinked posts, the top post was the one
-  with no link. **The honest counterexample:** one creator links on all five of his posts and still
-  records the highest raw engagement in his platform's set. So this is about relative performance
-  inside one creator's feed, not a rule that links suppress reach.
-- **A person, not a topic.** The winners center someone specific where the same creators' ordinary
-  posts center a subject. One Bluesky post naming and praising one person drew 10,135 likes against
-  153 for that same author's most carefully constructed post, a 66 to 1 gap on 84 characters versus
-  297.
+An earlier version of this section, written on 58 posts, said the winner was shorter than the
+creator's own average in 7 of 10 accounts. **With 100 posts it is 9 of 18, or 8 of 17 excluding the
+search-biased X account. That is a coin flip, and the claim is withdrawn.**
 
-**The three exceptions are what make this credible rather than a slogan.** Not every winner was
-short, and the ones that were not are the most instructive:
+The split is not random, and how it splits is the real finding:
+
+- On the **cherry-picked platforms**, where only famous posts were reachable, the winner is usually
+  shorter. Those accounts' ordinary posts are long essays and long structured posts, so the winner
+  broke format by being brief.
+- On **Mastodon, the one platform sampled without cherry-picking**, the direction REVERSES. In 6 of
+  7 accounts the winner is LONGER than that creator's own average, by 1.41x to 2.28x. The seventh is
+  shorter, and it is the one whose winning post carries an image attachment that was never
+  collected. Those accounts' ordinary posts include bare headline links and a 13-character greeting
+  that landed below its own account's baseline.
+
+So length was never the variable. It tracks effort relative to whatever that account normally does,
+and it points in opposite directions depending on what normal is. **Where the baseline is long
+essays, the winner is the short one. Where the baseline is throwaway posts, the winner is the one
+with substance.** The constant across both is the finding above.
+
+Two things follow that are worth stating plainly. Sampling method changed the apparent answer, which
+is a warning about every number in this file that came from a cherry-picked platform. And "write
+shorter" would have been actively bad advice: on the best-sampled platform, the single worst
+performer relative to its own baseline is a 13-character greeting, and one of the best is a
+482-character admission.
+
+### What did survive
+
+- **No link.** In all 8 accounts that had both linked and unlinked posts, the top post was the one
+  without a link. That now includes 3 Mastodon accounts. **Two honest qualifiers.** One creator
+  links on all five of his posts and still records the highest raw engagement in his platform's set,
+  so this is about relative performance inside one feed rather than a rule that links suppress
+  reach. And on Mastodon a linked post is usually a forward of somebody else's work, so part of what
+  this measures is that original material beats forwarding, which converges with the point below.
+  One Mastodon outlier does carry a link and still ran 3.7x, so the effect is a tendency, not a law.
+- **Recycled and forwarded material loses.** The clearest cases sit on opposite ends of the corpus:
+  one Substack account's two losers are an openly revisited interview and a republished book
+  excerpt, while its two winners open on something the author personally found in a primary source;
+  and one Mastodon account's forwarded academic paper drew a thirtieth of what his own arguments
+  drew in the same window.
+- **Something specific in front of the reader.** On the cherry-picked platforms the winners center a
+  named person where the ordinary posts center a topic; one Bluesky post naming and praising one
+  person drew 10,135 likes against 153 for that author's most carefully constructed post. On
+  Mastodon the equivalent is subtly different and worth keeping separate: the winners center the
+  POSTER'S OWN judgment, a verdict, a confession, or a disclosed stake, rather than another person.
+  Both are instances of putting something specific and human in front of the material.
+
+### The exceptions, which are what make this credible rather than a slogan
 
 - One Substack account's two outliers are among its LONGEST posts and still beat its ordinary posts
-  tenfold. What they have is original labour: each opens on something the author personally found in
-  a primary source. That account's two losers are openly recycled, a revisited interview and a
-  republished book excerpt.
-- Another Substack account's winner is LONGER than its own average. What it has is timing plus a
-  named tool aimed at the exact week the reader was living through.
-- One YouTube account's best scored post is its longest of the two, not its shortest.
+  tenfold, on original primary-source labour.
+- Another Substack account's winner is LONGER than its own average, carried by timing and a named
+  tool aimed at the exact week the reader was living through.
+- On Mastodon, one account's winner is its shortest post, a 52-character solidarity line with no
+  link and no information, while that same account's longest and most technically precise post drew
+  about a third of it. Within a single account, both directions appear.
 
-So "shorter wins" is the wrong lesson and this file does not teach it. The right question to ask of
-a draft is: **what does this give the reader that my ordinary posts do not?** Brevity is one answer.
-A specific person is another. Original labour is another. **A real image is a fourth, and it is the
-only one of the four the corpus can prove**, which is the subject of the next section. Having no
-answer is the failure the losing posts in this corpus share.
+The right question to ask of a draft is: **what does this give the reader that my ordinary posts do
+not?** Substance, brevity, a specific person, original labour, a disclosed stake, and a real image
+are all answers the corpus has seen work. Only one of them is measured rather than observed, and
+that is the subject of the next section. Having no answer is the failure the losing posts share.
 
-**One honest limit.** These are engagement comparisons within a single creator's feed, mostly on
-raw like counts, on posts of different ages, and on platforms where view counts are not public.
-They show relative performance inside an account. They are not controlled experiments, and no
+**One honest limit.** These are engagement comparisons within a single creator's feed, on raw
+favourite and like counts, across posts of different ages. The Mastodon multiples are measured
+against an unbiased 40-post window and deserve the most weight; every other platform's multiples
+rest on cherry-picked siblings and deserve less. None of this is a controlled experiment and no
 causal claim here has been tested.
 
 ## What form the post takes, and the one thing the corpus can prove about it
 
 **A second run-level finding from the 2026-08-22 mining pass, not a pattern record.** Like the
 section above it, this is something to ask of a draft before reaching for a skeleton. It comes from
-a `media.form` classification on 56 of the 58 corpus entries.
+a `media.form` classification on 56 corpus entries.
+
+**These figures were NOT recomputed when the corpus grew to 100, and they did not need to be:
+none of the 42 Mastodon entries carries a media classification, so they cannot join this analysis.**
+The table still rests on the same 56 classified entries. A scorable-but-unclassified bucket of 44
+does exist and averages 3.48x, and it is not a form and must never be read as one: it is mostly
+Mastodon, where every account contributes its guaranteed top post by design, so the bucket is
+inflated by construction. Classifying Mastodon media is a known gap, and it is not empty, 6 of the
+42 carry attachments according to their notes.
 
 The control that matters here is `body_is_complete`. Some entries are posts whose substance sat in
 something never collected, an image, a carousel, a thread, being scored on engagement that
@@ -129,7 +167,10 @@ corpus, and three independent things back it up:
 - **Within one account, holding audience and period constant.** One LinkedIn creator's five posts:
   his four image posts run 5.06x, 1.68x, 0.88x and 0.63x, and his single text-only post is his worst
   at 0.53x. The gradient inside that is worth as much as the ranking. The more the image carried and
-  the less the caption said, the better the post did.
+  the less the caption said, the better the post did. To be even-handed about it: his top two are
+  flagged body-incomplete, so they sit outside the controlled 13-entry figure above exactly as the
+  38,442-like post does. This gradient is a within-account observation, not part of the measured
+  result, and it is offered as corroboration rather than as evidence.
 - **Convergent professional practice.** 14 of 15 LinkedIn posts in the corpus, from three separate
   creators who do this for a living, carry an image. They arrived at that independently.
 - **It is not one account's artifact.** The 8 text-only entries span 4 creators on 4 platforms.
@@ -741,7 +782,195 @@ Not yet mined. Fall back to `references/hook-patterns.md`.
 
 ### mastodon
 
-Not yet mined. Fall back to `references/hook-patterns.md`.
+**Provenance:** mined by `/patterns synthesize` on 2026-08-23 from 42 Mastodon analyses, corpus at
+100 entries, across 7 accounts contributing 6 posts each. 3 accounts are `building-solopreneur`,
+4 are `civic-democracy`. **`inner-journey` is absent from this platform**, not under-collected: a
+search across 11 hashtags on 3 instances found no creator at meaningful scale. Do not plan around
+filling that gap.
+
+**This is the best-sampled platform in the corpus and its numbers deserve the most weight.**
+Everywhere else, only famous posts were reachable, so a multiple is measured against cherry-picked
+siblings. Here the open API returned each account's last 40 original top-level posts, the true
+median was computed across all 40, and the 6 kept per account are the single highest-engagement post
+plus five chosen purely by POSITION in the timeline (0, 9, 19, 29, 39). **Nothing was selected for
+looking good.** The collector also tested selection ratios: two-top-plus-four inflated the corpus
+median 2.45x and would have suppressed real outliers, while one-top-plus-five came in at 1.14x mean.
+That is what shipped. So a Mastodon multiple is measured against an unbiased window.
+
+10 of the corpus's outliers are here, at least one per account. **Mastodon publishes no view count
+by design**, so every result here is an engagement-baseline result and never a view ratio.
+
+**Caveats that constrain what follows:**
+
+- **Body-complete control.** 6 of the 42 carry media attachments and 5 are self-thread heads whose
+  continuations were not collected. 8 of the 10 outliers are clean; the 2 that are not are flagged
+  on their patterns below and are never used as sole evidence.
+- **Two accounts have gone quiet.** One civic account's most recent original post is from
+  2025-11-06 and another's is from 2026-01-12, so their 40-post windows reach back one to two years
+  while the other five span weeks. **Within-account comparison stays fair. Cross-account comparison
+  does not.** No pattern below rests on comparing raw numbers between accounts.
+- **One account's niche fit is a judgment call.** A maintainer employed rather than self-employed,
+  included because his posts are about the economics of a project he owns. The pattern drawn from
+  him is maintainer economics, not open-source politics; if it ever starts reading as the latter,
+  it has drifted.
+
+**Boosts, not favourites, are how things travel here.** Several posts in this corpus draw more
+boosts than favourites, ratios up to about 1.6, and they are consistently the short quotable
+verdicts. A reader boosts a claim to make it themselves. Posts that draw favourites without boosts
+tend to be personal or appreciative. Worth knowing when choosing what a post is for.
+
+**Why 3 patterns and not 5 to 7.** The 42 posts contain two arcs that repeat across creators and one
+that does not. The rest of the corpus is dominated by bare link shares and throwaway greetings, which
+are the LOSING form here and are recorded as counter-evidence inside pattern 1 rather than dressed up
+as patterns. Fewer patterns, but these carry the strongest evidence in this file: 8 clean outliers
+across 5 creators measured against unbiased baselines.
+
+#### 1. Say Something Before the Link
+
+- **Platform:** mastodon
+- **Mechanism:** the poster puts their own judgment in front of the link, so the reader gets the
+  payload without clicking and knows why it matters before deciding to. Seen in 3 posts across 3
+  creators, all three of them outliers, all three body-complete, at 19.0x, 10.2x and 9.3x. The
+  counter-evidence is unusually strong: bare headline-plus-link shares are the single most common
+  form in this sample and they cluster at the bottom of every account that uses them.
+- **Structure / arc:**
+  1. Your own words first. The link never leads.
+  2. One of three fills, all evidenced here: a short verdict plus the lifted sentence that earned
+     it; a personal frame about why you are posting this; or a recommendation with a turn.
+  3. The specific reason the reader should care, in their terms, not a summary of the article.
+  4. For a recommendation, the turn: what the thing gives them beyond the obvious.
+  5. The link, last.
+  6. Optional and effective: a one-line disclosure of your own stake.
+- **Emotional trigger:** being handed a judgment by someone whose judgment the reader already
+  trusts. The lifted-sentence variant goes further and pre-loads agreement, so the reader has
+  accepted the point before the link is even offered.
+- **Immediate personal payoff:** the argument itself, delivered inside the post. A reader who never
+  clicks still leaves with something, which is why beat 2 cannot be a generic "this is worth
+  reading". The clearest case in the corpus: five bare headline shares on one account run 3 to 17
+  favourites, and the one post that added two words of reaction and quoted the key sentence ran 93,
+  about 19 times that account's true median.
+- **CTA style:** read the linked thing, but the post is complete without it. Non-civic material
+  keeps the ordinary `config/cta.yaml` default. **CIVIC GATE:** three of the four civic accounts
+  here post almost entirely links to news that offers the reader nothing to do, and that is a
+  finding about the niche, not a model to copy. To clear Muxin's bar this shape needs a close
+  pointing at one specific verified thing the reader can finish in under 5 to 10 minutes, local
+  where possible. The one civic winner here already did that: it pointed at a tool the reader could
+  use the next time they bought something. One factual note for register, no more: across the civic
+  accounts, the constructive posts outperformed the alarm posts within their own windows.
+- **Length and formatting:** 150 to 460 characters. Verdict or frame first, quotation as its own
+  block when used, link last on its own line. No hashtags on any of the three winners. Note the
+  limit case: where an audience is already deep in a running story, three words plus a link is
+  enough, so the "something" scales to how much context the reader already has.
+- **Shape:**
+  ```
+  [Beat 1: your own words. The link does not go here.]
+  [Beat 2: pick ONE fill and commit to it:
+     (a) a short verdict, then the one sentence from the piece that earned it, quoted
+     (b) why YOU are posting this, something true about your relationship to the reader
+     (c) a recommendation: what this thing is, in one line]
+  [Beat 3: the specific reason it matters to them, never a summary of the article]
+  [Beat 4, for a recommendation: the turn, what it gives them that they would not expect]
+  [Beat 5: the link, last]
+  [Beat 6, optional: your stake, disclosed in one short parenthetical]
+  ```
+  Beat 2(a)'s quotation must be lifted accurately from the source. Beat 6 must be true. If the only
+  thing you can say is that something is interesting, this shape has nothing to work with, and the
+  corpus shows that a two-word generic praise adds close to nothing.
+- **Real example:** Heidi Li Feldman, Mastodon, her post pairing a two-word reaction with a pulled
+  quote from a commentary piece, against five bare headline shares on the same account. Also Dan
+  Gillmor, Mastodon, his recommendation of a consumer-guidance site with a disclosed donor
+  relationship. Citation only, do not reuse the wording.
+
+#### 2. The Candid Constraint
+
+- **Platform:** mastodon
+- **Mechanism:** the person running the thing states an unflattering internal reality in specific
+  terms, explains why it is that way, and often ends by asking for the help that would fix it. The
+  admission buys credibility and the ask spends it. Seen in 3 posts across 2 creators, all three
+  outliers, all body-complete, at 15.3x, 6.2x and 3.7x.
+- **Structure / arc:**
+  1. The uncomfortable fact, first, with an exact number in it where one exists.
+  2. The honest reaction, in the words actually used privately rather than in status-update
+     language.
+  3. The reason, given as a decision the poster made or a constraint they operate under, never as
+     an accident.
+  4. What it does not mean, meaning the reassurance that stops the admission reading as
+     indifference.
+  5. The value that explains why this particular thing was hard to say.
+  6. The ask, or the constraint named plainly, in one sentence.
+- **Emotional trigger:** trust through exposure. Someone volunteering information that makes them
+  look worse in the short term is read as evidence that the rest of what they say is true. The
+  audience converts an annoyance into loyalty.
+- **Immediate personal payoff:** a straight answer about something the reader was confused or
+  annoyed by, plus a timeline. Where the post ends in an ask, a small number of readers also get a
+  direct route into work they were qualified for and did not know was open.
+- **CTA style:** where one exists it is a genuine, completable ask with no link and no form, just
+  tell me if this is you. That already clears a micro-action bar. Non-civic here, so the ordinary
+  `config/cta.yaml` default applies otherwise.
+- **Length and formatting:** 200 to 500 characters. Short paragraphs. Exact numbers in the opening
+  sentence. Deliberately informal verbs in the middle. The strongest example carries no link, no
+  hashtag and no emoji.
+- **Shape:**
+  ```
+  [Beat 1: the uncomfortable fact, with a real number in it (how many people, how long, how often)]
+  [Beat 2: the honest reaction, in the words you would actually use, not the professional version]
+  [Beat 3: why, framed as your decision or your constraint, never as bad luck]
+  [Beat 4: what it does not mean, so the admission does not read as not caring]
+  [Beat 5: the value at stake, one line, why this was hard to say]
+  [Beat 6: the ask, specific enough that the right person recognises themselves, or the
+     constraint named plainly]
+  ```
+  **The admission has to cost something.** The same account's post sharing a comfortable internal
+  state sat at baseline while its post admitting a gap ran 15.3x. Every number and every constraint
+  must be true; a manufactured vulnerability is the exact failure this shape invites.
+- **Real example:** Daniel Stenberg, Mastodon, his post about his project's security team lacking
+  anyone on a major platform, ending on an open invitation. Also Daniel Supernault, Mastodon, his
+  post disabling a shipped migration feature and explaining the one-person constraint behind it.
+  Citation only, do not reuse the wording.
+
+#### 3. The Sideways Critique `(single sighting, clean)`
+
+- **Platform:** mastodon
+- **Mechanism:** attack the thing on an axis nobody is defending. Everyone in the argument has their
+  moral counterarguments loaded, so switching to analogy or to taste walks straight past the
+  defence. **Evidence is one clean post and one thread head.** The clean one is the largest multiple
+  in the entire corpus at 37.3x; its sibling at 8.8x is a self-thread head whose continuations were
+  never collected, and both are from one creator. Recorded because of the size of that one result,
+  not because it repeats.
+- **Structure / arc:**
+  1. Build a counterfactual world in one long sentence, with the harm concrete and its scale pinned
+     to something specific.
+  2. Put the choice to the reader personally: would YOU work inside it.
+  3. Voice the rationalisation in quotation marks, in the voice of someone who means it, made
+     genuinely plausible rather than strawmanned.
+  4. Snap to the real target in one short sentence.
+  5. Stop. Do not explain the analogy afterwards.
+- **Emotional trigger:** recognition arriving as a small shock. The reader agrees with an argument
+  about something else, commits, and only then learns it was about them. Quoting the rationalisation
+  fairly is what makes the trap fair rather than cheap.
+- **Immediate personal payoff:** a ready-made frame for an argument the reader is probably already
+  having, plus the relief of hearing a discomfort named precisely.
+- **CTA style:** none, and the winner carried no link and no hashtag. The withheld conclusion is
+  what drives boosts, because forwarding it is how the reader makes the argument themselves. On
+  civic material this shape would still need a completable close added to clear the rubric, and it
+  does not have one natively.
+- **Length and formatting:** 280 to 390 characters in two paragraphs, and **the imbalance is the
+  mechanism**: a long setup paragraph carrying the whole counterfactual, then a single short
+  sentence. No link, no hashtag.
+- **Shape:**
+  ```
+  [Beat 1: the counterfactual world, one long sentence, harm named concretely and scale pinned]
+  [Beat 2: "would you [work inside it / take that job / defend it]?" put to the reader directly]
+  [Beat 3: the rationalisation, in quotes, in the voice of someone who believes it and is not stupid]
+  [Beat 4: the snap, one short sentence naming the real subject]
+  [Stop. No explanation, no restatement, no link.]
+  ```
+  Beat 1's counterfactual must be recognisably true of the thing it describes, and beat 3 must be a
+  rationalisation someone actually makes. A strawman collapses this shape, and an analogy the reader
+  can dispute on facts turns the argument into a debate about the analogy.
+- **Real example:** Baldur Bjarnason, Mastodon, his post transposing a technology-industry argument
+  onto a different regulated industry and snapping back in the final line. Citation only, do not
+  reuse the wording; the transposition is the borrowable thing, never the sentences.
 
 ### tiktok
 

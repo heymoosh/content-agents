@@ -97,6 +97,7 @@ nothing in this file.
 | 25 | State-and-Excuses Open | Recite the reader's current state and their own excuses back to them, in the order they would give them, closing the escape route before they can reach it | "There's something you know you should [do] today, and you're not doing it, because [their excuse], [their second excuse], [their third]." | Mel Robbins, YouTube shorts, her short on doing the hard thing, which is the full form; Nicole LePera, YouTube, who names the state without the excuses. Seen in 2 posts across 2 creators, both YouTube, and only one of the two is the complete shape |
 | 26 | Found-Artifact Open | Lead with the labour you personally did and the one thing it turned up, so the reader is buying a discovery instead of an opinion | "[Real amount of time] into [the research you actually did], I found [one specific artifact] that [what it did to you]." | Anand Giridharadas, Substack (The Ink), the numbered chapters of his Epstein files series. Seen in 2 posts, one creator, both of them that account's outliers |
 | 27 | Refused Premise | Reject, in the first line, a forced choice or a piece of received advice the reader has already accepted, so the post begins by taking a weight off them rather than adding one | "[The forced choice or the received advice, in the reader's own terms]. [Flat rejection, same breath, no hedging]." | Justin Welsh, LinkedIn, his post rejecting the standard quit-your-job advice, and his post refusing the money-or-freedom either-or. Seen at the opening in 2 posts across 2 creators, one refusing an either-or and one rejecting named advice; a third post uses the move after its opening line |
+| 28 | Counterfactual Snap | Build an invented but recognisable world, voice the rationalisation someone would offer inside it, then snap to the real subject in one short sentence and stop | "If you lived in a world where [recognisable harm returning at a pinned scale], would you [work inside it] to make it less bad? \"[the rationalisation, in the voice of someone who means it]\" [Snap: this is what [the real subject] now sounds like.]" | Baldur Bjarnason, Mastodon, his post transposing a technology-industry argument onto a different regulated industry. Single sighting, and the largest clean multiple in the corpus at 37.3x on its best-sampled platform. DISTINCT FROM 10: pattern 10 opens on a REAL historical scene and pivots; this builds an INVENTED counterfactual and embeds a quoted rationalisation inside it |
 
 ## Verification caveats (carry forward, don't drop)
 
@@ -114,7 +115,14 @@ nothing in this file.
 - Pattern 27 rests on 2 posts that carry the shape at the opening. Both are strong performers for
   their accounts but neither is a measured outlier, and LinkedIn exposes no view counts, so there is
   engagement evidence behind it but no reach evidence.
-- Rows 24 to 26 draw on no LinkedIn body. If LinkedIn entries later clear their
+- Rows 24 to 26 draw on no LinkedIn body.
+- Pattern 28 rests on a SINGLE post. It is included, where other single sightings encountered in the
+  same mining pass were refused, and the reason is worth recording so the bar stays consistent: this
+  one is the largest clean multiple measured anywhere in the corpus (37.3x) and it comes from the
+  only platform sampled without cherry-picking, so it carries real performance evidence. The single
+  sightings that were refused had either no performance evidence or negative performance. n=1 with a
+  strong measured result on an unbiased sample is not the same as n=1 with none, but it is still
+  n=1: treat the shape as promising, not proven, until a second creator is seen using it. If LinkedIn entries later clear their
   provenance check, they may add rows; they did not inform these.
 - The joyful-activism register (16–23) is genuinely thinner in short-form (X/LinkedIn) than the
   outrage-framed register — most source material sits in Substack essays, books, and long-form
