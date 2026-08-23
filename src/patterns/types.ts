@@ -15,6 +15,17 @@ export const PLATFORMS = [
   "tiktok",
   "youtube",
   "instagram",
+  // Added 2026-08-23. Open channels where a post travels on its own merit rather than on the
+  // poster's follower count, so a real timeline sample is cheap and the baselines mean something.
+  // reddit and hackernews score in upvotes and expose no follower concept at all, so a
+  // view-to-follower ratio can never run on them; they are baseline-multiple only.
+  "reddit",
+  "hackernews",
+  "devto",
+  // Substack Notes is its own surface with its own feed, its own numbers and its own craft. Kept
+  // separate from "substack" on purpose: a Note and an essay are different products, and pooling
+  // them would put an essay's baseline under a Note.
+  "substack-notes",
 ] as const;
 
 export type Platform = (typeof PLATFORMS)[number];

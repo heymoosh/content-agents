@@ -8,6 +8,19 @@
 
 # The three niches already covered by .claude/skills/atomize/references/hook-patterns.md.
 niches:
+  # Widened 2026-08-23 to Muxin's own description of what she writes about: "using AI, product
+  # thinking, and an ADHD brain to build a business solving for real social problems. I care about
+  # civic work. I'm a solopreneur building with AI. I have ADHD."
+  - ai-building        # building with AI, AI workflows, AI as a tool for one person
+  - product-thinking   # product sense, prioritisation, shipping judgement
+  - adhd               # ADHD brain, executive function, working with it not against it
+  - civic-tech         # civic work, democracy, real social problems, tech for public good
+  - solopreneur        # one-person business, indie building, audience as distribution
+  # Posts that won on STRUCTURE alone, any topic. Muxin's words: "anything that's just viral in
+  # general because it can work across niches." These are shape donors, not topic matches. Judge
+  # them on how far they beat their own author's baseline, never on subject.
+  - general-viral
+  # The original three, kept so the 100 entries already collected under them stay valid.
   - building-solopreneur
   - inner-journey
   - civic-democracy
@@ -722,6 +735,23 @@ verbatim_ok:
     grant: public blanket grant in the post that introduced this remix method
 
 outlier_thresholds:
+  # Added 2026-08-23 with the open channels. reddit and hackernews have NO follower concept, so
+  # view_follower_ratio can never fire there; both are baseline-multiple only, and the ratio number
+  # below is inert. Reddit medians differ wildly by subreddit (r/ADHD median 3, r/LifeProTips
+  # median 691), so a single platform-wide bar is a rough instrument here; tune per subreddit if
+  # this becomes load-bearing.
+  reddit:
+    view_follower_ratio: 999.0  # inert, no follower count exists
+    baseline_multiple: 5.0      # starting guess; medians are tiny so multiples run large
+  hackernews:
+    view_follower_ratio: 999.0  # inert, no follower concept on the platform
+    baseline_multiple: 10.0     # median submission dies at 3 points; the front page is the top 1%
+  substack-notes:
+    view_follower_ratio: 999.0  # inert, no public view count
+    baseline_multiple: 4.0      # starting guess
+  devto:
+    view_follower_ratio: 999.0  # inert
+    baseline_multiple: 2.0      # distribution is compressed; best of a year is about 2x the median
   x:
     view_follower_ratio: 5.0    # starting guess, tune once real data lands
     baseline_multiple: 3.0      # starting guess, tune once real data lands
