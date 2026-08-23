@@ -76,10 +76,39 @@ anger-toned; don't impose a heavier register than the source actually carries.
 | 22 | Explicit Rejection of Duty/Guilt Register | Name the finger-wagging tone directly and reject it in the same breath | "[This work] shouldn't be a [finger-wagging/eat-your-vegetables] thing. It should be [joyful/something you co-create]." | Eric Liu, Citizen University |
 | 23 | Short Trust/Faith Declarative | A brief, calm line affirming trust in a long process, standing in for hope without over-explaining | "[Short calm affirming line], [standing in for hope about a long process]." | adrienne maree brown, blog post title "i trust the trees" |
 
+## Mined patterns (added by `/patterns synthesize`, 2026-08-22)
+
+**Source, and how it differs from 1 to 23:** rows 1 to 23 came from a research pass over creators
+in Muxin's niches. The rows below were mined from a 53-post corpus of real collected posts with
+recorded numbers (`data/patterns/corpus.jsonl`, gitignored), analysed in
+`data/patterns/analyses.jsonl`, and each one is a shape seen repeating across real posts rather
+than a shape observed once. Full-post structure for these lives in `references/post-patterns.md`
+under the platform it was mined on; these rows cover only the opening.
+
+**None of these rest on a LinkedIn body.** The corpus's LinkedIn entries were withheld from this
+synthesis run pending a data-provenance check, so no row below draws on one.
+
+| # | Name | Mechanism | Shape | Real example (citation only, do not copy) |
+|---|---|---|---|---|
+| 24 | Named-Tool Handover | Name the technique and give away the entire mechanic in the same breath, so the value arrives before the viewer has decided whether to stay | "[Two or three word tool name] is [what kind of thing it is]. Here it is: [the whole mechanic, one sentence, nothing withheld]." | Ali Abdaal, YouTube shorts, his timer-based rule for starting when procrastinating; Mel Robbins, YouTube shorts, her two-word relationship technique. Seen at the opening in 5 posts across 3 creators; the full-post version is in `post-patterns.md` under youtube |
+| 25 | State-and-Excuses Open | Recite the reader's current state and their own excuses back to them, in the order they would give them, closing the escape route before they can reach it | "There's something you know you should [do] today, and you're not doing it, because [their excuse], [their second excuse], [their third]." | Mel Robbins, YouTube shorts, her short on doing the hard thing, which is the full form; Nicole LePera, YouTube, who names the state without the excuses. Seen in 2 posts across 2 creators, both YouTube, and only one of the two is the complete shape |
+| 26 | Found-Artifact Open | Lead with the labour you personally did and the one thing it turned up, so the reader is buying a discovery instead of an opinion | "[Real amount of time] into [the research you actually did], I found [one specific artifact] that [what it did to you]." | Anand Giridharadas, Substack (The Ink), the numbered chapters of his Epstein files series. Seen in 2 posts, one creator, both of them that account's outliers |
+
 ## Verification caveats (carry forward, don't drop)
 
 - Patterns 15, 17, and 23 are supported by real, verified people and real context, but not by a
   single clean verbatim quote — treat the shape as real, not the specific wording.
+- Pattern 26 is supported by only 2 posts from a single creator. Both are large outliers for that
+  account, which is why it is recorded, but treat it as promising rather than proven until a second
+  creator shows the same shape.
+- Patterns 24 and 25 were mined from short-form video, where a hook is the first three seconds of
+  spoken words. Both should transfer to text, but that has not been measured here.
+- Pattern 25 rests on 2 posts and only one of them is the complete shape (state plus the reader's
+  own excuses); the other names the state alone. It is the thinnest of the three mined rows. Neither
+  post had a retrievable view or like count, so there is no performance evidence behind it at all,
+  only the structure.
+- No mined row (24 to 26) draws on a LinkedIn body. If LinkedIn entries later clear their
+  provenance check, they may add rows; they did not inform these.
 - The joyful-activism register (16–23) is genuinely thinner in short-form (X/LinkedIn) than the
   outrage-framed register — most source material sits in Substack essays, books, and long-form
   interviews. That's a property of the niche, not a research gap; don't read it as license to

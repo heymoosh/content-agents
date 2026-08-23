@@ -7,7 +7,7 @@ Read this before running `/patterns collect`. One section per platform covering 
 3. Whether view counts exist on that platform at all.
 4. The honest fallback when they do not.
 
-**Two ground rules.**
+**Three ground rules.**
 
 - **Record only what you can actually see.** Every `metrics` field is nullable. A null is a real,
   useful answer. A guessed number quietly poisons the outlier math in `src/patterns/outliers.ts`,
@@ -15,6 +15,14 @@ Read this before running `/patterns collect`. One section per platform covering 
 - **Say "unverified" out loud.** Several claims below are marked unverified because platform UIs
   change often and nobody has re-checked them since this file was written (2026-08-22). Treat an
   unverified line as a thing to go look at, not a thing to rely on.
+- **Never let a model produce a `body`.** Do not use WebFetch, or any other tool that answers a
+  prompt against a page with a model, to retrieve post text. It hands back the model's version of
+  the page, not the page. On 2026-08-22 that route staged another person's comment as a creator's
+  own 22-character post, and all 15 LinkedIn entries had to be purged and re-collected from raw
+  markup. Bodies come from Muxin's clipboard or from raw retrieval (`curl` plus the platform's own
+  JSON or markup). When raw retrieval fails for a post, stage nothing for it and say so. The full
+  rule, including the four tells that a body was summarized, is the hard rule at the top of mode 1
+  in `SKILL.md`.
 
 ## What the paid tools do, and why we are not buying them
 
@@ -37,26 +45,41 @@ None of them is required for v1. Every platform below has a free route or an hon
   `from:handle min_faves:500` and raise the threshold until only a handful of posts come back.
   `min_retweets:` and `min_replies:` work the same way, and `since:`/`until:` bound the window.
   This is the free version of what Twemex sells.
-- **Visible to a non-owner.** Views, likes, reposts, replies, quotes, bookmarks. X is the most
-  generous public platform on this front.
+- **Visible to a non-owner.** Views, likes, reposts, replies, quotes, bookmarks. To a human in a
+  browser, X is the most generous public platform on this front.
 - **View counts?** Yes, public on every post.
-- **Fallback.** Not needed. If search is rate limited while logged out, log in and retry.
-- **Cheapest starting point overall**, because views plus a public follower count means
-  `viewFollowerRatio` works here with no guessing.
+- **Raw-retrieval verdict (2026-08-22): not collectable honestly today.** A direct fetch of a post
+  URL returns HTTP 402. The public mirrors serve anti-bot walls instead of content. And
+  `cdn.syndication.twimg.com/tweet-result`, the one endpoint that does answer, truncates body text
+  at 279 characters with no full-text field anywhere in the response, which fails the verbatim-body
+  rule for anything longer. Do not stitch a truncated body into a whole one, and do not record a
+  truncated body as if it were the post.
+- **Fallback.** Muxin pastes the body herself; X search still does the sorting. There is no
+  automated body route here until Phase 2.
+- Once an entry exists, views plus a public follower count mean `viewFollowerRatio` works here with
+  no guessing. The bottleneck on X is the body, not the numbers.
 
 ## linkedin
 
 - **Free sort.** Open the creator's profile, click "Show all posts" to reach their activity feed,
   then scroll. The activity feed offers a sort control; whether it still includes a "Top" option
   (as opposed to only "Recent") is **unverified**. Check before relying on it.
-- **Visible to a non-owner.** Reactions, comments, reposts. That is all.
-- **View counts?** No. LinkedIn impressions are owner-only. Do not record a views number here.
-- **Fallback (this is the normal path on LinkedIn).** Scroll the activity feed by hand, record
-  reactions and comments for each post, and leave `views` null. Outlier detection then runs off
-  `baselineMultiple` against that account's other entries, not `viewFollowerRatio`. That is fine
-  and it is why the ratio path is allowed to return null.
-- Follower count is public on the profile, so record it even though views are missing. It is still
-  useful context when reading the analyses later.
+- **Visible to a non-owner.** Reactions and comments. Repost counts are not visible logged out.
+- **View counts?** No. LinkedIn impressions are owner-only, so `views` is always null here.
+- **Raw-retrieval verdict (2026-08-22): a good free surface, and the strongest one in this file.**
+  curl the public post URL and parse the `<script type="application/ld+json">`
+  `SocialMediaPosting` block. It carries:
+  - `articleBody`: the true post body, with its real line breaks. This is the only acceptable
+    source for `body` on LinkedIn.
+  - `interactionStatistic`: the like and comment counts.
+  - `author.interactionStatistic.userInteractionCount`: the account's follower count.
+  - `datePublished`: a real ISO timestamp for `posted_at`.
+- **Fallback.** Scroll the activity feed by hand, record reactions and comments for each post, and
+  leave `views` null. Outlier detection then runs off `baselineMultiple` against that account's
+  other entries, not `viewFollowerRatio`. That is fine and it is why the ratio path is allowed to
+  return null.
+- Follower count is public on the profile and in the ld+json block, so record it even though views
+  are missing. It is still useful context when reading the analyses later.
 
 ## substack
 
@@ -65,6 +88,11 @@ None of them is required for v1. Every platform below has a free route or an hon
   signal.
 - **Visible to a non-owner.** Likes, comments, restacks, on both posts and Notes.
 - **View counts?** No. Substack keeps opens and views owner-only.
+- **Raw-retrieval verdict (2026-08-22): retrievable.** Posts come back as raw HTML or through
+  Substack's own JSON, both via curl, so `body` has a verbatim route here. Per-post view counts are
+  never public by any route. One caveat found in practice: at least one publication's archive
+  returned zero posts logged out, so a real, active publication can still yield nothing. Report
+  that as the finding it is rather than filling the gap from somewhere else.
 - **Fallback.** Use the archive top sort to pick candidates, then record likes and comments.
   Leave `views` null.
 - Notes are a separate surface from posts. This repo already pulls Notes for Muxin's own account
@@ -78,6 +106,8 @@ None of them is required for v1. Every platform below has a free route or an hon
   locally by likes. `bsky.app` search also supports `from:handle`.
 - **Visible to a non-owner.** Likes, reposts, replies, quotes.
 - **View counts?** No. Bluesky does not expose impressions publicly.
+- **Raw-retrieval verdict (2026-08-22): retrievable.** The public API returns the post record
+  itself, so `text` off `getAuthorFeed` is a verbatim `body` route with no model in the path.
 - **Fallback.** Sort by likes and leave `views` null, same shape as LinkedIn.
 - This repo already talks to Bluesky (`npm run bluesky`), but that path is scoped to Muxin's own
   analytics ingest. Do not extend it inside `/patterns`; v1 has no scraper.
@@ -107,31 +137,53 @@ None of them is required for v1. Every platform below has a free route or an hon
 
 ## tiktok
 
-- **Free sort.** The profile grid prints a view count on every video thumbnail, so you can scan a
-  creator's grid and spot the outliers with your eyes. That is the whole job the paid short-form
-  tools automate. Whether the web profile currently offers a "Popular" sort tab alongside
-  Videos / Reposts / Liked is **unverified**.
-- **Visible to a non-owner.** Views, likes, comments, shares, saves.
-- **View counts?** Yes, public on every video.
-- **Fallback.** Not needed for the numbers. The hard part on TikTok is the *body*, not the metrics:
-  see the transcript note below.
-- **Transcript.** v1 has no puller. Either type or paste the spoken content yourself, or use
-  TikTok's own auto-captions if the creator left them on and copy that text. Record which one you
-  did in `transcript_source` (`manual` or `captions`). Never summarize the video into the `body`
-  field; a summary is not a transcript and it destroys the structural analysis in `/patterns analyze`.
+- **Raw-retrieval verdict (2026-08-22): not minable for free today. TikTok needs the Phase 2
+  scraper.** Profile pages return only the follower header and nothing about individual videos.
+  Video permalinks time out. No transcript of any kind, spoken or written, comes back. Nothing from
+  TikTok can be staged honestly right now, so report it as an uncollected platform instead of
+  making up the difference elsewhere.
+- **Third-party analytics mirrors are discovery leads only.** Some of them do print a per-video
+  view number, but that number is the aggregator's own computation, not what TikTok shows. Use such
+  a mirror at most to notice which video is worth a look. **Never record its numbers into
+  `metrics`.** A computed figure staged as a reading is the same class of error as a summarized
+  body.
+- **Free sort, in a browser, by eye.** The profile grid prints a view count on every video
+  thumbnail, so Muxin can scan a creator's grid and spot the outliers herself. That is the whole
+  job the paid short-form tools automate. Whether the web profile currently offers a "Popular" sort
+  tab alongside Videos / Reposts / Liked is **unverified**.
+- **Visible to a non-owner, in a browser.** Views, likes, comments, shares, saves.
+- **View counts?** Yes on the page, no through any free fetch.
+- **Transcript.** v1 has no puller and no fetch route. Either type or paste the spoken content
+  yourself (`transcript_source: "manual"`), or copy TikTok's own auto-captions if the creator left
+  them on (`transcript_source: "captions"`, plural, because those are the spoken words). If neither
+  is available and all you have is the creator's written caption, record that and set
+  `transcript_source: "caption"`, singular, which says the body is not speech. Never summarize the
+  video into the `body` field; a summary is not a transcript and it destroys the structural
+  analysis in `/patterns analyze`.
 
 ## youtube
 
 - **Free sort.** The best free sort of any platform here. Channel page, Videos tab (or Shorts tab),
   then the sort control set to "Popular". This is exactly what vidIQ and Viewstats charge for.
-- **Visible to a non-owner.** Views, likes, comments. Dislikes are hidden. Subscriber counts are
-  public but rounded, so record the rounded number and do not pretend to precision.
+- **Visible to a non-owner.** Views, likes, comments. Dislikes are hidden. In a browser,
+  subscriber counts are public but rounded, so record the rounded number and do not pretend to
+  precision. See the fetch caveat below before assuming you can get that number without a browser.
 - **View counts?** Yes, public.
-- **Fallback.** Not needed.
-- **Transcript.** Free and reliable: open the video, expand the description, click "Show
-  transcript", copy the text. Record `transcript_source: captions`. If the creator disabled
-  captions, type the first thirty seconds by hand at minimum, because the hook is what the analysis
-  step needs most, and set `transcript_source: manual`.
+- **Raw-retrieval verdict (2026-08-22): genuinely minable, with one hole.** The watch page yields a
+  real caption transcript, a real view count, and a real like count. **Subscriber counts are NOT
+  retrievable**: channel pages render as a JavaScript shell and the number is not in the fetched
+  markup. So `followers` stays null on a fetched YouTube entry, the view-to-follower bar cannot run
+  there, and those entries score on `baselineMultiple` instead, the way LinkedIn's do.
+- **Never substitute a creator's website figure for a subscriber count.** Creator sites publish a
+  cross-platform total audience number. That is not a per-platform follower count, and recording it
+  as one quietly corrupts every ratio computed from it.
+- **Fallback.** For the numbers, none needed. For the subscriber count, either Muxin reads the
+  rounded number off the channel page herself or `followers` stays null.
+- **Transcript.** Free and reliable: the real caption track off the watch page, or in a browser,
+  open the video, expand the description, click "Show transcript", copy the text. Either way record
+  `transcript_source: "captions"`, plural, because those are the spoken words. If the creator
+  disabled captions, type the first thirty seconds by hand at minimum, because the hook is what the
+  analysis step needs most, and set `transcript_source: "manual"`.
 
 ## instagram
 
@@ -141,13 +193,26 @@ None of them is required for v1. Every platform below has a free route or an hon
   and **like counts can be hidden by the account owner**, in which case you see nothing numeric at
   all. Carousels and stills are therefore often uncollectable.
 - **View counts?** On Reels, yes (as plays). On feed posts, no.
+- **Raw-retrieval verdict (2026-08-22): partly minable.** Captions and profile follower counts are
+  retrievable via curl. Play counts and like counts on Reels are NOT retrievable logged out, so
+  those metrics stay null on a fetched entry. Spoken transcripts are never retrievable here, by any
+  free route.
 - **Fallback.** Collect Reels only and skip feed posts. If likes are hidden on an account, either
   skip the account or record the entry with every metric null and rely on the analysis step alone;
   an entry with no numbers can never be an outlier, so say so to Muxin rather than filing it
   silently.
-- **Transcript.** Same as TikTok: paste or type it, no puller in v1.
+- **Transcript.** There is no spoken-transcript route on Instagram at all. If Muxin types the
+  spoken words herself, that is `transcript_source: "manual"`. Otherwise record the creator's
+  written caption or the on-screen text as `body` and set `transcript_source: "caption"`,
+  singular. **Instagram is the platform where `"caption"` is normally the right answer.** It states
+  that the body is written text rather than speech, which is what stops `/patterns analyze` from
+  reporting a spoken hook nobody spoke. Do not use `"captions"`, plural, here unless you genuinely
+  copied a spoken caption track.
 
 ## Quick reference
+
+This table is what a human can see in a browser. What a free `curl` actually returns is a narrower
+question, and the scoreboard under the table answers that one.
 
 | Platform | Public views? | Free sort route | Realistic denominator |
 |---|---|---|---|
@@ -157,12 +222,31 @@ None of them is required for v1. Every platform below has a free route or an hon
 | bluesky | no | public API author feed, sort locally | baseline multiple on likes |
 | threads | no (unverified) | none, scroll | baseline multiple on likes |
 | mastodon | no, by design | public API statuses, sort locally | baseline multiple on favourites |
-| tiktok | yes | view counts printed on profile grid | views / followers |
-| youtube | yes | Videos or Shorts tab, sort "Popular" | views / subscribers |
-| instagram | Reels only | Reels grid play counts | views / followers, Reels only |
+| tiktok | yes, in a browser only | view counts printed on profile grid | views / followers |
+| youtube | yes | Videos or Shorts tab, sort "Popular" | views / subscribers in a browser, baseline multiple when fetched |
+| instagram | Reels only, in a browser only | Reels grid play counts | baseline multiple when fetched |
+
+**Raw-retrieval scoreboard (2026-08-22).** What a free fetch actually returned when this was last
+checked:
+
+- **linkedin**: body, likes, comments, follower count, date. The ld+json route, the best surface
+  here.
+- **youtube**: body (a real caption transcript), views, likes. No subscriber count.
+- **substack**: body, likes, comments. No views ever. One publication's archive came back empty
+  logged out.
+- **bluesky**: body plus all four engagement counts, via the public API.
+- **instagram**: written caption and follower count. No plays, no likes, no spoken transcript.
+- **mastodon**: body, favourites, boosts, replies, via the public API. No views, by design.
+- **threads**: not checked in that run. Assume paste-only.
+- **tiktok**: nothing. Needs the Phase 2 scraper.
+- **x**: nothing usable. 402 on a direct fetch, walls on the mirrors, and a 279-character
+  truncation on the syndication endpoint.
 
 `baselineMultiple` needs at least three other entries with a numeric `views` value for that
 account before it will return anything. On the five platforms with no public views, that condition
 can never be met from views alone, so those platforms lean on human judgment in `/patterns analyze`
 plus whatever engagement numbers you did record. Say that to Muxin plainly when you collect there
 instead of implying the scoring works the same everywhere.
+
+Two platforms, x and tiktok, currently have no honest free body route at all. An empty entry count
+for either one is the correct outcome, not a collection failure to work around.

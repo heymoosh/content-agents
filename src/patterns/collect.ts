@@ -58,11 +58,16 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
   const kind = r.kind;
   if (kind !== "text" && kind !== "video") errors.push('kind must be "text" or "video"');
   const transcriptSource = r.transcript_source ?? null;
-  if (transcriptSource !== null && transcriptSource !== "manual" && transcriptSource !== "captions") {
-    errors.push('transcript_source must be "manual", "captions", or null');
+  if (
+    transcriptSource !== null &&
+    transcriptSource !== "manual" &&
+    transcriptSource !== "captions" &&
+    transcriptSource !== "caption"
+  ) {
+    errors.push('transcript_source must be "manual", "captions", "caption", or null');
   }
   if (kind === "video" && transcriptSource === null) {
-    errors.push("a video entry needs transcript_source, because body is its transcript");
+    errors.push("a video entry needs transcript_source, so the corpus records what body actually is");
   }
   if (kind === "text" && transcriptSource !== null) {
     errors.push("a text entry must leave transcript_source null");

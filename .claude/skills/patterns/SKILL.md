@@ -217,7 +217,59 @@ accounts is a better corpus than fifty mediocre ones.
 
 **There is no scraper in v1. Say so plainly.** Muxin does the gathering with her eyes and her
 clipboard; you do the sorting, structuring, and bookkeeping. Do not imply anything is being pulled
-automatically, and do not pretend a number was fetched when she read it off a screen.
+automatically, and do not pretend a number was fetched when she read it off a screen. Fetching one
+post's own raw markup with `curl` to read its text back is allowed, and is governed by the hard
+rule directly below. A built per-platform pull pipeline is not, and stays Phase 2.
+
+### Hard rule: the `body` field is raw text only, never a summarizing fetch tool
+
+**Read this before staging a single entry.** It is the most damaging thing that can go wrong in
+this skill, and it did go wrong on 2026-08-22.
+
+**Never use WebFetch, or any other tool that answers a prompt against a page with a model, to
+produce a `body`.** WebFetch converts a page to markdown and then has a small fast model answer
+your prompt against it. Instructing it "return the text verbatim, do not summarize" does NOT make
+it return verbatim text. It returns that model's version of the page. On one LinkedIn post whose
+real body is 22 characters, it returned roughly 1,100 characters that were a COMMENT written by a
+different person, with the author attribution stripped. That entry was staged as the creator's own
+words and scored as the highest outlier in its set. Every winning pattern derived from it would
+have been a shape that creator never wrote. All 15 LinkedIn entries had to be purged and
+re-collected from raw markup.
+
+**A body comes from one of exactly two places.**
+
+1. **Muxin pastes it.** Her clipboard is a verbatim route and it is the v1 default.
+2. **Raw retrieval.** `curl` the page and read the creator's words out of the markup or JSON the
+   platform itself serves, with no model anywhere in the path. Routes verified on 2026-08-22:
+   - **LinkedIn**: curl the public post URL and parse the
+     `<script type="application/ld+json">` `SocialMediaPosting` block. `articleBody` is the true
+     body, `interactionStatistic` carries the like and comment counts,
+     `author.interactionStatistic.userInteractionCount` is the follower count, and `datePublished`
+     is a real ISO timestamp.
+   - **Substack, Bluesky, Instagram**: the platform's own raw JSON endpoints, or raw HTML via curl.
+   - **YouTube**: the real caption track off the watch page.
+   `references/platform-collection.md` carries the per-platform detail and the honest limits.
+
+**The tells that a body was summarized.** Check all four before staging a batch:
+
+- line breaks are missing, or a post that plainly had structure arrives as one flowing paragraph
+- every body from one platform lands in a suspiciously similar length range
+- the body text does not match the post's own URL slug
+- the text reads like a description of the post rather than the creator's own voice
+
+The 2026-08-22 run reported "line breaks lost on 11 of 15 bodies" and read it as a platform
+rendering quirk. It was the summarizer reflowing text it had rewritten. After re-collection from
+raw markup, 13 of those 15 bodies carried real line breaks.
+
+**Why this is the worst failure mode in the pipeline.** A fabricated or misattributed body looks
+exactly like a real one. Nothing downstream can catch it: `outliers.ts` scores it, `analyze` reads
+structure off it, `synthesize` writes that structure into `post-patterns.md`, and no human reading
+`post-patterns.md` later has any way to tell. A missing entry costs one row. A fake entry costs the
+credibility of every pattern near it.
+
+**When raw retrieval fails, stage nothing for that post.** An honest gap is a finding. Say which
+platform could not be collected and why, and report the thinner coverage as it is. Never thin
+coverage elsewhere to compensate, and never reach for a summarizing tool to fill the hole.
 
 ### Steps
 
@@ -239,10 +291,14 @@ automatically, and do not pretend a number was fetched when she read it off a sc
 
 4. **Take one post at a time.** For each one Muxin pastes, capture:
    - the post text, verbatim, for a text post
-   - the transcript, for a video (TikTok, Reels, YouTube Shorts). Pasted by hand, or copied from
-     the platform's own captions. YouTube's "Show transcript" is the free route and it is the
-     easiest of the three. **A summary is not a transcript.** Never write a paraphrase into
-     `body`; the analysis step reads structure off the actual words and a summary erases it.
+   - the transcript, for a video (TikTok, Reels, YouTube Shorts). Pasted by hand
+     (`transcript_source: "manual"`), or copied from the platform's own caption track
+     (`transcript_source: "captions"`). YouTube's "Show transcript" is the free route and it is the
+     easiest of the three. When no spoken transcript can be had at all, record the creator's
+     written caption or on-screen text instead and set `transcript_source: "caption"`, singular,
+     which records out loud that `body` is not the spoken words. **A summary is not a transcript.**
+     Never write a paraphrase into `body`; the analysis step reads structure off the actual words
+     and a summary erases it.
    - the url, the posting date if visible, and whichever metrics are genuinely on screen
    - anything she noticed herself, into `notes`
 
@@ -288,8 +344,18 @@ automatically, and do not pretend a number was fetched when she read it off a sc
      rejected.
    - `niche` must be one of the niches in `config/pattern-mining.yaml`
      (`building-solopreneur`, `inner-journey`, `civic-democracy`). Do not invent one.
-   - `kind` is `"text"` or `"video"`. A video entry MUST carry `transcript_source` (`"manual"` or
-     `"captions"`), and a text entry MUST leave it `null`. Validation enforces both directions.
+   - `kind` is `"text"` or `"video"`. A video entry MUST carry a non-null `transcript_source`, and
+     a text entry MUST leave it `null`. Validation enforces both directions.
+   - **`transcript_source` has FOUR values, and two of them sit one letter apart on purpose.**
+     Re-read this every time you stage a video. `"captions"` and `"caption"` now mean nearly
+     opposite things.
+     - `"manual"`: the SPOKEN words, typed out by hand.
+     - `"captions"`, plural: the SPOKEN words, taken from the platform's caption track.
+     - `"caption"`, singular: **NOT the spoken words.** The creator's written caption or the
+       on-screen text, recorded because the spoken transcript could not be retrieved.
+     - `null`: text entries only. A video entry may never be null.
+     Swapping the singular for the plural tells every later step that written text is speech, which
+     is the same misattribution the body rule above exists to stop.
    - `posted_at` is an ISO date string or null. `notes` is an optional string.
    - **Every metric may be null, and null is the correct answer when the number is not public.**
      A missing key reads as null. **Never write 0 for an unknown number**: a real 0 suppresses the
@@ -334,8 +400,10 @@ gitignored, same as the corpus.
 
 3. **Pull each outlier's actual text.** The outliers report prints ids and urls, not bodies. Look
    each id up in `data/patterns/corpus.jsonl` and read that entry's `body`, which is the full post
-   text or the full transcript. Analyze the words that are there, never the url and never a
-   memory of the post.
+   text, the full spoken transcript, or (on a `transcript_source: "caption"` entry) the creator's
+   written caption. Check `transcript_source` before you read a video entry, because a `"caption"`
+   body is not speech and step 4 handles it differently. Analyze the words that are there, never
+   the url and never a memory of the post.
 
 4. **For EACH outlier, extract these eight fields.** The first six are Muxin's own requested
    fields. The last two exist to test her civic rubric against real numbers instead of assuming
@@ -344,6 +412,11 @@ gitignored, same as the corpus.
 
    - **`hook`**: the exact hook. First 1 to 3 sentences for a text post. The first 3 seconds for
      a video, meaning the opening words of the transcript, not a description of the visuals.
+     **A `transcript_source: "caption"` entry cannot answer that and must not be made to.** Its
+     body is written caption text, so record what that caption does structurally (how it opens,
+     what it withholds, where it turns) and then state plainly that the spoken hook is unknown for
+     this entry. Never infer, reconstruct, or guess a spoken hook from a caption. A guessed hook
+     becomes a synthesized pattern about how videos open, built on words nobody said.
    - **`structure`**: the overall structure and storytelling arc. Beat by beat, in order. What
      the opening sets up, where it turns, what pays off, how it lands.
    - **`emotional_trigger`**: the emotional trigger or curiosity gap. What feeling or unanswered
@@ -836,8 +909,12 @@ points at is real. Ranking a fabricated link first is worse than proposing nothi
 
 Say these plainly rather than working around them:
 
-- **No scrapers.** Collection is paste-driven. Automated per-platform pulls are a later phase.
-- **No automatic video transcripts.** Paste or captions, and record which in `transcript_source`.
+- **No scrapers.** Collection is paste-driven, with raw `curl` retrieval of one post's own markup
+  as the sanctioned alternative for the `body` field (mode 1's hard rule). Automated per-platform
+  pull pipelines are a later phase, and TikTok needs one before it is collectable at all.
+- **No automatic video transcripts.** Paste, the platform's caption track, or, when neither exists,
+  the written caption recorded honestly as `"caption"`. Record which in `transcript_source`, and
+  never a summary in any of the three cases.
 - **No automatic series scaffolding.** `/patterns series` proposes; accepting a piece goes through
   the GUI's existing accept and `/atomize --continue`. Scaffolding a whole accepted arc in one step
   is Phase 2.

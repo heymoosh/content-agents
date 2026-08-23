@@ -21,7 +21,20 @@ export type Platform = (typeof PLATFORMS)[number];
 
 export type PostKind = "text" | "video";
 
-export type TranscriptSource = "manual" | "captions" | null;
+// What `body` actually holds on a video entry, so nothing downstream has to guess.
+//
+// "manual"   - the SPOKEN words, typed or pasted by hand off the video.
+// "captions" - the SPOKEN words, taken from the platform's own caption track.
+// "caption"  - NOT the spoken words. The creator's written caption, description, or on-screen
+//              text, recorded because the spoken transcript could not be retrieved at all. Note
+//              the single letter between this and "captions": the two mean opposite things, so
+//              read twice before labelling.
+// null       - only ever valid on a text entry, where `body` is simply the post.
+//
+// The distinction is load-bearing for the analyze step, which reads a hook as the first few
+// seconds of speech. A "caption" entry cannot answer that question, and this value is what says
+// so, instead of letting a caption be read as if it were speech.
+export type TranscriptSource = "manual" | "captions" | "caption" | null;
 
 export interface CorpusMetrics {
   views: number | null;
