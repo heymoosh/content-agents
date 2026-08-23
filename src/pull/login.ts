@@ -12,6 +12,10 @@ const LOGIN_HINTS: Partial<Record<PullPlatform, string>> = {
   x:
     'If X says "We\'ve temporarily limited your login", close the window, wait a few minutes, and retry —\n' +
     "  it rate-limits repeated attempts.",
+  threads:
+    "Threads signs in with an INSTAGRAM account, not a separate Threads password. If the page offers\n" +
+    "  \"Continue as <name>\", take it. Once you are in, scroll your own feed once before pressing Enter,\n" +
+    "  so the session is fully established and not sitting on a half-loaded onboarding screen.",
 };
 
 // One-time interactive login. Opens a REAL (headed) browser at the platform's login

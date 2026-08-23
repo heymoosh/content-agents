@@ -115,13 +115,54 @@ None of them is required for v1. Every platform below has a free route or an hon
 ## threads
 
 - **Free sort.** None. There is no public way to sort another account's Threads posts by
-  performance. Scroll the profile.
+  performance. Scroll the profile. The puller below therefore takes the most recent posts, not the
+  best ones, and the outlier math finds the winners inside that sample.
 - **Visible to a non-owner.** Likes, replies, reposts, quotes.
 - **View counts?** Threads shows a view count to the post's own author. Whether any view number is
   currently public to other readers is **unverified**; assume not, and leave `views` null unless
   you can literally see one on the post.
-- **Fallback.** Scroll and record likes plus replies. Expect a small, rough corpus here. Threads is
-  the weakest collection surface of the nine and it is fine to skip it in a first pass.
+- **Raw-retrieval verdict (2026-08-23): logged out, nothing. Logged in, a real route.** A
+  logged-out fetch of `threads.com/@handle` returns a 262KB JavaScript shell with no post data in
+  it at all: no `like_count`, no `thread_items`, no captions. And threads.com answers HTTP 200 for
+  any string including nonsense, so a status code is never an existence check. The route that does
+  work is a saved Chrome session, the same machinery LinkedIn, X and Substack use:
+
+      npm run pull:login -- threads     # once, by hand, in a real browser window
+      npm run pull -- threads           # later, headless, stages into data/patterns/inbox/
+      npm run patterns:collect          # validates and appends to the corpus
+
+  Threads signs in with an Instagram account, not a separate Threads password. The collector reads
+  the app's own JSON, both the `<script type="application/json">` blobs on the page and the
+  GraphQL responses the app fetches, and walks them structurally for post objects. No model reads
+  the page, so no body is ever a model's version of one.
+- **The carousel problem, stated plainly.** Threads' top posts in this corpus are carousels whose
+  substance is typeset onto the slide images. **That on-screen text is not extractable.** Nothing
+  in this repo reads words off a picture, and the one field that looks like it might, Meta's
+  `accessibility_caption`, is a machine description of the image ("May be an image of text"), not
+  the typeset headline. So on every image, carousel, video, link-preview and quote post:
+  `media.onscreen_text` stays **null**, `media.body_is_complete` is **false**, and the alt text
+  goes in `media.description` labelled as Meta's own. The caption is recorded as the caption and is
+  never allowed to stand in for the slides.
+  What the collector does instead is **download the slide images** to
+  `data/patterns/media/threads/<handle>-<code>/` (gitignored) and name that directory in the
+  entry's `description`, so a human can read the words off them and fill `onscreen_text` in by
+  hand. That is the honest half-measure: the pictures are collected, the words on them are not.
+- **A post with no caption at all is skipped, not padded.** `validateEntry` requires a non-empty
+  `body`, and a wordless carousel has none. The collector skips it and prints why. Writing a
+  description into `body` to get it past the gate would put text in the corpus the creator never
+  wrote.
+- **Only the account's own standalone posts are staged.** Every extracted post is checked against
+  the target handle, and replies and reposts are dropped. This is the rule that exists because a
+  stranger's comment was once staged as a creator's own post on LinkedIn and all 15 entries had to
+  be purged.
+- **Do not ship a crawler user-agent.** An earlier pass reached Threads content by presenting as
+  Googlebot. It worked, and Muxin chose the login route instead. There is no user-agent trick in
+  `src/pull/platforms/threads.ts` and there should not be one.
+- **Fallback.** If the puller comes back empty, it writes every captured JSON payload to
+  `~/.content-agents/pull-diagnostics/` and fails `UI_CHANGED`, because the field names it reads
+  are reconstructed from Instagram's schema rather than verified against a live Threads response.
+  Read that dump, correct the names in `src/pull/threads-extract.ts`, and run again. Failing that,
+  scroll by hand and record likes plus replies with `views` null.
 
 ## mastodon
 
@@ -220,7 +261,7 @@ question, and the scoreboard under the table answers that one.
 | linkedin | no | activity feed scroll (top sort unverified) | baseline multiple on likes |
 | substack | no | archive `?sort=top` | baseline multiple on likes |
 | bluesky | no | public API author feed, sort locally | baseline multiple on likes |
-| threads | no (unverified) | none, scroll | baseline multiple on likes |
+| threads | no (unverified) | none, scroll (puller takes most recent) | baseline multiple on likes |
 | mastodon | no, by design | public API statuses, sort locally | baseline multiple on favourites |
 | tiktok | yes, in a browser only | view counts printed on profile grid | views / followers |
 | youtube | yes | Videos or Shorts tab, sort "Popular" | views / subscribers in a browser, baseline multiple when fetched |
@@ -237,7 +278,10 @@ checked:
 - **bluesky**: body plus all four engagement counts, via the public API.
 - **instagram**: written caption and follower count. No plays, no likes, no spoken transcript.
 - **mastodon**: body, favourites, boosts, replies, via the public API. No views, by design.
-- **threads**: not checked in that run. Assume paste-only.
+- **threads**: logged out, nothing at all. Logged in, via the saved-session puller (2026-08-23):
+  body (the caption), likes, replies, reposts, follower count, date, media form and slide count.
+  No views. **No carousel on-screen text, ever**, so every media post lands
+  `body_is_complete: false` and its slides are downloaded for a human to read.
 - **tiktok**: nothing. Needs the Phase 2 scraper.
 - **x**: nothing usable. 402 on a direct fetch, walls on the mirrors, and a 279-character
   truncation on the syndication endpoint.
