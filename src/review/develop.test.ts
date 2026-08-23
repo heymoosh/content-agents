@@ -15,6 +15,9 @@ import {
   developSessionForFolder,
   advicePath,
   developLogPath,
+  ownDestinationHosts,
+  sourceTagFor,
+  contentSessionForFolder,
   type Advice,
 } from "./develop.js";
 import { buildFormatArg, parseContinueArg, continueJobProgressed } from "./jobs.js";
@@ -253,4 +256,99 @@ test("continueJobProgressed: growth in queue rows OR derivatives counts as progr
   assert.equal(continueJobProgressed({ rows: 3, derivatives: 0 }, { rows: 8, derivatives: 0 }), true);
   assert.equal(continueJobProgressed({ rows: 3, derivatives: 2 }, { rows: 3, derivatives: 5 }), true);
   assert.equal(continueJobProgressed({ rows: 3, derivatives: 2 }, { rows: 3, derivatives: 2 }), false);
+});
+
+// ── The source picker's tags ────────────────────────────────────────────────────────────────────
+
+const OWN = ["humaninference.ai", "humaninference.substack.com", "voter-choice.vercel.app"];
+
+test("ownDestinationHosts reads the configured destinations and skips the `source` keyword", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cta-"));
+  try {
+    const p = join(dir, "cta.yaml");
+    writeFileSync(
+      p,
+      [
+        "targets:",
+        "  human-ai:",
+        "    url: source",
+        "  civic-tech:",
+        '    url: "https://voter-choice.vercel.app/"',
+        "  builder:",
+        '    url: "https://www.humaninference.substack.com"',
+        "source_fallback:",
+        '  url: "https://humaninference.ai"',
+        "",
+      ].join("\n"),
+    );
+    assert.deepEqual(ownDestinationHosts(p), ["humaninference.ai", "humaninference.substack.com", "voter-choice.vercel.app"]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ownDestinationHosts on a missing file returns nothing, so no origin is guessed as hers", () => {
+  assert.deepEqual(ownDestinationHosts(join(tmpdir(), "no-such-cta-config-here.yaml")), []);
+});
+
+test("sourceTagFor: every tag stands on a fact, and an origin that does not say gets no tag", () => {
+  // a Note: new-notes.ts only ever ingests HER account, so source_kind alone proves it
+  const note = sourceTagFor({ source_kind: "substack-note", origin: "https://substack.com/@x/note/c-1" }, OWN);
+  assert.equal(note.tag, "SUBSTACK");
+  assert.match(note.basis, /source_kind/);
+
+  // an http origin on one of her own configured destinations
+  const own = sourceTagFor({ origin: "https://humaninference.substack.com/p/essay" }, OWN);
+  assert.equal(own.tag, "SUBSTACK");
+  assert.match(own.basis, /config\/cta\.yaml/);
+
+  // the same shape on a foreign host is NOT hers
+  const foreign = sourceTagFor({ origin: "https://example.com/p/someone-else" }, OWN);
+  assert.equal(foreign.tag, "READ IN");
+  assert.match(foreign.basis, /example\.com/);
+
+  // her own local drafts
+  for (const origin of ["file:An Essay.md", "pasted-text", "voice-memo:memo.m4a"]) {
+    assert.equal(sourceTagFor({ origin }, OWN).tag, "YOURS", origin);
+  }
+
+  // nothing to stand on
+  assert.equal(sourceTagFor({}, OWN).tag, null);
+  assert.equal(sourceTagFor({ origin: "  " }, OWN).tag, null);
+  assert.equal(sourceTagFor({ origin: "reply to mention" }, OWN).tag, null);
+  assert.equal(sourceTagFor({ origin: "http://" }, OWN).tag, null);
+});
+
+test("sourceTagFor never invents VENTURE, the one prototype tag with no source in this repo", () => {
+  const vectors: Record<string, unknown>[] = [
+    { origin: "file:x.md" },
+    { origin: "pasted-text" },
+    { origin: "https://humaninference.substack.com/p/x" },
+    { origin: "https://example.com/p/x" },
+    { source_kind: "substack-note" },
+    {},
+  ];
+  for (const fm of vectors) assert.notEqual(sourceTagFor(fm, OWN).tag, "VENTURE");
+});
+
+test("contentSessionForFolder carries the origin facts the picker renders", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cs-"));
+  try {
+    writeFileSync(
+      join(dir, "source.md"),
+      '---\ntitle: "T"\norigin: https://example.com/p/x\ncanonical_url: https://example.com/p/x\npublished_at: 2026-08-10\n---\n\n# T\n\nbody\n',
+    );
+    // a cut on disk is what makes this a workbench piece at all
+    mkdirSync(join(dir, "cuts", "extract"), { recursive: true });
+    writeFileSync(join(dir, "cuts", "extract", "cut.md"), '---\ntitle: "T"\nsource_lines: [1]\n---\n\nbody\n');
+    const s = contentSessionForFolder(dir, "2026-08-10-t", OWN);
+    assert.ok(s);
+    assert.equal(s.origin, "https://example.com/p/x");
+    assert.equal(s.canonicalUrl, "https://example.com/p/x");
+    assert.equal(s.publishedAt, "2026-08-10");
+    assert.equal(s.tag, "READ IN");
+    assert.ok(s.tagBasis.length > 0, "the tag never renders bare");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

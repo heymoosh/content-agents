@@ -17,6 +17,9 @@ import { join } from "node:path";
 import { addCut, listCuts, DEFAULT_LENS } from "../atomize/cuts.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { CONTENT, safeFolder, isValidLens, firstHeading, listRootFolders, readQueueCached, DECIDED } from "./rows.js";
+import { repoRoot } from "../db/db.js";
+import { loadYamlConfig } from "../config/load.js";
+import { z } from "zod";
 
 export type AdviceCardKind = "angle" | "cta" | "spin" | "routing" | "note";
 export type AdviceCardStatus = "open" | "accepted" | "dismissed";
@@ -272,6 +275,89 @@ export function listDevelopSessions(): DevelopSession[] {
 // cut, or pending review rows — settled folders stay reachable through the review list instead of
 // piling up on the desk.
 
+// ── Where a source came from (the Content room's source picker tags) ───────────────────────────
+//
+// Every entry in the picker carries a tag. All three are provable from facts source.md already
+// records, and a source whose origin does not say gets NO tag rather than a guessed one:
+//
+//   SUBSTACK   live on Muxin's own Substack. Two provable routes: `source_kind: substack-note`
+//              (src/atomize/new-notes.ts only ever ingests HER account's notes), or an `origin:`
+//              URL whose host is one of the destinations config/cta.yaml is configured to send
+//              readers to. Those destinations are her own properties by definition, which is the
+//              only ownership fact this repo actually holds.
+//   YOURS      `origin: file:…`, `pasted-text` or `voice-memo:…`. Written by her and never
+//              published from this repo (src/atomize/new-content.ts sets published_at null for
+//              all three).
+//   READ IN    an http(s) origin on a host that is not one of hers. Source material, not a post
+//              of hers.
+//
+// The design prototype's fourth tag, VENTURE ("handed over from the venture build"), is
+// deliberately NOT rendered. Nothing in this repo hands a Venture artifact to content/:
+// src/venture/deliver.ts writes ready-to-paste files and Substack Notes and never scaffolds a
+// content folder. A tag no source could ever earn is a claim with no read behind it
+// (docs/prototype-port-rules.md Rule 0).
+
+export type SourceTag = "SUBSTACK" | "YOURS" | "READ IN";
+
+export const CTA_CONFIG_PATH = join(repoRoot, "config", "cta.yaml");
+
+const ctaHostsSchema = z
+  .object({
+    targets: z.record(z.object({ url: z.string().optional() }).passthrough()).optional(),
+    source_fallback: z.object({ url: z.string().optional() }).passthrough().optional(),
+  })
+  .passthrough();
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+// The hosts config/cta.yaml is configured to send readers to. `url: source` is a keyword, not a
+// URL, and is skipped. Returns [] when the config is missing, which makes every http origin read
+// as READ IN rather than as a guessed SUBSTACK.
+export function ownDestinationHosts(path: string = CTA_CONFIG_PATH): string[] {
+  const cfg = loadYamlConfig(path, ctaHostsSchema, {} as z.infer<typeof ctaHostsSchema>);
+  const urls: string[] = [];
+  for (const target of Object.values(cfg.targets ?? {})) {
+    if (typeof target?.url === "string") urls.push(target.url);
+  }
+  if (typeof cfg.source_fallback?.url === "string") urls.push(cfg.source_fallback.url);
+  const hosts = new Set<string>();
+  for (const url of urls) {
+    if (!/^https?:\/\//i.test(url)) continue;
+    const host = hostOf(url);
+    if (host) hosts.add(host);
+  }
+  return [...hosts].sort();
+}
+
+// Pure: the tag plus the fact it is standing on. The basis is rendered next to the tag so the tag
+// never appears bare (docs/prototype-port-rules.md Rule 3).
+export function sourceTagFor(
+  fm: Record<string, unknown>,
+  ownHosts: readonly string[]
+): { tag: SourceTag | null; basis: string } {
+  const kind = typeof fm.source_kind === "string" ? fm.source_kind.trim() : "";
+  if (kind === "substack-note") return { tag: "SUBSTACK", basis: "source.md records source_kind: substack-note" };
+  const origin = typeof fm.origin === "string" ? fm.origin.trim() : "";
+  if (!origin) return { tag: null, basis: "source.md records no origin, so nothing here says where it came from" };
+  if (/^https?:\/\//i.test(origin)) {
+    const host = hostOf(origin);
+    if (!host) return { tag: null, basis: "the recorded origin is not a readable URL" };
+    return ownHosts.includes(host)
+      ? { tag: "SUBSTACK", basis: `origin host ${host}, one of your own destinations in config/cta.yaml` }
+      : { tag: "READ IN", basis: `origin host ${host}, which is not one of your configured destinations` };
+  }
+  if (/^(file:|voice-memo:)/i.test(origin) || origin === "pasted-text") {
+    return { tag: "YOURS", basis: `origin ${origin}, and nothing here has published it` };
+  }
+  return { tag: null, basis: `origin ${origin}, which does not say where it came from` };
+}
+
 export interface ContentCutView {
   lens: string;
   title: string;
@@ -287,15 +373,31 @@ export interface ContentSession {
   rounds: DevelopSession["rounds"]; // [] when no advisor session yet
   cuts: ContentCutView[];
   pending: number;
+  // Where this source came from, verbatim off source.md's own frontmatter. The Content room's
+  // source picker tags each entry with these; see sourceTagFor below for what each tag stands on.
+  origin: string; // "" when source.md records none
+  sourceKind: string; // e.g. "substack-note"; "" when absent
+  canonicalUrl: string | null; // null when never pasted in (the scaffold leaves it blank)
+  publishedAt: string | null; // null for a local draft that has never gone out
+  tag: SourceTag | null; // null = the origin does not say, never a guess
+  tagBasis: string; // the fact the tag is standing on, so the tag never renders bare
 }
 
-export function contentSessionForFolder(folder: string, slug: string): ContentSession | null {
+export function contentSessionForFolder(
+  folder: string,
+  slug: string,
+  ownHosts: readonly string[] = ownDestinationHosts()
+): ContentSession | null {
   let sourceBody = "";
+  let fm: Record<string, unknown> = {};
   try {
-    sourceBody = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8")).body.trim();
+    const split = splitFrontmatter(readFileSync(join(folder, "source.md"), "utf8"));
+    sourceBody = split.body.trim();
+    fm = split.fm;
   } catch {
     return null; // no source.md — not a workbench piece
   }
+  const { tag, basis } = sourceTagFor(fm, ownHosts);
   const session = developSessionForFolder(folder, slug);
   const cuts: ContentCutView[] = [];
   for (const lens of listCuts(folder)) {
@@ -326,13 +428,20 @@ export function contentSessionForFolder(folder: string, slug: string): ContentSe
     rounds: session?.rounds ?? [],
     cuts,
     pending,
+    origin: typeof fm.origin === "string" ? fm.origin.trim() : "",
+    sourceKind: typeof fm.source_kind === "string" ? fm.source_kind.trim() : "",
+    canonicalUrl: typeof fm.canonical_url === "string" && fm.canonical_url.trim() ? fm.canonical_url.trim() : null,
+    publishedAt: typeof fm.published_at === "string" && fm.published_at.trim() ? fm.published_at.trim() : null,
+    tag,
+    tagBasis: basis,
   };
 }
 
 export function listContentSessions(): ContentSession[] {
   const out: ContentSession[] = [];
+  const ownHosts = ownDestinationHosts(); // read once, not once per folder
   for (const slug of listRootFolders(CONTENT)) {
-    const session = contentSessionForFolder(join(CONTENT, slug), slug);
+    const session = contentSessionForFolder(join(CONTENT, slug), slug, ownHosts);
     if (session) out.push(session);
   }
   out.sort((a, b) => b.slug.localeCompare(a.slug));
