@@ -8,3 +8,9 @@ description = "Verified false positive: src/pull/platforms/linkedin.ts only hold
 paths = [
   '''src/pull/platforms/linkedin\.ts''',
 ]
+
+[[allowlists]]
+description = "Verified false positive: the linkedin-client-secret rule matches the TYPE ANNOTATION in `export const linkedin: PatternCollector = {`, not a credential. PatternCollector is an interface imported from ./shared.js. Full 278-line file checked 2026-08-23; the collector reads public profile pages through a Playwright session and holds no keys."
+paths = [
+  '''src/patterns/collectors/linkedin\.ts''',
+]
