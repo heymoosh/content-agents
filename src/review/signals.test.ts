@@ -462,6 +462,8 @@ test("an empty research table reads as unmeasured, but a populated one with no c
 const EM_DASH = "—";
 const READER_FACING_MODULES: { dir: string; files: string[] }[] = [
   { dir: "review", files: ["signals.ts", "treatment.ts", "fixtures.ts"] },
+  // The two cron routines print a run summary Muxin reads in the job log.
+  { dir: "cron", files: ["bluesky-mentions.ts", "notes-daily.ts"] },
   {
     dir: "strategy",
     files: [
