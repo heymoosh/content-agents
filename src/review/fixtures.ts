@@ -271,7 +271,7 @@ const FXS_NOW = "2026-08-21T09:00:00.000Z";
 // with no source to measure it from.
 
 function fxMeasured(value: number, measured: number, unmeasured: number): Record<string, unknown> {
-  return { state: "measured", value, posts_measured: measured, posts_unmeasured: unmeasured };
+  return { state: "measured", value, records_measured: measured, records_unmeasured: unmeasured };
 }
 function fxUnmeasured(reason: string): Record<string, unknown> {
   return { state: "not_measured", reason: "FIXTURE: " + reason };
@@ -649,7 +649,7 @@ function fxArtifact(over: Partial<VentureArtifact> & { artifact_id: string; titl
     delivery_mode: "manual", publishable: false, editorial_status: "draft", delivery_status: "awaiting_approval",
     evidence: null, retraction: null, failure: null, origin_type: "venture", venture_id: "fixture-venture",
     venture_phase: 1, message_id: "fx", cta_id: null, rules_version: "fixture-rules", probe_id: null,
-    unknown_id: null, claim_refs: [], created_at: FX_AT, updated_at: FX_AT,
+    unknown_id: null, claim_refs: [], body_edited_by_muxin_at: null, created_at: FX_AT, updated_at: FX_AT,
     ...over,
   } as VentureArtifact;
 }
@@ -683,6 +683,19 @@ const FX_RETRACTED = fxArtifact({
   editorial_status: "discarded", delivery_status: "cancelled",
   evidence: ev("url", "https://example.invalid/fixture-retracted"),
   retraction: { attestation: "I unpublished it, the link is dead now.", retracted_at: FX_NOW, retracted_by: "muxin" } as Retraction,
+});
+
+// The pair the body editor exists to keep apart, side by side: one body still in the AI register,
+// one Muxin has been through herself. Without a fixture for the second, the only way to review that
+// register is to have a real venture with a real edit in it.
+const FX_AI_DRAFT = fxArtifact({
+  artifact_id: "p1-essay-04", title: "FIXTURE: still my draft, and it says so",
+  body_path: "phase-1-attention/p1-essay-04.md",
+});
+const FX_EDITED_BY_MUXIN = fxArtifact({
+  artifact_id: "p1-essay-05", title: "FIXTURE: the one you rewrote",
+  body_path: "phase-1-attention/p1-essay-05.md",
+  body_edited_by_muxin_at: FX_NOW,
 });
 
 function fxCheckpoint(required: VentureArtifact[], over: Partial<CheckpointState> = {}): CheckpointState {
@@ -848,6 +861,22 @@ const VENTURE_SCENARIOS: FixtureScenario[] = [
           state: fxState(3, { "checkpoint-3": fxCheckpoint([], { decisions_required_count: 3, decisions_complete_count: 1, blocking: [{ artifact_id: null, reason: 'missing required decision kind "transformation-choice"' }, { artifact_id: null, reason: 'missing required decision kind "product-format-and-price"' }] }) }),
           statusText: "fixture-venture -- Phase 3\n0 of 20 people who count toward the goal so far.",
           artifacts: [],
+        }),
+      },
+    },
+  },
+  {
+    id: "venture-authorship",
+    group: "Venture",
+    label: "my draft beside the one you rewrote",
+    room: "venture",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": {
+        ok: true,
+        thread: fxThread({
+          artifacts: [FX_AI_DRAFT, FX_EDITED_BY_MUXIN],
+          state: fxState(1, { "checkpoint-1": fxCheckpoint([FX_AI_DRAFT, FX_EDITED_BY_MUXIN]) }),
         }),
       },
     },

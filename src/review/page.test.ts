@@ -846,6 +846,7 @@ test("job surface copy: no em dashes and no 'atomize' in the strings this PR add
 import {
   outreachSegment, OUTREACH_SEGMENTS, groupLeadsBySegment, lastPitchedLabel, threadSegLabel,
   matchmakerRead, contactsLine, isEvidenceSourceValid, evidenceSourceView, NO_SOURCE_RECORDED,
+  evidenceCapturedView, NO_CAPTURE_DATE_RECORDED,
   outreachSendState, outreachSendNote, outreachSendBadge, leadSendLogLine,
   outreachThreadPhase, firstSentence, outreachOpeningLine,
 } from "./page.js";
@@ -984,12 +985,67 @@ test("evidenceSourceView: a valid URL is clickable, a vault path is text, anythi
   assert.deepEqual(evidenceSourceView(undefined), { kind: "none", text: NO_SOURCE_RECORDED });
 });
 
-test("evidenceSourceView: never invents a date, because EvidenceItem carries no timestamp", () => {
+test("evidenceSourceView: the source line stays a source line and never carries a date", () => {
+  // EvidenceItem now HAS a captured_at, and it renders on its own row (evidenceCapturedView
+  // below). The source cell still must not borrow from it: the prototype's hardcoded
+  // "observed Aug 6" sat exactly here, and a dateless source must keep reading as a dateless
+  // source rather than reaching for the item's timestamp.
   for (const src of ["https://posthog.com/blog", "vault:People/Annika L.md", "(none)", "", "tbd"]) {
     const v = evidenceSourceView(src);
     assert.ok(!/observed/i.test(v.text), "an evidence source must never read as an observation date: " + v.text);
     assert.ok(!/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(v.text));
   }
+});
+
+// ── captured_at: dated, undated, and no evidence at all ─────────────────────────────────────────
+
+test("evidenceCapturedView: a recorded date and no recorded date are two different sentences", () => {
+  assert.deepEqual(evidenceCapturedView("2026-08-23"), { dated: true, text: "captured 2026-08-23" });
+  assert.deepEqual(evidenceCapturedView(null), { dated: false, text: NO_CAPTURE_DATE_RECORDED });
+  assert.deepEqual(evidenceCapturedView(undefined), { dated: false, text: NO_CAPTURE_DATE_RECORDED });
+  assert.deepEqual(evidenceCapturedView(""), { dated: false, text: NO_CAPTURE_DATE_RECORDED });
+  assert.notEqual(evidenceCapturedView("2026-08-23").text, evidenceCapturedView(null).text);
+});
+
+test("evidenceCapturedView: an undated item never renders as though it were dated", () => {
+  // The failure this guards is the whole reason the field has three states: every lead.md already
+  // on disk was written before captured_at existed, nothing rewrites those files, so undated is a
+  // permanent state and not a loading one. No mtime, no today, no blank that reads like a date.
+  for (const v of [null, undefined, "", "   ", "today", "unknown", "(none)", "2026-08", "Aug 23 2026"]) {
+    const out = evidenceCapturedView(v);
+    assert.equal(out.dated, false, JSON.stringify(v));
+    assert.equal(out.text, NO_CAPTURE_DATE_RECORDED, JSON.stringify(v));
+    assert.ok(!/\d{4}-\d{2}-\d{2}/.test(out.text), "an undated item must not render a date: " + out.text);
+    assert.ok(!/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(out.text));
+  }
+});
+
+test("evidenceCapturedView: the browser copy answers every vector identically (Rule 5)", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin the capture-date mirror ──");
+  const end = script.indexOf("// ── end of the capture-date mirror ──");
+  assert.ok(start > -1, "the inline capture-date mirror must reach the browser");
+  assert.ok(end > start, "the capture-date mirror's end marker must follow it");
+  const mirror = new Function(
+    script.slice(start, end) + "\nreturn evidenceCapturedView;"
+  )() as typeof evidenceCapturedView;
+  for (const v of ["2026-08-23", "1999-01-01", null, undefined, "", "  ", "today", "2026-08", "Aug 23 2026"]) {
+    assert.deepEqual(mirror(v), evidenceCapturedView(v), JSON.stringify(v));
+  }
+});
+
+test("the evidence rail renders the capture date in the browser, in its own two registers", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("evidenceCapturedView(e.captured_at)"), "the rail must read the item's own date");
+  assert.ok(html.includes('cv.dated?"ev-cap":"ev-nocap"'), "dated and undated must take different classes");
+  // ...and the two classes must actually LOOK different, or the distinction is only in the markup.
+  // Asserted against the emitted CSS because that is the only place it exists.
+  const cap = /\.ev-cap \{([^}]*)\}/.exec(html);
+  const nocap = /\.ev-nocap \{([^}]*)\}/.exec(html);
+  assert.ok(cap && nocap, "both registers need a rule of their own, or the two collapse");
+  assert.ok(/font-style:italic/.test(nocap![1]), "the undated register is set apart in style: " + nocap![1]);
+  assert.ok(!/font-style:italic/.test(cap![1]), "and the dated one is not");
+  assert.notEqual(/color:(#[0-9a-f]+)/.exec(cap![1])?.[1], /color:(#[0-9a-f]+)/.exec(nocap![1])?.[1], "and in colour");
 });
 
 test("outreachSendState: locking is the only per-message fact the repo measures", () => {
@@ -1924,12 +1980,12 @@ function signalsMirror(): SignalsMirror {
 }
 
 const METRIC_VECTORS: MetricReadView[] = [
-  { state: "measured", value: 4180, posts_measured: 12, posts_unmeasured: 0 },
-  { state: "measured", value: 0, posts_measured: 12, posts_unmeasured: 0 },   // a MEASURED zero
-  { state: "measured", value: 0, posts_measured: 0, posts_unmeasured: 11 },   // a sum over nothing
-  { state: "measured", value: 7, posts_measured: 1, posts_unmeasured: 1 },    // singular wording
-  { state: "measured", value: -3, posts_measured: 2, posts_unmeasured: 0 },   // a negative delta
-  { state: "measured", value: 1234567, posts_measured: 9, posts_unmeasured: 2 },
+  { state: "measured", value: 4180, records_measured: 12, records_unmeasured: 0 },
+  { state: "measured", value: 0, records_measured: 12, records_unmeasured: 0 },   // a MEASURED zero
+  { state: "measured", value: 0, records_measured: 0, records_unmeasured: 11 },   // a sum over nothing
+  { state: "measured", value: 7, records_measured: 1, records_unmeasured: 1 },    // singular wording
+  { state: "measured", value: -3, records_measured: 2, records_unmeasured: 0 },   // a negative delta
+  { state: "measured", value: 1234567, records_measured: 9, records_unmeasured: 2 },
   { state: "not_measured", reason: "the metrics table has no saves column" },
 ];
 
@@ -1963,6 +2019,33 @@ test("metricLine: measured, measured-as-zero and never-measured are three differ
 test("metricLine: the browser copy answers every vector identically", () => {
   const mirror = signalsMirror().metricLine;
   for (const v of METRIC_VECTORS) assert.deepEqual(mirror(v), metricLine(v), JSON.stringify(v));
+});
+
+// The `posts_measured`/`posts_unmeasured` -> `records_measured`/`records_unmeasured` rename (PR
+// #376 documented the mismatch at the declaration and deferred it until page.ts was free). It was
+// a rename and nothing else, so these are the exact sentences the screen shipped before it, pinned
+// byte for byte: if a later change to the field names moves a word, this is what says so.
+test("metricLine: the rename left every rendered sentence byte-identical", () => {
+  assert.deepEqual(metricLine({ state: "measured", value: 4180, records_measured: 12, records_unmeasured: 0 }), {
+    value: "4,180",
+    note: "measured on 12 records",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 7, records_measured: 1, records_unmeasured: 1 }), {
+    value: "7",
+    note: "measured on 1 record, 1 record carried no number",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 1234567, records_measured: 9, records_unmeasured: 2 }), {
+    value: "1,234,567",
+    note: "measured on 9 records, 2 records carried no number",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 0, records_measured: 0, records_unmeasured: 11 }), {
+    value: "0",
+    note: "no record carried this number, so this is a sum over nothing rather than a measured zero",
+    tone: "grey",
+  });
 });
 
 test("groupDigits: grouping is written out, not left to a locale, and both copies agree", () => {

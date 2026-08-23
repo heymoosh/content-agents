@@ -33,11 +33,22 @@ const PLATFORM_POSITIVE = new Set(["strong", "partial"]);
 const PLACEHOLDER_SOURCES = new Set(["(none)", "none", "n/a", "na", "tbd", "unknown", ""]);
 const PLACEHOLDER_QUOTES = new Set(["(none)", "none", "n/a", "na", "tbd", ""]);
 
-// Evidence line shape (research.ts writes these, qualify.ts reads them):
+// Evidence line shape (research.ts and discover.ts write these, qualify.ts reads them):
 //   - E1 | signal: worldview-match | person: | source: https://... | quote: "..." | one-line note
 //   - E2 | signal: person-fit | person: Jane Doe | source: https://... | quote: "..." | one-line note
+//
+// The capture date is an OPTIONAL trailing segment, and it has to stay optional forever:
+//
+//   - E3 | signal: greenfield | person: | source: https://... | quote: "..." | note | captured: 2026-08-23
+//
+// Every lead.md already on disk was written before this field existed, and nothing rewrites those
+// files. So an old line has no date and never will -- it parses to captured_at: null, which is a
+// THIRD state, not a zero and not a stand-in for today (docs/prototype-port-rules.md Rule 3). The
+// optional group sits after the note rather than before it because the note is the only free-text
+// field on the line and would otherwise swallow the segment; the date is pinned to YYYY-MM-DD for
+// the same reason, so a note that happens to end with the word "captured" cannot be misread as one.
 const EVIDENCE_LINE_RE =
-  /^-\s*(E\d+)\s*\|\s*signal:\s*([^|]*?)\s*\|\s*person:\s*([^|]*?)\s*\|\s*source:\s*([^|]*?)\s*\|\s*quote:\s*([^|]*?)\s*\|\s*(.*)$/;
+  /^-\s*(E\d+)\s*\|\s*signal:\s*([^|]*?)\s*\|\s*person:\s*([^|]*?)\s*\|\s*source:\s*([^|]*?)\s*\|\s*quote:\s*([^|]*?)\s*\|\s*(.*?)(?:\s*\|\s*captured:\s*(\d{4}-\d{2}-\d{2}))?\s*$/;
 
 export interface EvidenceItem {
   id: string;
@@ -46,6 +57,14 @@ export interface EvidenceItem {
   source: string;
   quote: string;
   description: string;
+  /**
+   * The day this repo recorded the evidence, stamped by whichever run wrote the line (a /outreach
+   * research pass, a /scout discovery pass). `null` means no date was recorded -- which is the
+   * permanent, correct answer for every item written before the field existed. It is never
+   * backfilled, never filled from the file's mtime, and never defaulted to today: an undated item
+   * renders as undated.
+   */
+  captured_at: string | null;
 }
 
 // Exported so research.ts (the LLM evidence-gathering pass) can reuse the exact same section
@@ -73,6 +92,7 @@ export function parseEvidence(body: string): EvidenceItem[] {
       source: m[4].trim(),
       quote: m[5].trim(),
       description: m[6].trim(),
+      captured_at: m[7] ?? null,
     });
   }
   return items;
@@ -100,6 +120,21 @@ export function isValidSourceUrl(url: string): boolean {
 export function hasQuote(quote: string): boolean {
   const trimmed = quote.trim();
   return trimmed.length > 0 && !PLACEHOLDER_QUOTES.has(trimmed.toLowerCase());
+}
+
+/**
+ * The one place an evidence line is written, so the reader above and every writer stay one format.
+ * research.ts (merging a research pass into an existing lead.md) and discover.ts (scaffolding a
+ * freshly discovered one) both call this.
+ *
+ * The round trip is the point: an item parsed from an undated line re-serializes STILL UNDATED.
+ * research.ts re-writes the whole ## Evidence section on every merge, so a formatter that filled a
+ * blank date in would silently stamp today onto evidence gathered months ago -- which is the exact
+ * lie the field was added to avoid.
+ */
+export function formatEvidenceLine(item: EvidenceItem, index: number): string {
+  const captured = item.captured_at ? ` | captured: ${item.captured_at}` : "";
+  return `- E${index} | signal: ${item.signal} | person: ${item.person} | source: ${item.source} | quote: ${item.quote} | ${item.description}${captured}`;
 }
 
 export function isValidEvidenceItem(item: EvidenceItem): boolean {

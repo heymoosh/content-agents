@@ -16,6 +16,7 @@ const GREENFIELD_ITEM: EvidenceItem = {
   source: "https://acme.co/blog/act-2",
   quote: "(none)",
   description: "publicly exploring a new, unshipped direction",
+  captured_at: null,
 };
 
 const WORLDVIEW_ITEM: EvidenceItem = {
@@ -25,6 +26,7 @@ const WORLDVIEW_ITEM: EvidenceItem = {
   source: "https://acme.co/founders/product-360",
   quote: "I used to think you don't need product people. I was wrong.",
   description: "founder reverses a foundational assumption",
+  captured_at: null,
 };
 
 const PERSON_ITEM: EvidenceItem = {
@@ -34,6 +36,7 @@ const PERSON_ITEM: EvidenceItem = {
   source: "https://acme.co/founders/product-360",
   quote: "I used to think you don't need product people. I was wrong.",
   description: "person-fit tier: Developing",
+  captured_at: null,
 };
 
 // Captured from buildDraftPrompt on commit c42e9a9, BEFORE runDraft learned about a typed

@@ -694,6 +694,8 @@ export interface OutreachEvidenceView {
   source?: string;
   quote?: string;
   description?: string;
+  /** src/outreach/qualify.ts's EvidenceItem.captured_at. null/absent = no date was ever recorded. */
+  captured_at?: string | null;
 }
 
 export interface OutreachMessageView {
@@ -820,13 +822,36 @@ export function isEvidenceSourceValid(source: string | undefined): boolean {
 
 export const NO_SOURCE_RECORDED = "no source recorded";
 
-// What the evidence rail shows under a quote. There is no timestamp anywhere in EvidenceItem, so
-// there is no date to fall back on: an item with nothing valid behind it says it has nothing.
+// What the evidence rail shows under a quote. An item with nothing valid behind it says it has
+// nothing — the date below is a separate fact and is never a stand-in for a missing source.
 export function evidenceSourceView(source: string | undefined): { kind: "link" | "text" | "none"; text: string } {
   const trimmed = (source ?? "").trim();
   if (!isEvidenceSourceValid(trimmed)) return { kind: "none", text: NO_SOURCE_RECORDED };
   if (/^https?:\/\//i.test(trimmed)) return { kind: "link", text: trimmed };
   return { kind: "text", text: trimmed };
+}
+
+export const NO_CAPTURE_DATE_RECORDED = "no capture date recorded";
+
+// When the evidence was gathered. THREE states, not two (docs/prototype-port-rules.md Rule 3), and
+// the third one is the whole reason this exists:
+//
+//   dated    a real YYYY-MM-DD, stamped by the run that wrote the line
+//   undated  the line was written before qualify.ts recorded dates, and never will have one
+//   (absent) the lead has no evidence at all — handled by the rail's own empty state, not here
+//
+// An undated item says so in its own words and in a visibly quieter register. It is never filled
+// from the file's mtime, never from today, and never left blank in a way that reads like a date is
+// coming. The prototype's hardcoded "observed Aug 6" was refused before this shipped for exactly
+// this reason; a silent backfill would be the same lie with a real-looking number on it.
+//
+// Anything that is not a plain YYYY-MM-DD reads as undated rather than being echoed back: the
+// parser only ever produces that shape, so a different string means the field was set by something
+// that does not know what it holds.
+export function evidenceCapturedView(capturedAt: string | null | undefined): { dated: boolean; text: string } {
+  const trimmed = (capturedAt ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return { dated: false, text: NO_CAPTURE_DATE_RECORDED };
+  return { dated: true, text: "captured " + trimmed };
 }
 
 // Locked and sent are two different states and never collapse into one check. Locking readies the
@@ -1013,7 +1038,7 @@ export type DeskRoom = "content" | "studio" | "outreach" | "fiction" | "charles"
 // (500 / 20 / 30 / 25) appear in no document in this repo. They are not rendered.
 
 export type MetricReadView =
-  | { state: "measured"; value: number; posts_measured: number; posts_unmeasured: number }
+  | { state: "measured"; value: number; records_measured: number; records_unmeasured: number }
   | { state: "not_measured"; reason: string };
 
 export type ReadTone = "ink" | "grey" | "green" | "amber";
@@ -1034,7 +1059,7 @@ export function groupDigits(n: number): string {
  */
 export function metricLine(m: MetricReadView): { value: string; note: string; tone: ReadTone } {
   if (m.state === "not_measured") return { value: "not measured", note: m.reason, tone: "grey" };
-  if (m.posts_measured === 0) {
+  if (m.records_measured === 0) {
     return {
       value: "0",
       note: "no record carried this number, so this is a sum over nothing rather than a measured zero",
@@ -1044,9 +1069,9 @@ export function metricLine(m: MetricReadView): { value: string; note: string; to
   // "record", not "post": the audience rolls come off capture rows and the research count off
   // observation sources, so calling every one of them a post would be a claim about the shape of
   // the data that is not true of half of them.
-  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured + " records";
-  const missing = m.posts_unmeasured
-    ? ", " + m.posts_unmeasured + (m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
+  const on = m.records_measured === 1 ? "1 record" : m.records_measured + " records";
+  const missing = m.records_unmeasured
+    ? ", " + m.records_unmeasured + (m.records_unmeasured === 1 ? " record carried no number" : " records carried no number")
     : "";
   return { value: groupDigits(m.value), note: "measured on " + on + missing, tone: "ink" };
 }
@@ -1468,6 +1493,10 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .ev-quote { font:italic 400 13px/1.55 Georgia,serif; color:#3a352c; }
   .ev-src { font-size:12px; color:#7a7266; border-bottom:1px solid #d8cfbb; width:fit-content; text-decoration:none; }
   .ev-nosrc { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; }
+  /* A recorded capture date and no recorded capture date are the same line in two registers, so
+     the pair is legible at a glance: dated reads as a fact, undated reads as an admission. */
+  .ev-cap { font:10.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#8b8272; letter-spacing:.03em; margin-top:3px; }
+  .ev-nocap { font:10.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b3a894; font-style:italic; letter-spacing:.03em; margin-top:3px; }
   /* Outreach triage: the queue grouped by why, one row per lead, one click into the thread */
   .tri-cap { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.06em;
     color:#a89a80; text-transform:uppercase; margin-bottom:20px; }
@@ -1741,6 +1770,17 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     border-left:2px solid #5b46b8; white-space:pre-wrap; margin-top:7px; max-width:600px; }
   .vpen { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
     letter-spacing:.05em; color:#5b46b8; }
+  /* The .vpen of HER register: same label slot, her blue instead of the AI purple. The pair is the
+     whole point — a body she rewrote must never keep the purple one. */
+  .vhand { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--blue); }
+  /* The body editor. Georgia + the blue rule, because the moment she types in it the words are
+     hers — the same box the intake interview gives her, for the same reason. */
+  .vedit { width:100%; box-sizing:border-box; margin-top:11px; min-height:280px;
+    font:400 17px/1.62 Georgia,"Times New Roman",serif; color:var(--ink); padding:12px 14px 12px 16px;
+    border:1px solid #d8cfbb; border-left:2px solid var(--blue); border-radius:0 7px 7px 0;
+    background:#fff; resize:vertical; white-space:pre-wrap; }
+  .vedit:focus { outline:none; border-color:#b9c9dd; border-left-color:var(--blue); }
   .vreceipt { display:grid; grid-template-columns:7px minmax(0,1fr); gap:12px; align-items:baseline; max-width:600px; }
   .vreceipt i { width:6px; height:6px; border-radius:50%; margin-top:6px; display:block; }
   .vreceipt span { font-size:13px; line-height:1.5; color:#8a7f6d; }
@@ -1805,6 +1845,18 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .vform input, .vform textarea { width:100%; box-sizing:border-box; margin-top:9px;
     font:400 15px/1.5 Georgia,"Times New Roman",serif; padding:8px 10px; border:1px solid #d8cfbb;
     border-radius:7px; background:#fff; color:var(--ink); resize:vertical; }
+  /* A dropdown is the APP's list of categories, not anyone's prose, so it takes the app's face.
+     Rule 4: sans is the app speaking; Georgia is for words a person actually wrote. */
+  .vform select { width:100%; box-sizing:border-box; margin-top:9px; font:400 14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:8px 10px; border:1px solid #d8cfbb; border-radius:7px; background:#fff; color:var(--ink); }
+  /* SOMEONE ELSE'S words, transcribed. Not hers (that is Georgia + the blue rule, .vmine) and not
+     the AI's (Georgia + the purple rule, .vdrafted). The third party gets the neutral rule the
+     cluster panel already gives audience evidence, so the room never has three registers meaning
+     two things. */
+  .vform .other { border-left:2px solid #d8cfbb; border-radius:0 7px 7px 0; }
+  .vform .sub { font-size:12px; line-height:1.5; color:#8a7f6d; margin-top:6px; }
+  .vform .pair { display:flex; gap:10px; }
+  .vform .pair > * { flex:1; min-width:0; }
   .vchoice-row.pick { cursor:pointer; }
   .vchoice-row.pick:hover .n { text-decoration:underline; }
   /* ── The intake interview ──────────────────────────────────────────────────────────────────────
@@ -2821,6 +2873,15 @@ function evidenceSourceView(source){
   if(/^https?:\\/\\//i.test(t)) return { kind:"link", text:t };
   return { kind:"text", text:t };
 }
+// ── begin the capture-date mirror ──
+// Mirror of evidenceCapturedView: dated, or undated and saying so. Never a backfilled day.
+const NO_CAPTURE_DATE_RECORDED = "no capture date recorded";
+function evidenceCapturedView(capturedAt){
+  const t = (capturedAt||"").trim();
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(t)) return { dated:false, text:NO_CAPTURE_DATE_RECORDED };
+  return { dated:true, text:"captured "+t };
+}
+// ── end of the capture-date mirror ──
 // Message status only: the tracker's lastTouch is keyed lead:person, never message, so it can
 // never say WHICH message went. The logged send is reported below as the lead-level fact it is.
 function outreachSendState(msg){
@@ -2892,14 +2953,16 @@ function outreachMarginHtml(l){
   const items = evs.slice(0,5).map(e=>{
     const quote = e.quote && e.quote!=="(none)" ? '<div class="ev-quote">"'+esc(e.quote)+'"</div>'
       : (e.description ? '<div class="d">'+esc(e.description)+'</div>' : "");
-    // No date fallback: EvidenceItem carries no timestamp, so an item with nothing valid behind it
-    // says it has no source rather than showing a day nobody recorded.
+    // No fallback anywhere on this row: an item with nothing valid behind it says it has no
+    // source, and an item nobody dated says it has no date. Neither borrows from the other.
     const sv = evidenceSourceView(e.source);
     const src = sv.kind==="link" ? '<a class="ev-src" href="'+esc(sv.text)+'" target="_blank" rel="noopener">source ↗</a>'
       : sv.kind==="text" ? '<div class="ev-src">'+esc(sv.text)+'</div>'
       : '<div class="ev-nosrc">'+esc(sv.text)+'</div>';
+    const cv = evidenceCapturedView(e.captured_at);
+    const cap = '<div class="'+(cv.dated?"ev-cap":"ev-nocap")+'">'+esc(cv.text)+'</div>';
     const cls = e.signal==="worldview-match" ? "green" : "sand";
-    return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+src+'</div>';
+    return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(e.signal)+'</span>'+(e.person?' · '+esc(e.person):"")+'</span>'+quote+src+cap+'</div>';
   }).join("");
   const stats = (l.jsaStats||[]).slice(0,3).map(s=>'<div class="d" style="font-size:12.5px;color:#5a5346;">'+esc(s.label)+': '+esc(s.value)+'</div>').join("");
   const profile = (l.profileRest||l.profile) ? '<details class="lead-details"><summary>Full profile</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.profileRest||l.profile)+'</div></details>' : "";
@@ -3934,6 +3997,7 @@ async function ventureWrite(path, body, okMsg, key){
 
 function vCardAction(artifactId, action){
   const key = "card:"+artifactId+":"+action.id;
+  if(action.id === "edit") return vOpenEditor(artifactId);
   if(action.id === "confirm-live") return vOpen(key, "confirm:"+action.proof, "");
   if(action.id === "failed") return vOpen(key, "failed", "");
   if(action.id === "retract") return vOpen(key, "retract", "");
@@ -3945,6 +4009,32 @@ function vCardAction(artifactId, action){
 // recommended_candidate_ids (via choice.items[].recommended), never from source order: an empty
 // recommendation set makes every option an override, which is exactly how selectWithOverride
 // treats it, and the prototype got both of those wrong.
+// Opening the editor is a READ first: the body lives in a file the thread deliberately does not
+// inline, so it is fetched when she asks for it and not before. The box never opens empty and
+// hopeful -- until the read lands, the slot says it is reading, because an empty editor and an
+// empty document look identical and one of them saves over a draft.
+async function vOpenEditor(artifactId){
+  const key = "card:"+artifactId+":edit";
+  vOpen(key, "editloading", "");
+  try {
+    const r = await fetch("/api/venture/"+encodeURIComponent(ventureSlug)+"/artifacts/"+encodeURIComponent(artifactId)+"/body");
+    const j = await r.json();
+    if(!ventureOpen || ventureOpen.key !== key) return;   // she moved on while it was loading
+    if(!j.ok){ ventureOpen.kind = "error"; return vErr(j.error || "could not read the file"); }
+    ventureOpen.kind = "editing";
+    ventureOpen.value = j.body || "";
+    renderVenture();
+  } catch(e){
+    if(ventureOpen && ventureOpen.key === key){ ventureOpen.kind = "error"; vErr(String(e && e.message || e)); }
+  }
+}
+function vSaveBody(artifactId, text){
+  // NOT blocked here when empty. editArtifactBody refuses it and says what to do instead ("discard
+  // it instead"), and that sentence is better than anything this layer would invent.
+  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/edit", { body: text },
+    "Saved. They are your words now.", "card:"+artifactId+":edit");
+}
+
 function vNeedsReason(choice, item){
   if(choice.reasonAlwaysRequired) return true;
   return !!choice.overrideDiscipline && !item.recommended;
@@ -3966,6 +4056,62 @@ function vSubmitReason(choice, item){
   const body = { candidateIds:[item.candidateId] };
   if(choice.reasonAlwaysRequired) body.rationale = text; else body.overrideReason = text;
   ventureWrite("/decisions/"+encodeURIComponent(choice.decisionId)+"/select", body, "Recorded in canon", key);
+}
+
+// The response form's own open/submit pair, kept next to the other writes rather than inside the
+// listener so the state it carries is visible in one place.
+//
+// THE COUNT IS NEVER MOVED FROM HERE. What lands on screen after a successful write is the gate the
+// SERVER just computed and then, on the refetch, the gate it computes again from the log. This
+// screen has no arithmetic of its own about who counts, which is the only way "20 of 30" can be
+// trusted to mean what ingestResponse decided rather than what a form hoped.
+const V_RESPONSE_FIELDS = ["source","received_at","exact_quote","redacted_quote","stuck_point","desired_outcome",
+  "emotional_intensity","target_audience_eligible","id_platform","id_value","exclusion_reason"];
+// The browser's own clock, and the only thing it is used for: pre-filling a box she can change.
+// Nothing derives a stored date from it.
+function vToday(){ const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function vOpenResponse(){
+  ventureOpen = { key:"gate:response", kind:"response", value:"", error:"", fields:{} };
+  renderVenture();
+}
+// Read every box back out of the DOM before anything can rebuild it. A refusal re-renders the form,
+// so a value not captured here is a value she has to type again.
+function vCaptureResponse(){
+  const f = {};
+  for(const k of V_RESPONSE_FIELDS){ const el = $("#vr-"+k); f[k] = el ? el.value : ""; }
+  if(ventureOpen) ventureOpen.fields = f;
+  return f;
+}
+function vSubmitResponse(){
+  const f = vCaptureResponse();
+  const body = {
+    source: f.source,
+    received_at: f.received_at,
+    exact_quote: f.exact_quote,
+    redacted_quote: f.redacted_quote,
+    stuck_point: f.stuck_point,
+    desired_outcome: f.desired_outcome,
+    emotional_intensity: f.emotional_intensity,
+    exclusion_reason: f.exclusion_reason
+  };
+  // Sent ONLY when she actually answered. An unanswered dropdown must reach the server as absent so
+  // its refusal is what she reads, rather than this layer picking a side and moving the count.
+  if(f.target_audience_eligible === "yes") body.target_audience_eligible = true;
+  else if(f.target_audience_eligible === "no") body.target_audience_eligible = false;
+  if(f.id_platform || f.id_value) body.raw_identifier = { platform: f.id_platform, stable_user_id: f.id_value };
+  ventureWrite("/responses", body, "", "gate:response").then(res=>{
+    if(!res) return;
+    const g = res.gate || {};
+    // The server's own counts, said back plainly. It deliberately does NOT say "+1": an ineligible
+    // response, or a second one from someone already counted, moves nothing, and the sentence has
+    // to be able to report that honestly.
+    const counted = (typeof g.have === "number" && typeof g.need === "number")
+      ? " " + g.have + " of " + g.need + " people count toward the goal."
+      : "";
+    flash((res.likely_duplicate
+      ? "Written down. Same identifier as one already in the log, so they count once."
+      : "Written down.") + counted);
+  });
 }
 
 function vBadge(ev){
@@ -3998,8 +4144,19 @@ function vCard(m){
       + '<div class="vnote" style="margin-top:4px">'+esc(m.failure.message)+'</div></div>';
   }
   if(m.bodyPath){
-    h += '<div style="margin-top:15px"><div class="vpen">I DRAFTED THIS</div>'
-      + '<div class="vnote" style="margin-top:6px;font:11px/1.5 ui-monospace,monospace">'+esc(m.bodyPath)+'</div></div>';
+    // Whose words this is, and the ONLY thing that decides it: the recorded edit stamp. Purple and
+    // "I DRAFTED THIS" until she has been through it, her blue and the day she did afterwards.
+    // Nothing here guesses from how much changed, because nothing measured that.
+    h += '<div style="margin-top:15px">'
+      + (m.editedAt
+        ? '<div class="vhand">YOU REWROTE THIS &middot; '+esc(String(m.editedAt).slice(0,10))+'</div>'
+          + '<div class="vnote" style="margin-top:5px;max-width:560px">You have been through this one yourself, so I no longer call it my draft.</div>'
+        : '<div class="vpen">I DRAFTED THIS</div>')
+      + '<div class="vnote" style="margin-top:6px;font:11px/1.5 ui-monospace,monospace">'+esc(m.bodyPath)+'</div>'
+      // Why the Edit button is absent, said plainly rather than left as a missing control. Only
+      // when there IS a body to edit and something is stopping it.
+      + (!m.editable && m.editBlockedReason ? '<div class="vnote" style="margin-top:6px;max-width:560px">'+esc(m.editBlockedReason)+'</div>' : "")
+      + '</div>';
   }
   if(m.claimRefs && m.claimRefs.length){
     h += '<div class="vmono" style="margin-top:11px">'+m.claimRefs.length+' CLAIM'+(m.claimRefs.length===1?"":"S")+' TRACED · '
@@ -4063,6 +4220,20 @@ function vSlot(prefix, m){
     form = '<div class="lbl">YOUR ONGOING POSTING PACE</div>'
       + '<div class="ask">In your own words. Checkpoint 1 does not clear without it.</div>'
       + '<input id="vFormVal" value="'+esc(o.value)+'" placeholder="three a week" />' + vFormButtons("Record it");
+  } else if(o.kind === "editing"){
+    form = '<div class="lbl">THE WORDS THEMSELVES</div>'
+      + '<div class="ask">Read straight off the file. Saving overwrites it and records that you were the one who did.</div>'
+      + '<textarea class="vedit" id="vFormVal">'+esc(o.value)+'</textarea>'
+      + vFormButtons("Save it");
+  } else if(o.kind === "editloading"){
+    // Not an empty editor. An editor with nothing in it looks exactly like a document with nothing
+    // in it, and saving that would wipe the draft.
+    form = '<div class="lbl">THE WORDS THEMSELVES</div><div class="ask">Reading the file&hellip;</div>';
+  } else if(o.kind === "response"){
+    // The one multi-field form in the room, so it keeps its own values in ventureOpen.fields --
+    // a refusal rebuilds this whole subtree, and losing a transcribed quote to a missing dropdown
+    // would be the worst possible time to throw her typing away.
+    form = vResponseForm(o);
   }
   void m;
   return (form ? '<div class="vform">'+form+'</div>' : "")
@@ -4111,13 +4282,73 @@ function vChoice(m){
   h += vSlot("choice:"+m.decisionId, m);
   return h+'</div>';
 }
+// The gate, and the one control that can move it. Every number here is the server's: have is
+// countEligibleUnique over the log, and the bar is its own pct. Recording a response does NOT
+// nudge them client-side -- ventureWrite refetches the whole thread, so what the bar shows is
+// always what the log actually counted, never an optimistic have+1 for a response that turned out
+// to be ineligible or a repeat of someone already in there.
 function vGate(m){
   return '<div class="vblock"><div class="vmono">'+esc(m.rail)+'</div>'
     + '<div class="vtitle" style="font-size:20px">'+esc(m.title)+'</div>'
     + '<div style="display:flex;align-items:baseline;gap:12px;margin-top:14px;flex-wrap:wrap">'
     + '<span class="vgate-n">'+m.have+'</span><span style="font-size:14px;color:#7a7266">of '+m.need+' needed, aiming for '+m.target+'</span></div>'
     + '<div class="vgate-bar"><span style="width:'+m.pct+'%"></span></div>'
-    + '<div class="vnote" style="margin-top:13px;max-width:530px;font-size:13.5px;color:#5a5346">'+esc(m.note)+'</div></div>';
+    + '<div class="vnote" style="margin-top:13px;max-width:530px;font-size:13.5px;color:#5a5346">'+esc(m.note)+'</div>'
+    + '<div class="vacts"><button class="primary" id="vAddResponse">Write down a response</button>'
+    + '<span class="vnote">One person at a time. I never split a paste into several and I never guess who sent what.</span></div>'
+    + vSlot("gate", m)
+    + '</div>';
+}
+// One response, transcribed. Every field is Muxin's answer, because the two that decide anything --
+// is this person in the audience you are testing, and is there an identifier to recognize them by --
+// are judgments src/venture/responses.ts has always required as explicit input and refuses to infer.
+//
+// The audience question starts UNANSWERED and stays that way until she picks. That is the three-
+// states rule applied to a form: "not answered" is not "no", and the route refuses an unanswered
+// one with its own sentence rather than this screen quietly defaulting the count either way.
+const V_RESP_SOURCES = [["survey","a survey answer"],["email","an email"],["comment","a comment"],["dm","a DM"],["other","somewhere else"]];
+const V_RESP_INTENSITY = [["low","said in passing"],["medium","clearly bothered"],["high","really wound up about it"]];
+function vRespField(id, label, ask, o, opts){
+  const v = esc((o.fields && o.fields[id]) || "");
+  const box = opts && opts.textarea
+    ? '<textarea id="vr-'+id+'" rows="'+(opts.rows||3)+'"'+(opts.other?' class="other"':'')+'>'+v+'</textarea>'
+    : '<input id="vr-'+id+'" value="'+v+'"'+(opts&&opts.placeholder?' placeholder="'+esc(opts.placeholder)+'"':'')+' />';
+  return '<div style="margin-top:14px"><div class="lbl">'+esc(label)+'</div>'
+    + (ask ? '<div class="sub">'+esc(ask)+'</div>' : "") + box + '</div>';
+}
+function vRespSelect(id, label, ask, o, options, blank){
+  const cur = (o.fields && o.fields[id]) || "";
+  const opts = (blank ? '<option value=""'+(cur===""?" selected":"")+'>'+esc(blank)+'</option>' : "")
+    + options.map(pair=>'<option value="'+esc(pair[0])+'"'+(cur===pair[0]?" selected":"")+'>'+esc(pair[1])+'</option>').join("");
+  return '<div style="margin-top:14px"><div class="lbl">'+esc(label)+'</div>'
+    + (ask ? '<div class="sub">'+esc(ask)+'</div>' : "")
+    + '<select id="vr-'+id+'">'+opts+'</select></div>';
+}
+function vResponseForm(o){
+  return '<div class="lbl">ONE RESPONSE, IN THEIR WORDS AND YOUR JUDGMENT</div>'
+    + '<div class="ask">Nothing you type here is read back to you later. The log answers in counts only, and it stays out of git.</div>'
+    + vRespSelect("source", "WHERE IT CAME FROM", "", o, V_RESP_SOURCES, "pick one")
+    // Pre-filled with today because most transcribing happens the day it lands, and left editable
+    // because plenty of it does not. The date that gets stored is whichever one is in this box when
+    // she sends it -- the server requires the field rather than reading its own clock, so an email
+    // from last week never gets today written on it just because today is when she typed it up.
+    + '<div style="margin-top:14px"><div class="lbl">WHEN IT REACHED YOU</div>'
+    + '<div class="sub">Today unless you change it. Nothing here can tell when it actually arrived.</div>'
+    + '<input type="date" id="vr-received_at" value="'+esc((o.fields && o.fields.received_at) || vToday())+'" /></div>'
+    + vRespField("exact_quote", "WHAT THEY ACTUALLY SAID", "Their words, not yours and not mine. Paste or type them as they came.", o, { textarea:true, rows:4, other:true })
+    + vRespField("redacted_quote", "THE SAME THING, WITH IDENTIFYING BITS TAKEN OUT", "This is the only version that ever leaves the log, so it is the one a cluster quotes. I do not redact it for you.", o, { textarea:true, rows:4, other:true })
+    + vRespField("stuck_point", "WHERE THEY ARE STUCK", "One line, in your words.", o, {})
+    + vRespField("desired_outcome", "WHAT THEY SAID THEY WANT INSTEAD", "Leave it empty if they did not say.", o, {})
+    + vRespSelect("emotional_intensity", "HOW HARD THEY SAID IT", "", o, V_RESP_INTENSITY, "pick one")
+    + vRespSelect("target_audience_eligible", "IS THIS PERSON IN THE AUDIENCE YOU ARE TESTING?",
+        "Your call, and it is the one that decides whether they count toward the goal above. I have no way to read it off their words.",
+        o, [["yes","Yes, they are the person this is for"],["no","No, they are outside it"]], "not answered yet")
+    + '<div style="margin-top:14px"><div class="lbl">SOMETHING TO RECOGNIZE THEM BY (OPTIONAL)</div>'
+    + '<div class="sub">An email or a platform user id, never a display name. It gets hashed and the raw value is thrown away, never written down. It is the only way two responses from the same person count as one. Leave both empty and this counts as its own person.</div>'
+    + '<div class="pair"><input id="vr-id_platform" value="'+esc((o.fields&&o.fields.id_platform)||"")+'" placeholder="which platform" />'
+    + '<input id="vr-id_value" value="'+esc((o.fields&&o.fields.id_value)||"")+'" placeholder="their id or email there" /></div></div>'
+    + vRespField("exclusion_reason", "A REASON TO KEEP THEM OUT OF THE COUNT (OPTIONAL)", "Filling this in keeps the response on file and out of the goal.", o, {})
+    + vFormButtons("Write it down");
 }
 function vCheckpoint(m){
   const rows = m.rows.map(r=>
@@ -4232,6 +4463,8 @@ document.addEventListener("click", e=>{
     if(o.kind === "failed") return ventureWrite("/artifacts/"+encodeURIComponent(id)+"/failed", { message: val() }, "Recorded", o.key);
     if(o.kind === "retract") return ventureWrite("/artifacts/"+encodeURIComponent(id)+"/retract", { attestation: val() }, "Recorded as taken down", o.key);
     if(o.kind === "pace") return ventureWrite("/pace", { postsPerWeek: val() }, "Pace recorded", o.key);
+    if(o.kind === "editing") return vSaveBody(id, val());
+    if(o.kind === "response") return vSubmitResponse();
     return;
   }
 
@@ -4253,6 +4486,7 @@ document.addEventListener("click", e=>{
     if(c && it && c.requiredCount === 1) return vPick(c, it);
     return;
   }
+  if(t.id === "vAddResponse") return vOpenResponse();
   if(t.id === "vPace"){
     const cp = (VENTURE_THREAD.messages||[]).find(x=>x.kind==="checkpoint");
     if(cp) return vOpen("checkpoint:"+cp.checkpointId+":pace", "pace", "");
@@ -5109,15 +5343,15 @@ function groupDigits(n){
 }
 function metricLine(m){
   if(m.state === "not_measured") return { value:"not measured", note:m.reason, tone:"grey" };
-  if(m.posts_measured === 0){
+  if(m.records_measured === 0){
     return { value:"0",
       note:"no record carried this number, so this is a sum over nothing rather than a measured zero",
       tone:"grey" };
   }
   // "record", not "post": half of these come off capture rows and observation sources, not posts.
-  const on = m.posts_measured === 1 ? "1 record" : m.posts_measured+" records";
-  const missing = m.posts_unmeasured
-    ? ", "+m.posts_unmeasured+(m.posts_unmeasured === 1 ? " record carried no number" : " records carried no number")
+  const on = m.records_measured === 1 ? "1 record" : m.records_measured+" records";
+  const missing = m.records_unmeasured
+    ? ", "+m.records_unmeasured+(m.records_unmeasured === 1 ? " record carried no number" : " records carried no number")
     : "";
   return { value:groupDigits(m.value), note:"measured on "+on+missing, tone:"ink" };
 }

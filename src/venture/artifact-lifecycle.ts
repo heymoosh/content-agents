@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve, sep } from "node:path";
+import { ventureDir } from "./paths.js";
 import { readArtifact, readArtifacts, transitionArtifact, type ClaimRef, type VentureArtifact } from "./artifacts.js";
 import { appendCanonEvent } from "./canon.js";
 import type { VentureRules } from "./rules.js";
@@ -182,4 +184,80 @@ export function cmdList(slug: string) {
   for (const a of readArtifacts(slug)) {
     console.log(`${a.artifact_id}  ${a.artifact_kind}  ${a.editorial_status}/${a.delivery_status}  "${a.title}"`);
   }
+}
+
+// --- the body file ------------------------------------------------------------------------------
+//
+// Approving or discarding a draft was the whole of Muxin's say over an artifact: there was no way
+// to change a word of it without opening the file in an editor. These two functions are that way,
+// and they live here rather than in the route that calls them because a body edit is an editorial
+// act with its own rules, and venture-writes.ts's standing rule is that no route may invent one.
+//
+// What an edit means, and why it is recorded:
+//
+//   An artifact body starts as AI-written prose, and the room says so in the AI register (purple,
+//   "I DRAFTED THIS"). The moment Muxin rewrites it, that stops being true of the file on disk, and
+//   leaving it purple would be the exact defect docs/prototype-port-rules.md Rule 4 names: her
+//   prose rendered as the AI's. So the edit stamps body_edited_by_muxin_at, and the register
+//   follows the stamp. It is deliberately a timestamp and not a flag, because the screen shows the
+//   day, and the day has to be one something actually recorded.
+//
+//   There is no partial state and no diffing. Once she has been through it, the file is hers; the
+//   room does not try to work out which sentences survived.
+
+function resolveBodyFile(slug: string, a: VentureArtifact): string {
+  if (!a.body_path) {
+    throw new Error(`"${a.artifact_id}" has no body file to edit -- this kind of artifact keeps its content in fields, not in a document`);
+  }
+  const dir = ventureDir(slug);
+  const full = resolve(dir, a.body_path);
+  // body_path is written by the phase scripts and has never been user input, but this read and
+  // write are reachable from an HTTP route now, and a containment check costs nothing.
+  if (full !== dir && !full.startsWith(dir + sep)) {
+    throw new Error(`"${a.artifact_id}" points outside its own venture folder -- refusing to touch ${a.body_path}`);
+  }
+  return full;
+}
+
+export function readArtifactBody(slug: string, artifactId: string): { body: string; editedAt: string | null } {
+  const a = requireArtifact(slug, artifactId);
+  const file = resolveBodyFile(slug, a);
+  // A body_path whose file is not there is a real state (a draft recorded, the file lost) and it
+  // reads as empty rather than throwing, so the editor can open and put something there.
+  const body = existsSync(file) ? readFileSync(file, "utf8") : "";
+  return { body, editedAt: a.body_edited_by_muxin_at };
+}
+
+/**
+ * Muxin's own rewrite of one artifact body. Refuses on the two states where the file and the world
+ * would stop agreeing:
+ *
+ *   handed_off / live_confirmed — the words are already out there. Editing the file afterwards
+ *     would leave the record claiming that this text went live when a different one did. The
+ *     refusal says what to do instead, because there IS something to do: take it down (retract),
+ *     or report the delivery failed, and then edit.
+ *   discarded — it is off the desk. Restore it first, so the record shows it came back before it
+ *     changed rather than changing while it was out.
+ *
+ * Everything else can be edited: a draft, an approved-and-ready artifact that has not gone
+ * anywhere yet, and one whose delivery failed and is waiting to be tried again.
+ */
+export function editArtifactBody(slug: string, artifactId: string, body: string, at: string = now()): VentureArtifact {
+  const a = requireArtifact(slug, artifactId);
+  if (a.editorial_status === "discarded") {
+    throw new Error(`"${a.artifact_id}" is discarded -- put it back on the desk first, then edit it`);
+  }
+  if (a.delivery_status === "live_confirmed" || a.delivery_status === "handed_off") {
+    throw new Error(
+      `"${a.artifact_id}" has already gone out, so the file and what people saw would stop matching. ` +
+        `Take it down or report the delivery failed, then edit it`
+    );
+  }
+  if (!body.trim()) {
+    throw new Error(`an empty body would throw the draft away without recording that you meant to -- discard it instead`);
+  }
+  const file = resolveBodyFile(slug, a);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, body.endsWith("\n") ? body : body + "\n");
+  return transitionArtifact(slug, artifactId, { body_edited_by_muxin_at: at }, at);
 }

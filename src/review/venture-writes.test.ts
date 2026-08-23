@@ -12,9 +12,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { handleVentureWrite, VENTURE_WRITE_PATHS, VENTURE_WRITE_ROUTE_COUNT } from "./venture-writes.js";
 import { handleVentureRead } from "./venture-reads.js";
@@ -694,5 +694,351 @@ test("no write route echoes a raw response quote or a respondent hash", () => {
     ].join("\n");
     assert.ok(!seen.includes(EXACT), "a write route echoed a raw quote");
     assert.ok(!seen.includes(HASH), "a write route echoed a respondent hash");
+  });
+});
+
+// --- POST :slug/responses -------------------------------------------------------------------------
+//
+// The route Muxin asked for, and the one this module's header used to say could not exist. What is
+// under test is not "it writes a line" but the four things that keep the Phase 3 gate honest:
+// the eligibility judgment is hers and is refused when unanswered, the response body is a
+// confirmation and never the text, the counts come back from the log rather than from arithmetic
+// here, and nothing outside responses.jsonl (plus the gate's own ledger event) moves.
+
+// respondentHash() is a keyed HMAC and requireResearchHashKey() refuses without the key, so a test
+// that supplies an identifier has to supply one too. Set locally rather than globally: the tests
+// that omit an identifier must keep passing with no key at all, which is the real configuration a
+// first response is written under.
+function withHashKey<T>(fn: () => T): T {
+  const before = process.env.RESEARCH_HASH_KEY;
+  process.env.RESEARCH_HASH_KEY = "test-key-not-a-real-secret";
+  try {
+    return fn();
+  } finally {
+    if (before === undefined) delete process.env.RESEARCH_HASH_KEY;
+    else process.env.RESEARCH_HASH_KEY = before;
+  }
+}
+
+function baseResponse(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    source: "survey",
+    received_at: "2026-08-19",
+    exact_quote: "I keep rewriting the same brief and it never gets shorter",
+    redacted_quote: "I keep rewriting the same brief and it never gets shorter",
+    stuck_point: "cannot cut a brief down",
+    emotional_intensity: "medium",
+    target_audience_eligible: true,
+    ...overrides,
+  };
+}
+
+test("responses: one ingest returns a confirmation and the log's own gate counts", () => {
+  withRoot(() => {
+    kickoff();
+    const body = ok(`/api/venture/${SLUG}/responses`, baseResponse());
+    assert.equal(body.ok, true);
+    assert.match(String(body.response_id), /^r-/);
+    assert.equal(body.likely_duplicate, false);
+    const gate = body.gate as Record<string, unknown>;
+    assert.equal(gate.have, 1);
+    assert.equal(gate.state, "closed");
+    assert.equal(typeof gate.need, "number");
+    assert.equal(typeof gate.target, "number");
+  });
+});
+
+test("responses: the reply carries no quote, no stuck point and no respondent hash", () => {
+  withRoot(() => withHashKey(() => {
+    kickoff();
+    const body = ok(`/api/venture/${SLUG}/responses`, baseResponse({
+      raw_identifier: { platform: "email", stable_user_id: "Someone@Example.com" },
+    }));
+    const serialized = JSON.stringify(body);
+    assert.ok(!serialized.includes("I keep rewriting"), "the exact quote must never come back: " + serialized);
+    assert.ok(!serialized.includes("cannot cut a brief down"), serialized);
+    assert.ok(!/respondent/i.test(serialized), serialized);
+    assert.ok(!serialized.includes("Someone@Example.com"), "the raw identifier must never come back");
+    assert.ok(!serialized.includes("someone@example.com"), "nor its canonical form");
+    assert.deepEqual(Object.keys(body).sort(), ["gate", "likely_duplicate", "ok", "response_id"]);
+  }));
+});
+
+test("responses: an unanswered audience question is refused, not defaulted either way", () => {
+  withRoot(() => {
+    kickoff();
+    const { target_audience_eligible, ...withoutIt } = baseResponse();
+    void target_audience_eligible;
+    const msg = refusal(`/api/venture/${SLUG}/responses`, withoutIt);
+    assert.match(msg, /say whether this person is in the audience/);
+    // and nothing was written: the count is still a measured zero, not a nudged one
+    const gate = (handleVentureRead("GET", `/api/venture/${SLUG}/thread`)!.body as { thread: { messages: { kind: string; have?: number }[] } })
+      .thread.messages.find((m) => m.kind === "gate");
+    if (gate) assert.equal(gate.have, 0);
+  });
+});
+
+test("responses: a string 'true' is not a judgment, and neither is a missing one", () => {
+  withRoot(() => {
+    kickoff();
+    assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ target_audience_eligible: "true" })), /say whether this person is in the audience/);
+    assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ target_audience_eligible: null })), /say whether this person is in the audience/);
+  });
+});
+
+test("responses: the day it arrived is required, never taken off the ingest clock", () => {
+  withRoot(() => {
+    kickoff();
+    // A response transcribed today may have arrived a fortnight ago, and the server has no way to
+    // know which. So it asks rather than stamping now() and calling that a fact.
+    const { received_at, ...withoutIt } = baseResponse();
+    void received_at;
+    assert.equal(refusal(`/api/venture/${SLUG}/responses`, withoutIt), "still needs: received at");
+    assert.equal(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ received_at: "  " })), "still needs: received at");
+  });
+});
+
+test("responses: shape refusals name what is missing, in the field's own words", () => {
+  withRoot(() => {
+    kickoff();
+    assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ source: "" })), /where did this response come from\?/);
+    assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ source: "carrier pigeon" })), /survey, email, comment, dm, other/);
+    assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ emotional_intensity: "furious" })), /low, medium, high/);
+    assert.equal(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ exact_quote: "   ", stuck_point: "" })), "still needs: exact quote, stuck point");
+  });
+});
+
+test("responses: half an identifier is refused rather than silently becoming a new person", () => {
+  withRoot(() => {
+    kickoff();
+    const msg = refusal(`/api/venture/${SLUG}/responses`, baseResponse({ raw_identifier: { platform: "email", stable_user_id: "  " } }));
+    assert.match(msg, /an identifier needs both halves/);
+    assert.match(refusal(`/api/venture/${SLUG}/responses`, baseResponse({ raw_identifier: { platform: "", stable_user_id: "x@y.co" } })), /an identifier needs both halves/);
+  });
+});
+
+test("responses: the same identifier is flagged as a duplicate and counted once", () => {
+  withRoot(() => withHashKey(() => {
+    kickoff();
+    const id = { platform: "email", stable_user_id: "same@person.co" };
+    const first = ok(`/api/venture/${SLUG}/responses`, baseResponse({ raw_identifier: id }));
+    assert.equal(first.likely_duplicate, false);
+    const second = ok(`/api/venture/${SLUG}/responses`, baseResponse({ raw_identifier: id, exact_quote: "and again", redacted_quote: "and again" }));
+    assert.equal(second.likely_duplicate, true);
+    // Two rows, one person: the gate counts eligible UNIQUE respondents, never lines.
+    assert.equal((second.gate as { have: number }).have, 1);
+  }));
+});
+
+test("responses: an ineligible person is on file and moves the count by nothing", () => {
+  withRoot(() => {
+    kickoff();
+    ok(`/api/venture/${SLUG}/responses`, baseResponse());
+    const out = ok(`/api/venture/${SLUG}/responses`, baseResponse({ target_audience_eligible: false }));
+    assert.equal((out.gate as { have: number }).have, 1, "someone outside the audience does not count toward the goal");
+  });
+});
+
+test("responses: an exclusion reason keeps the response and takes it out of the count", () => {
+  withRoot(() => {
+    kickoff();
+    const out = ok(`/api/venture/${SLUG}/responses`, baseResponse({ exclusion_reason: "she is my sister" }));
+    assert.equal((out.gate as { have: number }).have, 0);
+    assert.match(String(out.response_id), /^r-/);
+  });
+});
+
+test("responses: an ingest writes responses.jsonl and nothing else", () => {
+  withRoot((root) => {
+    kickoff();
+    const before = snapshot(root);
+    ok(`/api/venture/${SLUG}/responses`, baseResponse());
+    assert.deepEqual(changedPaths(before, snapshot(root)), [`${SLUG}/responses.jsonl`]);
+  });
+});
+
+test("responses: an unknown venture 404s rather than creating one", () => {
+  withRoot((root) => {
+    const r = post("/api/venture/nosuch/responses", baseResponse());
+    assert.equal(r.status, 404);
+    assert.equal(snapshot(root).size, 0);
+  });
+});
+
+test("responses: the missing-hash-key refusal reaches Muxin in store.ts's own words", () => {
+  withRoot(() => {
+    const before = process.env.RESEARCH_HASH_KEY;
+    delete process.env.RESEARCH_HASH_KEY;
+    try {
+      kickoff();
+      // Not this module's sentence to write or to soften: requireResearchHashKey owns it, and a
+      // reworded copy here would drift from the one the CLI shows for the same missing config.
+      assert.equal(
+        refusal(`/api/venture/${SLUG}/responses`, baseResponse({ raw_identifier: { platform: "email", stable_user_id: "a@b.co" } })),
+        "RESEARCH_HASH_KEY is required before research capture can write observations"
+      );
+    } finally {
+      if (before !== undefined) process.env.RESEARCH_HASH_KEY = before;
+    }
+  });
+});
+
+// --- POST :slug/artifacts/:id/edit, and the authorship it records ---------------------------------
+//
+// The verb the room could not offer: Muxin could approve a draft or throw it away, but not change a
+// word of it. What matters more than the write is what the write RECORDS -- once she has been
+// through the body, the words are hers, and a room that kept rendering them in the AI register
+// would be committing the exact defect docs/prototype-port-rules.md Rule 4 exists to stop.
+
+function seedBodyArtifact(id: string, rel: string, text: string, root: string): VentureArtifact {
+  const a = createArtifact(SLUG, loadRules(), {
+    artifact_id: id,
+    phase: 1,
+    artifact_kind: "text-post-note",
+    title: `title for ${id}`,
+    body_path: rel,
+    venture_id: SLUG,
+    venture_phase: 1,
+    message_id: `m-${id}`,
+    at: AT,
+  });
+  const file = join(root, SLUG, rel);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+  return a;
+}
+
+test("edit: the body is rewritten on disk and the edit is stamped on the record", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "what I drafted\n", root);
+    const body = ok(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "what she actually wants to say" });
+    const a = body.artifact as VentureArtifact;
+    assert.equal(typeof a.body_edited_by_muxin_at, "string");
+    assert.equal(readFileSync(join(root, SLUG, "phase-1-attention/p1-note.md"), "utf8"), "what she actually wants to say\n");
+  });
+});
+
+test("edit: the stamp is what flips the card out of the AI register", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "drafted\n", root);
+    const card = () => {
+      const thread = (handleVentureRead("GET", `/api/venture/${SLUG}/thread`)!.body as {
+        thread: { messages: { kind: string; artifactId?: string; drafted?: boolean; editedAt?: string | null }[] };
+      }).thread;
+      return thread.messages.find((m) => m.kind === "card" && m.artifactId === "p1-note")!;
+    };
+    assert.equal(card().drafted, true, "an untouched body is the AI's, and says so");
+    assert.equal(card().editedAt, null);
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "her words" });
+    assert.equal(card().drafted, false, "her prose must never keep rendering in the AI register");
+    assert.equal(typeof card().editedAt, "string");
+  });
+});
+
+test("edit: an artifact that already went out is refused, and told what to do instead", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "drafted\n", root);
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/approve`);
+    transitionArtifact(SLUG, "p1-note", { delivery_status: "handed_off" }, AT);
+    const msg = refusal(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "too late" });
+    assert.match(msg, /already gone out/);
+    assert.match(msg, /Take it down or report the delivery failed, then edit it/);
+    assert.equal(readFileSync(join(root, SLUG, "phase-1-attention/p1-note.md"), "utf8"), "drafted\n", "a refused edit must not touch the file");
+  });
+});
+
+test("edit: a discarded artifact is refused until it is back on the desk", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "drafted\n", root);
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/discard`);
+    assert.match(refusal(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "x" }), /put it back on the desk first/);
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/restore`);
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "back and rewritten" });
+  });
+});
+
+test("edit: an empty body is refused rather than quietly emptying the draft", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "drafted\n", root);
+    assert.match(refusal(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "   " }), /discard it instead/);
+    assert.equal(readFileSync(join(root, SLUG, "phase-1-attention/p1-note.md"), "utf8"), "drafted\n");
+  });
+});
+
+test("edit: an artifact with no body file says so instead of creating one", () => {
+  withRoot(() => {
+    kickoff();
+    seedArtifact("p1-plan", "phase_1_research_plan");
+    assert.match(refusal(`/api/venture/${SLUG}/artifacts/p1-plan/edit`, { body: "x" }), /has no body file to edit/);
+  });
+});
+
+test("edit: the offered action list mirrors what the function will actually accept", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "drafted\n", root);
+    const actionsFor = (id: string) => {
+      const thread = (handleVentureRead("GET", `/api/venture/${SLUG}/thread`)!.body as {
+        thread: { messages: { kind: string; artifactId?: string; actions?: { id: string }[]; editable?: boolean; editBlockedReason?: string | null }[] };
+      }).thread;
+      return thread.messages.find((m) => m.kind === "card" && m.artifactId === id)!;
+    };
+    assert.ok(actionsFor("p1-note").actions!.some((a) => a.id === "edit"), "a draft with a body is editable");
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/approve`);
+    assert.ok(actionsFor("p1-note").actions!.some((a) => a.id === "edit"), "approved and not yet gone anywhere is still editable");
+    transitionArtifact(SLUG, "p1-note", { delivery_status: "handed_off" }, AT);
+    const card = actionsFor("p1-note");
+    assert.ok(!card.actions!.some((a) => a.id === "edit"), "a control the route would refuse is not drawn");
+    assert.equal(card.editable, false);
+    assert.match(String(card.editBlockedReason), /already went out/);
+  });
+});
+
+test("edit: GET the body reads the file, and says whether she has been through it", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "drafted words\n", root);
+    const read = () => handleVentureRead("GET", `/api/venture/${SLUG}/artifacts/p1-note/body`)!;
+    assert.deepEqual(read().body, { ok: true, body: "drafted words\n", editedAt: null });
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "hers now" });
+    const after = read().body as { body: string; editedAt: string | null };
+    assert.equal(after.body, "hers now\n");
+    assert.equal(typeof after.editedAt, "string");
+  });
+});
+
+test("edit: an unknown artifact id refuses on both the read and the write", () => {
+  withRoot(() => {
+    kickoff();
+    assert.match(refusal(`/api/venture/${SLUG}/artifacts/nope/edit`, { body: "x" }), /no such artifact/);
+    const r = handleVentureRead("GET", `/api/venture/${SLUG}/artifacts/nope/body`)!;
+    assert.equal(r.status, 400);
+    assert.match(String((r.body as { error: string }).error), /no such artifact/);
+  });
+});
+
+test("edit: a body_path pointing outside the venture is refused, not followed", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "../escape.md", "drafted\n", root);
+    assert.match(refusal(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "x" }), /points outside its own venture folder/);
+  });
+});
+
+test("edit: writing the body touches the body file and artifacts.jsonl, nothing else", () => {
+  withRoot((root) => {
+    kickoff();
+    seedBodyArtifact("p1-note", "phase-1-attention/p1-note.md", "drafted\n", root);
+    const before = snapshot(root);
+    ok(`/api/venture/${SLUG}/artifacts/p1-note/edit`, { body: "hers" });
+    assert.deepEqual(changedPaths(before, snapshot(root)), [
+      `${SLUG}/artifacts.jsonl`,
+      `${SLUG}/phase-1-attention/p1-note.md`,
+    ]);
   });
 });
