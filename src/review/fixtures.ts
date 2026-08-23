@@ -484,13 +484,15 @@ const FX_QUEUE: Record<string, unknown> = {
       rows: [
         fxRow({ id: "fx-x-1", platform: "x" }),
         fxRow({ id: "fx-x-2", platform: "x", status: "approve" }),
+        // she flagged this one: the tab badge counts it, the bulk yes must not touch it
+        fxRow({ id: "fx-x-3", platform: "x", status: "revise", notes: "FIXTURE — needs a colder open" }),
         fxRow({ id: "fx-li-1", platform: "linkedin", body: "FIXTURE — the LinkedIn draft." }),
         fxRow({ id: "fx-li-2", platform: "linkedin", status: "approve", body: "FIXTURE — already yes." }),
         fxRow({ id: "fx-card-1", platform: "quote-card", kind: "image", format: "quote-card", body: "" }),
       ],
     },
   ],
-  pending: 3,
+  pending: 4,
   liveStateAsOf: null,
   textPlatforms: ["x", "linkedin", "bluesky"],
 };

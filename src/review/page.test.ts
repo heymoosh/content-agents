@@ -2137,4 +2137,28 @@ test("the wizard's bulk yes reuses the row status route and says what it approve
   assert.ok(script.includes("Yes to all "), "the scoped label ships");
   assert.ok(script.includes("Nothing outside this channel is touched"), "the scope is stated");
   assert.ok(script.includes("Nothing posts instantly"), "scheduling is not hidden behind the word approve");
+  // A row she flagged revise must be out of reach: approving it would act against her own note.
+  assert.ok(script.includes("!DECIDED.has(r.status) && !r.status"), "the bulk yes targets untouched drafts only");
+  assert.ok(script.includes("marked revise or blocked"), "the button says what it deliberately leaves alone");
+});
+
+test("cwGroups: the bulk yes counts only untouched drafts, never a row marked revise", () => {
+  // The browser's cwGroups is DOM-bound, so this asserts the shape of the emitted source instead:
+  // the three counts must be distinct, and `fresh` (what the button acts on) must exclude a status.
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function cwGroups(){");
+  assert.ok(start > -1, "cwGroups must reach the browser");
+  const body = script.slice(start, script.indexOf("\nfunction ", start + 10));
+  assert.match(body, /fresh: pending\.filter\(r=>!r\.status\)\.length/);
+  assert.match(body, /flagged: pending\.filter\(r=>!!r\.status\)\.length/);
+  // and a live check of the same predicate over a realistic row set
+  const rows = [
+    { status: "" }, { status: "" }, { status: "approve" }, { status: "revise" },
+    { status: "blocked" }, { status: "published" }, { status: "discard" },
+  ];
+  const DECIDED_SET = new Set(["published", "discard", "locked"]);
+  const pending = rows.filter((r) => !DECIDED_SET.has(r.status) && r.status !== "approve");
+  assert.equal(pending.length, 4, "the badge counts revise and blocked as outstanding");
+  assert.equal(pending.filter((r) => !r.status).length, 2, "but only two are what a bulk yes may touch");
+  assert.equal(pending.filter((r) => !!r.status).length, 2);
 });

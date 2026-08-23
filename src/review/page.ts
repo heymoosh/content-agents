@@ -961,7 +961,7 @@ export function metricLine(m: MetricReadView): { value: string; note: string; to
   if (m.posts_measured === 0) {
     return {
       value: "0",
-      note: "no post on record carried this number, so this is a sum over nothing rather than a measured zero",
+      note: "no record carried this number, so this is a sum over nothing rather than a measured zero",
       tone: "grey",
     };
   }
@@ -3361,8 +3361,14 @@ function cwSources(){ return WB_SESSIONS || []; }
 function cwSession(){ return cwSources().filter(s=>s.slug===CW.slug)[0] || null; }
 function cwPiece(){ return (DATA.pieces||[]).filter(p=>p.slug===CW.slug)[0] || null; }
 function cwRows(){ const p = cwPiece(); return p ? p.rows : []; }
-// One group per channel this piece actually has drafts for. "Pending" is a row that is neither
-// decided nor already approved, which is exactly what a yes would change.
+// One group per channel this piece actually has drafts for. Three counts, not one, because a bulk
+// yes must not touch everything a badge counts:
+//   pending  neither decided nor already approved. This is what the tab badge and the step rail
+//            report, matching the review sheet's own idea of outstanding work.
+//   fresh    no status at all. ONLY these are what "Yes to all" approves.
+//   flagged  pending but carrying a status of her own (revise, blocked). A bulk yes that swept a
+//            row she asked to have changed would approve, and on a scheduled platform SCHEDULE,
+//            the very draft she flagged. Those stay hers to handle one at a time.
 function cwGroups(){
   const order = [];
   const byPlatform = {};
@@ -3370,12 +3376,18 @@ function cwGroups(){
     if(!byPlatform[r.platform]){ byPlatform[r.platform] = []; order.push(r.platform); }
     byPlatform[r.platform].push(r);
   }
-  return order.map(platform=>({
-    platform: platform,
-    rows: byPlatform[platform],
-    total: byPlatform[platform].length,
-    pending: byPlatform[platform].filter(r=>!DECIDED.has(r.status) && r.status!=="approve").length,
-  }));
+  return order.map(platform=>{
+    const rows = byPlatform[platform];
+    const pending = rows.filter(r=>!DECIDED.has(r.status) && r.status!=="approve");
+    return {
+      platform: platform,
+      rows: rows,
+      total: rows.length,
+      pending: pending.length,
+      fresh: pending.filter(r=>!r.status).length,
+      flagged: pending.filter(r=>!!r.status).length,
+    };
+  });
 }
 function cwActiveGroup(){
   const gs = cwGroups();
@@ -3534,15 +3546,21 @@ function cwStep3Html(){
     ? '<div class="fam-note t-amber">'+CW.yesErrors.map(e=>esc(e)).join("<br />")+'</div>'
     : "";
   const schedulable = ["x","linkedin","bluesky"].indexOf(active.platform) >= 0;
-  const yesAll = active.pending
-    ? '<button class="cw-yes-all">Yes to all '+active.pending+' left in '+esc(active.platform)+'</button>'+
-      '<span class="src" style="max-width:460px">Approves only the '+active.pending+' still waiting in '+esc(active.platform)+
+  const flagged = active.flagged
+    ? ' '+active.flagged+' you marked revise or blocked '+(active.flagged===1?"stays":"stay")+' yours to handle one at a time, and this button leaves '+(active.flagged===1?"it":"them")+' alone.'
+    : "";
+  const yesAll = active.fresh
+    ? '<button class="cw-yes-all">Yes to all '+active.fresh+' left in '+esc(active.platform)+'</button>'+
+      '<span class="src" style="max-width:460px">Approves only the '+active.fresh+' untouched draft'+(active.fresh===1?"":"s")+' in '+esc(active.platform)+
       ', one call each, exactly the same call the Approve button on each card makes. '+
       (schedulable
         ? 'On '+esc(active.platform)+' that also books the next free slot as a scheduled Typefully draft. Nothing posts instantly.'
         : 'On '+esc(active.platform)+' it marks the draft ready and schedules nothing.')+
-      ' Nothing outside this channel is touched.</span>'
-    : '<span class="src" style="max-width:460px">Every draft in '+esc(active.platform)+' already has your yes.</span>';
+      ' Nothing outside this channel is touched.'+flagged+'</span>'
+    : '<span class="src" style="max-width:460px">'+
+      (active.flagged
+        ? 'Nothing in '+esc(active.platform)+' is waiting on a plain yes.'+flagged
+        : 'Every draft in '+esc(active.platform)+' already has your yes.')+'</span>';
   return '<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-top:20px">'+
     '<span class="fam-ask">'+total+' DRAFT'+(total===1?"":"S")+' ON THIS PIECE · '+groups.length+' CHANNEL'+(groups.length===1?"":"S")+'</span>'+
     '<span style="flex:1"></span><button class="cw-back" data-step="2">Change nothing, look at the treatment again</button></div>'+
@@ -3584,7 +3602,9 @@ async function cwLoadTreatment(){
 async function cwYesAll(btn){
   const g = cwActiveGroup();
   if(!g || !CW.slug) return;
-  const targets = g.rows.filter(r=>!DECIDED.has(r.status) && r.status!=="approve");
+  // Only untouched drafts. A row she marked revise (or one the pipeline blocked) is deliberately
+  // out of reach here, because approving it would act against the note she left on it.
+  const targets = g.rows.filter(r=>!DECIDED.has(r.status) && !r.status);
   btn.disabled = true;
   // Every refusal is kept and rendered. A bulk yes must never report success it did not get.
   CW.yesErrors = targets.filter(r=>r.approveBlocked).map(r=>r.id+": "+r.approveBlocked);
@@ -4552,7 +4572,7 @@ function metricLine(m){
   if(m.state === "not_measured") return { value:"not measured", note:m.reason, tone:"grey" };
   if(m.posts_measured === 0){
     return { value:"0",
-      note:"no post on record carried this number, so this is a sum over nothing rather than a measured zero",
+      note:"no record carried this number, so this is a sum over nothing rather than a measured zero",
       tone:"grey" };
   }
   // "record", not "post": half of these come off capture rows and observation sources, not posts.
