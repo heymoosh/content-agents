@@ -833,6 +833,108 @@ export function outreachOpeningLine(lead: OutreachLeadView): string {
 // started with REVIEW_FIXTURES=1. When it is off, NONE of it is emitted — no banner, no panel, no
 // scenario data, no fetch interceptor, no control that could switch it on. That absence is the
 // guarantee that fixture data can never appear on a real screen, and fixtures.test.ts asserts it.
+// ── Studio capture: one front door for every room (v7 Studio, prototype lines 691-811) ────────
+// The capture box moved off the Content room to the top of Studio, so one textarea takes a thought,
+// a link, a name or a scene. `classifyCapture` is the prototype's routeCapture() rule: first match
+// wins, and the order is load-bearing. "intro to plotting" is Outreach, not Fiction, because rule 1
+// runs first.
+//
+// Two deliberate divergences from the design, both settled before this shipped:
+//
+//   1. The v5 backend handoff's match table sends anything containing http / .com / .ai / .org to
+//      Signals, as its FIRST row. The v7 prototype checks a bare URL LAST and turns it into a
+//      question instead. Muxin decided v7 wins: a link is two things and the app says so rather
+//      than guessing which.
+//   2. A verdict routes her text to a room and names the room it picked. It does not start a job.
+//      Outreach drafting needs a lead folder rather than a sentence, and Venture has no free-text
+//      entry at all, so a dispatch that claimed to start either would be claiming work this system
+//      cannot do (docs/prototype-port-rules.md Rule 0).
+//
+// Both halves are mirrored inline in the browser script by hand, per Rule 5.
+
+export type CaptureRoom = "Content" | "Fiction" | "Outreach" | "Venture";
+
+export type CaptureVerdict =
+  | { kind: "empty" }
+  | { kind: "ask-link"; url: string }
+  | { kind: "room"; room: CaptureRoom };
+
+// A bare URL and nothing else. Anchored at both ends on purpose: a link sitting INSIDE a sentence
+// is something she is already talking about, so it falls through to the keyword rules and only a
+// link pasted alone reaches the two-button ask. (The prototype's alternation also lists
+// `substack.com`, which `com` already covers; dropping it changes nothing it matches.)
+const BARE_URL_RE = /^\s*(https?:\/\/|www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.(com|ai|org|io|net|co|dev)(\/\S*)?\s*$/i;
+
+export function classifyCapture(text: string): CaptureVerdict {
+  const t = String(text ?? "").trim();
+  if (!t) return { kind: "empty" };
+  const low = t.toLowerCase();
+  if (/follow up|reply to|email|intro|reach out|met /.test(low)) return { kind: "room", room: "Outreach" };
+  if (/chapter|scene|elias|character|plot/.test(low)) return { kind: "room", room: "Fiction" };
+  if (/price|offer|landing|magnet|survey|venture|phase|response|repl/.test(low)) return { kind: "room", room: "Venture" };
+  if (BARE_URL_RE.test(t)) return { kind: "ask-link", url: t };
+  return { kind: "room", room: "Content" };
+}
+
+export interface CaptureVerdictView {
+  room: CaptureRoom;
+  line: string;
+  // The one thing the app can honestly offer for this room, or null when the room needs no move
+  // because her next step is already on this screen.
+  actionLabel: string | null;
+}
+
+// What the screen says back. Every line names the room it picked, because the guess is cheap and
+// reversible only if it is stated. Two of the four lines say plainly what cannot be started.
+export function captureVerdict(room: CaptureRoom): CaptureVerdictView {
+  if (room === "Content") {
+    return {
+      room,
+      line: "I read this as Content. Hand it to your director for a read, or format it directly. Both buttons are right here.",
+      actionLabel: null,
+    };
+  }
+  if (room === "Fiction") {
+    return {
+      room,
+      line: "I read this as Fiction. I can put it in the composer as your beats, so your words sit above whatever it drafts.",
+      actionLabel: "Take it to Fiction",
+    };
+  }
+  if (room === "Outreach") {
+    return {
+      room,
+      line: "I read this as Outreach. A draft there starts from a lead folder, not from a sentence, so I cannot start one from this. Your words stay in the box.",
+      actionLabel: "Open Outreach",
+    };
+  }
+  return {
+    room,
+    line: "I read this as Venture. Venture runs off its own phases and takes no free text, so I cannot start anything from this. Your words stay in the box.",
+    actionLabel: "Open Venture",
+  };
+}
+
+// The room the desk opens in. Muxin's decision, 2026-08-23: with the capture box moved to Studio,
+// booting into Content opens on a screen with no way to capture a thought. Studio opens on the
+// capture box, the job queue and "Needs you today", which is the front-door shape the design
+// intends and its room order already implies. The nav's resting `on` class, `currentTab` and the
+// boot `setRoom()` all read from here so the three cannot drift apart.
+export type DeskRoom = "content" | "studio" | "outreach" | "fiction" | "charles" | "venture" | "signals";
+export const BOOT_ROOM: DeskRoom = "studio";
+
+export const CAPTURE_RAIL_IDLE = "One place to say it";
+export const CAPTURE_RAIL_ASKING = "A link is two things · you say which";
+export const LINK_ASK_HEADING = "Where should this go?";
+// Verbatim from the prototype. It is the honest statement of the ambiguity, so it ships as written.
+export const LINK_ASK_EXPLAINER =
+  "Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.";
+// Signals has no ingest for "a URL someone came from": no referrer record, no funnel data, no job
+// kind that takes a URL. So the button files a backlog card, and says that is what it does rather
+// than implying an attribution this system cannot perform.
+export const LINK_ASK_SIGNALS_NOTE =
+  "Source for Signals files a backlog card carrying the link. Nothing here records where a reader came from, so this is a note to look at it later, not attribution.";
+
 export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fixtures?: boolean }): string {
   return /* html */ `<!doctype html>
 <html lang="en">
@@ -886,6 +988,24 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .capture textarea { width:100%; min-height:110px; font:17px/1.6 Georgia,"Times New Roman",serif;
     padding:4px 0; border:none; outline:none; background:transparent; resize:vertical; color:var(--ink); }
   .capture textarea::placeholder { color:#a89a80; }
+  /* The capture box (v7 Studio): its rail, the verdict it states back, and the bare-link ask.
+     While the ask is open the textarea dims and goes read-only, and the rail turns amber — that is
+     honest state (the app is holding her link, waiting), not decoration. */
+  .capture-rail { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.06em; color:#8a7f6d; margin-bottom:10px; }
+  .capture-rail.asking { color:#9a6b12; }
+  .capture textarea.dimmed { opacity:.6; }
+  .capture-verdict { margin:12px 0 0; padding:11px 14px; border:1px solid #e3d9c3; background:#fffdf8;
+    border-radius:8px; font-size:13.5px; line-height:1.55; color:var(--ink); max-width:640px; }
+  .capture-verdict .cv-row { margin-top:9px; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap;
+    font-size:12.5px; color:#8a7f6d; }
+  .capture-verdict button { font-size:12.5px; padding:4px 11px; }
+  .link-ask { margin-top:14px; padding-top:14px; border-top:1px solid #e3d9c3; max-width:640px; }
+  .link-ask-head { font-size:14.5px; line-height:1.5; color:var(--ink); font-weight:600; }
+  .link-ask-btns { display:flex; gap:9px; margin-top:12px; flex-wrap:wrap; align-items:center; }
+  .link-ask-btns button.link-ask-cancel { border:none; background:none; padding:0; margin-left:4px;
+    font-size:12.5px; color:#7a7266; border-bottom:1px solid #d8cfbb; }
+  .link-ask-why { font-size:12.5px; line-height:1.55; color:#8a7f6d; margin-top:12px; max-width:470px; }
   .director-line { margin-top:34px; padding-top:20px; border-top:1px solid #efe7d6;
     display:flex; align-items:flex-start; gap:14px; }
   .d-avatar { width:30px; height:30px; border-radius:50%; background:#efeafd; border:1px solid #d8cff2;
@@ -1393,8 +1513,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 <header>
   <h1>Content studio</h1>
   <nav class="rooms">
-    <button class="room on" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
-    <button class="room" data-room="studio">Studio</button>
+    <button class="room${BOOT_ROOM === "content" ? " on" : ""}" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
+    <button class="room${BOOT_ROOM === "studio" ? " on" : ""}" data-room="studio">Studio</button>
     <button class="room" data-room="outreach">Outreach</button>
     <button class="room" data-room="fiction">Fiction</button>
     <button class="room" data-room="charles">Charles</button>
@@ -1409,13 +1529,39 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 <main>
   <section class="view" id="roomContent">
     <div class="sheet" id="stripContent" hidden style="padding:24px 56px 10px"></div>
+    <div id="workbench"></div>
+    <div class="sheet" id="reviewSheet">
+      <div class="sheet-head">
+        <h2>Drafts for your yes</h2>
+        <span class="grow"></span>
+        <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
+      </div>
+      <div class="sheet-sub">Approve schedules it. Nothing posts without a yes here.</div>
+      <div id="reviewMain" style="margin-top:14px"><div class="empty">Loading…</div></div>
+    </div>
+  </section>
+  <section class="view" id="roomStudio" hidden>
     <div class="sheet capture">
+      <div class="capture-rail" id="captureRail">One place to say it</div>
       <div class="capture-title" id="captureTitle">What's on your mind today?</div>
       <textarea id="src" placeholder="Start typing. Paste a link, a file path, or half a sentence. Nothing is a form. (⌘/Ctrl+Enter hands it over)"></textarea>
-      <div class="ingest-actions">
-        <button class="primary" id="devStartBtn">Hand it to your director</button>
+      <div class="capture-verdict" id="captureVerdict" hidden></div>
+      <div class="ingest-actions" id="captureActions">
+        <button class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Put it where it goes</button>
+        <button id="devStartBtn">Hand it to your director</button>
         <button id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
         <button id="notesBtn">Browse Substack Notes</button>
+      </div>
+      <div class="hint" id="captureHint">Put it where it goes reads what you wrote, picks the room, and tells you which one it picked. A bare link it asks about first, because that could be two things. It starts nothing, and nothing goes out.</div>
+      <div class="link-ask" id="linkAsk" hidden>
+        <div class="link-ask-head">Where should this go?</div>
+        <div class="link-ask-btns">
+          <button id="linkFileBtn">Source for Signals</button>
+          <button class="primary" id="linkReadBtn">Versions for Content</button>
+          <button class="link-ask-cancel" id="linkCancelBtn">Never mind, clear it</button>
+        </div>
+        <div class="hint">Source for Signals files a backlog card carrying the link. Nothing here records where a reader came from, so this is a note to look at it later, not attribution.</div>
+        <div class="link-ask-why">Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.</div>
       </div>
       <div class="director-line">
         <span class="d-avatar">d</span>
@@ -1434,22 +1580,10 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
         <div class="notes-actions">
           <button class="primary" id="notesDraftBtn">Draft selected</button>
-          <span class="hint">Pick the notes worth cross-posting. Each one gets a folder and goes through the production pipeline; every draft still waits for your yes below. A note published in the last 30 days stays blocked.</span>
+          <span class="hint">Pick the notes worth cross-posting. Each one gets a folder and goes through the production pipeline; every draft still waits for your yes in the Content room. A note published in the last 30 days stays blocked.</span>
         </div>
       </div>
     </div>
-    <div id="workbench"></div>
-    <div class="sheet" id="reviewSheet">
-      <div class="sheet-head">
-        <h2>Drafts for your yes</h2>
-        <span class="grow"></span>
-        <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
-      </div>
-      <div class="sheet-sub">Approve schedules it. Nothing posts without a yes here.</div>
-      <div id="reviewMain" style="margin-top:14px"><div class="empty">Loading…</div></div>
-    </div>
-  </section>
-  <section class="view" id="roomStudio" hidden>
     <div class="sheet session">
       <div class="session-grid">
         <div class="session-main" id="studioMain"><div class="empty">Loading…</div></div>
@@ -1857,7 +1991,7 @@ function render(){
 // Six rooms on the desk (Content Studio Riff): Content, Studio, Outreach, Fiction, Charles, Signals.
 // Refresh stays room-aware: it only re-reads whatever the CURRENT room shows, labeled per room,
 // with a "last refreshed HH:MM" stamp so its effect is visible.
-let currentTab = "content";
+let currentTab = ${JSON.stringify(BOOT_ROOM)};
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
 function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
@@ -3292,6 +3426,7 @@ async function loadFiction(){
   if(!FICTION.length){
     $("#fictionMain").innerHTML = '<div class="empty">No series on the desk yet. Start one with /story new in a terminal.</div>';
     $("#fictionSide").innerHTML = "";
+    consumeCapturedBeats(); // nothing to fill; it says so rather than silently swallowing her text
     return;
   }
   if(!ficSeries || !FICTION.some(s=>s.slug===ficSeries)) ficSeries = FICTION[0].slug;
@@ -3302,6 +3437,7 @@ async function loadFiction(){
   const sr = await fetch("/api/fiction/scene?series="+encodeURIComponent(ficSeries));
   ficScene = await sr.json();
   renderFiction();
+  consumeCapturedBeats(); // a capture routed here lands in the composer the render just built
 }
 function ficStatusWord(hasScene){
   const mine = (JOBS||[]).filter(j=>jobRoom(j.kind)==="Fiction");
@@ -3525,7 +3661,7 @@ function renderFiction(){
   });
   const promo = $("#ficPromoNote");
   if(promo) promo.addEventListener("click", ()=>{
-    setRoom("content");
+    setRoom("studio"); // the capture box lives in Studio now, so the promo bridge goes there
     $("#src").value = "Launch note for "+series.title+": ";
     $("#src").focus();
   });
@@ -4199,6 +4335,142 @@ async function addSource(){
   if(r.ok){ ta.value=""; flash("Queued — Claude is drafting"); loadJobs(); }
   else flash(r.error || "Could not queue");
 }
+// ── Studio capture: one front door (v7 Studio) ───────────────────────────────────────────────
+// Inline mirror of classifyCapture() / captureVerdict() in this file's exported section. The client
+// script cannot import, so the two copies are kept in sync BY HAND (docs/prototype-port-rules.md
+// Rule 5) and page.test.ts pulls this copy back out of the emitted script and runs the identical
+// vectors through both.
+const BARE_URL_RE = /^\\s*(https?:\\/\\/|www\\.)?[a-z0-9-]+(\\.[a-z0-9-]+)*\\.(com|ai|org|io|net|co|dev)(\\/\\S*)?\\s*$/i;
+function classifyCapture(text){
+  const t = String(text==null?"":text).trim();
+  if(!t) return {kind:"empty"};
+  const low = t.toLowerCase();
+  if(/follow up|reply to|email|intro|reach out|met /.test(low)) return {kind:"room", room:"Outreach"};
+  if(/chapter|scene|elias|character|plot/.test(low)) return {kind:"room", room:"Fiction"};
+  if(/price|offer|landing|magnet|survey|venture|phase|response|repl/.test(low)) return {kind:"room", room:"Venture"};
+  if(BARE_URL_RE.test(t)) return {kind:"ask-link", url:t};
+  return {kind:"room", room:"Content"};
+}
+function captureVerdict(room){
+  if(room==="Content") return {room:room, line:${JSON.stringify(captureVerdict("Content").line)}, actionLabel:null};
+  if(room==="Fiction") return {room:room, line:${JSON.stringify(captureVerdict("Fiction").line)}, actionLabel:"Take it to Fiction"};
+  if(room==="Outreach") return {room:room, line:${JSON.stringify(captureVerdict("Outreach").line)}, actionLabel:"Open Outreach"};
+  return {room:room, line:${JSON.stringify(captureVerdict("Venture").line)}, actionLabel:"Open Venture"};
+}
+// ── end of the capture mirror ──
+
+let pendingCaptureBeats = null; // her words, waiting for the Fiction composer to actually render
+let linkAskUrl = null;          // the bare link the two-button ask is open on
+
+function captureText(){ return ($("#src").value||"").trim(); }
+function hideCaptureVerdict(){ $("#captureVerdict").hidden = true; }
+function setCaptureRail(asking){
+  const rail = $("#captureRail");
+  rail.textContent = asking ? ${JSON.stringify(CAPTURE_RAIL_ASKING)} : ${JSON.stringify(CAPTURE_RAIL_IDLE)};
+  rail.classList.toggle("asking", !!asking);
+}
+function openLinkAsk(url){
+  linkAskUrl = url;
+  hideCaptureVerdict();
+  $("#linkAsk").hidden = false;
+  $("#captureActions").hidden = true;
+  $("#captureHint").hidden = true;
+  const ta = $("#src");
+  ta.readOnly = true; ta.classList.add("dimmed");
+  setCaptureRail(true);
+}
+function closeLinkAsk(clearText){
+  linkAskUrl = null;
+  $("#linkAsk").hidden = true;
+  $("#captureActions").hidden = false;
+  $("#captureHint").hidden = false;
+  const ta = $("#src");
+  ta.readOnly = false; ta.classList.remove("dimmed");
+  if(clearText) ta.value = "";
+  setCaptureRail(false);
+}
+// States the room it picked, and offers to move it. Nothing here starts a job: the verdict is a
+// sentence plus, where one honestly exists, the single move the app can make for that room.
+function showCaptureVerdict(room){
+  const v = captureVerdict(room);
+  const box = $("#captureVerdict");
+  const others = ["Content","Fiction","Outreach","Venture"].filter(r=>r!==room);
+  box.innerHTML = '<div>'+esc(v.line)+'</div>'+
+    (v.actionLabel ? '<div class="cv-row"><button class="primary cap-go">'+esc(v.actionLabel)+'</button></div>' : '')+
+    '<div class="cv-row"><span>Wrong room?</span>'+
+      others.map(r=>'<button class="cap-move" data-room="'+r+'">'+r+'</button>').join("")+'</div>';
+  box.hidden = false;
+  const go = box.querySelector(".cap-go");
+  if(go) go.addEventListener("click", ()=>takeCaptureTo(room));
+  box.querySelectorAll(".cap-move").forEach(b=>b.addEventListener("click", ()=>showCaptureVerdict(b.dataset.room)));
+}
+// Content needs no move: the two Content buttons are already on this screen, right under the box.
+// Outreach and Venture have no free-text entry, so the honest move is to open the room and say the
+// words are still here. Only Fiction can actually carry them, as the beats the composer keeps.
+function takeCaptureTo(room){
+  const t = captureText();
+  if(!t){ flash("Write or paste something first"); return; }
+  if(room==="Fiction"){ pendingCaptureBeats = t; setRoom("fiction"); return; }
+  if(room==="Outreach"){ setRoom("outreach"); flash("Opened Outreach. Your words are still in the capture box."); return; }
+  if(room==="Venture"){ setRoom("venture"); flash("Opened Venture. Your words are still in the capture box."); return; }
+}
+// Called from loadFiction() once the room has rendered, both when a composer exists and when it
+// does not. A scene that already has beats has no textarea to fill, and a desk with no series at
+// all never renders one, so both say so instead of dropping her words on the floor.
+function consumeCapturedBeats(){
+  if(pendingCaptureBeats == null) return;
+  const ta = $("#ficBeats");
+  if(ta){
+    ta.value = pendingCaptureBeats;
+    ta.focus();
+    $("#src").value = "";
+    hideCaptureVerdict();
+    flash("Put in Fiction as your beats. Nothing is drafted yet.");
+  } else {
+    flash("Fiction has no empty composer right now. Your words are still in the capture box.");
+  }
+  pendingCaptureBeats = null;
+}
+function routeCapture(){
+  const v = classifyCapture(captureText());
+  if(v.kind==="empty"){ flash("Write or paste something first"); return; }
+  if(v.kind==="ask-link"){ openLinkAsk(v.url); return; }
+  showCaptureVerdict(v.room);
+  flash("I read this as "+v.room+".");
+}
+// "Versions for Content" is exactly what the director already does with a URL: reads it and
+// proposes cuts. Same route as "Hand it to your director", relabelled for the question being asked.
+async function linkReadForContent(){
+  const url = linkAskUrl;
+  if(!url) return;
+  $("#linkReadBtn").disabled = true;
+  const r = await post("/api/develop/start",{source:url});
+  $("#linkReadBtn").disabled = false;
+  if(r.ok){ closeLinkAsk(true); flash("Handed over. Your director is reading it."); loadJobs(); }
+  else flash(r.error || "Could not hand it over");
+}
+// "Source for Signals" files a backlog card and nothing more. There is no referrer record, no
+// funnel data and no job kind that takes a URL, so this must never imply traffic attribution.
+async function linkFileForSignals(){
+  const url = linkAskUrl;
+  if(!url) return;
+  $("#linkFileBtn").disabled = true;
+  const r = await post("/api/signals/backlog",{
+    title: "Look at "+url,
+    detail: "Filed from the Studio capture box as a place readers may have come from. No referrer or traffic data exists for it here, so this card is a note to look at it, not a measurement.",
+  });
+  $("#linkFileBtn").disabled = false;
+  const already = ((r.error||"")+"").includes("already");
+  if(r.ok || already){ closeLinkAsk(true); flash(r.ok ? "Filed to the backlog" : "Already on the backlog"); }
+  else flash(r.error || "Could not file it");
+}
+$("#routeBtn").addEventListener("click", routeCapture);
+$("#linkReadBtn").addEventListener("click", linkReadForContent);
+$("#linkFileBtn").addEventListener("click", linkFileForSignals);
+$("#linkCancelBtn").addEventListener("click", ()=>{ closeLinkAsk(true); hideCaptureVerdict(); });
+// A verdict is about the text that produced it, so editing the text retires it.
+$("#src").addEventListener("input", hideCaptureVerdict);
+
 // ── Substack Notes checklist (manual pick, replaces the old one-click "Pull Substack Notes") ──
 let NOTES = [];
 let notesShowDrafted = false;
@@ -4270,7 +4542,7 @@ $("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="
 setInterval(()=>{ if(jobsPollDue(JOBS, Date.now(), jobsPollArmedUntil)) loadJobs(); }, JOBS_POLL_MS);
 
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
-setRoom("content");
+setRoom(${JSON.stringify(BOOT_ROOM)});
 // The desk header's live date ("Thursday · Jul 17").
 {
   const now = new Date();
@@ -4280,7 +4552,10 @@ setRoom("content");
 }
 // Match doRefresh()'s ordering: stamp "last refreshed" once the initial data has actually
 // landed, not the instant the page starts loading it (load()/loadJobs() are async).
-Promise.all([load(), loadJobs(), loadContent()]).finally(markRefreshed);
+// loadStudio() is in here because Studio is the boot room: without it the first paint of the desk
+// she actually opens on is an empty "Loading…". load() still runs at boot even though its sheet is
+// in another room, because the Content nav button's pending badge reads off it.
+Promise.all([loadStudio(), load(), loadJobs(), loadContent()]).finally(markRefreshed);
 </script>
 </body>
 </html>`;
