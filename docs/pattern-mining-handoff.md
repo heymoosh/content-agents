@@ -114,6 +114,49 @@ Both write to `data/patterns/` and report rather than merging. Check `git log` f
 - **HTTP 200 means nothing** on Pinterest, Threads, and Reddit alike. Nonexistent boards and
   handles all return 200 with empty payloads.
 
+## Corrections landed after this doc was first written
+
+**The Exa contamination scare was WRONG, and this reversal must not get re-litigated.** Three
+YouTube entries were flagged as corrupted by the Exa page-fetch API, one supposedly "truncated
+mid-sentence at 'separate work and'". They were re-collected with yt-dlp and **11 model-fetched
+bodies matched YouTube's own caption files word for word.** Zero were replaced because zero were
+wrong. The "truncation" is YouTube's own ASR track ending there on a 49-second video with 100%
+coverage. A second flagged entry is a genuine 24-second teaser. This exonerates those specific
+fetches, NOT the tool class: the ban stands on the real incident where 14 of 15 bodies were
+rewritten and a stranger's comment was attributed to the author.
+
+**YouTube transcripts are solved by yt-dlp, and it is a passthrough by construction.** It runs no
+speech recognition of its own; it performs YouTube's player handshake, mints the proof-of-origin
+token, and downloads the caption file YouTube itself serves. Same category as the fxtwitter
+passthrough. Install with `brew install yt-dlp`; the collector stops with an install message rather
+than recording empty transcripts if the binary is missing. Collection IS scriptable and cron-safe,
+roughly 2 to 3 minutes for 24 videos, no browser required.
+
+**A bug that only long videos could surface, found by asking for a long-video test.** Nothing in
+the corpus is longer than 159 seconds, so any length-dependent failure was structurally invisible.
+Testing a 2h49m video proved no truncation (11,101 caption events, 100% coverage). Testing a 15m33s
+one exposed the real bug: it carries a HUMAN-authored en-GB track that YouTube publishes as **VTT
+with no json3 at all**, and the collector asked only for json3 then refused the file it had just
+downloaded. It was pointed at precisely the wrong tracks: ASR gets json3 and sails through, while a
+human track, the only kind whose wording may ever be quoted as the creator's own, was dropped.
+Fixed in `1ebadab`. **All 24 collected entries are ASR with json3 and were unaffected.**
+
+**Two YouTube route traps, both nasty.** On a search result's `channelRenderer` the field names are
+swapped against their contents: `subscriberCountText` holds the HANDLE and `videoCountText` holds
+the subscriber count. And `?sort=p` on `/videos` is silently IGNORED; Popular is only reachable by
+posting the sort chip's continuation token to `/youtubei/v1/browse`. Some channels are never
+offered the sort at all.
+
+**Instagram's plain profile curl is now WALLED** (login shell, zero follower fields). The working
+first-party route is `https://www.instagram.com/api/v1/users/web_profile_info/?username=<h>` with
+header `X-IG-App-ID: 936619743392459`, reading `data.user.edge_followed_by.count`. Confirmed on
+`@adhd_love_` at 1,381,663. Any reference saying the profile page is curl-retrievable is stale.
+
+**The YouTube /about four-value trap is intermittent.** It did not reproduce on a later day; header
+and /about both returned exactly one value on `@aliabdaal` and `@veritasium`. Keep the
+more-than-one-candidate-means-null rule as a guard, since the failure was real once and the guard
+is cheap.
+
 ## Open decisions
 
 1. **3 Exa-contaminated YouTube entries** were re-collected properly, so this may be resolved.
