@@ -1,7 +1,13 @@
 // The review GUI's single HTML page (self-contained, no build step, no external requests): CSS +
 // client-side <script> (the client script keeps its own DECIDED constant, shadowing the server-side
 // one in rows.ts — that's a different runtime, left exactly as-is, no logic changes here).
-//
+
+import {
+  fixtureBannerHtml,
+  fixturePanelHtml,
+  fixtureScriptHtml,
+} from "./fixtures.js";
+
 // Pure, DOM-free mirror of the inline "replying to" context line the client <script> below renders
 // for a "reply to mention" row (backend origin — carries reply_to_url/reply_to_text frontmatter
 // alongside the normal kind:"text" shape; row-enrichment may surface either the camelCased
@@ -754,8 +760,14 @@ export function outreachOpeningLine(lead: OutreachLeadView): string {
 
 // Not fully static: it interpolates the dev-worktree banner (isDevWorktree + repoRoot), so this is
 // exported as a function of those two inputs rather than a bare constant — serve.ts calls
-// renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }) from its GET / route.
-export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): string {
+// renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE, fixtures: FIXTURES_ON }) from its GET /
+// route.
+//
+// `fixtures` is the dev fixture mode (src/review/fixtures.ts), off unless the server process was
+// started with REVIEW_FIXTURES=1. When it is off, NONE of it is emitted — no banner, no panel, no
+// scenario data, no fetch interceptor, no control that could switch it on. That absence is the
+// guarantee that fixture data can never appear on a real screen, and fixtures.test.ts asserts it.
+export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fixtures?: boolean }): string {
   return /* html */ `<!doctype html>
 <html lang="en">
 <head>
@@ -1212,6 +1224,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean }): 
 </style>
 </head>
 <body>
+${opts.fixtures ? fixtureBannerHtml() : ""}
 ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (${opts.repoRoot}) — data/content here is isolated and gitignored, not synced with your main repo. Numbers may look empty/stale even when your real pipeline is fine.</div>` : ""}
 <header>
   <h1>Content studio</h1>
@@ -1391,6 +1404,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   </section>
 </main>
 <div class="flash" id="flash"></div>
+${opts.fixtures ? fixturePanelHtml() + fixtureScriptHtml() : ""}
 <script>
 const $ = (s, r=document) => r.querySelector(s);
 let DATA = { pieces: [], pending: 0 };

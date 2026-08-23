@@ -90,6 +90,7 @@ import {
 import { listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
 import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
+import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
 import { getAnalyst } from "../providers/registry.js";
 import { readSignals, appendBacklogCard } from "./signals.js";
@@ -117,6 +118,14 @@ const PORT = Number(process.env.REVIEW_PORT ?? 4600);
 // come back looking empty even though nothing is actually broken. Surfaced as a banner (see PAGE)
 // so this is never silently confusing again (Muxin, 2026-07-04).
 const IS_DEV_WORKTREE = repoRoot.includes("/.claude/worktrees/");
+
+// Dev fixture mode (src/review/fixtures.ts). Read ONCE, here, from the environment the process was
+// started with — an env var and not a query param precisely because nothing in the browser can set
+// one, so a normal `npm run review` cannot be talked into serving fixture data. While it is on the
+// server is READ-ONLY: the guard at the top of the request handler refuses every non-GET before any
+// route matches, which is what makes "a fixture session writes nothing" a property of the process
+// rather than a promise about the client.
+const FIXTURES_ON = fixturesEnabled();
 
 // Approve → auto-schedule routing. Which platform scheduler an approved row belongs to. Each check
 // calls the OWNING publisher's own exported predicate (isQuoteCardRow, isTikTokRow, isShortRow,
@@ -826,9 +835,18 @@ function json(res: ServerResponse, code: number, obj: unknown): void {
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   try {
+    // Fixture mode is read-only by construction. This sits ABOVE every route on purpose: nothing
+    // that mutates state can be reached at all while REVIEW_FIXTURES is set, so no fixture session
+    // can touch data/analytics.db, data/publish-schedule.jsonl, review-queue.md, briefs/bets.md or
+    // any venture/<slug>/ file. The browser interceptor refuses these too and they never get this
+    // far in practice — this is the half that holds even for a request the page did not send.
+    if (FIXTURES_ON && req.method !== "GET") {
+      json(res, 403, { ok: false, error: FIXTURE_WRITE_REFUSAL });
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE }));
+      res.end(renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE, fixtures: FIXTURES_ON }));
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/queue") {
@@ -1868,6 +1886,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   // so there is no opt-in flag to keep: if that ever changes, add one explicitly rather than
   // widening the default.
   server.listen(PORT, "127.0.0.1", () => {
+    if (FIXTURES_ON) {
+      console.log(`\n  ⚠ FIXTURE MODE (${FIXTURE_ENV_VAR}=1) — the desk can serve fake data and every write is refused.`);
+    }
     console.log(`\n  Review queue → http://localhost:${PORT}\n`);
     console.log("  Approve / revise / discard / edit every pending derivative in one place.");
     console.log("  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.\n");
