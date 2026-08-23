@@ -741,17 +741,31 @@ accounts:
   #             adjacent to the matching "uniqueId". This CONTRADICTS platform-collection.md's
   #             2026-08-22 note that TikTok profile pages yield nothing; the route worked on
   #             2026-08-23. That file is not this block's to edit, so the delta is recorded here.
-  #   youtube   the channel page's channelMetadataRenderer title plus vanityChannelUrl. Subscriber
-  #             counts are NOT server-rendered: every subscriberCountText in that markup belongs
-  #             to a sidebar channel, and reading one gives a different channel's number. So every
-  #             youtube row below is followers: null, deliberately.
-  #   x         the profile page's twitter:title meta, which reads "Display Name (@handle) on X".
-  #             A wrong handle returns "User Profile Not Found - X | 404 Error", so this route
-  #             genuinely discriminates. No follower count is exposed, so x rows are followers:
-  #             null.
-  #   linkedin  the profile page <title>, "Name - Headline | LinkedIn". A wrong slug returns
-  #             "Profile Not Found | LinkedIn". A BLANK response is a wall, not a negative, and
-  #             was retried rather than recorded either way.
+  #   youtube   TWO fetches. The channel page's channelMetadataRenderer gives the title plus the
+  #             vanityChannelUrl, which verifies the handle. The subscriber count comes from the
+  #             /about page, which carries EXACTLY ONE "subscriberCountText" string. Do NOT read a
+  #             subscriber count off the main channel page: every subscriberCountText there
+  #             belongs to a sidebar channel, so a naive read records a different channel's
+  #             number. If /about ever returns more than one match, treat it as ambiguous and
+  #             record null rather than taking the first.
+  #   x         TWO sources, and they are not equally strong. The HANDLE is verified against x.com
+  #             itself: the profile page's twitter:title meta reads "Display Name (@handle) on X",
+  #             and a wrong handle returns "User Profile Not Found - X | 404 Error", so that route
+  #             genuinely discriminates. The FOLLOWER COUNT is not on any x.com page, and comes
+  #             from api.fxtwitter.com, a third-party mirror that passes X's own API through. That
+  #             is ONE HOP REMOVED from the platform record and is labelled as such on every row.
+  #             It is a passthrough rather than a computed aggregate (the returned name and
+  #             screen_name match x.com on every account checked), which is why it is recorded at
+  #             all, unlike the TikTok analytics mirrors platform-collection.md correctly bans.
+  #             If that distinction ever matters for a decision, re-read the number off the app.
+  #   linkedin  TWO fetches. The handle is verified by the profile page <title>, "Name - Headline
+  #             | LinkedIn"; a wrong slug returns "Profile Not Found | LinkedIn". The follower
+  #             count needs a public POST: pull a linkedin.com/posts/... URL off the profile, fetch
+  #             it, and read author.interactionStatistic where interactionType is FollowAction.
+  #             That is a first-party number and it was in platform-collection.md all along. It
+  #             only works when a public post is reachable, which LinkedIn's wall often prevents.
+  #             A BLANK response is a wall, not a negative, and was retried rather than recorded
+  #             either way.
   #   substack  substack.com/api/v1/user/<handle>/public_profile. Returns the profile handle, the
   #             name, the publications with their subdomains, and a rounded subscriber string.
   #   reddit    www.reddit.com/r/<sub>/.rss, which is the only reddit surface still answering a
@@ -911,11 +925,17 @@ accounts:
   # Do not fill these three later with a marginal account just to make the grid look complete.
 
   # ---------------------------------------------------------------------------------------------
-  # YOUTUBE, round 3. Every row here is followers: null and that is not laziness. See the
-  # verification note at the top of this block: a channel page does not server-render its own
-  # subscriber count, and every subscriberCountText in the markup belongs to a sidebar channel.
-  # Reading one would record a different channel's number as this channel's. Muxin can read the
-  # rounded figure off the page herself; nothing here may guess it.
+  # YOUTUBE, round 3. Subscriber counts here are YouTube's own rounded display figures ("514M"
+  # recorded as 514000000), read from each channel's /about page on 2026-08-23, where exactly one
+  # "subscriberCountText" appears and it is the channel's own.
+  #
+  # Do NOT try to read a subscriber count off the main channel page. Every subscriberCountText
+  # there belongs to a sidebar recommendation, so the first match is another channel's number.
+  # That trap is why an earlier pass concluded these counts were unretrievable; /about is the fix.
+  #
+  # Adding the counts immediately paid for itself: two seeded channels were REMOVED because their
+  # numbers exposed them as copycats whose metadata titles matched the real creator exactly. See
+  # the notes where they used to sit.
   # ---------------------------------------------------------------------------------------------
 
   # general-viral, youtube. Shape donors, picked on scale and on format discipline, not subject.
@@ -926,7 +946,7 @@ accounts:
     # entire reason he is here.
     platform: youtube
     niche: general-viral
-    followers: null
+    followers: 514000000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@veritasium"
     creator: Derek Muller (Veritasium)
@@ -935,7 +955,7 @@ accounts:
     # cold open, which is the transferable part for Muxin.
     platform: youtube
     niche: general-viral
-    followers: null
+    followers: 21100000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@mkbhd"
     creator: Marques Brownlee
@@ -943,7 +963,7 @@ accounts:
     # youtube.com/@mkbhd, retrieved 2026-08-23.
     platform: youtube
     niche: general-viral
-    followers: null
+    followers: 21100000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@MarkRober"
     creator: Mark Rober
@@ -952,7 +972,7 @@ accounts:
     # @MarkRober even though the lowercase form also resolves.
     platform: youtube
     niche: general-viral
-    followers: null
+    followers: 81400000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@kurzgesagt"
     creator: Kurzgesagt (In a Nutshell)
@@ -960,7 +980,7 @@ accounts:
     # youtube.com/@kurzgesagt, retrieved 2026-08-23.
     platform: youtube
     niche: general-viral
-    followers: null
+    followers: 25500000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@ColinandSamir"
     creator: Colin and Samir
@@ -970,7 +990,7 @@ accounts:
     # the same lesson.
     platform: youtube
     niche: general-viral
-    followers: null
+    followers: 1630000   # rounded display figure from the channel /about page, read 2026-08-23
 
   # ai-building, youtube. This is youtube's strongest new cell: the niche is large, active, and
   # every one of these posts weekly or more.
@@ -980,7 +1000,7 @@ accounts:
     # retrieved 2026-08-23.
     platform: youtube
     niche: ai-building
-    followers: null
+    followers: 998000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@matthew_berman"
     creator: Matthew Berman
@@ -988,16 +1008,15 @@ accounts:
     # youtube.com/@matthew_berman, retrieved 2026-08-23.
     platform: youtube
     niche: ai-building
-    followers: null
+    followers: 630000   # rounded display figure from the channel /about page, read 2026-08-23
 
-  - handle: "@TheAIAdvantage"
-    creator: The AI Advantage
-    # Verified: channelMetadataRenderer title "The AI Advantage", vanityChannelUrl
-    # youtube.com/@TheAIAdvantage, retrieved 2026-08-23. The page names only the brand, not a
-    # person, so the creator field records the brand rather than inventing a name.
-    platform: youtube
-    niche: ai-building
-    followers: null
+  # youtube.com/@TheAIAdvantage was seeded here on 2026-08-23 and then REMOVED the same day, once
+  # the /about route made subscriber counts readable. The channel's own metadata title really is
+  # "The AI Advantage", but it carries 448 subscribers and no listed videos, so the handle a human
+  # would guess for that creator is a copycat or a squat rather than theirs. The same handle on
+  # tiktok has 3 followers. Do not re-add it without resolving the real channel first. This row is
+  # the clearest evidence in the file that a title match alone is not verification: the follower
+  # count is what caught it.
 
   - handle: "@indydevdan"
     creator: IndyDevDan
@@ -1006,7 +1025,7 @@ accounts:
     # one developer, agentic coding workflows, no team.
     platform: youtube
     niche: ai-building
-    followers: null
+    followers: 145000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@AIJasonZ"
     creator: AI Jason
@@ -1014,7 +1033,7 @@ accounts:
     # retrieved 2026-08-23.
     platform: youtube
     niche: ai-building
-    followers: null
+    followers: 230000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@DavidOndrej"
     creator: David Ondrej
@@ -1022,7 +1041,7 @@ accounts:
     # youtube.com/@DavidOndrej, retrieved 2026-08-23.
     platform: youtube
     niche: ai-building
-    followers: null
+    followers: 412000   # rounded display figure from the channel /about page, read 2026-08-23
 
   # solopreneur, youtube
   - handle: "@starterstory"
@@ -1032,7 +1051,7 @@ accounts:
     # verified x profile @thepatwalls; the channel page itself names only the brand.
     platform: youtube
     niche: solopreneur
-    followers: null
+    followers: 866000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@GregIsenberg"
     creator: Greg Isenberg
@@ -1040,7 +1059,7 @@ accounts:
     # youtube.com/@GregIsenberg, retrieved 2026-08-23.
     platform: youtube
     niche: solopreneur
-    followers: null
+    followers: 699000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@MyFirstMillionPod"
     creator: My First Million
@@ -1049,15 +1068,11 @@ accounts:
     # its hosts, so the creator field records the show.
     platform: youtube
     niche: solopreneur
-    followers: null
+    followers: 945000   # rounded display figure from the channel /about page, read 2026-08-23
 
-  - handle: "@indiehackers"
-    creator: Indie Hackers
-    # Verified: channelMetadataRenderer title "Indie Hackers", vanityChannelUrl
-    # youtube.com/@indiehackers, retrieved 2026-08-23.
-    platform: youtube
-    niche: solopreneur
-    followers: null
+  # youtube.com/@indiehackers was seeded here on 2026-08-23 and REMOVED the same day for the same
+  # reason as @TheAIAdvantage above: metadata title "Indie Hackers", but 13 subscribers and 2
+  # videos. Not the real Indie Hackers channel.
 
   - handle: "@thefutur"
     creator: The Futur
@@ -1065,7 +1080,7 @@ accounts:
     # youtube.com/@thefutur, retrieved 2026-08-23.
     platform: youtube
     niche: solopreneur
-    followers: null
+    followers: 2810000   # rounded display figure from the channel /about page, read 2026-08-23
 
   # civic-tech, youtube
   - handle: "@johnnyharris"
@@ -1075,7 +1090,7 @@ accounts:
     # Filmmaker helping you better understand the world".
     platform: youtube
     niche: civic-tech
-    followers: null
+    followers: 7920000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@CGPGrey"
     creator: CGP Grey
@@ -1085,7 +1100,7 @@ accounts:
     # infrequently, which is a real caveat for a timeline window.
     platform: youtube
     niche: civic-tech
-    followers: null
+    followers: 7030000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@moreperfectunion"
     creator: More Perfect Union
@@ -1095,7 +1110,7 @@ accounts:
     # register hook-patterns.md sets as the civic default. Here for hook mechanics.
     platform: youtube
     niche: civic-tech
-    followers: null
+    followers: 3810000   # rounded display figure from the channel /about page, read 2026-08-23
 
   # adhd, youtube
   - handle: "@HowtoADHD"
@@ -1105,7 +1120,7 @@ accounts:
     # channel there is.
     platform: youtube
     niche: adhd
-    followers: null
+    followers: 1950000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@adhdjesse"
     creator: Jesse J. Anderson (ADHD Jesse)
@@ -1114,7 +1129,7 @@ accounts:
     # rows because the collector is keyed on platform.
     platform: youtube
     niche: adhd
-    followers: null
+    followers: 86700   # rounded display figure from the channel /about page, read 2026-08-23
 
   # product-thinking, youtube
   - handle: "@LennysPodcast"
@@ -1128,7 +1143,7 @@ accounts:
     # channel titled "Werner Muller", which is a good reminder to verify before recording.
     platform: youtube
     niche: product-thinking
-    followers: null
+    followers: 629000   # rounded display figure from the channel /about page, read 2026-08-23
 
   # ---------------------------------------------------------------------------------------------
   # TIKTOK, round 3. Follower counts here ARE real: they were read from the followerCount value
@@ -1389,10 +1404,14 @@ accounts:
   # anything about them. Do not read the silence here as a finding.
 
   # ---------------------------------------------------------------------------------------------
-  # X, round 3. Every row is followers: null. The profile page's meta tags verify WHO a handle
-  # belongs to but expose no follower count, and platform-collection.md's other X findings still
-  # hold (the syndication endpoint truncates bodies at 279 characters, so X bodies still have no
-  # honest automated route and stay paste-only).
+  # X, round 3. The handle on every row is verified against x.com's own profile meta. The follower
+  # count is NOT on any x.com page and comes from api.fxtwitter.com, a third-party passthrough of
+  # X's API, labelled as such on every row and in the route notes at the top of this block. Treat
+  # it as one hop removed from the platform record.
+  #
+  # platform-collection.md's other X findings still hold: the syndication endpoint truncates post
+  # bodies at 279 characters, so X BODIES still have no honest automated route and stay
+  # paste-only. Nothing here changes that.
   #
   # The verification route does genuinely discriminate: a wrong handle returns "User Profile Not
   # Found - X | 404 Error". Two candidates in this round returned exactly that and were dropped.
@@ -1404,7 +1423,7 @@ accounts:
     # Verified: twitter:title meta "Elon Musk (@elonmusk) on X", retrieved 2026-08-23.
     platform: x
     niche: general-viral
-    followers: null
+    followers: 241498085   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@BarackObama"
     creator: Barack Obama
@@ -1412,7 +1431,7 @@ accounts:
     # President, citizen.", retrieved 2026-08-23.
     platform: x
     niche: general-viral
-    followers: null
+    followers: 119083084   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@Cristiano"
     creator: Cristiano Ronaldo
@@ -1421,7 +1440,7 @@ accounts:
     # differs from his lowercase instagram username.
     platform: x
     niche: general-viral
-    followers: null
+    followers: 113603668   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@dril"
     creator: wint (dril)
@@ -1431,14 +1450,14 @@ accounts:
     # exactly the atomized-versus-organic comparison this repo already runs on Muxin's own posts.
     platform: x
     niche: general-viral
-    followers: null
+    followers: 1684797   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@MrBeast"
     creator: MrBeast
     # Verified: twitter:title meta "MrBeast (@MrBeast) on X", retrieved 2026-08-23.
     platform: x
     niche: general-viral
-    followers: null
+    followers: 34957651   # exact count via api.fxtwitter.com, read 2026-08-23
 
   # ai-building, x. This is x's strongest new cell. X is where AI builders actually argue, and all
   # six post daily or near it.
@@ -1448,7 +1467,7 @@ accounts:
     # retrieved 2026-08-23.
     platform: x
     niche: ai-building
-    followers: null
+    followers: 3941667   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@simonw"
     creator: Simon Willison
@@ -1457,7 +1476,7 @@ accounts:
     # one person, tools, worked examples, published continuously.
     platform: x
     niche: ai-building
-    followers: null
+    followers: 208790   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@swyx"
     creator: swyx (Shawn Wang)
@@ -1465,7 +1484,7 @@ accounts:
     # @aidotengine, retrieved 2026-08-23. Also seeded on substack below as Latent.Space.
     platform: x
     niche: ai-building
-    followers: null
+    followers: 182949   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@AndrewYNg"
     creator: Andrew Ng
@@ -1473,7 +1492,7 @@ accounts:
     # Stanford CS adjunct faculty", retrieved 2026-08-23.
     platform: x
     niche: ai-building
-    followers: null
+    followers: 1823054   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@rowancheung"
     creator: Rowan Cheung
@@ -1482,7 +1501,7 @@ accounts:
     # operator rather than a builder, so watch him for packaging, not for practice.
     platform: x
     niche: ai-building
-    followers: null
+    followers: 596473   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@mattshumer_"
     creator: Matt Shumer
@@ -1490,7 +1509,7 @@ accounts:
     # the TRAILING UNDERSCORE; the handle without it is a different account.
     platform: x
     niche: ai-building
-    followers: null
+    followers: 385209   # exact count via api.fxtwitter.com, read 2026-08-23
 
   # product-thinking, x
   - handle: "@shreyas"
@@ -1500,7 +1519,7 @@ accounts:
     # full-name slug.
     platform: x
     niche: product-thinking
-    followers: null
+    followers: 395933   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@lennysan"
     creator: Lenny Rachitsky
@@ -1510,7 +1529,7 @@ accounts:
     # substack row below.
     platform: x
     niche: product-thinking
-    followers: null
+    followers: 431812   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@gibsonbiddle"
     creator: Gibson Biddle
@@ -1518,7 +1537,7 @@ accounts:
     # VP/CPO", retrieved 2026-08-23.
     platform: x
     niche: product-thinking
-    followers: null
+    followers: 30258   # exact count via api.fxtwitter.com, read 2026-08-23
 
   # Marty Cagan was checked on x on 2026-08-23 and deliberately NOT seeded. The handle @cagan is
   # genuinely his (twitter:title meta "Marty Cagan (@cagan) on X"), but his own bio reads "I'm no
@@ -1532,7 +1551,7 @@ accounts:
     # daily", retrieved 2026-08-23.
     platform: x
     niche: solopreneur
-    followers: null
+    followers: 694233   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@dvassallo"
     creator: Daniel Vassallo
@@ -1540,7 +1559,7 @@ accounts:
     # his substack profile "dvassallo" carrying the Small Bets Newsletter.
     platform: x
     niche: solopreneur
-    followers: null
+    followers: 203637   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@tdinh_me"
     creator: Tony Dinh
@@ -1549,7 +1568,7 @@ accounts:
     # the same shape as @levelsio already seeded above.
     platform: x
     niche: solopreneur
-    followers: null
+    followers: 198385   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@thepatwalls"
     creator: Pat Walls
@@ -1557,7 +1576,7 @@ accounts:
     # Starter Story, seeded on youtube and tiktok above.
     platform: x
     niche: solopreneur
-    followers: null
+    followers: 142219   # exact count via api.fxtwitter.com, read 2026-08-23
 
   # civic-tech, x. Thin and honest at one row. The two other candidates checked, @BetaNYC and
   # @codeforamerica, are ORGANISATION accounts whose reachable output is announcements and event
@@ -1573,7 +1592,7 @@ accounts:
     # civic-tech pillar wants. Cut him if the corpus starts pulling her toward contrarian takes.
     platform: x
     niche: civic-tech
-    followers: null
+    followers: 586813   # exact count via api.fxtwitter.com, read 2026-08-23
 
   # No x row for adhd. Not searched exhaustively in this round, so this is an unexamined cell
   # rather than a proven empty one. Say that rather than implying a finding.
@@ -1582,8 +1601,11 @@ accounts:
   # LINKEDIN, round 3. Handle convention unchanged from the round-2 block: the linkedin.com/in/
   # slug with an "@" prefix. Verified by the profile page's own <title>, which reads
   # "Name - Headline | LinkedIn"; a wrong slug returns "Profile Not Found | LinkedIn", so the
-  # route genuinely discriminates. followers stays null, because LinkedIn does not publish a
-  # follower count in the fetched markup and impressions are owner-only.
+  # route genuinely discriminates. A follower count IS reachable, but not from the profile: pull a
+  # public linkedin.com/posts/... URL off the profile, fetch it, and read author's
+  # interactionStatistic where interactionType is FollowAction. Three of the eleven rows below
+  # carry a number that way; the other eight hit LinkedIn's wall on three separate attempts and
+  # stay null. Per-post impressions remain owner-only and are null everywhere regardless.
   #
   # Read this before extending the cell: LinkedIn began WALLING the profile fetch partway through
   # this round, returning an empty response rather than a title. An empty response is a wall, NOT
@@ -1599,7 +1621,7 @@ accounts:
     # 2026-08-23. Also verified on x as @shreyas and on substack as "shreyasdoshi".
     platform: linkedin
     niche: product-thinking
-    followers: null
+    followers: 247913   # exact FollowAction count from a public post ld+json, read 2026-08-23
 
   - handle: "@lennyrachitsky"
     creator: Lenny Rachitsky
@@ -1624,14 +1646,14 @@ accounts:
     # Verified: profile title "Scott Belsky - A24 | LinkedIn", retrieved 2026-08-23.
     platform: linkedin
     niche: product-thinking
-    followers: null
+    followers: 223946   # exact FollowAction count from a public post ld+json, read 2026-08-23
 
   - handle: "@gibsonbiddle"
     creator: Gibson Biddle
     # Verified: profile title "Gibson Biddle - Gibson Biddle | LinkedIn", retrieved 2026-08-23.
     platform: linkedin
     niche: product-thinking
-    followers: null
+    followers: 51409   # exact FollowAction count from a public post ld+json, read 2026-08-23
 
   # ai-building, linkedin
   - handle: "@andrewyng"
