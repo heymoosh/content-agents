@@ -42,31 +42,31 @@ accounts:
     creator: Sahil Bloom
     platform: x
     niche: inner-journey
-    followers: null
+    followers: 1181980   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@nathanbarry"
     creator: Nathan Barry
     platform: x
     niche: building-solopreneur
-    followers: null
+    followers: 150574   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@levelsio"
     creator: Pieter Levels
     platform: x
     niche: building-solopreneur
-    followers: null
+    followers: 935592   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@dickiebush"
     creator: Dickie Bush
     platform: x
     niche: building-solopreneur
-    followers: null
+    followers: 444188   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@arvidkahl"
     creator: Arvid Kahl
     platform: x
     niche: building-solopreneur
-    followers: null
+    followers: 207684   # exact count via api.fxtwitter.com, read 2026-08-23
 
   # Handle convention for substack entries, set 2026-08-22 while filling the nulls below: the
   # handle is the creator's Substack PROFILE handle, so substack.com/<handle> resolves. The
@@ -97,7 +97,7 @@ accounts:
     # x.com/AnandWrites/status/1763575873687724519. Checked 2026-08-22.
     platform: x   # cited separately by hook pattern 9
     niche: civic-democracy
-    followers: null
+    followers: 603822   # exact count via api.fxtwitter.com, read 2026-08-23
 
   - handle: "@heathercoxrichardson"   # verified: substack.com/@heathercoxrichardson, retrieved 2026-08-22
     creator: Heather Cox Richardson
@@ -141,7 +141,7 @@ accounts:
     # youtube.com/@baratunde, retrieved 2026-08-22.
     platform: youtube
     niche: civic-democracy
-    followers: null
+    followers: 12600   # rounded display figure from the channel /about page, read 2026-08-23
 
   # The four creators hook-patterns.md cites but never seeded. Added 2026-08-22, same rule as
   # above: verified against a retrieved source or left null.
@@ -174,7 +174,7 @@ accounts:
     # account @CitizenUniv, which is not him.
     platform: x
     niche: civic-democracy
-    followers: null
+    followers: 12268   # exact count via api.fxtwitter.com, read 2026-08-23
 
   # ---------------------------------------------------------------------------------------------
   # VIDEO ACCOUNTS, added 2026-08-22 to close the video-platform gap.
@@ -200,7 +200,7 @@ accounts:
     # stays null.
     platform: youtube
     niche: building-solopreneur
-    followers: null
+    followers: 6670000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@aliabdaal"   # verified: instagram.com/aliabdaal, retrieved 2026-08-22
     creator: Ali Abdaal
@@ -214,7 +214,7 @@ accounts:
     # retrieved 2026-08-22.
     platform: youtube
     niche: building-solopreneur
-    followers: null
+    followers: 1410000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@thedankoe"   # verified: instagram.com/thedankoe, retrieved 2026-08-22
     creator: Dan Koe
@@ -226,9 +226,16 @@ accounts:
     creator: Noah Kagan
     # Verified from his own site noahkagan.com, which links youtube.com/okdork and states
     # 1.3M subscribers, retrieved 2026-08-22.
+    # CORRECTED 2026-08-23. The old value, 1300000, came from a figure stated on noahkagan.com,
+    # which is exactly the substitution platform-collection.md warns against: a creator's site
+    # publishes a cross-platform audience number, not a per-platform subscriber count. The /about
+    # page reads 1.18M across 562 videos, so that is what the row now holds.
+    # HANDLE DRIFT, flagged not changed: the channel's own vanityChannelUrl now resolves to
+    # youtube.com/@noahkagan. "okdork" still redirects there and still fetches correctly, so the
+    # handle is left as seeded rather than edited. Worth updating deliberately at some point.
     platform: youtube
     niche: building-solopreneur
-    followers: 1300000   # stated on noahkagan.com, retrieved 2026-08-22
+    followers: 1180000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@realmattgray"
     creator: Matt Gray
@@ -236,7 +243,7 @@ accounts:
     # retrieved 2026-08-22.
     platform: youtube
     niche: building-solopreneur
-    followers: null
+    followers: 287000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@realmattgray"
     creator: Matt Gray
@@ -244,7 +251,7 @@ accounts:
     # retrieved 2026-08-22. This is the only verified tiktok account in this niche.
     platform: tiktok
     niche: building-solopreneur
-    followers: null
+    followers: 147500   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@matthgray"   # verified: instagram.com/matthgray, retrieved 2026-08-22
     creator: Matt Gray
@@ -259,7 +266,7 @@ accounts:
     # youtube.com/@TheHolisticPsychologist, retrieved 2026-08-22.
     platform: youtube
     niche: inner-journey
-    followers: null
+    followers: 847000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@theholisticpsychologist"
     creator: Nicole LePera
@@ -268,7 +275,7 @@ accounts:
     # account in this niche.
     platform: tiktok
     niche: inner-journey
-    followers: null
+    followers: 1500000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@the.holistic.psychologist"   # verified: instagram.com/the.holistic.psychologist, retrieved 2026-08-22
     creator: Nicole LePera
@@ -291,7 +298,7 @@ accounts:
     # was retrieved 2026-08-22. Follower count was not readable off the profile page.
     platform: instagram
     niche: inner-journey
-    followers: null
+    followers: 3433480   # exact API count, read 2026-08-23
 
   - handle: "@sahilbloom"   # verified: instagram.com/sahilbloom, retrieved 2026-08-22
     creator: Sahil Bloom
@@ -314,7 +321,7 @@ accounts:
     # tiktok.com/@underthedesknews, retrieved 2026-08-22.
     platform: tiktok
     niche: civic-democracy
-    followers: null
+    followers: 3800000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@underthedesknews"
     creator: V Spehar
@@ -322,7 +329,7 @@ accounts:
     # youtube.com/@underthedesknews, retrieved 2026-08-22.
     platform: youtube
     niche: civic-democracy
-    followers: null
+    followers: 248000   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@underthedesknews"   # verified: instagram.com/underthedesknews, retrieved 2026-08-22
     creator: V Spehar
@@ -334,34 +341,44 @@ accounts:
     creator: Carlos Eduardo Espina
     # Verified: en.wikipedia.org/wiki/Carlos_Eduardo_Espina names this tiktok handle and count,
     # retrieved 2026-08-22.
+    # CORRECTED 2026-08-23 to a platform reading: 14.6M followers, 1.2B hearts, 14,900 videos,
+    # read off the profile page JSON anchored on the matching uniqueId. The old 13800000 came from
+    # Wikipedia. The largest account in this whole file by video count.
     platform: tiktok
     niche: civic-democracy
-    followers: 13800000   # per Wikipedia, retrieved 2026-08-22
+    followers: 14600000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@carlos_eduardo_espina"
     creator: Carlos Eduardo Espina
     # Verified: en.wikipedia.org/wiki/Carlos_Eduardo_Espina names this instagram handle and count,
     # retrieved 2026-08-22.
+    # CORRECTED 2026-08-23 to a platform reading: web_profile_info gives an exact 2,457,924
+    # followers across 12,506 posts. The old 1950000 came from Wikipedia and was 26 per cent low,
+    # the largest gap between a cited figure and a platform reading found in this backfill.
     platform: instagram
     niche: civic-democracy
-    followers: 1950000   # per Wikipedia, retrieved 2026-08-22
+    followers: 2457924   # exact API count, read 2026-08-23
 
   - handle: "@aaronparnas1"
     creator: Aaron Parnas
     # Verified: en.wikipedia.org/wiki/Aaron_Parnas names this tiktok handle and count,
     # retrieved 2026-08-22.
+    # CORRECTED 2026-08-23 to a platform reading: 5.5M followers across 9,541 videos. The old
+    # 5400000 came from Wikipedia.
     platform: tiktok
     niche: civic-democracy
-    followers: 5400000   # per Wikipedia, retrieved 2026-08-22
+    followers: 5500000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@aaronparnas"
     creator: Aaron Parnas
     # Verified: en.wikipedia.org/wiki/Aaron_Parnas names this instagram handle and count,
     # retrieved 2026-08-22. His youtube channel is named there too, but by channel name only and
     # not by handle, so no youtube row was added.
+    # CORRECTED 2026-08-23 to a platform reading: an exact 3,335,558 followers. The old 3200000
+    # came from Wikipedia.
     platform: instagram
     niche: civic-democracy
-    followers: 3200000   # per Wikipedia, retrieved 2026-08-22
+    followers: 3335558   # exact API count, read 2026-08-23
 
   - handle: "@sharonsaysso"
     creator: Sharon McMahon
@@ -384,6 +401,15 @@ accounts:
   # (LinkedIn assigns those). Those are correct as written, not typos.
   #
   # Same caveats as the video block: CANDIDATES to prune, and follower figures are a snapshot.
+  #
+  # WHY EVERY ROW IN THIS BLOCK STILL READS followers: null, noted 2026-08-23. A follower count IS
+  # reachable on linkedin, but not from a profile page: pull a public linkedin.com/posts/... URL
+  # off the profile, fetch that post, and read author.interactionStatistic where interactionType
+  # is FollowAction. That route was run against all twelve handles here on three separate
+  # attempts and LinkedIn walled the profile fetch every time, so no post URL could even be
+  # obtained. A WALL IS NOT AN ABSENCE. Do not read these nulls as "linkedin has no count" and do
+  # not fill them from a creator's website; retry the route on a fresh window instead. It does
+  # work when the wall lifts: three round-3 linkedin rows further down carry real numbers from it.
   # ---------------------------------------------------------------------------------------------
 
   # building-solopreneur, linkedin
@@ -514,9 +540,12 @@ accounts:
     creator: Codie Sanchez
     # Verified from her own site codiesanchez.com, which links tiktok.com/@realcodiesanchez and
     # states 2M followers, retrieved 2026-08-22.
+    # CORRECTED 2026-08-23 to a platform reading: the profile page JSON gives 2.1M across 3,047
+    # videos. The old 2000000 came from her own website. Small drift, consistent with growth, but
+    # a site figure is not a platform figure and this row now holds the platform one.
     platform: tiktok
     niche: building-solopreneur
-    followers: 2000000   # stated on codiesanchez.com, retrieved 2026-08-22
+    followers: 2100000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@garyvee"
     creator: Gary Vaynerchuk
@@ -525,7 +554,7 @@ accounts:
     # business. Hook mechanics only.
     platform: tiktok
     niche: building-solopreneur
-    followers: null
+    followers: 15400000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   # inner-journey, tiktok
   - handle: "@melrobbins"
@@ -534,7 +563,7 @@ accounts:
     # retrieved 2026-08-22.
     platform: tiktok
     niche: inner-journey
-    followers: null
+    followers: 5900000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@simonsinek"
     creator: Simon Sinek
@@ -542,7 +571,7 @@ accounts:
     # retrieved 2026-08-22.
     platform: tiktok
     niche: inner-journey
-    followers: null
+    followers: 1900000   # rounded display figure from the profile page JSON, read 2026-08-23
 
   # civic-democracy, tiktok
   - handle: "@kahlilgreene"
@@ -550,9 +579,11 @@ accounts:
     # Verified from his own site kahlilgreene.com, which links tiktok.com/@kahlilgreene and
     # states 650,000+ followers, retrieved 2026-08-22. Hidden-history explainer register, closer
     # to teaching than to grievance.
+    # CORRECTED 2026-08-23 to a platform reading: 697,900 followers across 585 videos, nickname
+    # "Gen Z Historian". The old 650000 came from his own website.
     platform: tiktok
     niche: civic-democracy
-    followers: 650000   # stated on kahlilgreene.com, retrieved 2026-08-22
+    followers: 697900   # rounded display figure from the profile page JSON, read 2026-08-23
 
   - handle: "@mosheh"
     creator: Mosheh Oinounou (Mo News)
@@ -561,7 +592,7 @@ accounts:
     # the handle is verified and the person behind it is inferred from the brand.
     platform: tiktok
     niche: civic-democracy
-    followers: null
+    followers: 46200   # rounded display figure from the profile page JSON, read 2026-08-23
 
   # civic-democracy, youtube. Beyond the two gaps this round targeted, these three close the
   # civic youtube thinness reported after round 1 (it was 2 accounts).
@@ -570,22 +601,32 @@ accounts:
     # Verified from her own site valariekaur.com, which links youtube.com/@valariekaurofficial,
     # retrieved 2026-08-22. She is already seeded above on instagram; this is the same person on
     # a second platform, kept separate because the collector is keyed on platform.
+    # PRUNE CANDIDATE, added 2026-08-23 once the /about route made counts readable: this channel
+    # carries 412 subscribers across 58 videos. Read twice on separate attempts, same answer both
+    # times. The handle is genuinely hers and the row is not wrong, but an account this size
+    # cannot be a reference creator: there is no meaningful engagement baseline to sample. Her
+    # instagram row (121k) is the live one. Cut this row unless someone wants it for contrast.
     platform: youtube
     niche: civic-democracy
-    followers: null
+    followers: 412   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@deepaviyer"
     creator: Deepa Iyer
     # Verified from her own site deepaiyer.com, which links youtube.com/@deepaviyer,
     # retrieved 2026-08-22.
+    # PRUNE CANDIDATE, added 2026-08-23: 90 subscribers across 7 videos, read twice on separate
+    # attempts. Genuinely her channel, but seven videos cannot be sampled and ninety subscribers
+    # cannot be a baseline. Her substack and linkedin rows are the live ones.
     platform: youtube
     niche: civic-democracy
-    followers: null
+    followers: 90   # rounded display figure from the channel /about page, read 2026-08-23
 
   - handle: "@moshehnews"
     creator: Mosheh Oinounou (Mo News)
     # Verified from the Mo News site mo.news, which links youtube.com/moshehnews, retrieved
     # 2026-08-22.
+    # followers stays null after 2026-08-23's backfill: the /about page walled on all four
+    # attempts, unlike every other youtube row in this file. A wall, not an absence. Retry it.
     platform: youtube
     niche: civic-democracy
     followers: null
