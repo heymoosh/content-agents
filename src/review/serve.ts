@@ -1015,11 +1015,12 @@ const server = createServer(async (req, res) => {
         // result is unused now, but the gate is why the call stays.
         listChapters(slug);
         const beats = readSceneBeats(slug);
-        const asked = Number(url.searchParams.get("chapter") ?? "");
-        // Only a chapter this room actually produced. Falling back to the newest chapter on disk
-        // handed back one Muxin wrote herself in /story, which the room then labelled "the scene,
-        // from your beats" and set in the AI purple. Her prose is never the AI register.
-        const n = Number.isInteger(asked) && asked > 0 ? asked : beats?.chapter ?? null;
+        // The one chapter this room actually produced, and nothing else. It used to fall back to
+        // the newest chapter on disk, which handed back one Muxin wrote herself in /story; the room
+        // then labelled her prose "the scene, from your beats" and set it in the AI purple. Her
+        // words are never the AI register. A ?chapter= override is gone with the fallback rather
+        // than gated: it had no caller, and any value it took could name a chapter she wrote.
+        const n = beats?.chapter ?? null;
         const chapter = n ? readFictionChapter(slug, n) : null;
         json(res, 200, {
           ok: true,
