@@ -2403,6 +2403,21 @@ accounts:
     niche: solopreneur
     followers: null
 
+  # Added 2026-08-23 by the RSS pass, which is also where its numbers come from.
+  - handle: "r/SideProject"
+    creator: r/SideProject (subreddit)
+    # Verified: RSS category label "r/SideProject", retrieved 2026-08-23 from the community's own
+    # top-of-year feed. WHAT WINS: media, totally. 16 video and 9 image posts across the top 25,
+    # and ZERO text posts, the only community in this file with no text winner at all. Not one of
+    # the 25 carries a body: body_is_complete is false on all of them, because the substance is a
+    # demo of the thing working. Titles are reduced to a caption on that demo ("just made my first
+    # SaaS!", "Jelly Slider"). The lesson is blunt: here you show the build, you do not write about
+    # it. Same niche as r/Entrepreneur, whose top 25 are 25 text posts. That pair is the
+    # solopreneur-niche twin of the r/ADHD versus r/adhdmeme split.
+    platform: reddit
+    niche: solopreneur
+    followers: null
+
   # civic-tech, reddit. Read the r/civictech note below before anything else in this block; it is
   # the most directly actionable finding in the whole round.
   - handle: "r/civictech"
@@ -2497,6 +2512,22 @@ accounts:
     # Verified: RSS category label "r/YouShouldKnow", retrieved 2026-08-23. WHAT WINS: text, zero
     # thumbnails across ten posts. Every post is a titled piece of useful information, which is the
     # closest general-viral shape on reddit to what Muxin actually writes.
+    platform: reddit
+    niche: general-viral
+    followers: null
+
+  # Added 2026-08-23 by the RSS pass, which is also where its numbers come from. It already had
+  # entries in the corpus, collected by hand under an explicit niche, but no row here.
+  - handle: "r/LifeProTips"
+    creator: r/LifeProTips (subreddit)
+    # Verified: RSS category label "r/LifeProTips", retrieved 2026-08-23 from the community's own
+    # top-of-year feed. WHAT WINS: text, entirely. 25 text posts out of the top 25, zero media of
+    # any kind, and 23 of them carry a real body. The house format is strict and worth copying:
+    # every title opens with the literal token "LPT" or "LPT:" and then states the whole tip as a
+    # complete sentence ("LPT: Don't punish the behaviour you want to see"). The title does the
+    # work and the body supplies the reason. Seeded next to r/YouShouldKnow because the two are
+    # the same shape, and together they are the closest general-viral form on reddit to what Muxin
+    # actually writes.
     platform: reddit
     niche: general-viral
     followers: null
