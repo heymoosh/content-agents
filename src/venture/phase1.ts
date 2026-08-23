@@ -8,7 +8,7 @@ import {
   readArtifact,
   type ClaimRef,
 } from "./artifacts.js";
-import { writeDecision, selectDecision, selectWithOverride, readDecision, type Candidate } from "./decisions.js";
+import { writeDecision, selectDecision, selectWithOverride, readDecision, type Candidate, selectOptionsFor} from "./decisions.js";
 import { phase1Dir } from "./paths.js";
 import { hasCanonEvent } from "./canon.js";
 import {
@@ -126,11 +126,7 @@ function cmdPlatform(slug: string) {
 
 function cmdPlatformSelect(slug: string, candidateId: string) {
   const overrideReason = flag("--override-reason");
-  const d = selectWithOverride(slug, "p1-platform-01", candidateId, overrideReason, {
-    requiredSelectCount: 1,
-    ruleCite: "rules.md §5.1",
-    candidateLabel: "platform",
-  });
+  const d = selectWithOverride(slug, "p1-platform-01", candidateId, overrideReason, selectOptionsFor("platform-recommendation", loadRules()));
   console.log(`platform selected: ${d.selected_candidate_ids[0]}`);
 }
 
@@ -485,12 +481,7 @@ function cmdContinuation(slug: string) {
 
 function cmdContinuationSelect(slug: string, candidateId: string) {
   const overrideReason = flag("--override-reason");
-  const d = selectWithOverride(slug, "p1-continuation-01", candidateId, overrideReason, {
-    requiredSelectCount: 1,
-    ruleCite: "rules.md §5.6",
-    candidateLabel: "continuation candidate",
-    overridePhrase: "overriding requires",
-  });
+  const d = selectWithOverride(slug, "p1-continuation-01", candidateId, overrideReason, selectOptionsFor("phase-1-research-continuation", loadRules()));
   console.log(`continuation selected: ${d.selected_candidate_ids[0]}`);
 }
 

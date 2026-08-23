@@ -26,10 +26,24 @@ export interface Evidence {
 }
 
 export interface Failure {
-  provider: string;
+  // null for a manual artifact, where there is no provider and the message is what Muxin
+  // reported -- docs/venture-schema-contract.md §4.1. Was `string` when deliver.ts, whose only
+  // failure is a "substack-notes" one, was the sole writer.
+  provider: string | null;
   message: string;
   retryable: boolean;
   at: string;
+}
+
+// docs/venture-schema-contract.md §4.2. Written ALONGSIDE, never over, the original `evidence`:
+// an artifact carrying both was genuinely live and is now not, and both facts matter -- the first
+// is why a checkpoint cleared, the second is why the thing is no longer out there. It carries its
+// own attestation because the system can no more verify a takedown than it could verify the
+// original posting.
+export interface Retraction {
+  attestation: string;
+  retracted_at: string;
+  retracted_by: "muxin";
 }
 
 export interface VentureArtifact {
@@ -49,6 +63,10 @@ export interface VentureArtifact {
   editorial_status: EditorialStatus;
   delivery_status: DeliveryStatus;
   evidence: Evidence | null;
+  // Present iff this artifact was taken down after being live (§2.1). Its presence is what
+  // separates "retracted" from a plain "discarded" on screen -- both are discarded x cancelled,
+  // and §2.2 says the screen must not flatten them into one word.
+  retraction: Retraction | null;
   failure: Failure | null;
 
   // §1B lineage fields
@@ -154,6 +172,7 @@ export function createArtifact(
     editorial_status: "draft",
     delivery_status: kindRule.delivery_mode === "none" ? "not_applicable" : "awaiting_approval",
     evidence: null,
+    retraction: null,
     failure: null,
     origin_type: "venture",
     venture_id: input.venture_id,
@@ -185,6 +204,11 @@ export interface TransitionPatch {
   editorial_status?: EditorialStatus;
   delivery_status?: DeliveryStatus;
   evidence?: Evidence | null;
+  // Deliberately NOT paired with an `evidence` clear: §2.1 is explicit that a retract writes this
+  // "without touching `evidence`", because erasing that record would falsify the history a
+  // cleared checkpoint rests on. Set by retractArtifact() in artifact-lifecycle.ts, which is the
+  // only caller that should ever pass it.
+  retraction?: Retraction | null;
   failure?: Failure | null;
 }
 

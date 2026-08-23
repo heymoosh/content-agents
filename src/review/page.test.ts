@@ -185,6 +185,7 @@ import { fileURLToPath } from "node:url";
 import { renderPage } from "./page.js";
 import { repoRoot } from "../db/db.js";
 import { VENTURE_READ_PATHS } from "./venture-reads.js";
+import { VENTURE_WRITE_PATHS } from "./venture-writes.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -273,19 +274,20 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
 });
 
 // ---------------------------------------------------------------------------
-// The same self-deleting exemption as PENDING_UI_ROUTES above, for the Venture room's read routes.
+// The same self-deleting exemption as PENDING_UI_ROUTES above, for the Venture room's routes.
 //
 // Two lists rather than one, for a structural reason: the guard above discovers routes by scanning
-// serve.ts for `url.pathname === "..."` literals, and the nine venture reads are not written that
-// way — they are dispatched by handleVentureRead() and carry a :slug path parameter, so the
-// extractor cannot see them and `routes.has(...)` would reject them on sight. This block gets its
-// route list from the module itself (VENTURE_READ_PATHS), which is a stronger source than a regex
-// over source text: a route deleted there disappears from this check automatically.
+// serve.ts for `url.pathname === "..."` literals, and the venture routes are not written that
+// way — they are dispatched by handleVentureRead()/handleVentureWrite() and carry :slug and :id
+// path parameters, so the extractor cannot see them and `routes.has(...)` would reject them on
+// sight. This block gets its route list from the modules themselves (VENTURE_READ_PATHS,
+// VENTURE_WRITE_PATHS), which is a stronger source than a regex over source text: a route deleted
+// there disappears from this check automatically.
 //
 // The mechanism is identical in spirit and identical in the property that matters — each entry
 // asserts its route is STILL uncalled, so wiring the room turns the entry red and the only way
 // back to green is deleting it. Keep the list at or near zero.
-const PENDING_UI_VENTURE_READS: { route: string; reason: string }[] = [
+const PENDING_UI_VENTURE: { route: string; reason: string }[] = [
   { route: "/api/venture/list", reason: "Venture room venture picker" },
   { route: "/api/venture/:slug/state", reason: "Venture room phase + checkpoint header" },
   { route: "/api/venture/:slug/artifacts", reason: "Venture room artifact list" },
@@ -295,38 +297,54 @@ const PENDING_UI_VENTURE_READS: { route: string; reason: string }[] = [
   { route: "/api/venture/:slug/clusters", reason: "Venture room problem clusters" },
   { route: "/api/venture/:slug/rules", reason: "Venture room rules-version stamp" },
   { route: "/api/venture/:slug/intake/answers", reason: "Venture room YOUR WORDS / quotes panel" },
+  { route: "/api/venture/:slug/decisions/:id/select", reason: "Venture room decision picker" },
+  { route: "/api/venture/:slug/artifacts/:id/approve", reason: "Venture room approve button" },
+  { route: "/api/venture/:slug/artifacts/:id/discard", reason: "Venture room discard button" },
+  { route: "/api/venture/:slug/artifacts/:id/restore", reason: "Venture room restore-to-draft button" },
+  { route: "/api/venture/:slug/artifacts/:id/retract", reason: "Venture room retract button" },
+  { route: "/api/venture/:slug/artifacts/:id/confirm-live", reason: "Venture room confirm-live form" },
+  { route: "/api/venture/:slug/artifacts/:id/failed", reason: "Venture room report-failed form" },
+  { route: "/api/venture/:slug/artifacts/:id/findings/:findingId", reason: "Venture room research-read finding toggles" },
+  { route: "/api/venture/:slug/checkpoint/:id/clear", reason: "Venture room clear-checkpoint button" },
+  { route: "/api/venture/:slug/pace", reason: "Venture room posting-pace field" },
+  { route: "/api/venture/:slug/intake/drafts/clear", reason: "Venture intake, on the final write" },
 ];
 
-// A :slug route counts as called when the emitted script both reaches into /api/venture/ and names
-// this route's own tail — the client builds these as "/api/venture/" + slug + "/state".
+// A parameterised route counts as called when the emitted script both reaches into /api/venture/
+// and names this route's own literal segments — the client builds these as
+// "/api/venture/" + slug + "/artifacts/" + id + "/approve", so ":slug"/":id" never appear as text
+// and the fixed segments around them are what to look for.
 function venturePathIsCalled(script: string, route: string): boolean {
-  if (!route.includes(":slug")) return script.includes(route);
-  return script.includes("/api/venture/") && script.includes("/" + route.split("/:slug/")[1]);
+  if (!route.includes(":")) return script.includes(route);
+  if (!script.includes("/api/venture/")) return false;
+  return route
+    .split("/")
+    .filter((seg) => seg && !seg.startsWith(":") && seg !== "api" && seg !== "venture")
+    .every((seg) => script.includes("/" + seg));
 }
 
-test("wiring guard: every venture read route is either called by the page or parked in PENDING_UI_VENTURE_READS", () => {
+const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS];
+
+test("wiring guard: every venture route is either called by the page or parked in PENDING_UI_VENTURE", () => {
   const script = emittedScripts().join("\n");
-  for (const route of VENTURE_READ_PATHS) {
+  for (const route of VENTURE_PATHS) {
     const called = venturePathIsCalled(script, route);
-    const parked = PENDING_UI_VENTURE_READS.find((e) => e.route === route);
+    const parked = PENDING_UI_VENTURE.find((e) => e.route === route);
     if (parked) {
       assert.ok(
         !called,
-        `${route} now has a caller in the page — delete its PENDING_UI_VENTURE_READS entry ` +
+        `${route} now has a caller in the page — delete its PENDING_UI_VENTURE entry ` +
           `(parked for the ${parked.reason}); the exemption has done its job`
       );
     } else {
-      assert.ok(called, `venture-reads.ts serves ${route} but no caller in the page (orphan route) — wire it, or park it with a reason`);
+      assert.ok(called, `venture-reads.ts/venture-writes.ts serves ${route} but no caller in the page (orphan route) — wire it, or park it with a reason`);
     }
   }
 });
 
-test("PENDING_UI_VENTURE_READS holds no entry for a route that no longer exists", () => {
-  for (const e of PENDING_UI_VENTURE_READS) {
-    assert.ok(
-      VENTURE_READ_PATHS.includes(e.route),
-      `PENDING_UI_VENTURE_READS lists ${e.route}, which is no longer served — delete the entry`
-    );
+test("PENDING_UI_VENTURE holds no entry for a route that no longer exists", () => {
+  for (const e of PENDING_UI_VENTURE) {
+    assert.ok(VENTURE_PATHS.includes(e.route), `PENDING_UI_VENTURE lists ${e.route}, which is no longer served — delete the entry`);
   }
 });
 
