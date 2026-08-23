@@ -220,6 +220,13 @@ const PENDING_UI_ROUTES = new Set([
   // The Content room's "decide the treatment" read layer (fit label per channel, that channel's
   // own reuse window, next free slot). Backend shipped separately from the page.ts surface.
   "/api/content/treatment",
+  // Card D: the four outcome families grouped at read time out of data/analytics.db
+  // (docs/venture-schema-contract.md §5.8). Built backend-only by agreement; page.ts is owned by
+  // another worker, so the Signals screen that calls this has not landed yet.
+  "/api/signals/outcomes",
+  // The redacted account-level research read (contract §5.4b), exposed to the GUI in the same
+  // backend-only Card D change. Same reason: its Signals surface lands separately.
+  "/api/research/report",
 ]);
 
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
