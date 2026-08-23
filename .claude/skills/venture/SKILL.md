@@ -157,17 +157,28 @@ tsx src/venture/deliver.ts <slug>
 ```
 
 An approved `substack-post` writes to `ready-to-paste/<artifact_id>.txt` for Muxin to paste
-herself; once it's live, she confirms the URL:
+herself; once it's live, she confirms it. Two proofs, and which one is right depends on whether the
+thing has an address:
 
 ```
 tsx src/venture/deliver.ts confirm <slug> <artifact_id> --url <live-url>
+tsx src/venture/deliver.ts confirm <slug> <artifact_id> --attestation "<what she states>"
 ```
+
+Use `--url` whenever the artifact has a real address, because a link can be re-checked later and a
+sentence cannot. Use `--attestation` only for a thing with no addressable trace at all — a welcome
+email sequence being switched on, a note sent by hand. **Never ask Muxin for a URL that does not
+exist, and never write one on her behalf.** A kind that needs a checkable link refuses an
+attestation and says so; a kind that only needs an attestation still accepts a URL if there is one.
 
 An approved `text-post-note` claims a slot from the same shared scheduler `/atomize` uses (so it
 can never collide with a same-day `/atomize` Note), then posts through the existing Substack Notes
 agent once that slot is due — re-running `deliver.ts` is what actually fires an already-claimed
-slot, there's no separate cron. Both paths write real delivery evidence
-(`{type: "url", ...}` or `{type: "agent", ...}`) — this is what Checkpoint 1 checks for below.
+slot, there's no separate cron. Both paths write real delivery evidence — `{type: "url", ...}` for
+what Muxin pastes herself, `{type: "agent", ...}` for what the Notes agent posts (and
+`{type: "attestation", ...}` later, for Phase 2's welcome email). Each kind declares a MINIMUM, not
+an exact type: a url or an agent confirmation both clear an attestation minimum, an attestation
+never stands in for either. This is what Checkpoint 1 checks for below.
 
 ## Step 7: Checkpoint 1
 
@@ -320,7 +331,9 @@ tsx src/venture/checkpoint.ts clear <slug> checkpoint-2
 
 Checkpoint 2 needs exactly four artifacts approved AND live: the lead magnet, the landing page,
 the welcome email, and the survey review — no pace requirement, and the announcement never counts
-toward it. The survey's own "live" evidence is simply its already-live URL on humaninference.ai —
+toward it. The welcome email is the one with no address to point at: it goes live inside Muxin's
+email tool, so it is confirmed with `--attestation "the welcome sequence is on"`, never with an
+invented link. The survey's own "live" evidence is simply its already-live URL on humaninference.ai —
 Muxin isn't building anything new for it, this step only confirms the existing survey continues to
 run and the review's fit findings, if any, got acted on.
 
