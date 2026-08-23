@@ -3015,6 +3015,696 @@ accounts:
       - fashion
       - met-gala-2023
 
+  # ---------------------------------------------------------------------------------------------
+  # TOP CREATORS pass, added 2026-08-23. A WHO sweep rather than a what sweep: who is biggest,
+  # all-time, in each of Muxin's niches and in the transferable general lane.
+  #
+  # "General" here means big AND transferable, never big and famous. Explainers, teachers,
+  # essayists, builders in public. No musicians, no dance accounts, no stunt channels, no
+  # celebrity-famous accounts, because none of that structure carries over to a person writing
+  # about AI, product thinking, ADHD and civic work.
+  #
+  # Every count below was read off the platform's own page or its own API on 2026-08-23. Each row
+  # carries its route inline. Nothing here came from a creator's website or a third-party mirror.
+  #
+  # Nine more name-matching impostors were caught and REFUSED during this pass. They are recorded
+  # here so nobody re-adds them: youtube @aakashgupta is a stand-up comedian with 4.72M subs and
+  # not the product writer; youtube @PracticalEngineering is "Practical Engineering Australia"
+  # with 208 subs; x @jzhuo has 0 followers and Julie Zhuo is @joulee; x @pluralistic is "Nizar
+  # Kheraj" with 17 followers and Cory Doctorow is @doctorow; substack @thebootstrappedfounder is
+  # "Victory Chikasi" with 61 subscribers and not Arvid Kahl; substack @jamesclear is "Mobin
+  # heydari" with 5; substack @thehonestbroker is "Becky Quinby" with 23; bluesky
+  # levelsio.bsky.social is "Jeramy" with 72; tiktok @mattwolfe is "Johnny" with 0.
+  #
+  # A quieter failure mode also worth writing down: a real person's real profile that is not their
+  # audience. substack @arvidkahl (17), @caseynewton (3), @teresatorres (3), @timurban (299) are
+  # genuinely those people and completely unusable. Their readers are on a publication handle
+  # (@platformer is Casey Newton at 176,000) or off Substack entirely. Check the count even when
+  # the name and the person both check out.
+  #
+  # Four cells were searched and found GENUINELY EMPTY. They are left blank on purpose:
+  # mastodon/product-thinking, tiktok/product-thinking, instagram/ai-building and
+  # instagram/product-thinking. Every instagram candidate tested was a parked handle: @mattwolfe
+  # has 744, @shreyasdoshi 245, @thefutur 92, @justinwelsh 464. Those people do not run Instagram.
+  #
+  # Nothing was added for linkedin, threads or reddit. linkedin walled again (HTTP 999 and a
+  # zero-byte 301, so the profile-then-post chain never starts). threads returns 200 and 262KB
+  # with zero follower_count fields logged out. reddit returned HTTP 403 on the first about.json
+  # request and the sweep stopped there rather than working around it.
+  # ---------------------------------------------------------------------------------------------
+
+  # --- youtube ---
+  - handle: "@TED"
+    creator: "TED"
+    platform: youtube
+    niche: general-viral
+    followers: 27700000   # read off the channel page header on youtube.com, 2026-08-23
+    # 15-minute idea talks; the original one-idea-well-argued format
+  - handle: "@Vsauce"
+    creator: "Michael Stevens (Vsauce)"
+    platform: youtube
+    niche: general-viral
+    followers: 25000000   # read off the channel page header on youtube.com, 2026-08-23
+    # opens a curiosity question wide, then answers it
+  - handle: "@SmarterEveryDay"
+    creator: "Destin Sandlin"
+    platform: youtube
+    niche: general-viral
+    followers: 11900000   # read off the channel page header on youtube.com, 2026-08-23
+    # first-person 'I went and looked' investigation
+  - handle: "@3blue1brown"
+    creator: "Grant Sanderson"
+    platform: youtube
+    niche: general-viral
+    followers: 8560000   # read off the channel page header on youtube.com, 2026-08-23
+    # visual math; the strongest abstract-idea-made-concrete structure on the platform
+  - handle: "@RealLifeLore"
+    creator: "RealLifeLore"
+    platform: youtube
+    niche: general-viral
+    followers: 7940000   # read off the channel page header on youtube.com, 2026-08-23
+    # geography and systems explainers
+  - handle: "@Wendoverproductions"
+    creator: "Wendover Productions"
+    platform: youtube
+    niche: general-viral
+    followers: 4910000   # read off the channel page header on youtube.com, 2026-08-23
+    # how one industry actually works, per video
+  - handle: "@PracticalEngineeringChannel"
+    creator: "Grady Hillhouse"
+    platform: youtube
+    niche: general-viral
+    followers: 4810000   # read off the channel page header on youtube.com, 2026-08-23
+    # infrastructure explained by building a model of it. NOTE the handle: @PracticalEngineering is a different channel with 208 subs
+  - handle: "@MattDAvella"
+    creator: "Matt D'Avella"
+    platform: youtube
+    niche: general-viral
+    followers: 4040000   # read off the channel page header on youtube.com, 2026-08-23
+    # personal-experiment documentaries, 'I tried X for 30 days'
+  - handle: "@LegalEagle"
+    creator: "Devin Stone"
+    platform: youtube
+    niche: general-viral
+    followers: 3950000   # read off the channel page header on youtube.com, 2026-08-23
+    # expert reacts to a news event and teaches the rules while doing it
+  - handle: "@economicsexplained"
+    creator: "Economics Explained"
+    platform: youtube
+    niche: general-viral
+    followers: 2870000   # read off the channel page header on youtube.com, 2026-08-23
+    # one country or one policy per video
+  - handle: "@PolyMatter"
+    creator: "PolyMatter"
+    platform: youtube
+    niche: general-viral
+    followers: 1930000   # read off the channel page header on youtube.com, 2026-08-23
+    # tightly scripted geopolitics and business
+  - handle: "@TLDRnewsGLOBAL"
+    creator: "TLDR News Global"
+    platform: youtube
+    niche: general-viral
+    followers: 1150000   # read off the channel page header on youtube.com, 2026-08-23
+    # short neutral news explainers at high cadence
+  - handle: "@kylascanlon"
+    creator: "Kyla Scanlon"
+    platform: youtube
+    niche: general-viral
+    followers: 192000   # read off the channel page header on youtube.com, 2026-08-23
+    # economics made legible; coined 'vibecession'
+  - handle: "@Thomasfrank"
+    creator: "Thomas Frank"
+    platform: youtube
+    niche: productivity
+    followers: 3000000   # read off the channel page header on youtube.com, 2026-08-23
+    # study and productivity systems, one method per video
+  - handle: "@fireship"
+    creator: "Fireship"
+    platform: youtube
+    niche: ai-building
+    followers: 4250000   # read off the channel page header on youtube.com, 2026-08-23
+    # 100-second technical explainers; the tightest hook structure in dev video
+  - handle: "@techwithtim"
+    creator: "Tech With Tim"
+    platform: youtube
+    niche: ai-building
+    followers: 2070000   # read off the channel page header on youtube.com, 2026-08-23
+    # Python and AI tutorials
+  - handle: "@TwoMinutePapers"
+    creator: "Karoly Zsolnai-Feher"
+    platform: youtube
+    niche: ai-building
+    followers: 1830000   # read off the channel page header on youtube.com, 2026-08-23
+    # one AI research paper per video, awe-first framing
+  - handle: "@AndrejKarpathy"
+    creator: "Andrej Karpathy"
+    platform: youtube
+    niche: ai-building
+    followers: 1660000   # read off the channel page header on youtube.com, 2026-08-23
+    # long-form build-it-from-scratch lectures, only 17 videos
+  - handle: "@sentdex"
+    creator: "Harrison Kinsley"
+    platform: youtube
+    niche: ai-building
+    followers: 1440000   # read off the channel page header on youtube.com, 2026-08-23
+    # long-running Python and ML tutorials
+  - handle: "@CodeWithAntonio"
+    creator: "Antonio Erdeljac"
+    platform: youtube
+    niche: ai-building
+    followers: 419000   # read off the channel page header on youtube.com, 2026-08-23
+    # full-stack AI app builds, start to finish
+  - handle: "@AllAboutAI"
+    creator: "All About AI"
+    platform: youtube
+    niche: ai-building
+    followers: 226000   # read off the channel page header on youtube.com, 2026-08-23
+    # AI tool walkthroughs
+  - handle: "@NetworkChuck"
+    creator: "NetworkChuck"
+    platform: youtube
+    niche: solopreneur
+    followers: 5370000   # read off the channel page header on youtube.com, 2026-08-23
+    # tech skills framed as 'you can do this yourself'
+  - handle: "@AlexHormozi"
+    creator: "Alex Hormozi"
+    platform: youtube
+    niche: solopreneur
+    followers: 4430000   # read off the channel page header on youtube.com, 2026-08-23
+    # business mechanics, offers and pricing
+  - handle: "@PatFlynn"
+    creator: "Pat Flynn"
+    platform: youtube
+    niche: solopreneur
+    followers: 485000   # read off the channel page header on youtube.com, 2026-08-23
+    # long-running build-in-public, audience business
+  - handle: "@Vox"
+    creator: "Vox"
+    platform: youtube
+    niche: civic-tech
+    followers: 12700000   # read off the channel page header on youtube.com, 2026-08-23
+    # policy and systems explainers, card-stack structure
+  - handle: "@ClimateTown"
+    creator: "Rollie Williams"
+    platform: youtube
+    niche: civic-tech
+    followers: 712000   # read off the channel page header on youtube.com, 2026-08-23
+    # climate policy, comedy-forward
+  - handle: "@CityNerd"
+    creator: "Ray Delahanty"
+    platform: youtube
+    niche: civic-tech
+    followers: 414000   # read off the channel page header on youtube.com, 2026-08-23
+    # ranked-list urbanism, data-driven
+  - handle: "@RBReich"
+    creator: "Robert Reich"
+    platform: youtube
+    niche: civic-democracy
+    followers: 1580000   # read off the channel page header on youtube.com, 2026-08-23
+    # two-minute whiteboard explainers on inequality and policy
+  - handle: "@HealthyGamerGG"
+    creator: "Alok Kanojia"
+    platform: youtube
+    niche: adhd
+    followers: 3430000   # read off the channel page header on youtube.com, 2026-08-23
+    # psychiatrist on mental health broadly. BORDERLINE: not ADHD-specific, kept for the explainer structure
+  - handle: "@ADHDdude"
+    creator: "Ryan Wexelblatt"
+    platform: youtube
+    niche: adhd
+    followers: 92000   # read off the channel page header on youtube.com, 2026-08-23
+    # ADHD parenting, 'Confident Parents, Capable Kids'
+
+  # --- x ---
+  - handle: "@sama"
+    creator: "Sam Altman"
+    platform: x
+    niche: ai-building
+    followers: 5988566   # exact count via api.fxtwitter.com, read 2026-08-23
+    # short declarative posts on where AI goes
+  - handle: "@paulg"
+    creator: "Paul Graham"
+    platform: x
+    niche: general-viral
+    followers: 4941456   # exact count via api.fxtwitter.com, read 2026-08-23
+    # essayist; the canonical one-idea-plainly-stated account
+  - handle: "@naval"
+    creator: "Naval Ravikant"
+    platform: x
+    niche: general-viral
+    followers: 3931295   # exact count via api.fxtwitter.com, read 2026-08-23
+    # aphorism threads on wealth and judgement
+  - handle: "@RBReich"
+    creator: "Robert Reich"
+    platform: x
+    niche: civic-democracy
+    followers: 1468366   # exact count via api.fxtwitter.com, read 2026-08-23
+    # one economic fact per post
+  - handle: "@JamesClear"
+    creator: "James Clear"
+    platform: x
+    niche: general-viral
+    followers: 1398577   # exact count via api.fxtwitter.com, read 2026-08-23
+    # one-sentence habit ideas; the tightest atomic-post structure alive
+  - handle: "@ylecun"
+    creator: "Yann LeCun"
+    platform: x
+    niche: ai-building
+    followers: 1277641   # exact count via api.fxtwitter.com, read 2026-08-23
+    # AI argument conducted in public
+  - handle: "@waitbutwhy"
+    creator: "Tim Urban"
+    platform: x
+    niche: general-viral
+    followers: 900140   # exact count via api.fxtwitter.com, read 2026-08-23
+    # long visual essays teased into threads
+  - handle: "@morganhousel"
+    creator: "Morgan Housel"
+    platform: x
+    niche: general-viral
+    followers: 697987   # exact count via api.fxtwitter.com, read 2026-08-23
+    # short essays on behaviour and money
+  - handle: "@jasonfried"
+    creator: "Jason Fried"
+    platform: x
+    niche: solopreneur
+    followers: 4552197   # exact count via api.fxtwitter.com, read 2026-08-23
+    # short contrarian posts on how work should work
+  - handle: "@AlexHormozi"
+    creator: "Alex Hormozi"
+    platform: x
+    niche: solopreneur
+    followers: 1063174   # exact count via api.fxtwitter.com, read 2026-08-23
+    # business one-liners
+  - handle: "@dhh"
+    creator: "DHH"
+    platform: x
+    niche: solopreneur
+    followers: 835394   # exact count via api.fxtwitter.com, read 2026-08-23
+    # opinionated software and business posts
+  - handle: "@rauchg"
+    creator: "Guillermo Rauch"
+    platform: x
+    niche: ai-building
+    followers: 814028   # exact count via api.fxtwitter.com, read 2026-08-23
+    # builder notes from inside a dev-tools company
+  - handle: "@thejustinwelsh"
+    creator: "Justin Welsh"
+    platform: x
+    niche: solopreneur
+    followers: 586949   # exact count via api.fxtwitter.com, read 2026-08-23
+    # solopreneur tactics. The file already had his LinkedIn; this is the bigger account
+  - handle: "@amasad"
+    creator: "Amjad Masad"
+    platform: x
+    niche: ai-building
+    followers: 484615   # exact count via api.fxtwitter.com, read 2026-08-23
+    # builds Replit in public
+  - handle: "@rrhoover"
+    creator: "Ryan Hoover"
+    platform: x
+    niche: product-thinking
+    followers: 480403   # exact count via api.fxtwitter.com, read 2026-08-23
+    # Product Hunt founder
+  - handle: "@ShaanVP"
+    creator: "Shaan Puri"
+    platform: x
+    niche: solopreneur
+    followers: 474379   # exact count via api.fxtwitter.com, read 2026-08-23
+    # My First Million; business-idea posts
+  - handle: "@thesamparr"
+    creator: "Sam Parr"
+    platform: x
+    niche: solopreneur
+    followers: 382778   # exact count via api.fxtwitter.com, read 2026-08-23
+    # My First Million
+  - handle: "@marclou"
+    creator: "Marc Lou"
+    platform: x
+    niche: solopreneur
+    followers: 372935   # exact count via api.fxtwitter.com, read 2026-08-23
+    # ships small products in public with revenue screenshots
+  - handle: "@joulee"
+    creator: "Julie Zhuo"
+    platform: x
+    niche: product-thinking
+    followers: 351734   # exact count via api.fxtwitter.com, read 2026-08-23
+    # design and product management. NOTE: @jzhuo is a different person with 0 followers
+  - handle: "@jeremyphoward"
+    creator: "Jeremy Howard"
+    platform: x
+    niche: ai-building
+    followers: 326771   # exact count via api.fxtwitter.com, read 2026-08-23
+    # fast.ai; teaching-first AI
+  - handle: "@mckaywrigley"
+    creator: "Mckay Wrigley"
+    platform: x
+    niche: ai-building
+    followers: 228212   # exact count via api.fxtwitter.com, read 2026-08-23
+    # AI-coding demos
+  - handle: "@ADHD_Alien"
+    creator: "Pina (ADHD Alien)"
+    platform: x
+    niche: adhd
+    followers: 182575   # exact count via api.fxtwitter.com, read 2026-08-23
+    # ADHD comics
+  - handle: "@HowtoADHD"
+    creator: "Jessica McCabe"
+    platform: x
+    niche: adhd
+    followers: 132341   # exact count via api.fxtwitter.com, read 2026-08-23
+    # ADHD explainer plus lived experience
+  - handle: "@danidonovan"
+    creator: "Dani Donovan"
+    platform: x
+    niche: adhd
+    followers: 124230   # exact count via api.fxtwitter.com, read 2026-08-23
+    # ADHD comics and flowcharts
+  - handle: "@johncutlefish"
+    creator: "John Cutler"
+    platform: x
+    niche: product-thinking
+    followers: 116885   # exact count via api.fxtwitter.com, read 2026-08-23
+    # diagrams used as arguments about how teams work
+  - handle: "@BeauTFC"
+    creator: "Beau of The Fifth Column"
+    platform: x
+    niche: civic-democracy
+    followers: 109811   # exact count via api.fxtwitter.com, read 2026-08-23
+    # plainspoken civic explainers
+  - handle: "@csallen"
+    creator: "Courtland Allen"
+    platform: x
+    niche: solopreneur
+    followers: 70154   # exact count via api.fxtwitter.com, read 2026-08-23
+    # founder of Indie Hackers. NOTE: youtube.com/@indiehackers is a 13-subscriber copycat
+  - handle: "@ttorres"
+    creator: "Teresa Torres"
+    platform: x
+    niche: product-thinking
+    followers: 57017   # exact count via api.fxtwitter.com, read 2026-08-23
+    # continuous discovery habits
+  - handle: "@lissijean"
+    creator: "Melissa Perri"
+    platform: x
+    niche: product-thinking
+    followers: 49424   # exact count via api.fxtwitter.com, read 2026-08-23
+    # product strategy and org design
+  - handle: "@asmartbear"
+    creator: "Jason Cohen"
+    platform: x
+    niche: solopreneur
+    followers: 48327   # exact count via api.fxtwitter.com, read 2026-08-23
+    # long analytical posts on small-business strategy
+  - handle: "@bbalfour"
+    creator: "Brian Balfour"
+    platform: x
+    niche: product-thinking
+    followers: 37073   # exact count via api.fxtwitter.com, read 2026-08-23
+    # growth frameworks
+  - handle: "@pahlkadot"
+    creator: "Jennifer Pahlka"
+    platform: x
+    niche: civic-tech
+    followers: 37061   # exact count via api.fxtwitter.com, read 2026-08-23
+    # founder of Code for America; the strongest civic-tech name in this pass
+
+  # --- bluesky ---
+  - handle: "rbreich.bsky.social"
+    creator: "Robert Reich"
+    platform: bluesky
+    niche: civic-democracy
+    followers: 813600   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # one economic fact per post
+  - handle: "pkrugman.bsky.social"
+    creator: "Paul Krugman"
+    platform: bluesky
+    niche: civic-democracy
+    followers: 316185   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # economics as civic argument
+  - handle: "molly.wiki"
+    creator: "Molly White"
+    platform: bluesky
+    niche: civic-tech
+    followers: 237590   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # tech-accountability research turned into short posts
+  - handle: "edzitron.com"
+    creator: "Ed Zitron"
+    platform: bluesky
+    niche: ai-building
+    followers: 185008   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # the loudest AI-skeptic structure; useful as a counter-shape
+  - handle: "anildash.com"
+    creator: "Anil Dash"
+    platform: bluesky
+    niche: civic-tech
+    followers: 101475   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # tech and civic life
+  - handle: "kyla.bsky.social"
+    creator: "Kyla Scanlon"
+    platform: bluesky
+    niche: general-viral
+    followers: 56528   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # economics made legible
+  - handle: "simonwillison.net"
+    creator: "Simon Willison"
+    platform: bluesky
+    niche: ai-building
+    followers: 49341   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # working notes on building with LLMs
+  - handle: "doctorow.pluralistic.net"
+    creator: "Cory Doctorow"
+    platform: bluesky
+    niche: civic-tech
+    followers: 29432   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # daily links plus argument. He is DORMANT on x.com, active here
+  - handle: "pahlkadot.bsky.social"
+    creator: "Jennifer Pahlka"
+    platform: bluesky
+    niche: civic-tech
+    followers: 14260   # followersCount on the public AT Protocol profile, read 2026-08-23
+    # government that actually delivers
+
+  # --- mastodon ---
+  - handle: "@Gargron@mastodon.social"
+    creator: "Eugen Rochko"
+    platform: mastodon
+    niche: solopreneur
+    followers: 382285   # followers_count on the instance's public accounts API, read 2026-08-23
+    # built Mastodon in public; the largest account on the network
+  - handle: "@molly0xfff@hachyderm.io"
+    creator: "Molly White"
+    platform: mastodon
+    niche: civic-tech
+    followers: 133331   # followers_count on the instance's public accounts API, read 2026-08-23
+    # tech accountability
+  - handle: "@nixCraft@mastodon.social"
+    creator: "nixCraft"
+    platform: mastodon
+    niche: ai-building
+    followers: 119648   # followers_count on the instance's public accounts API, read 2026-08-23
+    # one Linux or tooling tip per post, very high cadence
+  - handle: "@pluralistic@mamot.fr"
+    creator: "Cory Doctorow"
+    platform: mastodon
+    niche: civic-tech
+    followers: 76448   # followers_count on the instance's public accounts API, read 2026-08-23
+    # larger here than his Bluesky
+  - handle: "@mcc@mastodon.social"
+    creator: "mcc"
+    platform: mastodon
+    niche: ai-building
+    followers: 40781   # followers_count on the instance's public accounts API, read 2026-08-23
+    # long technical threads
+  - handle: "@thomasfuchs@hachyderm.io"
+    creator: "Thomas Fuchs"
+    platform: mastodon
+    niche: ai-building
+    followers: 25137   # followers_count on the instance's public accounts API, read 2026-08-23
+    # short sharp software takes
+  - handle: "@jwz@mastodon.social"
+    creator: "jwz"
+    platform: mastodon
+    niche: general-viral
+    followers: 22428   # followers_count on the instance's public accounts API, read 2026-08-23
+    # one of the oldest personal-voice accounts on the web
+  - handle: "@rysiek@mstdn.social"
+    creator: "Michal 'rysiek' Wozniak"
+    platform: mastodon
+    niche: civic-tech
+    followers: 17214   # followers_count on the instance's public accounts API, read 2026-08-23
+    # digital rights and infrastructure politics
+  - handle: "@kissane@mas.to"
+    creator: "Erin Kissane"
+    platform: mastodon
+    niche: civic-tech
+    followers: 15613   # followers_count on the instance's public accounts API, read 2026-08-23
+    # long civic-internet essays. Last post 2026-07-13: quiet, not stopped. Re-check before collecting
+  - handle: "@danluu@mastodon.social"
+    creator: "Dan Luu"
+    platform: mastodon
+    niche: ai-building
+    followers: 13309   # followers_count on the instance's public accounts API, read 2026-08-23
+    # data-backed engineering essays
+  - handle: "@Edent@mastodon.social"
+    creator: "Terence Eden"
+    platform: mastodon
+    niche: civic-tech
+    followers: 9838   # followers_count on the instance's public accounts API, read 2026-08-23
+    # UK government digital, open standards
+
+  # --- substack ---
+  - handle: "@robertreich"
+    creator: "Robert Reich"
+    platform: substack
+    niche: civic-democracy
+    followers: 1100000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # daily short civic essays
+  - handle: "@paulkrugman"
+    creator: "Paul Krugman"
+    platform: substack
+    niche: civic-democracy
+    followers: 603000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # economics as civic argument
+  - handle: "@platformer"
+    creator: "Casey Newton"
+    platform: substack
+    niche: ai-building
+    followers: 176000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # tech-power reporting. NOTE: his personal profile @caseynewton has 3 subscribers
+  - handle: "@sahilbloom"
+    creator: "Sahil Bloom"
+    platform: substack
+    niche: solopreneur
+    followers: 165000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # essays on building a life and a business
+  - handle: "@kyla"
+    creator: "Kyla Scanlon"
+    platform: substack
+    niche: general-viral
+    followers: 165000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # economics essays
+  - handle: "@importai"
+    creator: "Jack Clark"
+    platform: substack
+    niche: ai-building
+    followers: 138000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # weekly AI research digest. NOTE: @jackclark is a 24-subscriber profile
+  - handle: "@morganhousel"
+    creator: "Morgan Housel"
+    platform: substack
+    niche: general-viral
+    followers: 81000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # behaviour and money
+  - handle: "@cutlefish"
+    creator: "John Cutler"
+    platform: substack
+    niche: product-thinking
+    followers: 60000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # The Beautiful Mess. NOTE: @johncutlefish does not resolve on Substack
+  - handle: "@garyvee"
+    creator: "Gary Vaynerchuk"
+    platform: substack
+    niche: solopreneur
+    followers: 48000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # business and attention
+  - handle: "@justinwelsh"
+    creator: "Justin Welsh"
+    platform: substack
+    niche: solopreneur
+    followers: 44000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # The Saturday Solopreneur; one tactic per issue
+  - handle: "@growthinreverse"
+    creator: "Chenell Basilio"
+    platform: substack
+    niche: solopreneur
+    followers: 41000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # reverse-engineers how individual newsletters grew
+  - handle: "@thezvi"
+    creator: "Zvi Mowshowitz"
+    platform: substack
+    niche: ai-building
+    followers: 37000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # exhaustive weekly AI roundups
+
+  # --- substack-notes ---
+  - handle: "@robertreich"
+    creator: "Robert Reich"
+    platform: substack-notes
+    niche: civic-democracy
+    followers: 1100000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # same profile as the substack row
+  - handle: "@paulkrugman"
+    creator: "Paul Krugman"
+    platform: substack-notes
+    niche: civic-democracy
+    followers: 603000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # same profile as the substack row
+  - handle: "@platformer"
+    creator: "Casey Newton"
+    platform: substack-notes
+    niche: ai-building
+    followers: 176000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # same profile as the substack row
+  - handle: "@cutlefish"
+    creator: "John Cutler"
+    platform: substack-notes
+    niche: product-thinking
+    followers: 60000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # same profile as the substack row
+  - handle: "@justinwelsh"
+    creator: "Justin Welsh"
+    platform: substack-notes
+    niche: solopreneur
+    followers: 44000   # subscriber count on the profile page substack.com/<handle>, read 2026-08-23
+    # same profile as the substack row
+
+  # --- instagram ---
+  - handle: "@garyvee"
+    creator: "Gary Vaynerchuk"
+    platform: instagram
+    niche: solopreneur
+    followers: 11890831   # edge_followed_by.count from instagram.com's own web_profile_info API, read 2026-08-23
+    # business and attention, high volume
+  - handle: "@codiesanchez"
+    creator: "Codie Sanchez"
+    platform: instagram
+    niche: solopreneur
+    followers: 3351678   # edge_followed_by.count from instagram.com's own web_profile_info API, read 2026-08-23
+    # boring-business acquisition. The file had her LinkedIn and TikTok, not this
+  - handle: "@gregisenberg"
+    creator: "Greg Isenberg"
+    platform: instagram
+    niche: solopreneur
+    followers: 145190   # edge_followed_by.count from instagram.com's own web_profile_info API, read 2026-08-23
+    # startup idea teardowns
+  - handle: "@tracyotsuka"
+    creator: "Tracy Otsuka"
+    platform: instagram
+    niche: adhd
+    followers: 38123   # edge_followed_by.count from instagram.com's own web_profile_info API, read 2026-08-23
+    # 'ADHD for Smart Ass Women'; the women-and-ADHD lane
+
+  # --- tiktok ---
+  - handle: "@rileybrown.ai"
+    creator: "Riley Brown"
+    platform: tiktok
+    niche: ai-building
+    followers: 636600   # followerCount anchored to the matching uniqueId in the profile's own embedded JSON, read 2026-08-23
+    # builds apps on camera with AI. This cell was empty before
+  - handle: "@howtoadhd"
+    creator: "Jessica McCabe"
+    platform: tiktok
+    niche: adhd
+    followers: 100700   # followerCount anchored to the matching uniqueId in the profile's own embedded JSON, read 2026-08-23
+    # her TikTok, much smaller than her YouTube
+  - handle: "@sharonsaysso"
+    creator: "Sharon McMahon"
+    platform: tiktok
+    niche: civic-democracy
+    followers: 33500   # followerCount anchored to the matching uniqueId in the profile's own embedded JSON, read 2026-08-23
+    # her TikTok, much smaller than her Instagram
+
 
 # Either bar clearing marks a post as an outlier worth studying.
 #
