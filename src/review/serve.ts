@@ -1011,12 +1011,16 @@ const server = createServer(async (req, res) => {
       try {
         const slug = url.searchParams.get("series") ?? "";
         // listChapters runs the same slug gate resolveDoc does. Joining the raw query param onto
-        // stories/ here let "../.." walk out and list any chapters/ directory on the disk.
-        const chapters = listChapters(slug);
+        // stories/ here let "../.." walk out and list any chapters/ directory on the disk. Its
+        // result is unused now, but the gate is why the call stays.
+        listChapters(slug);
         const beats = readSceneBeats(slug);
-        const asked = Number(url.searchParams.get("chapter") ?? "");
-        const latest = chapters.length ? (chapters[chapters.length - 1].chapter as number) : null;
-        const n = Number.isInteger(asked) && asked > 0 ? asked : beats?.chapter ?? latest;
+        // The one chapter this room actually produced, and nothing else. It used to fall back to
+        // the newest chapter on disk, which handed back one Muxin wrote herself in /story; the room
+        // then labelled her prose "the scene, from your beats" and set it in the AI purple. Her
+        // words are never the AI register. A ?chapter= override is gone with the fallback rather
+        // than gated: it had no caller, and any value it took could name a chapter she wrote.
+        const n = beats?.chapter ?? null;
         const chapter = n ? readFictionChapter(slug, n) : null;
         json(res, 200, {
           ok: true,

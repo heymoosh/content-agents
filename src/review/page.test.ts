@@ -10,7 +10,7 @@ import {
   JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
-  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
+  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
 } from "./page.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
@@ -491,8 +491,8 @@ test("stripJobFor: a job only shows in the room it lands in", () => {
 });
 
 test("stripJobFor: a Fiction failure suppresses the strip, so only Fiction's own failure card shows", () => {
-  // No job kind maps to Fiction yet (PR 6 adds the /story draft job), so the rule is exercised
-  // through the injectable resolver. One failure card per screen, never two.
+  // Fiction kinds map for real now, but job() here builds a Content-kind job, so the rule is
+  // exercised through the injectable resolver. One failure card per screen, never two.
   const toFiction = () => "Fiction" as const;
   const failed = [job({ id: "f", status: "failed", finishedAt: 1_000_000 })];
   assert.equal(stripJobFor(failed, "Fiction", 1_000_000, toFiction), null);
@@ -1088,11 +1088,38 @@ test("every route that enqueues a job arms the poll", () => {
     "/api/develop/start", "/api/develop/format", "/api/strategy/refresh-brief", "/api/strategy/insights",
     "/api/strategy/ask-insights", "/api/strategy/pull", "/api/outreach/scout", "/api/outreach/draft",
     "/api/outreach/message/revise", "/api/charles/draft", "/api/followups/draft-follow-up",
+    "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check",
   ]) {
     assert.equal(enqueuesJob(route), true, route + " queues a job, so it must arm the poll");
   }
   assert.equal(enqueuesJob("/api/status"), false, "a status write queues nothing");
   assert.equal(enqueuesJob("/api/outreach/mark-sent"), false);
+});
+
+// The Fiction room shipped its three buttons without adding their routes to the arming list, so
+// from an idle desk jobsPollDue stayed false and pressing Draft it, Second pass or Check the canon
+// showed no progress at all. Fiction does not self-heal either: its refresh only reloads the room,
+// never the jobs. Named on their own so a future edit cannot quietly drop them again.
+test("the Fiction room's three buttons arm the poll, so a scene it is writing is visible", () => {
+  for (const route of ["/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check"]) {
+    assert.equal(enqueuesJob(route), true, route + " enqueues a Fiction job, so it must arm the poll");
+    assert.ok(JOB_ENQUEUE_ROUTES.includes(route), route + " must be in the exported list");
+  }
+  // Reading a scene enqueues nothing, so it must not arm the poll.
+  assert.equal(enqueuesJob("/api/fiction/scene"), false, "a read queues nothing");
+  assert.equal(enqueuesJob("/api/fiction/doc"), false);
+});
+
+// The mirror convention again: the browser has its own copy of this list, and only the copy that
+// ships decides whether Muxin sees the strip.
+test("client <script> output: the Fiction routes reach the browser's arming list too", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+  const list = script.slice(script.indexOf("const JOB_ENQUEUE_ROUTES = ["));
+  const mirrored = list.slice(0, list.indexOf("]"));
+  for (const route of ["/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check"]) {
+    assert.ok(mirrored.includes('"' + route + '"'), route + " must ship in the client mirror");
+  }
 });
 
 // Finding 9: "Update it" on an Outreach thread showed up under Content as the Formatter, because
@@ -1179,6 +1206,36 @@ test("a failure reads as nothing written only when nothing was in fact written",
   assert.equal(fictionStatusWord([fjob({ status: "done" }), fjob({ id: "j2", status: "failed" })], true), "scene waiting on you");
   assert.equal(fictionStatusTone("nothing written").fg, JOB_COLORS.red);
   assert.equal(fictionStatusTone("drafting").fg, JOB_COLORS.ai);
+});
+
+// Rule 4 guard: Georgia is Muxin's own words, the AI purple is the machine's. The room used to
+// call "a scene exists" whatever chapter sat newest in stories/, so a chapter she wrote herself in
+// /story came back labelled "The scene, from your beats" and set in purple, with the composer
+// underneath it still asking for the beats it claimed to have used. A scene exists only when her
+// saved beats produced it.
+test("a chapter she wrote herself is never a scene from beats she never gave", () => {
+  const hers = { body: "The rope went slack in his hand." };
+  assert.equal(fictionHasScene("", hers), false);
+  assert.equal(fictionHasScene(null, hers), false);
+  assert.equal(fictionHasScene("   ", hers), false);
+  // With no beats the header stays honest and the composer keeps the room.
+  assert.equal(fictionStatusWord([], fictionHasScene("", hers)), "unwritten");
+  assert.equal(fictionStatusWord([fjob({ status: "done" })], fictionHasScene("", hers)), "unwritten");
+  // Beats saved but the draft not back yet is still not a scene.
+  assert.equal(fictionHasScene("Eli finds the cut line.", null), false);
+  assert.equal(fictionHasScene("Eli finds the cut line.", { body: "  " }), false);
+  assert.equal(fictionStatusWord([fjob({ status: "running" })], fictionHasScene("Eli finds the cut line.", null)), "drafting");
+  // Her beats and the prose they produced: that is a scene.
+  assert.equal(fictionHasScene("Eli finds the cut line.", hers), true);
+  assert.equal(fictionStatusWord([fjob({ status: "done" })], fictionHasScene("Eli finds the cut line.", hers)), "scene waiting on you");
+});
+
+// The mirror convention: fixing the exported copy and forgetting the inline one would leave the
+// browser rendering her prose in purple while the test suite reported green.
+test("client <script> output: the browser gates the scene on her beats too, not just the export", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("function ficHasScene(beats, chapter){"), "the client mirror must ship");
+  assert.ok(html.includes("const hasScene = ficHasScene(beats, chapter);"), "renderFiction must use the mirror");
 });
 
 test("Fix the line is offered only on a conflict the check can actually patch", () => {

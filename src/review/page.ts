@@ -284,6 +284,18 @@ export function fictionStatusWord(jobs: JobView[], hasScene: boolean): FictionSt
   return hasScene ? "scene waiting on you" : "unwritten";
 }
 
+// "A scene exists" means one was written FROM her saved beats, never "some chapter file sits in
+// stories/". Without this gate a series she wrote herself in /story reads back as the room's own
+// output: the header says "scene waiting on you", the composer still asks for beats, and her
+// chapter renders under "The scene, from your beats" in the AI purple. Georgia is her voice,
+// purple is the machine's, and her prose never wears the machine's colour.
+export function fictionHasScene(
+  beats: string | null | undefined,
+  chapter: { body?: string } | null | undefined,
+): boolean {
+  return !!(String(beats ?? "").trim() && chapter && String(chapter.body ?? "").trim());
+}
+
 export function fictionStatusTone(word: FictionStatus): { fg: string; bg: string; bd: string } {
   if (word === "nothing written") return { fg: JOB_COLORS.red, bg: "#fdf1ef", bd: "#ecc9c0" };
   if (word === "drafting") return { fg: JOB_COLORS.ai, bg: "#efeafd", bd: "#ded5e9" };
@@ -399,13 +411,14 @@ export const JOB_ENQUEUE_ROUTES: readonly string[] = [
   "/api/strategy/ask-insights", "/api/strategy/pull",
   "/api/outreach/scout", "/api/outreach/draft", "/api/outreach/message/revise",
   "/api/charles/draft", "/api/followups/draft-follow-up",
+  "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check",
 ];
 export function enqueuesJob(path: string): boolean {
   return JOB_ENQUEUE_ROUTES.includes(path);
 }
 
-// `roomOf` is injectable only so the Fiction-failure rule below is testable today: no job kind maps
-// to Fiction yet (PR 6 adds the /story draft job). The client always uses the default.
+// `roomOf` is injectable only so the Fiction-failure rule below can be exercised against a made-up
+// kind. Fiction kinds map for real now (see jobRoom above), so the client always uses the default.
 export function stripJobFor(
   jobs: JobView[], room: JobRoom, now: number, roomOf: (kind: string) => JobRoom = jobRoom,
 ): JobView | null {
@@ -1785,8 +1798,8 @@ async function askBrief(){
 $("#briefAskBtn").addEventListener("click", askBrief);
 
 // "Refresh brief": the FULL /strategy skill as a background job (Muxin, 2026-07-16: the brief
-// never refreshes unless he runs /strategy in a terminal). Same live-elapsed ticker pattern as
-// askInsights — this genuinely takes minutes, so an honest ticking count beats a fake ETA.
+// never refreshes unless he runs /strategy in a terminal). It genuinely takes minutes, and the one
+// measured count for that wait is the room strip's, not a clock started here.
 async function refreshBriefRun(){
   const btn = $("#briefRefreshBtn");
   btn.disabled = true;
@@ -1903,9 +1916,9 @@ $("#rawRefreshBtn").addEventListener("click", loadRaw);
 
 // "Pull fresh now" — the real pull (npm run pull -- --ingest), queued through the same job system
 // as every other Claude/subprocess spawn in this GUI, so it gets a persisted log + heartbeat even
-// though it can take minutes (real Chrome, saved LinkedIn/X/Substack sessions). A ticking elapsed
-// count (not a fixed ETA) mirrors askInsights' own ticker above — card a14693da's fix for the same
-// "don't undersell an honestly-variable wait" problem.
+// though it can take minutes (real Chrome, saved LinkedIn/X/Substack sessions). Card a14693da took
+// the fixed ETA off this wait rather than underselling an honestly variable one; the honest count
+// that replaced it is the room strip's, and nothing here starts a second one.
 async function pullFresh(){
   const btn = $("#rawPullBtn");
   btn.disabled = true; $("#rawRefreshBtn").disabled = true;
@@ -2656,6 +2669,9 @@ function ficStatusWord(hasScene){
   if(mine.some(j=>j.status==="queued"||j.status==="running") && !hasScene) return "drafting";
   return hasScene ? "scene waiting on you" : "unwritten";
 }
+function ficHasScene(beats, chapter){
+  return !!(String(beats||"").trim() && chapter && String(chapter.body||"").trim());
+}
 function ficStatusTone(w){
   if(w==="nothing written") return {fg:JC.red, bg:"#fdf1ef", bd:"#ecc9c0"};
   if(w==="drafting") return {fg:JC.ai, bg:"#efeafd", bd:"#ded5e9"};
@@ -2703,7 +2719,7 @@ function renderFiction(){
   const chapter = sc.chapter || null;
   const beats = (sc.beats||"").trim();
   const rep = sc.continuity || null;
-  const hasScene = !!(chapter && (chapter.body||"").trim());
+  const hasScene = ficHasScene(beats, chapter);
   const word = ficStatusWord(hasScene);
   const tone = ficStatusTone(word);
   const passJob = ficPassJob();
@@ -3225,7 +3241,7 @@ function jobsPollDue(jobs, now, armedUntil){
   if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
   return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
 }
-const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/develop/start","/api/develop/reply","/api/develop/format","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up"];
+const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/develop/start","/api/develop/reply","/api/develop/format","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check"];
 function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path); }
 function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
