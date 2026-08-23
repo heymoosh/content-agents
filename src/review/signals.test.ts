@@ -37,6 +37,26 @@ The funnel goal is unchanged.
 ## Directives for atomization
 `;
 
+// BOTH wordings of the INSUFFICIENT status must parse, forever. src/strategy/snapshot.ts wrote the
+// em-dash form until 2026-08-23 and the comma form after (root CLAUDE.md rule 5), and briefs already
+// in briefs/ are never rewritten. The status cell is captured as free text rather than matched
+// against a literal, so this is a guard on that staying true, not on the wording itself.
+test("parseBriefSignals reads the INSUFFICIENT status in both the old and the current wording", () => {
+  const table = (status: string) =>
+    ["## Data confidence", "", "| Channel | Posts | Weeks of data | Status |", "|---|---|---|---|", `| threads | 3 | 2 | ${status} |`, ""].join("\n");
+  const oldForm = parseBriefSignals(table("INSUFFICIENT (<4 wks) — directional only")).confidence[0];
+  const newForm = parseBriefSignals(table("INSUFFICIENT (<4 wks), directional only")).confidence[0];
+  for (const read of [oldForm, newForm]) {
+    assert.equal(read.channel, "threads");
+    assert.equal(read.posts, 3);
+    assert.equal(read.weeks, 2);
+    assert.match(read.status, /INSUFFICIENT/);
+  }
+  // the wording is carried through verbatim, never normalized to one form or the other
+  assert.equal(oldForm.status, "INSUFFICIENT (<4 wks) — directional only");
+  assert.equal(newForm.status, "INSUFFICIENT (<4 wks), directional only");
+});
+
 test("parseBriefSignals reads the confidence table and the marked recommendations", () => {
   const { confidence, recommendations } = parseBriefSignals(BRIEF);
   assert.deepEqual(confidence[0], { channel: "bluesky", posts: 73, weeks: 28, status: "OK" });

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { routingMd } from "../strategy/route.js";
 import {
   checkDerivative,
   parseRoutingDecisions,
@@ -79,6 +80,8 @@ describe("checkDerivative: spin default-on angle consistency", () => {
 });
 
 describe("platform-fit hard gate: derivatives vs routing.md", () => {
+  // The HISTORICAL routing.md shape (em-dash heading, em-dash rationales), still on disk in every
+  // folder routed before 2026-08-23. Those files are never rewritten, so this must keep parsing.
   const ROUTING_MD = [
     "# Routing — civic-tech + human-ai — 2026-07-04",
     "",
@@ -90,6 +93,27 @@ describe("platform-fit hard gate: derivatives vs routing.md", () => {
     "| community:democratic-resilience | include | — | rule | editorial rule: always route here |",
     "| quote-card | include | — | always | format asset — always generated |",
   ].join("\n");
+
+  // ROUND TRIP against the REAL writer. parseRoutingDecisions splits on "|" and reads the platform
+  // and decision cells, so it is punctuation-agnostic by construction, but "by construction" is what
+  // was also believed about treatment.ts's parsePillars right before a heading change broke it.
+  // Driving route.ts's own routingMd() proves it rather than assuming it.
+  test("parseRoutingDecisions round-trips routing.md exactly as route.ts writes it", () => {
+    const md = routingMd(
+      ["civic-tech", "human-ai"],
+      [
+        { platform: "x", decision: "include", score: 1.2, confidence: "data", rationale: "config default: include, data shows 1.20x platform norm (n=5)", pillars: ["human-ai"] },
+        { platform: "linkedin", decision: "skip", score: null, confidence: "rule", rationale: "hard veto: brief says never route here", pillars: ["civic-tech"] },
+        { platform: "quote-card", decision: "include", score: null, confidence: "always", rationale: "format asset, always generated", pillars: ["human-ai"] },
+      ],
+    );
+    const decisions = parseRoutingDecisions(md);
+    assert.equal(decisions.get("x"), "include");
+    assert.equal(decisions.get("linkedin"), "skip");
+    assert.equal(decisions.get("quote-card"), "include");
+    // and the header/separator rows are still skipped, not read as platforms
+    assert.equal(decisions.has("platform"), false);
+  });
 
   test("parseRoutingDecisions reads platform -> decision even when the rationale column has embedded pipes", () => {
     const decisions = parseRoutingDecisions(ROUTING_MD);
