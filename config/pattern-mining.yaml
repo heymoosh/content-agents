@@ -36,6 +36,19 @@ niches:
   - adhd               # ADHD brain, executive function, working with it not against it
   - civic-tech         # civic work, democracy, real social problems, tech for public good
   - solopreneur        # one-person business, indie building, audience as distribution
+  # Added 2026-08-23 with the pinterest collector. Pinterest's single richest archive in Muxin's
+  # direction is tip-graphics: text typeset onto an image, teaching one small method. The probe's
+  # productivity-graphic accounts (creativemarket, piktochart, freedomapp) sit at a pre-2020 median
+  # of 8,581 saves, the highest of any niche measured, and they are not ADHD posts and not
+  # solopreneur posts. Giving them their own niche is what keeps them findable.
+  - productivity       # tip-graphics, method infographics, one small system per image
+  # NOT a niche Muxin writes in. It is the DECAY CONTROL: lifestyle and home-decor accounts
+  # (marthastewart, hgtv, food52, etsy, thepioneerwoman, buzzfeed, nytimes) collected only so the
+  # 2020 collapse can be measured against something. Lifestyle decayed about 20x over the same
+  # span the informational niches decayed about 2,000x, and without this control that 2,000x could
+  # be read as ordinary platform-wide decline. Never draft against these; never fold them into
+  # general-viral, because that would stop them being queryable as a control.
+  - lifestyle-control
   # Posts that won on STRUCTURE alone, any topic. Muxin's words: "anything that's just viral in
   # general because it can work across niches." These are shape donors, not topic matches. Judge
   # them on how far they beat their own author's baseline, never on subject.
@@ -2581,6 +2594,271 @@ accounts:
   #     score 5, 3, 3 and 2. That is effectively dead. HN is the wrong platform for Muxin's civic
   #     work and this row exists to say so rather than to leave the question open.
 
+  # ------------------------------------------------------------------------------------------
+  # PINTEREST, added 2026-08-23. Read this before adding a row or reading a number off one.
+  #
+  # These accounts are seeded for their ARCHIVE, not their current feed. Pinterest's delivery to
+  # informational content collapsed around 2020: ADDitude Magazine's 2017 pins carry 15,201 and
+  # 14,710 saves and its 2026 pins carry 1 to 3, and Creative Market's 2016 pin carries 22,454
+  # against about 40 on its 2025 boards. A lifestyle control decayed about 20x over the same span
+  # while these niches decayed about 2,000x. Nothing collected here is evidence about what works
+  # on Pinterest today, and it must never be presented that way.
+  #
+  # What it IS evidence about: the shape of a tip-graphic that thousands of people saved. The best
+  # ADHD pin measured carries 104,864 saves, ahead of the best home-decor pin's 93,185. That is
+  # the same format Muxin already produces as quote cards, which is the whole reason this list
+  # exists.
+  #
+  # `boards` is REQUIRED in practice rather than optional. Pinterest has no logged-out discovery:
+  # /search/pins/, /ideas/ and /today/ all answer 200 with zero pins. Leaving it off makes the
+  # collector read the account's boards off its profile page, which works but collects whatever
+  # happens to be surfaced there. The slugs below are the ones the probe verified.
+  #
+  # A board slug that does not exist ALSO answers 200, with zero pins. The collector reports that
+  # as an explicit ZERO PIN IDS line rather than as a quiet zero, so read the run output.
+  #
+  # Every followers value here was read off the profile's own server-rendered payload on
+  # pinterest.com, which is the platform itself, per the STANDING RULING at the top of this file.
+  # None came from a creator's website. `creator` is not decoration either: the collector refuses
+  # to collect when the page's display name conflicts with it, which is what catches a vanity
+  # handle belonging to someone else. /jasminestar/ resolves to "Sharon Stewart", 36 followers.
+  # ------------------------------------------------------------------------------------------
+  - handle: "@additudemag"
+    creator: "ADDitude Magazine"
+    platform: pinterest
+    niche: adhd
+    followers: 96671   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - tips-for-adhd-adults
+      - executive-functions-at-school-2026
+      - womens-health-month-2026
+      - one-thing-today
+      - additude-free-downloads
+  - handle: "@addfreesources"
+    creator: "ADD freeSources"
+    platform: pinterest
+    niche: adhd
+    followers: 24216   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - organization-techniques-for-adhd
+  - handle: "@kiddiematters"
+    creator: "Yanique {Kiddie Matters}"
+    platform: pinterest
+    niche: adhd
+    followers: 29696   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - adhd-strategies-and-resources
+  - handle: "@sandrarief"
+    creator: "Sandra Rief"
+    platform: pinterest
+    niche: adhd
+    followers: 4467   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - add-adhd-for-teachers
+  - handle: "@martynamarmar"
+    creator: "Martyna Mar-Mar"
+    platform: pinterest
+    niche: adhd
+    followers: 101   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - adhd-organizationchartslists
+  - handle: "@autismparentmag"
+    creator: "Autism Parenting Magazine"
+    platform: pinterest
+    niche: adhd
+    followers: 24898   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - adhd
+  - handle: "@pipshints"
+    creator: "Pipshints\u2503Study Tips, Study Motivation and Lifestyle Hacks"
+    platform: pinterest
+    niche: adhd
+    followers: 78   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - adhd-tips
+  - handle: "@creativemarket"
+    creator: "Creative Market"
+    platform: pinterest
+    niche: productivity
+    followers: 1850987   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - productivity-infographics-and-quotes
+      - social-media-templates
+      - summer-inspiration
+  - handle: "@freedomapp"
+    creator: "Freedom"
+    platform: pinterest
+    niche: productivity
+    followers: 143   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - productivity-via-infographics
+  - handle: "@piktochart"
+    creator: "Piktochart"
+    platform: pinterest
+    niche: productivity
+    followers: 46836   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - productivity-inspiration-creativity-infographics
+  - handle: "@tailwind"
+    creator: "Tailwind | #1 Approved Partner"
+    platform: pinterest
+    niche: productivity
+    followers: 330356   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - solopreneur-productivity-tips
+  - handle: "@lauren_taylar"
+    creator: "Lauren Taylar | Squarespace Website Designer + SEO Strategist"
+    platform: pinterest
+    niche: solopreneur
+    followers: 5071   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - business-tips-and-advice-for-solopreneurs
+  - handle: "@guykawasaki"
+    creator: "Guy Kawasaki"
+    platform: pinterest
+    niche: solopreneur
+    followers: 469676   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - business-tips-for-entreprenuers
+  - handle: "@constantcontact"
+    creator: "Constant Contact"
+    platform: pinterest
+    niche: solopreneur
+    followers: 150292   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - business-tips-for-small-business-owners
+      - small-business-now-report-2025
+      - email-marketing
+  - handle: "@ladair82"
+    creator: "Lawrence Adair"
+    platform: pinterest
+    niche: product-thinking
+    followers: 3421   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - product-management
+  - handle: "@jmnickey"
+    creator: "John Nickey"
+    platform: pinterest
+    niche: product-thinking
+    followers: 239   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - product-management
+  - handle: "@wired"
+    creator: "WIRED"
+    platform: pinterest
+    niche: ai-building
+    followers: 189600   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - artificial-intelligence
+  - handle: "@f5th"
+    creator: "Colleen"
+    platform: pinterest
+    niche: ai-building
+    followers: 20271   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - ai-artificial-intelligence
+  - handle: "@sabriman096"
+    creator: "SabriMan"
+    platform: pinterest
+    niche: ai-building
+    followers: 1   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - ai-agents
+  - handle: "@tinashemakwande"
+    creator: "tmak"
+    platform: pinterest
+    niche: civic-tech
+    followers: 0   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - voter-education
+  - handle: "@allison_dupuis"
+    creator: "Allison Dupuis"
+    platform: pinterest
+    niche: civic-tech
+    followers: 5352   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - go-vote-voting-design-illustration-inspiration
+  - handle: "@palmtopinedesign"
+    creator: "Nicole | Palm to Pine Design"
+    platform: pinterest
+    niche: civic-tech
+    followers: 2513   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - social-justice-political-and-vote-yard-signs
+  - handle: "@jenna7996"
+    creator: "Jenna Miller"
+    platform: pinterest
+    niche: civic-tech
+    followers: 28   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - vote-poster-inspiration
+  - handle: "@ginferrara"
+    creator: "Gin Ferrara"
+    platform: pinterest
+    niche: civic-tech
+    followers: 333   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - election-design
+  - handle: "@marthastewart"
+    creator: "Martha Stewart"
+    platform: pinterest
+    niche: lifestyle-control
+    followers: 1867979   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - letscelebrate-pin-party
+      - american-made
+      - appetizers-and-hors-doeuvres-recipes
+  - handle: "@hgtv"
+    creator: "HGTV"
+    platform: pinterest
+    niche: lifestyle-control
+    followers: 5597924   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - the-best-of-hgtvcom
+      - hgtv-smart-home
+  - handle: "@food52"
+    creator: "Food52"
+    platform: pinterest
+    niche: lifestyle-control
+    followers: 486552   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - gifts-for-dessert-people
+      - gifts-for-dinner-partiers
+  - handle: "@etsy"
+    creator: "Etsy"
+    platform: pinterest
+    niche: lifestyle-control
+    followers: 11235888   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - artwork-for-your-home
+      - bath-and-beauty
+  - handle: "@thepioneerwoman"
+    creator: "Ree Drummond | The Pioneer Woman"
+    platform: pinterest
+    niche: lifestyle-control
+    followers: 886438   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - pw-friends
+      - home-decor-fantasies
+  - handle: "@buzzfeed"
+    creator: "BuzzFeed"
+    platform: pinterest
+    niche: lifestyle-control
+    followers: 6043527   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - bf-shopping
+      - bf-quiz
+      - celebrities
+  - handle: "@nytimes"
+    creator: "The New York Times"
+    platform: pinterest
+    niche: lifestyle-control
+    followers: 391697   # read off the profile's own server-rendered payload on pinterest.com, 2026-08-23
+    boards:
+      - fashion
+      - met-gala-2023
+
+
 # Either bar clearing marks a post as an outlier worth studying.
 #
 # view_follower_ratio: views divided by the account's follower count. Views only. A post with no
@@ -2660,6 +2938,27 @@ outlier_thresholds:
   instagram:
     view_follower_ratio: 12.0   # starting guess, tune once real data lands; reels reach ignores follower count
     baseline_multiple: 4.0      # starting guess, tune once real data lands
+  # THERE IS DELIBERATELY NO pinterest ENTRY HERE. Do not add one without reading this.
+  #
+  # Two reasons, and neither is a missing number waiting to be guessed.
+  #
+  #   1. The ratio bar can never fire. Logged out, Pinterest publishes no view count at all, so
+  #      view_follower_ratio has nothing to divide.
+  #   2. The baseline bar would be dishonest. An account-level median pools every era, and on
+  #      Pinterest the eras are three orders of magnitude apart on the SAME account: ADDitude
+  #      Magazine's 2017 pins carry 15,201 saves and its 2026 pins carry 1 to 3. Every pre-2020
+  #      pin would clear any bar and every recent pin would fail it, which measures the calendar,
+  #      not the post. Save counts are also lifetime running totals with no window, so an old pin
+  #      has simply had longer to accrue them.
+  #
+  # Because there is no entry, the corpus report prints "no thresholds" for pinterest accounts and
+  # scores nothing, which is the honest state. Pinterest entries also carry sample.role "unranked",
+  # so their siblings are never used as a denominator either. Ask the era-scoped question instead:
+  #   npm run patterns:pinterest -- rank --era pre-2020 --niche productivity
+  #
+  # A real pinterest bar would need era-scoped baselines, which AccountBaseline cannot express
+  # today: it is keyed on platform plus handle with no era dimension. That is a schema change, not
+  # a config change.
 
 # How big a corpus is worth analyzing. Muxin's stated range.
 targets:

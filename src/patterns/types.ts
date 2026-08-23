@@ -26,11 +26,30 @@ export const PLATFORMS = [
   // separate from "substack" on purpose: a Note and an essay are different products, and pooling
   // them would put an essay's baseline under a Note.
   "substack-notes",
+  // Added 2026-08-23. Pinterest is collected for its ARCHIVE, not its feed. A probe of 459 pins
+  // across 31 accounts found that delivery to informational content collapsed around 2020: the
+  // same account, same niche, same format, carries 15,201 saves on a 2017 pin and 1 to 3 saves on
+  // a 2026 one. So a pinterest entry is only meaningful alongside its `era`, and pinterest posts
+  // are never ranked in one pool with mixed eras. See src/patterns/era.ts.
+  "pinterest",
 ] as const;
 
 export type Platform = (typeof PLATFORMS)[number];
 
 export type PostKind = "text" | "video";
+
+// Which delivery era a post went up in. Derived from `posted_at`, never recorded independently,
+// and computed by `eraFor` in src/patterns/era.ts, which is also where the boundaries are argued.
+//
+// The buckets are Pinterest's, because Pinterest is where they were measured and where the split
+// is enormous. They are still recorded on every platform, because a 2016 post and a 2026 post are
+// not comparable anywhere and a reader should never have to parse a date to notice.
+//
+// "unknown" is a real answer, not a placeholder: it means the platform published no date, or
+// published one that could not be read. It is never filled in by inference.
+export const POST_ERAS = ["pre-2020", "2020-2022", "2023-plus", "unknown"] as const;
+
+export type PostEra = (typeof POST_ERAS)[number];
 
 // What `body` actually holds on a video entry, so nothing downstream has to guess.
 //
@@ -58,6 +77,22 @@ export interface CorpusMetrics {
   // outlier score: a 0.95 ratio on a 12-point post and on a 12,000-point post are the same number
   // and mean different things, so it is context a reader weighs, never a bar the code fires on.
   upvote_ratio?: number | null;
+  // Pinterest only, and it is a DIFFERENT quantity from `shares`. Read twice.
+  //
+  // `shares` on a pinterest entry holds that copy's own repin count: how many people saved THIS
+  // pin, which is the number attributable to the account that posted it. `aggregate_saves` is
+  // Pinterest's global aggregate across every copy of the same image anywhere on the platform, so
+  // it measures whether the IMAGE travelled, not whether this account's post did. One collected
+  // pin reads 93,185 aggregate against 2,723 repins on the same copy.
+  //
+  // For mining the shape of a graphic, aggregate is the honest number. For judging a creator,
+  // `shares` is. Never add the two, and never quote one as the other.
+  //
+  // THE CUMULATIVE CONFOUND. Both are LIFETIME running totals with no time window, so a 2016 pin
+  // has had ten years to accrue and a 2026 pin has had weeks. A raw comparison across eras
+  // measures elapsed time as much as it measures quality. Comparisons are only honest within one
+  // account, or against a same-era control. This is why `era` exists.
+  aggregate_saves?: number | null;
 }
 
 // Every form a post can take on the page. This is the axis the analysis compares on - which form
@@ -145,7 +180,17 @@ export interface CorpusMedia {
 // "baseline" is defined here for completeness, but the unbiased sample itself does not enter the
 // corpus. It lives in data/patterns/baselines.jsonl as one AccountBaseline per account, because a
 // few hundred ordinary posts per community would drown the collected winners the analysis reads.
-export type SampleRole = "winner" | "baseline";
+// "unranked" is the third answer, added 2026-08-23 for Pinterest and available to any collector
+// that needs it. It means the entries came off a listing that is not a ranking at all: a
+// pinterest board's first server-rendered page is roughly the order the owner saved things, so it
+// carries the board's best pin and its worst side by side. That is neither a winners list nor an
+// unbiased performance sample, and saying either would be a lie in a different direction.
+//
+// What it tells a downstream step: do not read these as "this creator's best posts", and do not
+// use their median as a denominator either, because on pinterest the pool spans eras whose
+// medians differ by three orders of magnitude. Pinterest deliberately has no entry in
+// `outlier_thresholds`, so nothing scores these automatically. See config/pattern-mining.yaml.
+export type SampleRole = "winner" | "baseline" | "unranked";
 
 export interface CorpusSample {
   // The platform listing the post came out of, in that platform's own words: "top", "new", "hot".
@@ -169,6 +214,13 @@ export interface CorpusEntry {
   niche: string;
   url: string;
   posted_at: string | null;
+  // Which delivery era `posted_at` falls in. Absent on entries collected before this field
+  // existed. Present, it must agree with `posted_at`: the collect step recomputes it and rejects
+  // an entry where the two disagree, so it can never drift into a second, wrong source of truth.
+  //
+  // This is the field a downstream consumer filters on. "Top pinterest tip-graphics 2014-2019" is
+  // era === "pre-2020", and it is one jq filter rather than a date parse.
+  era?: PostEra;
   collected_at: string;
   kind: PostKind;
   // Full post text, or the pasted transcript for a video.
@@ -296,6 +348,11 @@ export interface AccountSeed {
   platform: Platform;
   niche: string;
   followers: number | null;
+  // Board slugs to collect from, pinterest only. Absent everywhere else, and absent on a pinterest
+  // row means "read the account's boards off its profile page". It exists because pinterest has no
+  // logged-out discovery at all: /search/pins/, /ideas/ and /today/ all answer 200 with zero pins,
+  // so a seeded list is the primary path rather than a convenience.
+  boards?: string[];
 }
 
 // One verbatim opener, kept separately from the shape libraries because it is stored WORD FOR

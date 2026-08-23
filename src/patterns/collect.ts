@@ -12,9 +12,11 @@ import { repoRoot } from "../db/db.js";
 import { CORPUS_PATH, INBOX_DIR, appendEntries, groupByAccount, makeId, readCorpus } from "./corpus.js";
 import { BASELINES_PATH, loadBaselineIndex } from "./baselines.js";
 import { classifyOutlier, isWinnersOnlySample } from "./outliers.js";
+import { countByEra, eraFor, isPostEra } from "./era.js";
 import {
   PLATFORMS,
   MEDIA_FORMS,
+  POST_ERAS,
   type CorpusEntry,
   type CorpusMedia,
   type CorpusSample,
@@ -23,6 +25,7 @@ import {
   type MediaAspect,
   type MediaForm,
   type Platform,
+  type PostEra,
 } from "./types.js";
 
 const CONFIG_PATH = join(repoRoot, "config", "pattern-mining.yaml");
@@ -86,6 +89,24 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
   }
   const postedAt = r.posted_at ?? null;
   if (postedAt !== null && typeof postedAt !== "string") errors.push("posted_at must be an ISO date string or null");
+  // `era` is optional, so entries staged before it existed still validate. When it IS there it has
+  // to agree with posted_at, because two fields describing the same fact is exactly how a corpus
+  // grows a second, wrong source of truth. A staged entry that disagrees is rejected rather than
+  // silently corrected, so the collector that produced it gets fixed.
+  const rawEra = r.era ?? null;
+  let era: PostEra | null = null;
+  if (rawEra !== null) {
+    if (!isPostEra(rawEra)) {
+      errors.push(`era ${JSON.stringify(rawEra)} is not one of: ${POST_ERAS.join(", ")}`);
+    } else {
+      const derived = eraFor(typeof postedAt === "string" ? postedAt : null);
+      if (derived !== rawEra) {
+        errors.push(`era ${JSON.stringify(rawEra)} disagrees with posted_at ${JSON.stringify(postedAt)}, which is ${JSON.stringify(derived)}`);
+      } else {
+        era = rawEra;
+      }
+    }
+  }
 
   const rawMetrics = r.metrics;
   const metrics = { views: null, likes: null, comments: null, shares: null, followers: null } as CorpusEntry["metrics"];
@@ -109,6 +130,17 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
         errors.push("metrics.upvote_ratio must be a number between 0 and 1, or null");
       } else {
         metrics.upvote_ratio = upvoteRatio;
+      }
+    }
+    // Optional and pinterest-only. Kept out of the loop above on purpose: it is NOT one of the
+    // five comparable metrics, it is a global aggregate across every copy of an image, and
+    // entryScore must never pick it up as if it were this account's own number.
+    const aggregateSaves = (rawMetrics as Record<string, unknown>).aggregate_saves ?? null;
+    if (aggregateSaves !== null) {
+      if (typeof aggregateSaves !== "number" || !Number.isFinite(aggregateSaves) || aggregateSaves < 0) {
+        errors.push("metrics.aggregate_saves must be a non-negative number or null");
+      } else {
+        metrics.aggregate_saves = aggregateSaves;
       }
     }
   }
@@ -178,8 +210,8 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
       if (typeof sm.listing !== "string" || sm.listing.trim() === "") {
         errors.push("sample.listing must name the listing the post came from");
       }
-      if (sm.role !== "winner" && sm.role !== "baseline") {
-        errors.push('sample.role must be "winner" or "baseline"');
+      if (sm.role !== "winner" && sm.role !== "baseline" && sm.role !== "unranked") {
+        errors.push('sample.role must be "winner", "baseline", or "unranked"');
       }
       const window = sm.window ?? null;
       if (window !== null && typeof window !== "string") errors.push("sample.window must be a string or null");
@@ -214,6 +246,7 @@ export function validateEntry(raw: unknown, config: PatternMiningConfig): { entr
     transcript_source: transcriptSource as CorpusEntry["transcript_source"],
     metrics,
   };
+  if (era !== null) entry.era = era;
   if (typeof r.title === "string") entry.title = r.title;
   if (media) entry.media = media;
   if (sample) entry.sample = sample;
@@ -274,6 +307,13 @@ function printCorpusReport(corpus: CorpusEntry[], config: PatternMiningConfig, b
   console.log(`\nCorpus: ${corpus.length} entries across ${groups.size} accounts (target ${config.targets.corpus_size_min}-${config.targets.corpus_size_max}).`);
   if (corpus.length < config.targets.corpus_size_min) {
     console.log(`Below the ${config.targets.corpus_size_min}-entry floor. Collect more before running the analysis step.`);
+  }
+  // Printed unconditionally so no one reads a corpus count as one comparable population. On
+  // pinterest the eras differ by three orders of magnitude, and the same split is worth seeing
+  // anywhere.
+  const eras = [...countByEra(corpus).entries()].filter(([, count]) => count > 0);
+  if (eras.length > 1) {
+    console.log(`By era: ${eras.map(([era, count]) => `${era} ${count}`).join(", ")}. Eras are not comparable in one ranking.`);
   }
 
   console.log("\nAccount                              Platform    Entries  Outliers");
