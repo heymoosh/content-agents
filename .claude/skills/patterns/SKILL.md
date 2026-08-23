@@ -410,6 +410,14 @@ gitignored, same as the corpus.
    `multiple`, and the `reason` naming which test fired. That is the whole selection step. Do not
    re-judge which posts are outliers; the script owns that call.
 
+   **The `admissible` field, and what it is not.** Records in `analyses.jsonl` carry `admissible`,
+   which is true exactly when `gate` is `ADMITTED`. It was called `outlier` in earlier passes and
+   was renamed once its meaning stopped matching `classifyOutlier` in `src/patterns/outliers.ts`.
+   Do not read it as that function's verdict. A post can be a script-outlier and still not
+   admissible, because admission also requires clearing its platform's raw-popularity floor and
+   having a complete body. The per-record `reason` prose is historical working notes and may
+   describe a retired gate; trust `gate`, `popularity` and `platform_floor` instead.
+
 2. **If the outlier set is empty or tiny, say so and stop.** The usual causes are a corpus under
    the size target, an account with fewer than three other scored entries (so `baselineMultiple`
    cannot compute), or a platform with no public views. Name the actual cause and recommend either
@@ -486,6 +494,20 @@ gitignored, same as the corpus.
 Goal: the 5 to 7 most common winning patterns, **per platform**, written as reusable shapes,
 adapted for civic where the niche calls for it, and proposed as an edit Muxin approves before it
 lands in git.
+
+**Every record you write MUST carry a `Reach behind it` line.** It sits between `Mechanism` and
+`Structure / arc`, and it states the real size of the evidence in the metric that platform
+publishes, named every time. List raw values where there are five or fewer; add a median only where
+there are three or more AND every one is identified. **Never round up, never blend a view count
+with an engagement count, and never write a number you did not measure.** Where you cannot resolve
+a pattern to specific posts, say "section band" and quote that platform's admitted range, which is
+a statement about the section rather than a measurement of the pattern.
+
+This exists because post count and evidence strength point in opposite directions in this corpus.
+Mastodon contributed 54 posts at a median of 128 engagements while TikTok contributed 38 at 29,691,
+a 232x gap on the same unit. Without this line a Mastodon pattern resting on three posts reads as
+equal to a TikTok pattern resting on three posts. See the "How much reach is actually behind the
+evidence" section in `post-patterns.md` for the full table.
 
 **Per platform is load-bearing.** What wins on LinkedIn is not what wins on TikTok. A LinkedIn
 case-first structure and a TikTok three-second visual-payoff hook are different patterns, not one
