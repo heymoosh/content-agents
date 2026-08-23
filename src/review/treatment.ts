@@ -189,12 +189,20 @@ export interface TreatmentDeps {
 // ---------------------------------------------------------------------------
 
 // A piece's pillar is not stored in source.md frontmatter — the only place on disk that records it
-// is routing.md's heading, written by route.ts:429/435:
-//   "# Routing — human-ai — 2026-06-16"  /  "# Routing — civic-tech + human-ai — 2026-07-04"
+// is routing.md's heading, written by route.ts's routingMd(). That heading has had two shapes and
+// BOTH must keep parsing forever, because routing.md files already on disk are never rewritten:
+//   current: "# Routing: human-ai (2026-06-16)"  /  "# Routing: civic-tech + human-ai (2026-07-04)"
+//   pre-2026-08-23 (em dash, banned by root CLAUDE.md rule 5 and config/voice.yaml, so no longer
+//   written): "# Routing — human-ai — 2026-06-16"  /  "# Routing — civic-tech + human-ai — 2026-07-04"
+// The two eras get two explicit patterns rather than one merged expression, so each stays exact and
+// greppable. The historical one is a regex LITERAL on purpose: it MATCHES a dash in files Muxin
+// already has, it never prints one, which is why the em-dash guard exempts regex literals.
 // A pasted foreign essay that was never routed has no routing.md and therefore no pillar; that is
 // reported as pillarSource "none" rather than guessed at.
 export function parsePillars(routingMd: string): string[] {
-  const m = routingMd.match(/^#\s*Routing\s*—\s*(.+?)\s*—\s*\d{4}-\d{2}-\d{2}\s*$/m);
+  const m =
+    routingMd.match(/^#\s*Routing:\s*(.+?)\s*\(\d{4}-\d{2}-\d{2}\)\s*$/m) ??
+    routingMd.match(/^#\s*Routing\s*—\s*(.+?)\s*—\s*\d{4}-\d{2}-\d{2}\s*$/m);
   if (!m) return [];
   return m[1]
     .split("+")

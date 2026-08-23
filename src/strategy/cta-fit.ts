@@ -108,7 +108,7 @@ export function classifyCtaFit(
   now = Date.now()
 ): CtaFitResult {
   if (!strategyCfg.cta_thresholds) {
-    throw new Error("config/strategy.yaml is missing cta_thresholds (lever E, card d80411bc) — add a cta_thresholds block.");
+    throw new Error("config/strategy.yaml is missing cta_thresholds (lever E, card d80411bc). Add a cta_thresholds block.");
   }
   const group = rows.filter((r) => r.platform === platform);
   const min = cfg.thresholds.min_posts_for_data;
@@ -160,13 +160,13 @@ function main() {
   const rows = loadRows();
   const ranked = rankCtaFit(rows, cfg, strategyCfg);
 
-  console.log(`# CTA-fit signal — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# CTA-fit signal, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
-    `Recommendation only — nothing here changes what /atomize or /publish choose. Engagement is used as ` +
+    `Recommendation only. Nothing here changes what /atomize or /publish choose. Engagement is used as ` +
       `an honest proxy: no click/conversion metric survives ingest (clicks sums to ~40 across 1,229 metric ` +
       `rows, NULL on linkedin/bluesky). posts.cta_destination only started being stamped once card d80411bc ` +
       `shipped, so most platforms are expected to read insufficient-data until enough CTA-tagged posts ` +
-      `accumulate — that is the correct state today, not a bug. Live consumption (prioritizing the winning ` +
+      `accumulate. That is the correct state today, not a bug. Live consumption (prioritizing the winning ` +
       `destination in /publish) is deferred to a follow-up card once real signal exists.\n`
   );
 
@@ -193,7 +193,7 @@ function main() {
 
   if (thin.length > 0) {
     console.log(
-      `\n${thin.length} platform(s) read insufficient data — fewer than two CTA destinations clear ` +
+      `\n${thin.length} platform(s) read insufficient data: fewer than two CTA destinations clear ` +
         `n>=${cfg.thresholds.min_posts_for_data} and a 4wk span yet:`
     );
     for (const r of thin) {

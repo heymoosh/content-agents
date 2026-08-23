@@ -63,7 +63,7 @@ function main() {
   const platforms = [...new Set(rows.map((r) => r.platform))].sort();
   const cell = (pl: string, src: string): string => {
     const group = rows.filter((r) => r.platform === pl && r.source === src);
-    if (group.length === 0) return "—";
+    if (group.length === 0) return "-";
     const avgEng = group.reduce((s, r) => s + eng(r), 0) / group.length;
     const wSum = group.reduce((s, r) => s + weight(r), 0);
     const rcEng = wSum > 0 ? group.reduce((s, r) => s + eng(r) * weight(r), 0) / wSum : 0;
@@ -75,7 +75,7 @@ function main() {
     return `${avgEng.toFixed(1)} (rc ${rcEng.toFixed(1)}) · n=${group.length}${insufficient ? " ⚠INSUFFICIENT" : ""}`;
   };
 
-  console.log(`# Atomized vs organic — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Atomized vs organic, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
     `Per platform: verbatim-atomized vs spin (audience-reframed) vs natively posted (organic). ` +
       `Cell = avg engagement (replies ×3, reposts ×2, likes ×1) · rc = recency-weighted ` +
@@ -110,7 +110,7 @@ function main() {
   console.log(`\n## Spin control readiness\n`);
   if (totalSpin < 3) {
     console.log(
-      `No spin data classified yet — spin is the always-on default, so this fills in as atomized-spin ` +
+      `No spin data classified yet. Spin is the always-on default, so this fills in as atomized-spin ` +
         `posts ship and get tagged. Once a platform has spin volume, this flags whether its verbatim ` +
         `\`--no-spin\` control is thick enough to measure spin's lift. See docs/spin-experiment.md.`
     );
@@ -123,7 +123,7 @@ function main() {
     );
   } else {
     console.log(
-      `Verbatim control is adequate where spin has volume — read spin vs verbatim vs organic straight off ` +
+      `Verbatim control is adequate where spin has volume. Read spin vs verbatim vs organic straight off ` +
         `the table above. Keep the odd \`/atomize --no-spin\` run going so the control doesn't age out ` +
         `(recency-weighted). See docs/spin-experiment.md.`
     );

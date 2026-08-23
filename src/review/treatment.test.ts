@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { routingMd } from "../strategy/route.js";
 import {
   readTreatment,
   fitLabelFor,
@@ -112,11 +113,31 @@ test("reuseKeyFor maps routing channel names onto Placed-log platform names", ()
 
 // --- pillar ----------------------------------------------------------------
 
-test("parsePillars reads single and multi-pillar routing.md headings", () => {
+// The HISTORICAL heading, still on disk in every routing.md written before 2026-08-23. These files
+// are never rewritten, so this test must keep passing forever.
+test("parsePillars reads the pre-2026-08-23 em-dash routing.md headings", () => {
   assert.deepEqual(parsePillars("# Routing — human-ai — 2026-06-16\n"), ["human-ai"]);
   assert.deepEqual(parsePillars("# Routing — civic-tech + human-ai — 2026-07-04\n"), ["civic-tech", "human-ai"]);
   assert.deepEqual(parsePillars("# Some other doc\n"), []);
   assert.deepEqual(parsePillars("# Routing — not-a-pillar — 2026-07-04\n"), []);
+});
+
+test("parsePillars reads the current parenthesized-date routing.md headings", () => {
+  assert.deepEqual(parsePillars("# Routing: human-ai (2026-06-16)\n"), ["human-ai"]);
+  assert.deepEqual(parsePillars("# Routing: civic-tech + human-ai (2026-07-04)\n"), ["civic-tech", "human-ai"]);
+  assert.deepEqual(parsePillars("# Routing: not-a-pillar (2026-07-04)\n"), []);
+});
+
+// ROUND TRIP. The bug this guards against: route.ts changed its heading punctuation and parsePillars
+// still demanded the old one, so every newly written routing.md silently read as "no pillar" and the
+// Content room's treatment step went blank. Nothing caught it because every parse test fed a
+// hand-typed fixture. This drives the REAL writer instead, so the two can never drift again.
+test("parsePillars round-trips routing.md exactly as route.ts writes it", () => {
+  const decisions = [
+    { platform: "x", decision: "include" as const, score: 1.2, confidence: "data" as const, rationale: "why", pillars: ["human-ai"] },
+  ];
+  assert.deepEqual(parsePillars(routingMd(["human-ai"], decisions)), ["human-ai"]);
+  assert.deepEqual(parsePillars(routingMd(["civic-tech", "human-ai"], decisions)), ["civic-tech", "human-ai"]);
 });
 
 test("allChannels is derived from config, not a hardcoded list", () => {

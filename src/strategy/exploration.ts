@@ -168,7 +168,7 @@ export function formatExplorationCoverage(cells: Map<string, Cell>, cfg: Routing
   }
   const lines = [
     `## Exploration coverage\n`,
-    `Off-assignment pillar/platform probes (card 92bb2ae6) — tracked separately from, and never ` +
+    `Off-assignment pillar/platform probes (card 92bb2ae6), tracked separately from, and never ` +
       `folded into, the pillar/platform resonance figures route.ts and the routing drift flag use. ` +
       `Surfaced only once an untested pillar has reached n>=${COVERAGE_MIN_N} probes.\n`,
   ];
@@ -201,7 +201,7 @@ function main() {
   const dryRun = args.includes("--dry-run");
   const entries = readExplorationLedger();
 
-  console.log(`\nexploration-budget${dryRun ? " [DRY RUN — no ledger write]" : ""}`);
+  console.log(`\nexploration-budget${dryRun ? " [DRY RUN, no ledger write]" : ""}`);
   console.log("=".repeat(50));
 
   for (const platform of EXPLORATION_PLATFORMS) {
@@ -212,7 +212,7 @@ function main() {
         untested.length === 0
           ? "no untested pillars for this platform"
           : "already probed this platform this calendar month";
-      console.log(`${platform}: skip — ${reason}`);
+      console.log(`${platform}: skip, ${reason}`);
       continue;
     }
     console.log(`${platform}: probe "${pick.pillar}" this month (untested: ${pick.untested.join(", ")})`);
@@ -224,7 +224,7 @@ function main() {
   }
 
   if (dryRun) {
-    console.log("\nDry-run complete — no ledger entries written.");
+    console.log("\nDry-run complete, no ledger entries written.");
   } else {
     console.log(
       `\nNext: for each platform picked above, route + draft that one probe:\n` +

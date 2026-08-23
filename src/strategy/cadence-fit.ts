@@ -98,7 +98,7 @@ export function classifyTrend(
   now = Date.now()
 ): TrendResult {
   if (!strategyCfg.cadence_thresholds) {
-    throw new Error("config/strategy.yaml is missing cadence_thresholds (lever C, card ed23f712) — add a cadence_thresholds block.");
+    throw new Error("config/strategy.yaml is missing cadence_thresholds (lever C, card ed23f712). Add a cadence_thresholds block.");
   }
   const group = rows.filter((r) => r.platform === platform);
   const recent = group.filter((r) => r.posted_at && new Date(r.posted_at).getTime() > now - 4 * WEEK_MS);
@@ -146,7 +146,7 @@ export function classifyPeakHour(
   now = Date.now()
 ): PeakHourResult {
   if (!strategyCfg.peak_hour_thresholds) {
-    throw new Error("config/strategy.yaml is missing peak_hour_thresholds (lever C, card ed23f712) — add a peak_hour_thresholds block.");
+    throw new Error("config/strategy.yaml is missing peak_hour_thresholds (lever C, card ed23f712). Add a peak_hour_thresholds block.");
   }
   const group = rows.filter((r) => r.platform === platform && r.posted_at);
   const distinctHours = new Set(group.map((r) => laHour(new Date(r.posted_at!)))).size;
@@ -246,7 +246,7 @@ export function classifyCadenceFollow(
 ): CadenceFollowFitResult {
   if (!strategyCfg.cadence_follow_thresholds) {
     throw new Error(
-      "config/strategy.yaml is missing cadence_follow_thresholds (lever C follow-through, epic 2ce597d7) — add a cadence_follow_thresholds block."
+      "config/strategy.yaml is missing cadence_follow_thresholds (lever C follow-through, epic 2ce597d7). Add a cadence_follow_thresholds block."
     );
   }
   const group = rows.filter((r) => r.platform === platform);
@@ -304,11 +304,11 @@ export function rankCadenceFollow(
 function followLabelText(r: CadenceFollowFitResult): string {
   switch (r.label) {
     case "override-winning":
-      return "override winning — keep it";
+      return "override winning, keep it";
     case "even":
       return "even";
     case "override-losing":
-      return "override losing — default cadence outperforms";
+      return "override losing, default cadence outperforms";
     case "insufficient-data":
       return "insufficient data";
   }
@@ -400,7 +400,7 @@ export function buildOverridesFile(
   existingFile: OverridesFile
 ): OverridesFile {
   if (!strategyCfg.cadence_thresholds) {
-    throw new Error("config/strategy.yaml is missing cadence_thresholds (lever C, card ed23f712) — add a cadence_thresholds block.");
+    throw new Error("config/strategy.yaml is missing cadence_thresholds (lever C, card ed23f712). Add a cadence_thresholds block.");
   }
   const { step, max_posts_per_week } = strategyCfg.cadence_thresholds;
   const overrides: OverridesFile["overrides"] = {};
@@ -437,10 +437,10 @@ function main() {
   const trends = rankTrend(rows, cfg, strategyCfg);
   const peakHours = rankPeakHour(rows, cfg, strategyCfg);
 
-  console.log(`# Cadence + timing fit — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Cadence + timing fit, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
     `Nothing here is live posting behavior on its own. This report is recommendation-only; even with` +
-      ` --write, the proposals below land in config/schedule-overrides.yaml with approved: false —` +
+      ` --write, the proposals below land in config/schedule-overrides.yaml with approved: false.` +
       ` /publish's scheduler (src/publish/slots.ts) ignores it until Muxin reviews the numbers and sets` +
       ` approved: true herself.\n`
   );
@@ -457,7 +457,7 @@ function main() {
   }
   if (trendThin.length > 0) {
     console.log(
-      `\n${trendThin.length} platform(s) have insufficient data (n<${cfg.thresholds.min_posts_for_data} in either 4wk window) — no trend read yet:`
+      `\n${trendThin.length} platform(s) have insufficient data (n<${cfg.thresholds.min_posts_for_data} in either 4wk window), so there is no trend read yet:`
     );
     for (const t of trendThin) console.log(`- ${t.platform}`);
   }
@@ -474,7 +474,7 @@ function main() {
   }
   if (hourThin.length > 0) {
     console.log(
-      `\n${hourThin.length} platform(s) read insufficient data for peak-hour — either too few posts/weeks, or` +
+      `\n${hourThin.length} platform(s) read insufficient data for peak-hour, either too few posts/weeks, or` +
         ` (true today of X and LinkedIn) their analytics only capture the posting DATE, not the hour, so every` +
         ` post lands on a synthetic timestamp with no real time-of-day signal:`
     );
@@ -485,13 +485,13 @@ function main() {
   console.log(
     `Whether an approved config/schedule-overrides.yaml entry actually outperforms the static default, ` +
       `once Muxin has approved one and posts have accumulated under it. Every post published via ` +
-      `src/publish/typefully.ts is stamped 'override' or 'default' at claim time — this compares them.\n`
+      `src/publish/typefully.ts is stamped 'override' or 'default' at claim time, and this compares them.\n`
   );
   const followRows = loadFollowRows();
   const followRanked = rankCadenceFollow(followRows, cfg, strategyCfg);
   if (followRanked.length === 0) {
     console.log(
-      "No platform has any cadence_source-tagged posts yet — either no override has been approved, or none " +
+      "No platform has any cadence_source-tagged posts yet, either because no override has been approved, or because none " +
         "have published since. Run npm run tag-source after publishing to stamp posts.cadence_source."
     );
   } else {
