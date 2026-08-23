@@ -31,7 +31,7 @@
 // cannot be moved from the desk at all, which left Phase 3 a CLI-only phase inside a GUI build.
 
 import { transitionArtifact, readArtifact, type VentureArtifact } from "../venture/artifacts.js";
-import { approveArtifact, discardArtifact, restoreArtifact, retractArtifact } from "../venture/artifact-lifecycle.js";
+import { approveArtifact, discardArtifact, editArtifactBody, restoreArtifact, retractArtifact } from "../venture/artifact-lifecycle.js";
 import { updateResearchReadFinding } from "../venture/artifacts.js";
 import { selectByKind } from "../venture/decisions.js";
 import { clearCheckpoint, recordPace } from "../venture/checkpoint.js";
@@ -139,6 +139,29 @@ const ROUTES: Route[] = [
     method: "POST",
     pattern: /^\/api\/venture\/([^/]+)\/artifacts\/([^/]+)\/retract$/,
     handler: (slug, [id], body) => ({ artifact: retractArtifact(slug, id, str(body, "attestation") ?? "", now()) }),
+  },
+
+  // Muxin's own rewrite of a draft body. The verb venture-schema-contract.md 2.2 lists and the
+  // room could not offer: before this, her whole say over an artifact was approve or discard.
+  //
+  // The POST is :id/edit, not :id/body, because every write in this file is named for the verb it
+  // performs and page.test.ts asserts the artifact route set and the CardAction id set are
+  // literally the same words. The GET that reads the text back is :id/body, which is the resource.
+  //
+  // editArtifactBody owns every rule -- which states may still be edited, that a body file exists,
+  // that an empty body is not an edit -- and its refusals name what to do instead ("take it down or
+  // report the delivery failed, then edit it"), so they pass through like every other one here.
+  // What this route must not do is decide whose words the result is: the function stamps
+  // body_edited_by_muxin_at, the thread reads the stamp, and the register follows from that one
+  // recorded fact rather than from anything the client says about itself.
+  {
+    method: "POST",
+    pattern: /^\/api\/venture\/([^/]+)\/artifacts\/([^/]+)\/edit$/,
+    handler: (slug, [id], body) => {
+      const text = str(body, "body");
+      if (text === undefined) throw new Error("send the edited text as body");
+      return { artifact: editArtifactBody(slug, id, text, now()) };
+    },
   },
 
   // Confirming something went live. The proof shape and the evidence floor are both
@@ -375,6 +398,7 @@ export const VENTURE_WRITE_PATHS = [
   "/api/venture/:slug/artifacts/:id/discard",
   "/api/venture/:slug/artifacts/:id/restore",
   "/api/venture/:slug/artifacts/:id/retract",
+  "/api/venture/:slug/artifacts/:id/edit",
   "/api/venture/:slug/artifacts/:id/confirm-live",
   "/api/venture/:slug/artifacts/:id/failed",
   "/api/venture/:slug/artifacts/:id/findings/:findingId",
