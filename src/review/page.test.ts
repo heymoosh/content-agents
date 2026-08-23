@@ -714,6 +714,9 @@ test("client <script> output: the job working panel, room strips and team rail a
     "An answer in the build conversation.",
     "YOUR TEAM, WAITING ON YOU", "YOUR TEAM, WORKING", "YOUR TEAM, IDLE",
     "You answered. A fresh job is running it from the start.",
+    // The stopped register (this PR): her word for it, its frozen clock, its footer, its log line.
+    "You stopped it", "You stopped this one. It did not finish.", "Stop it",
+    "Too late, it had already stopped on its own.", "Stopping it.",
   ]) {
     assert.ok(script.includes(copy), "authored copy missing from the page: " + copy);
   }
@@ -724,7 +727,12 @@ test("job surface copy: no em dashes and no 'atomize' in the strings this PR add
     jobFooter(job({ status: "queued" })), jobFooter(job({ status: "blocked" })),
     jobFooter(job({ status: "failed" })), jobFooter(job({ status: "done" })),
     jobFooter(job({ status: "running", lastStdoutLine: null })), ANSWERED_FOOTER,
+    jobFooter(job({ status: "stopped" })), STOPPED_FOOTER,
     stripFooter(job({ status: "queued" })), stripFooter(job({ status: "running", lastStdoutLine: null })),
+    stripFooter(job({ status: "stopped" })),
+    jobRailLabel(job({ status: "stopped" })).text, stripRailLabel(job({ status: "stopped" })).text,
+    jobClockText(job({ status: "stopped", elapsedMs: 185_000 }), 0), jobLogLine(job({ status: "stopped" })),
+    jobOpenLabel(job({ status: "stopped" })),
     jobRailLabel(job({ status: "queued" })).text, jobRailLabel(job({ status: "failed" })).text,
     stripRailLabel(job({ status: "running" })).text, stripRailLabel(job({ status: "blocked" })).text,
     stripRailLabel(job({ status: "done" })).text,
@@ -1411,4 +1419,195 @@ test("the scene renders as paragraphs, while the file keeps one sentence per lin
     "He did not speak into the comms.",
   ]);
   assert.deepEqual(fictionSceneParagraphs(""), []);
+});
+
+// ── a job Muxin stopped (the UI half of the per-job "Stop it", PR #361) ──────────────────────────
+// #361 shipped `stopped` as its own status, a POST /api/jobs/:id/stop route and the whole queue
+// mechanic, with no UI at all. Every helper below fell through to its `running` default, so a job
+// she had deliberately ended rendered as "Working", in the AI purple, under "Real elapsed time, not
+// an estimate." — the screen claiming work was in flight that was not. Same class of defect as the
+// Fiction scene bug in #359. These tests pin the honest rendering AND the client mirror of it.
+
+import { STOPPED_FOOTER, jobStopOffered } from "./page.js";
+
+test("a stopped job's rail says she ended it, in her own blue, never Working in the AI purple", () => {
+  const rail = jobRailLabel(job({ status: "stopped" }));
+  assert.equal(rail.text, "You stopped it");
+  assert.equal(rail.color, JOB_COLORS.blue);
+  assert.notEqual(rail.text, "Working");
+  assert.notEqual(rail.color, JOB_COLORS.ai, "a stopped job is not working, so it must not wear the AI register");
+  assert.notEqual(rail.color, JOB_COLORS.red, "she ended it; nothing broke");
+
+  const strip = stripRailLabel(job({ status: "stopped" }));
+  assert.equal(strip.text, "You stopped it");
+  assert.equal(strip.color, JOB_COLORS.blue);
+  assert.notEqual(strip.text, "Working now");
+});
+
+test("a stopped job's footer says she stopped it, and claims nothing about what reached disk", () => {
+  assert.equal(jobFooter(job({ status: "stopped" })), STOPPED_FOOTER);
+  assert.equal(stripFooter(job({ status: "stopped" })), STOPPED_FOOTER);
+  assert.equal(STOPPED_FOOTER, "You stopped this one. It did not finish.");
+  // Never the running heartbeat line, and never the failure line's "Nothing was written." — a job
+  // killed mid-run may have written something, so that is a claim this screen cannot make.
+  assert.ok(!STOPPED_FOOTER.includes("Real elapsed time, not an estimate."));
+  assert.ok(!STOPPED_FOOTER.includes("Nothing was written"));
+  // A stopped job carrying a stale heartbeat line must not render it as if it were still beating.
+  assert.equal(jobFooter(job({ status: "stopped", lastStdoutLine: "reading the essay" })), STOPPED_FOOTER);
+});
+
+test("a stopped job's clock is the real measured elapsed, frozen, and says nothing when it never ran", () => {
+  // finishedAt is set by stopJob, so jobElapsedMs freezes: this is measured, not a live tick.
+  assert.equal(jobClockText(job({ status: "stopped", elapsedMs: 185_000 }), 0), "ran for 3m 5s");
+  assert.equal(stripClockText(job({ status: "stopped", elapsedMs: 185_000 })), "ran for 3m 5s");
+  // Stopped while still queued: startedAt is null, so there is no duration to render at all.
+  assert.equal(jobClockText(job({ status: "stopped", elapsedMs: null }), 3), "not started");
+  assert.equal(stripClockText(job({ status: "stopped", elapsedMs: null })), "not started");
+  // Not the queue copy, not the done copy, not the failure copy.
+  for (const text of [jobClockText(job({ status: "stopped", elapsedMs: 185_000 }), 3), stripClockText(job({ status: "stopped", elapsedMs: 185_000 }))]) {
+    assert.ok(!text.includes("ahead of it"));
+    assert.ok(!text.startsWith("took"));
+    assert.ok(!text.startsWith("stopped after"));
+  }
+});
+
+test("a stopped job's log line names no artifact path, because it may not have written one", () => {
+  const line = jobLogLine(job({ status: "stopped", logPath: "/logs/j1.log" }));
+  assert.equal(line, "> stopped, you ended it");
+  assert.ok(!line.includes("/logs/j1.log"), "a stopped run must not claim it wrote anywhere");
+  assert.ok(!line.includes("reading"), "nothing is being read any more");
+});
+
+test("a stopped job's room link neither promises motion nor promises an artifact", () => {
+  assert.equal(jobOpenLabel(job({ status: "stopped", kind: "url" })), "Open Content");
+  assert.equal(jobOpenLabel(job({ status: "stopped", kind: "fiction-draft" })), "Open Fiction");
+  assert.ok(!jobOpenLabel(job({ status: "stopped" })).includes("Watch it"));
+  assert.ok(!jobOpenLabel(job({ status: "stopped" })).includes("Read it"));
+});
+
+test("a stopped job's steps show what finished and nothing in flight", () => {
+  const dots = jobStepDots(job({ status: "stopped", steps: ["pull", "draft", "score", "write"], step: 2 }));
+  assert.deepEqual(dots.map((d) => d.state), ["done", "done", "pending", "pending"]);
+  assert.ok(!dots.some((d) => d.state === "current"), "nothing is in flight, so no dot pulses in the AI purple");
+  assert.ok(!dots.some((d) => d.state === "failed"), "she stopped it; no step broke");
+  assert.ok(!dots.map((d) => dotColor(d.state)).includes(JOB_COLORS.ai));
+});
+
+test("a stopped job is settled: it stops holding the team rail and stops asking for anything", () => {
+  assert.equal(jobSettled(job({ status: "stopped" })), true);
+  assert.equal(jobAwaitingAnswer(job({ status: "stopped" })), false);
+  // The Studio team rail lists live work only. A job she ended is not live work.
+  assert.deepEqual(teamLiveRows([job({ id: "a", status: "stopped" })]), []);
+  assert.equal(teamRailHeader([job({ status: "stopped" })]), "YOUR TEAM, IDLE");
+  // `failed` is still deliberately unsettled: it holds its strip until she has seen it.
+  assert.equal(jobSettled(job({ status: "failed" })), false);
+});
+
+test("a stopped job holds its room strip only for the linger, then the strip goes away", () => {
+  const now = 1_000_000;
+  const stopped = job({ id: "s1", kind: "url", status: "stopped", finishedAt: now - 1000 });
+  assert.equal(stripJobFor([stopped], "Content", now)?.id, "s1", "just-stopped work still shows what happened");
+  const old = job({ id: "s2", kind: "url", status: "stopped", finishedAt: now - (STRIP_LINGER_MS + 1) });
+  assert.equal(stripJobFor([old], "Content", now), null, "it is settled, so it does not hold the strip open");
+});
+
+test("Stop is offered on queued and running work only, never on anything already settled", () => {
+  assert.equal(jobStopOffered(job({ status: "queued" })), true);
+  assert.equal(jobStopOffered(job({ status: "running" })), true);
+  for (const status of ["done", "failed", "stopped"]) {
+    assert.equal(jobStopOffered(job({ status })), false, status + " has already settled; the route would no-op");
+  }
+  // Blocked is settled too, and stopping it would throw away a question she has not answered.
+  assert.equal(jobStopOffered(job({ status: "blocked", ask: { question: "which cut?", options: ["a", "b"] } })), false);
+  assert.equal(jobStopOffered(job({ status: "blocked", answer: "a" })), false);
+});
+
+test("storyboardJobDone: a stopped video job is resolved, so the generating hint clears", () => {
+  const jobs = [{ kind: "video", slugs: ["my-slug"], status: "stopped" }];
+  assert.equal(storyboardJobDone(jobs, "my-slug"), true);
+  assert.equal(storyboardJobDone([...jobs, { kind: "video", slugs: ["my-slug"], status: "running" }], "my-slug"), false);
+});
+
+// ── the client mirror (Rule 5) ───────────────────────────────────────────────────────────────────
+// Every branch above exists twice: exported for these tests, and again inline in the browser
+// <script>. Fixing only the export would leave the browser rendering "Working" for a stopped job
+// and go green without these. That exact failure is why #359 needed two tests, not one.
+
+function clientScript(): string {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  return html.slice(html.indexOf("<script>"), html.lastIndexOf("</script>"));
+}
+
+test("client mirror: the stopped branch ships in the browser script, on both job surfaces", () => {
+  const script = clientScript();
+  const twice = (needle: string) => script.split(needle).length - 1;
+  // rail: the Studio panel's jobRail and the room strip's stripRail
+  assert.equal(twice('if(j.status==="stopped") return {text:"You stopped it", color:JC.blue};'), 2);
+  // clock: jobClock and stripClock, both frozen on the measured elapsedMs
+  assert.equal(twice('if(j.status==="stopped") return j.elapsedMs==null ? "not started" : "ran for "+jobElapsedText(j.elapsedMs);'), 2);
+  // footer: jobFooter and stripFooter, off one constant
+  assert.ok(script.includes('const STOPPED_FOOTER = "You stopped this one. It did not finish.";'));
+  assert.equal(twice('if(j.status==="stopped") return STOPPED_FOOTER;'), 2);
+  // log line, room link, step dots
+  assert.ok(script.includes('if(j.status==="stopped") return "> stopped, you ended it";'));
+  assert.ok(script.includes('if(j.status==="stopped") return "Open " + jobRoom(j.kind);'));
+  assert.ok(script.includes('if(j.status==="stopped") return steps.map((t,i)=>({text:t,state: i<step?"done":"pending"}));'));
+  // settled, the Stop predicate, and the sweep set that matches jobIsSweepable in jobs.ts
+  assert.ok(script.includes('function jobSettled(j){ return j.status==="done" || j.status==="stopped" || (j.status==="blocked" && !!j.answer); }'));
+  assert.ok(script.includes('function jobStopOffered(j){ return j.status==="queued" || j.status==="running"; }'));
+  assert.ok(script.includes('JOBS.some(j=>j.status==="done"||j.status==="failed"||j.status==="stopped")'));
+  assert.ok(script.includes('forSlug.every(j=>j.status==="done"||j.status==="failed"||j.status==="stopped")'));
+});
+
+test("client mirror: the Stop control and its route reach the browser, on both surfaces", () => {
+  const script = clientScript();
+  assert.ok(script.includes("function stopBtnHtml(j)"), "the button must be built from jobStopOffered, not from a status test inline");
+  assert.ok(script.includes('jobStopOffered(j) ? \'<button class="jstop" data-id="\'+esc(j.id)+\'">Stop it</button>\' : ""'));
+  assert.ok(script.includes("async function stopJob(id)"), "the handler must reach the browser");
+  assert.ok(script.includes('"/api/jobs/"+encodeURIComponent(id)+"/stop"'), "Stop must post to the stop route");
+  // Wired on the Studio working panel AND on the room strip: a job running while she is inside a
+  // room has no other surface on that screen.
+  assert.equal(script.split('querySelectorAll("button.jstop")').length - 1, 2);
+});
+
+test("client mirror: Retry is never offered for a stopped job", () => {
+  const script = clientScript();
+  const box = script.slice(script.indexOf("function askBoxHtml(j)"), script.indexOf("function renderJobs()"));
+  assert.ok(box.includes('class="jretry"'), "the retry button lives in the failure box");
+  assert.ok(box.indexOf('if(j.status==="failed")') < box.indexOf('class="jretry"'), "and only inside the failed branch");
+  assert.ok(!box.includes('"stopped"'), "the ask/failure box must not render for a stopped job at all");
+  // Two independent refusals in jobs.ts back this: stopJob forces retryable=false, and retryJob
+  // refuses anything that is not `failed`. The UI must not offer what the backend will refuse.
+  assert.equal(script.split('class="jretry"').length - 1, 1, "exactly one place builds a Retry button");
+});
+
+test("stopJob claims nothing when the job had already settled", async () => {
+  const script = clientScript();
+  const start = script.indexOf("async function stopJob(id){");
+  const src = script.slice(start, script.indexOf("\n}", start) + 2);
+  const flashed: string[] = [];
+  const reloads: number[] = [];
+  const make = (response: Record<string, unknown>) =>
+    new Function("post", "flash", "loadJobs", src + "\nreturn stopJob;")(
+      async () => response,
+      (m: string) => flashed.push(m),
+      () => reloads.push(1),
+    ) as (id: string) => Promise<void>;
+
+  await make({ ok: true, status: "running", stopped: true })("j1");
+  assert.equal(flashed[0], "Stopping it.");
+  // The route answers the moment SIGTERM goes out, so its `status` is not final. The toast must not
+  // quote it, and the poll must re-read.
+  assert.ok(!flashed[0].includes("running"));
+  assert.equal(reloads.length, 1);
+
+  flashed.length = 0;
+  await make({ ok: true, status: "done", stopped: false })("j1");
+  assert.equal(flashed[0], "Too late, it had already stopped on its own.");
+  assert.ok(!/stopped it\.$/i.test(flashed[0]), "an already-settled stop must not read as success");
+
+  flashed.length = 0;
+  await make({ ok: false, error: "no such job" })("j1");
+  assert.equal(flashed[0], "no such job");
+  assert.equal(reloads.length, 2, "a failed stop must not trigger a reload as if something changed");
 });

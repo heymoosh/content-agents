@@ -160,12 +160,13 @@ const JOB_STATES: { id: string; label: string; job: FixtureJob }[] = [
     }),
   },
   {
-    // `stopped` is Muxin pressing Stop it (jobs.ts). FINDING, surfaced by building this fixture:
-    // page.ts has no branch for it anywhere — jobRailLabel, jobFooter, jobLogLine, jobClockText and
-    // the strip mirrors all fall through to their running default, so a job she stopped currently
-    // renders as "Working" in AI purple with "Real elapsed time, not an estimate." underneath. That
-    // is a screen claiming work is in flight that is not. Deliberately NOT fixed here — the copy for
-    // a stopped job is a judgment call, not dev tooling — but this button puts it in front of you.
+    // `stopped` is Muxin pressing Stop it (jobs.ts). This button FOUND the defect it now reviews:
+    // page.ts had no branch for it anywhere, so jobRailLabel, jobFooter, jobLogLine, jobClockText
+    // and every strip mirror fell through to their running default and a job she had stopped
+    // rendered as "Working" in AI purple under "Real elapsed time, not an estimate." — a screen
+    // claiming work was in flight that was not. Fixed since: the rail now reads "You stopped it" in
+    // her own blue, the clock is the frozen measured elapsed, and no Retry is offered. The button
+    // stays as the review surface for that copy.
     id: "job-stopped",
     label: "stopped",
     job: job({
