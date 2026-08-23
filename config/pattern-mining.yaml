@@ -1254,6 +1254,155 @@ accounts:
     platform: youtube
     niche: product-thinking
     followers: 629000   # rounded display figure from the channel /about page, read 2026-08-23
+    #
+    # RESOLVED 2026-08-23: the open question in the comment above has an answer. The real Product
+    # School channel is youtube.com/@ProductSchoolSanFrancisco, titled "Product School", 157,000
+    # subscribers off the page header. youtube.com/@productschool, titled "Werner Muller", is a
+    # different channel entirely. It is deliberately NOT seeded here, and neither is
+    # youtube.com/@tryexponent (507,000, titled "Exponent"), because both are course and
+    # interview-prep channels and this comment already ruled that padding out. Recorded so nobody
+    # re-runs the search and reaches a different conclusion by accident.
+
+  # -----------------------------------------------------------------------------------------
+  # YOUTUBE, round 4, added 2026-08-23. Found by YouTube's OWN channel-filtered search
+  # (/results?search_query=<q>&sp=EgIQAg%3D%3D), never a third-party ranking site and never a
+  # search API. Every followers value below was then re-read off that channel's page header, the
+  # single `"content":"<n> subscribers"` string, under the one-candidate rule: more than one
+  # match records null, never the first. All fourteen header reads agreed exactly with the count
+  # the search listing carried, which is a cross-check rather than a coincidence.
+  #
+  # TRAP worth knowing before anyone reads a count off a search listing: in a search result's
+  # channelRenderer the field names LIE. `subscriberCountText` holds the HANDLE ("@HowtoADHD")
+  # and `videoCountText` holds the subscriber count ("1.95M subscribers"). A search listing is
+  # good enough to rank candidates and never good enough to record a number.
+  #
+  # Each row was also corroborated against the channel's top-ranked videos, read through the
+  # "Popular" sort, so a title matching a name is never the only evidence. Note that ?sort=p on
+  # /videos is silently IGNORED: the Popular sort is only reachable by posting the sort chip's
+  # own continuation token to /youtubei/v1/browse, and some channels are not offered it at all.
+  # -----------------------------------------------------------------------------------------
+
+  # ai-building. The thickest vein found: people who build things with AI on camera, which is
+  # Muxin's own sentence for what she does.
+  - handle: "@JeffSu"
+    creator: Jeff Su
+    # Verified: page header title "Jeff Su". Top video "AI Agents, Clearly Explained" at 4.7M,
+    # then Google's AI course explainer at 3.6M. Explains AI at work to non-engineers, which is
+    # closer to Muxin's register than the agency channels below.
+    platform: youtube
+    niche: ai-building
+    followers: 1860000   # channel page header, read 2026-08-23
+
+  - handle: "@nateherk"
+    creator: Nate Herk
+    # Verified: page header title "Nate Herk | AI Automation". Top videos are n8n agent courses
+    # at 1.8M and 1.1M, and "Build & Sell with Claude Code" at 936K.
+    platform: youtube
+    niche: ai-building
+    followers: 955000   # channel page header, read 2026-08-23
+
+  - handle: "@LiamOttley"
+    creator: Liam Ottley
+    # Verified: page header title "Liam Ottley". Top video "How to Build & Sell AI Agents" at
+    # 3.7M. Heavy on the money hook, so treat it as a structure donor rather than a voice model.
+    platform: youtube
+    niche: ai-building
+    followers: 838000   # channel page header, read 2026-08-23
+
+  - handle: "@ai-foundations"
+    creator: AI Foundations
+    # Verified: page header title "AI Foundations". Top videos are numbered-tips tutorials, the
+    # same "32 tips" shape re-run yearly, which is itself the pattern worth studying.
+    platform: youtube
+    niche: ai-building
+    followers: 362000   # channel page header, read 2026-08-23
+
+  - handle: "@rileybrownai"
+    creator: Riley Brown
+    # Verified: page header title "Riley Brown". Top video is a vibe-coding challenge at 1M, and
+    # the rest is Claude Code, Codex and Cursor tutorials. The closest match on this list to
+    # building software with AI as one person.
+    platform: youtube
+    niche: ai-building
+    followers: 276000   # channel page header, read 2026-08-23
+
+  - handle: "@mikeynocode"
+    creator: Mikey No Code
+    # Verified: page header title "Mikey No Code". Top videos are Claude Code and no-code app
+    # builds, 500K down to 191K.
+    platform: youtube
+    niche: ai-building
+    followers: 154000   # channel page header, read 2026-08-23
+
+  # product-thinking. One row, and one row only, for the reason argued above the Lenny entry:
+  # this is a written-medium niche and its youtube surface is course footage. Chloe Shih is here
+  # because she is a working PM talking to camera, not a course.
+  - handle: "@chloeshih"
+    creator: Chloe Shih
+    # Verified: page header title "Chloe Shih". Top videos "What I *actually* do as a Product
+    # Manager" at 800K and "Why I just quit my Product Manager job at TikTok" at 401K. Her feed
+    # mixes PM content with apartment and desk tours, so filter by topic when collecting.
+    platform: youtube
+    niche: product-thinking
+    followers: 428000   # channel page header, read 2026-08-23
+
+  # adhd. Two registers the existing rows do not cover: an expert-interview podcast and a
+  # research clinician.
+  - handle: "@ADHD_Chatter_Podcast"
+    creator: ADHD Chatter Podcast
+    # Verified: page header title "ADHD Chatter Podcast". Top videos are expert interviews at
+    # 644K and 595K, all built on a named-authority hook ("The No.1 ADHD Expert", "Psychiatrist
+    # Who Diagnosed 6,000 ADHD Women").
+    platform: youtube
+    niche: adhd
+    followers: 388000   # channel page header, read 2026-08-23
+
+  - handle: "@russellbarkleyphd2023"
+    creator: Russell Barkley
+    # Verified: page header title "Russell Barkley, PhD - Dedicated to ADHD Science+". Top videos
+    # are plain lecture-style explainers, "ADHD & Time Blindness" at 276K. The research voice
+    # rather than the lived-experience voice, which is the opposite pole from @HowtoADHD.
+    platform: youtube
+    niche: adhd
+    followers: 223000   # channel page header, read 2026-08-23
+
+  # civic-tech. Real public-good explanation, not political commentary. See the note at the end
+  # of this block for why the big political channels found in the same search are not here.
+  - handle: "@CityBeautiful"
+    creator: Dave Amos (City Beautiful)
+    # Verified: page header title "City Beautiful". Top videos "The Most Miserable City in
+    # America" at 9.6M and "The Reason Our Streets Switched to Cul-De-Sacs" at 4.8M. An urban
+    # planner explaining why places are the way they are, which is civic work in Muxin's sense.
+    platform: youtube
+    niche: civic-tech
+    followers: 740000   # channel page header, read 2026-08-23
+
+  # solopreneur.
+  - handle: "@thekoerneroffice"
+    creator: Chris Koerner
+    # Verified: page header title "Chris Koerner on The Koerner Office Podcast", and the Videos
+    # tab is live (33K views on a one-day-old upload). Small-business and one-person-business
+    # ideas. This channel offers no "Popular" sort chip, only a membership filter, so its top
+    # videos by view count could not be listed and the identity check rests on the header title
+    # and the live feed instead.
+    platform: youtube
+    niche: solopreneur
+    followers: 674000   # channel page header, read 2026-08-23
+
+  # FOUND AND DELIBERATELY NOT SEEDED, recorded so the same search is not re-run from scratch.
+  # Every count below was verified off the page header the same way as the rows above.
+  #   @BreezyPolitics (1,210,000), @restispolitics (672,000), @ReflectPolitics (238,000),
+  #   @RedEaglePolitics (225,000). Large political channels, but partisan commentary and
+  #   congressional-clip reaction, not civic work in the sense this file's civic-tech niche
+  #   means. @ReflectPolitics and @RedEaglePolitics in particular are outrage-hook channels, and
+  #   seeding them would pull the corpus's civic patterns toward outrage bait. Muxin's call to
+  #   overturn, not the collector's.
+  #   @ruriohama (1,530,000) is language learning and study motivation; it surfaced on an ADHD
+  #   query only because one top video is about procrastination.
+  #   @TinaHuang1 (1,290,000) is coding-career and study-habit content rather than building.
+  #   @GoogleSmallBiz (445,000) is a corporate brand channel, not a creator.
+  #   @CityPlannerPlays (931,000) and @derekcheungsa (447,000) are plausible but offer no
+  #   "Popular" sort, so neither could be corroborated by its own top videos.
 
   # ---------------------------------------------------------------------------------------------
   # TIKTOK, round 3. Follower counts here ARE real: they were read from the followerCount value

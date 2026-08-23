@@ -371,6 +371,17 @@ None of them is required for v1. Every platform below has a free route or an hon
 
 - **Free sort.** The best free sort of any platform here. Channel page, Videos tab (or Shorts tab),
   then the sort control set to "Popular". This is exactly what vidIQ and Viewstats charge for.
+  **It is scriptable, but NOT by URL (verified 2026-08-23).** `/@handle/videos?view=0&sort=p` is
+  silently **ignored**: the page comes back byte-comparable to the default and its own chip data
+  still reads `Latest: selected: true`. The Popular chip carries a `continuationCommand.token` and
+  a `sendPost` to `/youtubei/v1/browse`; POST that token with the page's own `INNERTUBE_CONTEXT`
+  and YouTube returns its genuinely top-ranked videos by views. Checked against `@HowtoADHD`: the
+  default listing opens at a 5-day-old video with 30K views, the continuation opens at "ADHD in
+  Women" with 4.6M from four years ago. **Not every channel is offered the sort.** Channels with
+  memberships show a `Latest / Members only / Public` chip set instead, and a Shorts-first channel
+  may show no chips at all, so a missing Popular sort is a fact about the channel and not a
+  failure. This is a passthrough of YouTube's own response, in the same category the
+  follower-count rules already sanction, and no model is anywhere in the path.
 - **Visible to a non-owner.** Views, likes, comments. Dislikes are hidden. In a browser,
   subscriber counts are public but rounded, so record the rounded number and do not pretend to
   precision. See the fetch caveat below before assuming you can get that number without a browser.
@@ -432,6 +443,20 @@ None of them is required for v1. Every platform below has a free route or an hon
 - **The main channel page is still a trap** and still worse than a blank, for the original reason:
   *every* `subscriberCountText` in that markup belongs to a sidebar recommendation. That is how the
   original "not retrievable" verdict was reached.
+- **`subscriberCountText` lies a SECOND way, on the search page (found 2026-08-23).**
+  `/results?search_query=<q>&sp=EgIQAg%3D%3D` is YouTube's own search filtered to channels, and it
+  is a good discovery route: it found 206 channels across eleven queries. But in each
+  `channelRenderer` **the two field names are swapped against their contents**:
+  `subscriberCountText.simpleText` holds the **handle** (`"@HowtoADHD"`) and
+  `videoCountText.simpleText` holds the **subscriber count** (`"1.95M subscribers"`). Read the
+  obvious-looking field and you record a handle where a number belongs, or a video count where a
+  subscriber count belongs. **Use a search listing to RANK candidates and never to record a
+  number.** Re-read every count off the channel page header, under the one-candidate rule. Done
+  that way across fourteen channels, header and listing agreed exactly every time.
+- **A channel title is not an identity check.** `@indiehackers` is titled "Indie Hackers" and has
+  13 subscribers; `@TheAIAdvantage` is titled "The AI Advantage" and has 448; `@productschool` is
+  titled "Werner Muller". The subscriber count and the channel's actual top videos are the tells.
+  The real Product School is `@ProductSchoolSanFrancisco`, 157,000, confirmed 2026-08-23.
 - **Never substitute a creator's website figure for a subscriber count.** Creator sites publish a
   cross-platform total audience number. That is not a per-platform follower count, and recording it
   as one quietly corrupts every ratio computed from it.
