@@ -265,7 +265,7 @@ export interface DiscoverKindResult {
   skipped: string[]; // names the model proposed but were already on file
 }
 
-async function discoverKind(kind: DiscoveryKind, theme: string, maxCandidates: number): Promise<DiscoverKindResult> {
+async function sweepKind(kind: DiscoveryKind, theme: string, maxCandidates: number): Promise<DiscoverKindResult> {
   const config = loadOutreachConfig();
   const excludeNames = existingNamesForKind(kind);
   const created: string[] = [];
@@ -308,31 +308,69 @@ async function discoverKind(kind: DiscoveryKind, theme: string, maxCandidates: n
   return { kind, created, skipped };
 }
 
+// The default per-kind runner: one bounded `claude -p` sweep plus the cost-log row for it. The
+// row lives here rather than in runDiscover's loop because the spend belongs to the kind that
+// incurred it, so an injected runKind never logs a cost for a call it did not make.
+async function discoverKind(kind: DiscoveryKind, theme: string, maxCandidates: number): Promise<DiscoverKindResult> {
+  const result = await sweepKind(kind, theme, maxCandidates);
+  logCost({ step: "discovery:scout", detail: `${kind} (${result.created.length} found)`, costUsd: 0 });
+  return result;
+}
+
 export interface RunDiscoverResult {
   results: DiscoverKindResult[];
   theme: string;
 }
 
-export async function runDiscover(opts: { kinds?: DiscoveryKind[]; theme?: string; limit?: number } = {}): Promise<RunDiscoverResult> {
+// One step per kind, because one kind IS one unit of real work: a single bounded `claude -p` web
+// search followed by the lead folders it writes. The label says what the sweep is looking for.
+export const DISCOVERY_STEP_LABELS: Record<DiscoveryKind, string> = {
+  client: "Scouting companies worth pitching",
+  platform: "Scouting platforms worth pitching",
+  "content-example": "Scouting real examples to write about",
+};
+
+export interface RunDiscoverOptions {
+  kinds?: DiscoveryKind[];
+  theme?: string;
+  limit?: number;
+  // Progress markers for the GUI job queue (src/review/jobs.ts parseStepMarker). Optional: a
+  // caller that passes none gets exactly today's behaviour. main() below is the one wiring that
+  // turns these into `STEP n/total label` lines on stdout.
+  onStep?: (n: number, total: number, label: string) => void;
+  // Injected so the step sequence is unit-testable without spawning `claude` per kind. Nothing
+  // but the test overrides it.
+  runKind?: (kind: DiscoveryKind, theme: string, maxCandidates: number) => Promise<DiscoverKindResult>;
+  // Where the run log is appended. Injectable so a test never writes into the real
+  // data/discovery/run-log.jsonl -- same convention as the notes-spread ledger's test path.
+  runLogPath?: string;
+}
+
+export async function runDiscover(opts: RunDiscoverOptions = {}): Promise<RunDiscoverResult> {
   const kinds = opts.kinds && opts.kinds.length ? opts.kinds : [...DISCOVERY_KINDS];
   const theme = opts.theme?.trim() || defaultTheme();
   const maxCandidates = Math.max(1, Math.min(opts.limit ?? 3, 5)); // hard cap of 5/kind, cost-bounding
+  const step = opts.onStep ?? (() => {});
+  const runKind = opts.runKind ?? discoverKind;
+  // The total is the kinds actually about to run, counted before the first marker — never a guess.
+  const total = kinds.length;
 
   const results: DiscoverKindResult[] = [];
-  for (const kind of kinds) {
-    const result = await discoverKind(kind, theme, maxCandidates);
+  for (const [i, kind] of kinds.entries()) {
+    step(i + 1, total, DISCOVERY_STEP_LABELS[kind]);
+    const result = await runKind(kind, theme, maxCandidates);
     results.push(result);
-    logCost({ step: "discovery:scout", detail: `${kind} (${result.created.length} found)`, costUsd: 0 });
   }
 
-  mkdirSync(dirname(RUN_LOG_PATH), { recursive: true });
+  const runLogPath = opts.runLogPath ?? RUN_LOG_PATH;
+  mkdirSync(dirname(runLogPath), { recursive: true });
   const runLogEntry = {
     timestamp: new Date().toISOString(),
     theme,
     limit: maxCandidates,
     results: results.map((r) => ({ kind: r.kind, created: r.created, skipped: r.skipped })),
   };
-  appendFileSync(RUN_LOG_PATH, JSON.stringify(runLogEntry) + "\n");
+  appendFileSync(runLogPath, JSON.stringify(runLogEntry) + "\n");
 
   return { results, theme };
 }
@@ -356,7 +394,12 @@ function parseArgs(argv: string[]): { kinds?: DiscoveryKind[]; theme?: string; l
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  runDiscover(args)
+  runDiscover({
+    ...args,
+    // The STEP markers the job queue reads (src/review/jobs.ts parseStepMarker). Their own lines
+    // on stdout, before each kind's work begins; the findings print after the run, as before.
+    onStep: (n, total, label) => process.stdout.write(`STEP ${n}/${total} ${label}\n`),
+  })
     .then((result) => {
       console.log(`theme: ${result.theme}\n`);
       for (const r of result.results) {
