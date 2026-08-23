@@ -87,8 +87,12 @@ export function ytDlpArgs(url: string, opts: { human: boolean; language: string 
     opts.human ? "--write-subs" : "--write-auto-subs",
     "--sub-langs",
     langs,
+    // json3 preferred, vtt as an explicit fallback. NOT decoration: Ali Abdaal's 1ArVtCQqQRE
+    // carries a HUMAN-authored en-GB track that YouTube publishes as vtt with no json3 at all, and
+    // asking for json3 alone made yt-dlp fall back silently to a file this module then refused to
+    // read. Naming the fallback makes the second format a decision rather than an accident.
     "--sub-format",
-    "json3",
+    "json3/vtt",
     // yt-dlp's own inter-request pacing, on top of the collector's. YouTube answered 429 during
     // the 2026-08-23 probe after roughly fifteen rapid requests.
     "--sleep-requests",
@@ -101,9 +105,12 @@ export function ytDlpArgs(url: string, opts: { human: boolean; language: string 
   ];
 }
 
+export type SubtitleFormat = "json3" | "vtt";
+
 export interface SubtitleFile {
   name: string;
   languageCode: string;
+  format: SubtitleFormat;
 }
 
 // Which of the downloaded files to actually read.
@@ -113,13 +120,20 @@ export interface SubtitleFile {
 // video is a lossy round trip and for any other video is not the spoken words at all. So `-orig`
 // wins whenever it is there.
 export function pickSubtitleFile(names: string[], language: string): SubtitleFile | null {
-  const parsed = names
-    .filter((n) => n.endsWith(".json3"))
-    .map((n) => {
-      const match = n.match(/\.([A-Za-z0-9-]+)\.json3$/);
-      return match ? { name: n, languageCode: match[1] } : null;
-    })
-    .filter((f): f is SubtitleFile => f !== null);
+  // json3 first, vtt only if no json3 exists. A track can be published in one and not the other,
+  // and refusing vtt outright is how a HUMAN-authored track gets silently skipped: 1ArVtCQqQRE
+  // has one in en-GB and offers no json3 for it. Human tracks are the quotable ones, so losing
+  // them is the most expensive kind of miss this module can make.
+  const inFormat = (ext: string): SubtitleFile[] =>
+    names
+      .filter((n) => n.endsWith(`.${ext}`))
+      .map((n) => {
+        const match = n.match(new RegExp(`\\.([A-Za-z0-9-]+)\\.${ext}$`));
+        return match ? { name: n, languageCode: match[1], format: ext as SubtitleFormat } : null;
+      })
+      .filter((f): f is SubtitleFile => f !== null);
+
+  const parsed = inFormat("json3").length > 0 ? inFormat("json3") : inFormat("vtt");
   if (parsed.length === 0) return null;
   return (
     parsed.find((f) => f.languageCode === `${language}-orig`) ??
@@ -127,6 +141,43 @@ export function pickSubtitleFile(names: string[], language: string): SubtitleFil
     parsed.find((f) => f.languageCode.startsWith(`${language}-`)) ??
     parsed[0]
   );
+}
+
+// A WebVTT caption file into one run of plain text.
+//
+// Everything that is not spoken words comes out: the WEBVTT header and its Kind/Language lines,
+// the cue timing lines, the numeric cue ids, and the inline <c> and <00:00:01.000> karaoke tags
+// YouTube sprinkles through rolling captions. Consecutive duplicate lines are collapsed because a
+// rolling caption repeats each line as the window scrolls, and leaving them in would triple the
+// body and wreck any structural read of it.
+//
+// Sound cues like "(tranquil ambient music)" are LEFT IN, exactly as the human captioner wrote
+// them, on the same principle that keeps YouTube's "[ __ ]" profanity mask and its ASR
+// mis-transcriptions in the corpus verbatim: the record shows what the track said.
+export function parseVtt(raw: string): string | null {
+  const lines = raw.split(/\r?\n/);
+  const out: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed === "WEBVTT") continue;
+    if (trimmed.includes("-->")) continue;
+    if (/^(Kind|Language|NOTE|STYLE|REGION):?\b/.test(trimmed)) continue;
+    if (/^\d+$/.test(trimmed)) continue;
+    const text = trimmed
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&")
+      .trim();
+    if (text === "") continue;
+    if (out.length > 0 && out[out.length - 1] === text) continue;
+    out.push(text);
+  }
+  const joined = out.join("\n").trim();
+  return joined.length > 0 ? joined : null;
 }
 
 export interface TranscriptResult {
@@ -137,6 +188,8 @@ export interface TranscriptResult {
   // Carried straight through from the watch page's own track list. yt-dlp is asked for one kind or
   // the other, so this is a statement of what was requested and got served, not an inference.
   isAsr: boolean;
+  // Which caption format the words were actually read out of.
+  format: SubtitleFormat;
 }
 
 export interface FetchTranscriptOptions {
@@ -166,18 +219,22 @@ export async function fetchTranscript(url: string, opts: FetchTranscriptOptions)
     const raw = readFileSync(join(dir, chosen.name), "utf8");
     // A zero-byte or unparseable file is the old timedtext wall showing through, not an empty
     // video. Null here says "no words retrieved", and the caller leaves body_is_complete false.
-    let json: unknown;
-    try {
-      json = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-    const text = parseTimedTextJson3(json);
+    const text = chosen.format === "vtt" ? parseVtt(raw) : parseJson3Text(raw);
     if (text === null) return null;
-    return { text, languageCode: chosen.languageCode, isAsr: opts.isAsr };
+    return { text, languageCode: chosen.languageCode, isAsr: opts.isAsr, format: chosen.format };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function parseJson3Text(raw: string): string | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  return parseTimedTextJson3(json);
 }
 
 function defaultRunner(binary: string): YtDlpRunner {
