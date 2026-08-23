@@ -1,16 +1,15 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { ventureDir } from "./paths.js";
 import { appendCanonEvent, hasCanonEvent } from "./canon.js";
 import { readArtifact } from "./artifacts.js";
 import { readDecision } from "./decisions.js";
 import { ingestResponse } from "./responses.js";
 import { kickoffVenture, INTAKE_QUESTIONS, type IntakeAnswers } from "./intake.js";
 import { loadRules } from "./rules.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 // Exercises the real CLI as a subprocess, same discipline as phase2.test.ts/phase3.test.ts.
 const SCRIPT = join(repoRoot, "src", "venture", "phase4.ts");
@@ -32,9 +31,9 @@ function must(r: { status: number | null; stdout: string; stderr: string }, labe
   return r;
 }
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+beforeEach(useTempVentureRoot);
+
+afterEach(clearTempVentureRoot);
 
 // ---- seeding helpers ----
 

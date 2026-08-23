@@ -1,12 +1,11 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
-import { ventureDir } from "./paths.js";
 import { appendCanonEvent } from "./canon.js";
 import { readArtifact } from "./artifacts.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 // Exercises the real CLI as a subprocess -- avoids fighting process.argv/stdin mutation across
 // tests, and tests the actual contract (exit code, stderr message) rather than an internal call.
@@ -22,9 +21,9 @@ function runCmd(sub: string, rest: string[], stdin = ""): { status: number | nul
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+beforeEach(useTempVentureRoot);
+
+afterEach(clearTempVentureRoot);
 
 describe("plan-init validation", () => {
   test("rejects a probe referencing an unknown_id not in open_unknowns", () => {

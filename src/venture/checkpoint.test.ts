@@ -1,18 +1,17 @@
-import { test, describe, afterEach } from "node:test";
+import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
 import { recordPace, clearCheckpoint } from "./checkpoint.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
-import { ventureDir } from "./paths.js";
 import { hasCanonEvent, readCanonEvents } from "./canon.js";
 import { writeDecision, selectDecision, type DecisionKind } from "./decisions.js";
 import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-checkpoint";
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+beforeEach(useTempVentureRoot);
+
+afterEach(clearTempVentureRoot);
 
 function seedRequired(rules: VentureRules, id: string) {
   createArtifact(SLUG, rules, {

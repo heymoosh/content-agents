@@ -1,24 +1,23 @@
 import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
 import { deriveState } from "./state.js";
 import { createArtifact, transitionArtifact } from "./artifacts.js";
 import { appendCanonEvent, hasCanonEvent } from "./canon.js";
 import { writeDecision, selectDecision, type DecisionKind } from "./decisions.js";
 import { maybeCompletePhase4 } from "./phase4.js";
-import { ventureDir } from "./paths.js";
 import { loadRules, type ArtifactKind, type VentureRules } from "./rules.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-state";
 let rules: VentureRules;
+
+beforeEach(useTempVentureRoot);
 
 beforeEach(() => {
   rules = loadRules();
 });
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+afterEach(clearTempVentureRoot);
 
 function seedRequiredArtifact(id: string) {
   createArtifact(SLUG, rules, {

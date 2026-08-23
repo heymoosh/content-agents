@@ -1,13 +1,14 @@
 import { test, describe, before, beforeEach, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync, existsSync, readFileSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deliverVenture, confirmManualDelivery } from "./deliver.js";
 import { createArtifact, transitionArtifact, readArtifact } from "./artifacts.js";
-import { ventureDir, phase1Dir, readyToPasteDir } from "./paths.js";
+import { phase1Dir, readyToPasteDir } from "./paths.js";
 import { loadRules, type VentureRules } from "./rules.js";
 import { PullError } from "../pull/errors.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-deliver";
 const TEST_LEDGER = join(tmpdir(), "venture-deliver-test-ledger.jsonl");
@@ -21,13 +22,15 @@ after(() => {
   if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
 });
 
+beforeEach(useTempVentureRoot);
+
 beforeEach(() => {
   rules = loadRules();
   if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
 });
 
 afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
+  clearTempVentureRoot();
   if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
 });
 

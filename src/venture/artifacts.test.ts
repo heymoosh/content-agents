@@ -1,6 +1,5 @@
 import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
 import {
   createArtifact,
   transitionArtifact,
@@ -12,19 +11,19 @@ import {
   InvalidTransitionError,
   type VentureArtifact,
 } from "./artifacts.js";
-import { ventureDir } from "./paths.js";
 import { loadRules, type VentureRules } from "./rules.js";
+import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js";
 
 const SLUG = "zz-test-artifacts";
 let rules: VentureRules;
+
+beforeEach(useTempVentureRoot);
 
 beforeEach(() => {
   rules = loadRules();
 });
 
-afterEach(() => {
-  rmSync(ventureDir(SLUG), { recursive: true, force: true });
-});
+afterEach(clearTempVentureRoot);
 
 function baseInput(overrides: Partial<Parameters<typeof createArtifact>[2]> = {}) {
   return {
