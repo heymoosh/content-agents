@@ -59,10 +59,17 @@ export interface OutlierThresholds {
 
 export type OutlierReason = "ratio" | "baseline" | "both" | "none";
 
+// Which quantity the baseline was measured on. "views" where a public view count was recorded,
+// "engagement" where it was not and the sum of the recorded likes/comments/shares stood in.
+export type BaselineMetric = "views" | "engagement";
+
 export interface OutlierVerdict {
   isOutlier: boolean;
   ratio: number | null;
   multiple: number | null;
+  // Which metric `multiple` was measured on, so a 4x is never ambiguous between views and
+  // engagement. Null exactly when `multiple` is null.
+  baselineMetric: BaselineMetric | null;
   reason: OutlierReason;
 }
 

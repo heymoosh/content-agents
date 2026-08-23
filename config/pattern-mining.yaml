@@ -579,12 +579,26 @@ accounts:
 
 # Either bar clearing marks a post as an outlier worth studying.
 #
-# view_follower_ratio: views divided by the account's follower count.
-# baseline_multiple: views divided by the median views of that account's other collected posts.
+# view_follower_ratio: views divided by the account's follower count. Views only. A post with no
+#   recorded view count simply does not get scored on this bar, which is correct: a
+#   like-to-follower ratio is a different quantity and does not belong against this number.
+# baseline_multiple: the post's engagement score divided by the median engagement score of that
+#   account's other collected posts. The engagement score is the view count where one was
+#   recorded, and otherwise the sum of the recorded likes, comments and shares. That fallback is
+#   what lets LinkedIn and Substack posts be scored at all, since neither publishes a per-post
+#   view count. The two kinds are never mixed: a post scored on views is compared only against
+#   siblings also scored on views, and the same for engagement, so this one bar is applied to
+#   whichever kind the account actually reports.
 #
 # Every number below is a starting guess. Tune each one once real collected data lands and the
 # ordinary spread per platform is visible. Video platforms carry a higher ratio bar than text
 # platforms because video reach is not capped by follower count.
+#
+# One bar covers both kinds on purpose, for now. There is no engagement data collected yet, so a
+# separate engagement bar would just be a second untuned guess. Watch for this when tuning:
+# engagement counts are much smaller absolute numbers than view counts, so a multiple computed on
+# them is noisier, and a post at 8 likes against a median of 2 clears a 3x bar on almost nothing.
+# If real data shows engagement-scored accounts producing junk outliers, split the bar then.
 outlier_thresholds:
   x:
     view_follower_ratio: 5.0    # starting guess, tune once real data lands
