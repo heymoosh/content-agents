@@ -152,6 +152,10 @@ checkpoints:
     required_artifact_count: 3
     require_all_live: true # Muxin, 2026-08-18 -- no partial pass
     require_pace_recorded: true
+    # rules.md §5.6 / venture-schema-contract.md §5.4b: this checkpoint exists to prove three posts
+    # went live THROUGH this venture. Evidence pointing at something published before kickoff is
+    # `historical_prior` and does not count toward it.
+    require_current_evidence: true
   checkpoint-2:
     required_artifact_kinds: [lead-magnet, landing-page-copy, welcome-email, survey]
     require_all_live: true # rules.md §6.8 -- the announcement is explicitly NOT required to clear
