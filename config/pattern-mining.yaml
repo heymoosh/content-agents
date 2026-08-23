@@ -5,6 +5,26 @@
 #
 # The collected corpus itself (data/patterns/) is gitignored. Other creators' full post text and
 # transcripts never reach git. Only the distilled patterns get committed.
+#
+# FOLLOWER-COUNT PROVENANCE, decided 2026-08-23, so it is a rule rather than a drift.
+# Every follower number here should be read off the platform itself. Two rules follow, both
+# learned the hard way on this branch.
+#
+#   1. NEVER take a count from a creator's own website. Seven rows were wrong because of this.
+#      Six were modest drift, but Carlos Eduardo Espina's Instagram was 26 percent low and Noah
+#      Kagan's YouTube went DOWN, and a follower count cannot move backwards. A creator's site
+#      publishes a cross-platform AUDIENCE TOTAL, not a per-platform count.
+#
+#   2. api.fxtwitter.com IS allowed for X, because x.com exposes no count anywhere. It is a
+#      PASSTHROUGH that relays X's own API response, which is a different category from the
+#      analytics mirrors this project bans: a mirror computes or estimates a number, a passthrough
+#      relays one. Every such row must keep its inline provenance note. If one of these numbers
+#      ever drives a real decision, re-read it off the app first. The note is the whole point.
+#
+# A blank followers value is not one thing. It can mean the platform has no follower concept
+# (reddit, hackernews), or that the fetch was WALLED, or that an implausible figure was refused.
+# A wall is not an absence. Do not fill a null from a creator's website to make the file look
+# complete; that is exactly how the seven wrong numbers got in.
 
 # The three niches already covered by .claude/skills/atomize/references/hook-patterns.md.
 niches:
@@ -798,12 +818,36 @@ accounts:
   #             itself: the profile page's twitter:title meta reads "Display Name (@handle) on X",
   #             and a wrong handle returns "User Profile Not Found - X | 404 Error", so that route
   #             genuinely discriminates. The FOLLOWER COUNT is not on any x.com page, and comes
-  #             from api.fxtwitter.com, a third-party mirror that passes X's own API through. That
-  #             is ONE HOP REMOVED from the platform record and is labelled as such on every row.
-  #             It is a passthrough rather than a computed aggregate (the returned name and
-  #             screen_name match x.com on every account checked), which is why it is recorded at
-  #             all, unlike the TikTok analytics mirrors platform-collection.md correctly bans.
-  #             If that distinction ever matters for a decision, re-read the number off the app.
+  #             from api.fxtwitter.com, which is ONE HOP REMOVED from the platform record.
+  #             See the standing ruling directly below before touching an x follower value.
+  #
+  # ------------------------------------------------------------------------------------------
+  # STANDING RULING on third-party follower sources, decided 2026-08-23. Read this before
+  # recording, removing or trusting any number that did not come from the platform itself.
+  #
+  # THE RULE: a PASSTHROUGH that relays the platform's own number is a different category from a
+  # MIRROR that computes or estimates one, and only the second kind is banned.
+  # platform-collection.md bans third-party analytics mirrors because their number is somebody
+  # else's arithmetic. api.fxtwitter.com relays X's own API response rather than computing
+  # anything, and the returned name and screen_name matched x.com on every account checked, so
+  # the failure mode that ban exists to prevent does not apply here. Recording it was weighed
+  # against the alternative, which is null on all 26 x rows: that would leave the largest text
+  # platform in this file unrankable without making anything more accurate, only emptier.
+  #
+  # TWO CONDITIONS, and they are the substance of the ruling rather than trimming on it:
+  #   1. Every fxtwitter-sourced value KEEPS its inline provenance note. A number whose origin is
+  #      not written next to it has quietly become a platform reading, which is the exact drift
+  #      this ruling exists to prevent. Do not tidy those notes away.
+  #   2. If a number from this route ever DRIVES A REAL DECISION, re-read it off the app first.
+  #      The note is what makes that possible, so it is the whole point rather than a formality.
+  #
+  # This ruling covers the route, not the platform. It does not license recording a TikTok
+  # analytics mirror, a creator's own website figure, or a Wikipedia number as a platform
+  # reading. All three of those have already produced wrong values in this file: see the seven
+  # corrections dated 2026-08-23, one of which moved DOWNWARD, which growth cannot explain and
+  # which is the clearest evidence here that a site figure and a platform figure are different
+  # quantities.
+  # ------------------------------------------------------------------------------------------
   #   linkedin  TWO fetches. The handle is verified by the profile page <title>, "Name - Headline
   #             | LinkedIn"; a wrong slug returns "Profile Not Found | LinkedIn". The follower
   #             count needs a public POST: pull a linkedin.com/posts/... URL off the profile, fetch
