@@ -90,6 +90,7 @@
     "patterns:youtube": "tsx src/patterns/youtube.ts",
     "patterns:account-mapping": "tsx src/patterns/account-mapping.ts",
     "patterns:coverage": "tsx src/patterns/coverage.ts",
+    "patterns:pool-evidence": "tsx src/patterns/pool-evidence.ts",
     "grow:plan": "tsx src/grow/cli.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",

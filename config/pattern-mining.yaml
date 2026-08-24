@@ -3728,11 +3728,11 @@ accounts:
 # engagement counts are much smaller absolute numbers than view counts, so a multiple computed on
 # them is noisier, and a post at 8 likes against a median of 2 clears a 3x bar on almost nothing.
 # If real data shows engagement-scored accounts producing junk outliers, split the bar then.
-# Creators who have PUBLICLY granted permission to remix their content verbatim.
-# Only these handles may have their opener copied word for word by /patterns remix
-# (references/remix-mode.md). Everyone else defaults to false: their opener is studied as a shape,
-# never reused as text. Add a handle here only with a real, citable grant, and cite it inline.
-# A wrong entry here puts someone else's words in Muxin's feed under a permission she does not have.
+# Creators whose PUBLIC statement may support intentional verbatim quotation or licensed use.
+# This is not the default /patterns remix path: common, widely shared hooks may be adapted as
+# mad-lib templates without a grant, while distinctive creator wording stays internal evidence.
+# Add a handle here only with a real, citable grant, and cite it inline. A wrong entry here puts
+# someone else's words in Muxin's feed under a permission she does not have.
 verbatim_ok:
   - handle: "@sabrinaramonov"
     creator: Sabrina Ramonov

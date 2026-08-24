@@ -42,8 +42,46 @@ test("projects derived rows as needs-review and sorts by current account key", (
   assert.deepEqual(mapping.rows.map((row) => row.derivedAccountId), ["linkedin|alpha", "x|zeta"]);
   assert.deepEqual(mapping.rows.map((row) => row.mappingDisposition), ["needs-review", "needs-review"]);
   assert.equal(mapping.rows[0].evidenceCount, 1);
+  assert.deepEqual(mapping.rows[0].audience, { size: null, countType: null, provenance: null, asOf: null });
+  assert.deepEqual(mapping.rows[0].topics, []);
+  assert.deepEqual(mapping.rows[0].formats, []);
+  assert.equal(mapping.rows[0].readiness.status, "blocked");
+  assert.match(mapping.rows[0].readiness.reason, /missing required fields/i);
   assert.match(mapping.rows[0].humanReviewNote, /derived.*not yet opaque.*reviewed/i);
-  assert.deepEqual(mapping.summary, { total: 2, needsReview: 2, unmapped: 0, evidenceCount: 3 });
+  assert.deepEqual(mapping.summary, {
+    total: 2, needsReview: 2, unmapped: 0, evidenceCount: 3,
+    readiness: { ready: 0, blocked: 2, blockedRows: ["linkedin|alpha", "x|zeta"] },
+  });
+});
+
+test("marks a row ready only when the normalized inventory is complete", () => {
+  const mapping = buildAccountMapping(catalog([{
+    key: "x|complete", accountId: "x|complete", platform: "x", niche: "systems", evidenceCount: 1,
+    audience: { size: 1000, countType: "followers", provenance: "profile", asOf: "2026-08-23" },
+    topics: ["systems"], focus: ["research"], researchPools: ["niche"],
+    popularityScopes: ["top"], sampleScopes: ["recent"], baselineSources: ["account-baseline"],
+    formats: ["text"],
+  }]));
+
+  assert.deepEqual(mapping.rows[0].readiness, { status: "ready", blockingFields: [], reason: "Inventory complete; identity still requires human review." });
+  assert.deepEqual(mapping.summary.readiness, { ready: 1, blocked: 0, blockedRows: [] });
+});
+
+test("reports missing fields in a stable order without changing null semantics", () => {
+  const mapping = buildAccountMapping(catalog([{
+    key: "x|partial", accountId: "x|partial", platform: "x", niche: null, evidenceCount: 0,
+    audience: { size: null, countType: "followers", provenance: null, asOf: null },
+    topics: ["systems"], focus: [], researchPools: [], popularityScopes: [], sampleScopes: [],
+    baselineSources: [], formats: [],
+  }]));
+
+  assert.deepEqual(mapping.rows[0].readiness.blockingFields, [
+    "audience.size", "audience.provenance", "audience.asOf", "focus", "researchPools",
+    "popularityScopes", "sampleScopes", "baselineSources", "formats", "evidenceCount",
+  ]);
+  assert.equal(mapping.rows[0].audience.size, null);
+  assert.equal(mapping.rows[0].audience.provenance, null);
+  assert.match(mapping.rows[0].readiness.reason, /audience\.size, audience\.provenance, audience\.asOf/);
 });
 
 test("renders review fields in a deterministic markdown table", () => {
@@ -56,6 +94,8 @@ test("renders review fields in a deterministic markdown table", () => {
   assert.match(markdown, /needs-review/);
   assert.match(markdown, /x\\\|alpha/);
   assert.match(markdown, /Evidence count/);
+  assert.match(markdown, /Readiness/);
+  assert.match(markdown, /audience\.size/);
   assert.match(markdown, /derived ID is not yet opaque\/reviewed/i);
   assert.match(markdown, /Total rows: 1 \| Needs review: 1 \| Unmapped: 0 \| Evidence: 3/);
 });
@@ -76,7 +116,10 @@ test("CLI emits JSON by default and Markdown when requested", () => {
     const inputs = { config: cliConfig, corpus: [], analyses: [] };
     assert.equal(main([], () => inputs), 0);
     const json = JSON.parse(output.pop() ?? "");
-    assert.deepEqual(json.summary, { total: 0, needsReview: 0, unmapped: 0, evidenceCount: 0 });
+    assert.deepEqual(json.summary, {
+      total: 0, needsReview: 0, unmapped: 0, evidenceCount: 0,
+      readiness: { ready: 0, blocked: 0, blockedRows: [] },
+    });
 
     assert.equal(main(["--format", "markdown"], () => inputs), 0);
     assert.match(output.pop() ?? "", /# Account identity mapping review/);

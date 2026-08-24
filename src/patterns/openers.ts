@@ -1,10 +1,10 @@
-// The opener bank: verbatim first lines, derived from corpus entries and stored on their own.
+// The opener bank: captured first lines, derived from corpus entries and stored on their own.
 //
-// This file is the one place in the pattern pipeline that keeps another creator's EXACT wording.
-// That is deliberate and narrow. Read `.claude/skills/patterns/references/remix-mode.md` before
-// changing anything here: the exception covers the opener and the on-screen title, nothing else,
-// and everything after the opener is still governed by the shapes-only rule in
-// `.claude/skills/atomize/references/hook-patterns.md`.
+// This is an analysis evidence bank. It may retain another creator's captured wording so Muxin can
+// inspect the source and identify a common hook mechanism. Read
+// `.claude/skills/patterns/references/remix-mode.md` before changing anything here: generated
+// output adapts a common template into Muxin's own words. Exact text is for analysis, quotation,
+// attribution, or a licensed exception only.
 //
 // The derivation functions are pure. Only the read/append helpers and the CLI touch disk.
 //
@@ -28,8 +28,8 @@ import type { AccountBaseline, CorpusEntry, Opener, OpenerWarning, PatternMining
 
 export const OPENERS_PATH = join(PATTERNS_DIR, "openers.jsonl");
 
-// How many lines of a text post count as the opener. Sabrina's rule for text platforms is the
-// first two lines, which is also roughly what LinkedIn and Substack show above the fold.
+// How many lines of a text post count as the opener. The first two lines are a practical
+// above-the-fold evidence window for text platforms such as LinkedIn and Substack.
 export const TEXT_OPENER_LINES = 2;
 
 // How many spoken sentences count as the opener on a video. Two is about three seconds of speech,
@@ -131,7 +131,7 @@ export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
       const title = media.onscreen_text === null ? "and its on-screen text was not captured" : "though its on-screen text WAS captured";
       warnings.push({
         code: "substance-outside-body",
-        note: `Someone looked at this post: its form is ${media.form}, and its substance is not in the collected body, ${title}. Copying this opener copies a fragment of what actually worked.`,
+        note: `Someone looked at this post: its form is ${media.form}, and its substance is not in the collected body, ${title}. Using this fragment as hook evidence could miss what actually worked.`,
       });
     }
   } else {
@@ -150,14 +150,13 @@ export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
     }
   }
 
-  // Sabrina's method copies the title as well as the opener, so a post that HAS a media and no
-  // captured on-screen text is missing half the method. Form "none" means someone looked and found
-  // no media at all, which is not a gap.
+  // A media-first post with no captured on-screen text is missing part of the hook evidence. Form
+  // "none" means someone looked and found no media at all, which is not a gap.
   const mediaCarriesTitle = media ? media.form !== "text-only" && media.form !== "thread" : entry.kind === "video";
   if (mediaCarriesTitle && (media?.onscreen_text ?? null) === null) {
     warnings.push({
       code: "missing-onscreen-title",
-      note: "No on-screen title on record. Sabrina's method copies the title as well as the opener, so read it off the original and supply it by hand.",
+      note: "No on-screen title on record. Read the original if the visual hook matters, then record the evidence before selecting a template.",
     });
   }
 
@@ -172,8 +171,8 @@ export function openerWarnings(entry: CorpusEntry): OpenerWarning[] {
 }
 
 export interface BuildOpenersOptions {
-  // Handles whose creator has PUBLICLY granted permission to remix their work. Everyone else gets
-  // verbatim_ok: false, which is the honest default. The durable list lives in
+  // Handles with a PUBLIC attribution/licensing grant for intentional verbatim quotation. Common
+  // template adaptation does not require this flag. The durable list lives in
   // config/pattern-mining.yaml under `verbatim_ok`, each entry citing its grant; the CLI reads it
   // from there and `--verbatim-ok @handle` adds one ad hoc on top.
   verbatimOkHandles?: string[];
@@ -236,8 +235,8 @@ export function buildOpeners(entries: CorpusEntry[], options: BuildOpenersOption
       handle: entry.handle,
       url: entry.url,
       opener_text,
-      // Verbatim, straight off the entry, and null when nobody captured it. Never derived, never
-      // guessed: this text gets copied into Muxin's own post word for word.
+      // Captured verbatim from the entry, and null when nobody captured it. Never derived or
+      // guessed: this is evidence for template selection, not generated copy.
       onscreen_title: entry.media?.onscreen_text ?? null,
       kind: entry.kind,
       performance: {
@@ -333,8 +332,8 @@ function parseArgs(argv: string[]): Args {
   return args;
 }
 
-// The whole opener, indented for the listing. Every line of it, because a text opener is two
-// lines and showing only the first would misrepresent what gets copied.
+// The whole opener, indented for the evidence listing. Every line of it, because a text opener is
+// two lines and showing only the first would misrepresent the captured source.
 function indented(text: string): string {
   return text
     .split("\n")
@@ -368,17 +367,17 @@ export function main(argv: string[] = process.argv.slice(2)): number {
   const skipped = corpus.filter((e) => extractOpener(e) === null).length;
 
   console.log(`Corpus entries: ${corpus.length}. Openers derived: ${built.length}.`);
-  console.log(`Public remix grants on record: ${granted.length === 0 ? "none" : granted.join(", ")}.`);
+  console.log(`Attribution/licensing grants on record: ${granted.length === 0 ? "none" : granted.join(", ")}.`);
   console.log(`Skipped (caption, truncated opening, thread opener, or empty body): ${skipped}.`);
   console.log(`Appended: ${appended.length}. Already in the bank: ${duplicates.length}.`);
 
   const ranked = rankOpeners(readOpeners(args.openersPath));
   console.log("\nRanked opener bank:");
   for (const opener of ranked) {
-    const permission = opener.verbatim_ok ? "verbatim_ok" : "no remix permission on record";
+    const permission = opener.verbatim_ok ? "attribution/licensing grant on record" : "common-template adaptation allowed";
     const metric = opener.performance.metric ? ` (${opener.performance.metric})` : "";
     console.log(`\n  ${opener.performance.note}${metric} - ${opener.creator} (${opener.handle}), ${opener.platform}`);
-    console.log("  opener, copied word for word:");
+    console.log("  captured opener evidence (verbatim):");
     console.log(indented(opener.opener_text));
     console.log(`  on-screen title: ${onscreenTitleLine(opener)}`);
     console.log(`  ${permission} | ${opener.url}`);

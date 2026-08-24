@@ -1,6 +1,6 @@
 ---
 name: patterns
-description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into the strongest shapes, and remixes a proven opener onto her own material. Proven structures only and never anyone's wording, with one scoped 2026-08-22 exception in remix mode covering two elements: a proven opener and, where it was captured, its on-screen title, copied verbatim, with everything after them hers. It proposes rather than composes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>, /patterns remix <content-folder | topic> [--platform X].
+description: Learn what already works in Muxin's niches on each platform, then put it to work on her own material. Collects real winners from other creators into a gitignored local corpus, flags outliers off recorded numbers, synthesizes the patterns that repeat per platform, then proposes net-new post ideas, series arcs, and completable civic CTAs in both accepted forms (micro-action and value-aligned matching), and restructures her existing source material into platform-native treatments using common hook templates adapted into her own words. Exact creator text is retained only as internal evidence, quotation, attribution, or a licensed exception. It proposes rather than publishes. Usage - /patterns collect [--platform X] [--account @handle], /patterns analyze, /patterns synthesize [--platform X], /patterns ideas [--platform X] [--niche Y], /patterns series <content-folder>, /patterns rewrite <content-folder | file>, /patterns asap <content-folder>, /patterns remix <content-folder | topic> [--platform X].
 ---
 
 # /patterns: the pattern mining pipeline
@@ -44,29 +44,26 @@ this platform" when nothing was mined.
 
 ## The four non-negotiable rules
 
-### 1. Shapes, not lines
+### 1. Common templates, original substance
 
 The whole guardrail, inherited from `.claude/skills/atomize/references/hook-patterns.md`. Read
 that file's "How to use this" section before you synthesize, propose, or rewrite anything.
 
-- **What we mine is proven STRUCTURE.** "This shape is proven to work" is the value. The wording
-  never is.
-- **Every synthesized pattern is a template with blanks**, filled at apply time with a specific
-  fact or phrase that is *already in Muxin's material*.
-- **A real example is a citation, never a phrase bank.** Cite the creator, the platform, and what
-  the post did. Never reuse an example's exact wording, and never paraphrase it closely enough
-  that it is recognizable as theirs. These are named people with audiences who know their own
-  lines. A near match reads as plagiarism, not inspiration.
+- **What we mine is the mechanism and the reusable hook template.** "This format is common and
+  works under these conditions" is the value. A common opener may be adapted in mad-lib form.
+- **Every synthesized pattern has slots**, filled at apply time with Muxin's own fact, claim,
+  experience, evidence, example, and point of view. The resulting wording should sound like her,
+  not like a generic social post.
+- **A real example is evidence, not a body-copy bank.** Cite the creator, platform, post, metric,
+  and scope. Exact creator wording may remain visible in internal analysis, but the generated
+  treatment must adapt the common template and must not copy a distinctive phrase sequence.
 - **Never copy a creator's body text into a committed file.** The corpus holds their full text
   locally and stays out of git for exactly this reason. Only distilled shapes get committed.
 
-**One scoped exception, added 2026-08-22: `/patterns remix`.** Muxin handed over Sabrina Ramonov's
-playbook and said to do it, and its rule is the opposite of this one for two elements: the opener
-and the on-screen title get copied word for word, because the exact wording is the proven part.
-That reversal is deliberate, it is scoped to those two elements, and it lives entirely in
-`references/remix-mode.md`. Read that file before running remix. Everything after the opener is
-still governed by the four bullets above, and `hook-patterns.md` and `post-patterns.md` stay
-shapes-only libraries that remix neither changes nor writes to. Every other mode is unaffected.
+`/patterns remix` applies this same common-template rule to the selected opener and on-screen
+title. It may show the exact captured text as evidence, but the output adapts the hook into
+Muxin's own wording and fills it with her substance. There is no requirement for a creator-specific
+permission flag when the output is a common template rather than a quotation.
 
 ### 2. The system proposes. It does not compose.
 
@@ -92,6 +89,9 @@ its model exactly. Read its "Hard rules" before running any of the three.
 `/patterns rewrite` is the one mode that produces prose, so this is where the rule bites hardest:
 
 - Every rewritten version reorders, re-hooks, and re-frames material **already in her source**.
+- The hook may be newly worded from a selected common template. That is the deliberate exception
+  to strict extraction, and it applies only to the platform hook/opening. The body must continue
+  to use Muxin's own source, facts, examples, and point of view.
 - It NEVER composes a new claim, statistic, experience, result, or worldview line in her voice.
   If a shape has a blank the source cannot fill honestly, that shape does not fit this piece. Pick
   a different one. Do not fill the blank with something you made up.
@@ -146,12 +146,16 @@ reads as useful rather than partisan. And local plus specific beating national p
 
 ## Scripts count, Claude judges (CLAUDE.md rule 4)
 
-Three npm scripts exist and they are all deterministic:
+The deterministic catalog/report scripts are:
 
 - `npm run patterns:collect` validates staged entries, dedupes by url, appends to the corpus, and
   prints a per-account summary. It never judges, analyzes, or calls a model.
 - `npm run patterns:outliers` is the same script's `outliers` subcommand. It scores the corpus off
   recorded numbers and prints the report. It appends nothing and fetches nothing.
+
+- `npm run patterns:account-mapping`, `npm run patterns:coverage`, and
+  `npm run patterns:pool-evidence` print deterministic inventory reports. They preserve nulls,
+  expose missing metadata, and never infer pool membership, select winners, or generate copy.
 
 - `npm run patterns:openers` builds the verbatim opener bank from the corpus and prints it ranked.
   It derives, dedupes, and appends. It never judges or calls a model, and it skips any entry whose
@@ -167,13 +171,13 @@ Everything else here is Claude judgment done inline while running this skill. Th
 |---|---|---|
 | Config: niches, accounts, thresholds, targets | `config/pattern-mining.yaml` | yes |
 | Muxin's civic rubric (read only, never written here) | `.claude/skills/atomize/references/civic-adaptation.md` | yes |
-| The remix rule and its scoped verbatim exception | `.claude/skills/patterns/references/remix-mode.md` | yes |
+| The common-hook template rule | `.claude/skills/patterns/references/remix-mode.md` | yes |
 | Hook shapes | `.claude/skills/atomize/references/hook-patterns.md` | yes |
 | Full-post shapes (this skill writes these) | `.claude/skills/atomize/references/post-patterns.md` | yes |
 | Staged entries waiting to be collected | `data/patterns/inbox/*.json` | no |
 | The corpus of collected posts | `data/patterns/corpus.jsonl` | no |
 | Per-outlier structural analyses | `data/patterns/analyses.jsonl` | no |
-| The verbatim opener bank (remix mode only) | `data/patterns/openers.jsonl` | no |
+| The verbatim opener evidence bank (analysis only) | `data/patterns/openers.jsonl` | no |
 | Proposed post ideas | `data/patterns/ideas.md` | no |
 | Remix drafts for her review | `<content-folder>/pattern-remixes.md` | yes |
 | Series and micro-action proposal cards | `<content-folder>/develop/advice.json` + `develop/log.md` | yes |
@@ -218,12 +222,13 @@ two-platform scope, it is stale.
 - **`/patterns rewrite`** restructures her own source material three ways.
 - **`/patterns asap`** proposes ranked, verifiable civic CTA candidates for a piece, in either
   accepted form: a micro-action, or value-aligned matching.
-- **`/patterns remix`** copies one proven opener and its on-screen title verbatim, then builds the
-  rest of the post out of her own material. Read `references/remix-mode.md` first, every time.
+- **`/patterns remix`** adapts one proven common opener template and, when available, its visual
+  title into her own words, then builds the rest of the post out of her own material. Read
+  `references/remix-mode.md` first, every time.
 
 `ideas`, `series`, and `asap` all run under rule 2. `rewrite` runs under rule 3. `remix` runs under
-rule 1's one scoped exception for the opener and the on-screen title, and under rule 3's
-source-only constraint for every line after them. Nothing runs without rules 1 and 4.
+rule 1's common-template hook exception, and under rule 3's source-only constraint for every line
+after the adapted hook. Nothing runs without rules 1 and 4.
 
 ---
 
@@ -947,23 +952,19 @@ points at is real. Ranking a fabricated link first is worse than proposing nothi
 
 ## Mode 8: `/patterns remix <content-folder | topic> [--platform X]`
 
-Goal: one post that opens with a proven opener, copied word for word, and then says something that
-is entirely Muxin's.
+Goal: one post that adapts a proven common opener template to Muxin's own material, then says
+something that is entirely hers.
 
 **Read `references/remix-mode.md` before running this, every time.** It carries the full rule, the
 two honest cautions, and the refuse conditions. The short version is here so nothing important is
 only in one place.
 
-### What this mode reverses, and how far
+### What this mode adapts
 
-This is the one mode where exact reuse is intended, and it is scoped to TWO elements: the opener
-(the first thing said on a video, or the first two lines on a text platform) and the on-screen
-title. Muxin decided this on 2026-08-22 off Sabrina Ramonov's playbook, reversing the 2026-08-18
-shapes-not-lines rule for those two elements only.
-
-Everything after the opener is still hers and still governed by rule 1, `civic-adaptation.md`, and
-`config/voice.yaml`. `hook-patterns.md` and `post-patterns.md` are untouched shapes-only libraries
-here. A copied opener over a copied body is not a remix, and this mode does not produce one.
+This mode applies a common template to the opener (the first thing said on a video, or the first
+lines on a text platform) and, when present, the on-screen title. The exact captured text is shown
+as evidence, but the generated hook is mad-lib close in structure and written in Muxin's own
+words. A copied opener over a copied body is not a remix, and this mode does not produce one.
 
 **The opener half always works. The title half depends on what was collected.** An entry's
 `visual.onscreen_text` holds the on-screen title verbatim when a collector recorded one, and
@@ -975,14 +976,16 @@ that a post won on something outside the words that were collected.
 
 ### Steps
 
-1. **Show her the ranked opener bank for the target platform.** Build or refresh it first with
-   `npm run patterns:openers -- [--platform X]`. Each row shows the verbatim opener,
+1. **Show her the ranked opener evidence for the target platform.** Build or refresh it first with
+   `npm run patterns:openers -- [--platform X]`. Each row shows the captured opener,
    its on-screen title where one is known, the creator, the measured multiple and its metric, and
-   whether `verbatim_ok` is set, plus any warnings on it. She picks one. `verbatim_ok: false` is
-   shown, not hidden, and it does not block the pick. It is her call with the fact in front of her.
+   the comparison scope and warnings on it. She picks one or accepts a common template
+   recommendation. `verbatim_ok` may still be shown for quotation or licensed exceptions, but it
+   is not required for ordinary template adaptation.
 
-2. **Keep the opener and the on-screen title EXACTLY.** No tightening, no rephrasing for voice, no
-   swapped nouns. Editing it discards the only thing being borrowed.
+2. **Adapt the opener and the on-screen title into Muxin's own words.** Keep the familiar rhythm,
+   promise, tension, or audience callout, but fill the slots with her actual substance. Do not
+   preserve a distinctive creator-specific phrase sequence.
 
 3. **Write the rest out of her material.** Her list, her picks, her examples, her take. Use
    `post-patterns.md` for that platform where a shape has been mined, run the cold-start disclosure
@@ -994,20 +997,21 @@ that a post won on something outside the words that were collected.
 5. **Write to `<content-folder>/pattern-remixes.md`**, or `<file-stem>-pattern-remixes.md` next to
    a bare file. **Never into `derivatives/`.** Nothing here publishes or queues.
 
-6. **State the provenance in the file itself**, not only in the chat: which opener was copied, from
-   which creator and handle, its url, its multiple, and its `verbatim_ok` status. This is what
-   keeps the borrowing visible to her at review time.
+6. **State the provenance in the file itself**, not only in the chat: which source example informed
+   the template, from which creator and handle, its URL, its multiple and scope, and what was
+   adapted into Muxin's own words. This keeps the borrowing visible to her at review time.
 
 ### Refuse, in plain language, when
 
 - **there is no opener bank yet.** Point her at `/patterns collect` then the openers build. Never
   write an opener that merely sounds proven as a substitute.
 - **the chosen opener came from a `"caption"` entry or a truncated body.** The real opener is
-  unknown, so there is nothing honest to copy.
+  unknown, so there is not enough evidence to select the template honestly.
 - **the chosen opener's post won on something outside its body** (a `substance-outside-body`,
   `short-body`, or `media-first-platform` warning). Say it plainly: this post won on an image we
-  did not collect, so copying its 22-character opener would copy the caption and miss the post. She
-  can override with eyes on the original; the system does not hand her a fragment on its own.
+  did not collect, so copying its 22-character caption would copy the wrong thing and miss the post.
+  She can inspect the original and resolve the evidence; the system does not silently treat a
+  fragment as the winning template.
 - **the body she wants to remix is not her own material.** Route her to `/patterns ideas` when
   there is no source yet.
 

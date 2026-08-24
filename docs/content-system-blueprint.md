@@ -74,7 +74,7 @@ same object.
 | Claim | A proposition being made or tested. It must point to source lines, an evidence record, or a clearly marked hypothesis. |
 | Cut | A message-level treatment before platform formatting. It may select, order, and lightly trim Muxin's words; it is not a raw working file or a platform post. |
 | Variant | A cut formatted for one platform, medium, and format, with its experiment variables and lineage intact. |
-| Pattern | A structural description of an observed mechanism: hook family, sequence, pacing, tension, CTA shape, or visual treatment. It is not creator-copy substitution. |
+| Pattern | A reusable description of an observed mechanism: common hook template, sequence, pacing, tension, CTA shape, or visual treatment. It is not creator body-copy substitution. |
 | Experiment | A declared comparison with a question, variable(s), unit, audience/platform scope, success observations, sample size, and end date or review rule. |
 | Comment | A conversation observation linked to a published variant and date. It may propose a question or follow-up test; it is not automatically evidence of demand. |
 | Funnel event | A measurable transition such as profile visit, landing visit, opt-in, reply, call inquiry, or sale, linked to the originating variant where possible. |
@@ -140,6 +140,36 @@ Keep three research pools separate, with separate labels and retrieval/ranking:
 A record can appear in more than one pool only with an explicit reason. Pool membership is not a
 quality score, and evidence from one pool cannot silently stand in for another.
 
+### Deterministic pool-evidence inventory
+
+Phase 2 has a deterministic inventory artifact: `pool-evidence-inventory-v1`, with
+`src/patterns/pool-evidence.ts` as its source module. It is scaffolded and provisional. For a
+fixed catalog snapshot and the same invocation inputs, it emits a stable, reviewable set of rows;
+it does not claim that the catalog or any pool is complete.
+
+The provisional output requires `rows` and `summary`. `summary` requires
+`poolCounts` for `niche`, `broad`, and `format`, plus `blockedAccounts`. Every row requires
+`accountId`, `platform`, `handle`, `creator`, `niche`, `topics`, `focus`, `formats`, `audience`,
+`pool`, `membershipReason`, `popularityScopes`, `sampleScopes`, `baselineSources`,
+`evidenceCount`, `admissibleCount`, `bodyCompleteCount`, `bodyIncompleteCount`, `caveats`, and
+`readiness`. `readiness` is `ready` or `blocked` with a reason. Nulls and empty lists preserve
+the common missing-data policy; the counts are descriptive inventory facts, not metric judgments.
+
+Pool membership is explicit-membership-only. `pool` may be populated only from explicit
+`research_pool`/`research_pools` metadata; it may not be inferred from the account name, niche,
+topic, format, metric, ranking, body, or a model's judgment. An account may have more than one row
+only when each membership is explicitly recorded. Unsupported pool labels do not create rows. If
+there is no explicit pool metadata, the row remains with `pool: null`, `membershipReason: null`,
+`readiness.status: blocked`, and a reason; it is not dropped, assigned a pool, or made usable for
+a pool-specific comparison. Rows and pool values are sorted deterministically.
+
+This inventory has three explicit non-goals: no inference of missing metadata or membership, no
+winner selection or winner claim, and no body generation. It records evidence and body-completeness
+counts as metadata, but does not draft, rewrite, or generate a body, hook, opener, or exact creator
+wording. The common-hook policy remains unchanged: later Grow work may adapt a
+common, widely shared hook template as a mad-lib around Muxin's own substance, while distinctive
+creator-specific wording and exact opener generation remain outside the default generation path.
+
 ### Popularity and winner claims
 
 Use **winner** only with a declared scope: niche, broad platform, format, account-relative,
@@ -157,21 +187,23 @@ Without those fields, say “selected example” or “observed signal,” never
 or “proven.” Account-relative performance is never platform-wide performance. Small samples may
 generate experiments, but cannot establish a general rule.
 
-### Exact-hook and mad-lib boundary
+### Common-hook template and originality boundary
 
-The system may abstract a hook family, opener shape, rhythm, sequence, tension, or CTA pattern and
-adapt that structure to Muxin's own claim and voice. A generated variant must be materially
-original, traceable to Muxin's source or a declared Venture exception, and checked for voice and
-originality before review.
+The system may reuse common, widely shared hook and opener templates as mad-lib structures. A
+template may stay recognizably close to the familiar format when its slots are filled with
+Muxin's own claim, experience, example, evidence, and point of view. This is the requested growth
+lever, not a prohibition on using the opening forms that circulate throughout social media.
 
-Live verbatim opener storage and remix mode may retain exact creator text for internal analysis or
-licensed/attributed exceptions, but Grow's default generation path is mad-lib-originality: copy is
-structurally inspired and materially original.
+The generated hook and body must still be written in Muxin's voice, preserve her non-generic
+substance, and pass voice and originality review before approval. Exact creator text may be retained
+in the local corpus or opener bank as internal evidence, quotation, attribution, or a licensed
+exception. It is not the default output.
 
-It may not turn an identifiable creator's wording into a noun-swapped template, preserve a
-distinctive phrase sequence, or draft from exact creator text. Exact text is analysis, quotation,
-or licensed material only. Pattern records describe structure, trigger, pacing, context, and
-conditions of success. They do not store substitution-ready copy banks.
+The system must not copy a distinctive creator-specific phrase sequence, body, story, claim, or
+example and swap nouns. A common template is allowed; a recognizable creator's signature wording
+is not. Pattern records therefore store the reusable slots, mechanism, trigger, pacing, context,
+conditions of success, and source evidence. They may include a template example for analysis, but
+the generation path must produce an adapted version rather than paste the example.
 
 ## 4. Human Inference and brand hypotheses
 
@@ -324,7 +356,15 @@ Muxin decides whether a summary is usable as an observation, hypothesis, or expe
 Evidence is the bounded evidence set, pattern summaries, source links, and review notes. The owner
 is pool evidence.
 
-**Not in scope:** training on exact creator text, replacing human judgment with ranking, or
+`pool-evidence-inventory-v1` advances this phase by making the pool-membership inputs,
+provenance, metadata gaps, and blocked rows deterministic and inspectable. It is the inventory
+scaffold for Phase 2, not the Phase 2 ship predicate: the phase remains incomplete until the
+normalized evidence set, reviewable summaries and selection rules, denominators, dates, caveats,
+source citations, originality checks, and Muxin's judgment are present. A provisional inventory
+does not unlock Grow variants or permit a winner claim.
+
+**Not in scope:** inferring missing pool metadata, training on exact creator text, selecting or
+claiming winners, generating body or opener copy, replacing human judgment with ranking, or
 generalizing from a single account or small sample.
 
 ### Phase 3: Grow-this experiments
@@ -368,14 +408,15 @@ claim. “Partial” means some supporting material exists, not that the archite
 |---|---|---|---|
 | Seeded targets | 352 rows across 13 configured platforms | Stable, provenance-aware target records with explicit scope and caveats | Partial |
 | Corpus | 292 entries across 13 corpus platforms | Normalized source/account/evidence catalog with queryable pool membership | Partial |
-| Patterns | 31 hook patterns | Structural patterns with source citations, originality review, and no substitution copy | Partial |
+| Patterns | 31 hook patterns | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | Current systems generate or queue artifacts in several places, but do not yet expose one shared capacity view | Separate candidate counts from approved publish counts, with human capacity, platform slots, pauses, and rollback records | Target |
-| Source-to-publish path | Existing extraction, review, and publish engines | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
+| Source-to-publish path | Existing extraction, review, and publish engines; `src/grow/variants.ts` now emits provisional no-copy candidate specifications | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
 | Review gate | Human review and publish approval already required | Explicit per-artifact states, rationale, lineage, and no-AI-smell check | Partial |
 | Phase contracts | This blueprint names broad phase outcomes; the parallel contracts document is not yet treated as an implemented runtime contract | `docs/content-system-contracts.md` records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Target |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` now emit a deterministic descriptive report over the catalog; it is a scaffold, not a completeness claim | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
-| Research pools | Niche, broad, and format distinction documented | Separate ingestion, ranking, retrieval, and reporting | Target |
+| Pool-evidence inventory | `pool-evidence-inventory-v1` is specified as a deterministic, scaffolded/provisional artifact from `src/patterns/pool-evidence.ts`; explicit memberships are retained and missing pool metadata is blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
+| Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership | Separate ingestion, ranking, retrieval, and reporting | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems | Variant-level variables linked to comments, funnel events, Signals, and Venture | Target |
 | Venture handoff | Venture has its own phases and gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |

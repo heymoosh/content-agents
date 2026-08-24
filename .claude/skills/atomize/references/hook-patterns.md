@@ -20,16 +20,13 @@ be argued for on the grounds that it went viral when nothing behind it was count
 
 ## How to use this, read before drafting
 
-**These are proven sentence SHAPES, not text to copy.** Muxin confirmed (2026-08-18): the value
-here is "this structure is proven to work," never the wording itself. A pattern's "Shape" row is a
-template with blanks. Fill every blank with a specific fact or phrase that is *already in the
-source material being atomized*, the same reframe-never-invent guardrail every other spin pass in
-this skill follows (`references/spin-mode.md`). The "Real example" row exists only to prove the
-shape actually works in the wild; it is a citation, not a phrase bank. **Never reuse a real
-example's exact wording, and never paraphrase it closely enough that it's recognizable as theirs.**
-These are named, identifiable creators with audiences who know their own lines, a near-match reads
-as plagiarism, not inspiration, and undermines the extraction-first rule this whole pipeline runs
-on (CLAUDE.md rule 1).
+**These are reusable common hook templates, not creator-copy banks.** Muxin's current direction is
+to use familiar social-media opener forms in mad-lib style. A pattern's "Shape" row has blanks that
+may be filled with Muxin's own claim, experience, evidence, example, and point of view, including
+new hook wording that makes the opening work on the target platform. The "Real example" row exists
+to prove the mechanism and scope, not to supply body copy. Exact captured wording may remain in
+internal evidence, but do not copy a distinctive creator-specific phrase sequence or story and
+swap nouns. The result must sound like Muxin and retain her actual substance.
 
 **When this applies:** the same scope as the storytelling re-hook pass it extends,
 `appliesRehook(platform, sourceKind)` in `src/atomize/spin.ts`. Muxin widened that gate on
@@ -37,8 +34,9 @@ on (CLAUDE.md rule 1).
 re-hook pass runs. A platform can opt back out with `rehook: false` in `config/platforms.yaml`
 (only `quote-card` does today, because a card is pulled verbatim), and a Notes repost
 (`source_kind: substack-note`) is still excluded everywhere. Use a pattern to decide HOW to
-reorder/lead with a specific already pulled from the source, never as a reason to add a claim,
-statistic, or detail that isn't already there.
+reorder/lead with a specific thought from Muxin. The hook may be newly worded from the common
+template, but never add a claim, statistic, experience, or detail that is not hers or clearly
+marked as a hypothesis.
 
 **Companion libraries:** `references/post-patterns.md` covers FULL-POST structure (arc, emotional
 trigger, CTA, length) the way this file covers the opening line; both are populated and maintained

@@ -17,7 +17,31 @@ export interface CoverageCell {
   bodyIncompleteCount: number;
 }
 
+export interface CoverageAccountRow {
+  accountId: string;
+  platform: string;
+  handle: string | null;
+  creator: string | null;
+  niche: string | null;
+  audience: {
+    size: number | null;
+    countType: string | null;
+    provenance: string | null;
+    asOf: string | null;
+  };
+  topics: string[];
+  focus: string[];
+  researchPools: string[];
+  popularityScopes: string[];
+  sampleScopes: string[];
+  baselineSources: string[];
+  formats: string[];
+  evidenceCount: number;
+  caveats: string[];
+}
+
 export interface CoverageReport {
+  accountRows: CoverageAccountRow[];
   cells: CoverageCell[];
   summary: {
     accountCount: number;
@@ -59,6 +83,26 @@ function compareCells(a: CoverageCell, b: CoverageCell): number {
   return 0;
 }
 
+function accountRow(row: CatalogRow): CoverageAccountRow {
+  return {
+    accountId: row.accountId,
+    platform: row.platform,
+    handle: row.handle,
+    creator: row.creator,
+    niche: row.niche,
+    audience: { ...row.audience },
+    topics: [...row.topics],
+    focus: [...row.focus],
+    researchPools: [...row.researchPools],
+    popularityScopes: [...row.popularityScopes],
+    sampleScopes: [...row.sampleScopes],
+    baselineSources: [...row.baselineSources],
+    formats: [...row.formats],
+    evidenceCount: row.evidenceCount,
+    caveats: [...row.caveats],
+  };
+}
+
 function addRow(cells: Map<string, CoverageCell>, row: CatalogRow): void {
   const platform = row.platform || "null";
   const evidenceState: EvidenceState = row.evidenceCount > 0 ? "present" : "none";
@@ -89,6 +133,7 @@ export function buildCoverageReport(catalog: PatternCatalog): CoverageReport {
   const rows = [...catalog.rows].sort((a, b) => compare(a.accountId, b.accountId));
   return {
     cells: [...cells.values()].sort(compareCells),
+    accountRows: rows.map(accountRow),
     summary: {
       accountCount: catalog.rows.length,
       evidenceCount: catalog.summary.evidenceCount,
@@ -116,6 +161,14 @@ function markdownCell(value: CoverageDimension): string {
   return (value ?? "null").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
 }
 
+function markdownList(values: string[]): string {
+  return markdownCell(values.length ? values.join(", ") : null);
+}
+
+function markdownText(value: string | null): string {
+  return markdownCell(value);
+}
+
 export function renderCoverageMarkdown(report: CoverageReport): string {
   const { gaps, summary } = report;
   const accountWord = (count: number): string => count === 1 ? "account" : "accounts";
@@ -137,9 +190,21 @@ export function renderCoverageMarkdown(report: CoverageReport): string {
     gapLine("No sample scope", gaps.noSampleScopeAccountIds),
     gapLine("No baseline source", gaps.noBaselineSourceAccountIds),
     "",
+    "## Account inventory",
+    "",
+    "Descriptive account metadata only. Unknown values remain null; empty lists indicate no collected value.",
+    "",
+    "| Account | Platform | Handle | Creator | Niche label | Audience size | Audience type | Audience provenance | Audience as-of | Topics | Focus | Research pools | Popularity scopes | Sample scopes | Baseline sources | Formats | Evidence | Caveats |",
+    "|---|---|---|---|---|---:|---|---|---|---|---|---|---|---|---|---|---:|---|",
+  ];
+  for (const row of report.accountRows) {
+    lines.push(`| ${markdownText(row.accountId)} | ${markdownText(row.platform)} | ${markdownText(row.handle)} | ${markdownText(row.creator)} | ${markdownText(row.niche)} | ${row.audience.size ?? "null"} | ${markdownText(row.audience.countType)} | ${markdownText(row.audience.provenance)} | ${markdownText(row.audience.asOf)} | ${markdownList(row.topics)} | ${markdownList(row.focus)} | ${markdownList(row.researchPools)} | ${markdownList(row.popularityScopes)} | ${markdownList(row.sampleScopes)} | ${markdownList(row.baselineSources)} | ${markdownList(row.formats)} | ${row.evidenceCount} | ${markdownList(row.caveats)} |`);
+  }
+  lines.push(
+    "",
     "| Platform | Research pool | Topic | Format | Evidence state | Accounts | Evidence | Admissible | Body-complete | Body-incomplete |",
     "|---|---|---|---|---|---:|---:|---:|---:|---:|",
-  ];
+  );
   for (const cell of report.cells) {
     lines.push(`| ${markdownCell(cell.platform)} | ${markdownCell(cell.researchPool)} | ${markdownCell(cell.topic)} | ${markdownCell(cell.format)} | ${cell.evidenceState} | ${cell.accountCount} | ${cell.evidenceCount} | ${cell.admissibleCount} | ${cell.bodyCompleteCount} | ${cell.bodyIncompleteCount} |`);
   }

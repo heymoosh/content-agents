@@ -135,9 +135,9 @@ export type MediaAspect = "vertical" | "square" | "horizontal";
 export interface CorpusMedia {
   form: MediaForm;
   // The text the creator typeset ONTO the image, frame or slide as its hook, word for word. This
-  // is Sabrina Ramonov's "on-screen title", and remix mode copies it into Muxin's own post
-  // VERBATIM. So a guess here does not degrade gracefully: it puts words she never verified into
-  // her feed under a claim they were market-tested.
+  // is on-screen title evidence used when identifying a visual hook template. A guess here does
+  // not degrade gracefully: it puts words the collector never verified into the evidence record
+  // under a claim they were market-tested.
   //
   // Null when the post has no such title, and also null when one was simply not retrievable.
   // `description` is what tells those two apart. Never "probably something like this".
@@ -175,8 +175,8 @@ export interface CorpusMedia {
   // were collected. A 22-character caption over an image that earned 3,536 likes has
   // body_is_complete: false, because the caption is not what won.
   //
-  // This is the flag that stops a downstream step copying that caption and calling it a proven
-  // opener. Any step that quotes `body` as if it were the whole post must check this first.
+  // This is the flag that stops a downstream step treating that caption as the complete winning
+  // hook. Any step that uses `body` as evidence for the whole post must check this first.
   body_is_complete: boolean;
 }
 
@@ -340,14 +340,16 @@ export interface PatternMiningConfig {
   accounts: AccountSeed[];
   outlier_thresholds: Record<string, OutlierThresholds>;
   targets: { corpus_size_min: number; corpus_size_max: number };
-  // Creators who have PUBLICLY granted permission to remix their content verbatim. Absent on a
-  // config written before remix mode existed, so every reader treats absent as "nobody".
+  // Creators whose PUBLIC statement may support intentional verbatim quotation or licensed use.
+  // Common hook templates do not require a grant; absent means no intentional verbatim exception
+  // is recorded, so every reader treats absent as "nobody".
   verbatim_ok?: VerbatimGrant[];
 }
 
 // One public grant. `grant` is the citation, and it is required for the same reason every other
 // claim in this repo needs a source: a wrong entry here puts someone else's words in Muxin's feed
-// under a permission she does not have.
+// under a permission she does not have. It does not turn distinctive creator wording into the
+// default output of remix mode.
 export interface VerbatimGrant {
   handle: string;
   creator: string;
@@ -370,10 +372,9 @@ export interface AccountSeed {
   boards?: string[];
 }
 
-// One verbatim opener, kept separately from the shape libraries because it is stored WORD FOR
-// WORD. That is the deliberate 2026-08-22 exception described in
-// `.claude/skills/patterns/references/remix-mode.md`, and it is scoped to two elements: the
-// opener and the on-screen title. Everything after the opener stays shapes-only.
+// One captured opener, kept separately from the shape libraries because it is retained as source
+// evidence WORD FOR WORD. Generated output adapts a common template into Muxin's own words; this
+// evidence is not a creator-copy bank.
 //
 // Stored one JSON object per line in data/patterns/openers.jsonl, gitignored like the rest of
 // data/patterns/**, because this is another creator's exact text.
@@ -400,9 +401,10 @@ export interface Opener {
     // Plain-language reading of the two numbers above, including why they are null when they are.
     note: string;
   };
-  // True ONLY where the creator has publicly granted permission to remix their work. False is the
-  // default and the honest answer for almost everyone. This is a fact shown to Muxin at pick
-  // time, not a gate the code enforces.
+  // True ONLY where the creator has publicly granted permission for intentional verbatim quotation
+  // or licensed reuse. False is the default and the honest answer for almost everyone. Common
+  // template adaptation does not require this flag. This is a fact shown to Muxin at pick time,
+  // not a gate the code enforces.
   verbatim_ok: boolean;
   // Reasons to doubt this opener, shown at pick time. Empty is the good case.
   warnings: OpenerWarning[];
@@ -412,8 +414,9 @@ export interface Opener {
 // Why an opener is doubtful. Coded rather than freeform, because two of these four decide a
 // refusal in `/patterns remix` and the other two only decide what Muxin is told.
 //
-// Refuse the pick on any of these three. All three mean the post's substance sat OUTSIDE the body
-// the corpus holds, so copying its opener copies a fragment and misses the thing that worked:
+// Refuse template selection on any of these three. All three mean the post's substance sat OUTSIDE
+// the body the corpus holds, so using the captured fragment as evidence could miss the thing that
+// worked:
 //
 //   "substance-outside-body" - RECORDED, not guessed: the entry's `media.body_is_complete` is
 //                              false, meaning someone looked at the post and confirmed the body is

@@ -129,7 +129,7 @@ immediate parent. Non-Venture content has `venture_id` and `venture_phase`
 existing status and are not silently rewritten; adapters may expose null
 fields until migration.
 
-### `variant` (scaffolded)
+### `variant` (scaffolded; provisional manifest exists)
 
 Owner: `atomize` for construction; Muxin owns treatment and editorial approval.
 
@@ -147,6 +147,13 @@ comparison dimensions, such as hook family, angle, length, CTA, timing, and
 visual treatment. A variant cannot become `approved` unless lineage, claim
 refs, treatment reason, evidence status, voice check, and originality check
 are present. Approval is per variant or an explicitly named bundle.
+
+`src/grow/variants.ts` currently emits a no-copy `grow-variant-manifest-v1`
+with source descriptor provenance, platform/medium/format, treatment reason,
+pattern/evidence references, experiment values, and `needs-human-review`
+status. It is an inspectable planning artifact only. It does not read source
+bodies, generate copy, create review-queue rows, schedule, publish, or claim
+that a variant is approved.
 
 ### `experiment` (scaffolded)
 
@@ -282,6 +289,57 @@ creates normal `cut`, `content_item`, `variant`, and human-review records.
 
 ## 6. Platform, format, and pattern evidence
 
+### `pool-evidence-inventory-v1` (scaffolded; provisional)
+
+Owner: `pool evidence`; the artifact is an inspectable inventory, not a human
+judgment or approval record. Its provisional source module is
+`src/patterns/pool-evidence.ts`. For the same catalog snapshot and invocation
+inputs, the producer must emit the same row content and ordering.
+
+The provisional serialized output requires:
+
+```text
+rows, summary
+```
+
+Each row requires:
+
+```text
+accountId, platform, handle, creator, niche, topics, focus, formats, audience,
+pool, membershipReason, popularityScopes, sampleScopes, baselineSources,
+evidenceCount, admissibleCount, bodyCompleteCount, bodyIncompleteCount,
+caveats, readiness
+```
+
+`summary` requires `poolCounts` for `niche`, `broad`, and `format`, plus
+`blockedAccounts`. `pool` is one of `niche`, `broad`, or `format`, or `null`
+for a blocked row. It is explicit-membership-only: the producer may copy it
+only from explicit `research_pool`/`research_pools` metadata. It must not
+infer membership from a name, niche, topic, format, metric, ranking, body, or
+model judgment. Multiple rows for one account are valid only for separately
+explicit memberships; unsupported pool labels do not create rows. The
+producer sorts rows and pool values deterministically. Nulls and empty lists
+follow the common missing-data policy; the counts are descriptive inventory
+facts, not metric judgments.
+
+Rows with missing required pool metadata remain in the artifact with
+`pool: null`, `membershipReason: null`, and `readiness.status: blocked`, with
+the reason explaining that the membership was not inferred. They are not
+dropped, assigned a pool, or used in a pool-specific comparison. The artifact
+has no inference, no winner selection or winner claim, and no body generation
+as non-goals. It carries body-completeness counts only; it does not draft or
+rewrite a body, hook, opener, or exact creator wording.
+
+This is a Phase 2 scaffold, not completion of Phase 2. It makes membership,
+provenance, gaps, and blocked work deterministic and reviewable; it does not
+by itself provide the normalized evidence set, reviewed summaries and
+selection rules, source citations, originality checks, or Muxin's decision
+required by the Phase 2 ship predicate. It cannot unlock Grow variants or
+support a winner claim. The common-hook policy remains available downstream:
+a common, widely shared hook template may be adapted as a mad-lib around
+Muxin's own substance, but exact opener generation and distinctive creator
+wording are not default generation behavior.
+
 Every `variant` must carry the following treatment object:
 
 ```text
@@ -306,10 +364,13 @@ Each `pattern_evidence_ref` is:
 ```
 
 `pool` is `niche`, `broad`, or `format`; `scope`, denominator, dates, and
-caveats are required. A pattern describes a mechanism, not substitution-ready
-creator copy. Exact creator wording is analysis or attributed quotation only,
-never a generated template. A single sighting may motivate a hypothesis but
-cannot be called a general rule.
+caveats are required. A pattern describes a reusable mechanism and its mad-lib
+slots. Common, widely shared hook templates may be adapted into Muxin's own
+wording and substance. Distinctive creator-specific phrase sequences, bodies,
+stories, claims, and examples may not be copied with nouns swapped. Exact
+creator wording remains analysis, quotation, attribution, or a licensed
+exception, not the default generated output. A single sighting may motivate a
+hypothesis but cannot be called a general rule.
 
 ## 7. Compact end-to-end lifecycle
 
