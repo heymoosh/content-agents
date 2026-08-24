@@ -112,6 +112,8 @@
     "patterns:measurement-run": "tsx src/patterns/measurement-run-cli.ts",
     "patterns:account-review-ledger": "tsx src/patterns/account-review-ledger-cli.ts",
     "patterns:source-evidence-ledger": "tsx src/patterns/source-evidence-ledger-cli.ts",
+    "patterns:baseline-measurement-ledger": "tsx src/patterns/baseline-measurement-ledger-cli.ts",
+    "patterns:reviewed-evidence-ledger-bridge": "tsx src/patterns/reviewed-evidence-ledger-bridge-cli.ts",
     "grow:plan": "tsx src/grow/cli.ts",
     "grow:brief": "tsx src/grow/brief-cli.ts",
     "grow:studio-readiness": "tsx src/grow/studio-readiness-cli.ts",

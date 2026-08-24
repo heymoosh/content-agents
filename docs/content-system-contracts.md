@@ -195,6 +195,9 @@ source-ledger inputs. It carries the intake's explicit readiness blockers,
 keeps pending, blocked, and unmapped dispositions visible, and never supplies
 missing identity, pool, baseline, or review facts. It owns no file or database
 write; the ledger append boundary remains the caller's explicit decision.
+`src/patterns/reviewed-evidence-ledger-bridge-cli.ts` provides a deterministic
+JSON/Markdown inspection of that projection. It accepts one explicit report,
+preserves separate evidence links and refs, and does not persist or promote rows.
 
 ### `baseline_measurement_ledger` (scaffolded; append-only JSONL seam exists)
 
@@ -217,6 +220,10 @@ when the sample window, metric denominator, method, dates, scope/source,
 evidence refs, and reviewed status are present. The injected JSONL adapter
 appends one validated fact at a time and rejects duplicate IDs or malformed
 rows; it does not mutate the established baseline data.
+`src/patterns/baseline-measurement-ledger-cli.ts` exposes deterministic JSON or
+Markdown inspection and an explicit one-fact append command. It requires a
+caller-supplied path and fact, and performs no measurement, calculation, or
+inference.
 
 ### `account_example_table` (scaffolded; pure projection exists)
 
@@ -512,6 +519,10 @@ unique platform/medium/format/treatment/hook/experiment identity. It preserves
 source lineage, allows common-hook mad-lib template references, and rejects
 creator-body, model, PII, ranking, and winner inputs. It never generates copy,
 approves, schedules, publishes, or writes files.
+`src/grow/draft-batch-inspection.ts` is a read-only projection of that batch for
+operators. It lists exact identities, lineage, per-platform/per-format counts,
+and pending-review blockers while retaining `generatesCopy: false` and
+`sideEffects: "none"`.
 
 ### `grow_treatment_coverage` (scaffolded; read-only reconciliation exists)
 

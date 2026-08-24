@@ -164,6 +164,22 @@ export {
 } from "./draft-batch.js";
 
 export {
+  buildDraftBatchInspection,
+  createDraftBatchInspection,
+  inspectDraftBatch,
+  renderDraftBatchInspection,
+  renderDraftBatchInspectionJson,
+  renderDraftBatchInspectionMarkdown,
+  DRAFT_BATCH_INSPECTION_VERSION,
+  type DraftBatchInspection,
+  type DraftBatchInspectionCounts,
+  type DraftBatchInspectionFormat,
+  type DraftBatchInspectionHumanReview,
+  type DraftBatchInspectionIdentity,
+  type DraftBatchInspectionRequest,
+} from "./draft-batch-inspection.js";
+
+export {
   buildExperimentOutcomeLedger,
   createExperimentOutcomeLedger,
   type ExperimentDeclaredObservation,
