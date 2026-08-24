@@ -124,7 +124,7 @@ export function buildContinuityPrompt(canonPack: string, chapterBody: string): s
   ].join("\n");
 }
 
-// Em dashes are Muxin's house rule and it carries into fiction (stories/CLAUDE.md). A proposed
+// Em dashes are Muxin's house rule and it carries into fiction (stories/AGENTS.md). A proposed
 // replacement carrying one cannot be written into a chapter, so it is not a usable fix.
 export function hasEmDash(s: string): boolean {
   return /[—–]/.test(s);

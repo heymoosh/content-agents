@@ -1902,7 +1902,7 @@ export function charlesDraftPrompt(mode: CharlesDraftMode, input: string, existi
     `(Build 4). Do not run shell commands beyond what reading/writing files requires; write the one`,
     `new file plus the one queue row below, then stop.`,
     ``,
-    `First read charles/CLAUDE.md and charles/config/persona.yaml in full — his voice is governed`,
+    `First read charles/AGENTS.md and charles/config/persona.yaml in full — his voice is governed`,
     `by persona.yaml, NOT config/voice.yaml. Then follow the "Mode: /charles ${mode}" section of`,
     `.claude/skills/charles/SKILL.md exactly, for this input:`,
     ``,
@@ -1916,7 +1916,7 @@ export function charlesDraftPrompt(mode: CharlesDraftMode, input: string, existi
     `- Status for the new row is always "pending" — never approve/discard it yourself.`,
     `- If you use a "useful leak," it MUST be one already listed in persona.yaml's leak_bank —`,
     `  never invent a statistic, org, or ballot measure that isn't there.`,
-    `- Keep the em-dash ban (charles/CLAUDE.md carries it over from Build 2's fiction rule).`,
+    `- Keep the em-dash ban (charles/AGENTS.md carries it over from Build 2's fiction rule).`,
   ].join("\n");
 }
 

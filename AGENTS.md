@@ -1,6 +1,15 @@
 # content-agents — agent notes
 
-Repo-specific notes only. Universal principles live in the global CLAUDE.md — do not duplicate them here.
+This is the agent-agnostic entry point for repository instructions. Read the root `CLAUDE.md`
+for the project's full architecture and safety rules, then read the scoped `AGENTS.md` for any
+build you are touching:
+
+- `stories/AGENTS.md` — Build 2 fiction rules
+- `venture/AGENTS.md` — Build 3 venture rules
+- `charles/AGENTS.md` — Build 4 Charles persona rules
+
+The root `CLAUDE.md` remains as a Claude Code compatibility file for now; all scoped build walls
+use `AGENTS.md` so any agent can discover them consistently.
 
 - Inner loop: verify every change with `npm run check`.
 - Behavior gate: run `TODO: e2e/integration command` once, only when user-visible behavior changed.

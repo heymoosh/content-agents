@@ -147,7 +147,7 @@ traces a research-plan/decision-record claim back to an observation or citation 
 §2C.3, §2C.4). `claim_refs` is the narrower, outbound-facing counterpart: it traces each concrete
 factual claim inside a **drafted Phase 1 post's own body** back to an `intake.md` answer or a
 `confirmed_known`, so a reviewer can check the post itself without re-deriving the research plan.
-This is the field `venture/CLAUDE.md` describes as "Venture's replacement for `source_lines`
+This is the field `venture/AGENTS.md` describes as "Venture's replacement for `source_lines`
 tracing" — see that doc's "The claim boundary" section. A claim with no ref is cut or reframed as
 an explicit hypothesis before a post reaches `editorial_status: approved`.
 
