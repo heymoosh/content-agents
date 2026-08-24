@@ -21,6 +21,9 @@ The original reference files are in `/Users/Muxin/Downloads/handoff`. The most i
 - `Venture Build v7 - backend handoff.md`: prototype-to-repository gap analysis
 - `Venture Build v5 - backend handoff.md`: existing backend contracts
 
+The newest authored direction is `docs/Muxin's Vision for Content Studio.md` in this preserved
+branch. Read it alongside the prototype. It is the current product brief for the redesign.
+
 The primary user flow should be:
 
 1. One large, quiet Studio writing space.
@@ -86,4 +89,3 @@ It should not delete the state merely because it is hidden from the first view.
 3. Produce a design architecture and screen hierarchy first.
 4. Mark each current capability as keep, rehost, collapse, rename, or defer.
 5. Only then make UI changes, preserving the current backend contracts and tests.
-
