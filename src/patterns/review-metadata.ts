@@ -8,6 +8,8 @@ export interface AudienceSnapshot {
   countType: string | null;
   provenance: string | null;
   asOf: string | null;
+  /** Collection timestamp is distinct from the audience observation date. */
+  collectedAt?: string | null;
 }
 
 export interface ReviewPoolMembership {
@@ -19,6 +21,8 @@ export interface ReviewMetadataRecord {
   currentAccountKey: string;
   platform: string;
   handle: string | null;
+  /** Optional display name; the catalog remains the preferred source when available. */
+  creator?: string | null;
   stableAccountId: string | null;
   stableAccountIdStatus: string;
   topics: string[] | "unknown" | null;
@@ -128,6 +132,7 @@ function normalize(value: ReviewMetadataInput): { normalized: NormalizedReviewMe
     countType: scalar(value.audienceSnapshot?.countType),
     provenance: scalar(value.audienceSnapshot?.provenance),
     asOf: scalar(value.audienceSnapshot?.asOf),
+    collectedAt: scalar(value.audienceSnapshot?.collectedAt),
   };
   return {
     normalized: {
@@ -135,6 +140,7 @@ function normalize(value: ReviewMetadataInput): { normalized: NormalizedReviewMe
       currentAccountKey: value.currentAccountKey.trim(),
       platform: value.platform.trim(),
       handle: value.handle === null ? null : value.handle.trim(),
+      creator: value.creator === undefined || value.creator === null ? value.creator ?? null : value.creator.trim(),
       stableAccountId: value.stableAccountId === null ? null : value.stableAccountId.trim(),
       stableAccountIdStatus: value.stableAccountIdStatus.trim(),
       topics: strings(value.topics),
@@ -170,7 +176,7 @@ function blockingFields(row: ReviewMetadataRecord): string[] {
   }
   if (row.audienceSnapshot === null) blockers.push("audienceSnapshot");
   else {
-    for (const field of ["size", "countType", "provenance", "asOf"] as const) {
+    for (const field of ["size", "countType", "provenance", "asOf", "collectedAt"] as const) {
       if (row.audienceSnapshot[field] === null) blockers.push(`audienceSnapshot.${field}`);
     }
   }

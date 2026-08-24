@@ -29,6 +29,7 @@ export interface ComparisonReadinessRow {
   readonly baselineScope: string | null;
   readonly baselineSource: string | null;
   readonly evidenceLinks: string[];
+  readonly caveats: string[];
   readonly readiness: { status: "ready" | "blocked"; blockers: string[] };
   readonly bodyIncluded: false;
 }
@@ -135,6 +136,7 @@ function buildRow(
     baselineScope: nullable(evidence.baselineScope),
     baselineSource: nullable(evidence.baselineSource),
     evidenceLinks: evidence.evidenceLinks === "unknown" || evidence.evidenceLinks === null ? [] : [...evidence.evidenceLinks].sort(),
+    caveats: evidence.caveats === "unknown" || evidence.caveats === null ? [] : [...evidence.caveats].sort(),
     readiness: { status: blockers.length === 0 ? "ready" : "blocked", blockers: [...new Set(blockers)] },
     bodyIncluded: false,
   };

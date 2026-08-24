@@ -20,7 +20,7 @@ const review: ReviewMetadataInput = {
   baselineSource: "baseline-1",
   medium: "text",
   format: "short post",
-  audienceSnapshot: { size: 12000, countType: "followers", provenance: "profile snapshot", asOf: "2026-08-20" },
+  audienceSnapshot: { size: 12000, countType: "followers", provenance: "profile snapshot", asOf: "2026-08-20", collectedAt: "2026-08-21" },
   evidenceLinks: ["source-post-1"],
   reviewer: "muxin",
   reviewNote: "reviewed",

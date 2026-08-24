@@ -64,3 +64,32 @@ export {
   type ExperimentOutcomeLedgerInput,
   type ExperimentOutcomeLink,
 } from "./experiment-outcomes.js";
+
+export {
+  buildGrowReconciliation,
+  reconcileGrowDelivery,
+  type GrowQueueState,
+  type GrowReconciliation,
+  type GrowReconciliationInput,
+  type GrowReconciliationStatus,
+  type GrowSchedulerState,
+} from "./reconciliation.js";
+
+export {
+  buildGrowThisPlan,
+  createGrowThisPlan,
+  type GrowThisHumanGate,
+  type GrowThisCutDecision,
+  type GrowThisPlan,
+  type GrowThisPlanInput,
+  type GrowThisStage,
+  type GrowThisStageProjection,
+} from "./grow-this-plan.js";
+
+export {
+  buildCommentLearningView,
+  createCommentLearningView,
+  type CommentLearningHypothesis,
+  type CommentLearningView,
+  type CommentLearningViewInput,
+} from "./comment-learning.js";

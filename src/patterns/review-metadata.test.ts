@@ -34,6 +34,7 @@ function review(overrides: Partial<ReviewMetadataRecord> = {}): ReviewMetadataRe
       countType: "followers",
       provenance: "fixture profile snapshot",
       asOf: "2026-08-20",
+      collectedAt: "2026-08-21",
     },
     evidenceLinks: ["fixture://evidence/alpha"],
     reviewer: "fixture-reviewer",
@@ -118,7 +119,7 @@ test("keeps explicit nulls and reports them as deterministic readiness blockers"
   assert.deepEqual(result.blockingFields, [
     "topics", "focus", "nicheLabel", "researchPoolMembership", "popularityScope", "sampleScope",
     "baselineSource", "format", "audienceSnapshot.size", "audienceSnapshot.countType",
-    "audienceSnapshot.provenance", "audienceSnapshot.asOf", "evidenceLinks", "reviewer", "reviewed_at",
+    "audienceSnapshot.provenance", "audienceSnapshot.asOf", "audienceSnapshot.collectedAt", "evidenceLinks", "reviewer", "reviewed_at",
   ]);
   assert.equal(result.normalized?.topics, null);
   assert.equal(result.normalized?.focus, "unknown");

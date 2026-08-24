@@ -148,6 +148,23 @@ caveat, body-completeness, and lineage fields. It preserves blocked rows for
 human review. Its output contains no body text, never assigns a pool from a
 rank or name, and cannot select a winner or authorize generation.
 
+`src/patterns/operator-readiness.ts` consumes that inventory to expose
+deterministic ready/blocked coverage by pool, platform, medium, and format,
+plus the blocking gaps that must be resolved before a comparison can be
+called complete. It is an operator view only: it carries no winner field,
+does not promote a row, and does not include source body or copy.
+
+### `account_example_table` (scaffolded; pure projection exists)
+
+`src/patterns/account-table.ts` projects the reviewed account overlay and
+comparison-readiness rows into the requested account/example table. Each row
+preserves account size snapshot, topics, focus, platform, medium, format,
+explicit niche/broad/format pool, popularity/sample/baseline scopes, evidence
+links, caveats, and review status. It keeps incomplete or unjoined examples
+visible and blocked. It never derives a pool, copies a body, or selects a
+winner. The source/post evidence row remains authoritative for comparison
+scopes and caveats; account-overlay values never overwrite its denominators.
+
 ### `claim` (scaffolded)
 
 Owner: `muxin` for final assertion; `system` may extract a candidate.
@@ -268,6 +285,24 @@ before `measured`. It exposes `autoScheduling: false`, `autoPublishing: false`,
 and `sideEffects: none`; it does not claim a slot or call a queue, scheduler,
 or publisher.
 
+### `grow_this_plan` (scaffolded; pure lifecycle projection exists)
+
+`src/grow/grow-this-plan.ts` joins the supplied source, cut, variant, review,
+delivery, experiment, and outcome references into one deterministic
+conversation view. It exposes stage statuses, evidence blockers, and required
+human gates for cut, review, and delivery. Callers must supply source/cut
+readiness facts and an explicit Muxin cut decision; reference presence does not
+prove that a stage ran or measured an outcome. Supplied records remain
+authoritative.
+The projection contains no body text, never selects a winner, and never calls
+the review queue, scheduler, publisher, Signals, or Venture.
+
+`src/grow/reconciliation.ts` is a read-side comparison of the review bundle,
+delivery record, review-queue fact, and scheduler fact. It reports `blocked` or
+`drifted` when IDs, lineage, approval, lifecycle, or scheduler evidence
+disagree. It never repairs a queue row, claims a slot, cancels a post, or calls
+a publisher.
+
 ### `experiment` (scaffolded; typed deterministic record exists)
 
 The typed adapter in `src/grow/experiment-record.ts` normalizes one question,
@@ -303,6 +338,15 @@ or write to Signals, Venture, the review queue, or publishing. `ready` means
 only that linked rows are lineage- and evidence-valid; it does not mean the
 declared success observations are measured or that the experiment has
 concluded.
+
+### `model_boundary_record` (scaffolded; pure audit manifest exists)
+
+`src/agents/model-boundary.ts` records a bounded role, task kind, model route,
+subscription/local/paid cost class, input/output/evidence refs, and human gate.
+Extraction remains non-composing. Content generation and pattern adaptation
+remain human-gated. A common hook may be used as a mad-lib template when it is
+anchored to Muxin's original substance; creator-body copying is always blocked.
+The manifest is an audit record only and makes no model call or side effect.
 
 ## 3. Conversation records and human reply gate
 
@@ -404,6 +448,13 @@ comment alone never satisfies a willingness-to-pay or Venture evidence gate.
 The packet remains pending until Muxin explicitly adopts or declines the
 proposal; Venture then has its own independent gate. Building this packet does
 not write Signals, mutate Venture, reply to a commenter, or change routing.
+
+`src/grow/comment-learning.ts` adds a deterministic operator projection over
+the same comment, funnel, and business facts. It emits product/lead
+hypotheses with lineage, evidence refs, qualification, confidence, and a
+pending Muxin decision. It preserves missing evidence and non-qualified
+comments, never claims demand, includes no comment body in the projection, and
+does not create a Venture artifact or write to Signals.
 
 ## 5. Venture boundary
 

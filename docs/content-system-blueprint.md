@@ -6,12 +6,14 @@ learnable set of platform treatments. It is not an autopilot, a universal virali
 claim that the current corpus is comprehensive.
 
 **Next increment status:** The human-reviewed account metadata overlay and the source/post-level
-pool-evidence boundary are scaffolded. Typed source-evidence, comparison-readiness, Grow-variant,
-review-bundle, capacity, delivery, experiment-outcome, experiment-record, and learning-packet
-adapters now make the next joins explicit, but current live rows remain blocked for pool comparison
-until real reviewed metadata is entered. The new Grow artifacts are planning, measurement, and
-delivery-readiness seams, not copy generation or automatic publishing. This document describes
-the target contract; it does not make existing rows reviewed by inference.
+pool-evidence boundary are scaffolded. Typed source-evidence, comparison-readiness, operator
+readiness, account-example-table, Grow-variant, Grow-this, review-bundle, capacity, delivery,
+reconciliation, experiment-outcome, experiment-record, learning-packet, comment-learning, and
+model-boundary adapters now make the next joins explicit,
+but current live rows remain blocked for pool comparison until real reviewed metadata is entered.
+The new Grow artifacts are planning, measurement, reconciliation, and delivery-readiness seams,
+not copy generation or automatic publishing. This document describes the target contract; it does
+not make existing rows reviewed by inference.
 
 ## 1. What the system must do
 
@@ -326,17 +328,31 @@ coverage/catalog
 3. **Grow variants** turns an approved source or raw thought into cuts and platform treatments,
    retaining lineage, variables, rationale, and the mad-lib originality boundary.
 4. **Review/publish** exposes decisions, enforces human approval, claims only valid platform slots,
-   and records scheduling and delivery outcomes. The current typed seams are the review bundle and
-   capacity manifest; both are side-effect-free and keep candidate volume separate from approved
-   publish volume.
+   and records scheduling and delivery outcomes. The current typed seams are the review bundle,
+   capacity manifest, delivery record, and reconciliation view; all are side-effect-free and keep
+   candidate volume separate from approved publish volume. Reconciliation observes drift between
+   canonical review/delivery facts and queue/scheduler facts; it never repairs them.
 5. **Comments/Signals** links post and conversation observations, funnel events, and experiments
-   without collapsing attention into demand or strategy proof.
+   without collapsing attention into demand or strategy proof. `src/grow/comment-learning.ts`
+   exposes a deterministic product/lead hypothesis view with evidence and a pending Muxin decision;
+   it does not claim demand or create Venture artifacts.
 6. **Venture** receives only qualified, caveated inputs and remains governed by its own decision and
    approval gates.
 
 The dependency order is a sequencing constraint, not a claim that each workstream is currently
 implemented. A later workstream can be prototyped with explicit fixtures, but its output must be
 labelled provisional and must not be presented as live evidence.
+
+### Current orchestration seams
+
+`src/grow/grow-this-plan.ts` is the current read-only conversation projection. It joins the
+source, cut, variant, review, delivery, experiment, and outcome references into one lifecycle,
+surfaces human gates and evidence blockers, and suppresses winner inference and body text. It
+does not call the review queue, scheduler, publisher, Signals, or Venture. `src/patterns/account-table.ts`
+is the account/example navigation table requested for both niche and broad-platform examples; it
+preserves explicit pool, topic, focus, platform, medium, format, audience-size, scope, evidence,
+caveat, and review fields while keeping incomplete rows blocked. These are typed operator seams,
+not proof that the live corpus has been reviewed or that the app is wired end to end.
 
 ## 6. Model and subagent responsibilities
 
@@ -352,7 +368,8 @@ metric calculations. Models handle bounded judgment:
   record why, model, cost, input artifact, and output artifact.
 - **Subagents:** run isolated, read-only research, corpus normalization, originality checks, or
   review passes with a bounded brief and structured evidence output. They may not publish, send,
-  approve, alter the canonical voice/config, or invent missing facts.
+  approve, alter the canonical voice/config, or invent missing facts. `src/agents/model-boundary.ts`
+  records the role, task, route, audit refs, cost class, and human gate for this boundary.
 
 Human review remains authoritative for the claim, cut, voice, lane, CTA, platform treatment,
 visual, publish timing, and any proposed strategic change. AI prose is visibly distinct from
@@ -449,6 +466,11 @@ with review/publish owning the approval and delivery gate.
 **Not in scope:** silent platform selection, publishing without approval, auto-replies, or changing
 voice/pillars/routing from metrics alone.
 
+The current `src/grow/grow-this-plan.ts` projection makes this lifecycle inspectable in one
+conversation without pretending that the downstream systems are wired. It reports stage refs,
+human gates, evidence blockers, and the absence of a winner; it does not generate copy, schedule,
+publish, or mark an experiment measured merely because a reference exists.
+
 ### Phase 4: Venture learning
 
 **Ship predicate:** Given measured variants, qualified comments, funnel events, and business
@@ -458,10 +480,10 @@ own gate decides whether the input becomes a Venture artifact or phase transitio
 linked signal, decision record, Venture artifact, and approval record. The owner is Venture after
 comments/Signals has produced qualified inputs.
 
-The current side-effect-free bridge is `src/review/learning-packet.ts`. It is a review packet, not
-an automatic handoff: it keeps observation, interpretation, Muxin's decision, and Venture's gate
-separate. A comment can inform a hypothesis, but cannot by itself establish willingness to pay or
-unlock Venture.
+The current side-effect-free bridges are `src/review/learning-packet.ts` and
+`src/grow/comment-learning.ts`. They are review views, not automatic handoffs: they keep
+observation, interpretation, Muxin's decision, and Venture's gate separate. A comment can inform
+a product or lead hypothesis, but cannot by itself establish willingness to pay or unlock Venture.
 
 **Not in scope:** turning content engagement into proof of demand, bypassing Venture decisions, or
 making Venture the owner of every Studio idea.
@@ -485,17 +507,17 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Patterns | 31 hook patterns | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it | Connect the accounting view to live review and scheduler records without allowing it to approve or publish | Partial |
-| Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` emits provisional no-copy candidate specifications, while delivery and outcome ledgers preserve the later handoff | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
-| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, and `src/grow/delivery-record.ts` blocks delivery without it | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
+| Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` emits provisional no-copy candidate specifications, `src/grow/grow-this-plan.ts` joins the lifecycle read-only, while delivery and outcome ledgers preserve the later handoff | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
+| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, `src/grow/delivery-record.ts` blocks delivery without it, and `src/grow/reconciliation.ts` reports queue/scheduler drift without repairing it | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
 | Phase contracts | This blueprint names broad phase outcomes; `docs/content-system-contracts.md` is a scaffolded documentation contract, not an implemented runtime contract | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
-| Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` now emit a deterministic descriptive report over the catalog; it is a scaffold, not a completeness claim | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
-| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, and `src/patterns/comparison-readiness.ts` joins them to source/post evidence; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
+| Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` emit a deterministic descriptive report; `src/patterns/operator-readiness.ts` adds deterministic ready/blocked coverage by pool, platform, medium, format, and gap | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
+| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, and `src/patterns/account-table.ts` produces the body-free account/example table; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; comparison readiness now checks explicit memberships and evidence scopes while keeping missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables, `src/grow/experiment-record.ts` adds scoped records, and `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
-| Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet preserves qualified observations and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
+| Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet and `src/grow/comment-learning.ts` preserve qualified observations, product/lead hypotheses, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
-| Model boundaries | Subscription-first and human approval rules exist | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
+| Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts and permits common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
 
 This blueprint does not authorize implementation by itself. Each future change should name the
 phase, artifacts, acceptance predicate, human decision, and explicit non-goals it satisfies.
