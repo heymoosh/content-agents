@@ -7,7 +7,7 @@
 // READ path: every chapter doc is `editable: false`, so saveFictionDoc still refuses them and the
 // only write into a chapter stays the scoped span patch (src/fiction/patch.ts). Line-by-line review
 // and the commit history stay in the GitHub /story flow, exactly as before.
-// (Build 2 wall, stories/CLAUDE.md: the sole bridge to the rest of the studio is promotion.)
+// (Build 2 wall, stories/AGENTS.md: the sole bridge to the rest of the studio is promotion.)
 
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";

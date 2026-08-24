@@ -60,6 +60,8 @@ export interface DecisionRecord {
   status: DecisionStatus;
   created_at: string;
   decided_at: string | null;
+  /** CLI that produced the judgment, when an agent run created this decision. */
+  engine?: string | null;
 }
 
 function readLines(slug: string): DecisionRecord[] {
@@ -96,6 +98,7 @@ export interface WriteDecisionInput {
   candidates: Candidate[];
   recommended_candidate_ids: string[];
   at: string;
+  engine?: string | null;
 }
 
 // Writes a decision awaiting Muxin's selection. Nothing auto-selects -- selected_candidate_ids
@@ -115,6 +118,7 @@ export function writeDecision(slug: string, input: WriteDecisionInput): Decision
     status: "awaiting_user",
     created_at: input.at,
     decided_at: null,
+    engine: input.engine ?? process.env.CONTENT_AGENT_ENGINE ?? null,
   };
   appendLine(slug, record);
   return record;

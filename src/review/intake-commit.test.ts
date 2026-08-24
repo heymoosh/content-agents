@@ -231,7 +231,13 @@ test("the clear route drops the scratch buffer the commit no longer needs", () =
 test("every path the guards read is declared, and the commit route is one of them", () => {
   assert.ok(VENTURE_WRITE_PATHS.includes("/api/venture/:slug/intake/commit"));
   assert.ok(VENTURE_WRITE_PATHS.includes("/api/venture/:slug/intake/drafts/clear"));
-  assert.deepEqual(INTAKE_DRAFT_PATHS, ["/api/venture/:slug/intake/:n/draft", "/api/venture/:slug/intake/drafts"]);
+  assert.deepEqual(INTAKE_DRAFT_PATHS, [
+    "/api/venture/:slug/intake/:n/draft",
+    "/api/venture/:slug/intake/drafts",
+    "/api/venture/:slug/intake/section",
+    "/api/venture/:slug/intake/sections",
+    "/api/venture/:slug/intake/drafts/clear",
+  ]);
   // Every declared write path must actually be dispatched, or the guard is checking a fiction.
   for (const p of VENTURE_WRITE_PATHS) {
     const concrete = p.replace(/:[a-zA-Z]+/g, "zz-intake-guard-claims");

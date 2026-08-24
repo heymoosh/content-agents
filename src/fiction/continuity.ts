@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
 import { resolveSeriesDir, chapterPath, readChapter, pad2, characterSheets } from "./_series.js";
 import { buildContext } from "./context.js";
+import { buildEngineSpawn, ENGINE_COMMANDS, ENGINE_LABELS, isEngine, type Engine } from "../review/engines.js";
 
 // Read a fresh chapter draft against the series canon and say what holds and what breaks.
 // Nothing in src/fiction/ did this before: canon.ts is a write-only ledger (it appends a summary
@@ -123,7 +124,7 @@ export function buildContinuityPrompt(canonPack: string, chapterBody: string): s
   ].join("\n");
 }
 
-// Em dashes are Muxin's house rule and it carries into fiction (stories/CLAUDE.md). A proposed
+// Em dashes are Muxin's house rule and it carries into fiction (stories/AGENTS.md). A proposed
 // replacement carrying one cannot be written into a chapter, so it is not a usable fix.
 export function hasEmDash(s: string): boolean {
   return /[—–]/.test(s);
@@ -218,31 +219,56 @@ export function parseContinuityResponse(raw: string, chapterBody: string): { rul
   return { rulesRead, holds, conflicts };
 }
 
-// The judgment call, on Muxin's Claude Code subscription ($0 marginal, CLAUDE.md rule 6). `--tools ""`
-// keeps it a single-shot read: everything it needs is in the prompt, so it cannot wander the repo.
+// The judgment call, on Muxin's chosen CLI (Claude/Grok/Codex all run through the same
+// buildEngineSpawn seam src/review/jobs.ts uses -- src/review/multi-engine-plan.md's "one seam").
+// Claude and Grok get `--tools ""`: a single-shot read, everything it needs is in the prompt, so it
+// cannot wander the repo. Codex has no such flag; `sandbox: "read-only"` is its equivalent guarantee.
 export type ContinuityModelCall = (prompt: string) => Promise<string>;
 
 function continuityModel(): string {
   return (process.env.FICTION_CONTINUITY_MODEL ?? "sonnet").trim();
 }
 
-export const callClaudeContinuity: ContinuityModelCall = async (prompt) => {
-  try {
-    const { stdout } = await execFileP("claude", ["-p", prompt, "--model", continuityModel(), "--tools", ""], {
-      cwd: repoRoot,
-      timeout: CHECK_TIMEOUT_MS,
-      maxBuffer: 20_000_000,
-    });
-    return stdout;
-  } catch (e) {
-    const err = e as { code?: string; killed?: boolean; stderr?: string };
-    if (err.code === "ENOENT") throw new Error("`claude` CLI is not on this PATH, so the canon check has nothing to ask");
-    if (err.killed) throw new Error(`the canon check timed out after ${CHECK_TIMEOUT_MS / 1000}s`);
-    throw new Error(`the canon check failed: ${err.stderr?.trim() || (e instanceof Error ? e.message : String(e))}`);
-  }
-};
+// Pure argv assembly, exported so a test can assert the read-only guarantee without spawning
+// anything. Claude's model knob (FICTION_CONTINUITY_MODEL) is Claude-specific and does not carry
+// over to Grok or Codex, which have no equivalent env override here -- each just runs its CLI's
+// default.
+export function continuityEngineSpawn(engine: Engine, prompt: string): { command: string; args: string[] } {
+  return buildEngineSpawn(engine, prompt, {
+    timeoutMs: CHECK_TIMEOUT_MS,
+    permissionMode: null, // read-only report: no edits are ever on offer, so no approval flag to set
+    tools: engine === "codex" ? undefined : "",
+    sandbox: "read-only",
+    ...(engine === "claude" ? { model: continuityModel() } : {}),
+  });
+}
+
+export function callEngineContinuity(engine: Engine): ContinuityModelCall {
+  return async (prompt) => {
+    const { command, args } = continuityEngineSpawn(engine, prompt);
+    try {
+      const { stdout } = await execFileP(command, args, {
+        cwd: repoRoot,
+        timeout: CHECK_TIMEOUT_MS,
+        maxBuffer: 20_000_000,
+      });
+      return stdout;
+    } catch (e) {
+      const err = e as { code?: string; killed?: boolean; stderr?: string };
+      const cli = ENGINE_COMMANDS[engine];
+      if (err.code === "ENOENT") throw new Error(`\`${cli}\` CLI is not on this PATH, so the canon check has nothing to ask`);
+      if (err.killed) throw new Error(`the canon check timed out after ${CHECK_TIMEOUT_MS / 1000}s`);
+      throw new Error(`the ${ENGINE_LABELS[engine]} canon check failed: ${err.stderr?.trim() || (e instanceof Error ? e.message : String(e))}`);
+    }
+  };
+}
+
+// Kept for the one caller (a hand run outside the job queue) that wants Claude specifically without
+// naming an engine.
+export const callClaudeContinuity: ContinuityModelCall = callEngineContinuity("claude");
 
 export interface ContinuityOptions {
+  engine?: Engine; // which CLI reads the chapter; defaults to Claude, same as every other seam caller
   callModel?: ContinuityModelCall;
   root?: string; // where the report is written; injectable for tests
   prev?: number; // how many prior chapters to send in full (buildContext's own knob)
@@ -266,7 +292,8 @@ export async function runContinuityCheck(seriesArg: string, chapter: number, opt
   const canonPack = buildContext(dir, chapter, opts.prev ?? 2);
 
   step(3, total, CONTINUITY_STEPS[2]);
-  const raw = await (opts.callModel ?? callClaudeContinuity)(buildContinuityPrompt(canonPack, body));
+  const engine = opts.engine ?? "claude";
+  const raw = await (opts.callModel ?? callEngineContinuity(engine))(buildContinuityPrompt(canonPack, body));
   const { rulesRead, holds, conflicts } = parseContinuityResponse(raw, body);
 
   step(4, total, CONTINUITY_STEPS[3]);
@@ -305,8 +332,11 @@ async function main() {
     console.error("no chapter to check yet");
     process.exit(1);
   }
+  const engineFlag = flag("--engine");
+  const engine: Engine = isEngine(engineFlag) ? engineFlag : "claude";
   try {
     const report = await runContinuityCheck(series, chapter, {
+      engine,
       // The STEP markers the job queue reads (src/review/jobs.ts parseStepMarker). They go to
       // stdout on their own lines; the findings go to the report file, never mixed in here.
       onStep: (n, total, label) => process.stdout.write(`STEP ${n}/${total} ${label}\n`),

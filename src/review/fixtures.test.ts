@@ -378,6 +378,7 @@ test("the refusal message says how to get back to real data", () => {
 interface FakeEl {
   id: string;
   hidden: boolean;
+  style: Record<string, string>;
   innerHTML: string;
   textContent: string;
   addEventListener(type: string, fn: (e: unknown) => void): void;
@@ -387,6 +388,7 @@ interface FakeEl {
 function fakeEl(id: string): FakeEl {
   const el: FakeEl = {
     id, hidden: false, innerHTML: "", textContent: "",
+    style: {},
     addEventListener(_t, fn) { el.handler = fn; },
   };
   return el;
@@ -442,6 +444,21 @@ test("the interceptor installs, and refuses every write without letting it reach
     assert.deepEqual(await res.json(), { ok: false, error: FIXTURE_WRITE_REFUSAL });
   }
   assert.deepEqual(fx.passthrough, [], "not one write request reached the real fetch");
+});
+
+test("fixture panel hide and reopen explicitly toggle display state", async () => {
+  const fx = await bootInterceptor();
+  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, true);
+  assert.equal(fx.els.fxPanel.style.display, "none");
+  assert.equal(fx.els.fxOpen.hidden, false);
+  assert.equal(fx.els.fxOpen.style.display, "block");
+
+  fx.els.fxOpen.handler?.({ target: { closest: () => ({ id: "fxOpen", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, false);
+  assert.equal(fx.els.fxPanel.style.display, "flex");
+  assert.equal(fx.els.fxOpen.hidden, true);
+  assert.equal(fx.els.fxOpen.style.display, "none");
 });
 
 test("with nothing forced, every read passes straight through to the real server", async () => {

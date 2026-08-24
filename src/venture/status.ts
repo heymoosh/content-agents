@@ -7,7 +7,7 @@ import { loadRules } from "./rules.js";
 import { maybeCompletePhase4 } from "./phase4.js";
 
 // Read-only (formatStatus's own render step). Plain language throughout -- never "artifact",
-// "delivery status", "gated" in the output (venture/CLAUDE.md's user-facing vocabulary).
+// "delivery status", "gated" in the output (venture/AGENTS.md's user-facing vocabulary).
 
 export function formatStatus(slug: string): string {
   // Opportunistic lazy write, ahead of the pure read below: day-14-decide only requires the

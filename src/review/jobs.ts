@@ -7,9 +7,10 @@
 // like an atomize job (previously only atomize jobs queued; the other four spawned unbounded).
 // Split out of serve.ts (Codebase review Phase 5c).
 
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, createWriteStream, rmSync } from "node:fs";
 import { join, basename } from "node:path";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { repoRoot } from "../db/db.js";
 import { appendRow, readQueue, stampOrigin } from "../publish/queue.js";
@@ -17,14 +18,17 @@ import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { resolveAngle } from "../atomize/spin.js";
 import { loadPlatforms } from "../config/platforms.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { upsertFrontmatterField } from "../outreach/qualify.js";
 import { CONTENT, safeFolder, isValidLens } from "./rows.js";
 import { roundCount } from "./develop.js";
 import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { runDraft, draftModel, type DraftResult } from "../outreach/draft.js";
-import { CHARLES_DIR, listCharlesPosts, readCharlesPost, type CharlesPost } from "./charles.js";
+import { CHARLES_DIR, listCharlesPosts, readCharlesPost, stampCharlesEngine, type CharlesPost } from "./charles.js";
 import { saveSceneBeats } from "./fiction.js";
+import { logCost } from "../util/cost-log.js";
 import { resolveSeriesDir, chapterNumbers, readChapter } from "../fiction/_series.js";
 import { continuityReportPath, readContinuityReport } from "../fiction/continuity.js";
+import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type Engine, type EngineSpawnOptions } from "./engines.js";
 
 // Per-job stdout/stderr logs for the atomize job queue (see the Job interface below) — persisted
 // to disk so a job's real output survives past the 40MB in-memory buffer execFile used to impose,
@@ -32,6 +36,21 @@ import { continuityReportPath, readContinuityReport } from "../fiction/continuit
 const JOB_LOG_DIR = join(homedir(), ".content-agents", "logs", "gui-jobs");
 export function jobLogPath(jobId: string): string {
   return join(JOB_LOG_DIR, `${jobId}.log`);
+}
+
+function stampFileEngine(path: string, engine: Engine): void {
+  if (!existsSync(path)) return;
+  const raw = readFileSync(path, "utf8");
+  const { header, body } = splitFrontmatter(raw);
+  if (!header) return;
+  const nextHeader = upsertFrontmatterField(header, "engine", engine);
+  if (nextHeader !== header) writeFileSync(path, `${nextHeader}${body.trim() ? `${body.trim()}\n` : ""}`);
+}
+
+function stampFolderEngine(folder: string, engine: Engine): void {
+  for (const row of readQueue(folder).rows) {
+    if (row.asset) stampFileEngine(join(folder, row.asset), engine);
+  }
 }
 
 // The last non-empty line of accumulated output — the "heartbeat" shown in the jobs pill so a
@@ -53,6 +72,9 @@ export function tailLines(text: string, n: number): string {
 // which uses Muxin's subscription ($0 marginal), to edit ONE derivative in place per a
 // natural-language instruction.
 const REVISE_TIMEOUT_MS = 180_000;
+function engineName(job: Pick<Job, "engine">): string {
+  return ENGINE_LABELS[job.engine ?? "claude"];
+}
 
 // Ask Claude's real scope, in one line, reused everywhere the boundary needs stating: editing ONE
 // existing derivative's body text in place. Anything else (retargeting the platform, creating a
@@ -211,7 +233,7 @@ export function answerPromptSuffix(answer: string): string {
 // thrown messages the GUI shows durably on the row instead of a silent no-op or a crash. Routed
 // through runQueued so "Ask Claude" shares the ONE job queue/log/heartbeat every other Claude spawn
 // in this GUI does (Codebase review Phase 2) — no separate concurrency lane.
-export async function reviseDerivative(slug: string, id: string, instruction: string): Promise<string> {
+export async function reviseDerivative(slug: string, id: string, instruction: string, engine: Engine = "claude"): Promise<string> {
   const folder = safeFolder(slug);
   if (!/^[\w.-]+$/.test(id)) throw new Error("bad id");
   if (!instruction.trim()) throw new Error("tell Claude what to change first");
@@ -222,28 +244,29 @@ export async function reviseDerivative(slug: string, id: string, instruction: st
   const platform = typeof original.fm.platform === "string" ? original.fm.platform : "";
   const prompt = revisePrompt(slug, id, platform, instruction.trim());
 
-  return runQueued("revise", `Ask Claude: ${slug}/${id}`, async (job) => {
+  return runQueued("revise", `Revise ${slug}/${id}`, async (job) => {
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude revise",
     });
-    if (failure) throw new Error(failure);
+    if (failure) throw new Error(failure.replace(/Claude/g, engineName(job)));
 
     const refusal = parseReviseRefusal(result.stdout);
-    if (refusal) throw new Error(`Ask Claude can't do that: ${refusal}`);
+    if (refusal) throw new Error(`The selected engine can't do that: ${refusal}`);
 
     const after = splitFrontmatter(readFileSync(p, "utf8")).body;
     if (after === original.body) {
-      throw new Error("Claude ran but didn't change anything — try a more specific instruction");
+      throw new Error(`${engineName(job)} ran but didn't change anything — try a more specific instruction`);
     }
+    stampFileEngine(p, engine);
     return after;
-  });
+  }, engine);
 }
 
 // Same "revise with Claude" pattern as reviseDerivative, but for the latest strategy brief instead
 // of a derivative — briefRevisePrompt/latestBriefPath stay in serve.ts (part of the Strategy/
 // Analytics block), imported back here since this is the one place that spawns the subprocess.
-export async function reviseBrief(instruction: string): Promise<{ path: string; content: string }> {
+export async function reviseBrief(instruction: string, engine: Engine = "claude"): Promise<{ path: string; content: string }> {
   const abs = latestBriefPath();
   if (!abs) throw new Error("no strategy brief exists yet — run /strategy first");
   if (!instruction.trim()) throw new Error("tell Claude what to change first");
@@ -258,9 +281,9 @@ export async function reviseBrief(instruction: string): Promise<{ path: string; 
     });
     if (failure) throw new Error(failure);
     const after = readFileSync(abs, "utf8");
-    if (after === before) throw new Error("Claude ran but didn't change anything — try a more specific instruction");
+    if (after === before) throw new Error(`${engineName(job)} ran but didn't change anything — try a more specific instruction`);
     return { path: relPath, content: after };
-  });
+  }, engine);
 }
 
 // Same "revise ONE file with Claude" pattern as briefRevisePrompt/reviseBrief, scoped to a drafted
@@ -287,7 +310,7 @@ export function outreachMessageRevisePrompt(relPath: string, channel: string, in
 // locked message — a locked text is Muxin's final word; a new angle goes through the existing
 // draft-follow-up path instead. `dir`/`file` are validated by the route (isValidLeadDir + the
 // messages/message-NN.md shape) before this runs.
-export async function reviseOutreachMessage(dir: string, file: string, instruction: string): Promise<{ body: string }> {
+export async function reviseOutreachMessage(dir: string, file: string, instruction: string, engine: Engine = "claude"): Promise<{ body: string }> {
   if (!instruction.trim()) throw new Error("tell Claude what to change first");
   const abs = join(repoRoot, dir, file);
   if (!existsSync(abs)) throw new Error("no such message to revise");
@@ -310,10 +333,10 @@ export async function reviseOutreachMessage(dir: string, file: string, instructi
     if (failure) throw new Error(failure);
     const after = splitFrontmatter(readFileSync(abs, "utf8")).body;
     if (after === before.body) {
-      throw new Error("Claude ran but didn't change anything — try a more specific instruction");
+      throw new Error(`${engineName(job)} ran but didn't change anything — try a more specific instruction`);
     }
     return { body: after.trim() };
-  });
+  }, engine);
 }
 
 // ── Content ingestion: the GUI's front door ─────────────────────────────────────────────────
@@ -346,7 +369,7 @@ const ATOMIZE_PERMISSION_MODE = process.env.ATOMIZE_PERMISSION_MODE ?? "acceptEd
 type JobStatus = "queued" | "running" | "blocked" | "done" | "failed" | "stopped";
 // "url" | "file" | "text" | "notes" | "continue" | "video" are the atomize-family kinds (dispatch
 // a slash-command against a folder/source, verified by artifact check — see drain() below).
-// "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up" |
+// "revise" | "brief-revise" | "insights" | "ask-insights" | "venture-analysis" | "duplicate" | "draft-follow-up" |
 // "outreach-revise" | "pull" | "strategy" | "scout" are generic task jobs (run an arbitrary async task via runQueued)
 // — the four call sites complaint 2 flagged as spawning unbounded, plus "Duplicate to platform",
 // the Follow-ups tab's "Draft follow-up", the Analytics tab's "Pull fresh now" (runCommandSpawn,
@@ -358,7 +381,7 @@ type JobStatus = "queued" | "running" | "blocked" | "done" | "failed" | "stopped
 export type JobKind =
   | "url" | "file" | "text" | "notes" | "continue" | "video"
   | "develop" | "develop-reply"
-  | "revise" | "brief-revise" | "insights" | "ask-insights" | "duplicate" | "draft-follow-up"
+  | "revise" | "brief-revise" | "insights" | "ask-insights" | "venture-analysis" | "venture-step" | "duplicate" | "draft-follow-up"
   | "outreach-revise"
   | "pull" | "strategy" | "scout" | "charles-draft"
   | "fiction-draft" | "fiction-continuity";
@@ -377,6 +400,7 @@ interface Job {
   id: string;
   kind: JobKind;
   label: string;
+  engine?: Engine; // selected CLI for this run; old callers default to Claude
   arg: string; // atomize-family only: what the slash command receives (url, .inbox path, folder, "notes")
   status: JobStatus;
   slugs: string[]; // content folders touched — linked back so the Review tab can jump to them
@@ -406,7 +430,7 @@ interface Job {
   // which chapter it targets. Kept OFF `arg` on purpose — `arg` is a shell-ish token every other
   // kind treats as one word, and a paragraph of beats does not belong there. Internal, and omitted
   // from publicJob() like `task` and `lastSpawn`.
-  payload?: { mode?: "draft" | "repass"; beats?: string; note?: string; series?: string; chapter?: number };
+  payload?: { mode?: "draft" | "repass"; beats?: string; note?: string; series?: string; chapter?: number; engine?: Engine };
   // Subprocess jobs only: the live child, kept ONLY so stopJob has something to signal. Set in
   // runCommandSpawn, cleared on close. Internal and omitted from publicJob like `task` — a
   // ChildProcess is not JSON-serializable, so leaking it would break the /api/jobs read outright.
@@ -483,11 +507,11 @@ function nextJobId(): string {
 // by the one `draining` gate and shows up in the jobs pill with a real log + heartbeat (via
 // runClaudeSpawn inside the task). The caller's promise resolves/rejects with whatever `task`
 // returns/throws — the job bookkeeping (status/error/finishedAt) is separate, driven by drain().
-export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => Promise<T>): Promise<T> {
+export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => Promise<T>, engine: Engine = "claude"): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const id = nextJobId();
     const job: Job = {
-      id, kind, label, arg: "", ...freshJobFields(),
+      id, kind, label, arg: "", engine, ...freshJobFields(),
       // Writes to `j`, the job actually running, NOT the captured `job`: an answered job is
       // requeued as a CLONE that reuses this same closure, and a rerun failure must land its error
       // on the clone, not back on the original blocked job.
@@ -519,7 +543,7 @@ export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => P
 // ask-insights/duplicate/pull) — so they all get the same log file + heartbeat UX. `stdout` is
 // captured separately (not just written to the log) for callers that need the process's actual
 // answer text (insights/ask) or a refusal marker (revise), since the log interleaves stdout+stderr.
-interface CommandSpawnResult {
+export interface CommandSpawnResult {
   code: number | null;
   timedOut: boolean;
   enoent: boolean;
@@ -591,7 +615,7 @@ export function runCommandSpawn(
   job: Job,
   command: string,
   args: string[],
-  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv }
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv; input?: string }
 ): Promise<CommandSpawnResult> {
   // A stopped job's future spawns are stillborn. A task job stopped between two spawns has no
   // child to signal, so stopJob settles it and hands the lane on immediately — without this guard
@@ -618,9 +642,12 @@ export function runCommandSpawn(
       // pipe) — no caller here ever writes to it, but an unclosed pipe makes `claude -p` wait up
       // to 3s for stdin input before it warns and proceeds without it ("no stdin data received in
       // 3s"). Closing it up front skips that wait entirely.
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [opts.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
       env: { ...process.env, ...opts.env },
     });
+    if (opts.input !== undefined && child.stdin) {
+      child.stdin.end(opts.input);
+    }
     // The only handle stopJob has to signal. Internal — publicJob never serializes it.
     job.proc = child;
     let enoent = false;
@@ -647,6 +674,39 @@ export function runCommandSpawn(
   });
 }
 
+/** Spawn the selected agent through the same persisted log/heartbeat lane as Claude did. */
+export async function runAgentSpawn(
+  job: Job,
+  engine: Engine,
+  prompt: string,
+  opts: EngineSpawnOptions & { env?: NodeJS.ProcessEnv },
+): Promise<CommandSpawnResult> {
+  const outputFile = engine === "codex"
+    ? join(tmpdir(), `content-agents-${job.id}-${randomUUID()}.md`)
+    : undefined;
+  const built = buildEngineSpawn(engine, job.answer ? prompt + answerPromptSuffix(job.answer) : prompt, {
+    ...opts,
+    outputFile,
+  });
+  try {
+    const result = await runCommandSpawn(job, built.command, built.args, {
+      timeoutMs: opts.timeoutMs,
+      env: { ...opts.env, CONTENT_AGENT_ENGINE: engine },
+    });
+    logCost({ step: `agent:${engine}`, detail: job.label, engine });
+    if (!outputFile) return result;
+    let finalMessage = "";
+    try {
+      finalMessage = readFileSync(outputFile, "utf8").trim();
+    } catch {
+      // The command's stdout remains useful for a failure log when Codex did not write a final answer.
+    }
+    return finalMessage ? { ...result, stdout: finalMessage } : result;
+  } finally {
+    if (outputFile) rmSync(outputFile, { force: true });
+  }
+}
+
 // Pure argv builder for runClaudeSpawn, split out so a caller's exact invocation is unit-testable
 // without spawning a real subprocess. `permissionMode: null` omits the --permission-mode flag
 // entirely (draft.ts's callClaudeDraft never passes one, using --model/--tools instead — see
@@ -669,11 +729,10 @@ export function runClaudeSpawn(
   prompt: string,
   opts: { timeoutMs: number; permissionMode?: string | null; model?: string; tools?: string; env?: NodeJS.ProcessEnv }
 ): Promise<CommandSpawnResult> {
-  // One choke point for the answer hand-off: every Claude spawn in the GUI runs through here, so a
-  // requeued job carries Muxin's answer into whatever prompt its kind builds, without each run
-  // function having to thread it. `answer` is null on every job that never asked.
-  const withAnswer = job.answer ? prompt + answerPromptSuffix(job.answer) : prompt;
-  return runCommandSpawn(job, "claude", buildClaudeSpawnArgs(withAnswer, opts), opts);
+  // Kept as a compatibility wrapper for existing callers. The job's selected engine is what
+  // actually runs, so older call sites keep their name while picker-backed jobs can use Grok or
+  // Codex without duplicating every task implementation.
+  return runAgentSpawn(job, job.engine ?? "claude", prompt, opts);
 }
 
 // Last ~30 lines of a job's persisted log, formatted as a "\n---\n<tail>" suffix to append to an
@@ -783,7 +842,7 @@ export function jobElapsedMs(j: Pick<Job, "status" | "startedAt" | "finishedAt">
 // field keeps its exact name and value.
 export function publicJob(j: Job) {
   return {
-    id: j.id, kind: j.kind, label: j.label, status: j.status, slugs: j.slugs,
+    id: j.id, kind: j.kind, label: j.label, engine: j.engine ?? "claude", status: j.status, slugs: j.slugs,
     error: j.error, createdAt: j.createdAt, startedAt: j.startedAt, finishedAt: j.finishedAt,
     elapsedMs: jobElapsedMs(j), lastStdoutLine: j.lastStdoutLine,
     steps: j.steps, stepTotal: j.stepTotal, step: j.step, failedAtStep: j.failedAtStep,
@@ -831,10 +890,10 @@ function materializeInboxArg(kind: "text" | "file", rawArg: string, id: string, 
 // file sources are copied into .inbox (space-free names) via materializeInboxArg; urls and "notes"
 // pass straight through. "video" jobs pass their content-folder path straight through too (see
 // addVideoJob) — no materialization needed.
-export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, rawText?: string): Job {
+export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, rawText?: string, engine: Engine = "claude"): Job {
   const id = nextJobId();
   const arg = kind === "text" || kind === "file" ? materializeInboxArg(kind, rawArg, id, rawText) : rawArg;
-  const job: Job = { id, kind, label, arg, ...freshJobFields() };
+  const job: Job = { id, kind, label, arg, engine, ...freshJobFields() };
   jobs.push(job);
   void drain();
   return job;
@@ -843,12 +902,12 @@ export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, r
 // "Generate storyboard" (card 9e20a616): enqueue `/video <folder>` through the SAME queue atomize
 // jobs run through — no second queue. Idempotent against a double-click: if this folder already
 // has a video job queued/running, hand back that job instead of starting a redundant second /video.
-export function addVideoJob(slug: string): Job {
+export function addVideoJob(slug: string, engine: Engine = "claude"): Job {
   safeFolder(slug); // throws "no such queue" if slug isn't a real content folder
   const arg = join("content", slug);
   const existing = jobs.find((j) => j.kind === "video" && j.arg === arg && (j.status === "queued" || j.status === "running"));
   if (existing) return existing;
-  return addJob("video", arg, `Generate storyboard: ${slug}`);
+  return addJob("video", arg, `Generate storyboard: ${slug}`, undefined, engine);
 }
 
 // ── Develop tab: the advisor stage ──────────────────────────────────────────────────────────────
@@ -871,16 +930,16 @@ export function developJobInFlight(slug: string): boolean {
 // file / pasted text); an existing folder comes in as `{ slug }` instead. Reply rounds are
 // enqueued by addDevelopReplyJob AFTER serve.ts persisted the reply to develop/log.md — the spawn
 // argv stays a fixed `/develop content/<slug>`, no free text in it.
-export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, rawText?: string): Job {
+export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, rawText?: string, engine: Engine = "claude"): Job {
   const id = nextJobId();
   const arg = kind === "url" ? rawArg : materializeInboxArg(kind, rawArg, id, rawText);
-  const job: Job = { id, kind: "develop", label: `Develop: ${label}`, arg, ...freshJobFields() };
+  const job: Job = { id, kind: "develop", label: `Develop: ${label}`, arg, engine, ...freshJobFields() };
   jobs.push(job);
   void drain();
   return job;
 }
 
-export function addDevelopFolderJob(slug: string, kind: "develop" | "develop-reply" = "develop"): Job {
+export function addDevelopFolderJob(slug: string, kind: "develop" | "develop-reply" = "develop", engine: Engine = "claude"): Job {
   safeFolder(slug); // throws "no such queue" if slug isn't a real content folder
   const arg = join("content", slug);
   const existing = jobs.find(
@@ -888,7 +947,7 @@ export function addDevelopFolderJob(slug: string, kind: "develop" | "develop-rep
   );
   if (existing) return existing; // idempotent against a double-click, like addVideoJob
   const label = kind === "develop-reply" ? `Advisor reply: ${slug}` : `Develop: ${slug}`;
-  const job: Job = { id: nextJobId(), kind, label, arg, ...freshJobFields() };
+  const job: Job = { id: nextJobId(), kind, label, arg, engine, ...freshJobFields() };
   jobs.push(job);
   void drain();
   return job;
@@ -946,7 +1005,7 @@ interface AtomizeRunResult {
 // to tag every row it appends "from GUI queue" instead of the default "from /cycle" — the origin
 // source-tag the review GUI renders per row (src/publish/queue.ts QUEUE_ORIGINS).
 async function runAtomizeJob(job: Job): Promise<AtomizeRunResult> {
-  const result = await runClaudeSpawn(job, `/atomize ${job.arg}`, {
+  const result = await runClaudeSpawn(job, enginePrompt(job.engine ?? "claude", "atomize", `/atomize ${job.arg}`), {
     timeoutMs: ATOMIZE_TIMEOUT_MS,
     permissionMode: ATOMIZE_PERMISSION_MODE,
     env: { ATOMIZE_ORIGIN: "gui-queue" },
@@ -959,7 +1018,7 @@ async function runAtomizeJob(job: Job): Promise<AtomizeRunResult> {
 // Sets job.status/job.error/job.slugs itself (mirrors the atomize branch of drain() below).
 async function runVideoJob(job: Job): Promise<void> {
   const folderAbs = join(repoRoot, job.arg);
-  const result = await runClaudeSpawn(job, `/video ${job.arg}`, {
+  const result = await runClaudeSpawn(job, enginePrompt(job.engine ?? "claude", "video", `/video ${job.arg}`), {
     timeoutMs: ATOMIZE_TIMEOUT_MS,
     permissionMode: ATOMIZE_PERMISSION_MODE,
   });
@@ -986,7 +1045,7 @@ async function runDevelopJob(job: Job): Promise<void> {
   const isFolderArg = job.arg.startsWith("content/");
   const beforeSlugs = isFolderArg ? null : new Set(listSlugs());
   const beforeRounds = isFolderArg ? roundCount(join(repoRoot, job.arg)) : 0;
-  const result = await runClaudeSpawn(job, `/develop ${job.arg}`, {
+  const result = await runClaudeSpawn(job, enginePrompt(job.engine ?? "claude", "develop", `/develop ${job.arg}`), {
     timeoutMs: DEVELOP_TIMEOUT_MS,
     permissionMode: ATOMIZE_PERMISSION_MODE,
   });
@@ -1030,6 +1089,7 @@ async function runContinueJob(job: Job): Promise<void> {
   job.status = !failure && progressed ? "done" : "failed";
   if (job.status === "done") {
     if (parsed) job.slugs = [basename(parsed.folder)]; // enables the jobs pill's "→ review" jump link
+    if (folderAbs) stampFolderEngine(folderAbs, job.engine ?? "claude");
     return;
   }
   job.error =
@@ -1156,7 +1216,7 @@ export function findFictionDupe(
   });
 }
 
-export function addFictionDraftJob(seriesArg: string, beats: string): { job: Job; queued: boolean } {
+export function addFictionDraftJob(seriesArg: string, beats: string, engine: Engine = "claude"): { job: Job; queued: boolean } {
   const dir = resolveSeriesDir(seriesArg); // throws on an unknown series before anything is queued
   const slug = basename(dir);
   if (!beats.trim()) throw new Error("say the beats first");
@@ -1166,7 +1226,7 @@ export function addFictionDraftJob(seriesArg: string, beats: string): { job: Job
   // running job never received.
   if (existing) return { job: existing, queued: false };
   const job: Job = {
-    id: nextJobId(), kind: "fiction-draft", label: `Draft a scene: ${slug}`, arg: slug, ...freshJobFields(),
+    id: nextJobId(), kind: "fiction-draft", label: `Draft a scene: ${slug}`, arg: slug, engine, ...freshJobFields(),
     payload: { mode: "draft", series: slug, beats: beats.trim() },
   };
   jobs.push(job);
@@ -1174,7 +1234,7 @@ export function addFictionDraftJob(seriesArg: string, beats: string): { job: Job
   return { job, queued: true };
 }
 
-export function addFictionRepassJob(seriesArg: string, chapter: number, note: string): Job {
+export function addFictionRepassJob(seriesArg: string, chapter: number, note: string, engine: Engine = "claude"): Job {
   const dir = resolveSeriesDir(seriesArg);
   const slug = basename(dir);
   if (!note.trim()) throw new Error("say what to change first");
@@ -1182,7 +1242,7 @@ export function addFictionRepassJob(seriesArg: string, chapter: number, note: st
   const existing = findFictionDupe(jobs, { kind: "fiction-draft", series: slug, mode: "repass", chapter });
   if (existing) return existing;
   const job: Job = {
-    id: nextJobId(), kind: "fiction-draft", label: `Second pass: ${slug} chapter ${chapter}`, arg: slug, ...freshJobFields(),
+    id: nextJobId(), kind: "fiction-draft", label: `Second pass: ${slug} chapter ${chapter}`, arg: slug, engine, ...freshJobFields(),
     payload: { mode: "repass", series: slug, chapter, note: note.trim() },
   };
   jobs.push(job);
@@ -1190,7 +1250,7 @@ export function addFictionRepassJob(seriesArg: string, chapter: number, note: st
   return job;
 }
 
-export function addFictionCheckJob(seriesArg: string, chapter: number): Job {
+export function addFictionCheckJob(seriesArg: string, chapter: number, engine: Engine = "claude"): Job {
   const dir = resolveSeriesDir(seriesArg);
   const slug = basename(dir);
   if (!chapterNumbers(dir).includes(chapter)) throw new Error(`there is no chapter ${chapter} to check`);
@@ -1198,7 +1258,7 @@ export function addFictionCheckJob(seriesArg: string, chapter: number): Job {
   if (existing) return existing;
   const job: Job = {
     id: nextJobId(), kind: "fiction-continuity", label: `Check the canon: ${slug} chapter ${chapter}`,
-    arg: slug, ...freshJobFields(), payload: { series: slug, chapter },
+    arg: slug, engine, ...freshJobFields(), payload: { series: slug, chapter, engine },
   };
   jobs.push(job);
   void drain();
@@ -1291,9 +1351,10 @@ async function runFictionDraftJob(job: Job): Promise<void> {
     /* the anchor is a convenience; a scene that exists is still a scene */
   }
   // "It writes a first pass and checks the canon while it goes." The queue is serial, so this
-  // simply runs next.
+  // simply runs next, on the same engine the draft ran on unless she picks a different one for the
+  // recheck itself.
   try {
-    addFictionCheckJob(p.series ?? job.arg, chapter);
+    addFictionCheckJob(p.series ?? job.arg, chapter, job.engine ?? "claude");
   } catch {
     /* a check that cannot be queued must not fail the draft that already landed */
   }
@@ -1303,13 +1364,14 @@ async function runFictionCheckJob(job: Job): Promise<void> {
   const p = job.payload ?? {};
   const slug = p.series ?? job.arg;
   const chapter = p.chapter ?? 0;
+  const engine: Engine = p.engine ?? job.engine ?? "claude";
   const before = readContinuityReport(slug, chapter)?.checkedAt ?? null;
-  const result = await runCommandSpawn(job, "npx", ["tsx", "src/fiction/continuity.ts", slug, "--chapter", String(chapter)], {
+  const result = await runCommandSpawn(job, "npx", ["tsx", "src/fiction/continuity.ts", slug, "--chapter", String(chapter), "--engine", engine], {
     timeoutMs: CONTINUITY_TIMEOUT_MS,
   });
   const failure = decodeSpawnFailure(result, job.id, {
-    timeoutVerb: "the canon check", timeoutLabel: `${CONTINUITY_TIMEOUT_MS / 60000} min`,
-    exitVerb: "the canon check", includeTailOnTimeout: true, command: "npx",
+    timeoutVerb: `the ${ENGINE_LABELS[engine]} canon check`, timeoutLabel: `${CONTINUITY_TIMEOUT_MS / 60000} min`,
+    exitVerb: `the ${ENGINE_LABELS[engine]} canon check`, includeTailOnTimeout: true, command: "npx",
   });
   // Artifact, not exit code: a fresh report actually on disk.
   const after = readContinuityReport(slug, chapter);
@@ -1458,6 +1520,7 @@ async function drain(): Promise<void> {
     for (const slug of job.slugs) {
       try {
         stampOrigin(join(CONTENT, slug), "from GUI queue");
+        stampFolderEngine(join(CONTENT, slug), job.engine ?? "claude");
       } catch {
         // best-effort tagging only — never fail the job over it
       }
@@ -1494,6 +1557,7 @@ export function answerJob(id: string, answer: string): { error: string } | { job
     kind: original.kind,
     label: original.label,
     arg: original.arg,
+    engine: original.engine ?? "claude",
     task: original.task,
     payload: original.payload,
     answer,
@@ -1666,7 +1730,8 @@ export function duplicatePrompt(
 export async function duplicateToPlatform(
   slug: string,
   id: string,
-  targetPlatform: string
+  targetPlatform: string,
+  engine: Engine = "claude",
 ): Promise<{ id: string; platform: string; body: string }> {
   const folder = safeFolder(slug);
   if (!/^[\w.-]+$/.test(id)) throw new Error("bad id");
@@ -1679,7 +1744,7 @@ export async function duplicateToPlatform(
   const sourcePlatform = typeof fm.platform === "string" ? fm.platform : "";
   const maxChars = loadPlatforms().platforms[targetPlatform]?.max_chars;
 
-  return runQueued("duplicate", `Duplicate ${slug}/${id} → ${targetPlatform}`, async (job) => {
+  return runQueued("duplicate", `Duplicate ${slug}/${id} to ${targetPlatform}`, async (job) => {
     // Computed at RUN time, not enqueue time: the queue serializes one job at a time, so reading
     // review-queue.md for the next free id HERE (not before the job was even queued) can't race
     // with another duplicate/atomize job that lands in between and claims the same id.
@@ -1690,14 +1755,16 @@ export async function duplicateToPlatform(
 
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: REVISE_TIMEOUT_MS });
     const failure = decodeSpawnFailure(result, job.id, {
-      timeoutVerb: "Claude", timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
+      timeoutVerb: `${engineName(job)} duplicate`, timeoutLabel: `${REVISE_TIMEOUT_MS / 1000}s`,
+      exitVerb: `${engineName(job)} duplicate`, command: job.engine === "claude" ? undefined : ENGINE_COMMANDS[job.engine ?? "claude"],
     });
     if (failure) throw new Error(failure);
     if (!existsSync(targetPath)) {
-      throw new Error(`Claude ran but didn't write ${targetId}.md — check the view-log link${logTailSuffix(job.id)}`);
+      throw new Error(`${engineName(job)} ran but didn't write ${targetId}.md — check the view-log link${logTailSuffix(job.id)}`);
     }
 
     const newBody = splitFrontmatter(readFileSync(targetPath, "utf8")).body;
+    stampFileEngine(targetPath, engine);
     appendRow(folder, {
       id: targetId,
       platform: targetPlatform,
@@ -1708,7 +1775,7 @@ export async function duplicateToPlatform(
       origin: "from GUI queue",
     });
     return { id: targetId, platform: targetPlatform, body: newBody };
-  });
+  }, engine);
 }
 
 // ── Follow-ups tab: "Draft follow-up" ────────────────────────────────────────────────────────
@@ -1735,40 +1802,58 @@ const DRAFT_TIMEOUT_MS = 120_000; // mirrors outreach/draft.ts's own (private) D
 // The ONE queued-draft path, shared by Follow-ups' "Draft follow-up" and the Outreach thread's
 // directed first draft. Only the label and the optional typed direction differ; the transport,
 // model, tools lockdown and timeout stay identical so neither caller can drift from the other.
-function enqueueOutreachDraft(
+export interface OutreachDraftJobDeps {
+  /** Injectable only for focused tests; production keeps the existing runDraft path. */
+  runDraft?: typeof runDraft;
+  /** Injectable only for focused tests; production uses the shared engine-aware spawn. */
+  spawn?: typeof runClaudeSpawn;
+}
+
+export function enqueueOutreachDraft(
   label: string,
   dir: string,
   opts: { channel?: string; recipient?: string; direction?: string },
+  engine: Engine = "claude",
+  deps: OutreachDraftJobDeps = {},
 ): Promise<DraftResult> {
+  const draft = deps.runDraft ?? runDraft;
+  const spawn = deps.spawn ?? runClaudeSpawn;
   return runQueued("draft-follow-up", label, (job) =>
-    runDraft(dir, {
+    draft(dir, {
       channel: opts.channel,
       recipient: opts.recipient,
       direction: opts.direction,
       callClaude: async (prompt) => {
-        const result = await runClaudeSpawn(job, prompt, {
+        const result = await spawn(job, prompt, {
           timeoutMs: DRAFT_TIMEOUT_MS,
           model: draftModel(),
           tools: "",
           permissionMode: null,
         });
         const failure = decodeSpawnFailure(result, job.id, {
-          timeoutVerb: "claude -p",
+          timeoutVerb: `${engineName(job)} draft`,
           timeoutLabel: "120s",
-          exitVerb: "claude -p",
+          exitVerb: `${engineName(job)} draft`,
           includeTailOnTimeout: true,
+          command: ENGINE_COMMANDS[job.engine ?? "claude"],
         });
         if (failure) throw new Error(failure);
         const text = result.stdout.trim();
-        if (!text) throw new Error("claude -p returned no text during draft");
+        if (!text) throw new Error(`${engineName(job)} returned no text during draft`);
         return text;
       },
     }),
+    engine,
   );
 }
 
-export async function enqueueFollowUpDraft(dir: string, channel?: string, recipient?: string): Promise<DraftResult> {
-  return enqueueOutreachDraft(`Draft follow-up: ${dir}`, dir, { channel, recipient });
+export async function enqueueFollowUpDraft(
+  dir: string,
+  channel?: string,
+  recipient?: string,
+  engine: Engine = "claude",
+): Promise<DraftResult> {
+  return enqueueOutreachDraft(`Draft follow-up: ${dir}`, dir, { channel, recipient }, engine);
 }
 
 // ── Outreach thread: the directed first draft (v7 handoff §3, the conversational half) ───────
@@ -1782,8 +1867,10 @@ export async function enqueueDirectedDraft(
   channel?: string,
   recipient?: string,
   direction?: string,
+  engine: Engine = "claude",
+  deps: OutreachDraftJobDeps = {},
 ): Promise<DraftResult> {
-  return enqueueOutreachDraft(`Draft message: ${dir}`, dir, { channel, recipient, direction });
+  return enqueueOutreachDraft(`Draft message: ${dir}`, dir, { channel, recipient, direction }, engine, deps);
 }
 
 // ── Charles room: "Draft" (Build 4) ─────────────────────────────────────────────────────────
@@ -1815,7 +1902,7 @@ export function charlesDraftPrompt(mode: CharlesDraftMode, input: string, existi
     `(Build 4). Do not run shell commands beyond what reading/writing files requires; write the one`,
     `new file plus the one queue row below, then stop.`,
     ``,
-    `First read charles/CLAUDE.md and charles/config/persona.yaml in full — his voice is governed`,
+    `First read charles/AGENTS.md and charles/config/persona.yaml in full — his voice is governed`,
     `by persona.yaml, NOT config/voice.yaml. Then follow the "Mode: /charles ${mode}" section of`,
     `.claude/skills/charles/SKILL.md exactly, for this input:`,
     ``,
@@ -1829,11 +1916,11 @@ export function charlesDraftPrompt(mode: CharlesDraftMode, input: string, existi
     `- Status for the new row is always "pending" — never approve/discard it yourself.`,
     `- If you use a "useful leak," it MUST be one already listed in persona.yaml's leak_bank —`,
     `  never invent a statistic, org, or ballot measure that isn't there.`,
-    `- Keep the em-dash ban (charles/CLAUDE.md carries it over from Build 2's fiction rule).`,
+    `- Keep the em-dash ban (charles/AGENTS.md carries it over from Build 2's fiction rule).`,
   ].join("\n");
 }
 
-export async function enqueueCharlesDraft(mode: string, input: string): Promise<{ id: string; post: CharlesPost }> {
+export async function enqueueCharlesDraft(mode: string, input: string, engine: Engine = "claude"): Promise<{ id: string; post: CharlesPost }> {
   if (!CHARLES_DRAFT_MODES.has(mode as CharlesDraftMode)) {
     throw new Error(`"${mode}" isn't a mode this can draft from the GUI — try one-liner, essay, or reply`);
   }
@@ -1845,15 +1932,17 @@ export async function enqueueCharlesDraft(mode: string, input: string): Promise<
 
     const result = await runClaudeSpawn(job, prompt, { timeoutMs: CHARLES_DRAFT_TIMEOUT_MS });
     const failure = decodeSpawnFailure(result, job.id, {
-      timeoutVerb: "Claude", timeoutLabel: `${CHARLES_DRAFT_TIMEOUT_MS / 1000}s`, exitVerb: "Claude draft",
+      timeoutVerb: `${engineName(job)} draft`, timeoutLabel: `${CHARLES_DRAFT_TIMEOUT_MS / 1000}s`,
+      exitVerb: `${engineName(job)} draft`, command: job.engine === "claude" ? undefined : ENGINE_COMMANDS[job.engine ?? "claude"],
     });
     if (failure) throw new Error(failure);
 
     const after = listCharlesPosts(CHARLES_DIR);
     const newId = after.map((p) => p.id).find((id) => !before.has(id));
     if (!newId) {
-      throw new Error(`Claude ran but didn't add a new row to charles/review-queue.md — check the view-log link${logTailSuffix(job.id)}`);
+      throw new Error(`${engineName(job)} ran but didn't add a new row to charles/review-queue.md — check the view-log link${logTailSuffix(job.id)}`);
     }
+    stampCharlesEngine(newId, job.engine ?? "claude", CHARLES_DIR);
     return { id: newId, post: readCharlesPost(newId, CHARLES_DIR) };
-  });
+  }, engine);
 }

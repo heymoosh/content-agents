@@ -6,17 +6,17 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
 - **Build 1 — Atomization**: original content + brief → platform assets (text, images, video) → human review → publish
 - **Build 2 — Fiction**: a serialized, monetized fiction series written chapter-by-chapter
   (`stories/`). The one place AI *composes* original prose. Deliberately walled off from
-  Builds 0/1 — see `stories/CLAUDE.md`.
+  Builds 0/1 — see `stories/AGENTS.md`.
 - **Build 3 — Venture**: a phased solo-business sprint (intake → Attention → Audience → Offer →
   Operations) that composes original business-testing content — post ideas, probe posts, and
   later a lead magnet, an offer, an operating plan (`venture/`). The second place AI *composes*
   original work, and unlike Build 2 it ships under Muxin's own byline in her own voice.
-  Deliberately walled off from Builds 0/1 — see `venture/CLAUDE.md`.
+  Deliberately walled off from Builds 0/1 — see `venture/AGENTS.md`.
 - **Build 4 — Charles Lord Featherbottom**: a satirical persona, a consultant to oligarchs
   secretly panicking as belief in "inevitable power" erodes. `/charles` composes his one-liners,
   essays, and replies from scratch — no source essay, no Muxin byline. Memes are out of scope
   (Muxin handles those herself elsewhere).
-  Deliberately walled off from Builds 0/1/3 — see `charles/CLAUDE.md`.
+  Deliberately walled off from Builds 0/1/3 — see `charles/AGENTS.md`.
 
 ## Non-negotiable rules
 
@@ -40,7 +40,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      inside the exception: never assert a result, customer, number, or experience Muxin did not
      have.
      Unlike Build 2, **rule 5 applies in full here** — this copy ships in Muxin's nonfiction voice
-     under her own name, so `config/voice.yaml` governs it completely. See `venture/CLAUDE.md`.
+     under her own name, so `config/voice.yaml` governs it completely. See `venture/AGENTS.md`.
      The exception is Venture-composed business copy only; it must never bleed into text/image
      derivatives.
    - `/brand-lens` (`.claude/skills/brand-lens/`) is NOT an exception to this rule: it proposes
@@ -54,7 +54,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      ready-to-paste, Muxin pastes it herself). **The exemption is from tracing, not from
      truthfulness**: Charles's "useful leaks" (real ballot measures, orgs) must stay factually
      accurate to the sourced claims in `charles/config/persona.yaml`'s leak bank — see
-     `charles/CLAUDE.md`. The exception is Charles-composed satire only; it must never bleed into
+     `charles/AGENTS.md`. The exception is Charles-composed satire only; it must never bleed into
      text/image derivatives or Muxin's own voice.
 2. **Nothing publishes without review.** `/publish` acts only on rows Muxin set to `approve` in
    `review-queue.md`. Text posts go to Typefully as scheduled drafts, never instant posts.
@@ -77,7 +77,7 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    - **Exemption — Build 4 (Charles Lord Featherbottom).** Charles is not Muxin and is not
      nonfiction-PM-voiced on purpose — `config/voice.yaml` does not govern him. He is governed
      instead by `charles/config/persona.yaml`. The em-dash ban still carries over, same as
-     Build 2's fiction. See `charles/CLAUDE.md`.
+     Build 2's fiction. See `charles/AGENTS.md`.
 6. **Prefer subscription / free model routes; minimize per-token API cost.** Default any model
    call to the cheapest acceptable route: Claude via the Claude Code subscription (harness
    subagents, $0 marginal — e.g. `/story` claude-native) and free-local media (Remotion / SVG /

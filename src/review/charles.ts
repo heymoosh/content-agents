@@ -1,7 +1,7 @@
 // Charles desk (Build 4): reads charles/review-queue.md + the draft files it points at, and lets
 // Muxin approve / revise / discard / edit in place — the same review contract as every other
 // room, just against a 5-column table instead of the main pipeline's 10-column one (see
-// charles/CLAUDE.md). Nothing here posts anything; approving just flips the status cell. Muxin
+// charles/AGENTS.md). Nothing here posts anything; approving just flips the status cell. Muxin
 // still pastes the approved draft to Substack herself. Also serves her original persona brief
 // (verbatim, not the distilled persona.yaml) for a one-click copy to hand to another tool.
 
@@ -19,6 +19,7 @@ export interface CharlesRow {
   file: string; // charles/-relative path
   status: string;
   notes: string;
+  engine?: string;
 }
 
 export interface CharlesPost extends CharlesRow {
@@ -35,7 +36,7 @@ function parseQueueTable(text: string): CharlesRow[] {
     if (!line.trim().startsWith("|")) continue;
     const cells = line.split("|").slice(1, -1).map((c) => c.trim());
     if (cells.length < 5 || cells[0] === "id" || /^-+$/.test(cells[0])) continue;
-    rows.push({ id: cells[0], type: cells[1], file: cells[2], status: cells[3], notes: cells[4] });
+    rows.push({ id: cells[0], type: cells[1], file: cells[2], status: cells[3], notes: cells[4], engine: cells[5] || undefined });
   }
   return rows;
 }
@@ -95,6 +96,24 @@ export function setCharlesStatus(id: string, status: string, notes?: string, roo
     found = true;
     cells[4] = ` ${status} `;
     if (notes !== undefined) cells[5] = ` ${notes} `;
+    return cells.join("|");
+  });
+  if (!found) throw new Error("no such post in queue: " + id);
+  writeFileSync(path, out.join("\n"));
+}
+
+/** Add the selected engine as a sixth, backward-compatible queue column. */
+export function stampCharlesEngine(id: string, engine: string, root: string = CHARLES_DIR): void {
+  const path = queuePath(root);
+  const lines = readFileSync(path, "utf8").split("\n");
+  let found = false;
+  const out = lines.map((line) => {
+    if (!line.trim().startsWith("|")) return line;
+    const cells = line.split("|");
+    if (cells.length < 7 || cells[1].trim() !== id) return line;
+    found = true;
+    if (cells.length >= 8) cells[6] = ` ${engine} `;
+    else cells.splice(cells.length - 1, 0, ` ${engine} `);
     return cells.join("|");
   });
   if (!found) throw new Error("no such post in queue: " + id);

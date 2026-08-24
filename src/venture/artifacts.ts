@@ -102,6 +102,8 @@ export interface VentureArtifact {
 
   created_at: string;
   updated_at: string;
+  /** CLI that produced the judgment, when an agent run created this artifact. */
+  engine?: string | null;
 }
 
 // §2.2's valid (editorial, delivery) combinations. Anything not listed here is rejected.
@@ -172,6 +174,7 @@ export interface CreateArtifactInput {
   unknown_id?: string | null;
   claim_refs?: ClaimRef[];
   at: string;
+  engine?: string | null;
 }
 
 // Stamps delivery_mode/publishable from rules.ts's kind table AT CREATE TIME and writes them
@@ -210,6 +213,7 @@ export function createArtifact(
     body_edited_by_muxin_at: null,
     created_at: input.at,
     updated_at: input.at,
+    engine: input.engine ?? process.env.CONTENT_AGENT_ENGINE ?? null,
   };
   appendLine(slug, artifact);
   return artifact;

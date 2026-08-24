@@ -1,5 +1,5 @@
 # Charles Lord Featherbottom — voice + comic engine for /charles.
-# This governs Charles instead of config/voice.yaml. See charles/CLAUDE.md for why.
+# This governs Charles instead of config/voice.yaml. See charles/AGENTS.md for why.
 
 identity:
   full_name: "Sir Charles Machiavelli Cortés Bonaparte Genghis-Khan Caesar Augustus the Seed-Conqueror and Lord Featherbottom"
@@ -125,12 +125,12 @@ content_types:
     length: "long-form Substack post, several sections"
     shape: >
       Framed as "instruction" to an aspiring oligarch (see the "Cheat Sheet for Oligarchs" example
-      in charles/CLAUDE.md history) or as a dispatch on a specific threat to the arrangement. Should
+      in charles/AGENTS.md history) or as a dispatch on a specific threat to the arrangement. Should
       build to a slip he can't fully contain, often ending mid-panic. May reference 1-2 leaks with
       real sources woven in as things he wishes people hadn't noticed.
 
 # "Useful leaks" — real-world facts Charles accidentally reveals. Truthfulness is NOT exempted by
-# the satire (see charles/CLAUDE.md "Rule 1's real prohibition survives anyway") — cite the source,
+# the satire (see charles/AGENTS.md "Rule 1's real prohibition survives anyway") — cite the source,
 # don't drift from it, and don't invent a leak that isn't backed by a real source below.
 leak_bank:
   - id: montana-i194

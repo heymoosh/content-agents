@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
+import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
@@ -326,6 +326,57 @@ test("buildClaudeSpawnArgs: permissionMode: null omits --permission-mode entirel
 
 test("buildClaudeSpawnArgs: model/tools are appended only when explicitly set", () => {
   assert.deepEqual(buildClaudeSpawnArgs("p", { model: "sonnet" }), ["-p", "p", "--permission-mode", "acceptEdits", "--model", "sonnet"]);
+});
+
+test("enqueueOutreachDraft carries the selected engine into the queued follow-up spawn", async () => {
+  jobs.length = 0;
+  let seenEngine: string | undefined;
+  const fakeRunDraft = async (_dir: string, opts: { callClaude?: (prompt: string) => Promise<string> } = {}) => {
+    await opts.callClaude?.("draft this follow-up");
+    return { dir: "outreach/leads/example", messageFile: "messages/message-01.md", messageId: "message-01", channel: "email" as const, evidenceIds: [] };
+  };
+  const result = await enqueueOutreachDraft(
+    "Draft follow-up: outreach/leads/example",
+    "outreach/leads/example",
+    { channel: "email" },
+    "grok",
+    {
+      runDraft: fakeRunDraft,
+      spawn: async (job) => {
+        seenEngine = job.engine;
+        return { code: 0, timedOut: false, enoent: false, stdout: "draft body" };
+      },
+    },
+  );
+  assert.equal(result.messageId, "message-01");
+  assert.equal(seenEngine, "grok");
+  jobs.length = 0;
+});
+
+test("enqueueDirectedDraft carries the selected engine into the queued draft spawn", async () => {
+  jobs.length = 0;
+  let seenEngine: string | undefined;
+  const fakeRunDraft = async (_dir: string, opts: { callClaude?: (prompt: string) => Promise<string> } = {}) => {
+    await opts.callClaude?.("draft this message");
+    return { dir: "outreach/leads/example", messageFile: "messages/message-01.md", messageId: "message-01", channel: "email" as const, evidenceIds: [] };
+  };
+  const result = await enqueueDirectedDraft(
+    "outreach/leads/example",
+    "email",
+    "muxin@example.com",
+    "keep it concise",
+    "codex",
+    {
+      runDraft: fakeRunDraft,
+      spawn: async (job) => {
+        seenEngine = job.engine;
+        return { code: 0, timedOut: false, enoent: false, stdout: "draft body" };
+      },
+    },
+  );
+  assert.equal(result.messageId, "message-01");
+  assert.equal(seenEngine, "codex");
+  jobs.length = 0;
 });
 
 // ── addVideoJob (card 9e20a616) — validation-only path, no real /video spawn ────────────────────

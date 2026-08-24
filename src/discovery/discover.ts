@@ -14,6 +14,7 @@ import { loadOutreachConfig } from "../outreach/config.js";
 import { listLeads } from "../outreach/status.js";
 import { runQualify, formatEvidenceLine } from "../outreach/qualify.js";
 import { buildResearchSettings } from "../outreach/research.js";
+import { buildEngineSpawn, isEngine } from "../review/engines.js";
 import {
   buildClientPlatformDiscoveryPrompt,
   parseClientPlatformDiscoveryCandidates,
@@ -202,6 +203,8 @@ const SEARCH_BUDGET_HOOK_PATH = join(repoRoot, "src", "outreach", "search-budget
 const TSX_BIN = join(repoRoot, "node_modules", ".bin", "tsx");
 
 async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<string> {
+  const selected = isEngine(process.env.CONTENT_AGENT_ENGINE) ? process.env.CONTENT_AGENT_ENGINE : "claude";
+  if (selected === "codex") throw new Error("Scout supports Claude or Grok web discovery; choose one of those engines.");
   const model = (process.env.CLAUDE_POLISH_MODEL ?? "sonnet").trim();
   const counterFile = join(tmpdir(), `discovery-search-budget-${randomUUID()}.count`);
   let stdout: string;
@@ -211,9 +214,11 @@ async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<
     // (this call never writes files itself; writeClientPlatformLead/writeContentExampleLead own
     // every byte written to disk). search-budget-hook.ts is reused completely unmodified: it only
     // ever reads the two env vars set below, kind-agnostic.
+    const built = buildEngineSpawn(selected, prompt, { timeoutMs: DEFAULT_TIMEOUT_MS, permissionMode: "acceptEdits", model: selected === "claude" ? model : undefined });
+    const args = [...built.args, "--settings", JSON.stringify(buildResearchSettings(SEARCH_BUDGET_HOOK_PATH))];
     const r = await execFileP(
-      "claude",
-      ["-p", prompt, "--model", model, "--permission-mode", "acceptEdits", "--settings", JSON.stringify(buildResearchSettings(SEARCH_BUDGET_HOOK_PATH))],
+      built.command,
+      args,
       {
         cwd: repoRoot,
         timeout: DEFAULT_TIMEOUT_MS,
@@ -229,12 +234,12 @@ async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<
   } catch (e) {
     const err = e as { code?: string; killed?: boolean; stderr?: string };
     if (err.code === "ENOENT") {
-      throw new Error("`claude` CLI not on PATH -- discover.ts needs Claude Code installed");
+      throw new Error(selected+" CLI not on PATH -- Scout needs the selected engine installed");
     }
     if (err.killed) {
-      throw new Error(`claude -p timed out after ${Math.round(DEFAULT_TIMEOUT_MS / 60_000)}min during discovery`);
+      throw new Error(selected+" web discovery timed out after "+Math.round(DEFAULT_TIMEOUT_MS / 60_000)+"min");
     }
-    throw new Error(`claude -p failed: ${err.stderr?.trim() || (e instanceof Error ? e.message : String(e))}`);
+    throw new Error(selected+" web discovery failed: "+(err.stderr?.trim() || (e instanceof Error ? e.message : String(e))));
   } finally {
     if (existsSync(counterFile)) {
       try {
@@ -245,7 +250,7 @@ async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<
     }
   }
   const text = stdout.trim();
-  if (!text) throw new Error("claude -p returned no text during discovery");
+  if (!text) throw new Error(selected+" returned no text during discovery");
   return text;
 }
 
