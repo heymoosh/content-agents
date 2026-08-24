@@ -99,13 +99,14 @@ function readiness(value: unknown, label: string): void {
 function reviewBundle(value: unknown): void {
   const item = record(value, "reviewBundle");
   allowed(item, [
-    "kind", "version", "id", "sourceRef", "cutRef", "variantRefs", "publishRefs", "lineage",
+    "kind", "version", "id", "reviewQueueRef", "sourceRef", "cutRef", "variantRefs", "publishRefs", "lineage",
     "evidenceStatus", "evidenceRefs", "evidenceNote", "voiceCheck", "originalityCheck",
     "readiness", "humanDecision", "status", "generatesCopy", "sideEffects",
   ], "reviewBundle");
   if (item.kind !== "grow_review_bundle") fail("reviewBundle.kind must be grow_review_bundle");
   if (item.version !== "grow-review-bundle-v1") fail("reviewBundle.version must be grow-review-bundle-v1");
   nonEmpty(item.id, "reviewBundle.id");
+  nullableText(item.reviewQueueRef, "reviewBundle.reviewQueueRef");
   reference(item.sourceRef, "reviewBundle.sourceRef");
   reference(item.cutRef, "reviewBundle.cutRef");
   referenceArray(item.variantRefs, "reviewBundle.variantRefs");

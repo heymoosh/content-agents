@@ -384,7 +384,7 @@ publishes, or turns a candidate into an approval by inference.
 Required review fields are:
 
 ```text
-id, source_ref, cut_ref, variant_refs, publish_refs, lineage,
+id, review_queue_ref, source_ref, cut_ref, variant_refs, publish_refs, lineage,
 evidence_status, evidence_refs, voice_check, originality_check, readiness,
 human_decision, status
 ```

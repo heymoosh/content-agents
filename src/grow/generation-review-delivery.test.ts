@@ -167,6 +167,40 @@ test("keeps missing, mismatched, and incomplete review joins blocked", () => {
   assert.equal(missing.rows[0]?.readiness.status, "blocked");
   assert.ok(missing.rows[0]?.readiness.blockers.some((blocker) => /binding|review bundle|live/i.test(blocker)));
 
+  const missingBundleQueueRef = buildGrowGenerationReviewDelivery({
+    generationRun,
+    bindings: [{
+      slot,
+      reviewQueueRef: slot.reviewQueueRef,
+      reviewBundle: { ...reviewBundle, reviewQueueRef: null },
+      day: "2026-08-25",
+      candidateLineage: lineage,
+      capacitySlice,
+      liveFacts,
+      queueLineage: { ...lineage, publishId: "publish:one" },
+      schedulerLineage: { ...lineage, publishId: "publish:one" },
+      providerFacts: null,
+    }],
+  });
+  assert.ok(missingBundleQueueRef.rows[0]?.readiness.blockers.includes("review bundle review queue reference is missing"));
+
+  const mismatchedBundleQueueRef = buildGrowGenerationReviewDelivery({
+    generationRun,
+    bindings: [{
+      slot,
+      reviewQueueRef: slot.reviewQueueRef,
+      reviewBundle: { ...reviewBundle, reviewQueueRef: "review:other" },
+      day: "2026-08-25",
+      candidateLineage: lineage,
+      capacitySlice,
+      liveFacts,
+      queueLineage: { ...lineage, publishId: "publish:one" },
+      schedulerLineage: { ...lineage, publishId: "publish:one" },
+      providerFacts: null,
+    }],
+  });
+  assert.ok(mismatchedBundleQueueRef.rows[0]?.readiness.blockers.includes("review bundle does not match review queue reference"));
+
   const mismatched = buildGrowGenerationReviewDelivery({
     generationRun,
     bindings: [{
