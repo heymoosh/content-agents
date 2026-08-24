@@ -34,6 +34,8 @@ export interface PoolEvidenceRow {
   bodyIncompleteCount: number;
   caveats: string[];
   readiness: PoolEvidenceReadiness;
+  /** Account rows are never comparison-ready; source/post evidence is the comparison authority. */
+  comparisonReadiness: PoolEvidenceReadiness;
 }
 
 export interface PoolEvidenceInventory {
@@ -86,6 +88,10 @@ function copyRow(row: CatalogRow, pool: PoolName | null): PoolEvidenceRow {
     readiness: pool === null
       ? { status: "blocked", reason: BLOCKED_REASON }
       : { status: "ready", reason: READY_REASON },
+    comparisonReadiness: {
+      status: "blocked",
+      reason: "Blocked: account inventory is a rollup; linked source/post evidence is required for comparison.",
+    },
   };
 }
 
@@ -161,11 +167,11 @@ export function renderPoolEvidenceMarkdown(inventory: PoolEvidenceInventory): st
     `Pool counts: niche ${poolCounts.niche} | broad ${poolCounts.broad} | format ${poolCounts.format} | blocked ${blockedAccounts.length}`,
     `Blocked accounts: ${blockedAccounts.length ? blockedAccounts.map(markdownCell).join(", ") : "none"}`,
     "",
-    "| Account ID | Platform | Handle | Creator | Niche | Topics | Focus | Formats | Audience | Pool | Membership reason | Popularity scopes | Sample scopes | Baseline sources | Evidence/admissible/body-complete/body-incomplete | Caveats | Readiness |",
-    "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|",
+    "| Account ID | Platform | Handle | Creator | Niche | Topics | Focus | Formats | Audience | Pool | Membership reason | Popularity scopes | Sample scopes | Baseline sources | Evidence/admissible/body-complete/body-incomplete | Caveats | Readiness | Comparison readiness |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|",
   ];
   for (const row of rows) {
-    lines.push(`| ${markdownCell(row.accountId)} | ${markdownCell(row.platform)} | ${markdownCell(row.handle)} | ${markdownCell(row.creator)} | ${markdownCell(row.niche)} | ${markdownList(row.topics)} | ${markdownList(row.focus)} | ${markdownList(row.formats)} | ${markdownCell(audienceSnapshot(row.audience))} | ${markdownCell(row.pool)} | ${markdownCell(row.membershipReason)} | ${markdownList(row.popularityScopes)} | ${markdownList(row.sampleScopes)} | ${markdownList(row.baselineSources)} | ${completeness(row)} | ${markdownList(row.caveats)} | ${row.readiness.status}: ${markdownCell(row.readiness.reason)} |`);
+    lines.push(`| ${markdownCell(row.accountId)} | ${markdownCell(row.platform)} | ${markdownCell(row.handle)} | ${markdownCell(row.creator)} | ${markdownCell(row.niche)} | ${markdownList(row.topics)} | ${markdownList(row.focus)} | ${markdownList(row.formats)} | ${markdownCell(audienceSnapshot(row.audience))} | ${markdownCell(row.pool)} | ${markdownCell(row.membershipReason)} | ${markdownList(row.popularityScopes)} | ${markdownList(row.sampleScopes)} | ${markdownList(row.baselineSources)} | ${completeness(row)} | ${markdownList(row.caveats)} | ${row.readiness.status}: ${markdownCell(row.readiness.reason)} | ${row.comparisonReadiness.status}: ${markdownCell(row.comparisonReadiness.reason)} |`);
   }
   return `${lines.join("\n")}\n`;
 }

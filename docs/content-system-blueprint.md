@@ -5,6 +5,11 @@
 learnable set of platform treatments. It is not an autopilot, a universal virality engine, or a
 claim that the current corpus is comprehensive.
 
+**Next increment status:** The human-reviewed account metadata overlay and the source/post-level
+pool-evidence boundary are scaffolded. Current live rows remain blocked for pool comparison until
+real reviewed metadata is entered. This document describes the target contract; it does not make
+existing rows reviewed by inference.
+
 ## 1. What the system must do
 
 Muxin supplies the insight, claims, observations, taste, and final yes. The system handles the
@@ -121,6 +126,42 @@ stable target `account_id` or a recorded reason it cannot yet receive one, the s
 are present with the null/unknown policy applied, and no target pool, scope, or identity claim is
 presented as complete beyond the available evidence.
 
+### Next increment: human-reviewed account metadata overlay
+
+Account metadata is a human-reviewed overlay on the account mapping. It is not inferred
+enrichment. A script may normalize handles, validate field shapes, join evidence, and roll the
+overlay up for display, but it may not infer an audience, topic, focus, pool, popularity scope,
+sample scope, baseline, or review decision from an account name, post metrics, ranking, or model
+judgment. The overlay supplements source and post records; it does not replace them or turn a
+current account key into a reviewed account.
+
+The requested account table has these fields:
+
+| Field | Meaning |
+|---|---|
+| `account` | Stable `account_id`, platform-local handle, and display creator or account name. |
+| `audience_size_snapshot` | Audience size and type, with observation date, collection date, and evidence source. |
+| `topics` / `focus` | Human-reviewed observed topics and the account's stated or observed editorial focus. |
+| `platform` | The platform that owns the handle and its reach baseline. |
+| `medium` / `format` | The medium and platform-native shape of the relevant source or post. |
+| `pool` | Explicit `niche` or canonical `broad` membership, displayed as broad-platform; `format` remains a separate format pool where applicable. |
+| `popularity_scope` / `sample_scope` / `baseline_scope` / `baseline_source` | The declared comparison scope, how the item was selected, and the denominator or baseline used, with its source. |
+| `evidence_links` | Links or stable references to the source/post-level evidence supporting the row. |
+| `caveats` | Missing body, attribution, audience, denominator, selection, or other limits. |
+| `review_status` | Whether Muxin reviewed the overlay, or whether it remains pending, blocked, or unmapped. |
+
+The account row is a rollup and navigation surface only. The authoritative unit for a pool
+comparison is a source/post-level evidence record with its own pool membership, metric snapshot,
+scope, sample rule, baseline, provenance, and caveats. Account mapping may group those records and
+report counts, but it cannot create evidence, supply a missing denominator, or make a pool
+comparison ready. A comparison that has only account mappings remains blocked.
+
+**Account-overlay acceptance predicate:** this increment is accepted only when the table schema is
+present, each current account key has one reviewed row or an explicit `unmapped` disposition,
+reviewed values are backed by real evidence links, and all unreviewed or incomplete live rows are
+marked blocked. The account overlay is not complete merely because rows exist. Current live rows
+remain blocked until real reviewed metadata is entered.
+
 ## 3. Research and evidence architecture
 
 The catalog is a shared index, not a promise of representative coverage. A source/account record
@@ -128,6 +169,13 @@ should preserve creator/account, platform and handle, source kind, URL, collecti
 date, audience size/type when known, topics, lane, medium, format, exact evidence location,
 provenance, and caveats. Metrics must preserve the numerator, denominator, observation window, and
 comparison group.
+
+For pool comparisons, the authoritative unit is the source/post-level evidence record. That row
+must carry the observed metric, audience snapshot when relevant, pool membership, popularity scope,
+sample scope, baseline or denominator, dates, evidence link, and caveats. Account mapping is only a
+rollup that groups those rows for navigation and reporting. It cannot substitute for a source/post
+row, create a denominator, or make a comparison ready. Account-level counts must not be treated as
+the comparison sample unless the underlying source/post units and selection rule are shown.
 
 Keep three research pools separate, with separate labels and retrieval/ranking:
 
@@ -151,9 +199,12 @@ The provisional output requires `rows` and `summary`. `summary` requires
 `poolCounts` for `niche`, `broad`, and `format`, plus `blockedAccounts`. Every row requires
 `accountId`, `platform`, `handle`, `creator`, `niche`, `topics`, `focus`, `formats`, `audience`,
 `pool`, `membershipReason`, `popularityScopes`, `sampleScopes`, `baselineSources`,
-`evidenceCount`, `admissibleCount`, `bodyCompleteCount`, `bodyIncompleteCount`, `caveats`, and
-`readiness`. `readiness` is `ready` or `blocked` with a reason. Nulls and empty lists preserve
-the common missing-data policy; the counts are descriptive inventory facts, not metric judgments.
+`evidenceCount`, `admissibleCount`, `bodyCompleteCount`, `bodyIncompleteCount`, `caveats`,
+`readiness`, and `comparisonReadiness`. `readiness` describes whether explicit account metadata is
+available for inventory inspection. `comparisonReadiness` remains blocked until linked
+source/post-level evidence is present. Both are `ready` or `blocked` with a reason. Nulls and
+empty lists preserve the common missing-data policy; the counts are descriptive inventory facts,
+not metric judgments.
 
 Pool membership is explicit-membership-only. `pool` may be populated only from explicit
 `research_pool`/`research_pools` metadata; it may not be inferred from the account name, niche,
@@ -198,6 +249,11 @@ The generated hook and body must still be written in Muxin's voice, preserve her
 substance, and pass voice and originality review before approval. Exact creator text may be retained
 in the local corpus or opener bank as internal evidence, quotation, attribution, or a licensed
 exception. It is not the default output.
+
+The exact creator body remains internal evidence. It may support analysis, quotation, attribution,
+or an originality check, but it must not be copied into Muxin's body. Common hooks may be adapted as
+mad-lib templates around Muxin's original substance: her supplied claim, experience, example,
+evidence, and point of view remain the content of the adapted treatment.
 
 The system must not copy a distinctive creator-specific phrase sequence, body, story, claim, or
 example and swap nouns. A common template is allowed; a recognizable creator's signature wording
@@ -363,6 +419,12 @@ normalized evidence set, reviewable summaries and selection rules, denominators,
 source citations, originality checks, and Muxin's judgment are present. A provisional inventory
 does not unlock Grow variants or permit a winner claim.
 
+For this increment, the Phase 2 comparison predicate is explicit: every comparison must name its
+source/post-level evidence rows, explicit pool membership, popularity and sample scopes, baseline
+or denominator, dates, and caveats. An account mapping may be included as a rollup, but it cannot
+stand in for any of those evidence rows. If real reviewed account metadata is absent, current live
+rows remain `blocked` and no pool comparison or winner claim may proceed.
+
 **Not in scope:** inferring missing pool metadata, training on exact creator text, selecting or
 claiming winners, generating body or opener copy, replacing human judgment with ranking, or
 generalizing from a single account or small sample.
@@ -413,10 +475,11 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Internal candidates versus publish volume | Current systems generate or queue artifacts in several places, but do not yet expose one shared capacity view | Separate candidate counts from approved publish counts, with human capacity, platform slots, pauses, and rollback records | Target |
 | Source-to-publish path | Existing extraction, review, and publish engines; `src/grow/variants.ts` now emits provisional no-copy candidate specifications | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
 | Review gate | Human review and publish approval already required | Explicit per-artifact states, rationale, lineage, and no-AI-smell check | Partial |
-| Phase contracts | This blueprint names broad phase outcomes; the parallel contracts document is not yet treated as an implemented runtime contract | `docs/content-system-contracts.md` records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Target |
+| Phase contracts | This blueprint names broad phase outcomes; `docs/content-system-contracts.md` is a scaffolded documentation contract, not an implemented runtime contract | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` now emit a deterministic descriptive report over the catalog; it is a scaffold, not a completeness claim | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
+| Account metadata overlay | Current account keys and partial source metadata exist, but the requested account table is not a reviewed overlay | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is specified as a deterministic, scaffolded/provisional artifact from `src/patterns/pool-evidence.ts`; explicit memberships are retained and missing pool metadata is blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
-| Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership | Separate ingestion, ranking, retrieval, and reporting | Partial |
+| Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems | Variant-level variables linked to comments, funnel events, Signals, and Venture | Target |
 | Venture handoff | Venture has its own phases and gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |

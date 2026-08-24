@@ -1,8 +1,12 @@
 # Content system record contracts
 
-**Status:** architecture contract, 2026-08-23. This document makes
+**Status:** architecture contract, scaffolded, 2026-08-23. This document makes
 `docs/content-system-blueprint.md` implementable. It does not authorize an
 implementation or change the blueprint.
+
+The account metadata overlay and source/post comparison boundary in this
+document are scaffolds, not live reviewed data. Current live rows remain
+blocked until real, human-reviewed metadata is entered.
 
 ## 1. Status vocabulary and common rules
 
@@ -73,6 +77,60 @@ topics, caveats, status, lineage
 the source's substance. A source may be retained with incomplete body data.
 `pool_memberships` contains zero or more of `niche`, `broad`, and `format`,
 each with a reason. Pool membership is not a quality score.
+
+### `account_metadata_overlay` (scaffolded)
+
+Owner: `coverage/catalog`; Muxin owns the review decision. This is a
+human-reviewed overlay on an account mapping, not inferred enrichment. A
+script may normalize handles, validate shapes, join evidence, and calculate a
+rollup. It may not infer metadata or `review_status` from an account name,
+post metrics, ranking, or model judgment.
+
+Required fields:
+
+```text
+id, account_id, account, audience_size_snapshot, topics, focus, platform,
+medium, format, pool, popularity_scope, sample_scope, baseline_scope,
+baseline_source, evidence_links, caveats, review_status, review_note,
+reviewed_by, reviewed_at, status, lineage
+```
+
+`account` contains the stable platform-local handle and display creator or
+account name. `audience_size_snapshot` preserves the audience value and type,
+observation date, collection date, and evidence source. `pool` is explicit
+`niche` or canonical `broad` membership, displayed as broad-platform; a
+separately declared `format` pool may also be represented by the source/post
+evidence. `evidence_links` points
+to the source/post-level records that support the row. `review_status` is
+`pending`, `reviewed`, `blocked`, or `unmapped`; only Muxin may set
+`reviewed`. The common `null`/`unknown` policy applies to every field.
+
+The overlay is a rollup and navigation surface only. It cannot create a
+source, post, metric, denominator, pool membership, or comparison sample.
+Rows without real reviewed metadata remain `blocked` and cannot support a
+pool comparison or winner claim.
+
+### `source_post_evidence` (scaffolded)
+
+Owner: `pool evidence`; the source/post row is the authoritative comparison
+unit. An account mapping may link and roll up these rows, but it cannot replace
+one.
+
+Required fields:
+
+```text
+id, source_id, post_id, account_id, platform, medium, format, pool,
+membership_reason, audience_size_snapshot, metric_snapshot,
+popularity_scope, sample_scope, baseline_scope, evidence_links,
+baseline_source, body_is_complete, caveats, provenance, observed_at,
+collected_at, review_status, status, lineage
+```
+
+At least one of `source_id` or `post_id` is required. A comparison may count a
+row only when its pool membership, metric snapshot, declared scopes,
+baseline or denominator, dates, provenance, and caveats are present. Account
+rows may report rollup counts, but the underlying source/post rows and their
+selection rule remain authoritative.
 
 ### `claim` (scaffolded)
 
@@ -308,7 +366,7 @@ Each row requires:
 accountId, platform, handle, creator, niche, topics, focus, formats, audience,
 pool, membershipReason, popularityScopes, sampleScopes, baselineSources,
 evidenceCount, admissibleCount, bodyCompleteCount, bodyIncompleteCount,
-caveats, readiness
+caveats, readiness, comparisonReadiness
 ```
 
 `summary` requires `poolCounts` for `niche`, `broad`, and `format`, plus
@@ -321,6 +379,13 @@ explicit memberships; unsupported pool labels do not create rows. The
 producer sorts rows and pool values deterministically. Nulls and empty lists
 follow the common missing-data policy; the counts are descriptive inventory
 facts, not metric judgments.
+
+These rows are account-oriented rollups for inventory display, not the
+authoritative comparison observations. `readiness` only says whether explicit
+metadata is available for inventory inspection. `comparisonReadiness` and any
+future comparison summary must derive from linked `source_post_evidence`
+records. An account row without those source/post records remains blocked for
+comparison.
 
 Rows with missing required pool metadata remain in the artifact with
 `pool: null`, `membershipReason: null`, and `readiness.status: blocked`, with
@@ -339,6 +404,36 @@ support a winner claim. The common-hook policy remains available downstream:
 a common, widely shared hook template may be adapted as a mad-lib around
 Muxin's own substance, but exact opener generation and distinctive creator
 wording are not default generation behavior.
+
+The exact creator body remains internal evidence. It may be inspected for
+analysis, quotation, attribution, or an originality check, but it must not be
+copied into Muxin's body. A common hook may be adapted as a mad-lib template
+around Muxin's original claim, experience, example, evidence, and point of
+view. The template supplies a structure, not a creator's body or signature
+wording.
+
+### Increment acceptance predicates and current status
+
+The account metadata and pool-evidence increment is accepted only when all of
+these predicates hold:
+
+1. Every current account key has one `account_metadata_overlay` row with real
+   evidence links and `review_status: reviewed`, or an explicit `unmapped`
+   disposition with a reason.
+2. Every live row lacking that reviewed metadata is marked `blocked`. The
+   existence of a row, a populated account mapping, or a model-generated value
+   does not satisfy the predicate.
+3. Every pool comparison names its authoritative `source_post_evidence`
+   rows, explicit pool membership, popularity scope, sample scope, baseline or
+   denominator, dates, provenance, and caveats. Account mappings may roll up
+   those rows but cannot stand in for them.
+4. Exact creator bodies remain internal evidence, and any adapted common hook
+   carries Muxin's original substance and passes human originality review.
+
+The current status is `scaffolded` for `account_metadata_overlay`,
+`source_post_evidence`, and `pool-evidence-inventory-v1`. The inventory is
+provisional and does not unlock Grow variants or permit a winner claim. Current
+live rows remain blocked until real reviewed metadata is entered.
 
 Every `variant` must carry the following treatment object:
 

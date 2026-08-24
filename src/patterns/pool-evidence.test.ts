@@ -84,6 +84,10 @@ test("emits one row for every explicitly declared pool and keeps the account fac
     bodyIncompleteCount: 1,
     caveats: ["small sample"],
     readiness: { status: "ready", reason: "Explicit pool membership is available for inspection." },
+    comparisonReadiness: {
+      status: "blocked",
+      reason: "Blocked: account inventory is a rollup; linked source/post evidence is required for comparison.",
+    },
   });
   assert.equal(inventory.rows[1]?.membershipReason, "Relevant civic audience");
   assert.deepEqual(inventory.summary, {
@@ -165,7 +169,7 @@ test("renders an inspectable markdown table with nulls, summary counts, and esca
 
   assert.match(markdown, /# Pool evidence inventory/);
   assert.match(markdown, /Pool counts: niche 0 \| broad 0 \| format 0 \| blocked 1/);
-  assert.match(markdown, /\| Account ID \| Platform \| Handle \| Creator \| Niche \| Topics \| Focus \| Formats \| Audience \| Pool \| Membership reason \| Popularity scopes \| Sample scopes \| Baseline sources \| Evidence\/admissible\/body-complete\/body-incomplete \| Caveats \| Readiness \|/);
+  assert.match(markdown, /\| Account ID \| Platform \| Handle \| Creator \| Niche \| Topics \| Focus \| Formats \| Audience \| Pool \| Membership reason \| Popularity scopes \| Sample scopes \| Baseline sources \| Evidence\/admissible\/body-complete\/body-incomplete \| Caveats \| Readiness \| Comparison readiness \|/);
   assert.match(markdown, /x\\\|alpha\\\|pipe/);
   assert.match(markdown, /null \| null \| null \| null \| null \| null \| null \| null \| 0 \/ 0 \/ 0 \/ 0 \| null \| blocked:/);
 });
