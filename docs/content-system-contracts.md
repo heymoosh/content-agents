@@ -456,7 +456,10 @@ the projection runs; its output is body-free, keeps `winner: null`, and has
 `sideEffects: none`. It does not queue, schedule, publish, or generate copy.
 
 `src/patterns/hook-template-ledger.ts` is the curated hook-mechanism read
-boundary. Its JSONL rows may contain only abstract mechanism, platform/niche/
+boundary. The checked-in starter ledger at
+`config/patterns/hook-template-ledger.jsonl` contains eight curated
+measured/hypothesis metadata rows, not creator copy. Its JSONL rows may contain
+only abstract mechanism, platform/niche/
 format/slot metadata, source references, caveats, review/originality state,
 evidence status, and adaptation guidance. `patterns:hook-templates` provides
 deterministic filtering and JSON/Markdown output. Exact opener evidence remains
