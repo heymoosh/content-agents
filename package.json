@@ -103,6 +103,7 @@
     "patterns:platform-pool-matrix": "tsx src/patterns/platform-pool-matrix-cli.ts",
     "patterns:platform-pool-matrix-repo": "tsx src/patterns/platform-pool-matrix-repo-cli.ts",
     "patterns:pool-review-handoff": "tsx src/patterns/pool-review-handoff-cli.ts",
+    "patterns:best-report": "tsx src/patterns/pool-best-report-cli.ts",
     "patterns:review-session": "tsx src/patterns/review-session-cli.ts",
     "patterns:pool-evidence-cli": "tsx src/patterns/pool-evidence-cli.ts",
     "patterns:manual-platform-report": "tsx src/patterns/manual-platform-report-cli.ts",

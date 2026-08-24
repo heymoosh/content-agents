@@ -793,6 +793,30 @@ With the current gitignored checkout, the command reports 0 matrix targets and
 that is a coverage fact and not permission to classify those rows from catalog
 niche, account name, platform, or other unreviewed labels.
 
+### `pool_best_report` (scaffolded; fail-closed comparison only)
+
+`src/patterns/pool-best-report.ts` and `npm run patterns:best-report` compare
+explicit source/post evidence rows against recorded account baselines. The input
+must supply reviewed account metadata, explicit niche/broad/format membership and
+reason, platform, medium, format, metric name/value/unit, numerator and
+denominator, metric scope and window, observation and collection dates, selection
+rule, provenance, evidence links, caveats, body-complete evidence, and a baseline
+with matching terms, metric, median, sample size, window, method, and collection
+date. The report uses the recorded baseline multiple; it never uses a winners-only
+or sibling median as a substitute.
+
+Niche groups are separated by the reviewed niche label. Broad groups are grouped
+by platform, and all groups remain separated by medium, format, metric, unit,
+metric numerator/denominator, metric window/scope, popularity scope, selection
+rule, baseline metric/terms/window, baseline scope, and baseline source. A
+declared minimum comparable-candidate count is required. A valid group
+may report one or more tied best examples and their creators; any missing,
+incomplete, conflicting, duplicate, or incomparable fact produces a blocked group
+and no winner claim. The output is deterministic JSON/Markdown, body-free, and
+stdout-only. It does not rank account tables or follower counts, infer topics or
+pools, copy creator text, or write data. Current live rows remain blocked because
+reviewed metadata and usable baseline terms have not yet been supplied.
+
 `src/patterns/pool-review-handoff.ts` and
 `npm run patterns:pool-review-handoff` provide the narrow human handoff for that
 gap. The adapter joins each exact catalog account key to the existing explicit
