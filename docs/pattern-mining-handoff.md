@@ -26,10 +26,14 @@ ADHD."* Plus generally-viral content whose STRUCTURE transfers.
 
 ## Current state
 
-- **269 accounts** across 14 platforms. 211 with a follower count read off the platform itself.
-- **292 posts** in `data/patterns/corpus.jsonl`, 132 admitted as pattern evidence.
-- **Only 61 of 269 accounts have any mined content.** The rest are verified and seeded but
-  uncollected. That is the single biggest gap.
+- **352 configured target rows** across 13 platforms; the current corpus contains **499 posts
+  across 65 account keys** after the Reddit inbox admission below. Account metadata remains
+  unreviewed, so these are inventory counts, not a best-creator ranking.
+- **499 posts** in `data/patterns/corpus.jsonl`, with 292 analysis records. The 225-entry Reddit
+  inbox remains on disk as replayable provenance; 207 entries were admitted and 18 duplicates
+  were skipped.
+- The single biggest research gap remains human-reviewed account metadata and explicit
+  niche/broad/format pool membership. Collection volume alone does not establish either.
 - 31 hook patterns, 47 post-pattern records, every one carrying a `Reach behind it` line.
 
 Collectors built and committed: `src/patterns/{reddit,reddit-rss,instagram,pinterest,youtube,
@@ -316,16 +320,17 @@ with real before/after samples is at the session scratchpad's `pr-body.md`.
 
 ## Reddit collection state, exactly
 
-### Is the staged file ready to collect? Yes. It has NOT been run.
+### Is the staged file ready to collect? Yes. It was admitted on 2026-08-24.
 
 `data/patterns/inbox/reddit-rss-top-year-2026-08-23.json` holds **225 entries, 25 from each of 9
 subreddits, and every one carries a real upvote count, comment count and upvote ratio.** No entry
 is left with null metrics. All 225 pass `validateEntry` with zero errors, and 18 of them dedupe
 against posts already in the corpus, so a collect run appends about 207.
 
-Nobody has run `npm run patterns:collect` on it. That was deliberate, not an oversight: the file
-was left for a human to admit, and admitting it is now safe because the scores are in. **A fresh
-session may run `npm run patterns:collect` on it.**
+The collector was run against this exact file with no rejected entries: **207 entries were
+appended and 18 were skipped as already collected**, bringing the corpus to 499 records. The
+inbox file was deliberately retained so the admission is replayable and auditable. The corpus is
+gitignored and was synchronized into the permanent checkout; it does not travel with the branch.
 
 Do NOT re-run `npm run patterns:reddit-rss` before collecting unless you also re-run the backfill.
 Re-staging regenerates the entries with null metrics, and the numbers only come back by running:
@@ -355,7 +360,9 @@ r/LifeProTips.** That is all 9 of the priority list.
 | r/microsaas | 806 | 331 | not measured | none, no baseline exists |
 | r/civictech | 27 | 12 | not measured | 7x, hand-lifted median 4 |
 
-**Only r/ADHD's baseline was measured in this pass.** 453 posts loaded off `/new`, filtered to the
+**No new `/new` baseline was measured by the inbox admission.** The existing baseline ledger still
+contains prior hand-lifted records for six Reddit communities, while four communities have no
+baseline record at all. The earlier r/ADHD measurement had 453 posts loaded off `/new`, filtered to the
 192 at least 3 days old, stickied and pinned excluded, no filter on score or topic. True median 3
 upvotes, which is what the hand pass got on 163 posts five months earlier. Every other multiple in
 that table divides by a hand-lifted median and is provisional until re-measured the same way. Four

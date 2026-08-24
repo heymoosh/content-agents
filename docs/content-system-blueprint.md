@@ -359,16 +359,20 @@ surfaces human gates and evidence blockers, and suppresses winner inference and 
 does not call the review queue, scheduler, publisher, Signals, or Venture. `src/patterns/account-table.ts`
 is the account/example navigation table requested for both niche and broad-platform examples; it
 preserves explicit pool, topic, focus, platform, medium, format, audience-size, scope, evidence,
-caveat, and review fields while keeping incomplete rows blocked. These are typed operator seams,
-not proof that the live corpus has been reviewed or that the app is wired end to end.
+caveat, and review fields while keeping incomplete rows blocked. `src/patterns/review-queue.ts`
+turns the overlay coverage into one actionable, body-free row per current account key without
+inventing review metadata. These are typed operator seams, not proof that the live corpus has been
+reviewed or that the app is wired end to end.
 `src/patterns/overlay-coverage.ts` reports the explicit per-account mapping status and missing
 fields; `src/grow/queue-facts.ts` normalizes supplied queue/scheduler facts without filesystem
 writes; `src/grow/live-facts.ts` adapts existing queue rows and scheduler claims into that boundary
-without claiming or scheduling; `src/blueprint/phase-contracts.ts` makes the four phase contracts
+without claiming or scheduling; `src/grow/live-reconciliation.ts` composes those explicit facts
+and preserves missing/conflicting inputs as blockers; `src/blueprint/phase-contracts.ts` makes the four phase contracts
 machine-checkable without asserting that their live producers exist; `src/grow/generation-brief.ts`
 describes deterministic platform/format experiment fan-out with mad-lib hook-template reuse and no
 body copy; and `src/grow/venture-handoff.ts` keeps the Signals-to-Venture view behind both human
-gates. `src/patterns/data-status.ts` provides a metadata-only, read-only report over an explicit
+gates. `src/agents/skill-invocation.ts` records key-only readiness for one declared skill contract.
+`src/patterns/data-status.ts` provides a metadata-only, read-only report over an explicit
 gitignored data directory so file availability and counts cannot be confused with reviewed account
 metadata or proof of platform-wide best content.
 
@@ -526,16 +530,16 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it | Connect the accounting view to live review and scheduler records without allowing it to approve or publish | Partial |
 | Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` and `src/grow/generation-brief.ts` emit provisional no-copy platform/format specifications, `src/grow/grow-this-plan.ts` joins the lifecycle read-only, while delivery and outcome ledgers preserve the later handoff | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
-| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, `src/grow/delivery-record.ts` blocks delivery without it, `src/grow/queue-facts.ts` normalizes facts, `src/grow/live-facts.ts` adapts existing queue/scheduler records, and `src/grow/reconciliation.ts` reports drift without repairing it | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
+| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, `src/grow/delivery-record.ts` blocks delivery without it, `src/grow/queue-facts.ts` normalizes facts, `src/grow/live-facts.ts` adapts existing queue/scheduler records, `src/grow/live-reconciliation.ts` composes them without inference, and `src/grow/reconciliation.ts` reports drift without repairing it | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
 | Phase contracts | `src/blueprint/phase-contracts.ts` provides deterministic contract definitions and fact evaluation, while live producers and reviewed data remain separate | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` emit a deterministic descriptive report; `src/patterns/operator-readiness.ts` adds deterministic ready/blocked coverage by pool, platform, medium, format, and gap | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
-| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, and `src/patterns/overlay-coverage.ts` reports per-key mapping status; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
+| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, `src/patterns/overlay-coverage.ts` reports per-key mapping status, and `src/patterns/review-queue.ts` emits the actionable body-free review handoff; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; comparison readiness now checks explicit memberships and evidence scopes while keeping missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables, `src/grow/experiment-record.ts` adds scoped records, and `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
 | Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet, `src/grow/comment-learning.ts`, and `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
-| Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts, `src/agents/skill-contract.ts` records the lightweight stage boundaries, and both permit common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
+| Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts, `src/agents/skill-contract.ts` records the lightweight stage boundaries, and `src/agents/skill-invocation.ts` records key-only readiness; all permit common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
 
 This blueprint does not authorize implementation by itself. Each future change should name the
 phase, artifacts, acceptance predicate, human decision, and explicit non-goals it satisfies.

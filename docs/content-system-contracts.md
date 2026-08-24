@@ -180,6 +180,12 @@ An unmapped key remains visible as `unmapped`; a row with incomplete metadata
 or duplicate mappings is `blocked`. The report is a coverage diagnostic, not
 an inferred completion claim or a winner table.
 
+`src/patterns/review-queue.ts` joins that coverage to the current catalog and
+emits one body-free review handoff row per account key. It preserves the
+explicit status and evidence count, reports the next human review action, and
+keeps absent rows unmapped rather than inferring metadata. It is an operator
+queue, not a reviewed account table, winner ranking, or approval action.
+
 ### `pattern_data_status` (current read-only inventory; unreviewed)
 
 `src/patterns/data-status.ts` accepts an explicit data directory and reports
@@ -340,6 +346,12 @@ repository records into that normalizer. It accepts an already-read
 delivery, and lineage facts. It does not read files itself, treat a claim as
 approval, invent lineage, claim a slot, or mutate the queue or scheduler.
 
+`src/grow/live-reconciliation.ts` composes those two already-read fact
+adapters into a single `grow_live_facts` artifact. Missing queue/claim facts
+and explicit lineage conflicts remain visible blockers; the composition never
+selects a winner, repairs drift, or upgrades a claim into approval or
+publication.
+
 ### `skill_contract` (scaffolded; lightweight manifest exists)
 
 `src/agents/skill-contract.ts` describes the bounded content-studio stages:
@@ -350,6 +362,12 @@ hidden writes, hidden model/skill calls, creator body-copy reuse, and
 unmeasured demand or causality claims. `evaluateSkillContract` checks only
 fact-key presence and non-empty values. The manifest is a migration aid for
 making existing skills lighter; it does not invoke or replace them.
+
+`src/agents/skill-invocation.ts` creates a model-free, key-only readiness
+envelope for one explicit contract check. It records supplied fact keys and
+the evaluator's missing/unknown facts without retaining values or body text.
+An invocation artifact does not run a skill or model and cannot publish,
+schedule, or make a demand/virality claim.
 
 ### `phase_contract` (scaffolded; executable definition exists)
 

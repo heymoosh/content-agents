@@ -114,6 +114,15 @@ export {
 } from "./live-facts.js";
 
 export {
+  buildGrowLiveFacts,
+  composeGrowLiveFacts,
+  createGrowLiveFacts,
+  GROW_LIVE_FACTS_VERSION,
+  type GrowLiveFacts,
+  type GrowLiveFactsInput,
+} from "./live-reconciliation.js";
+
+export {
   buildVentureHandoffView,
   createVentureHandoffView,
   type VentureHandoffFamily,
