@@ -2,7 +2,7 @@ import type { PoolName } from "./pool-evidence.js";
 
 export const PLATFORM_POOL_MATRIX_VERSION = "platform-pool-matrix-v1" as const;
 
-export type MatrixReviewStatus = "reviewed" | "unreviewed" | "blocked";
+export type MatrixReviewStatus = "reviewed" | "unreviewed" | "pending" | "blocked" | "unmapped";
 
 /** One explicit target/catalog row. No field is derived by this report. */
 export interface PlatformPoolMatrixTarget {
@@ -38,6 +38,8 @@ export interface PlatformPoolMatrixCell {
   readonly baselineReady: number;
   readonly blocked: number;
   readonly unreviewed: number;
+  readonly pending: number;
+  readonly unmapped: number;
   readonly gaps: PlatformPoolMatrixGaps;
 }
 
@@ -54,6 +56,8 @@ export interface PlatformPoolMatrix {
     readonly baselineReady: number;
     readonly blocked: number;
     readonly unreviewed: number;
+    readonly pending: number;
+    readonly unmapped: number;
     readonly gaps: PlatformPoolMatrixGaps;
   };
   readonly bodyIncluded: false;
@@ -107,6 +111,8 @@ function cellFor(rows: readonly PlatformPoolMatrixTarget[]): PlatformPoolMatrixC
     baselineReady: rows.filter((row) => row.baselineReady).length,
     blocked: rows.filter((row) => row.reviewStatus === "blocked").length,
     unreviewed: rows.filter((row) => row.reviewStatus === "unreviewed").length,
+    pending: rows.filter((row) => row.reviewStatus === "pending").length,
+    unmapped: rows.filter((row) => row.reviewStatus === "unmapped").length,
     gaps: cellGaps,
   };
 }
@@ -134,8 +140,10 @@ export function buildPlatformPoolMatrix(targets: readonly PlatformPoolMatrixTarg
       collected: orderedTargets.filter((row) => row.collected).length,
       reviewed: orderedTargets.filter((row) => row.reviewStatus === "reviewed").length,
       baselineReady: orderedTargets.filter((row) => row.baselineReady).length,
-      blocked: orderedTargets.filter((row) => row.reviewStatus === "blocked").length,
-      unreviewed: orderedTargets.filter((row) => row.reviewStatus === "unreviewed").length,
+    blocked: orderedTargets.filter((row) => row.reviewStatus === "blocked").length,
+    unreviewed: orderedTargets.filter((row) => row.reviewStatus === "unreviewed").length,
+    pending: orderedTargets.filter((row) => row.reviewStatus === "pending").length,
+    unmapped: orderedTargets.filter((row) => row.reviewStatus === "unmapped").length,
       gaps: summaryGaps,
     },
     bodyIncluded: false,
@@ -157,12 +165,12 @@ export function renderPlatformPoolMatrixMarkdown(matrix: PlatformPoolMatrix): st
   const lines = [
     "# Platform × research-pool coverage matrix",
     "",
-    `Targets: ${s.total} | configured ${s.configured} | collected ${s.collected} | reviewed ${s.reviewed} | baseline-ready ${s.baselineReady} | blocked ${s.blocked} | unreviewed ${s.unreviewed}`,
+    `Targets: ${s.total} | configured ${s.configured} | collected ${s.collected} | reviewed ${s.reviewed} | baseline-ready ${s.baselineReady} | blocked ${s.blocked} | unreviewed ${s.unreviewed} | pending ${s.pending} | unmapped ${s.unmapped}`,
     `Gaps: not configured ${s.gaps.notConfigured} | not collected ${s.gaps.notCollected} | not reviewed ${s.gaps.notReviewed} | baseline not ready ${s.gaps.baselineNotReady}`,
     "",
-    "| Platform | Pool | Medium | Format | Targets | Configured | Collected | Reviewed | Baseline-ready | Blocked | Unreviewed | Gaps (config / collection / review / baseline) |",
-    "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
-    ...matrix.cells.map((cell) => `| ${markdownCell(cell.platform)} | ${cell.researchPool} | ${markdownCell(cell.medium)} | ${markdownCell(cell.format)} | ${cell.total} | ${cell.configured} | ${cell.collected} | ${cell.reviewed} | ${cell.baselineReady} | ${cell.blocked} | ${cell.unreviewed} | ${cell.gaps.notConfigured} / ${cell.gaps.notCollected} / ${cell.gaps.notReviewed} / ${cell.gaps.baselineNotReady} |`),
+    "| Platform | Pool | Medium | Format | Targets | Configured | Collected | Reviewed | Baseline-ready | Blocked | Unreviewed | Pending | Unmapped | Gaps (config / collection / review / baseline) |",
+    "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+    ...matrix.cells.map((cell) => `| ${markdownCell(cell.platform)} | ${cell.researchPool} | ${markdownCell(cell.medium)} | ${markdownCell(cell.format)} | ${cell.total} | ${cell.configured} | ${cell.collected} | ${cell.reviewed} | ${cell.baselineReady} | ${cell.blocked} | ${cell.unreviewed} | ${cell.pending} | ${cell.unmapped} | ${cell.gaps.notConfigured} / ${cell.gaps.notCollected} / ${cell.gaps.notReviewed} / ${cell.gaps.baselineNotReady} |`),
     "",
     "Rows remain explicit catalog/target state. Missing labels are not inferred, and this report does not identify best creators.",
     "",

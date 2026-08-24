@@ -31,12 +31,12 @@ describe("buildPlatformPoolMatrix", () => {
       target({ id: "linkedin-broad-video-null", platform: "linkedin", researchPool: "broad", medium: "video", format: null, collected: false, reviewStatus: "blocked", baselineReady: false, blockers: ["duplicate review metadata"] }),
     ]);
 
-    assert.deepEqual(matrix.cells.map((cell) => [cell.platform, cell.researchPool, cell.medium, cell.format, cell.total, cell.configured, cell.collected, cell.reviewed, cell.baselineReady, cell.blocked, cell.unreviewed, cell.gaps]), [
-      ["linkedin", "broad", "video", null, 1, 1, 0, 0, 0, 1, 0, { notConfigured: 0, notCollected: 1, notReviewed: 1, baselineNotReady: 1 }],
-      ["x", "niche", "text", "short post", 2, 1, 1, 1, 1, 0, 1, { notConfigured: 1, notCollected: 1, notReviewed: 1, baselineNotReady: 1 }],
+    assert.deepEqual(matrix.cells.map((cell) => [cell.platform, cell.researchPool, cell.medium, cell.format, cell.total, cell.configured, cell.collected, cell.reviewed, cell.baselineReady, cell.blocked, cell.unreviewed, cell.pending, cell.unmapped, cell.gaps]), [
+      ["linkedin", "broad", "video", null, 1, 1, 0, 0, 0, 1, 0, 0, 0, { notConfigured: 0, notCollected: 1, notReviewed: 1, baselineNotReady: 1 }],
+      ["x", "niche", "text", "short post", 2, 1, 1, 1, 1, 0, 1, 0, 0, { notConfigured: 1, notCollected: 1, notReviewed: 1, baselineNotReady: 1 }],
     ]);
     assert.deepEqual(matrix.summary, {
-      total: 3, configured: 2, collected: 1, reviewed: 1, baselineReady: 1, blocked: 1, unreviewed: 1,
+      total: 3, configured: 2, collected: 1, reviewed: 1, baselineReady: 1, blocked: 1, unreviewed: 1, pending: 0, unmapped: 0,
       gaps: { notConfigured: 1, notCollected: 2, notReviewed: 2, baselineNotReady: 2 },
     });
     assert.equal(matrix.bodyIncluded, false);
@@ -60,4 +60,15 @@ test("JSON and Markdown renderers are deterministic and body-free", () => {
   assert.match(markdown, /baseline-ready/);
   assert.match(markdown, /Missing labels are not inferred/);
   assert.match(markdown, /does not identify best creators/);
+});
+
+test("counts pending and unmapped statuses without collapsing them", () => {
+  const matrix = buildPlatformPoolMatrix([
+    target({ id: "pending", reviewStatus: "pending" }),
+    target({ id: "unmapped", reviewStatus: "unmapped" }),
+  ]);
+  assert.equal(matrix.summary.pending, 1);
+  assert.equal(matrix.summary.unmapped, 1);
+  assert.equal(matrix.cells[0]?.pending, 1);
+  assert.equal(matrix.cells[0]?.unmapped, 1);
 });

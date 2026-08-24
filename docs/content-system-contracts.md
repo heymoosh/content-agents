@@ -776,6 +776,18 @@ niche, account name, or platform and does not rank creators.
 command is stdout-only and body-free; a later repo adapter may populate its
 explicit target rows from reviewed catalog and evidence facts.
 
+`src/patterns/platform-pool-matrix-repo.ts` and
+`npm run patterns:platform-pool-matrix-repo` are that repo adapter. They join
+catalog rows to review facts by exact `currentAccountKey` and baseline facts by
+exact normalized account key. A missing or unrecognized research-pool label is
+reported in `blockedTargets`; it is never assigned to `niche`. Multiple medium
+or format labels become null with an explicit provenance blocker rather than a
+cross-product. Review states `pending`, `blocked`, and `unmapped` remain visible
+in the matrix, and no creator body or winner claim is emitted.
+With the current gitignored checkout, the command reports 0 matrix targets and
+371 blocked rows because the catalog has no explicit pool labels; that is a
+coverage fact and not permission to classify those rows from niche or platform.
+
 ### `review_session` (scaffolded; human handoff only)
 
 `src/patterns/review-session.ts` joins an explicit `account_review_queue_batch`

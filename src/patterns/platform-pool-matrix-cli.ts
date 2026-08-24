@@ -38,7 +38,7 @@ function validateTarget(value: unknown, index: number): PlatformPoolMatrixTarget
   for (const field of ["configured", "collected", "baselineReady"] as const) {
     if (typeof value[field] !== "boolean") fail(`targets[${index}].${field} must be boolean`);
   }
-  if (value.reviewStatus !== "reviewed" && value.reviewStatus !== "unreviewed" && value.reviewStatus !== "blocked") fail(`targets[${index}].reviewStatus is invalid`);
+  if (value.reviewStatus !== "reviewed" && value.reviewStatus !== "unreviewed" && value.reviewStatus !== "pending" && value.reviewStatus !== "blocked" && value.reviewStatus !== "unmapped") fail(`targets[${index}].reviewStatus is invalid`);
   if (!Array.isArray(value.blockers) || value.blockers.some((blocker) => typeof blocker !== "string")) fail(`targets[${index}].blockers must be an array of strings`);
   return value as unknown as PlatformPoolMatrixTarget;
 }

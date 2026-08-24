@@ -7,7 +7,7 @@ const input = JSON.stringify({ targets: [target] });
 
 test("accepts explicit target arrays and renders a deterministic matrix", () => {
   const matrix = parsePlatformPoolMatrixInput(input);
-  assert.deepEqual(matrix.summary, { total: 1, configured: 1, collected: 0, reviewed: 0, baselineReady: 0, blocked: 0, unreviewed: 1, gaps: { notConfigured: 0, notCollected: 1, notReviewed: 1, baselineNotReady: 1 } });
+  assert.deepEqual(matrix.summary, { total: 1, configured: 1, collected: 0, reviewed: 0, baselineReady: 0, blocked: 0, unreviewed: 1, pending: 0, unmapped: 0, gaps: { notConfigured: 0, notCollected: 1, notReviewed: 1, baselineNotReady: 1 } });
   assert.equal(parsePlatformPoolMatrixArgs(["--json", input, "--format", "markdown"]).format, "markdown");
 });
 
