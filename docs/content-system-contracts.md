@@ -738,7 +738,9 @@ delivery state. Pending and declined tasks remain blocked; a sent task requires
 an explicit Muxin approval and timestamp. The adapter never includes the source
 comment body, calls a provider, writes a record, sends a reply, or publishes.
 `autoSend: false`, `autoPublish: false`, and `sideEffects: none` are contract
-fields, not suggestions.
+fields, not suggestions. `src/review/approved-reply-task-cli.ts` and
+`npm run review:approved-reply` expose the same body-free state as a
+read-only JSON/Markdown operator view; they do not send, publish, or write.
 
 ### `studio_readiness` (scaffolded; aggregate operator view exists)
 
@@ -748,6 +750,10 @@ view. It keeps missing or blocked stages visible and exposes the separate human
 gates. It is a body-free inspection artifact: it does not include the brief,
 source substance, creator text, generated copy, publishing records, or learning
 interpretation, and it never approves or publishes anything.
+`src/grow/studio-readiness-cli.ts` and `npm run grow:studio-readiness` provide a
+read-only JSON/Markdown operator projection of that envelope. Malformed or
+missing inputs fail closed; the command preserves blockers and never writes,
+publishes, or includes source substance.
 
 ### `manual_platform_observation` (scaffolded; collectorless intake exists)
 
@@ -758,6 +764,17 @@ metric snapshots, explicit niche/broad/format scope, evidence links, collection
 status, and caveats. It marks provenance as manual, body completeness false,
 and readiness blocked when required facts are absent. It does not fetch,
 infer, rank, select a winner, or copy a post body.
+`src/patterns/manual-platform-report.ts` aggregates normalized observations by
+platform, collection status, explicit role/pool, body flags, and missing facts.
+It is descriptive-only and cannot establish a winner or platform coverage.
+
+### `volume_plan` (scaffolded; deterministic slot projection exists)
+
+`src/grow/volume-plan.ts` allocates the copy-free variants in a generation
+brief into deterministic per-platform daily slots using the brief's declared
+volume or an explicit override. Each slot retains variant and experiment
+references, readiness blockers, and a pending human review gate. It does not
+compose copy, read source substance, schedule, publish, or approve.
 
 ### Increment acceptance predicates and current status
 

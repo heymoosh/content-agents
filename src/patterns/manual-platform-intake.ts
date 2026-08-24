@@ -88,6 +88,8 @@ export interface ManualPlatformIntakeInput {
   readonly platform?: string | "unknown" | null;
   readonly handle?: string | "unknown" | null;
   readonly creator?: string | "unknown" | null;
+  /** Explicit operator-supplied account role/category; never inferred. */
+  readonly role?: string | "unknown" | null;
   readonly topic?: string | "unknown" | null;
   readonly topics?: readonly string[] | "unknown" | null;
   readonly focus?: readonly string[] | string | "unknown" | null;
@@ -153,6 +155,8 @@ export interface ManualPlatformIntake {
   readonly platform: ManualText;
   readonly handle: ManualText;
   readonly creator: ManualText;
+  /** Present only when the operator supplied it explicitly. */
+  readonly role?: ManualText;
   readonly topics: string[] | "unknown" | null;
   readonly focus: string[] | "unknown" | null;
   readonly audienceSnapshot: ManualAudienceSnapshot | "unknown" | null;
@@ -468,6 +472,11 @@ function build(input: ManualPlatformIntakeInput): ManualPlatformIntake {
     { source: raw, keys: ["collectionCaveats", "collection_caveats"] },
     { source: collection, keys: ["caveats"] },
   );
+  const roleValue = text(pick(
+    { source: raw, keys: ["role"] },
+    { source: account, keys: ["role"] },
+    { source: post, keys: ["role"] },
+  ));
   const selectionInput = { ...evidence, ...raw };
   const rowWithoutReadiness: Omit<ManualPlatformIntake, "readiness"> = {
     kind: "manual_platform_observation",
@@ -501,6 +510,7 @@ function build(input: ManualPlatformIntakeInput): ManualPlatformIntake {
       { source: raw, keys: ["creator", "creatorName", "creator_name"] },
       { source: account, keys: ["creator", "creatorName", "creator_name", "name"] },
     )),
+    ...(roleValue === null ? {} : { role: roleValue }),
     topics: list(topicsValue),
     focus: list(focusValue),
     audienceSnapshot: normalizeAudience(audienceValue),
