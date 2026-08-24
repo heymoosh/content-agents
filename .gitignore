@@ -40,3 +40,8 @@ data/patterns/**
 !data/patterns/.gitkeep
 !data/patterns/inbox/
 !data/patterns/inbox/.gitkeep
+
+# End-to-end suite outputs (the suite writes for real; only its .ts sources are tracked)
+e2e/*.log
+e2e/results.jsonl
+e2e/RESULTS.md

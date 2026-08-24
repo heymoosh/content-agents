@@ -85,7 +85,8 @@
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck"
+    "check": "npm run typecheck",
+    "test:e2e": "tsx e2e/run-all.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.20.38",
