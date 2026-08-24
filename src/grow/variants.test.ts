@@ -126,6 +126,91 @@ describe("createGrowVariantManifest", () => {
     assert.ok(candidate?.readiness.blockingFields.includes("humanGate"));
   });
 
+  test("carries a hook template as provenance metadata and blocks incomplete adaptation", () => {
+    const [candidate] = createGrowVariantManifest(plan, [{
+      id: "hooked-post",
+      medium: "text",
+      format: "post",
+      reason: "Use a reviewed common hook structure.",
+      hookTemplate: {
+        ref: "pattern:hook:question-led",
+        slotRefs: [],
+        adaptationNote: "Fill the slots with Muxin's original claim and experience.",
+      },
+      evidenceStatus: "supported",
+      audienceScope: "independent builders",
+      responseIntent: "Invite a concrete example.",
+      experimentId: "exp-hook-1",
+      patternRefs: ["pattern-7"],
+      evidenceRefs: ["evidence-1"],
+      patternEvidenceRefs: [{
+        patternId: "pattern-7",
+        sourceId: "source-2",
+        evidenceLocation: "lines 9-11",
+        pool: "niche",
+        scope: "topic sample",
+        metricSnapshot: {
+          denominator: 10,
+          observedAt: "2026-08-20",
+          scope: "topic sample",
+        },
+        selectionRule: "top examples",
+        originalityReview: "pending",
+        caveats: [],
+      }],
+    }]).candidates;
+
+    assert.deepEqual(candidate?.source, plan.source);
+    assert.deepEqual(candidate?.hookTemplate, {
+      ref: "pattern:hook:question-led",
+      slotRefs: [],
+      adaptationNote: "Fill the slots with Muxin's original claim and experience.",
+    });
+    assert.deepEqual(candidate?.patternEvidenceRefs, [{
+      patternId: "pattern-7",
+      sourceId: "source-2",
+      evidenceLocation: "lines 9-11",
+      pool: "niche",
+      scope: "topic sample",
+      metricSnapshot: {
+        denominator: 10,
+        observedAt: "2026-08-20",
+        scope: "topic sample",
+      },
+      selectionRule: "top examples",
+      originalityReview: "pending",
+      caveats: [],
+    }]);
+    assert.equal(candidate?.voiceCheck, "pending");
+    assert.equal(candidate?.originalityCheck, "pending");
+    assert.equal(candidate?.status, "needs-human-review");
+    assert.equal(candidate?.readiness.status, "blocked");
+    assert.ok(candidate?.readiness.blockingFields.includes("hookTemplate.slotRefs"));
+    assert.ok(candidate?.readiness.blockingFields.includes("voiceCheck"));
+    assert.ok(candidate?.readiness.blockingFields.includes("originalityCheck"));
+    assert.ok(candidate?.readiness.blockingFields.includes("humanGate"));
+    assert.equal(createGrowVariantManifest(plan, [{
+      medium: "text",
+      format: "post",
+      reason: "Baseline treatment.",
+    }]).candidates[0]?.hookTemplate, null);
+    assert.equal(createGrowVariantManifest(plan, [{
+      medium: "text",
+      format: "post",
+      reason: "Baseline treatment.",
+    }]).creatorBodyCopyAllowed, false);
+    assert.equal(createGrowVariantManifest(plan, [{
+      medium: "text",
+      format: "post",
+      reason: "Baseline treatment.",
+    }]).generatesCopy, false);
+    assert.equal(createGrowVariantManifest(plan, [{
+      medium: "text",
+      format: "post",
+      reason: "Baseline treatment.",
+    }]).sideEffects, "none");
+  });
+
   test("marks omitted evidence and review decisions blocked instead of ready", () => {
     const [candidate] = createGrowVariantManifest(plan, [{
       medium: "text",

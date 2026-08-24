@@ -103,6 +103,7 @@ The current pattern and Grow entry points are:
 ```text
 npm run patterns:collect
 npm run patterns:review-status
+npm run patterns:review-status -- --template > data/patterns/account-review.json
 npm run patterns:catalog
 npm run patterns:outliers
 npm run patterns:openers

@@ -47,6 +47,7 @@ youtube-transcript}.ts`, `src/pull/platforms/threads.ts`, plus `baselines.ts` an
 ```
 npm run patterns:collect                      # validate an inbox file into the corpus
 npm run patterns:review-status                # read-only account metadata review table/status
+npm run patterns:review-status -- --template > data/patterns/account-review.json  # blank human-review input
 npm run patterns:outliers                     # score the corpus
 npm run patterns:reddit -- --sub r/ADHD       # needs REDDIT_ keys (Muxin declined these)
 npm run patterns:reddit-rss -- --feeds <dir>  # no credentials, works today (bodies, no numbers)

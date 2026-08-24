@@ -362,8 +362,10 @@ preserves explicit pool, topic, focus, platform, medium, format, audience-size, 
 caveat, and review fields while keeping incomplete rows blocked. `src/patterns/review-queue.ts`
 turns the overlay coverage into one actionable, body-free row per current account key without
 inventing review metadata. `src/patterns/review-status.ts` is the read-only operator entry point
-that validates an explicit review JSON input and exposes the account metadata table; it does not
-write or infer review values. These are typed operator seams, not proof that the live corpus has
+that emits a deterministic blank review template or validates an explicit review JSON input and
+exposes the account metadata table; it does not write or infer review values. `src/grow/variants.ts`
+can carry a hook-template reference and source-slot map as metadata only; it keeps copy generation,
+creator-body reuse, and approval blocked. These are typed operator seams, not proof that the live corpus has
 been reviewed or that the app is wired end to end.
 `src/patterns/overlay-coverage.ts` reports the explicit per-account mapping status and missing
 fields; `src/grow/queue-facts.ts` normalizes supplied queue/scheduler facts without filesystem

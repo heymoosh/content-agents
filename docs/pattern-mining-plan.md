@@ -47,6 +47,7 @@ or claim that the catalog is reviewed:
 ```text
 npm run patterns:collect
 npm run patterns:review-status
+npm run patterns:review-status -- --template > data/patterns/account-review.json
 npm run patterns:catalog
 npm run patterns:outliers
 npm run patterns:openers
@@ -66,6 +67,13 @@ The slash modes in `.claude/skills/patterns/SKILL.md` are judgment handoffs, not
 and not an automatic chain.
 
 ### Review input contract
+
+`npm run patterns:review-status -- --template` emits a deterministic top-level JSON array with one
+body-free pending row per current catalog account, including uncollected keys. It pre-fills only the
+current account key, platform, and handle. It does not infer creator, topic, focus, niche, pool,
+scope, audience, or evidence values. Review the file manually, then pass it back with
+`npm run patterns:review-status -- --reviews <file.json>`. The template mode cannot be combined with
+`--reviews`.
 
 `npm run patterns:review-status -- --reviews <file.json>` accepts a JSON array of
 `ReviewMetadataRecord` rows. Each row uses the current account key (`platform|normalized-handle`),

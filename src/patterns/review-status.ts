@@ -4,6 +4,7 @@ import { buildCatalog, loadCatalogInputs, type PatternCatalog } from "./catalog.
 import { buildOverlayCoverage } from "./overlay-coverage.js";
 import { buildReviewQueue, type ReviewQueueArtifact } from "./review-queue.js";
 import { buildPoolReviewCoverage, type PoolReviewCoverageArtifact } from "./review-pool-coverage.js";
+import { renderReviewInputTemplateJson } from "./review-input-template.js";
 import {
   validateReviewMetadata,
   validateReviewMetadataRows,
@@ -444,10 +445,11 @@ function optionValue(argv: readonly string[], index: number, option: string): st
   return value;
 }
 
-function parseArgs(argv: readonly string[]): { paths: ReviewStatusPaths; reviewsPath?: string; format: "json" | "markdown" } {
+function parseArgs(argv: readonly string[]): { paths: ReviewStatusPaths; reviewsPath?: string; format: "json" | "markdown"; template: boolean } {
   const paths: ReviewStatusPaths = {};
   let reviewsPath: string | undefined;
   let format: "json" | "markdown" = "json";
+  let template = false;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--config") {
@@ -462,6 +464,8 @@ function parseArgs(argv: readonly string[]): { paths: ReviewStatusPaths; reviews
     } else if (argument === "--reviews") {
       reviewsPath = optionValue(argv, index, argument);
       index += 1;
+    } else if (argument === "--template") {
+      template = true;
     } else if (argument === "--format") {
       const value = optionValue(argv, index, argument);
       if (value !== "json" && value !== "markdown") throw new Error("--format must be json or markdown");
@@ -471,7 +475,8 @@ function parseArgs(argv: readonly string[]): { paths: ReviewStatusPaths; reviews
       throw new Error(`unknown argument: ${argument}`);
     }
   }
-  return { paths, reviewsPath, format };
+  if (template && reviewsPath !== undefined) throw new Error("--template cannot be combined with --reviews");
+  return { paths, reviewsPath, format, template };
 }
 
 export function main(
@@ -482,6 +487,10 @@ export function main(
   const options = parseArgs(argv);
   const inputs = loadInputs(options.paths);
   const catalog = buildCatalog(inputs.config, inputs.corpus, inputs.analyses);
+  if (options.template) {
+    (io.write ?? defaultIo.write)(renderReviewInputTemplateJson(catalog));
+    return 0;
+  }
   const evaluated = options.reviewsPath === undefined
     ? emptyReviewInput(null)
     : evaluateReviewFile(options.reviewsPath, io.readFile ?? defaultIo.readFile);

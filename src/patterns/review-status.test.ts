@@ -196,3 +196,49 @@ test("JSON and Markdown output are deterministic and contain no body text", () =
   assert.doesNotMatch(markdown.output, /bodyIncluded/);
   assert.match(markdown.output, /Account metadata table/);
 });
+
+test("template JSON parses directly through review status, including an uncollected key", () => {
+  const output: string[] = [];
+  const code = main(
+    ["--template"],
+    () => ({
+      config,
+      corpus: [{
+        platform: "x",
+        handle: "@zeta",
+        creator: "Zeta",
+        body: "PRIVATE TEMPLATE BODY MUST NOT APPEAR",
+        url: "https://example.test/zeta",
+        collected_at: "2026-08-24T00:00:00.000Z",
+      }],
+      analyses: [],
+    }),
+    { write: (value) => output.push(value) },
+  );
+
+  assert.equal(code, 0);
+  const rows = JSON.parse(output.join("")) as ReviewMetadataRecord[];
+  const report = buildReviewStatus({ catalog: buildCatalog(config, [{
+    platform: "x",
+    handle: "@zeta",
+    creator: "Zeta",
+    body: "PRIVATE TEMPLATE BODY MUST NOT APPEAR",
+    url: "https://example.test/zeta",
+    collected_at: "2026-08-24T00:00:00.000Z",
+  }]), reviews: rows });
+
+  assert.equal(report.reviewInput.status, "valid");
+  assert.equal(report.reviewInput.reviewStatus, "unreviewed");
+  assert.deepEqual(report.accountMetadataRows.map((row) => [row.currentAccountKey, row.platform, row.handle, row.topics, row.focus, row.reviewedPoolMembership, row.audienceSnapshot, row.reviewStatus]), [
+    ["x|alpha", "x", "@alpha", null, null, null, null, "pending"],
+    ["x|zeta", "x", "@zeta", null, null, null, null, "pending"],
+  ]);
+  assert.doesNotMatch(output.join(""), /PRIVATE TEMPLATE BODY|"body"\s*:/);
+});
+
+test("template rejects a reviews input path", () => {
+  assert.throws(
+    () => main(["--template", "--reviews", "/tmp/reviews.json"], () => ({ config, corpus: [], analyses: [] }), { write: () => {} }),
+    /--template cannot be combined with --reviews/,
+  );
+});

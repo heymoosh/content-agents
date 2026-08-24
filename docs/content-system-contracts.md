@@ -193,6 +193,12 @@ coverage diagnostics. Without a review file it reports `not_supplied` and
 leaves all rows unreviewed. It never writes the review file or exposes source
 post bodies.
 
+Its `--template` mode emits a deterministic top-level JSON array with one
+pending, body-free row per catalog account, including uncollected accounts.
+Only the current account key, platform, and handle are prefilled. All
+judgment fields remain null until a human supplies them. The output can be
+reviewed and passed back through `--reviews`; the two modes cannot be combined.
+
 `src/patterns/review-pool-coverage.ts` reports niche, broad, and format labels
 only when they are present in validated human metadata. Its pool counts are
 metadata-coverage counts, not comparison-ready evidence or platform rankings;
@@ -686,7 +692,7 @@ Every `variant` must carry the following treatment object:
 ```text
 {
   platform, medium, format, treatment_reason, audience_scope, cta,
-  experiment_id, variables, pattern_refs, evidence_status
+  experiment_id, variables, pattern_refs, evidence_status, hook_template?
 }
 ```
 
@@ -696,6 +702,17 @@ carousel, or short. Routing decides what may be generated or queued. It does
 not approve publication. A missing or `unknown` treatment reason blocks
 approval; an unavailable platform may be represented with status
 `not-routed`, not by fabricating a variant.
+
+When present, `hook_template` is metadata only:
+
+```text
+{ ref, slot_refs, adaptation_note }
+```
+
+Slot references identify Muxin's original substance and evidence. The
+template contains no creator body copy. A hook treatment with no slot refs is
+blocked, and the Grow manifest remains `generatesCopy: false`,
+`creatorBodyCopyAllowed: false`, `sideEffects: none`, and human-gated.
 
 Each `pattern_evidence_ref` is:
 

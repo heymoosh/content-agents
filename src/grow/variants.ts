@@ -63,6 +63,21 @@ export interface GrowPatternEvidenceRefInput {
   caveats?: readonly string[];
 }
 
+export interface GrowHookTemplate {
+  ref: string;
+  slotRefs: string[];
+  adaptationNote: string;
+}
+
+/** Metadata only: the template is a reference and slot map, never creator body copy. */
+export interface GrowHookTemplateInput {
+  ref?: string;
+  slotRefs?: readonly string[];
+  slot_refs?: readonly string[];
+  adaptationNote?: string;
+  adaptation_note?: string;
+}
+
 export interface GrowHumanGate {
   required: true;
   before: "publish";
@@ -85,6 +100,7 @@ export interface GrowTreatmentDefinition {
   patternRefs?: readonly string[];
   evidenceRefs?: readonly string[];
   patternEvidenceRefs?: readonly GrowPatternEvidenceRefInput[];
+  hookTemplate?: GrowHookTemplateInput | null;
   evidenceStatus?: GrowEvidenceStatus;
   audienceScope?: string | null;
   cta?: string | null;
@@ -109,6 +125,7 @@ export interface GrowVariantCandidate {
   patternRefs: string[];
   evidenceRefs: string[];
   patternEvidenceRefs: GrowPatternEvidenceRef[];
+  hookTemplate: GrowHookTemplate | null;
   evidenceStatus: GrowEvidenceStatus;
   audienceScope: string | null;
   cta: string;
@@ -128,6 +145,7 @@ export interface GrowVariantManifest {
   candidates: GrowVariantCandidate[];
   reviewGate: GrowPlan["reviewGate"];
   generatesCopy: false;
+  creatorBodyCopyAllowed: false;
   sideEffects: "none";
 }
 
@@ -258,6 +276,15 @@ function normalizedPatternEvidenceRefs(values: readonly GrowPatternEvidenceRefIn
     || left.pool.localeCompare(right.pool));
 }
 
+function normalizedHookTemplate(value: GrowHookTemplateInput | null | undefined): GrowHookTemplate | null {
+  if (value === undefined || value === null) return null;
+  return {
+    ref: requiredText(value.ref, "hook template ref"),
+    slotRefs: uniqueSorted(value.slotRefs ?? value.slot_refs, "hook template slot ref"),
+    adaptationNote: requiredText(value.adaptationNote ?? value.adaptation_note, "hook template adaptation note"),
+  };
+}
+
 function normalizedExperimentVariables(values: Readonly<Record<string, string>> | undefined): Record<string, string> {
   return Object.fromEntries(
     Object.entries(values ?? {})
@@ -274,6 +301,7 @@ interface NormalizedTreatment {
   patternRefs: string[];
   evidenceRefs: string[];
   patternEvidenceRefs: GrowPatternEvidenceRef[];
+  hookTemplate: GrowHookTemplate | null;
   evidenceStatus: GrowEvidenceStatus;
   audienceScope: string | null;
   cta: string;
@@ -306,6 +334,7 @@ function normalizedTreatments(plan: GrowPlan, supplied: readonly GrowTreatmentDe
       treatment.patternRefs,
       treatment.evidenceRefs,
       treatment.patternEvidenceRefs,
+      treatment.hookTemplate,
       treatment.evidenceStatus,
       treatment.audienceScope,
       treatment.cta,
@@ -353,6 +382,7 @@ function normalizedTreatment(plan: GrowPlan, treatment: GrowTreatmentDefinition)
     patternRefs: uniqueSorted(treatment.patternRefs, "pattern ref"),
     evidenceRefs: uniqueSorted(treatment.evidenceRefs, "evidence ref"),
     patternEvidenceRefs: normalizedPatternEvidenceRefs(treatment.patternEvidenceRefs),
+    hookTemplate: normalizedHookTemplate(treatment.hookTemplate),
     evidenceStatus: normalizedEvidenceStatus(treatment.evidenceStatus),
     audienceScope: optionalText(treatment.audienceScope, "audience scope"),
     cta: treatment.cta === undefined || treatment.cta === null
@@ -390,7 +420,7 @@ function humanGate(plan: GrowPlan): GrowHumanGate {
   };
 }
 
-function readinessFor(candidate: Pick<GrowVariantCandidate, "evidenceStatus" | "audienceScope" | "responseIntent" | "experimentId" | "evidenceRefs" | "patternEvidenceRefs" | "voiceCheck" | "originalityCheck">, gate: GrowHumanGate): GrowVariantReadiness {
+function readinessFor(candidate: Pick<GrowVariantCandidate, "evidenceStatus" | "audienceScope" | "responseIntent" | "experimentId" | "evidenceRefs" | "patternEvidenceRefs" | "hookTemplate" | "voiceCheck" | "originalityCheck">, gate: GrowHumanGate): GrowVariantReadiness {
   const blockingFields: string[] = [];
   if (candidate.evidenceStatus === "blocked" || candidate.evidenceStatus === "insufficient") blockingFields.push("evidenceStatus");
   if (candidate.audienceScope === null || candidate.audienceScope.toLowerCase() === "unknown") blockingFields.push("audienceScope");
@@ -398,6 +428,9 @@ function readinessFor(candidate: Pick<GrowVariantCandidate, "evidenceStatus" | "
   if (candidate.experimentId === null || candidate.experimentId.toLowerCase() === "unknown") blockingFields.push("experimentId");
   if (candidate.evidenceStatus === "supported" && candidate.evidenceRefs.length === 0 && candidate.patternEvidenceRefs.length === 0) {
     blockingFields.push("evidenceRefs");
+  }
+  if (candidate.hookTemplate !== null && candidate.hookTemplate.slotRefs.length === 0) {
+    blockingFields.push("hookTemplate.slotRefs");
   }
   if (candidate.voiceCheck !== "passed") blockingFields.push("voiceCheck");
   if (candidate.originalityCheck !== "passed") blockingFields.push("originalityCheck");
@@ -445,6 +478,12 @@ export function createGrowVariantManifest(
         metricSnapshot: { ...ref.metricSnapshot },
         caveats: [...ref.caveats],
       })),
+      hookTemplate: treatment.hookTemplate === null
+        ? null
+        : {
+          ...treatment.hookTemplate,
+          slotRefs: [...treatment.hookTemplate.slotRefs],
+        },
       evidenceStatus: treatment.evidenceStatus,
       audienceScope: treatment.audienceScope,
       cta: treatment.cta,
@@ -476,6 +515,7 @@ export function createGrowVariantManifest(
       candidate.patternRefs,
       candidate.evidenceRefs,
       candidate.patternEvidenceRefs,
+      candidate.hookTemplate,
       candidate.evidenceStatus,
       candidate.audienceScope,
       candidate.cta,
@@ -497,6 +537,7 @@ export function createGrowVariantManifest(
     candidates: uniqueCandidates,
     reviewGate: { ...plan.reviewGate },
     generatesCopy: false,
+    creatorBodyCopyAllowed: false,
     sideEffects: "none",
   };
 }
