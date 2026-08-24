@@ -390,10 +390,19 @@ unchanged. These are bounded readiness seams, not evidence that every platform o
 currently connected.
 `npm run patterns:readiness` composes those evidence and platform projections for operator
 inspection; it reports absent or invalid review input rather than making the corpus look reviewed.
+`src/patterns/account-table-report.ts` and `npm run patterns:account-table` expose the requested
+body-free account/example table. When corpus and analysis inputs are supplied, the report derives
+comparison rows through the existing evidence seam; it keeps account size, topics, focus, platform,
+medium, format, pool, scope, evidence links, and review state explicit, without ranking winners or
+copying post bodies.
 `src/grow/generation-brief.ts` can carry explicit platform/format readiness blockers onto planning
 variants while remaining copy-free and human-gated. The Threads extractor now preserves explicit
 media URLs or downloaded slide paths as asset provenance, without treating them as read media or
 complete body evidence.
+`src/grow/brief-cli.ts` and `npm run grow:brief` provide a deterministic JSON/Markdown operator
+view over that planning boundary. `src/grow/comment-learning-cli.ts` and
+`npm run grow:comment-learning` provide the corresponding body-free operator view over explicitly
+captured comment, funnel, and business facts; both remain read-only and human-gated.
 
 ## 6. Model and subagent responsibilities
 

@@ -694,6 +694,24 @@ read-only operator entry point that composes evidence and platform readiness.
 It accepts an explicit review JSON file, reports missing or invalid review
 input, and never promotes a row to reviewed by inference or writes data.
 
+`src/patterns/account-table-report.ts` and `npm run patterns:account-table`
+provide the operator entry point for the account/example table. It preserves
+the requested account size, topics, focus, platform, medium, format, explicit
+pool membership, comparison scope, evidence links, caveats, and review state.
+When raw corpus and analyses are supplied, it derives comparison rows through
+`pattern_evidence_readiness`; otherwise it keeps the comparison view empty and
+visible. The report is body-free, deterministic, fail-closed for invalid review
+batches, and never ranks creators or declares a winner.
+
+### `generation_brief_cli` (scaffolded; read-only operator adapter exists)
+
+`src/grow/brief-cli.ts` and `npm run grow:brief` accept an explicit JSON
+generation-brief request from a string or file and render deterministic JSON or
+Markdown. They expose platform/format readiness blockers, preserve the common
+hook mad-lib policy, keep creator-body copying forbidden, and leave the human
+gate pending. They do not call models, read source bodies, write artifacts, or
+publish.
+
 ### `comment_observation_intake` (scaffolded; manual/local adapter exists)
 
 `src/review/comment-intake.ts` normalizes operator-supplied conversation
@@ -702,6 +720,12 @@ content and lineage/evidence references, preserves consent and moderation
 posture, and can produce a redacted representation when raw comment text is
 not permitted in downstream artifacts. It does not fetch comments, infer
 demand, create product ideas, publish replies, or write to Signals or Venture.
+
+`src/grow/comment-learning-cli.ts` and `npm run grow:comment-learning` accept
+an explicit JSON envelope of normalized comment observations, funnel events,
+and business outcomes. The adapter validates record shapes, renders a
+body-free learning view, preserves evidence blockers and Muxin's decision, and
+never infers demand or creates replies, Signals, or Venture artifacts.
 
 ### Increment acceptance predicates and current status
 
