@@ -11,11 +11,28 @@ import {
   type MuxinDecision,
   type VentureGate,
 } from "../review/learning-packet.js";
+import type { SourceEvidenceRow } from "../patterns/source-evidence.js";
 import { buildCommentLearningView, type CommentLearningView } from "./comment-learning.js";
+import { buildLearningBundle, type LearningBundle, type LearningBundleProposalInput } from "./learning-bundle.js";
 import { buildVentureHandoffView } from "./venture-handoff.js";
 
 const lineage: BlueprintLineage = { sourceId: "source-1", variantId: "variant-1", experimentId: "experiment-1" };
 const evidence = { status: "observed" as const, refs: ["ref-1"], note: null };
+
+const feedEvidence = (overrides: Partial<SourceEvidenceRow> = {}): SourceEvidenceRow => ({
+  id: "feed-1", sourceId: "source-1", postId: "post-1", accountId: "account-1",
+  platform: "linkedin", medium: "text", format: "short post", pool: "niche",
+  membershipReason: "reviewed niche membership", audienceSizeSnapshot: null,
+  metricSnapshot: { metric: "reactions", value: 240, unit: "count", numerator: 240, denominator: 10000, window: "lifetime", scope: "post", observedAt: "2026-08-23" },
+  popularityScope: "niche creators on LinkedIn", sampleScope: "fixed reviewed sample", baselineScope: "LinkedIn /new baseline",
+  evidenceLinks: ["https://example.test/post-1"], baselineSource: "baseline-ledger", bodyComplete: true,
+  caveats: ["fixture"], provenance: "reviewed post snapshot", observedAt: "2026-08-23", collectedAt: "2026-08-23",
+  reviewStatus: "reviewed", status: "ready", lineage: [{ recordType: "source", id: "source-1", relation: "evidences" }],
+  handle: "creator-1", creator: "Creator 1", url: "https://example.test/post-1", sourceRole: "niche creator",
+  listing: "fixed reviewed sample", window: "lifetime", rank: 1, evidenceLocation: "public post",
+  metric: { name: "reactions", numerator: 240, denominator: 10000, window: "lifetime", scope: "post" }, selectionRule: "fixed reviewed sample",
+  readiness: { status: "ready", reason: "complete", blockingFields: [] }, ...overrides,
+});
 
 function packet(muxinDecision: MuxinDecision, ventureGate: VentureGate): BlueprintLearningPacket {
   const comment = buildCommentObservation({
@@ -55,6 +72,38 @@ function view(muxinDecision: MuxinDecision, ventureGate: VentureGate): ReturnTyp
     muxinDecision,
   });
   return buildVentureHandoffView({ packet: packetValue, learningView });
+}
+
+function bundleFor(
+  packetValue: BlueprintLearningPacket,
+  overrides: Partial<LearningBundleProposalInput> = {},
+  feedEvidenceRows: readonly SourceEvidenceRow[] = [feedEvidence()],
+): LearningBundle {
+  const learningView = buildCommentLearningView({
+    commentObservations: packetValue.commentObservations,
+    funnelEvents: packetValue.funnelEvents,
+    businessOutcomes: packetValue.businessOutcomes,
+    muxinDecision: packetValue.ventureInputProposal.muxinDecision,
+  });
+  return buildLearningBundle({
+    lineage,
+    learningView,
+    feedEvidence: feedEvidenceRows,
+    proposals: [{
+      id: packetValue.ventureInputProposal.id,
+      type: "lead",
+      statement: "Test a focused workflow offer.",
+      basisRecordIds: ["funnel-1"],
+      feedContextIds: ["feed-1"],
+      scope: "LinkedIn civic technology audience",
+      sampleSize: 1,
+      caveats: ["fixture only"],
+      qualification: "qualified",
+      muxinDecision: packetValue.ventureInputProposal.muxinDecision,
+      lineage,
+      ...overrides,
+    }],
+  });
 }
 
 describe("Venture/Signals handoff view", () => {
@@ -115,5 +164,108 @@ describe("Venture/Signals handoff view", () => {
     });
     assert.equal(result.readiness.status, "blocked");
     assert.ok(result.readiness.blockers.includes("learning view is missing hypothesis comment-1"));
+  });
+
+  test("selects the exact bundle proposal and preserves only body-free metadata", () => {
+    const packetValue = packet("adopted", "ready");
+    const bundle = bundleFor(packetValue);
+    const learningView = buildCommentLearningView({
+      commentObservations: packetValue.commentObservations,
+      funnelEvents: packetValue.funnelEvents,
+      businessOutcomes: packetValue.businessOutcomes,
+      muxinDecision: "adopted",
+    });
+    const result = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: bundle, proposalId: "proposal-1" });
+
+    assert.equal(result.readiness.status, "ready");
+    assert.equal(result.proposalId, "proposal-1");
+    assert.equal(result.selectedProposal?.id, "proposal-1");
+    assert.equal(result.selectedProposal?.type, "lead");
+    assert.deepEqual(result.selectedProposal?.basisRecordIds, ["funnel-1"]);
+    assert.deepEqual(result.selectedProposal?.feedContextIds, ["feed-1"]);
+    assert.equal("statement" in (result.selectedProposal ?? {}), false);
+    assert.equal(JSON.stringify(result).includes("private comment text"), false);
+    assert.equal(JSON.stringify(result).includes("creator body"), false);
+  });
+
+  test("blocks a missing or mismatched explicit proposal instead of choosing one", () => {
+    const packetValue = packet("adopted", "ready");
+    const bundle = bundleFor(packetValue);
+    const learningView = buildCommentLearningView({
+      commentObservations: packetValue.commentObservations,
+      funnelEvents: packetValue.funnelEvents,
+      businessOutcomes: packetValue.businessOutcomes,
+      muxinDecision: "adopted",
+    });
+
+    const missing = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: bundle });
+    assert.equal(missing.readiness.status, "blocked");
+    assert.ok(missing.readiness.blockers.some((blocker) => /proposal.*required|proposal.*missing/i.test(blocker)));
+
+    const mismatched = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: bundle, proposalId: "proposal-404" });
+    assert.equal(mismatched.readiness.status, "blocked");
+    assert.ok(mismatched.readiness.blockers.some((blocker) => /proposal.*missing|proposal.*match/i.test(blocker)));
+  });
+
+  test("blocks a selected proposal with blocked feed evidence", () => {
+    const packetValue = packet("adopted", "ready");
+    const blockedBundle = bundleFor(packetValue, {}, [feedEvidence({ bodyComplete: false })]);
+    const learningView = buildCommentLearningView({
+      commentObservations: packetValue.commentObservations,
+      funnelEvents: packetValue.funnelEvents,
+      businessOutcomes: packetValue.businessOutcomes,
+      muxinDecision: "adopted",
+    });
+    const result = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: blockedBundle, proposalId: "proposal-1" });
+    assert.equal(result.readiness.status, "blocked");
+  });
+
+  test("blocks a selected proposal when its Muxin decision disagrees with the packet", () => {
+    const packetValue = packet("adopted", "ready");
+    const bundle = bundleFor(packetValue, { muxinDecision: "pending" });
+    const learningView = buildCommentLearningView({
+      commentObservations: packetValue.commentObservations,
+      funnelEvents: packetValue.funnelEvents,
+      businessOutcomes: packetValue.businessOutcomes,
+      muxinDecision: "adopted",
+    });
+    const result = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: bundle, proposalId: "proposal-1" });
+    assert.equal(result.readiness.status, "blocked");
+    assert.ok(result.readiness.blockers.some((blocker) => /decision.*match|decision.*packet/i.test(blocker)));
+  });
+
+  test("keeps a comment-only hypothesis separate and blocked from Venture", () => {
+    const fullPacket = packet("adopted", "ready");
+    const packetValue = buildBlueprintLearningPacket({
+      blueprint: fullPacket.blueprint,
+      commentObservations: fullPacket.commentObservations,
+      funnelEvents: [],
+      businessOutcomes: [],
+      ventureInputProposal: buildVentureInputProposal({
+        ...fullPacket.ventureInputProposal,
+        observation: { ...fullPacket.ventureInputProposal.observation, basisRecordIds: ["comment-1"] },
+      }),
+    });
+    const learningView = buildCommentLearningView({
+      commentObservations: packetValue.commentObservations,
+      funnelEvents: [],
+      businessOutcomes: [],
+      muxinDecision: "adopted",
+    });
+    const commentBundle = buildLearningBundle({
+      lineage,
+      learningView,
+      feedEvidence: [],
+      proposals: [{
+        id: "proposal-1", type: "product", statement: "Explore the comment signal.", basisRecordIds: ["comment-1"], feedContextIds: [],
+        scope: "comment only", sampleSize: 1, caveats: ["not demand"], qualification: "hypothesis", muxinDecision: "adopted", lineage,
+      }],
+    });
+    const result = buildVentureHandoffView({ packet: packetValue, learningView, learningBundle: commentBundle, proposalId: "proposal-1" });
+    assert.equal(result.readiness.status, "blocked");
+    assert.deepEqual(result.families.comment.map((hypothesis) => hypothesis.id), ["comment-1"]);
+    assert.deepEqual(result.families.funnel, []);
+    assert.deepEqual(result.families.business, []);
+    assert.ok(result.readiness.blockers.some((blocker) => /hypothesis/i.test(blocker)));
   });
 });
