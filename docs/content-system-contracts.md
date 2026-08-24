@@ -478,7 +478,7 @@ evidence_quality, response_status, status, lineage
 pay, audience fit, or a Venture gate. `author_or_hash` is redacted when
 identity is not needed.
 
-### `approved_reply_task` (future)
+### `approved_reply_task` (scaffolded; human-gated response seam exists)
 
 Owner: `content` for preparation; Muxin owns approval and sending.
 
@@ -490,10 +490,12 @@ target_platform, human_decision, decided_by, decided_at, delivery_status,
 sent_at, status, lineage
 ```
 
-`human_decision` is `approve` or `decline`. No auto-reply exists. Approval is
-specific to this draft, target, and context. `delivery_status` may not be
-`sent` unless the human decision is `approve`; `sent` records a confirmation,
-not an assumption.
+`human_decision` is `pending`, `approve`, or `decline`. No auto-reply exists.
+Approval is specific to this draft, target, and context. `delivery_status` may
+not be `sent` unless the human decision is `approve`; `sent` records a
+confirmation, not an assumption. The pure adapter is
+`src/review/approved-reply-task.ts`; it never sends, publishes, or includes the
+source comment body.
 
 ## 4. Outcomes and Signals
 
@@ -726,6 +728,36 @@ an explicit JSON envelope of normalized comment observations, funnel events,
 and business outcomes. The adapter validates record shapes, renders a
 body-free learning view, preserves evidence blockers and Muxin's decision, and
 never infers demand or creates replies, Signals, or Venture artifacts.
+
+### `approved_reply_task_operator_view` (scaffolded; human-gated response seam exists)
+
+`src/review/approved-reply-task.ts` normalizes an explicit proposed response
+to a `comment_observation`. It preserves the proposed reply text as a
+reviewable Muxin artifact, claim references, platform, lineage, decision, and
+delivery state. Pending and declined tasks remain blocked; a sent task requires
+an explicit Muxin approval and timestamp. The adapter never includes the source
+comment body, calls a provider, writes a record, sends a reply, or publishes.
+`autoSend: false`, `autoPublish: false`, and `sideEffects: none` are contract
+fields, not suggestions.
+
+### `studio_readiness` (scaffolded; aggregate operator view exists)
+
+`src/grow/studio-readiness.ts` composes caller-supplied readiness for the
+source, generation brief, review bundle, delivery record, and comment-learning
+view. It keeps missing or blocked stages visible and exposes the separate human
+gates. It is a body-free inspection artifact: it does not include the brief,
+source substance, creator text, generated copy, publishing records, or learning
+interpretation, and it never approves or publishes anything.
+
+### `manual_platform_observation` (scaffolded; collectorless intake exists)
+
+`src/patterns/manual-platform-intake.ts` normalizes an operator-supplied
+observation for a platform whose collector is unavailable. It preserves the
+account/post identity, topic/focus, medium/format/media facts, audience and
+metric snapshots, explicit niche/broad/format scope, evidence links, collection
+status, and caveats. It marks provenance as manual, body completeness false,
+and readiness blocked when required facts are absent. It does not fetch,
+infer, rank, select a winner, or copy a post body.
 
 ### Increment acceptance predicates and current status
 

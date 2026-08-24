@@ -271,6 +271,19 @@ describe("staged entries", () => {
     assert.match(entry.notes, /first server-rendered page/);
   });
 
+  test("keeps first-page evidence unranked and does not copy Pinterest text into body", () => {
+    const pin = parsePin(archivePin, "158540849367875270");
+    assert.ok(pin);
+    const entry = toStagedEntry(pin, CTX);
+    assert.ok(entry);
+    assert.equal(entry.body, "[Pinterest body not captured]");
+    assert.ok(!entry.body.includes(pin.headline ?? ""));
+    assert.ok(!entry.body.includes(pin.articleBody ?? ""));
+    assert.equal(entry.sample?.role, "unranked");
+    assert.match(entry.notes ?? "", /UNRANKED OBSERVATION/);
+    assert.match(entry.notes ?? "", /not a winner selection/);
+  });
+
   test("a date Pinterest published in the future is kept and flagged, never corrected", () => {
     const pin = parsePin(futureDatePin, "625507835742382007");
     assert.ok(pin);

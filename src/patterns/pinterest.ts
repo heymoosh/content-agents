@@ -385,6 +385,8 @@ const BOILERPLATE_BODIES = [
   "Discover (and save!) your own Pins on Pinterest",
 ];
 
+const PINTEREST_BODY_NOT_CAPTURED = "[Pinterest body not captured]";
+
 // Strips the date prefix Pinterest prepends to roughly 18 percent of articleBody values, and
 // refuses the boilerplate outright.
 //
@@ -546,13 +548,10 @@ export interface EntryContext {
 
 // Why some of these choices are what they are, since each one could plausibly be the other way:
 //
-//   body        Pinterest publishes no on-image text at all, and the two fields it does publish
-//               are SEO metadata rather than the creator's words. They still go in `title` and
-//               `body`, following the convention the reddit entries use for a titled post with no
-//               body of its own, because a validated entry needs a non-empty body and the only
-//               alternative is inventing one. What keeps that honest is labelling:
-//               body_is_complete is false, onscreen_text is null, and the notes say in words that
-//               this text is Pinterest's metadata and not the graphic.
+//   body        Pinterest publishes no on-image text at all, so this is a fixed observational
+//               marker rather than a copy of Pinterest's headline or description. `title` keeps
+//               the SEO metadata as a separate field, while body_is_complete is false and the
+//               notes say in words that it is not the creator's text.
 //   metrics     `shares` gets repinCount, this copy's own saves, because that is the number this
 //               account earned. The global aggregate goes in `aggregate_saves`, which nothing
 //               scores against. `views` and `likes` stay null: logged out, Pinterest publishes
@@ -566,18 +565,18 @@ export interface EntryContext {
 export function toStagedEntry(pin: PinterestPin, ctx: EntryContext): CorpusEntry | null {
   const cleaned = cleanArticleBody(pin.articleBody);
   const title = pin.headline;
-  const parts = [title, cleaned && cleaned !== title ? cleaned : null].filter((part): part is string => part !== null);
-  const body = parts.join("\n\n").trim();
+  const hasMetadata = title !== null || cleaned !== null;
   // A pin with neither a headline nor a usable description has no text at all. It is dropped
   // rather than staged with an invented body: 14 of 466 captured pins are in this state.
-  if (body === "") return null;
+  if (!hasMetadata) return null;
 
   const era = eraFor(pin.datePublished);
   const notes: string[] = [
     "Pinterest, logged out. The words ON the graphic are not published and were not collected, which is why body_is_complete is false and media.onscreen_text is null.",
-    "TEXT PROVENANCE: title and body hold Pinterest's SEO-GENERATED title and description. They are not the creator's words and they are frequently unrelated to the words printed on the image. One measured pin's headline reads \"Entrepreneurship Chart Ideas For Students\" over a graphic that reads \"MARK CUBAN'S 12 RULES FOR STARTUPS\". Never quote this text as the post.",
+    "TEXT PROVENANCE: title holds Pinterest's SEO-GENERATED metadata; body is an observational marker only. Neither is the creator's words, and the title is frequently unrelated to the words printed on the image. One measured pin's headline reads \"Entrepreneurship Chart Ideas For Students\" over a graphic that reads \"MARK CUBAN'S 12 RULES FOR STARTUPS\". Never quote this text as the post.",
     `Saves: ${pin.aggregateSaves ?? "unknown"} aggregate across every copy of this image on Pinterest, ${pin.repinCount ?? "unknown"} repins of this copy. Both are lifetime running totals with no window, so an older pin has had longer to accrue them.`,
     "Authorship: author.alternateName names whoever owns THIS copy, so this may be a repin of someone else's image. The route cannot separate an original from a repin, and a board's biggest pin often is one.",
+    "Evidence status: UNRANKED OBSERVATION. This is a first-page capture, not a winner selection, top-pins listing, or performance ranking.",
     `Sample: position ${ctx.rank} on the first server-rendered page of /${ctx.handle}/${ctx.boardSlug}/. Logged out that page carries roughly 21 to 25 pins and cannot be paged, so this is the board's first page, not its top pins.`,
   ];
   if (pin.copyCreatedAt !== null) {
@@ -605,7 +604,7 @@ export function toStagedEntry(pin: PinterestPin, ctx: EntryContext): CorpusEntry
     era,
     collected_at: ctx.collectedAt,
     kind: "text",
-    body,
+    body: PINTEREST_BODY_NOT_CAPTURED,
     transcript_source: null,
     metrics: {
       views: null,
@@ -634,8 +633,8 @@ export function toStagedEntry(pin: PinterestPin, ctx: EntryContext): CorpusEntry
       // The whole point of the 2026-08-23 correction. The words are in this file and nowhere else,
       // so a later transcription pass needs nothing but this url.
       asset_url: pin.imageUrl,
-      // False, always, and not a judgement call. `body` holds the pin's headline and Pinterest's
-      // description field. The graphic is what carried the pin, and it was not collected.
+      // False, always, and not a judgement call. The graphic is what carried the pin, and it was
+      // not collected; body is only the fixed observational marker above.
       body_is_complete: false,
     },
     sample: {

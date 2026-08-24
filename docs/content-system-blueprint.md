@@ -403,6 +403,12 @@ complete body evidence.
 view over that planning boundary. `src/grow/comment-learning-cli.ts` and
 `npm run grow:comment-learning` provide the corresponding body-free operator view over explicitly
 captured comment, funnel, and business facts; both remain read-only and human-gated.
+`src/review/approved-reply-task.ts` adds the missing response seam: a proposed reply can be
+reviewed, approved, declined, or kept pending, but no state in this adapter sends or publishes it.
+`src/grow/studio-readiness.ts` aggregates source, brief, review, delivery, and learning readiness
+without embedding source substance. `src/patterns/manual-platform-intake.ts` keeps a manually
+observed platform/post visible when a collector is unavailable, with explicit scope, provenance,
+metrics, caveats, and blocked fields rather than silently treating the platform as covered.
 
 ## 6. Model and subagent responsibilities
 
