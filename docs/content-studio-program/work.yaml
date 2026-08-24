@@ -1,0 +1,10 @@
+version: 1
+program: content-studio
+coordinator: codex
+authoritative_documents:
+  - docs/content-system-blueprint.md
+  - docs/content-studio-vision.md
+  - docs/content-studio-gemini-review-brief.md
+  - docs/multi-engine-plan.md
+  - docs/pattern-mining-plan.md
+tasks: []
