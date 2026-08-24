@@ -65,6 +65,7 @@ function fixture() {
   const slot = generationRun.slots[0]!;
   const reviewBundle = buildGrowReviewBundle({
     id: "review:one",
+    reviewQueueRef: "review:one",
     sourceRef: { recordType: "source", id: "thought:one" },
     cutRef: { recordType: "cut", id: "cut:one" },
     variantRefs: [{ recordType: "variant", id: "variant:one" }],
@@ -171,7 +172,11 @@ test("keeps missing, mismatched, and incomplete review joins blocked", () => {
     bindings: [{
       slot,
       reviewQueueRef: "review:other",
-      reviewBundle: { ...reviewBundle, sourceRef: { ...reviewBundle.sourceRef, id: "thought:other" } },
+      reviewBundle: {
+        ...reviewBundle,
+        reviewQueueRef: "review:other",
+        sourceRef: { ...reviewBundle.sourceRef, id: "thought:other" },
+      },
       day: "2026-08-25",
       candidateLineage: { ...lineage, variantId: "variant:other" },
       capacitySlice,
@@ -184,6 +189,29 @@ test("keeps missing, mismatched, and incomplete review joins blocked", () => {
   assert.equal(mismatched.readiness.status, "blocked");
   assert.ok(mismatched.rows[0]?.readiness.blockers.some((blocker) => /review queue reference|review bundle source|variant/i.test(blocker)));
   assert.equal(mismatched.rows[0]?.deliveryBinding.status, "blocked");
+});
+
+test("blocks duplicate artifact or queue references in a caller-shaped generation manifest", () => {
+  const { generationRun, slot, reviewBundle, lineage, liveFacts, capacitySlice } = fixture();
+  const secondSlot = { ...slot, slotIndex: 1, generatedArtifactRef: slot.generatedArtifactRef, reviewQueueRef: slot.reviewQueueRef };
+  const shapedRun = { ...generationRun, slots: [slot, secondSlot] };
+  const result = buildGrowGenerationReviewDelivery({
+    generationRun: shapedRun,
+    bindings: [{
+      slot,
+      reviewQueueRef: slot.reviewQueueRef,
+      reviewBundle,
+      day: "2026-08-25",
+      candidateLineage: lineage,
+      capacitySlice,
+      liveFacts,
+      queueLineage: { ...lineage, publishId: "publish:one" },
+      schedulerLineage: { ...lineage, publishId: "publish:one" },
+      providerFacts: null,
+    }],
+  });
+  assert.equal(result.readiness.status, "blocked");
+  assert.ok(result.rows.every((row) => row.readiness.blockers.some((blocker) => /duplicate (generated artifact|human review queue)/i.test(blocker))));
 });
 
 test("rejects duplicate or unknown slot bindings", () => {

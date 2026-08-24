@@ -51,6 +51,7 @@ describe("buildGrowReviewBundle", () => {
     const result = buildGrowReviewBundle(bundle());
 
     assert.equal(result.version, "grow-review-bundle-v1");
+    assert.equal(result.reviewQueueRef, null);
     assert.equal(result.status, "candidate");
     assert.deepEqual(result.sourceRef, refs.source);
     assert.deepEqual(result.cutRef, refs.cut);
@@ -88,6 +89,11 @@ describe("buildGrowReviewBundle", () => {
       decidedAt: "2026-08-23T15:00:00.000Z",
       note: "Approved for the declared treatment.",
     });
+  });
+
+  test("preserves the explicit review-queue association without inferring it", () => {
+    const result = buildGrowReviewBundle(bundle({ reviewQueueRef: "review:one" }));
+    assert.equal(result.reviewQueueRef, "review:one");
   });
 
   test("keeps approval blocked for non-Muxin decisions or incomplete lineage", () => {

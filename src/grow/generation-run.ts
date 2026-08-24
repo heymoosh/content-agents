@@ -435,18 +435,31 @@ export function createGenerationRun(input: GenerationRunInput): GenerationRun {
   if (!Array.isArray(envelope.candidates)) throw new Error("candidates must be an array");
   const normalizedCandidates = envelope.candidates.map((current, index) => normalizeCandidate(current, index));
   const reviewQueueRefCounts = new Map<string, number>();
+  const generatedArtifactRefCounts = new Map<string, number>();
   for (const candidate of normalizedCandidates) {
     if (candidate.reviewQueueRef !== null) {
       reviewQueueRefCounts.set(candidate.reviewQueueRef, (reviewQueueRefCounts.get(candidate.reviewQueueRef) ?? 0) + 1);
     }
+    if (candidate.generatedArtifactRef !== null) {
+      generatedArtifactRefCounts.set(candidate.generatedArtifactRef, (generatedArtifactRefCounts.get(candidate.generatedArtifactRef) ?? 0) + 1);
+    }
   }
   const candidates = normalizedCandidates.map((candidate) => {
-    if (candidate.reviewQueueRef === null || (reviewQueueRefCounts.get(candidate.reviewQueueRef) ?? 0) < 2) return candidate;
-    const candidateBlockers = sortedUnique([...candidate.blockers, "duplicate human review queue reference"]);
+    const candidateBlockers = [
+      ...candidate.blockers,
+      ...(candidate.reviewQueueRef !== null && (reviewQueueRefCounts.get(candidate.reviewQueueRef) ?? 0) >= 2
+        ? ["duplicate human review queue reference"]
+        : []),
+      ...(candidate.generatedArtifactRef !== null && (generatedArtifactRefCounts.get(candidate.generatedArtifactRef) ?? 0) >= 2
+        ? ["duplicate generated artifact reference"]
+        : []),
+    ];
+    if (candidateBlockers.length === candidate.blockers.length) return candidate;
+    const normalizedBlockers = sortedUnique(candidateBlockers);
     return {
       ...candidate,
-      readiness: { status: "blocked" as const, blockers: candidateBlockers },
-      blockers: candidateBlockers,
+      readiness: { status: "blocked" as const, blockers: normalizedBlockers },
+      blockers: normalizedBlockers,
     };
   });
   const treatmentCoverage = normalizeTreatmentCoverage(envelope.treatmentCoverage);

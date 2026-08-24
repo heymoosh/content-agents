@@ -76,6 +76,8 @@ export type GrowReviewLineageInput =
 
 export interface GrowReviewBundleInput {
   id: string;
+  reviewQueueRef?: string | null;
+  review_queue_ref?: string | null;
   sourceRef?: GrowReviewReferenceInput | null;
   source?: GrowReviewReferenceInput | null;
   cutRef?: GrowReviewReferenceInput | null;
@@ -109,6 +111,7 @@ export interface GrowReviewBundle {
   kind: "grow_review_bundle";
   version: typeof GROW_REVIEW_BUNDLE_VERSION;
   id: string;
+  reviewQueueRef?: string | null;
   sourceRef: GrowReviewReference;
   cutRef: GrowReviewReference;
   variantRefs: GrowReviewReference[];
@@ -377,6 +380,7 @@ function readinessFor(
 /** Build a deterministic, reference-only Grow review bundle. */
 export function buildGrowReviewBundle(input: GrowReviewBundleInput): GrowReviewBundle {
   const source = object(input, "review bundle");
+  const reviewQueueRef = optionalText(input.reviewQueueRef ?? input.review_queue_ref, "reviewQueueRef");
   const sourceValue = input.sourceRef ?? input.source;
   const cutValue = input.cutRef ?? input.cut;
   if (sourceValue === undefined || sourceValue === null) fail("sourceRef is required");
@@ -419,6 +423,7 @@ export function buildGrowReviewBundle(input: GrowReviewBundleInput): GrowReviewB
     kind: "grow_review_bundle",
     version: GROW_REVIEW_BUNDLE_VERSION,
     id: text(source.id, "id"),
+    reviewQueueRef,
     sourceRef,
     cutRef,
     variantRefs,

@@ -110,13 +110,23 @@ function blockedBinding(binding: GrowDeliveryBinding, blockers: readonly string[
   };
 }
 
-function generationSlotBlockers(slot: GenerationRunSlot): string[] {
+function generationSlotBlockers(
+  slot: GenerationRunSlot,
+  generatedArtifactRefCounts: ReadonlyMap<string, number>,
+  reviewQueueRefCounts: ReadonlyMap<string, number>,
+): string[] {
   // A draft-batch generation run is expected to carry this blocker until Muxin reviews the
   // artifact. Do not make the later review-bundle join permanently blocked because that gate
   // is precisely what this adapter connects.
   const blockers = slot.blockers.filter((blocker) => blocker !== "human review is pending");
   if (slot.status === "missing") blockers.push("generation slot metadata is missing");
   if (slot.status === "duplicate") blockers.push("generation slot metadata is duplicated");
+  if (slot.generatedArtifactRef !== null && (generatedArtifactRefCounts.get(slot.generatedArtifactRef) ?? 0) >= 2) {
+    blockers.push("duplicate generated artifact reference");
+  }
+  if (slot.reviewQueueRef !== null && (reviewQueueRefCounts.get(slot.reviewQueueRef) ?? 0) >= 2) {
+    blockers.push("duplicate human review queue reference");
+  }
   return uniqueSorted(blockers);
 }
 
@@ -145,6 +155,12 @@ function bindingFor(
   if (input?.candidateLineage === null || input?.candidateLineage === undefined) joinBlockers.push("delivery lineage is missing");
   if (reviewBundle !== null && reviewBundle.sourceRef.id !== sourceReference) {
     joinBlockers.push("review bundle source does not match generation run");
+  }
+  const bundleQueueRef = text(reviewBundle?.reviewQueueRef);
+  if (reviewBundle !== null && bundleQueueRef === null) {
+    joinBlockers.push("review bundle review queue reference is missing");
+  } else if (reviewBundle !== null && reviewQueueRef !== null && bundleQueueRef !== reviewQueueRef) {
+    joinBlockers.push("review bundle does not match review queue reference");
   }
   if (candidateLineage !== null && candidateLineage.variantId !== slot.variantId) {
     joinBlockers.push("delivery lineage variant does not match generation slot");
@@ -196,8 +212,19 @@ export function buildGrowGenerationReviewDelivery(input: GrowGenerationReviewDel
   if (input === null || typeof input !== "object" || Array.isArray(input)) throw new Error("generation review delivery input must be an object");
   if (input.generationRun?.version !== "grow-generation-run-v1") throw new Error("generationRun.version must be grow-generation-run-v1");
   if (!Array.isArray(input.bindings)) throw new Error("bindings must be an array");
+  if (!Array.isArray(input.generationRun.slots)) throw new Error("generationRun.slots must be an array");
 
   const planned = new Map(input.generationRun.slots.map((slot) => [slotKey(slot), slot]));
+  const generatedArtifactRefCounts = new Map<string, number>();
+  const reviewQueueRefCounts = new Map<string, number>();
+  for (const slot of input.generationRun.slots) {
+    if (slot.generatedArtifactRef !== null) {
+      generatedArtifactRefCounts.set(slot.generatedArtifactRef, (generatedArtifactRefCounts.get(slot.generatedArtifactRef) ?? 0) + 1);
+    }
+    if (slot.reviewQueueRef !== null) {
+      reviewQueueRefCounts.set(slot.reviewQueueRef, (reviewQueueRefCounts.get(slot.reviewQueueRef) ?? 0) + 1);
+    }
+  }
   const supplied = new Map<string, GrowGenerationReviewDeliveryBindingInput>();
   for (const current of input.bindings) {
     const key = slotKey(current.slot);
@@ -209,7 +236,11 @@ export function buildGrowGenerationReviewDelivery(input: GrowGenerationReviewDel
   const rows = input.generationRun.slots.map((slot) => {
     const current = supplied.get(slotKey(slot)) ?? null;
     const { binding, joinBlockers } = bindingFor(slot, current, input.generationRun.sourceReference);
-    const blockers = uniqueSorted([...generationSlotBlockers(slot), ...joinBlockers, ...binding.readiness.blockers]);
+    const blockers = uniqueSorted([
+      ...generationSlotBlockers(slot, generatedArtifactRefCounts, reviewQueueRefCounts),
+      ...joinBlockers,
+      ...binding.readiness.blockers,
+    ]);
     const effectiveBinding = blockedBinding(binding, blockers);
     return {
       slot,

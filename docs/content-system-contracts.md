@@ -1152,7 +1152,8 @@ body-bearing envelopes.
 the exact pending review-queue reference, a caller-supplied reviewed
 `grow_review_bundle`, already-read `grow_live_facts`, a capacity slice, and
 the existing `grow_delivery_binding` builder. The queue reference must repeat
-the generation slot's reference; the artifact, slot identity, review source,
+both the generation slot's reference and the reviewed bundle's explicit
+`reviewQueueRef`; the artifact, slot identity, review source,
 candidate variant, delivery lineage, and live facts remain explicit joins.
 Legacy queue/scheduler facts may omit treatment identity, so the adapter
 requires an explicit enriched queue/scheduler lineage rather than filling it

@@ -223,6 +223,18 @@ test("blocks duplicate human review queue references across distinct slots", () 
   assert.match(result.readiness.blockers.join("\n"), /duplicate human review queue reference/);
 });
 
+test("blocks duplicate generated artifact references across distinct slots", () => {
+  const volumePlan = plan();
+  const result = createGenerationRun(input(
+    volumePlan.slots.map((current) => candidate(current, { generatedArtifactRef: "artifact:shared" })),
+    volumePlan,
+  ));
+
+  assert.deepEqual(result.slots.map((current) => current.status), ["blocked", "blocked"]);
+  assert.ok(result.slots.every((current) => current.blockers.includes("duplicate generated artifact reference")));
+  assert.match(result.readiness.blockers.join("\n"), /duplicate generated artifact reference/);
+});
+
 test("uses canonical slot ordering regardless of candidate and plan input order", () => {
   const volumePlan = plan({
     slots: [
