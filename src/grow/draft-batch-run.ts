@@ -132,6 +132,7 @@ export function buildDraftBatchGenerationRun(input: DraftBatchGenerationRunInput
   const seenBindingKeys = new Set<string>();
   const seenRequestIds = new Set<string>();
   const seenSlotKeys = new Set<string>();
+  const seenReviewQueueRefs = new Set<string>();
   for (const binding of bindings) {
     const key = bindingKey(binding);
     if (seenBindingKeys.has(key)) throw new Error(`duplicate binding: ${key}`);
@@ -139,6 +140,8 @@ export function buildDraftBatchGenerationRun(input: DraftBatchGenerationRunInput
     const slotKey = identityKey(binding);
     if (seenSlotKeys.has(slotKey)) throw new Error(`duplicate slot binding: ${slotKey}`);
     seenSlotKeys.add(slotKey);
+    if (seenReviewQueueRefs.has(binding.reviewQueueRef)) throw new Error(`duplicate review queue binding: ${binding.reviewQueueRef}`);
+    seenReviewQueueRefs.add(binding.reviewQueueRef);
     if (seenRequestIds.has(binding.requestId)) throw new Error(`duplicate binding for request ${binding.requestId}`);
     seenRequestIds.add(binding.requestId);
     const request = requestFor(draftBatch.requests, binding.requestId);

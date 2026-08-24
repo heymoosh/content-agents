@@ -107,6 +107,10 @@ test("fails closed on unbound, duplicate, mismatched, and missing-review binding
     /reviewQueueRef/i,
   );
   assert.throws(
+    () => buildDraftBatchGenerationRun({ draftBatch: batch, volumePlan, treatmentCoverage, bindings: [{ ...base, requestId: request.id }, { ...base, requestId: `${request.id}:other`, generatedArtifactRef: `${request.expectedOutputArtifactRef}:other` }] }),
+    /duplicate.*(slot|request|review queue)/i,
+  );
+  assert.throws(
     () => buildDraftBatchGenerationRun({ draftBatch: batch, volumePlan: { ...volumePlan, sourceReference: "thought:other" }, treatmentCoverage, bindings: [base] }),
     /sourceReference.*sourceThoughtRef/i,
   );
