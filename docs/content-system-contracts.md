@@ -737,6 +737,34 @@ not write review state, infer metadata, rank accounts, select winners, or publis
 same view from an explicit queue artifact. Page size and page number are required
 positive integers, and the adapter remains stdout-only and human-gated.
 
+### `baseline_gap_report` and `baseline_sample_cli` (scaffolded; measurement remains explicit)
+
+`src/patterns/baseline-gap-report.ts` compares explicit target rows with explicit
+`AccountBaseline` rows. Missing rows are marked `measure_baseline`, require the
+`/new` route, and keep sample-size, age, topic/focus, method, and caveats visible
+when supplied. The report never manufactures a median, calls a winners-only
+sample a baseline, ranks accounts, or writes the ledger.
+
+`src/patterns/baseline-gap-report-cli.ts` and `npm run patterns:baseline-gaps`
+accept an explicit `{ targets, baselines }` JSON envelope and render JSON,
+Markdown, or both. `src/patterns/baseline-sample-cli.ts` and
+`npm run patterns:baseline-sample` accept an explicit `{ account, sample, meta }`
+envelope, run the existing pure baseline builder, and fail closed when the sample
+is empty or has no common measurable terms. Both commands are stdout-only. The
+sample adapter does not fetch `/new`, append `baselines.jsonl`, or establish a
+winner claim; the actual collector remains the separately authorized measurement
+step.
+
+### `review_session` (scaffolded; human handoff only)
+
+`src/patterns/review-session.ts` joins an explicit `account_review_queue_batch`
+with optional review-input and data-status facts. It preserves each row's
+pending, blocked, or unmapped status, required fields, evidence count, and next
+human action. `bodyIncluded` is always false. `src/patterns/review-session-cli.ts`
+and `npm run patterns:review-session` accept an explicit JSON/file envelope and
+render deterministic JSON/Markdown/both. The session does not approve, persist,
+rank, select, publish, or expose creator post bodies.
+
 ### `pattern_data_status_cli` (scaffolded; metadata-only operator command)
 
 `src/patterns/data-status-cli.ts` and `npm run patterns:data-status` expose the

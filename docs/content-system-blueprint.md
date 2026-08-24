@@ -406,8 +406,18 @@ captured opener text is labeled as source evidence, warnings and performance pro
 visible, and no full post body, ranking, or winner claim is added. `src/patterns/review-batch.ts`
 pages the unreviewed account queue without mutating it, so a human can process large review sets
 while status, next action, and blockers remain explicit.
+`src/patterns/baseline-gap-report.ts` compares explicit target rows with the explicit measured
+baseline ledger and marks each row `measure_baseline` or `already_measured`. Its route is `/new`
+and its missing rows contain no guessed median, winner claim, or platform-wide ranking.
+`src/patterns/baseline-sample-cli.ts` accepts an explicit settled sample and runs the existing
+baseline builder without writing the ledger; empty or incomparable samples fail closed.
+`src/patterns/review-session.ts` composes a paged review batch with explicit review/data-status
+facts into a body-free human checklist. It preserves pending, blocked, and unmapped state and
+never approves, persists, ranks, selects, publishes, or includes creator post bodies.
 The read-only adapters `src/patterns/opener-report-cli.ts`,
-`src/patterns/review-batch-cli.ts`, and `src/patterns/data-status-cli.ts` expose those
+`src/patterns/review-batch-cli.ts`, `src/patterns/data-status-cli.ts`,
+`src/patterns/baseline-gap-report-cli.ts`, `src/patterns/baseline-sample-cli.ts`, and
+`src/patterns/review-session-cli.ts` expose those
 operator views as explicit JSON/file commands with deterministic JSON/Markdown output.
 `src/patterns/pool-evidence-cli.ts` does the same for explicit catalog or raw catalog-input
 pool evidence. Their package commands fail closed on invalid input and do not write data,
@@ -604,6 +614,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Phase contracts | `src/blueprint/phase-contracts.ts` provides deterministic contract definitions and fact evaluation, while live producers and reviewed data remain separate | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` emit a deterministic descriptive report; `src/patterns/operator-readiness.ts` adds deterministic ready/blocked coverage by pool, platform, medium, format, and gap; `src/patterns/manual-platform-report.ts` and `patterns:manual-platform-report` summarize collectorless observations; `src/patterns/source-evidence-cli.ts` exposes source/post readiness; `src/patterns/evidence-readiness.ts` composes pool, source, comparison, and operator readiness without side effects | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
 | Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, `src/patterns/overlay-coverage.ts` reports per-key mapping status, `src/patterns/review-queue.ts` emits the actionable body-free review handoff, `src/patterns/review-batch.ts` pages unreviewed rows for human processing, and `npm run patterns:review-status` exposes the validated metadata table; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
+| Baseline measurement gate | `src/patterns/baseline-gap-report.ts` exposes explicit `/new` measurement gaps, `src/patterns/baseline-sample-cli.ts` builds a measured baseline only from an explicit settled sample, and `src/patterns/review-session.ts` carries the remaining review blockers; the permanent ledger still has only its currently recorded measurements | Measured `/new` baselines for every comparison account before any honest multiple or best-per-platform claim | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; `patterns:pool-evidence-cli` exposes explicit catalog/raw-input views while comparison readiness checks memberships and evidence scopes and keeps missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; `src/patterns/review-pool-coverage.ts` reports only explicit reviewed labels and keeps metadata coverage separate from comparison readiness; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables and explicit claim refs, `src/grow/experiment-record.ts` adds scoped records, `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families, `src/grow/experiment-outcome-cli.ts` exposes that ledger read-only, `src/grow/volume-plan-cli.ts` exposes copy-free slot assignments, and `src/review/funnel-events.ts` validates canonical attribution facts | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
