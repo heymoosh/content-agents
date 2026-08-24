@@ -203,6 +203,16 @@ export function engagementOf(media: IgMedia): number | null {
   return parts.length === 0 ? null : parts.reduce((sum, n) => sum + n, 0);
 }
 
+// Preserve only an asset URL the source actually returned. `thumbnail_url` is a useful fallback
+// when Meta does not expose the media file itself, but a post permalink or media id is not an asset
+// URL and must not be dressed up as one. Null is the honest result when neither URL was provided.
+export function assetUrl(media: IgMedia): string | null {
+  for (const candidate of [media.media_url, media.thumbnail_url]) {
+    if (typeof candidate === "string" && candidate.trim() !== "") return candidate;
+  }
+  return null;
+}
+
 // What form the post took, decided only from fields Meta itself returns. Nothing here opens an
 // image or plays a video, so `onscreen_text` is always null: unknown, never guessed.
 //
@@ -221,6 +231,9 @@ export function mediaFor(media: IgMedia): CorpusMedia {
     // No width or height is returned either, so aspect is genuinely unknown. Reels are vertical by
     // product convention, but convention is not an observation.
     aspect: null,
+    // This is source provenance only. It does not mean the asset was fetched or that its contents
+    // were read, so it has no bearing on onscreen_text or body_is_complete.
+    asset_url: assetUrl(media),
     body_is_complete: false,
   };
   const children = Array.isArray(media.children?.data) ? media.children!.data!.length : null;

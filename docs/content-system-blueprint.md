@@ -381,6 +381,13 @@ metadata-only boundary visible.
 `src/patterns/data-status.ts` provides a metadata-only, read-only report over an explicit
 gitignored data directory so file availability and counts cannot be confused with reviewed account
 metadata or proof of platform-wide best content.
+`src/patterns/platform-readiness.ts` projects platform and format coverage without ranking or
+inferring winners, and keeps configured-but-uncollected surfaces visible. `src/review/comment-intake.ts`
+provides a local/manual, lineage-aware observation adapter for the comment-learning seam; it does
+not fetch comments, infer demand, or publish replies. The Instagram route preserves an explicitly
+returned media asset URL as provenance while keeping caption-only and onscreen-text limitations
+unchanged. These are bounded readiness seams, not evidence that every platform or comment source is
+currently connected.
 
 ## 6. Model and subagent responsibilities
 

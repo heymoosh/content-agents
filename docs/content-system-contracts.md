@@ -677,6 +677,24 @@ catalog, expose post bodies, select winners, or write data. Empty or
 incomplete reviews keep comparison and operator readiness blocked. The
 artifact is an inspection join, not proof that the live corpus is reviewed.
 
+### `platform_format_readiness` (scaffolded; pure projection exists)
+
+`src/patterns/platform-readiness.ts` projects configured platform and format
+coverage from the catalog without ranking creators or inferring a platform
+winner. It keeps configured-but-uncollected surfaces visible, separates
+collected evidence from reviewed evidence and baselines, and reports
+conservative blockers. It has no network or filesystem side effects and does
+not expose post bodies.
+
+### `comment_observation_intake` (scaffolded; manual/local adapter exists)
+
+`src/review/comment-intake.ts` normalizes operator-supplied conversation
+observations for the existing comment-learning seam. It requires explicit
+content and lineage/evidence references, preserves consent and moderation
+posture, and can produce a redacted representation when raw comment text is
+not permitted in downstream artifacts. It does not fetch comments, infer
+demand, create product ideas, publish replies, or write to Signals or Venture.
+
 ### Increment acceptance predicates and current status
 
 The account metadata and pool-evidence increment is accepted only when all of

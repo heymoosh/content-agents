@@ -134,6 +134,30 @@ describe("field readers", () => {
 });
 
 describe("mediaFor", () => {
+  test("preserves an explicitly returned media URL as asset provenance", () => {
+    const form = mediaFor(post(REEL));
+    assert.equal(form.asset_url, "https://example.invalid/fixture-001.mp4");
+    assert.equal(form.body_is_complete, false);
+  });
+
+  test("falls back to an explicitly returned thumbnail URL when media_url is absent", () => {
+    const form = mediaFor({ media_type: "IMAGE", thumbnail_url: "https://example.invalid/fallback.jpg" });
+    assert.equal(form.asset_url, "https://example.invalid/fallback.jpg");
+    assert.equal(form.body_is_complete, false);
+  });
+
+  test("records null provenance when the source returns no media URL", () => {
+    const form = mediaFor(post(CAROUSEL));
+    assert.equal(form.asset_url, null);
+    assert.equal(form.onscreen_text, null);
+    assert.equal(form.body_is_complete, false);
+  });
+
+  test("does not dress a permalink or media id up as an asset URL", () => {
+    const form = mediaFor({ media_type: "IMAGE", id: "media-1", permalink: "https://example.invalid/post-1" });
+    assert.equal(form.asset_url, null);
+  });
+
   test("body_is_complete is false on EVERY form, which is the whole point of this collector", () => {
     for (const media of window) {
       assert.equal(mediaFor(media).body_is_complete, false, `${media.id} claimed a complete body`);
@@ -175,6 +199,15 @@ describe("mediaFor", () => {
 });
 
 describe("toStagedEntry", () => {
+  test("keeps the caption and sampled position unchanged while adding media provenance", () => {
+    const entry = toStagedEntry(post(REEL), { ...context, rank: 1 });
+    assert.equal(entry.body, "invented caption for a fixture reel, no real post");
+    assert.equal(entry.media?.asset_url, "https://example.invalid/fixture-001.mp4");
+    assert.equal(entry.media?.body_is_complete, false);
+    assert.equal(entry.sample?.rank, 1);
+    assert.equal(entry.sample?.role, "baseline");
+  });
+
   test("a Reel carries the view count, the caption as body, and transcript_source 'caption'", () => {
     const entry = toStagedEntry(post(REEL), { ...context, rank: 1 });
     assert.equal(entry.platform, "instagram");
