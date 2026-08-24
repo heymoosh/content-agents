@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { buildCommentLearningView, type CommentLearningView } from "./comment-learning.js";
 import { buildGrowDeliveryRecord, type GrowDeliveryRecord } from "./delivery-record.js";
 import { createGenerationBrief, GENERATION_BRIEF_VERSION, type GenerationBrief } from "./generation-brief.js";
+import type { GrowGenerationReviewDelivery } from "./generation-review-delivery.js";
 import { buildGrowReviewBundle, type GrowReviewBundle } from "./review-bundle.js";
 import {
   buildStudioReadiness,
@@ -48,6 +49,20 @@ function fail(message: string): never {
 function record(value: unknown, field: string): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail(`${field} must be an object`);
   return value as Record<string, unknown>;
+}
+
+function assertNoBodyFields(value: unknown, field: string): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => assertNoBodyFields(item, `${field}[${index + 1}]`));
+    return;
+  }
+  if (value === null || typeof value !== "object") return;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (new Set(["body", "content", "copy", "sourceBody", "creatorBody"]).has(key)) {
+      fail(`${field} contains unsupported body field "${key}"`);
+    }
+    assertNoBodyFields(item, `${field}.${key}`);
+  }
 }
 
 function assertAllowedFields(
@@ -283,6 +298,42 @@ function generationRun(value: unknown): StudioReadinessGenerationRun | null {
   return run as StudioReadinessGenerationRun;
 }
 
+function generationReviewDelivery(value: unknown): GrowGenerationReviewDelivery | null {
+  if (value === undefined || value === null) return null;
+  const join = record(value, "generationReviewDelivery");
+  assertAllowedFields(join, [
+    "kind", "version", "sourceReference", "substanceReference", "rows", "summary", "readiness",
+    "bodyFree", "generatesCopy", "creatorBodyCopyAllowed", "humanApprovalRequired",
+    "autoApproval", "autoScheduling", "autoPublishing", "sideEffects",
+  ], "generation review delivery");
+  if (join.kind !== "grow_generation_review_delivery") fail("generation review delivery kind must be grow_generation_review_delivery");
+  if (join.version !== "grow-generation-review-delivery-v1") fail("generation review delivery version is invalid");
+  if (!Array.isArray(join.rows)) fail("generation review delivery rows must be an array");
+  const readiness = readinessObject(join.readiness, "generation review delivery readiness");
+  if (readiness === null) fail("generation review delivery readiness is required");
+  if (join.bodyFree !== true) fail("generation review delivery must be body-free");
+  if (join.generatesCopy !== false) fail("generation review delivery must not generate copy");
+  if (join.creatorBodyCopyAllowed !== false) fail("generation review delivery must not allow creator body copy");
+  if (join.humanApprovalRequired !== true) fail("generation review delivery must require human approval");
+  if (join.autoApproval !== false || join.autoScheduling !== false || join.autoPublishing !== false) {
+    fail("generation review delivery must disable automatic approval, scheduling, and publishing");
+  }
+  if (join.sideEffects !== "none") fail("generation review delivery must have no side effects");
+  for (const [index, row] of join.rows.entries()) {
+    const rowRecord = record(row, `generation review delivery row ${index + 1}`);
+    assertAllowedFields(rowRecord, [
+      "slot", "generatedArtifactRef", "reviewQueueRef", "reviewBundleId", "deliveryBinding", "readiness",
+    ], `generation review delivery row ${index + 1}`);
+    const rowReadiness = readinessObject(rowRecord.readiness, `generation review delivery row ${index + 1} readiness`);
+    if (rowReadiness === null) fail(`generation review delivery row ${index + 1} readiness is required`);
+    record(rowRecord.slot, `generation review delivery row ${index + 1} slot`);
+    const binding = record(rowRecord.deliveryBinding, `generation review delivery row ${index + 1} deliveryBinding`);
+    readinessObject(binding.readiness, `generation review delivery row ${index + 1} binding readiness`);
+  }
+  assertNoBodyFields(join, "generationReviewDelivery");
+  return join as unknown as GrowGenerationReviewDelivery;
+}
+
 function treatmentCoverage(value: unknown): StudioReadinessTreatmentCoverage | null {
   if (value === undefined || value === null) return null;
   const coverage = record(value, "treatmentCoverage");
@@ -348,6 +399,7 @@ export function loadStudioReadinessEnvelope(raw: string): StudioReadinessInput {
   assertAllowedFields(input, [
     "sourceStatus", "source", "generationBrief", "brief", "treatmentCoverage", "coverage", "treatmentCoverageView",
     "volumePlan", "volume", "volumePlanManifest", "generationRunManifest", "generationRun", "generationManifest", "generation",
+    "generationReviewDelivery", "reviewDelivery",
     "reviewBundle", "reviewProjection", "review", "deliveryRecord", "delivery", "learningPacket", "learning",
     "commentLearningView", "commentLearning",
   ], "input envelope");
@@ -358,6 +410,7 @@ export function loadStudioReadinessEnvelope(raw: string): StudioReadinessInput {
     ?? input.generationRun
     ?? input.generationManifest
     ?? input.generation;
+  const generationReviewDeliveryValue = input.generationReviewDelivery ?? input.reviewDelivery;
   const reviewValue = input.reviewBundle ?? input.reviewProjection ?? input.review;
   const deliveryValue = input.deliveryRecord ?? input.delivery;
   const learningValue = input.learningPacket ?? input.learning ?? input.commentLearningView ?? input.commentLearning;
@@ -367,6 +420,7 @@ export function loadStudioReadinessEnvelope(raw: string): StudioReadinessInput {
     treatmentCoverage: treatmentCoverage(coverageValue),
     volumePlan: volumePlan(volumeValue),
     generationRunManifest: generationRun(generationValue),
+    generationReviewDelivery: generationReviewDelivery(generationReviewDeliveryValue),
     reviewBundle: review(reviewValue),
     delivery: delivery(deliveryValue),
     learning: learning(learningValue),

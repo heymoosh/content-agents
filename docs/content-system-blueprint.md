@@ -522,13 +522,16 @@ declined decision and creates no Venture artifact, demand claim, reply, or write
 `src/review/approved-reply-task.ts` adds the missing response seam: a proposed reply can be
 reviewed, approved, declined, or kept pending, but no state in this adapter sends or publishes it.
 `src/grow/studio-readiness.ts` aggregates source, brief, treatment coverage, volume, generation,
-review, delivery, and learning readiness without embedding source substance. Its pre-generation
+review, delivery, the optional per-slot generation-review-delivery join, and learning readiness without embedding source substance. Its pre-generation
 stages remain explicitly blocked when coverage, volume, or draft/review references are missing.
 `src/grow/delivery-binding.ts` and `npm run grow:delivery-binding` add the
 read-only delivery handoff join: approved review, exact candidate lineage,
 capacity, queue, scheduler, provider, and live evidence are reconciled without
 claiming a slot, scheduling, publishing, or copying creator body text. The
 binding cannot call a provider and keeps manual or ambiguous delivery blocked.
+`src/grow/studio-readiness.ts` now consumes the body-free generation-review-delivery
+artifact as an explicit delivery-stage input, preserving its per-slot blockers while
+still requiring the durable delivery record.
 `src/patterns/reviewed-evidence-intake.ts` and
 `npm run patterns:reviewed-evidence-intake` provide the matching intake gate
 for reviewed account metadata, source evidence, and `/new` baseline rows,

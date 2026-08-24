@@ -1,6 +1,7 @@
 import type { CommentLearningView } from "./comment-learning.js";
 import type { GrowDeliveryRecord } from "./delivery-record.js";
 import type { GenerationBrief } from "./generation-brief.js";
+import type { GrowGenerationReviewDelivery } from "./generation-review-delivery.js";
 import type { GrowReviewBundle } from "./review-bundle.js";
 
 /** A body-free aggregate of already-produced Studio lifecycle facts. */
@@ -136,6 +137,8 @@ export interface StudioReadinessInput {
   readonly generationRun?: StudioReadinessGenerationRun | null;
   readonly generationManifest?: StudioReadinessGenerationRun | null;
   readonly generation?: StudioReadinessGenerationRun | null;
+  /** Optional per-slot review-to-delivery join. It adds blockers; it never replaces a delivery record. */
+  readonly generationReviewDelivery?: GrowGenerationReviewDelivery | null;
   /** `review` is an explicit alias for callers that prefer the stage name. */
   readonly review?: GrowReviewBundle | null;
   readonly reviewBundle?: GrowReviewBundle | null;
@@ -521,6 +524,7 @@ function deliveryStage(
   reviewProjection: StudioReadinessStageProjection,
   source: StudioReadinessStageProjection,
   brief: StudioReadinessStageProjection,
+  generationReviewDelivery: GrowGenerationReviewDelivery | null,
 ): StudioReadinessStageProjection {
   if (delivery === null) return stage("delivery", "blocked", ["delivery record is missing"]);
 
@@ -541,7 +545,39 @@ function deliveryStage(
   }
   if (delivery.autoPublishing !== false) blockers.push("delivery record permits auto-publishing");
   if (delivery.sideEffects !== "none") blockers.push("delivery record has side effects");
+  blockers.push(...generationReviewDeliveryBlockers(generationReviewDelivery));
   return stage("delivery", blockers.length === 0 ? "ready" : "blocked", blockers);
+}
+
+function generationReviewDeliveryBlockers(join: GrowGenerationReviewDelivery | null): string[] {
+  if (join === null) return [];
+  const blockers: string[] = [];
+  if (join.readiness.status !== "ready") {
+    blockers.push(...(join.readiness.blockers.length > 0
+      ? join.readiness.blockers
+      : ["generation review delivery is blocked"]));
+  }
+  if (join.bodyFree !== true) blockers.push("generation review delivery must be body-free");
+  if (join.generatesCopy !== false) blockers.push("generation review delivery must not generate copy");
+  if (join.creatorBodyCopyAllowed !== false) blockers.push("generation review delivery must not allow creator body copy");
+  if (join.humanApprovalRequired !== true) blockers.push("generation review delivery must require human approval");
+  if (join.autoApproval !== false) blockers.push("generation review delivery permits auto-approval");
+  if (join.autoScheduling !== false) blockers.push("generation review delivery permits auto-scheduling");
+  if (join.autoPublishing !== false) blockers.push("generation review delivery permits auto-publishing");
+  if (join.sideEffects !== "none") blockers.push("generation review delivery has side effects");
+  for (const row of join.rows) {
+    if (row.readiness.status !== "ready") {
+      blockers.push(...(row.readiness.blockers.length > 0
+        ? row.readiness.blockers
+        : ["generation review delivery row is blocked"]));
+    }
+    if (row.deliveryBinding.readiness.status !== "ready") {
+      blockers.push(...(row.deliveryBinding.readiness.blockers.length > 0
+        ? row.deliveryBinding.readiness.blockers
+        : ["generation review delivery binding is blocked"]));
+    }
+  }
+  return uniqueSorted(blockers);
 }
 
 function learningStage(learning: CommentLearningView | null): StudioReadinessStageProjection {
@@ -641,7 +677,17 @@ export function buildStudioReadiness(input: StudioReadinessInput): StudioReadine
   const generationProjection = generationStage(generation, volume, volumeProjection, treatmentCoverageProjection);
   const reviewProjection = reviewStage(review);
   const deliveryRecord = input.delivery !== undefined ? input.delivery : input.deliveryRecord ?? null;
-  const deliveryProjection = deliveryStage(deliveryRecord, review, reviewProjection, source, briefProjection);
+  const generationReviewDelivery = input.generationReviewDelivery === undefined
+    ? null
+    : input.generationReviewDelivery;
+  const deliveryProjection = deliveryStage(
+    deliveryRecord,
+    review,
+    reviewProjection,
+    source,
+    briefProjection,
+    generationReviewDelivery,
+  );
   const learningProjection = learningStage(learning);
   const stages = [
     source,

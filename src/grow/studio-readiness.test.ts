@@ -5,6 +5,7 @@ import { buildGrowCapacityManifest } from "./capacity.js";
 import { buildCommentLearningView, type CommentLearningView } from "./comment-learning.js";
 import { buildGrowDeliveryRecord } from "./delivery-record.js";
 import { createGenerationBrief } from "./generation-brief.js";
+import type { GrowGenerationReviewDelivery } from "./generation-review-delivery.js";
 import { buildGrowReviewBundle } from "./review-bundle.js";
 import { buildStudioReadiness, type StudioReadiness } from "./studio-readiness.js";
 
@@ -103,6 +104,31 @@ const generationRunManifest = {
   autoPublishing: false as const,
 };
 
+const readyGenerationReviewDelivery = {
+  kind: "grow_generation_review_delivery",
+  version: "grow-generation-review-delivery-v1",
+  sourceReference: "source:essay-1",
+  substanceReference: "substance:essay-1",
+  rows: [{
+    slot: { platform: "linkedin", dayIndex: 0, slotIndex: 0, variantId: "variant-1" },
+    generatedArtifactRef: "artifact:variant-1",
+    reviewQueueRef: "review:variant-1",
+    reviewBundleId: "review-1",
+    deliveryBinding: { readiness: { status: "ready", blockers: [] } },
+    readiness: { status: "ready", blockers: [] },
+  }],
+  summary: { slots: 1, bound: 1, ready: 1, blocked: 0, missingBindings: 0 },
+  readiness: { status: "ready", blockers: [] },
+  bodyFree: true,
+  generatesCopy: false,
+  creatorBodyCopyAllowed: false,
+  humanApprovalRequired: true,
+  autoApproval: false,
+  autoScheduling: false,
+  autoPublishing: false,
+  sideEffects: "none",
+} as unknown as GrowGenerationReviewDelivery;
+
 function stage(result: StudioReadiness, name: "source" | "brief" | "treatment-coverage" | "volume" | "generation" | "review" | "delivery" | "learning") {
   return result.stages.find((entry) => entry.stage === name);
 }
@@ -150,6 +176,41 @@ test("accepts explicit ready volume and generation aliases in lifecycle order", 
   assert.equal(result.gates.volume.status, "pending");
   assert.equal(result.gates.generation.status, "pending");
   assert.equal(result.readiness.status, "ready");
+});
+
+test("folds the per-slot review-to-delivery join into delivery readiness without replacing the record gate", () => {
+  const blockedJoin = {
+    ...readyGenerationReviewDelivery,
+    readiness: { status: "blocked", blockers: ["review:variant-1: live queue is missing"] },
+  } as GrowGenerationReviewDelivery;
+  const result = buildStudioReadiness({
+    sourceStatus: "ready",
+    brief,
+    treatmentCoverage,
+    volumePlan,
+    generationRunManifest,
+    reviewBundle: approvedReview,
+    delivery,
+    generationReviewDelivery: blockedJoin,
+    learning,
+  });
+
+  assert.equal(stage(result, "delivery")?.status, "blocked");
+  assert.ok(stage(result, "delivery")?.blockers.includes("review:variant-1: live queue is missing"));
+  assert.equal(result.readiness.status, "blocked");
+
+  const ready = buildStudioReadiness({
+    sourceStatus: "ready",
+    brief,
+    treatmentCoverage,
+    volumePlan,
+    generationRunManifest,
+    reviewBundle: approvedReview,
+    delivery,
+    generationReviewDelivery: readyGenerationReviewDelivery,
+    learning,
+  });
+  assert.equal(stage(ready, "delivery")?.status, "ready");
 });
 
 test("blocks volume and generation on explicit readiness and one-to-one coverage gaps", () => {

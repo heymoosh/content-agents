@@ -53,6 +53,31 @@ const generationRunManifest = {
   autoPublishing: false,
 };
 
+const generationReviewDelivery = {
+  kind: "grow_generation_review_delivery",
+  version: "grow-generation-review-delivery-v1",
+  sourceReference: "source:essay-1",
+  substanceReference: "substance:essay-1",
+  rows: [{
+    slot: { platform: "linkedin", dayIndex: 0, slotIndex: 0, variantId: "variant-1" },
+    generatedArtifactRef: "artifact:variant-1",
+    reviewQueueRef: "review:variant-1",
+    reviewBundleId: "review-1",
+    deliveryBinding: { readiness: { status: "ready", blockers: [] } },
+    readiness: { status: "ready", blockers: [] },
+  }],
+  summary: { slots: 1, bound: 1, ready: 1, blocked: 0, missingBindings: 0 },
+  readiness: { status: "ready", blockers: [] },
+  bodyFree: true,
+  generatesCopy: false,
+  creatorBodyCopyAllowed: false,
+  humanApprovalRequired: true,
+  autoApproval: false,
+  autoScheduling: false,
+  autoPublishing: false,
+  sideEffects: "none",
+};
+
 test("parses exactly one JSON source and format", () => {
   assert.deepEqual(parseStudioReadinessArgs(["--json", "{}", "--format", "markdown"]), {
     source: { kind: "json-string", value: "{}" }, format: "markdown",
@@ -115,6 +140,20 @@ test("accepts a genuine versioned generation-run artifact", () => {
     },
   }));
   assert.equal(readiness.stages.find((entry) => entry.stage === "generation")?.status, "ready");
+});
+
+test("accepts a body-free generation review-delivery artifact and fails closed on body fields", () => {
+  const readiness = buildStudioReadinessFromJson(JSON.stringify({
+    source: { status: "ready" },
+    treatmentCoverage,
+    volumePlan,
+    generationRunManifest,
+    generationReviewDelivery,
+  }));
+  assert.equal(readiness.stages.find((entry) => entry.stage === "delivery")?.status, "blocked");
+  assert.throws(() => buildStudioReadinessFromJson(JSON.stringify({
+    generationReviewDelivery: { ...generationReviewDelivery, rows: [{ ...generationReviewDelivery.rows[0], deliveryBinding: { body: "copy" } }] },
+  })), /unsupported body field "body"/);
 });
 
 test("renders deterministic, body-free readiness metadata", () => {

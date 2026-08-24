@@ -1116,7 +1116,8 @@ read-only JSON/Markdown operator view; they do not send, publish, or write.
 
 `src/grow/studio-readiness.ts` composes caller-supplied readiness for the
 source, generation brief, treatment coverage, volume plan, generation run,
-review bundle, delivery record, and comment-learning view. Its lifecycle is
+review bundle, delivery record, optional per-slot generation-review-delivery
+join, and comment-learning view. Its lifecycle is
 explicitly `source -> brief -> treatment-coverage -> volume -> generation ->
 review -> delivery -> learning`; missing or blocked pre-generation stages keep
 generation blocked. It keeps separate human gates and is a body-free inspection
@@ -1126,7 +1127,10 @@ approves or publishes anything.
 `src/grow/studio-readiness-cli.ts` and `npm run grow:studio-readiness` provide a
 read-only JSON/Markdown operator projection of that envelope. Malformed or
 missing inputs fail closed; the command preserves blockers and never writes,
-publishes, or includes source substance.
+publishes, or includes source substance. When supplied, the
+`generationReviewDelivery` artifact contributes its per-slot blockers and
+safety boundary to the delivery stage; it never substitutes for the explicit
+delivery record or human approval gate.
 
 ### `generation_run` (scaffolded; explicit artifact/review handoff exists)
 
@@ -1172,7 +1176,9 @@ includes source or creator body text. `bodyFree: true`,
 `src/grow/generation-review-delivery-cli.ts` and
 `npm run grow:generation-review-delivery` expose the same join as
 deterministic JSON/Markdown from one explicit envelope; they do not write
-domain state.
+domain state. `grow:studio-readiness` accepts the resulting body-free artifact
+as `generationReviewDelivery` and carries its blockers into delivery readiness
+without treating the join as a durable delivery record.
 
 ### `manual_platform_observation` (scaffolded; collectorless intake exists)
 
