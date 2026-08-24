@@ -380,7 +380,9 @@ gates. `src/agents/skill-invocation.ts` records key-only readiness for one decla
 metadata-only boundary visible.
 `src/patterns/data-status.ts` provides a metadata-only, read-only report over an explicit
 gitignored data directory so file availability and counts cannot be confused with reviewed account
-metadata or proof of platform-wide best content.
+metadata or proof of platform-wide best content. It now reports the derived `openers.jsonl` bank
+separately from core artifacts, including parse/validation status without treating opener text as
+reviewed evidence or a winner claim.
 `src/patterns/platform-readiness.ts` projects platform and format coverage without ranking or
 inferring winners, and keeps configured-but-uncollected surfaces visible. `src/review/comment-intake.ts`
 provides a local/manual, lineage-aware observation adapter for the comment-learning seam; it does
@@ -395,6 +397,11 @@ body-free account/example table. When corpus and analysis inputs are supplied, t
 comparison rows through the existing evidence seam; it keeps account size, topics, focus, platform,
 medium, format, pool, scope, evidence links, and review state explicit, without ranking winners or
 copying post bodies.
+`src/patterns/opener-report.ts` provides a deterministic evidence view over the derived opener bank:
+captured opener text is labeled as source evidence, warnings and performance provenance remain
+visible, and no full post body, ranking, or winner claim is added. `src/patterns/review-batch.ts`
+pages the unreviewed account queue without mutating it, so a human can process large review sets
+while status, next action, and blockers remain explicit.
 `src/grow/generation-brief.ts` can carry explicit platform/format readiness blockers onto planning
 variants while remaining copy-free and human-gated. The Threads extractor now preserves explicit
 media URLs or downloaded slide paths as asset provenance, without treating them as read media or
@@ -418,6 +425,10 @@ observations by platform, status, explicit pool/role, and missing facts; it is d
 coverage only. `src/grow/volume-plan.ts` allocates existing copy-free variants into deterministic
 per-platform daily slots while retaining readiness and human review for every slot. These are
 operator/build seams, not reviewed evidence or permission to auto-publish.
+`src/grow/experiment-outcome-cli.ts` and `npm run grow:experiment-outcome` provide a read-only
+measurement view that keeps attention, conversation, audience, and business outcomes separate,
+preserves lineage/evidence blockers, and accepts a winner only as an explicitly supplied fact. It
+does not infer demand, close experiments, compose copy, or publish.
 
 ## 6. Model and subagent responsibilities
 
@@ -568,7 +579,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Area | Current fact | Target state | Status |
 |---|---|---|---|
 | Seeded targets | 352 rows across 13 configured platforms | Stable, provenance-aware target records with explicit scope and caveats | Partial |
-| Corpus | `src/patterns/data-status.ts` reports 499 corpus entries (292 previously collected plus 207 newly admitted; 18 staged duplicates skipped), 292 analyses, 12 baselines, 225 replayable Reddit inbox entries, 11 browser artifacts, and 9 RSS artifacts; all are available/parse-clean in the permanent gitignored data checkout, but the report is marked unreviewed | Normalized source/account/evidence catalog with queryable pool membership and reviewed niche/broad/format coverage | Partial |
+| Corpus | `src/patterns/data-status.ts` reports 499 corpus entries (292 previously collected plus 207 newly admitted; 18 staged duplicates skipped), 292 analyses, 12 baselines, 225 replayable Reddit inbox entries, the derived opener bank, 11 browser artifacts, and 9 RSS artifacts; all are available/parse-clean in the permanent gitignored data checkout, but the report is marked unreviewed | Normalized source/account/evidence catalog with queryable pool membership and reviewed niche/broad/format coverage | Partial |
 | Patterns | 31 hook patterns | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it | Connect the accounting view to live review and scheduler records without allowing it to approve or publish | Partial |
@@ -576,10 +587,10 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, `src/grow/delivery-record.ts` blocks delivery without it, `src/grow/queue-facts.ts` normalizes facts, `src/grow/live-facts.ts` adapts existing queue/scheduler records, `src/grow/live-reconciliation.ts` composes them without inference, and `src/grow/reconciliation.ts` reports drift without repairing it | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
 | Phase contracts | `src/blueprint/phase-contracts.ts` provides deterministic contract definitions and fact evaluation, while live producers and reviewed data remain separate | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` emit a deterministic descriptive report; `src/patterns/operator-readiness.ts` adds deterministic ready/blocked coverage by pool, platform, medium, format, and gap; `src/patterns/manual-platform-report.ts` summarizes collectorless observations; `src/patterns/evidence-readiness.ts` composes pool, source, comparison, and operator readiness without side effects | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
-| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, `src/patterns/overlay-coverage.ts` reports per-key mapping status, `src/patterns/review-queue.ts` emits the actionable body-free review handoff, and `npm run patterns:review-status` exposes the validated metadata table; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
+| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, `src/patterns/overlay-coverage.ts` reports per-key mapping status, `src/patterns/review-queue.ts` emits the actionable body-free review handoff, `src/patterns/review-batch.ts` pages unreviewed rows for human processing, and `npm run patterns:review-status` exposes the validated metadata table; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; comparison readiness now checks explicit memberships and evidence scopes while keeping missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; `src/patterns/review-pool-coverage.ts` reports only explicit reviewed labels and keeps metadata coverage separate from comparison readiness; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
-| Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables and explicit claim refs, `src/grow/experiment-record.ts` adds scoped records, `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families, and `src/review/funnel-events.ts` validates canonical attribution facts | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
+| Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables and explicit claim refs, `src/grow/experiment-record.ts` adds scoped records, `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families, `src/grow/experiment-outcome-cli.ts` exposes that ledger read-only, and `src/review/funnel-events.ts` validates canonical attribution facts | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
 | Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet, `src/grow/comment-learning.ts`, and `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
 | Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts, `src/agents/skill-contract.ts` records the lightweight stage boundaries, and `src/agents/skill-invocation.ts` records key-only readiness; all permit common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |

@@ -208,9 +208,10 @@ missing and incomplete rows remain blocked or unmapped.
 
 `src/patterns/data-status.ts` accepts an explicit data directory and reports
 availability, parse validity, record counts, platform counts, baseline keys,
-and optional browser/RSS file counts for the mined artifacts. It does not
+optional browser/RSS file counts, and a separate derived `openers.jsonl` status
+for the mined artifacts. It does not
 regenerate, rewrite, or expose body text. Its `reviewStatus` is always
-`unreviewed`: these counts do not establish human-reviewed account metadata,
+`unreviewed`: these counts, including the derived opener bank, do not establish human-reviewed account metadata,
 best creators, platform-wide winners, or permission to reuse creator body copy.
 
 ### `claim` (scaffolded)
@@ -705,6 +706,22 @@ When raw corpus and analyses are supplied, it derives comparison rows through
 visible. The report is body-free, deterministic, fail-closed for invalid review
 batches, and never ranks creators or declares a winner.
 
+### `opener_operator_report` (scaffolded; deterministic evidence projection exists)
+
+`src/patterns/opener-report.ts` projects already-normalized opener records with
+platform groups, warnings, performance provenance, and status counts. Captured
+`opener_text` is labeled source evidence for hook analysis; it is not generated
+copy or a full post body. The report permits downstream common-hook mad-lib
+adaptation under human review, but does not rank creators, infer winners, or
+authorize creator-body copying.
+
+### `account_review_queue_batch` (scaffolded; deterministic pagination exists)
+
+`src/patterns/review-batch.ts` returns one deterministic page of non-reviewed
+account queue rows with status counts, next actions, and explicit human-review
+fields. Empty queues expose page one and reject later pages. The projection does
+not write review state, infer metadata, rank accounts, select winners, or publish.
+
 ### `generation_brief_cli` (scaffolded; read-only operator adapter exists)
 
 `src/grow/brief-cli.ts` and `npm run grow:brief` accept an explicit JSON
@@ -775,6 +792,15 @@ brief into deterministic per-platform daily slots using the brief's declared
 volume or an explicit override. Each slot retains variant and experiment
 references, readiness blockers, and a pending human review gate. It does not
 compose copy, read source substance, schedule, publish, or approve.
+
+### `experiment_outcome_cli` (scaffolded; read-only measurement adapter exists)
+
+`src/grow/experiment-outcome-cli.ts` and `npm run grow:experiment-outcome`
+normalize an explicit experiment/outcome envelope and render JSON or Markdown
+over the existing outcome ledger. Attention, conversation, audience, and
+business families remain separate; lineage/evidence blockers and a supplied
+winner remain visible. The adapter never infers demand or a winner, composes
+copy, closes an experiment, sends, publishes, or writes.
 
 ### Increment acceptance predicates and current status
 

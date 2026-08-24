@@ -13,6 +13,24 @@ function writeJsonl(path: string, records: unknown[]): void {
   writeFileSync(path, `${records.map((record) => JSON.stringify(record)).join("\n")}\n`, "utf8");
 }
 
+function validOpener(): Record<string, unknown> {
+  return {
+    id: "opener-entry-1",
+    corpus_entry_id: "entry-1",
+    platform: "x",
+    creator: "Creator",
+    handle: "@creator",
+    url: "https://example.test/post/1",
+    opener_text: "A captured opener",
+    onscreen_title: null,
+    kind: "text",
+    performance: { multiple: 2, metric: "views", note: "2x against a recorded baseline" },
+    verbatim_ok: false,
+    warnings: [],
+    collected_at: "2026-08-23T00:00:00.000Z",
+  };
+}
+
 function writeCoreFixtures(root: string): void {
   mkdirSync(join(root, "inbox"), { recursive: true });
   writeJsonl(join(root, "corpus.jsonl"), [
@@ -29,6 +47,7 @@ function writeCoreFixtures(root: string): void {
   writeFileSync(join(root, "inbox", "reddit-rss-top-year-2026-08-23.json"), JSON.stringify([
     { platform: "reddit", title: "PRIVATE REDDIT TITLE" },
   ]), "utf8");
+  writeJsonl(join(root, "openers.jsonl"), [validOpener()]);
 }
 
 test("reports all core artifacts and metadata only", () => {
@@ -49,6 +68,12 @@ test("reports all core artifacts and metadata only", () => {
       Object.values(report.artifacts).map((artifact) => artifact.status),
       ["available", "available", "available", "available"],
     );
+    assert.equal(report.derivedArtifacts.openers.status, "available");
+    assert.equal(report.derivedArtifacts.openers.bytes !== null, true);
+    assert.equal(report.derivedArtifacts.openers.recordCount, 1);
+    assert.equal(report.derivedArtifacts.openers.validRecordCount, 1);
+    assert.deepEqual(report.derivedArtifacts.openers.parseErrors, []);
+    assert.deepEqual(report.derivedArtifacts.openers.validationErrors, []);
     assert.equal(report.artifacts["corpus.jsonl"].recordCount, 2);
     assert.equal(report.artifacts["analyses.jsonl"].recordCount, 1);
     assert.equal(report.artifacts["baselines.jsonl"].recordCount, 2);
@@ -95,10 +120,32 @@ test("reports missing core and optional artifacts without creating them", () => 
       "baselines.jsonl",
       "browser",
       "inbox/reddit-rss-top-year-2026-08-23.json",
+      "openers.jsonl",
       "rss",
     ]);
     assert.deepEqual(report.invalidArtifacts, []);
     assert.equal(readFileSync(join(root, "corpus.jsonl"), "utf8").includes("alpha"), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("reports invalid derived opener artifacts without treating them as evidence", () => {
+  const root = fixtureDirectory();
+  try {
+    writeFileSync(join(root, "openers.jsonl"), `${JSON.stringify({ id: "missing-required-fields" })}\nnot-json\n`, "utf8");
+
+    const report = readPatternDataStatus(root);
+
+    assert.equal(report.reviewStatus, "unreviewed");
+    assert.equal(report.derivedArtifacts.openers.status, "invalid");
+    assert.equal(report.derivedArtifacts.openers.recordCount, 2);
+    assert.equal(report.derivedArtifacts.openers.validRecordCount, 0);
+    assert.deepEqual(report.derivedArtifacts.openers.parseErrors, [{ line: 2, message: "invalid JSON" }]);
+    assert.equal(report.derivedArtifacts.openers.validationErrors[0]?.record, 1);
+    assert.match(report.derivedArtifacts.openers.validationErrors[0]?.message ?? "", /id/);
+    assert.deepEqual(report.invalidArtifacts, ["openers.jsonl"]);
+    assert.equal(JSON.stringify(report).includes("missing-required-fields"), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

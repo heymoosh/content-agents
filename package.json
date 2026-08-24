@@ -98,6 +98,7 @@
     "grow:brief": "tsx src/grow/brief-cli.ts",
     "grow:studio-readiness": "tsx src/grow/studio-readiness-cli.ts",
     "grow:comment-learning": "tsx src/grow/comment-learning-cli.ts",
+    "grow:experiment-outcome": "tsx src/grow/experiment-outcome-cli.ts",
     "review:approved-reply": "tsx src/review/approved-reply-task-cli.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",

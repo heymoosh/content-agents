@@ -8,10 +8,13 @@ export const CORE_PATTERN_ARTIFACT_PATHS = [
   "inbox/reddit-rss-top-year-2026-08-23.json",
 ] as const;
 
+const DERIVED_PATTERN_ARTIFACT_PATHS = ["openers.jsonl"] as const;
+
 const OPTIONAL_PATTERN_ARTIFACT_DIRECTORIES = ["browser", "rss"] as const;
 
 export type PatternArtifactStatus = "available" | "missing" | "invalid";
 export type PatternCoreArtifactPath = (typeof CORE_PATTERN_ARTIFACT_PATHS)[number];
+export type PatternDerivedArtifactPath = (typeof DERIVED_PATTERN_ARTIFACT_PATHS)[number];
 export type PatternOptionalArtifactDirectory = (typeof OPTIONAL_PATTERN_ARTIFACT_DIRECTORIES)[number];
 
 export interface PatternDataParseError {
@@ -31,6 +34,17 @@ export interface PatternCoreArtifactReport {
   bytes: number | null;
   // JSONL counts non-empty lines. JSON counts array items. Invalid positions are included in
   // recordCount and excluded from validRecordCount so partial files remain diagnosable.
+  recordCount: number;
+  validRecordCount: number;
+  parseErrors: PatternDataParseError[];
+  validationErrors: PatternDataValidationError[];
+}
+
+export interface PatternDerivedArtifactReport {
+  relativePath: PatternDerivedArtifactPath;
+  format: "jsonl";
+  status: PatternArtifactStatus;
+  bytes: number | null;
   recordCount: number;
   validRecordCount: number;
   parseErrors: PatternDataParseError[];
@@ -58,6 +72,9 @@ export interface PatternDataStatusReport {
   reviewBoundary: string;
   artifacts: {
     [path in PatternCoreArtifactPath]: PatternCoreArtifactReport;
+  };
+  derivedArtifacts: {
+    openers: PatternDerivedArtifactReport;
   };
   corpus: {
     recordCount: number;
@@ -162,6 +179,87 @@ function scanJsonl(path: string, relativePath: PatternCoreArtifactPath, onRecord
     }
     report.validRecordCount += 1;
     onRecord?.(parsed, report.recordCount, report.validationErrors);
+  }
+  report.status = statusForErrors(report.parseErrors, report.validationErrors);
+  return report;
+}
+
+function baseDerivedReport(relativePath: PatternDerivedArtifactPath): PatternDerivedArtifactReport {
+  return {
+    relativePath,
+    format: "jsonl",
+    status: "missing",
+    bytes: null,
+    recordCount: 0,
+    validRecordCount: 0,
+    parseErrors: [],
+    validationErrors: [],
+  };
+}
+
+function validateOpener(record: Record<string, unknown>, recordNumber: number, errors: PatternDataValidationError[]): void {
+  const requireString = (field: string): void => {
+    if (typeof record[field] !== "string" || (record[field] as string).trim() === "") {
+      errors.push({ record: recordNumber, message: `${field} must be a non-empty string` });
+    }
+  };
+  for (const field of ["id", "corpus_entry_id", "platform", "creator", "handle", "url", "opener_text", "kind", "collected_at"]) {
+    requireString(field);
+  }
+  if (record.onscreen_title !== null && typeof record.onscreen_title !== "string") {
+    errors.push({ record: recordNumber, message: "onscreen_title must be a string or null" });
+  }
+  if (typeof record.verbatim_ok !== "boolean") {
+    errors.push({ record: recordNumber, message: "verbatim_ok must be a boolean" });
+  }
+  if (!Array.isArray(record.warnings)) {
+    errors.push({ record: recordNumber, message: "warnings must be an array" });
+  }
+  const performance = record.performance;
+  if (!isRecord(performance)) {
+    errors.push({ record: recordNumber, message: "performance must be an object" });
+  } else {
+    if (performance.multiple !== null && typeof performance.multiple !== "number") {
+      errors.push({ record: recordNumber, message: "performance.multiple must be a number or null" });
+    }
+    if (performance.metric !== null && performance.metric !== "views" && performance.metric !== "engagement") {
+      errors.push({ record: recordNumber, message: "performance.metric must be views, engagement, or null" });
+    }
+    if (typeof performance.note !== "string" || performance.note.trim() === "") {
+      errors.push({ record: recordNumber, message: "performance.note must be a non-empty string" });
+    }
+  }
+}
+
+function scanOpeners(path: string): PatternDerivedArtifactReport {
+  const report = baseDerivedReport("openers.jsonl");
+  const file = readRegularFile(path);
+  if (file.status === "missing") return report;
+  if (file.status === "invalid") {
+    report.status = "invalid";
+    report.validationErrors.push({ record: null, message: file.message });
+    return report;
+  }
+  report.status = "available";
+  report.bytes = file.bytes;
+  const lines = file.text.split(/\r?\n/);
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    if (lines[lineIndex].trim() === "") continue;
+    report.recordCount += 1;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(lines[lineIndex]);
+    } catch {
+      report.parseErrors.push({ line: lineIndex + 1, message: "invalid JSON" });
+      continue;
+    }
+    if (!isRecord(parsed)) {
+      report.validationErrors.push({ record: report.recordCount, message: "record must be a JSON object" });
+      continue;
+    }
+    const before = report.validationErrors.length;
+    validateOpener(parsed, report.recordCount, report.validationErrors);
+    if (report.validationErrors.length === before) report.validRecordCount += 1;
   }
   report.status = statusForErrors(report.parseErrors, report.validationErrors);
   return report;
@@ -311,6 +409,7 @@ export function readPatternDataStatus(dataDirectory: string): PatternDataStatusR
     else if (platform && handle !== null) validationErrors.push({ record: recordNumber, message: "handle must contain characters after an optional @" });
   });
   const inbox = readJsonArray(join(root, "inbox", "reddit-rss-top-year-2026-08-23.json"), "inbox/reddit-rss-top-year-2026-08-23.json");
+  const openers = scanOpeners(join(root, "openers.jsonl"));
   const artifacts = {
     "corpus.jsonl": corpus,
     "analyses.jsonl": analyses,
@@ -319,15 +418,16 @@ export function readPatternDataStatus(dataDirectory: string): PatternDataStatusR
   };
   const browser = optionalArtifactReport(root, "browser");
   const rss = optionalArtifactReport(root, "rss");
-  const allArtifacts = [...Object.values(artifacts), browser, rss];
+  const allArtifacts = [...Object.values(artifacts), openers, browser, rss];
   const missingArtifacts = allArtifacts.filter((artifact) => artifact.status === "missing").map((artifact) => artifact.relativePath).sort(compare);
   const invalidArtifacts = allArtifacts.filter((artifact) => artifact.status === "invalid").map((artifact) => artifact.relativePath).sort(compare);
 
   return {
     dataDirectory: root,
     reviewStatus: "unreviewed",
-    reviewBoundary: "Counts and file metadata are unreviewed. They are not human-reviewed account metadata or proof of platform-wide best content.",
+    reviewBoundary: "Counts and file metadata are unreviewed and not human-reviewed. Derived openers are not reviewed evidence, winner claims, account metadata, or proof of platform-wide best content.",
     artifacts,
+    derivedArtifacts: { openers },
     corpus: {
       recordCount: corpus.recordCount,
       validRecordCount: corpus.validRecordCount,
