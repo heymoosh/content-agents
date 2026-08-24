@@ -6,9 +6,10 @@ learnable set of platform treatments. It is not an autopilot, a universal virali
 claim that the current corpus is comprehensive.
 
 **Next increment status:** The human-reviewed account metadata overlay and the source/post-level
-pool-evidence boundary are scaffolded. Current live rows remain blocked for pool comparison until
-real reviewed metadata is entered. This document describes the target contract; it does not make
-existing rows reviewed by inference.
+pool-evidence boundary are scaffolded. Typed source-evidence, Grow-variant, and learning-packet
+adapters now make the next joins explicit, but current live rows remain blocked for pool comparison
+until real reviewed metadata is entered. This document describes the target contract; it does not
+make existing rows reviewed by inference.
 
 ## 1. What the system must do
 
@@ -451,6 +452,11 @@ own gate decides whether the input becomes a Venture artifact or phase transitio
 linked signal, decision record, Venture artifact, and approval record. The owner is Venture after
 comments/Signals has produced qualified inputs.
 
+The current side-effect-free bridge is `src/review/learning-packet.ts`. It is a review packet, not
+an automatic handoff: it keeps observation, interpretation, Muxin's decision, and Venture's gate
+separate. A comment can inform a hypothesis, but cannot by itself establish willingness to pay or
+unlock Venture.
+
 **Not in scope:** turning content engagement into proof of demand, bypassing Venture decisions, or
 making Venture the owner of every Studio idea.
 
@@ -473,15 +479,15 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Patterns | 31 hook patterns | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | Current systems generate or queue artifacts in several places, but do not yet expose one shared capacity view | Separate candidate counts from approved publish counts, with human capacity, platform slots, pauses, and rollback records | Target |
-| Source-to-publish path | Existing extraction, review, and publish engines; `src/grow/variants.ts` now emits provisional no-copy candidate specifications | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
+| Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` emits provisional no-copy candidate specifications with evidence/review metadata | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
 | Review gate | Human review and publish approval already required | Explicit per-artifact states, rationale, lineage, and no-AI-smell check | Partial |
 | Phase contracts | This blueprint names broad phase outcomes; `docs/content-system-contracts.md` is a scaffolded documentation contract, not an implemented runtime contract | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` now emit a deterministic descriptive report over the catalog; it is a scaffold, not a completeness claim | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
 | Account metadata overlay | Current account keys and partial source metadata exist, but the requested account table is not a reviewed overlay | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is specified as a deterministic, scaffolded/provisional artifact from `src/patterns/pool-evidence.ts`; explicit memberships are retained and missing pool metadata is blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
-| Experiment lineage | Metrics and bets exist in specialized systems | Variant-level variables linked to comments, funnel events, Signals, and Venture | Target |
-| Venture handoff | Venture has its own phases and gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
+| Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables and evidence refs | Variant-level variables linked to comments, funnel events, Signals, and Venture | Partial |
+| Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet preserves qualified observations and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
 | Model boundaries | Subscription-first and human approval rules exist | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
 

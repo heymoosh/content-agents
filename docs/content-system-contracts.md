@@ -110,7 +110,7 @@ source, post, metric, denominator, pool membership, or comparison sample.
 Rows without real reviewed metadata remain `blocked` and cannot support a
 pool comparison or winner claim.
 
-### `source_post_evidence` (scaffolded)
+### `source_post_evidence` (scaffolded; typed inventory adapter exists)
 
 Owner: `pool evidence`; the source/post row is the authoritative comparison
 unit. An account mapping may link and roll up these rows, but it cannot replace
@@ -131,6 +131,14 @@ row only when its pool membership, metric snapshot, declared scopes,
 baseline or denominator, dates, provenance, and caveats are present. Account
 rows may report rollup counts, but the underlying source/post rows and their
 selection rule remain authoritative.
+
+The current adapter is `src/patterns/source-evidence.ts`. It normalizes the
+explicit fields available in the corpus and analysis inputs, preserves
+unknowns as `null` or an explicit blocked status, and never serializes the
+source body. It may emit one row per explicitly reasoned pool membership. A
+`ready` row means only that the evidence packet is structurally admissible for
+human comparison; it is not a winner claim, a pattern approval, or permission
+to reuse creator wording.
 
 ### `claim` (scaffolded)
 
@@ -208,10 +216,11 @@ are present. Approval is per variant or an explicitly named bundle.
 
 `src/grow/variants.ts` currently emits a no-copy `grow-variant-manifest-v1`
 with source descriptor provenance, platform/medium/format, treatment reason,
-pattern/evidence references, experiment values, and `needs-human-review`
-status. It is an inspectable planning artifact only. It does not read source
-bodies, generate copy, create review-queue rows, schedule, publish, or claim
-that a variant is approved.
+audience/CTA intent, experiment identity and variables, pattern/evidence
+references, evidence status, voice/originality review state, and
+`needs-human-review` status. It is an inspectable planning artifact only. It
+does not read source bodies, generate copy, create review-queue rows,
+schedule, publish, or claim that a variant is approved.
 
 ### `experiment` (scaffolded)
 
@@ -318,6 +327,17 @@ or `business`. These families are reported separately, never averaged into a
 single success score. `human_decision` is `adopt`, `decline`, or `defer`.
 Until `adopt`, a proposal cannot change routing, voice, pillars, experiment
 defaults, or strategy. Decline preserves the evidence and rationale.
+
+### `content_learning_packet` (scaffolded; side-effect-free bridge exists)
+
+The typed bridge in `src/review/learning-packet.ts` packages qualified
+conversation observations, funnel events, and business outcomes for review.
+It preserves variant/experiment lineage and separates observed facts from
+interpretation. Comments can be included as qualified observations, but a
+comment alone never satisfies a willingness-to-pay or Venture evidence gate.
+The packet remains pending until Muxin explicitly adopts or declines the
+proposal; Venture then has its own independent gate. Building this packet does
+not write Signals, mutate Venture, reply to a commenter, or change routing.
 
 ## 5. Venture boundary
 
@@ -431,7 +451,9 @@ these predicates hold:
    carries Muxin's original substance and passes human originality review.
 
 The current status is `scaffolded` for `account_metadata_overlay`,
-`source_post_evidence`, and `pool-evidence-inventory-v1`. The inventory is
+`source_post_evidence`, `content_learning_packet`, and
+`pool-evidence-inventory-v1`. The inventory adapters exist, but the live
+corpus is not thereby reviewed. The inventory is
 provisional and does not unlock Grow variants or permit a winner claim. Current
 live rows remain blocked until real reviewed metadata is entered.
 
