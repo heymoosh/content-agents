@@ -3,6 +3,25 @@ import type { CatalogRow } from "./catalog.js";
 export type ReviewPool = "niche" | "broad" | "format";
 export type ReviewDisposition = "pending" | "reviewed" | "blocked" | "unmapped";
 
+/** Fields the operator must supply before an account can be treated as reviewed. */
+export const REQUIRED_REVIEW_FIELDS = [
+  "stableAccountId",
+  "topics",
+  "focus",
+  "nicheLabel",
+  "researchPoolMembership",
+  "popularityScope",
+  "sampleScope",
+  "baselineScope",
+  "baselineSource",
+  "medium",
+  "format",
+  "audienceSnapshot",
+  "evidenceLinks",
+  "reviewer",
+  "reviewed_at",
+] as const;
+
 export interface AudienceSnapshot {
   size: number | null;
   countType: string | null;
@@ -167,6 +186,7 @@ function normalize(value: ReviewMetadataInput): { normalized: NormalizedReviewMe
 function blockingFields(row: ReviewMetadataRecord): string[] {
   const blockers: string[] = [];
   const missing = (value: unknown): boolean => value === null || value === "unknown" || (Array.isArray(value) && value.length === 0);
+  if (missing(row.stableAccountId) || row.stableAccountId === "") blockers.push("stableAccountId");
   if (missing(row.topics)) blockers.push("topics");
   if (missing(row.focus)) blockers.push("focus");
   if (missing(row.nicheLabel)) blockers.push("nicheLabel");

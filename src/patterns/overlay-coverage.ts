@@ -1,4 +1,4 @@
-import { validateReviewMetadata, type NormalizedReviewMetadataRecord, type ReviewMetadataInput } from "./review-metadata.js";
+import { REQUIRED_REVIEW_FIELDS, validateReviewMetadata, type NormalizedReviewMetadataRecord, type ReviewMetadataInput } from "./review-metadata.js";
 import type { ComparisonReadinessInventory } from "./comparison-readiness.js";
 import type { CatalogRow, PatternCatalog } from "./catalog.js";
 
@@ -70,7 +70,7 @@ export function buildOverlayCoverage(input: OverlayCoverageInput): OverlayCovera
     const matching = byKey.get(currentAccountKey) ?? [];
     const duplicate = matching.length > 1;
     const review = matching.length === 1 ? matching[0] : null;
-    const missing = matching.length === 0 ? [] : missingFields(matching);
+    const missing = matching.length === 0 ? [...REQUIRED_REVIEW_FIELDS] : missingFields(matching);
     const status: OverlayCoverageStatus = matching.length === 0
       ? "unmapped"
       : duplicate

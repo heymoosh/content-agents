@@ -1,14 +1,17 @@
 # Pattern mining: handoff
 
-**Written 2026-08-23.** Everything a fresh session (Grok, Codex, or Claude) needs to continue
+**Last refreshed 2026-08-24.** Everything a fresh session (Grok, Codex, or Claude) needs to continue
 without re-deriving anything. Read this top to bottom before touching the branch.
 
 ## Where the work lives
 
-- **Worktree:** `/private/tmp/claude/wt-mine`, branch `feat/pattern-corpus-v1`, 46 commits off
-  `origin/main` at `cf5f559`. **Not pushed. No PR opened.**
-- **Tests:** 2102 passing, 0 failing. Run them **unsandboxed** (`npm test`). Under the sandbox
-  ~196 `src/venture/*` tests fail spuriously and are not real failures.
+- **Worktree:** `/private/tmp/claude/wt-mine`, branch `feat/pattern-corpus-v1`. Confirm the
+  branch and remote refs with `git status -sb` and `git rev-parse HEAD origin/feat/pattern-corpus-v1`
+  before changing anything. No PR is currently evidenced as open; drafting-input changes remain
+  held for Muxin review and must not auto-merge.
+- **Checks:** Run `npm run check` for the inner loop. Run the full suite **unsandboxed** (`npm test`)
+  when the environment permits; under the sandbox, venture subprocess tests can fail spuriously
+  with macOS `listen EPERM` and must not be mistaken for product failures.
 - **A fresh worktree has no `node_modules`.** Run `npm run worktree:setup` once before testing.
 - `data/` is gitignored by design. Other creators' post text never enters git. Only distilled
   patterns are committed.
@@ -43,6 +46,7 @@ youtube-transcript}.ts`, `src/pull/platforms/threads.ts`, plus `baselines.ts` an
 
 ```
 npm run patterns:collect                      # validate an inbox file into the corpus
+npm run patterns:review-status                # read-only account metadata review table/status
 npm run patterns:outliers                     # score the corpus
 npm run patterns:reddit -- --sub r/ADHD       # needs REDDIT_ keys (Muxin declined these)
 npm run patterns:reddit-rss -- --feeds <dir>  # no credentials, works today (bodies, no numbers)
@@ -86,11 +90,11 @@ Both write to `data/patterns/` and report rather than merging. Check `git log` f
    Never let a caption, a title, or an SEO description stand in for it. Three platforms hide their
    substance in images: Threads carousels, Instagram, and Pinterest, whose `headline` is an
    SEO title that often does not match the words on the graphic at all.
-4. **Rule 1 (CLAUDE.md): never reuse a creator's wording.** Templates describe a MECHANISM; they
-   never supply the creator's sentence with their nouns bracketed out. Single-sighting patterns are
-   presumptively contaminated: 15 of 17 violations came from n=1 records. Verify by n-gram over the
-   WHOLE file including beats and Structure prose, not by scanning quoted strings. Bar is zero at
-   7-grams.
+4. **Never reuse a creator's full wording or body.** Common hooks and openers may be captured as
+   reusable mad-lib templates with slots, then rewritten with Muxin's subject, facts, voice, and
+   point of view. The source account and evidence remain attributed internally. Single-sighting
+   patterns are presumptively weak until corroborated; verify template novelty by n-gram over the
+   WHOLE file including beats and Structure prose, not by scanning quoted strings.
 5. **No em dashes anywhere** (CLAUDE.md rule 5), code comments included.
 6. **Follower counts:** never from a creator's own website. Seven were wrong that way; one moved
    DOWN when re-read, which proves those sites publish cross-platform totals. `api.fxtwitter.com`
@@ -312,11 +316,12 @@ channel exists, so it is either regionally gated or renamed (his X, `@BeauTFC` a
 verified and added). `youtube.com/@TheADHDGuy` and `youtube.com/@simonwillison` render a channel
 title but **zero** subscriber-count candidates, meaning the count is hidden or the channel is tiny.
 
-## This branch is a HELD draft PR
+## Draft PR rule for this branch
 
 It changes `/atomize` drafting inputs, which is content-generation logic under CLAUDE.md rule 7, so
-it must open as a **draft PR with old-vs-new content samples**, never auto-merge. A drafted PR body
-with real before/after samples is at the session scratchpad's `pr-body.md`.
+when a PR is opened it must be a **draft PR with old-vs-new content samples**, never auto-merge.
+Do not claim that a PR or sample artifact exists until the remote PR and the reviewable samples have
+actually been created and verified.
 
 ## Reddit collection state, exactly
 

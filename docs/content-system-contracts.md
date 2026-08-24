@@ -186,6 +186,18 @@ explicit status and evidence count, reports the next human review action, and
 keeps absent rows unmapped rather than inferring metadata. It is an operator
 queue, not a reviewed account table, winner ranking, or approval action.
 
+`src/patterns/review-status.ts` is the read-only operator entry point. It
+accepts an explicit JSON review input, validates it, exposes the requested
+account metadata fields and review state, and includes the queue and pool
+coverage diagnostics. Without a review file it reports `not_supplied` and
+leaves all rows unreviewed. It never writes the review file or exposes source
+post bodies.
+
+`src/patterns/review-pool-coverage.ts` reports niche, broad, and format labels
+only when they are present in validated human metadata. Its pool counts are
+metadata-coverage counts, not comparison-ready evidence or platform rankings;
+missing and incomplete rows remain blocked or unmapped.
+
 ### `pattern_data_status` (current read-only inventory; unreviewed)
 
 `src/patterns/data-status.ts` accepts an explicit data directory and reports

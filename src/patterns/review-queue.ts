@@ -1,5 +1,6 @@
 import type { CatalogRow, PatternCatalog } from "./catalog.js";
 import type { OverlayCoverageReport, OverlayCoverageStatus } from "./overlay-coverage.js";
+import { REQUIRED_REVIEW_FIELDS } from "./review-metadata.js";
 
 /** A body-free, read-only account metadata review handoff. */
 export const ACCOUNT_REVIEW_QUEUE_VERSION = "account-review-queue-v1" as const;
@@ -43,7 +44,7 @@ const EMPTY_COVERAGE = (currentAccountKey: string): OverlayCoverageReport["rows"
   status: "unmapped",
   stableId: null,
   stableIdPresent: false,
-  missingRequiredOverlayFields: [],
+  missingRequiredOverlayFields: [...REQUIRED_REVIEW_FIELDS],
   comparisonEvidenceReady: false,
 });
 
@@ -102,7 +103,11 @@ export function buildReviewQueue(input: ReviewQueueInput): ReviewQueueArtifact {
   const rows = keys.map((currentAccountKey): ReviewQueueRow => {
     const catalogRow = catalogByKey.get(currentAccountKey)!;
     const coverageRow = coverageByKey.get(currentAccountKey) ?? EMPTY_COVERAGE(currentAccountKey);
-    const missingRequiredOverlayFields = [...new Set(coverageRow.missingRequiredOverlayFields)].sort(compareValues);
+    const missingRequiredOverlayFields = [...new Set(
+      coverageRow.status === "unmapped" && coverageRow.missingRequiredOverlayFields.length === 0
+        ? REQUIRED_REVIEW_FIELDS
+        : coverageRow.missingRequiredOverlayFields,
+    )].sort(compareValues);
     return {
       currentAccountKey,
       platform: catalogRow.platform,

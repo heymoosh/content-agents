@@ -361,8 +361,10 @@ is the account/example navigation table requested for both niche and broad-platf
 preserves explicit pool, topic, focus, platform, medium, format, audience-size, scope, evidence,
 caveat, and review fields while keeping incomplete rows blocked. `src/patterns/review-queue.ts`
 turns the overlay coverage into one actionable, body-free row per current account key without
-inventing review metadata. These are typed operator seams, not proof that the live corpus has been
-reviewed or that the app is wired end to end.
+inventing review metadata. `src/patterns/review-status.ts` is the read-only operator entry point
+that validates an explicit review JSON input and exposes the account metadata table; it does not
+write or infer review values. These are typed operator seams, not proof that the live corpus has
+been reviewed or that the app is wired end to end.
 `src/patterns/overlay-coverage.ts` reports the explicit per-account mapping status and missing
 fields; `src/grow/queue-facts.ts` normalizes supplied queue/scheduler facts without filesystem
 writes; `src/grow/live-facts.ts` adapts existing queue rows and scheduler claims into that boundary
@@ -372,6 +374,8 @@ machine-checkable without asserting that their live producers exist; `src/grow/g
 describes deterministic platform/format experiment fan-out with mad-lib hook-template reuse and no
 body copy; and `src/grow/venture-handoff.ts` keeps the Signals-to-Venture view behind both human
 gates. `src/agents/skill-invocation.ts` records key-only readiness for one declared skill contract.
+`src/patterns/review-pool-coverage.ts` counts only explicit reviewed pool labels and keeps the
+metadata-only boundary visible.
 `src/patterns/data-status.ts` provides a metadata-only, read-only report over an explicit
 gitignored data directory so file availability and counts cannot be confused with reviewed account
 metadata or proof of platform-wide best content.
@@ -533,9 +537,9 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, `src/grow/delivery-record.ts` blocks delivery without it, `src/grow/queue-facts.ts` normalizes facts, `src/grow/live-facts.ts` adapts existing queue/scheduler records, `src/grow/live-reconciliation.ts` composes them without inference, and `src/grow/reconciliation.ts` reports drift without repairing it | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
 | Phase contracts | `src/blueprint/phase-contracts.ts` provides deterministic contract definitions and fact evaluation, while live producers and reviewed data remain separate | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` emit a deterministic descriptive report; `src/patterns/operator-readiness.ts` adds deterministic ready/blocked coverage by pool, platform, medium, format, and gap | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
-| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, `src/patterns/overlay-coverage.ts` reports per-key mapping status, and `src/patterns/review-queue.ts` emits the actionable body-free review handoff; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
+| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, `src/patterns/comparison-readiness.ts` joins them to source/post evidence, `src/patterns/account-table.ts` produces the body-free account/example table, `src/patterns/overlay-coverage.ts` reports per-key mapping status, `src/patterns/review-queue.ts` emits the actionable body-free review handoff, and `npm run patterns:review-status` exposes the validated metadata table; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; comparison readiness now checks explicit memberships and evidence scopes while keeping missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
-| Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
+| Research pools | Niche, broad, and format distinction documented; `src/patterns/review-pool-coverage.ts` reports only explicit reviewed labels and keeps metadata coverage separate from comparison readiness; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables, `src/grow/experiment-record.ts` adds scoped records, and `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
 | Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet, `src/grow/comment-learning.ts`, and `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |

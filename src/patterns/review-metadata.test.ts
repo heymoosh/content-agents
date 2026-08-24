@@ -130,6 +130,13 @@ test("keeps explicit nulls and reports them as deterministic readiness blockers"
   assert.deepEqual(merged.readiness.blockingFields, result.blockingFields);
 });
 
+test("requires a stable account identity before a row can be reviewed", () => {
+  const result = validateReviewMetadata(review({ stableAccountId: null, stableAccountIdStatus: "needs-review" }));
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.blockingFields, ["stableAccountId"]);
+});
+
 test("rejects unsupported pools instead of dropping or inferring membership", () => {
   const result = validateReviewMetadata(review({
     researchPoolMembership: [{ pool: "viral" as never, reason: "Fixture must be rejected." }],

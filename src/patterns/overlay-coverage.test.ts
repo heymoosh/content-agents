@@ -50,6 +50,7 @@ test("reports a complete reviewed mapping and linked evidence readiness", () => 
 test("reports missing current mappings and metadata rows that cannot be mapped", () => {
   const result = buildOverlayCoverage({ catalog: [catalogRow("fixture|alpha"), catalogRow("fixture|zeta")], reviews: [review("fixture|orphan")] });
   assert.deepEqual(result.rows.map((row) => [row.currentAccountKey, row.status]), [["fixture|alpha", "unmapped"], ["fixture|zeta", "unmapped"]]);
+  assert.ok(result.rows.every((row) => row.missingRequiredOverlayFields.includes("stableAccountId") && row.missingRequiredOverlayFields.includes("researchPoolMembership")));
   assert.deepEqual(result.missingMappings, ["fixture|alpha", "fixture|zeta"]);
   assert.deepEqual(result.unmappedMetadataRows, ["fixture|orphan"]);
 });
