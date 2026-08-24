@@ -45,3 +45,22 @@ export {
   type ExperimentStatus,
   type OutcomeFamily,
 } from "./experiment-record.js";
+
+export {
+  buildGrowDeliveryRecord,
+  createGrowDeliveryRecord,
+  type GrowDeliveryCandidate,
+  type GrowDeliveryInput,
+  type GrowDeliveryLineage,
+  type GrowDeliveryRecord,
+  type GrowDeliveryStatus,
+} from "./delivery-record.js";
+
+export {
+  buildExperimentOutcomeLedger,
+  createExperimentOutcomeLedger,
+  type ExperimentDeclaredObservation,
+  type ExperimentOutcomeLedger,
+  type ExperimentOutcomeLedgerInput,
+  type ExperimentOutcomeLink,
+} from "./experiment-outcomes.js";

@@ -140,6 +140,14 @@ source body. It may emit one row per explicitly reasoned pool membership. A
 human comparison; it is not a winner claim, a pattern approval, or permission
 to reuse creator wording.
 
+`src/patterns/comparison-readiness.ts` is the pure join boundary from reviewed
+account metadata to source/post evidence. It checks that platform, medium,
+format, and explicit pool membership agree, and independently re-validates the
+complete source-evidence identity, scope, provenance, dates, audience, metric,
+caveat, body-completeness, and lineage fields. It preserves blocked rows for
+human review. Its output contains no body text, never assigns a pool from a
+rank or name, and cannot select a winner or authorize generation.
+
 ### `claim` (scaffolded)
 
 Owner: `muxin` for final assertion; `system` may extract a candidate.
@@ -251,6 +259,15 @@ counts, review capacity, slot capacity, scheduled count, pauses, rollback
 conditions, and gap reasons. Missing placement or slot data stays blocked or
 `null`; the manifest does not approve, schedule, publish, or create content.
 
+`src/grow/delivery-record.ts` joins an already-approved review bundle to a
+capacity slice, an explicit candidate roster, and delivery facts. It requires
+Muxin's approval, complete source/cut/variant/experiment lineage, an explicit
+variant for multi-variant bundles, a remaining slot before scheduling, publish
+evidence declared by the bundle before `published`, and outcome references
+before `measured`. It exposes `autoScheduling: false`, `autoPublishing: false`,
+and `sideEffects: none`; it does not claim a slot or call a queue, scheduler,
+or publisher.
+
 ### `experiment` (scaffolded; typed deterministic record exists)
 
 The typed adapter in `src/grow/experiment-record.ts` normalizes one question,
@@ -275,6 +292,17 @@ start_at, end_at, variant_refs, outcome_refs, status, lineage
 `comparison` names the control or baseline and treatment. It must not compare
 selected winners to selected winners without a denominator. `status` is
 `proposed`, `running`, `closed`, or `insufficient-evidence`.
+
+`src/grow/experiment-outcomes.ts` is the pure measurement join from an
+experiment to normalized comment, funnel, and business records, with an
+optional Venture proposal reference. Comments, audience/funnel events, and
+business outcomes stay in separate families; evidence refs and caveats are
+preserved and source/variant/experiment lineage is checked exactly. The ledger
+does not infer a winner, close an experiment, interpret a comment as demand,
+or write to Signals, Venture, the review queue, or publishing. `ready` means
+only that linked rows are lineage- and evidence-valid; it does not mean the
+declared success observations are measured or that the experiment has
+concluded.
 
 ## 3. Conversation records and human reply gate
 

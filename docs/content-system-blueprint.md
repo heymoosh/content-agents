@@ -6,11 +6,12 @@ learnable set of platform treatments. It is not an autopilot, a universal virali
 claim that the current corpus is comprehensive.
 
 **Next increment status:** The human-reviewed account metadata overlay and the source/post-level
-pool-evidence boundary are scaffolded. Typed source-evidence, Grow-variant, review-bundle,
-capacity, experiment-record, and learning-packet adapters now make the next joins explicit, but
-current live rows remain blocked for pool comparison until real reviewed metadata is entered. The
-new Grow artifacts are planning and accounting seams, not copy generation or delivery. This
-document describes the target contract; it does not make existing rows reviewed by inference.
+pool-evidence boundary are scaffolded. Typed source-evidence, comparison-readiness, Grow-variant,
+review-bundle, capacity, delivery, experiment-outcome, experiment-record, and learning-packet
+adapters now make the next joins explicit, but current live rows remain blocked for pool comparison
+until real reviewed metadata is entered. The new Grow artifacts are planning, measurement, and
+delivery-readiness seams, not copy generation or automatic publishing. This document describes
+the target contract; it does not make existing rows reviewed by inference.
 
 ## 1. What the system must do
 
@@ -483,15 +484,15 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Corpus | 292 entries across 13 corpus platforms | Normalized source/account/evidence catalog with queryable pool membership | Partial |
 | Patterns | 31 hook patterns | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
-| Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions | Connect the accounting view to live review and scheduler records without allowing it to approve or publish | Partial |
-| Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` emits provisional no-copy candidate specifications with evidence/review metadata | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
-| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit for a reference bundle | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
+| Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it | Connect the accounting view to live review and scheduler records without allowing it to approve or publish | Partial |
+| Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` emits provisional no-copy candidate specifications, while delivery and outcome ledgers preserve the later handoff | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
+| Review gate | Human review and publish approval already required; `src/grow/review-bundle.ts` makes evidence, readiness, and Muxin's decision explicit, and `src/grow/delivery-record.ts` blocks delivery without it | Connect the bundle to the review queue and delivery records while retaining per-artifact approval | Partial |
 | Phase contracts | This blueprint names broad phase outcomes; `docs/content-system-contracts.md` is a scaffolded documentation contract, not an implemented runtime contract | The contracts document records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Scaffolded |
 | Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` now emit a deterministic descriptive report over the catalog; it is a scaffold, not a completeness claim | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
-| Account metadata overlay | Current account keys and partial source metadata exist, but the requested account table is not a reviewed overlay | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
-| Pool-evidence inventory | `pool-evidence-inventory-v1` is specified as a deterministic, scaffolded/provisional artifact from `src/patterns/pool-evidence.ts`; explicit memberships are retained and missing pool metadata is blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
+| Account metadata overlay | `src/patterns/review-metadata.ts` validates human-reviewed account rows, and `src/patterns/comparison-readiness.ts` joins them to source/post evidence; live rows are still not reviewed | Human-reviewed rows for account, audience snapshot, topic/focus, platform, medium/format, pool, scope, evidence links, caveats, and review status | Scaffolded |
+| Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; comparison readiness now checks explicit memberships and evidence scopes while keeping missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; the inventory scaffold preserves the distinction without inferring membership; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
-| Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables and `src/grow/experiment-record.ts` adds scoped, deterministic outcome records | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
+| Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables, `src/grow/experiment-record.ts` adds scoped records, and `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
 | Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet preserves qualified observations and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
 | Model boundaries | Subscription-first and human approval rules exist | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
