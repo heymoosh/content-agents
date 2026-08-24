@@ -755,6 +755,27 @@ sample adapter does not fetch `/new`, append `baselines.jsonl`, or establish a
 winner claim; the actual collector remains the separately authorized measurement
 step.
 
+`src/patterns/baseline-repo-report.ts` and `npm run patterns:baseline-repo` apply
+the same gap contract to the configured `PatternMiningConfig` account seeds and
+the current explicit baseline ledger. The command is read-only and reports
+configured accounts with an unconfirmed `handle: null` as explicit
+`handle_not_confirmed` blockers. It does not discard them silently, and it does
+not call a null handle a baseline gap that can be measured.
+
+### `platform_pool_matrix` (scaffolded; explicit coverage accounting)
+
+`src/patterns/platform-pool-matrix.ts` groups explicit target rows by platform,
+research pool (`niche`, `broad`, or `format`), medium, and format. It counts
+configured, collected, reviewed, baseline-ready, blocked, and unreviewed rows
+and keeps each gap dimension visible. It does not infer missing labels from a
+niche, account name, or platform and does not rank creators.
+
+`src/patterns/platform-pool-matrix-cli.ts` and
+`npm run patterns:platform-pool-matrix` accept an explicit target array (or
+`{ targets }` envelope) and render deterministic JSON, Markdown, or both. The
+command is stdout-only and body-free; a later repo adapter may populate its
+explicit target rows from reviewed catalog and evidence facts.
+
 ### `review_session` (scaffolded; human handoff only)
 
 `src/patterns/review-session.ts` joins an explicit `account_review_queue_batch`
