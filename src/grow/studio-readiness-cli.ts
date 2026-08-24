@@ -3,13 +3,16 @@ import { pathToFileURL } from "node:url";
 
 import { buildCommentLearningView, type CommentLearningView } from "./comment-learning.js";
 import { buildGrowDeliveryRecord, type GrowDeliveryRecord } from "./delivery-record.js";
-import { createGenerationBrief, type GenerationBrief } from "./generation-brief.js";
+import { createGenerationBrief, GENERATION_BRIEF_VERSION, type GenerationBrief } from "./generation-brief.js";
 import { buildGrowReviewBundle, type GrowReviewBundle } from "./review-bundle.js";
 import {
   buildStudioReadiness,
+  type StudioReadinessGenerationRun,
   type StudioReadiness,
   type StudioReadinessInput,
   type StudioReadinessStageProjection,
+  type StudioReadinessTreatmentCoverage,
+  type StudioReadinessVolumePlan,
 } from "./studio-readiness.js";
 
 export const STUDIO_READINESS_CLI_VERSION = "studio-readiness-cli-v1" as const;
@@ -76,7 +79,24 @@ function isBuilt(value: unknown, kind: string): boolean {
 
 function brief(value: unknown): GenerationBrief | null {
   if (value === undefined || value === null) return null;
-  if (isBuilt(value, "generation_brief")) return value as GenerationBrief;
+  const source = record(value, "generationBrief");
+  const appearsBuilt = Object.hasOwn(source, "version")
+    || Object.hasOwn(source, "variants")
+    || Object.hasOwn(source, "kind");
+  if (appearsBuilt) {
+    if (source.kind !== undefined && source.kind !== "generation_brief") fail("generation brief kind must be generation_brief");
+    if (source.version !== GENERATION_BRIEF_VERSION) fail(`generation brief version must be ${GENERATION_BRIEF_VERSION}`);
+    if (!Array.isArray(source.variants)) fail("built generation brief variants must be an array");
+    if (source.generatesCopy !== false) fail("built generation brief must not generate copy");
+    if (source.sideEffects !== "none") fail("built generation brief must have no side effects");
+    const templatePolicy = record(source.templateReusePolicy, "built generation brief templateReusePolicy");
+    if (templatePolicy.creatorBodyCopy !== "forbidden") fail("built generation brief must forbid creator body copy");
+    const modelBoundary = record(source.modelBoundary, "built generation brief modelBoundary");
+    if (modelBoundary.modelInvocation !== "deferred" || modelBoundary.sideEffects !== "none") {
+      fail("built generation brief model boundary is unsafe");
+    }
+    return source as unknown as GenerationBrief;
+  }
   try { return createGenerationBrief(record(value, "generationBrief") as never); }
   catch (error) { fail(`generation brief: ${error instanceof Error ? error.message : String(error)}`); }
 }
@@ -103,16 +123,130 @@ function learning(value: unknown): CommentLearningView | null {
   catch (error) { fail(`learning packet: ${error instanceof Error ? error.message : String(error)}`); }
 }
 
+function optionalArray(value: unknown, field: string): void {
+  if (value !== undefined && !Array.isArray(value)) fail(`${field} must be an array`);
+}
+
+function optionalBoolean(value: unknown, field: string): void {
+  if (value !== undefined && typeof value !== "boolean") fail(`${field} must be a boolean`);
+}
+
+function readinessObject(value: unknown, field: string): Record<string, unknown> | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") {
+    if (value !== "ready" && value !== "blocked") fail(`${field} status must be ready or blocked`);
+    return null;
+  }
+  const result = record(value, field);
+  if (result.status !== undefined && result.status !== "ready" && result.status !== "blocked") {
+    fail(`${field} status must be ready or blocked`);
+  }
+  if (Object.hasOwn(result, "blockers")) optionalArray(result.blockers, `${field} blockers`);
+  return result;
+}
+
+function volumePlan(value: unknown): StudioReadinessVolumePlan | null {
+  if (value === undefined || value === null) return null;
+  const plan = record(value, "volumePlan");
+  if (Object.hasOwn(plan, "slots") && !Array.isArray(plan.slots)) {
+    fail("volume plan slots must be an array");
+  }
+  for (const [index, slot] of (plan.slots as unknown[] | undefined ?? []).entries()) {
+    const slotRecord = record(slot, `volume plan slot ${index + 1}`);
+    if (Object.hasOwn(slotRecord, "blockers")) optionalArray(slotRecord.blockers, `volume plan slot ${index + 1} blockers`);
+    readinessObject(slotRecord.readiness, `volume plan slot ${index + 1} readiness`);
+    optionalBoolean(slotRecord.humanReviewRequired, `volume plan slot ${index + 1} humanReviewRequired`);
+  }
+  optionalBoolean(plan.humanReviewRequired, "volume plan humanReviewRequired");
+  optionalBoolean(plan.generatesCopy, "volume plan generatesCopy");
+  optionalBoolean(plan.creatorBodyCopyAllowed, "volume plan creatorBodyCopyAllowed");
+  if (plan.sideEffects !== undefined && plan.sideEffects !== "none") fail("volume plan sideEffects must be none");
+  return plan as StudioReadinessVolumePlan;
+}
+
+function generationRun(value: unknown): StudioReadinessGenerationRun | null {
+  if (value === undefined || value === null) return null;
+  const run = record(value, "generationRunManifest");
+  if (Object.hasOwn(run, "rows") && !Array.isArray(run.rows)) {
+    fail("generation run rows must be an array");
+  }
+  const rows = (run.rows as unknown[] | undefined) ?? [];
+  for (const [index, row] of rows.entries()) {
+    const rowRecord = record(row, `generation run row ${index + 1}`);
+    const readiness = rowRecord.readiness;
+    const readinessStatus = readiness !== null && typeof readiness === "object" && !Array.isArray(readiness)
+      ? (readiness as Record<string, unknown>).status
+      : undefined;
+    if (typeof rowRecord.status !== "string" && typeof readinessStatus !== "string") {
+      fail(`generation run row ${index + 1} must contain a status`);
+    }
+    if (Object.hasOwn(rowRecord, "blockers")) optionalArray(rowRecord.blockers, `generation run row ${index + 1} blockers`);
+    readinessObject(rowRecord.readiness, `generation run row ${index + 1} readiness`);
+    optionalBoolean(rowRecord.humanReviewRequired, `generation run row ${index + 1} humanReviewRequired`);
+  }
+  const coverage = run.coverage;
+  if (coverage !== undefined) {
+    const coverageRecord = record(coverage, "generation run coverage");
+    for (const field of ["expectedVariantIds", "generatedVariantIds", "duplicateVariantIds", "missingVariantIds", "blockers"]) {
+      if (Object.hasOwn(coverageRecord, field)) optionalArray(coverageRecord[field], `generation run coverage ${field}`);
+    }
+    if (coverageRecord.status !== undefined && coverageRecord.status !== "complete") {
+      fail("generation run coverage status must be complete");
+    }
+    optionalBoolean(coverageRecord.oneToOne, "generation run coverage oneToOne");
+  }
+  optionalBoolean(run.humanReviewRequired, "generation run humanReviewRequired");
+  optionalBoolean(run.generatesCopy, "generation run generatesCopy");
+  optionalBoolean(run.creatorBodyCopyAllowed, "generation run creatorBodyCopyAllowed");
+  optionalBoolean(run.autoApproval, "generation run autoApproval");
+  optionalBoolean(run.autoScheduling, "generation run autoScheduling");
+  optionalBoolean(run.autoPublishing, "generation run autoPublishing");
+  if (run.sideEffects !== undefined && run.sideEffects !== "none") fail("generation run sideEffects must be none");
+  return run as StudioReadinessGenerationRun;
+}
+
+function treatmentCoverage(value: unknown): StudioReadinessTreatmentCoverage | null {
+  if (value === undefined || value === null) return null;
+  const coverage = record(value, "treatmentCoverage");
+  if (coverage.kind !== undefined && coverage.kind !== "grow_treatment_coverage") {
+    fail("treatment coverage kind must be grow_treatment_coverage");
+  }
+  if (coverage.version !== undefined && coverage.version !== "grow-treatment-coverage-v1") {
+    fail("treatment coverage version must be grow-treatment-coverage-v1");
+  }
+  const built = coverage.kind === "grow_treatment_coverage" || coverage.version === "grow-treatment-coverage-v1";
+  const readiness = record(coverage.readiness, "treatment coverage readiness");
+  if (readiness.status !== "ready" && readiness.status !== "blocked") fail("treatment coverage readiness status must be ready or blocked");
+  if (Object.hasOwn(readiness, "blockers")) optionalArray(readiness.blockers, "treatment coverage readiness blockers");
+  optionalBoolean(coverage.generatesCopy, "treatment coverage generatesCopy");
+  optionalBoolean(coverage.creatorBodyCopyAllowed, "treatment coverage creatorBodyCopyAllowed");
+  optionalBoolean(coverage.bodyFree, "treatment coverage bodyFree");
+  if (coverage.sideEffects !== undefined && coverage.sideEffects !== "none") fail("treatment coverage sideEffects must be none");
+  if (built && coverage.generatesCopy !== false) fail("built treatment coverage must not generate copy");
+  if (built && coverage.creatorBodyCopyAllowed !== false) fail("built treatment coverage must not allow creator body copy");
+  if (built && coverage.sideEffects !== "none") fail("built treatment coverage must have no side effects");
+  return coverage as unknown as StudioReadinessTreatmentCoverage;
+}
+
 /** Parse the body-free operator envelope and feed only metadata to existing readiness builders. */
 export function loadStudioReadinessEnvelope(raw: string): StudioReadinessInput {
   const input = jsonEnvelope(raw);
   const briefValue = input.generationBrief ?? input.brief;
+  const coverageValue = input.treatmentCoverage ?? input.coverage ?? input.treatmentCoverageView;
+  const volumeValue = input.volumePlan ?? input.volume ?? input.volumePlanManifest;
+  const generationValue = input.generationRunManifest
+    ?? input.generationRun
+    ?? input.generationManifest
+    ?? input.generation;
   const reviewValue = input.reviewBundle ?? input.reviewProjection ?? input.review;
   const deliveryValue = input.deliveryRecord ?? input.delivery;
   const learningValue = input.learningPacket ?? input.learning ?? input.commentLearningView ?? input.commentLearning;
   return {
     sourceStatus: sourceStatus(input.sourceStatus ?? input.source),
     brief: brief(briefValue),
+    treatmentCoverage: treatmentCoverage(coverageValue),
+    volumePlan: volumePlan(volumeValue),
+    generationRunManifest: generationRun(generationValue),
     reviewBundle: review(reviewValue),
     delivery: delivery(deliveryValue),
     learning: learning(learningValue),

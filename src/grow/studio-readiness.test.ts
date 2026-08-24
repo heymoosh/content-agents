@@ -60,9 +60,161 @@ const learning = buildCommentLearningView({
   muxinDecision: "adopted",
 });
 
-function stage(result: StudioReadiness, name: "source" | "brief" | "review" | "delivery" | "learning") {
+const volumePlan = {
+  sourceReference: "source:essay-1",
+  substanceReference: "substance:essay-1",
+  slots: [{
+    platform: "linkedin",
+    dayIndex: 0,
+    slotIndex: 0,
+    variantId: "variant-1",
+    experimentAssignment: null,
+    readiness: "ready" as const,
+    blockers: [],
+    humanReviewRequired: true as const,
+    humanGate: { required: true as const, before: "publish" as const, approvalOwner: "human" as const, status: "pending" as const },
+  }],
+  humanReviewRequired: true as const,
+  generatesCopy: false as const,
+  sideEffects: "none" as const,
+};
+
+const treatmentCoverage = {
+  readiness: { status: "ready" as const, blockers: [] },
+  generatesCopy: false as const,
+  creatorBodyCopyAllowed: false as const,
+  sideEffects: "none" as const,
+};
+
+const generationRunManifest = {
+  coverage: {
+    status: "complete" as const,
+    expectedVariantIds: ["variant-1"],
+    generatedVariantIds: ["variant-1"],
+    duplicateVariantIds: [],
+    missingVariantIds: [],
+  },
+  rows: [{ variantId: "variant-1", status: "ready" as const, blockers: [] }],
+  humanReviewRequired: true as const,
+  generatesCopy: false as const,
+  sideEffects: "none" as const,
+  autoApproval: false as const,
+  autoScheduling: false as const,
+  autoPublishing: false as const,
+};
+
+function stage(result: StudioReadiness, name: "source" | "brief" | "treatment-coverage" | "volume" | "generation" | "review" | "delivery" | "learning") {
   return result.stages.find((entry) => entry.stage === name);
 }
+
+test("adds explicitly blocked volume and generation stages for legacy input", () => {
+  const result = buildStudioReadiness({ sourceStatus: "ready", brief, reviewBundle: approvedReview, delivery, learning });
+
+  assert.deepEqual(result.stages.map(({ stage: name, status }) => ({ name, status })), [
+    { name: "source", status: "ready" },
+    { name: "brief", status: "ready" },
+    { name: "treatment-coverage", status: "blocked" },
+    { name: "volume", status: "blocked" },
+    { name: "generation", status: "blocked" },
+    { name: "review", status: "ready" },
+    { name: "delivery", status: "ready" },
+    { name: "learning", status: "ready" },
+  ]);
+  assert.deepEqual(stage(result, "volume")?.blockers, ["volume plan is missing"]);
+  assert.deepEqual(stage(result, "generation")?.blockers, ["generation run manifest is missing"]);
+  assert.deepEqual(stage(result, "treatment-coverage")?.blockers, ["treatment coverage is missing"]);
+});
+
+test("accepts explicit ready volume and generation aliases in lifecycle order", () => {
+  const result = buildStudioReadiness({
+    sourceStatus: "ready",
+    brief,
+    treatmentCoverage,
+    volumePlan,
+    generationRunManifest,
+    reviewBundle: approvedReview,
+    delivery,
+    learning,
+  });
+
+  assert.deepEqual(result.stages.map(({ stage: name, status }) => ({ name, status })), [
+    { name: "source", status: "ready" },
+    { name: "brief", status: "ready" },
+    { name: "treatment-coverage", status: "ready" },
+    { name: "volume", status: "ready" },
+    { name: "generation", status: "ready" },
+    { name: "review", status: "ready" },
+    { name: "delivery", status: "ready" },
+    { name: "learning", status: "ready" },
+  ]);
+  assert.equal(result.gates.volume.status, "pending");
+  assert.equal(result.gates.generation.status, "pending");
+  assert.equal(result.readiness.status, "ready");
+});
+
+test("blocks volume and generation on explicit readiness and one-to-one coverage gaps", () => {
+  const result = buildStudioReadiness({
+    sourceStatus: "ready",
+    brief,
+    treatmentCoverage,
+    volumePlan: {
+      ...volumePlan,
+      slots: [{ ...volumePlan.slots[0], readiness: "blocked", blockers: ["slot review pending"] }],
+    },
+    generationRunManifest: {
+      ...generationRunManifest,
+      coverage: {
+        ...generationRunManifest.coverage,
+        status: "incomplete",
+        generatedVariantIds: [],
+        missingVariantIds: ["variant-1"],
+      },
+      rows: [{ variantId: "variant-1", status: "blocked", blockers: ["generation row blocked"] }],
+    },
+    reviewBundle: approvedReview,
+    delivery,
+    learning,
+  });
+
+  assert.deepEqual(stage(result, "volume")?.blockers, ["slot review pending"]);
+  assert.equal(stage(result, "generation")?.status, "blocked");
+  assert.ok(stage(result, "generation")?.blockers.includes("generation row blocked"));
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run coverage is incomplete"));
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run coverage is not one-to-one"));
+  assert.deepEqual(stage(result, "generation")?.blockers, [...(stage(result, "generation")?.blockers ?? [])].sort());
+});
+
+test("fails closed at volume and generation safety boundaries", () => {
+  const result = buildStudioReadiness({
+    sourceStatus: "ready",
+    brief,
+    treatmentCoverage,
+    volumePlan: { ...volumePlan, generatesCopy: true, sideEffects: "writes-queue" },
+    generationRunManifest: {
+      ...generationRunManifest,
+      humanReviewRequired: false,
+      generatesCopy: true,
+      sideEffects: "invokes-model",
+      autoApproval: true,
+      autoScheduling: true,
+      autoPublishing: true,
+    },
+    reviewBundle: approvedReview,
+    delivery,
+    learning,
+  });
+
+  assert.equal(stage(result, "volume")?.status, "blocked");
+  assert.ok(stage(result, "volume")?.blockers.includes("volume plan must not generate copy"));
+  assert.ok(stage(result, "volume")?.blockers.includes("volume plan has side effects"));
+  assert.equal(stage(result, "generation")?.status, "blocked");
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run must require human review"));
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run must not generate copy"));
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run has side effects"));
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run permits auto-approval"));
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run permits auto-scheduling"));
+  assert.ok(stage(result, "generation")?.blockers.includes("generation run permits auto-publishing"));
+});
 
 test("keeps a missing brief blocked even when later facts are supplied", () => {
   const result = buildStudioReadiness({
@@ -116,6 +268,7 @@ test("does not treat an approved review as delivery readiness", () => {
   const result = buildStudioReadiness({
     sourceStatus: "ready",
     brief,
+    treatmentCoverage,
     reviewBundle: approvedReview,
     learning,
   });
@@ -148,6 +301,9 @@ test("returns deterministic stages and human gates for fully explicit input", ()
   const input = {
     sourceStatus: "ready" as const,
     brief,
+    treatmentCoverage,
+    volumePlan,
+    generationRunManifest,
     reviewBundle: approvedReview,
     delivery,
     learning,
@@ -159,6 +315,9 @@ test("returns deterministic stages and human gates for fully explicit input", ()
   assert.deepEqual(first.stages.map(({ stage: name, status, blockers }) => ({ name, status, blockers })), [
     { name: "source", status: "ready", blockers: [] },
     { name: "brief", status: "ready", blockers: [] },
+    { name: "treatment-coverage", status: "ready", blockers: [] },
+    { name: "volume", status: "ready", blockers: [] },
+    { name: "generation", status: "ready", blockers: [] },
     { name: "review", status: "ready", blockers: [] },
     { name: "delivery", status: "ready", blockers: [] },
     { name: "learning", status: "ready", blockers: [] },

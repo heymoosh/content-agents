@@ -6,9 +6,96 @@ import type { GrowReviewBundle } from "./review-bundle.js";
 /** A body-free aggregate of already-produced Studio lifecycle facts. */
 export const STUDIO_READINESS_VERSION = "studio-readiness-v1" as const;
 
-export type StudioReadinessStage = "source" | "brief" | "review" | "delivery" | "learning";
+export type StudioReadinessStage = "source" | "brief" | "treatment-coverage" | "volume" | "generation" | "review" | "delivery" | "learning";
 export type StudioReadinessStatus = "ready" | "blocked";
 export type StudioHumanGateStatus = "pending" | "approved" | "rejected" | "needs-another-pass";
+
+export interface StudioReadinessHumanGateFact {
+  readonly required?: boolean;
+  readonly before?: string;
+  readonly approvalOwner?: string;
+  readonly status?: string;
+}
+
+export interface StudioReadinessVolumeSlot {
+  readonly id?: string | null;
+  readonly slotId?: string | null;
+  readonly slotKey?: string | null;
+  readonly platform?: string | null;
+  readonly dayIndex?: number | null;
+  readonly slotIndex?: number | null;
+  readonly variantId?: string | null;
+  readonly readiness?: "ready" | "blocked" | { readonly status?: string; readonly blockers?: readonly string[] };
+  readonly status?: "ready" | "blocked" | string;
+  readonly blockers?: readonly string[];
+  readonly humanReviewRequired?: boolean;
+  readonly humanGate?: StudioReadinessHumanGateFact;
+}
+
+/** Minimal structural seam for the body-free volume-plan artifact. */
+export interface StudioReadinessVolumePlan {
+  readonly slots?: readonly StudioReadinessVolumeSlot[];
+  readonly humanReviewRequired?: boolean;
+  readonly humanGate?: StudioReadinessHumanGateFact;
+  readonly generatesCopy?: boolean;
+  readonly creatorBodyCopyAllowed?: boolean;
+  readonly sideEffects?: string;
+}
+
+/** Structural seam for an already-produced, body-free treatment coverage report. */
+export interface StudioReadinessTreatmentCoverage {
+  readonly readiness?: {
+    readonly status?: string;
+    readonly blockers?: readonly string[];
+  } | null;
+  readonly generatesCopy?: boolean;
+  readonly creatorBodyCopyAllowed?: boolean;
+  readonly bodyFree?: boolean;
+  readonly sideEffects?: string;
+}
+
+export interface StudioReadinessGenerationCoverage {
+  readonly status?: string;
+  readonly oneToOne?: boolean;
+  readonly one_to_one?: boolean;
+  readonly expectedVariantIds?: readonly string[];
+  readonly generatedVariantIds?: readonly string[];
+  readonly duplicateVariantIds?: readonly string[];
+  readonly missingVariantIds?: readonly string[];
+  readonly blockers?: readonly string[];
+}
+
+export interface StudioReadinessGenerationRow {
+  readonly id?: string | null;
+  readonly slotId?: string | null;
+  readonly slotKey?: string | null;
+  readonly volumeSlotId?: string | null;
+  readonly volumePlanSlotId?: string | null;
+  readonly variantId?: string | null;
+  readonly platform?: string | null;
+  readonly dayIndex?: number | null;
+  readonly slotIndex?: number | null;
+  readonly status?: string;
+  readonly readiness?: { readonly status?: string; readonly blockers?: readonly string[] } | string;
+  readonly blockers?: readonly string[];
+  readonly humanReviewRequired?: boolean;
+  readonly humanGate?: StudioReadinessHumanGateFact;
+}
+
+/** Minimal structural seam for the forthcoming generation-run manifest. */
+export interface StudioReadinessGenerationRun {
+  readonly rows?: readonly StudioReadinessGenerationRow[];
+  readonly coverage?: StudioReadinessGenerationCoverage;
+  readonly humanReviewRequired?: boolean;
+  readonly reviewGate?: StudioReadinessHumanGateFact;
+  readonly humanGate?: StudioReadinessHumanGateFact;
+  readonly generatesCopy?: boolean;
+  readonly creatorBodyCopyAllowed?: boolean;
+  readonly sideEffects?: string;
+  readonly autoApproval?: boolean;
+  readonly autoScheduling?: boolean;
+  readonly autoPublishing?: boolean;
+}
 
 export interface StudioReadinessInput {
   /** Source readiness is always caller-supplied; the aggregate never classifies a source. */
@@ -16,6 +103,19 @@ export interface StudioReadinessInput {
   /** `generationBrief` is an explicit alias for callers that prefer the type name. */
   readonly brief?: GenerationBrief | null;
   readonly generationBrief?: GenerationBrief | null;
+  /** `treatmentCoverage` is canonical; `coverage` and `treatmentCoverageView` are aliases. */
+  readonly treatmentCoverage?: StudioReadinessTreatmentCoverage | null;
+  readonly coverage?: StudioReadinessTreatmentCoverage | null;
+  readonly treatmentCoverageView?: StudioReadinessTreatmentCoverage | null;
+  /** `volumePlan` and `volume` are explicit aliases for the body-free volume allocation. */
+  readonly volumePlan?: StudioReadinessVolumePlan | null;
+  readonly volume?: StudioReadinessVolumePlan | null;
+  readonly volumePlanManifest?: StudioReadinessVolumePlan | null;
+  /** `generationRunManifest`, `generationRun`, and `generation` are explicit aliases. */
+  readonly generationRunManifest?: StudioReadinessGenerationRun | null;
+  readonly generationRun?: StudioReadinessGenerationRun | null;
+  readonly generationManifest?: StudioReadinessGenerationRun | null;
+  readonly generation?: StudioReadinessGenerationRun | null;
   /** `review` is an explicit alias for callers that prefer the stage name. */
   readonly review?: GrowReviewBundle | null;
   readonly reviewBundle?: GrowReviewBundle | null;
@@ -45,6 +145,9 @@ export interface StudioReadiness {
   readonly stages: StudioReadinessStageProjection[];
   readonly gates: {
     readonly brief: StudioHumanGate;
+    readonly treatmentCoverage: StudioHumanGate;
+    readonly volume: StudioHumanGate;
+    readonly generation: StudioHumanGate;
     readonly review: StudioHumanGate;
     readonly delivery: StudioHumanGate;
     readonly learning: StudioHumanGate;
@@ -107,6 +210,197 @@ function briefStage(brief: GenerationBrief | null): StudioReadinessStageProjecti
   if (brief.modelBoundary?.boundaries?.composesBody !== false) blockers.push("generation model boundary composes body copy");
   if (brief.modelBoundary?.boundaries?.creatorBodyCopyAllowed !== false) blockers.push("generation model boundary allows creator body copy");
   return stage("brief", blockers.length === 0 ? "ready" : "blocked", blockers);
+}
+
+function stringStatus(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const status = (value as { status?: unknown }).status;
+    return typeof status === "string" ? status : null;
+  }
+  return null;
+}
+
+function treatmentCoverageStage(
+  coverage: StudioReadinessTreatmentCoverage | null,
+): StudioReadinessStageProjection {
+  if (coverage === null) return stage("treatment-coverage", "blocked", ["treatment coverage is missing"]);
+
+  const blockers: string[] = [];
+  if (coverage.readiness?.status !== "ready") {
+    blockers.push(...(coverage.readiness?.blockers?.length
+      ? coverage.readiness.blockers
+      : ["treatment coverage readiness is blocked"]));
+  }
+  if (coverage.generatesCopy !== false) blockers.push("treatment coverage must not generate copy");
+  if (coverage.creatorBodyCopyAllowed !== false) blockers.push("treatment coverage must not allow creator body copy");
+  if (coverage.bodyFree !== undefined && coverage.bodyFree !== true) blockers.push("treatment coverage must be body-free");
+  if (coverage.sideEffects !== "none") blockers.push("treatment coverage has side effects");
+  return stage("treatment-coverage", blockers.length === 0 ? "ready" : "blocked", blockers);
+}
+
+function factBlockers(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((blocker): blocker is string => typeof blocker === "string");
+}
+
+function volumeSlotBlockers(slot: StudioReadinessVolumeSlot): string[] {
+  const readinessBlockers = typeof slot.readiness === "object" && slot.readiness !== null
+    ? factBlockers(slot.readiness.blockers)
+    : [];
+  return [...new Set([...factBlockers(slot.blockers), ...readinessBlockers])];
+}
+
+function volumeSlotReady(slot: StudioReadinessVolumeSlot): string | null {
+  return stringStatus(slot.readiness ?? slot.status);
+}
+
+function volumeStage(plan: StudioReadinessVolumePlan | null): StudioReadinessStageProjection {
+  if (plan === null) return stage("volume", "blocked", ["volume plan is missing"]);
+
+  const blockers: string[] = [];
+  if (!Array.isArray(plan.slots)) {
+    blockers.push("volume plan slots are missing");
+  } else if (plan.slots.length === 0) {
+    blockers.push("volume plan has no slots");
+  } else {
+    for (const slot of plan.slots) {
+      const readiness = volumeSlotReady(slot);
+      const slotBlockers = volumeSlotBlockers(slot);
+      if (readiness === "blocked") {
+        blockers.push(...(slotBlockers.length ? slotBlockers : ["volume plan contains blocked slots"]));
+      } else if (readiness !== "ready") {
+        blockers.push("volume slot readiness is missing or invalid");
+      } else if (slotBlockers.length > 0) {
+        blockers.push(...slotBlockers);
+      }
+      if (slot.humanReviewRequired !== true) blockers.push("volume plan slots are not human-gated");
+      if (slot.humanGate?.required !== true || slot.humanGate.approvalOwner !== "human") {
+        blockers.push("volume plan slots are not human-gated");
+      }
+    }
+  }
+  if (plan.humanReviewRequired !== true) blockers.push("volume plan is not human-gated");
+  if (plan.humanGate !== undefined
+    && (plan.humanGate.required !== true || plan.humanGate.approvalOwner !== "human")) {
+    blockers.push("volume plan is not human-gated");
+  }
+  if (plan.generatesCopy !== false) blockers.push("volume plan must not generate copy");
+  if (plan.creatorBodyCopyAllowed === true) blockers.push("volume plan permits creator body copy");
+  if (plan.sideEffects !== "none") blockers.push("volume plan has side effects");
+  return stage("volume", blockers.length === 0 ? "ready" : "blocked", blockers);
+}
+
+function ids(value: readonly string[] | undefined): string[] | null {
+  return value === undefined ? null : [...value];
+}
+
+function sameIds(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function rowBlockers(row: StudioReadinessGenerationRow): string[] {
+  const readinessBlockers = typeof row.readiness === "object" && row.readiness !== null
+    ? factBlockers(row.readiness.blockers)
+    : [];
+  return [...new Set([...factBlockers(row.blockers), ...readinessBlockers])];
+}
+
+function rowStatus(row: StudioReadinessGenerationRow): string | null {
+  return stringStatus(row.readiness ?? row.status);
+}
+
+function generationVariantIds(plan: StudioReadinessVolumePlan | null): string[] | null {
+  if (plan === null || !Array.isArray(plan.slots)) return null;
+  const values = plan.slots.map((slot) => slot.variantId);
+  return values.every((value): value is string => typeof value === "string") ? values : null;
+}
+
+function generationCoverageBlockers(
+  run: StudioReadinessGenerationRun,
+  plan: StudioReadinessVolumePlan | null,
+): string[] {
+  const blockers: string[] = [];
+  const coverage = run.coverage;
+  if (coverage?.status !== "complete") blockers.push("generation run coverage is incomplete");
+
+  const expected = ids(coverage?.expectedVariantIds);
+  const generated = ids(coverage?.generatedVariantIds);
+  const duplicate = ids(coverage?.duplicateVariantIds);
+  const missing = ids(coverage?.missingVariantIds);
+  const rowIds = Array.isArray(run.rows)
+    ? run.rows.map((row) => row.variantId).filter((value): value is string => typeof value === "string")
+    : [];
+  const plannedIds = generationVariantIds(plan);
+
+  const declaredOneToOne = coverage?.oneToOne ?? coverage?.one_to_one;
+  let oneToOne = declaredOneToOne === true;
+  if (expected !== null && generated !== null) {
+    const sortedExpected = [...expected].sort();
+    const sortedGenerated = [...generated].sort();
+    const identifiersAreOneToOne = sameIds(sortedExpected, sortedGenerated)
+      && (duplicate?.length ?? 0) === 0
+      && (missing?.length ?? 0) === 0;
+    oneToOne = declaredOneToOne === false ? false : oneToOne || identifiersAreOneToOne;
+    if (plannedIds !== null && !sameIds([...plannedIds].sort(), sortedExpected)) oneToOne = false;
+    if (!sameIds([...rowIds].sort(), sortedGenerated)) oneToOne = false;
+  } else if (plannedIds !== null) {
+    oneToOne = oneToOne
+      && sameIds([...plannedIds].sort(), [...rowIds].sort())
+      && new Set(rowIds).size === rowIds.length;
+  } else {
+    oneToOne = false;
+  }
+
+  if ((duplicate?.length ?? 0) > 0 || (missing?.length ?? 0) > 0 || !oneToOne) {
+    blockers.push("generation run coverage is not one-to-one");
+  }
+  blockers.push(...factBlockers(coverage?.blockers));
+  return blockers;
+}
+
+function generationStage(
+  run: StudioReadinessGenerationRun | null,
+  plan: StudioReadinessVolumePlan | null,
+  volumeProjection: StudioReadinessStageProjection,
+): StudioReadinessStageProjection {
+  if (run === null) return stage("generation", "blocked", ["generation run manifest is missing"]);
+
+  const blockers: string[] = [];
+  if (!Array.isArray(run.rows)) {
+    blockers.push("generation run rows are missing");
+  } else if (run.rows.length === 0) {
+    blockers.push("generation run has no rows");
+  } else {
+    for (const row of run.rows) {
+      const status = rowStatus(row);
+      const rowBlockerValues = rowBlockers(row);
+      if (status === "blocked") {
+        blockers.push(...(rowBlockerValues.length ? rowBlockerValues : ["generation run contains blocked rows"]));
+      } else if (status !== "ready") {
+        blockers.push("generation run row readiness is missing or invalid");
+      } else if (rowBlockerValues.length > 0) {
+        blockers.push(...rowBlockerValues);
+      }
+      if (row.humanReviewRequired === false) blockers.push("generation run rows do not require human review");
+    }
+  }
+  blockers.push(...generationCoverageBlockers(run, plan));
+  if (volumeProjection.status !== "ready") {
+    blockers.push(plan === null ? "generation waits for volume plan" : "generation waits for volume readiness");
+  }
+  if (run.humanReviewRequired !== true
+    && run.reviewGate?.required !== true
+    && run.humanGate?.required !== true) {
+    blockers.push("generation run must require human review");
+  }
+  if (run.generatesCopy !== false) blockers.push("generation run must not generate copy");
+  if (run.creatorBodyCopyAllowed === true) blockers.push("generation run permits creator body copy");
+  if (run.sideEffects !== "none") blockers.push("generation run has side effects");
+  if (run.autoApproval !== false) blockers.push("generation run permits auto-approval");
+  if (run.autoScheduling !== false) blockers.push("generation run permits auto-scheduling");
+  if (run.autoPublishing !== false) blockers.push("generation run permits auto-publishing");
+  return stage("generation", blockers.length === 0 ? "ready" : "blocked", blockers);
 }
 
 function reviewApproved(review: GrowReviewBundle): boolean {
@@ -174,6 +468,14 @@ function briefGate(brief: GenerationBrief | null): StudioHumanGate {
   return gate(brief.humanGate.status, brief.humanGate.status === "pending" ? ["brief human approval is pending"] : []);
 }
 
+function treatmentCoverageGate(
+  coverage: StudioReadinessTreatmentCoverage | null,
+  projection: StudioReadinessStageProjection,
+): StudioHumanGate {
+  if (coverage === null) return gate("pending", ["treatment coverage is missing"]);
+  return gate("pending", projection.status === "ready" ? ["treatment coverage human review is pending"] : projection.blockers);
+}
+
 function reviewGate(review: GrowReviewBundle | null): StudioHumanGate {
   if (review === null) return gate("pending", ["review bundle is missing"]);
   const status = review.humanDecision.status === "candidate" ? "pending" : review.humanDecision.status;
@@ -191,11 +493,31 @@ function deliveryGate(delivery: GrowDeliveryRecord | null, blockers: readonly st
     : gate("pending", blockers.length > 0 ? blockers : ["delivery record is missing"]);
 }
 
+function volumeGate(volume: StudioReadinessVolumePlan | null, projection: StudioReadinessStageProjection): StudioHumanGate {
+  if (volume === null) return gate("pending", ["volume plan is missing"]);
+  return gate("pending", projection.status === "ready" ? ["volume human review is pending"] : projection.blockers);
+}
+
+function generationGate(
+  generation: StudioReadinessGenerationRun | null,
+  projection: StudioReadinessStageProjection,
+): StudioHumanGate {
+  if (generation === null) return gate("pending", ["generation run manifest is missing"]);
+  return gate("pending", projection.status === "ready" ? ["generation human review is pending"] : projection.blockers);
+}
+
 function learningGate(learning: CommentLearningView | null): StudioHumanGate {
   if (learning === null) return gate("pending", ["comment-learning view is missing"]);
   if (learning.muxinDecision === "adopted") return gate("approved");
   if (learning.muxinDecision === "declined") return gate("rejected", ["Muxin declined the learning handoff"]);
   return gate("pending", ["Muxin learning decision is pending"]);
+}
+
+function firstSupplied<T>(...values: readonly (T | null | undefined)[]): T | null {
+  for (const value of values) {
+    if (value !== undefined) return value;
+  }
+  return null;
 }
 
 /**
@@ -206,6 +528,14 @@ function learningGate(learning: CommentLearningView | null): StudioHumanGate {
  */
 export function buildStudioReadiness(input: StudioReadinessInput): StudioReadiness {
   const brief = supplied(input.brief, input.generationBrief);
+  const treatmentCoverage = firstSupplied(input.treatmentCoverage, input.coverage, input.treatmentCoverageView);
+  const volume = firstSupplied(input.volumePlan, input.volume, input.volumePlanManifest);
+  const generation = firstSupplied(
+    input.generationRunManifest,
+    input.generationRun,
+    input.generationManifest,
+    input.generation,
+  );
   const review = supplied(input.reviewBundle, input.review);
   const learning = input.learning !== undefined
     ? input.learning
@@ -215,11 +545,23 @@ export function buildStudioReadiness(input: StudioReadinessInput): StudioReadine
 
   const source = sourceStage(input.sourceStatus);
   const briefProjection = briefStage(brief);
+  const treatmentCoverageProjection = treatmentCoverageStage(treatmentCoverage);
+  const volumeProjection = volumeStage(volume);
+  const generationProjection = generationStage(generation, volume, volumeProjection);
   const reviewProjection = reviewStage(review);
-  const delivery = input.delivery !== undefined ? input.delivery : input.deliveryRecord ?? null;
-  const deliveryProjection = deliveryStage(delivery, review, reviewProjection, source, briefProjection);
+  const deliveryRecord = input.delivery !== undefined ? input.delivery : input.deliveryRecord ?? null;
+  const deliveryProjection = deliveryStage(deliveryRecord, review, reviewProjection, source, briefProjection);
   const learningProjection = learningStage(learning);
-  const stages = [source, briefProjection, reviewProjection, deliveryProjection, learningProjection];
+  const stages = [
+    source,
+    briefProjection,
+    treatmentCoverageProjection,
+    volumeProjection,
+    generationProjection,
+    reviewProjection,
+    deliveryProjection,
+    learningProjection,
+  ];
   const blockers = uniqueSorted(stages.flatMap((current) => current.blockers));
 
   return {
@@ -228,8 +570,11 @@ export function buildStudioReadiness(input: StudioReadinessInput): StudioReadine
     stages,
     gates: {
       brief: briefGate(brief),
+      treatmentCoverage: treatmentCoverageGate(treatmentCoverage, treatmentCoverageProjection),
+      volume: volumeGate(volume, volumeProjection),
+      generation: generationGate(generation, generationProjection),
       review: reviewGate(review),
-      delivery: deliveryGate(delivery, deliveryProjection.blockers),
+      delivery: deliveryGate(deliveryRecord, deliveryProjection.blockers),
       learning: learningGate(learning),
     },
     readiness: {
