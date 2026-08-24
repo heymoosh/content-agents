@@ -136,6 +136,24 @@ export {
 } from "./venture-input.js";
 
 export {
+  buildDraftRequest,
+  createDraftRequest,
+  DRAFT_REQUEST_VERSION,
+  type DraftRequest,
+  type DraftRequestHumanReview,
+  type DraftRequestHumanReviewInput,
+  type DraftRequestInput,
+  type DraftRequestLineage,
+  type DraftRequestLineageInput,
+  type DraftRequestReadiness,
+  type DraftRequestReadinessStatus,
+  type DraftRequestReviewStatus,
+  type DraftRequestTreatmentIdentity,
+  type DraftRequestTreatmentIdentityInput,
+  DraftRequestValidationError,
+} from "./draft-request.js";
+
+export {
   buildExperimentOutcomeLedger,
   createExperimentOutcomeLedger,
   type ExperimentDeclaredObservation,

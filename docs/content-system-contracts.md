@@ -118,6 +118,16 @@ source, post, metric, denominator, pool membership, or comparison sample.
 Rows without real reviewed metadata remain `blocked` and cannot support a
 pool comparison or winner claim.
 
+`src/patterns/account-review-ledger.ts` is the append-only persistence seam
+for these human-reviewed rows. It retains account size, audience, topic/focus,
+medium/format, explicit pool memberships, scopes, baseline/evidence refs,
+caveats, reviewer, and review status without storing creator bodies. It
+rejects duplicate identities, in-place edits, inferred values, ranking,
+winner, model, and body fields while keeping pending, blocked, and unmapped
+rows visible. `src/patterns/account-review-ledger-cli.ts` and
+`npm run patterns:account-review-ledger` expose deterministic JSON/Markdown
+inspection and append behavior over an explicit injected/local ledger.
+
 ### `source_post_evidence` (scaffolded; typed inventory adapter exists)
 
 Owner: `pool evidence`; the source/post row is the authoritative comparison
@@ -167,6 +177,17 @@ provide the read-only command adapter. It accepts one explicit JSON/file
 envelope containing `corpus` and `analyses`, renders JSON, Markdown, or both,
 and preserves explicit pool, scope, metric, provenance, review, and readiness
 blockers without emitting body fields or inferring winners.
+
+`src/patterns/source-evidence-ledger.ts` adds the append-only reviewed-evidence
+boundary for durable source/post comparison rows. It stores stable evidence
+identity, explicit pool/topic/focus/format, metric and denominator facts,
+popularity/sample scope, dates, selection rule, provenance, baseline/evidence
+refs, body-completeness status, review status, and caveats, but no creator body.
+`src/patterns/source-evidence-ledger-cli.ts` and
+`npm run patterns:source-evidence-ledger` provide deterministic inspection and
+append operations. Duplicate IDs, in-place edits, missing comparison facts,
+inferred membership, body/model/PII/ranking fields, and winner claims fail
+closed; blocked and unreviewed rows remain visible.
 
 ### `account_example_table` (scaffolded; pure projection exists)
 
@@ -442,6 +463,19 @@ or scheduler action. When supplied, explicit platform/format readiness facts
 are copied onto each matching treatment; a missing or blocked fact is exposed
 as a readiness blocker instead of being inferred. Human review remains
 required before release.
+
+### `grow_draft_request` (scaffolded; body-free studio handoff exists)
+
+`src/grow/draft-request.ts` binds one original thought and source artifact to
+one exact platform/medium/format treatment. It carries treatment, hook-template,
+experiment, voice-policy, output-artifact, and lineage refs plus an explicit
+pending/approved/rejected human review state. It is a request manifest, not
+copy: model invocation is deferred, common-hook mad-lib adaptation is allowed,
+creator-body reuse is forbidden, and auto-approval, scheduling, publishing,
+ranking, and side effects are false. `src/grow/draft-request-cli.ts` and
+`npm run grow:draft-request` render deterministic JSON/Markdown and fail closed
+on missing or mismatched identity, unsupported body/prompt fields, or approval
+that still has blockers.
 
 ### `grow_treatment_coverage` (scaffolded; read-only reconciliation exists)
 
