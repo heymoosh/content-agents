@@ -455,6 +455,16 @@ Markdown, or both. It rejects body, model, credential, and winner fields before
 the projection runs; its output is body-free, keeps `winner: null`, and has
 `sideEffects: none`. It does not queue, schedule, publish, or generate copy.
 
+`src/patterns/hook-template-ledger.ts` is the curated hook-mechanism read
+boundary. Its JSONL rows may contain only abstract mechanism, platform/niche/
+format/slot metadata, source references, caveats, review/originality state,
+evidence status, and adaptation guidance. `patterns:hook-templates` provides
+deterministic filtering and JSON/Markdown output. Exact opener evidence remains
+in the separate opener bank; creator body, copied wording, model, ranking, and
+winner fields are rejected recursively. Common-hook mad-lib adaptation is
+allowed downstream through the existing Grow metadata-only bridge, with no copy
+generation or side effects.
+
 `src/grow/reconciliation.ts` is a read-side comparison of the review bundle,
 delivery record, review-queue fact, and scheduler fact. It reports `blocked` or
 `drifted` when IDs, lineage, approval, lifecycle, or scheduler evidence

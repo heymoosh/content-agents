@@ -368,8 +368,10 @@ caveat, and review fields while keeping incomplete rows blocked. `src/patterns/r
 turns the overlay coverage into one actionable, body-free row per current account key without
 inventing review metadata. `src/patterns/review-status.ts` is the read-only operator entry point
 that emits a deterministic blank review template or validates an explicit review JSON input and
-exposes the account metadata table; it does not write or infer review values. `src/grow/variants.ts`
-can carry a hook-template reference and source-slot map as metadata only; it keeps copy generation,
+exposes the account metadata table; it does not write or infer review values. `src/patterns/hook-template-ledger.ts`
+provides the curated, body-free metadata boundary for hook mechanisms, and `patterns:hook-templates`
+exposes deterministic filtered JSON/Markdown. `src/grow/variants.ts` can carry a hook-template reference
+and source-slot map as metadata only; it keeps copy generation,
 creator-body reuse, and approval blocked. These are typed operator seams, not proof that the live corpus has
 been reviewed or that the app is wired end to end.
 `src/patterns/overlay-coverage.ts` reports the explicit per-account mapping status and missing
@@ -719,7 +721,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 |---|---|---|---|
 | Seeded targets | 352 rows across 13 configured platforms | Stable, provenance-aware target records with explicit scope and caveats | Partial |
 | Corpus | `src/patterns/data-status.ts` reports 499 corpus entries (292 previously collected plus 207 newly admitted; 18 staged duplicates skipped), 292 analyses, 12 baselines, 225 replayable Reddit inbox entries, the derived opener bank, 11 browser artifacts, and 9 RSS artifacts; all are available/parse-clean in the permanent gitignored data checkout, but the report is marked unreviewed | Normalized source/account/evidence catalog with queryable pool membership and reviewed niche/broad/format coverage | Partial |
-| Patterns | 31 hook patterns | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
+| Patterns | 31 hook patterns; `src/patterns/hook-template-ledger.ts` and `patterns:hook-templates` provide the curated body-free adapter, while live rows remain unpopulated | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it; `src/grow/delivery-binding.ts` reconciles that slice with explicit queue/scheduler/provider facts | Connect the accounting view to live review and scheduler records without allowing it to approve, schedule, or publish | Partial |
 | Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` and `src/grow/generation-brief.ts` emit provisional no-copy platform/format specifications, `src/grow/volume-plan.ts` allocates those variants into deterministic daily slots, `src/grow/treatment-coverage.ts` reconciles requested treatment cells, `src/grow/draft-batch.ts` fans one thought into unique exact treatment requests, `src/grow/generation-run.ts` records explicit artifact/review references, `src/grow/draft-request.ts` binds one original thought to one treatment without composing copy, `src/grow/grow-this-plan.ts` joins the lifecycle read-only, and `npm run grow:this` exposes the next-action view, while delivery and outcome ledgers preserve the later handoff | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
