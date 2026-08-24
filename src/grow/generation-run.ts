@@ -433,7 +433,22 @@ export function createGenerationRun(input: GenerationRunInput): GenerationRun {
   assertAllowedFields(envelope, new Set(["volumePlan", "candidates", "treatmentCoverage"]), "generation run input");
   const normalizedPlan = normalizePlan(envelope.volumePlan);
   if (!Array.isArray(envelope.candidates)) throw new Error("candidates must be an array");
-  const candidates = envelope.candidates.map((current, index) => normalizeCandidate(current, index));
+  const normalizedCandidates = envelope.candidates.map((current, index) => normalizeCandidate(current, index));
+  const reviewQueueRefCounts = new Map<string, number>();
+  for (const candidate of normalizedCandidates) {
+    if (candidate.reviewQueueRef !== null) {
+      reviewQueueRefCounts.set(candidate.reviewQueueRef, (reviewQueueRefCounts.get(candidate.reviewQueueRef) ?? 0) + 1);
+    }
+  }
+  const candidates = normalizedCandidates.map((candidate) => {
+    if (candidate.reviewQueueRef === null || (reviewQueueRefCounts.get(candidate.reviewQueueRef) ?? 0) < 2) return candidate;
+    const candidateBlockers = sortedUnique([...candidate.blockers, "duplicate human review queue reference"]);
+    return {
+      ...candidate,
+      readiness: { status: "blocked" as const, blockers: candidateBlockers },
+      blockers: candidateBlockers,
+    };
+  });
   const treatmentCoverage = normalizeTreatmentCoverage(envelope.treatmentCoverage);
   const plannedSlots = [...normalizedPlan.slots].sort(compareIdentity);
   const candidateByKey = new Map<string, NormalizedCandidate[]>();

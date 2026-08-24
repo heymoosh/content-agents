@@ -119,6 +119,7 @@
     "grow:brief": "tsx src/grow/brief-cli.ts",
     "grow:studio-readiness": "tsx src/grow/studio-readiness-cli.ts",
     "grow:generation-run": "tsx src/grow/generation-run-cli.ts",
+    "grow:generation-review-delivery": "tsx src/grow/generation-review-delivery-cli.ts",
     "grow:comment-learning": "tsx src/grow/comment-learning-cli.ts",
     "grow:learning-bundle": "tsx src/grow/learning-bundle-cli.ts",
     "grow:treatment-coverage": "tsx src/grow/treatment-coverage-cli.ts",

@@ -211,6 +211,18 @@ test("keeps missing, duplicate, wrong-platform, wrong-variant, and unexpected ca
   assert.match(result.readiness.blockers.join("\n"), /unexpected/);
 });
 
+test("blocks duplicate human review queue references across distinct slots", () => {
+  const volumePlan = plan();
+  const result = createGenerationRun(input(
+    volumePlan.slots.map((current) => candidate(current, { reviewQueueRef: "review:shared" })),
+    volumePlan,
+  ));
+
+  assert.deepEqual(result.slots.map((current) => current.status), ["blocked", "blocked"]);
+  assert.ok(result.slots.every((current) => current.blockers.includes("duplicate human review queue reference")));
+  assert.match(result.readiness.blockers.join("\n"), /duplicate human review queue reference/);
+});
+
 test("uses canonical slot ordering regardless of candidate and plan input order", () => {
   const volumePlan = plan({
     slots: [

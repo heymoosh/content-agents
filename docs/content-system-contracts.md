@@ -1146,6 +1146,33 @@ send. `src/grow/generation-run-cli.ts` and `npm run grow:generation-run`
 expose deterministic JSON/Markdown output and fail closed on malformed or
 body-bearing envelopes.
 
+### `generation_review_delivery` (scaffolded; per-artifact review-to-delivery join exists)
+
+`src/grow/generation-review-delivery.ts` joins each `generation_run` slot to
+the exact pending review-queue reference, a caller-supplied reviewed
+`grow_review_bundle`, already-read `grow_live_facts`, a capacity slice, and
+the existing `grow_delivery_binding` builder. The queue reference must repeat
+the generation slot's reference; the artifact, slot identity, review source,
+candidate variant, delivery lineage, and live facts remain explicit joins.
+Legacy queue/scheduler facts may omit treatment identity, so the adapter
+requires an explicit enriched queue/scheduler lineage rather than filling it
+from the candidate or review bundle. Missing, mismatched, pending, or
+incomplete inputs remain blocked per row. A generation slot's expected
+`human review is pending` blocker is not treated as a permanent generation
+failure once the separate reviewed bundle is supplied.
+
+The result contains one body-free delivery binding per planned slot and
+retains the review-queue reference, artifact reference, review bundle ID,
+capacity facts, live facts, and all blockers. It never reads or writes the
+queue, approves a bundle, claims a scheduler slot, schedules, publishes, or
+includes source or creator body text. `bodyFree: true`,
+`humanApprovalRequired: true`, `autoApproval: false`, `autoScheduling: false`,
+`autoPublishing: false`, and `sideEffects: none` remain mandatory.
+`src/grow/generation-review-delivery-cli.ts` and
+`npm run grow:generation-review-delivery` expose the same join as
+deterministic JSON/Markdown from one explicit envelope; they do not write
+domain state.
+
 ### `manual_platform_observation` (scaffolded; collectorless intake exists)
 
 `src/patterns/manual-platform-intake.ts` normalizes an operator-supplied

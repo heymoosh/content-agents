@@ -190,6 +190,17 @@ export {
 } from "./draft-batch-run.js";
 
 export {
+  buildGrowGenerationReviewDelivery,
+  buildGenerationReviewDelivery,
+  createGrowGenerationReviewDelivery,
+  GROW_GENERATION_REVIEW_DELIVERY_VERSION,
+  type GrowGenerationReviewDelivery,
+  type GrowGenerationReviewDeliveryBindingInput,
+  type GrowGenerationReviewDeliveryInput,
+  type GrowGenerationReviewDeliveryRow,
+} from "./generation-review-delivery.js";
+
+export {
   buildExperimentOutcomeLedger,
   createExperimentOutcomeLedger,
   type ExperimentDeclaredObservation,
