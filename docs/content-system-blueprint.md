@@ -419,6 +419,12 @@ creator bodies, so account rows remain rollups rather than a substitute for auth
 `src/patterns/reviewed-evidence-ledger-bridge.ts` projects the existing reviewed-intake report into
 append-ready account and source ledger inputs while retaining explicit blockers and refusing to
 infer missing identities or review decisions.
+`src/patterns/ledger-account-example-table.ts` is the next durable join: it consumes current
+account-review corrections plus source-evidence ledger rows, preserves source/post scope and
+metric facts as authoritative, and emits the body-free account/example table with explicit size,
+topics, focus, platform, medium, format, pool, citations, caveats, and readiness. Blocked rows
+remain visible; no pool, ranking, winner, or creator body is inferred. Its file adapter is
+`src/patterns/ledger-account-example-table-cli.ts` with `npm run patterns:ledger-account-example-table`.
 `src/patterns/opener-report.ts` provides a deterministic evidence view over the derived opener bank:
 captured opener text is labeled as source evidence, warnings and performance provenance remain
 visible, and no full post body, ranking, or winner claim is added. `src/patterns/review-batch.ts`
@@ -496,6 +502,11 @@ volume mechanism for trying many platform combinations; it does not generate or
 publish the resulting copy. `src/grow/draft-batch-inspection.ts` provides a deterministic
 body-free operator view with per-platform and per-format counts, exact treatment identities,
 lineage, and pending-review blockers.
+`src/grow/draft-batch-run.ts` is the producer/consumer join after that manifest: it requires an
+explicit one-to-one binding from every draft request to a volume slot, checks expected artifact
+and review-queue references, and creates pending generation-run candidates while preserving
+treatment blockers and the human gate. It never generates copy or invokes a model. The CLI is
+`src/grow/draft-batch-run-cli.ts` and `npm run grow:draft-batch-run`.
 `src/grow/brief-cli.ts` and `npm run grow:brief` provide a deterministic JSON/Markdown operator
 view over that planning boundary. `src/grow/comment-learning-cli.ts` and
 `npm run grow:comment-learning` provide the corresponding body-free operator view over explicitly

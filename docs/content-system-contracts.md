@@ -199,6 +199,18 @@ write; the ledger append boundary remains the caller's explicit decision.
 JSON/Markdown inspection of that projection. It accepts one explicit report,
 preserves separate evidence links and refs, and does not persist or promote rows.
 
+`src/patterns/ledger-account-example-table.ts` is the durable producer/consumer
+join after those ledgers exist. It reads current account-review corrections and
+source-evidence rows, feeds them through the strict comparison-readiness join,
+and emits the body-free account/example table with explicit account size,
+topics, focus, platform, medium, format, pool, scopes, citations, caveats, and
+blocked state. Source/post scope and metric facts remain authoritative; account
+metadata cannot overwrite them. The adapter accepts JSONL text or validated
+ledger objects, does not infer a pool or winner, and exposes no creator body.
+`src/patterns/ledger-account-example-table-cli.ts` and
+`npm run patterns:ledger-account-example-table` provide the file-based operator
+view from an account ledger and source ledger.
+
 ### `baseline_measurement_ledger` (scaffolded; append-only JSONL seam exists)
 
 Owner: `research` collects the measurement; Muxin owns review. This ledger
@@ -523,6 +535,16 @@ approves, schedules, publishes, or writes files.
 operators. It lists exact identities, lineage, per-platform/per-format counts,
 and pending-review blockers while retaining `generatesCopy: false` and
 `sideEffects: "none"`.
+
+`src/grow/draft-batch-run.ts` is the explicit producer/consumer join after the
+batch has been planned. It requires one caller-supplied binding for every draft
+request, verifies each artifact reference against the request's expected output,
+and joins those references to exact volume slots as pending generation candidates.
+Unbound, duplicate, mismatched, or missing-review bindings fail closed; blocked
+treatment coverage and human review remain visible. It creates no copy, invokes
+no model, and has no persistence or publishing side effects.
+`src/grow/draft-batch-run-cli.ts` and `npm run grow:draft-batch-run` expose the
+same JSON/Markdown handoff for an explicit file or JSON envelope.
 
 ### `grow_treatment_coverage` (scaffolded; read-only reconciliation exists)
 
