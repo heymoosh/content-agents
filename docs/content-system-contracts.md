@@ -1009,6 +1009,18 @@ With the current gitignored checkout, the command reports 0 matrix targets and
 that is a coverage fact and not permission to classify those rows from catalog
 niche, account name, platform, or other unreviewed labels.
 
+`src/patterns/reviewed-account-registry.ts` is the canonical read path over the
+append-only account ledger. It resolves exactly one non-superseded row per
+account identity, revalidates caller-shaped ledger objects through the ledger
+validator, and adapts the same explicit facts into the matrix review-fact
+shape. `src/patterns/reviewed-account-registry-report.ts` joins that registry
+to the durable account/source example table and the platform/pool matrix;
+`npm run patterns:reviewed-account-registry` exposes the JSON/Markdown/both
+operator view. This bridge does not infer pool membership from catalog labels,
+select winners, copy creator bodies, or replace the separate source/post and
+baseline gates. It remains blocked until real reviewed ledger rows and usable
+baseline terms exist.
+
 ### `pool_best_report` (scaffolded; fail-closed comparison only)
 
 `src/patterns/pool-best-report.ts` and `npm run patterns:best-report` compare
@@ -1032,6 +1044,16 @@ and no winner claim. The output is deterministic JSON/Markdown, body-free, and
 stdout-only. It does not rank account tables or follower counts, infer topics or
 pools, copy creator text, or write data. Current live rows remain blocked because
 reviewed metadata and usable baseline terms have not yet been supplied.
+
+`src/patterns/pool-best-ledger-report.ts` and
+`npm run patterns:best-ledger-report` are the durable-ledger adapter for this
+comparison. They resolve current account rows through the reviewed-account
+registry, convert validated source-ledger rows into the existing comparison
+shape, and pass caller-supplied baseline facts through unchanged. A missing
+baseline, incomplete source fact, missing explicit pool, or mismatched scope
+stays a blocked candidate/group. The adapter does not use follower count as a
+ranking metric, fall back to catalog labels, or turn incomplete evidence into a
+winner.
 
 `src/patterns/pool-review-handoff.ts` and
 `npm run patterns:pool-review-handoff` provide the narrow human handoff for that

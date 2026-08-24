@@ -98,7 +98,8 @@ function legacyMetric(row: SourceEvidenceLedgerRecord): SourceEvidenceRow["metri
   };
 }
 
-function sourceEvidenceRow(row: SourceEvidenceLedgerRecord): SourceEvidenceRow {
+/** Convert one validated durable source-ledger fact to the legacy comparison input shape. */
+export function sourceEvidenceRow(row: SourceEvidenceLedgerRecord): SourceEvidenceRow {
   const blockers = [...row.readiness.blockers];
   const metricWindow = row.metricSnapshot === null || row.metricSnapshot === "unknown" ? null : row.metricSnapshot.window;
   return {
