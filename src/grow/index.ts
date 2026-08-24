@@ -57,6 +57,27 @@ export {
 } from "./delivery-record.js";
 
 export {
+  buildGrowDeliveryBinding,
+  buildGrowDeliveryBindingView,
+  createGrowDeliveryBinding,
+  createGrowDeliveryBindingView,
+  GROW_DELIVERY_BINDING_VERSION,
+  type GrowDeliveryBinding,
+  type GrowDeliveryBindingCandidate,
+  type GrowDeliveryBindingDeliveryMode,
+  type GrowDeliveryBindingFactsLineage,
+  type GrowDeliveryBindingInput,
+  type GrowDeliveryBindingLineage,
+  type GrowDeliveryBindingLiveCheck,
+  type GrowDeliveryBindingLiveCheckStatus,
+  type GrowDeliveryBindingProviderFacts,
+  type GrowDeliveryBindingQueueFacts,
+  type GrowDeliveryBindingReconciliation,
+  type GrowDeliveryBindingSchedulerFacts,
+  type GrowDeliveryBindingStatus,
+} from "./delivery-binding.js";
+
+export {
   buildExperimentOutcomeLedger,
   createExperimentOutcomeLedger,
   type ExperimentDeclaredObservation,

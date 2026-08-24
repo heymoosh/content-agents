@@ -516,7 +516,7 @@ function evidenceBlockers(row: NormalizedEvidence): string[] {
   add(blockers, row.pool === null, "pool");
   add(blockers, missing(row.membershipReason), "membershipReason");
   if (row.audienceSizeSnapshot === null || row.audienceSizeSnapshot === "unknown") add(blockers, true, "audienceSizeSnapshot");
-  else for (const field of ["size", "countType", "observedAt", "collectedAt", "provenance"] as const) add(blockers, missing(row.audienceSizeSnapshot[field]), `audienceSizeSnapshot.${field}`);
+  else for (const field of ["size", "countType", "asOf", "collectedAt", "provenance"] as const) add(blockers, missing(row.audienceSizeSnapshot[field]), `audienceSizeSnapshot.${field}`);
   const metricRequired = row.comparisonClaimed !== false;
   if (metricRequired && (row.metricSnapshot === null || row.metricSnapshot === "unknown")) add(blockers, true, "metricSnapshot");
   else if (metricRequired && row.metricSnapshot !== null && row.metricSnapshot !== "unknown") {
@@ -546,7 +546,7 @@ function baselineBlockers(row: NormalizedBaseline): string[] {
   add(blockers, missing(row.source), "source");
   add(blockers, missing(row.settledSampleDate), "settledSampleDate");
   if (typeof row.window === "string") add(blockers, missing(row.window), "window");
-  else if (row.window === null || row.window === "unknown") add(blockers, true, "window");
+  else if (row.window === null) add(blockers, true, "window");
   else {
     add(blockers, missing(row.window.start), "window.start");
     add(blockers, missing(row.window.end), "window.end");
@@ -559,7 +559,7 @@ function baselineBlockers(row: NormalizedBaseline): string[] {
   add(blockers, row.caveats === null || row.caveats === "unknown", "caveats");
   add(blockers, missing(row.reviewer), "reviewer");
   add(blockers, missing(row.reviewedAt), "reviewedAt");
-  add(blockers, row.reviewStatus !== null && row.reviewStatus !== "reviewed", "reviewStatus");
+  add(blockers, row.reviewStatus !== "reviewed", "reviewStatus");
   return blockers.sort((left, right) => left.localeCompare(right));
 }
 
@@ -585,8 +585,10 @@ function compare(left: unknown, right: unknown): number {
 
 function accountOutput(row: NormalizedAccount, duplicateKeys: ReadonlySet<string>): ReviewedAccountIntakeRow {
   const blockers = accountBlockers(row);
+  const identityKeys = new Set([row.currentAccountKey, row.stableAccountId]
+    .filter((value): value is string => !missing(value)));
+  if ([...identityKeys].some((key) => duplicateKeys.has(key))) blockers.push("duplicate account identity");
   const key = row.currentAccountKey ?? row.stableAccountId ?? "";
-  if (key !== "" && duplicateKeys.has(key)) blockers.push("duplicate account identity");
   return {
     kind: "reviewed_account_intake_row",
     version: REVIEWED_EVIDENCE_INTAKE_VERSION,
@@ -711,18 +713,18 @@ function blockerCounts(rows: readonly { readiness: ReviewedEvidenceReadiness }[]
 export function buildReviewedEvidenceIntake(input: ReviewedEvidenceIntakeInput): ReviewedEvidenceIntakeReport {
   const rows = inputRows(input);
   const accountValues = rows.accountMetadataRows.map(normalizedAccount);
-  const accountKeys = new Set<string>();
-  const stableIds = new Set<string>();
-  const duplicateKeys = new Set<string>();
+  const keyCounts = new Map<string, number>();
   for (const row of accountValues) {
+    const rowKeys = new Set<string>();
     for (const key of [row.currentAccountKey, row.stableAccountId]) {
       if (missing(key)) continue;
-      const value = key as string;
-      if (accountKeys.has(value) || stableIds.has(value)) duplicateKeys.add(value);
-      accountKeys.add(value);
+      rowKeys.add(key as string);
     }
-    if (!missing(row.stableAccountId)) stableIds.add(row.stableAccountId as string);
+    for (const key of rowKeys) keyCounts.set(key, (keyCounts.get(key) ?? 0) + 1);
   }
+  const duplicateKeys = new Set([...keyCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([key]) => key));
   const accounts = accountValues
     .map((row) => accountOutput(row, duplicateKeys))
     .sort((left, right) => compare(left.currentAccountKey, right.currentAccountKey) || compare(left.stableAccountId, right.stableAccountId) || stableJson(left).localeCompare(stableJson(right)));

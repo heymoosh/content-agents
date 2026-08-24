@@ -6,7 +6,7 @@ import type { GrowReviewBundle } from "./review-bundle.js";
 /** Stable, body-free read-side join from reviewed Grow work to delivery evidence. */
 export const GROW_DELIVERY_BINDING_VERSION = "grow-delivery-binding-v1" as const;
 
-export type GrowDeliveryBindingStatus = "approved" | "scheduled" | "live_confirmed";
+export type GrowDeliveryBindingStatus = "blocked" | "approved" | "scheduled" | "live_confirmed";
 export type GrowDeliveryBindingDeliveryMode = "provider" | "manual" | "unknown";
 export type GrowDeliveryBindingLiveCheckStatus = "not_confirmed" | "confirmed" | "unavailable";
 
@@ -137,7 +137,9 @@ function readCandidateLineage(value: unknown, blockers: string[]): GrowDeliveryB
   for (const key of LINEAGE_KEYS) {
     const item = text(value[key]);
     if (item === null) {
-      blockers.push("candidate " + key + " lineage is missing");
+      blockers.push(key === "treatmentId"
+        ? "candidate treatment lineage is missing"
+        : "candidate " + key + " lineage is missing");
       complete = false;
     } else {
       result[key] = item;
@@ -216,7 +218,14 @@ function readFactsLineage(
   }
   result.publishId = value.publishId === undefined || value.publishId === null ? null : text(value.publishId);
   if (!complete) return null;
-  const lineage = result as GrowDeliveryBindingFactsLineage;
+  const lineage: GrowDeliveryBindingFactsLineage = {
+    sourceId: result.sourceId as string,
+    cutId: result.cutId as string,
+    variantId: result.variantId as string,
+    treatmentId: result.treatmentId as string,
+    experimentId: result.experimentId as string,
+    publishId: result.publishId,
+  };
   if (expected !== null && !sameLineage(lineage, expected)) {
     blockers.push(label + " lineage does not match candidate lineage");
   }
@@ -333,6 +342,14 @@ export function buildGrowDeliveryBinding(input: GrowDeliveryBindingInput): GrowD
       reviewBlockers.push("review bundle is not approved by Muxin");
     }
     if (reviewBundle.readiness?.status !== "ready") reviewBlockers.push("review bundle readiness is blocked");
+    if (reviewBundle.evidenceStatus !== "supported"
+      || !Array.isArray(reviewBundle.evidenceRefs)
+      || reviewBundle.evidenceRefs.length === 0
+      || reviewBundle.evidenceRefs.some((ref) => typeof ref !== "string" || ref.trim() === "")) {
+      reviewBlockers.push("review bundle evidence is not supported");
+    }
+    if (reviewBundle.voiceCheck !== "passed") reviewBlockers.push("voice check is not passed");
+    if (reviewBundle.originalityCheck !== "passed") reviewBlockers.push("originality check is not passed");
     if (reviewBundle.generatesCopy !== false) reviewBlockers.push("review bundle is not body-free");
     if (reviewBundle.sideEffects !== "none") reviewBlockers.push("review bundle has side effects");
   }
@@ -369,7 +386,7 @@ export function buildGrowDeliveryBinding(input: GrowDeliveryBindingInput): GrowD
   const queue = isRecord(source.queueFacts) ? source.queueFacts as unknown as GrowDeliveryBindingQueueFacts : null;
   const scheduler = isRecord(source.schedulerFacts) ? source.schedulerFacts as unknown as GrowDeliveryBindingSchedulerFacts : null;
   const provider = copyProvider(isRecord(source.providerFacts)
-    ? source.providerFacts as GrowDeliveryBindingProviderFacts
+    ? source.providerFacts as unknown as GrowDeliveryBindingProviderFacts
     : null);
   if (queue === null) blockers.push("queue facts are missing");
   if (scheduler === null) blockers.push("scheduler facts are missing");
@@ -408,8 +425,9 @@ export function buildGrowDeliveryBinding(input: GrowDeliveryBindingInput): GrowD
     && scheduler?.deliveryId === makeDeliveryId(text(reviewBundle?.id), candidateId);
   if (!approvedEvidence && !scheduledEvidence) blockers.push("queue and scheduler state do not agree");
 
-  const attemptedScheduled = queueScheduled || schedulerScheduled
-    || provider?.reference !== null || provider?.scheduledAt !== null;
+  const providerHasSchedulingFacts = provider !== null
+    && (provider.reference !== null || provider.scheduledAt !== null);
+  const attemptedScheduled = queueScheduled || schedulerScheduled || providerHasSchedulingFacts;
   const live = liveStatus(provider);
   if (attemptedScheduled) {
     if (provider === null || provider.reference === null) blockers.push("provider reference is missing");
@@ -426,7 +444,7 @@ export function buildGrowDeliveryBinding(input: GrowDeliveryBindingInput): GrowD
         blockers.push("live confirmation timestamp is missing or invalid");
       }
     }
-  } else if (provider?.reference !== null || provider?.scheduledAt !== null || live === "confirmed") {
+  } else if (providerHasSchedulingFacts || live === "confirmed") {
     blockers.push("manual delivery is ambiguous");
   }
   const mode = text(source.deliveryMode)?.toLowerCase() ?? null;
@@ -437,11 +455,6 @@ export function buildGrowDeliveryBinding(input: GrowDeliveryBindingInput): GrowD
 
   const reviewReady = reviewBlockers.length === 0;
   blockers.push(...reviewBlockers);
-  const currentStatus: GrowDeliveryBindingStatus = scheduledEvidence
-    ? live === "confirmed" && provider?.reference !== null && provider.liveCheck?.liveAt !== null
-      ? "live_confirmed"
-      : "scheduled"
-    : "approved";
   const liveCheck = attemptedScheduled
     ? live === null || live === "unavailable" ? "unavailable" : live
     : "not_required";
@@ -454,6 +467,18 @@ export function buildGrowDeliveryBinding(input: GrowDeliveryBindingInput): GrowD
   if (queueValid && schedulerValid && !approvedEvidence && !scheduledEvidence) drift.push("queue and scheduler lifecycle drift");
   const sortedBlockers = uniqueSorted(blockers);
   const sortedDrift = uniqueSorted(drift);
+  const lifecycleStatus: Exclude<GrowDeliveryBindingStatus, "blocked"> = scheduledEvidence
+    ? live === "confirmed" && provider !== null && provider.reference !== null && provider.liveCheck?.liveAt !== null
+      ? "live_confirmed"
+      : "scheduled"
+    : "approved";
+  const currentStatus: GrowDeliveryBindingStatus = sortedBlockers.length === 0 ? lifecycleStatus : "blocked";
+  const capacityReady = slice !== null
+    && slice.slotCapacity !== null
+    && slice.availableSlots !== null
+    && !slice.paused
+    && slice.rollbackConditions.length === 0
+    && (slice.availableSlots > 0 || scheduledEvidence);
   const reviewBundleId = text(reviewBundle?.id);
 
   return {
@@ -474,7 +499,7 @@ export function buildGrowDeliveryBinding(input: GrowDeliveryBindingInput): GrowD
       review: reviewReady ? "approved" : "blocked",
       lineage: boundLineage !== null && blockers.every((item) => !item.includes("lineage"))
         ? "matching" : "blocked",
-      capacity: slice !== null && slice.slotCapacity !== null && slice.availableSlots !== null ? "available" : "blocked",
+      capacity: capacityReady ? "available" : "blocked",
       queue: queue === null ? "blocked" : queueLineage !== null && queue.artifactId === candidateId ? "matching" : "drifted",
       scheduler: scheduler === null ? "blocked" : schedulerLineage !== null
         && scheduler.deliveryId === makeDeliveryId(reviewBundleId, candidateId) ? "matching" : "drifted",

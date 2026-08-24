@@ -342,6 +342,28 @@ before `measured`. It exposes `autoScheduling: false`, `autoPublishing: false`,
 and `sideEffects: none`; it does not claim a slot or call a queue, scheduler,
 or publisher.
 
+`src/grow/delivery-binding.ts` is the stricter read-side join for the next
+handoff: it binds the approved review bundle and candidate to capacity, queue,
+scheduler, and optional provider/live facts. It requires exact source/cut/
+variant/treatment/experiment lineage, matching IDs, both queue and scheduler
+evidence for scheduled state, and explicit provider timestamps/live checks for
+later states. Missing or ambiguous manual/provider facts remain blockers. The
+binding is body-free, read-only, human-gated, and exposes
+`autoScheduling: false`, `autoPublishing: false`, and `sideEffects: none`.
+`src/grow/delivery-binding-cli.ts` and `npm run grow:delivery-binding` expose
+the same fail-closed JSON/Markdown operator view.
+
+`src/patterns/reviewed-evidence-intake.ts` is the corresponding read-side
+boundary for the reviewed account, source-evidence, and `/new` baseline rows
+needed by comparison. It normalizes explicit niche, broad, and format pool
+membership, topic/focus, audience snapshots, source evidence, scopes,
+denominators, caveats, review status, and lineage into separate deterministic
+groups. Missing, unmapped, incomplete, or cross-mismatched rows remain
+blocked; creator body, model, ranking, winner, and selection fields are
+rejected. It does not collect, rank, calculate, merge, select, or write.
+`src/patterns/reviewed-evidence-intake-cli.ts` and
+`npm run patterns:reviewed-evidence-intake` expose the body-free operator view.
+
 ### `grow_this_plan` (scaffolded; pure lifecycle projection exists)
 
 `src/grow/grow-this-plan.ts` joins the supplied source, cut, variant, review,

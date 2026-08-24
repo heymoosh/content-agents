@@ -65,6 +65,10 @@ function evidence(overrides: Record<string, unknown> = {}): Record<string, unkno
     caveats: [],
     reviewStatus: "reviewed",
     status: "current",
+    popularityScope: "reviewed account sample",
+    sampleScope: "settled source listing",
+    baselineScope: "same-account settled window",
+    baselineSource: "baseline:alpha",
     lineage: [{ recordType: "source", id: "source-alpha", relation: "observes" }],
     audienceSizeSnapshot: {
       size: 1200,
@@ -100,6 +104,7 @@ function baseline(overrides: Record<string, unknown> = {}): Record<string, unkno
     metric: "engagement",
     reviewer: "muxin",
     reviewedAt: "2026-08-23",
+    reviewStatus: "reviewed",
     caveats: [],
     ...overrides,
   };
@@ -122,11 +127,13 @@ test("normalizes reviewed account, evidence, and baseline rows into explicit gro
   assert.equal(report.rows.accounts.length, 1);
   assert.equal(report.rows.evidence.length, 1);
   assert.equal(report.rows.baselines.length, 1);
-  assert.deepEqual(report.rows.accounts[0]?.researchPoolMembership.map((row) => row.pool), ["broad", "format", "niche"]);
+  const memberships = report.rows.accounts[0]?.researchPoolMembership;
+  if (!Array.isArray(memberships)) throw new Error("expected normalized pool memberships");
+  assert.deepEqual(memberships.map((row) => row.pool), ["broad", "format", "niche"]);
   assert.equal(report.rows.accounts[0]?.readiness.status, "ready");
   assert.equal(report.rows.evidence[0]?.readiness.status, "ready");
   assert.equal(report.rows.baselines[0]?.readiness.status, "ready");
-  assert.deepEqual(report.readiness, { status: "ready", ready: 3, blocked: 0, unmapped: 0, blockerCount: 0 });
+  assert.deepEqual(report.readiness, { status: "ready", total: 3, ready: 3, blocked: 0, unmapped: 0, blockerCount: 0 });
   assert.equal(report.bodyIncluded, false);
   assert.equal(report.sideEffects, "none");
 });
@@ -167,8 +174,8 @@ test("keeps niche, broad, and format as distinct explicit memberships", () => {
     { pool: "niche", reason: "explicit civic technology review" },
   ]);
   assert.equal(report.rows.evidence[0]?.pool, "niche");
-  assert.equal(report.rows.evidence[0]?.pool === "broad", false);
-  assert.equal(report.rows.evidence[0]?.pool === "format", false);
+  assert.notEqual(report.rows.evidence[0]?.pool, "broad");
+  assert.notEqual(report.rows.evidence[0]?.pool, "format");
 });
 
 test("blocks incomplete comparison metrics and baselines without inventing values", () => {
@@ -177,12 +184,39 @@ test("blocks incomplete comparison metrics and baselines without inventing value
     baselineSamples: [baseline({ numerator: null, denominator: null, unavailableReason: "route did not expose a settled denominator" })],
   }));
   const metric = report.rows.evidence[0]?.metricSnapshot;
+  if (metric === null || metric === "unknown" || metric === undefined) throw new Error("expected normalized metric snapshot");
   assert.equal(metric?.denominator, null);
   assert.ok(report.rows.evidence[0]?.readiness.blockers.includes("metricSnapshot.denominator"));
   assert.equal(report.rows.baselines[0]?.numerator, null);
   assert.equal(report.rows.baselines[0]?.denominator, null);
   assert.equal(report.rows.baselines[0]?.unavailableReason, "route did not expose a settled denominator");
   assert.equal(report.rows.baselines[0]?.readiness.status, "ready");
+});
+
+test("requires explicit baseline review status and permits a same-row stable/current identity", () => {
+  const report = buildReviewedEvidenceIntake(input({
+    accountMetadataRows: [account({ currentAccountKey: "account-alpha" })],
+    baselineSamples: [baseline({ reviewStatus: null })],
+  }));
+
+  assert.equal(report.rows.accounts[0]?.readiness.status, "ready");
+  assert.equal(report.rows.baselines[0]?.readiness.status, "blocked");
+  assert.ok(report.rows.baselines[0]?.readiness.blockers.includes("reviewStatus"));
+});
+
+test("blocks colliding stable account identities and their ambiguous evidence references", () => {
+  const shared = account({ stableAccountId: "shared-account" });
+  const second = account({ currentAccountKey: "x|beta", stableAccountId: "shared-account", handle: "@beta" });
+  const report = buildReviewedEvidenceIntake(input({
+    accountMetadataRows: [shared, second],
+    sourceEvidenceRows: [evidence({ accountId: "shared-account" })],
+    baselineSamples: [],
+  }));
+
+  assert.deepEqual(report.rows.accounts.map((row) => row.readiness.status), ["blocked", "blocked"]);
+  assert.ok(report.rows.accounts.every((row) => row.readiness.blockers.includes("duplicate account identity")));
+  assert.equal(report.rows.evidence[0]?.readiness.status, "blocked");
+  assert.ok(report.rows.evidence[0]?.readiness.blockers.includes("account reference is unmapped or ambiguous"));
 });
 
 test("sorts deterministically, does not mutate input, and never emits body or winner fields", () => {
@@ -204,8 +238,8 @@ test("sorts deterministically, does not mutate input, and never emits body or wi
   assert.deepEqual(original, snapshot);
   assert.deepEqual(report, reversed);
   assert.deepEqual(report.rows.accounts.map((row) => row.currentAccountKey), ["x|alpha", "x|zeta"]);
-  assert.deepEqual(report.rows.evidence.map((row) => row.id), ["a-evidence", "a-evidence", "z-evidence", "z-evidence"]);
-  assert.deepEqual(report.rows.baselines.map((row) => row.id), ["a-baseline", "a-baseline", "z-baseline", "z-baseline"]);
+  assert.deepEqual(report.rows.evidence.map((row) => row.id), ["a-evidence", "z-evidence"]);
+  assert.deepEqual(report.rows.baselines.map((row) => row.id), ["a-baseline", "z-baseline"]);
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE CREATOR BODY|"winner"|"model"|"ranking"/i);
   assert.throws(() => buildReviewedEvidenceIntake(poisoned), /body|unsupported/i);
 });

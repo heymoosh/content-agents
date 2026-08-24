@@ -139,7 +139,7 @@ describe("grow delivery binding", () => {
       queueFacts: queue("scheduled"),
       providerFacts: provider(),
     });
-    assert.equal(queueOnly.status, "approved");
+    assert.equal(queueOnly.status, "blocked");
     assert.ok(queueOnly.readiness.blockers.some((blocker) => /scheduler|manual delivery/i.test(blocker)));
   });
 
@@ -160,7 +160,7 @@ describe("grow delivery binding", () => {
       schedulerFacts: scheduler("scheduled"),
       providerFacts: { ...provider(), liveCheck: null },
     });
-    assert.equal(missingCheck.status, "scheduled");
+    assert.equal(missingCheck.status, "blocked");
     assert.ok(missingCheck.readiness.blockers.includes("live check is unavailable"));
   });
 
@@ -199,11 +199,45 @@ describe("grow delivery binding", () => {
       providerFacts: provider(),
     });
 
-    assert.equal(result.status, "approved");
+    assert.equal(result.status, "blocked");
     assert.ok(result.readiness.blockers.includes("candidate treatment lineage is missing"));
     assert.ok(result.readiness.blockers.includes("queue lineage is missing"));
     assert.ok(result.readiness.blockers.includes("scheduler lineage is missing"));
     assert.ok(result.readiness.blockers.includes("queue and scheduler state do not agree"));
+  });
+
+  test("rechecks review evidence and quality gates instead of trusting readiness", () => {
+    const result = buildGrowDeliveryBinding({
+      ...input(),
+      reviewBundle: {
+        ...review,
+        evidenceStatus: "insufficient",
+        evidenceRefs: [],
+        voiceCheck: "failed",
+        originalityCheck: "failed",
+        readiness: { status: "ready", blockingFields: [], reason: "forged ready flag" },
+      },
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.checks.review, "blocked");
+    assert.ok(result.readiness.blockers.includes("review bundle evidence is not supported"));
+    assert.ok(result.readiness.blockers.includes("voice check is not passed"));
+    assert.ok(result.readiness.blockers.includes("originality check is not passed"));
+  });
+
+  test("rejects blank evidence references in direct library input", () => {
+    const result = buildGrowDeliveryBinding({
+      ...input(),
+      reviewBundle: {
+        ...review,
+        evidenceRefs: ["", "  "],
+        readiness: { status: "ready", blockingFields: [], reason: "forged ready flag" },
+      },
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.ok(result.readiness.blockers.includes("review bundle evidence is not supported"));
   });
 
   test("orders output deterministically and never mutates supplied facts", () => {

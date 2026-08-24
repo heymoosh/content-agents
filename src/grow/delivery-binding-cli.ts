@@ -57,6 +57,10 @@ function nullableText(value: unknown, label: string): void {
   if (value !== undefined && value !== null) nonEmpty(value, label);
 }
 
+function enumText(value: unknown, values: readonly string[], label: string): void {
+  if (typeof value !== "string" || !values.includes(value)) fail(`${label} must be one of ${values.join(", ")}`);
+}
+
 function array(value: unknown, label: string): unknown[] {
   if (!Array.isArray(value)) fail(label + " must be an array");
   return value;
@@ -85,9 +89,10 @@ function lineage(value: unknown, label: string, allowNull = true): void {
 
 function readiness(value: unknown, label: string): void {
   const item = record(value, label);
-  allowed(item, ["status", "blockers"], label);
+  allowed(item, ["status", "blockers", "blockingFields", "reason"], label);
   if (item.status !== "ready" && item.status !== "blocked") fail(label + ".status must be ready or blocked");
-  const blockers = array(item.blockers, label + ".blockers");
+  const blockersValue = item.blockers ?? item.blockingFields ?? [];
+  const blockers = array(blockersValue, label + ".blockers");
   blockers.forEach((blocker, index) => nonEmpty(blocker, label + ".blockers[" + index + "]"));
 }
 
@@ -107,6 +112,9 @@ function reviewBundle(value: unknown): void {
   if (item.publishRefs !== null) referenceArray(item.publishRefs, "reviewBundle.publishRefs");
   if (item.lineage !== null) referenceArray(item.lineage, "reviewBundle.lineage");
   array(item.evidenceRefs, "reviewBundle.evidenceRefs").forEach((ref, index) => nonEmpty(ref, "reviewBundle.evidenceRefs[" + index + "]"));
+  enumText(item.evidenceStatus, ["supported", "hypothesis", "insufficient", "blocked"], "reviewBundle.evidenceStatus");
+  enumText(item.voiceCheck, ["pending", "passed", "failed", "not-run"], "reviewBundle.voiceCheck");
+  enumText(item.originalityCheck, ["pending", "passed", "failed", "not-run"], "reviewBundle.originalityCheck");
   readiness(item.readiness, "reviewBundle.readiness");
   const decision = record(item.humanDecision, "reviewBundle.humanDecision");
   allowed(decision, ["status", "decidedBy", "decidedAt", "note"], "reviewBundle.humanDecision");
