@@ -222,7 +222,45 @@ references, evidence status, voice/originality review state, and
 does not read source bodies, generate copy, create review-queue rows,
 schedule, publish, or claim that a variant is approved.
 
-### `experiment` (scaffolded)
+### `grow_review_bundle` (scaffolded; side-effect-free reference bundle exists)
+
+The typed adapter in `src/grow/review-bundle.ts` packages source, cut, variant,
+and optional publish references with evidence status, voice/originality checks,
+readiness blockers, and Muxin's explicit decision. It carries references and
+metadata only. It never reads source bodies, generates copy, queues, schedules,
+publishes, or turns a candidate into an approval by inference.
+
+Required review fields are:
+
+```text
+id, source_ref, cut_ref, variant_refs, publish_refs, lineage,
+evidence_status, evidence_refs, voice_check, originality_check, readiness,
+human_decision, status
+```
+
+`status` is `candidate`, `approved`, `rejected`, or `needs-another-pass`.
+`approved` requires complete lineage, supported evidence with references,
+passed voice and originality checks, and a decision explicitly recorded by
+Muxin. Missing or blocked inputs remain visible as readiness blockers.
+
+### `grow_capacity_manifest` (scaffolded; side-effect-free accounting view exists)
+
+The typed adapter in `src/grow/capacity.ts` separates inspectable candidate
+volume from approved publish volume. It records per-day/per-platform candidate
+counts, review capacity, slot capacity, scheduled count, pauses, rollback
+conditions, and gap reasons. Missing placement or slot data stays blocked or
+`null`; the manifest does not approve, schedule, publish, or create content.
+
+### `experiment` (scaffolded; typed deterministic record exists)
+
+The typed adapter in `src/grow/experiment-record.ts` normalizes one question,
+declared variables, platform/format/topic/audience scope, source/variant/
+publish/outcome lineage, success observations, minimum sample, and an end date
+or review rule. Attention, conversation, audience, and business observations
+remain separate outcome families. A winner may be recorded only when its
+observation is measured, references a declared outcome, and meets the declared
+minimum sample; otherwise the experiment remains provisional or
+`insufficient-evidence`.
 
 Owner: `signals`; Muxin owns the question and adoption of the conclusion.
 
@@ -230,7 +268,7 @@ Required fields:
 
 ```text
 id, question, hypothesis, unit, comparison, variable_names, platform_scope,
-audience_scope, success_observations, minimum_sample, review_rule,
+format_scope, topic_scope, audience_scope, success_observations, minimum_sample, review_rule,
 start_at, end_at, variant_refs, outcome_refs, status, lineage
 ```
 
