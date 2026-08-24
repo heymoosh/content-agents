@@ -44,6 +44,8 @@ test("renders a deterministic, body-free operator view through injected I/O", ()
   assert.deepEqual(errors, []);
   assert.match(output[0] ?? "", /hook-template-ledger-cli-v1/);
   assert.match(output[0] ?? "", /Common-hook mad-lib adaptation/);
+  assert.match(output[0] ?? "", /"bodyIncluded": false/);
+  assert.match(output[0] ?? "", /"winnerClaimsAllowed": false/);
   assert.doesNotMatch(output[0] ?? "", /"(?:body|copy|model|winner|score)"\s*:/);
   assert.match(renderHookTemplateLedgerMarkdown(readHookTemplateLedger(JSON.stringify(row))), /Contrast opener|contrast/);
 });

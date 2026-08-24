@@ -55,6 +55,8 @@ test("reads valid JSONL, filters by platform/niche/format, and reports evidence 
   })), { platform: "linkedin", niche: "building", format: "text-post" });
   assert.deepEqual(result.rows.map((value) => value.id), ["hook:contrast"]);
   assert.deepEqual(result.summary, { total: 1, reviewed: 1, unreviewed: 0, measured: 1 });
+  assert.equal(result.bodyIncluded, false);
+  assert.equal(result.winnerClaimsAllowed, false);
   assert.equal(result.generatesCopy, false);
   assert.equal(result.creatorBodyCopyAllowed, false);
   assert.equal(result.sideEffects, "none");

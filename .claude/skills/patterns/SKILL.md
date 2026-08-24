@@ -116,8 +116,17 @@ npm run patterns:youtube
 npm run patterns:account-mapping
 npm run patterns:coverage
 npm run patterns:pool-evidence
+npm run patterns:hook-templates -- --file <hook-template-ledger.jsonl> [--platform X] [--niche Y] [--format json|markdown|both]
 npm run grow:plan
 ```
+
+`patterns:hook-templates` reads only the curated JSONL hook-mechanism ledger. It is a metadata
+adapter for common-hook mad-lib reuse: it keeps platform, niche, format, slot, source-reference,
+review, originality, evidence, and adaptation fields, while rejecting creator body, exact opener,
+model, credential, ranking, and winner fields. The exact opener evidence bank remains separate.
+Its output is body-free, has `bodyIncluded: false` and `winnerClaimsAllowed: false`, and has no
+collection, generation, queue, scheduling, or publishing side effect. Missing or unreviewed rows
+remain blocked unless the operator explicitly asks to include unreviewed metadata.
 
 Do not invent a new command because a judgment step would be convenient. `/patterns analyze`,
 `synthesize`, `ideas`, `series`, `rewrite`, `asap`, and `remix` are explicit skill modes whose
