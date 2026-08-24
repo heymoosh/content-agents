@@ -216,6 +216,116 @@ test("fails closed at volume and generation safety boundaries", () => {
   assert.ok(stage(result, "generation")?.blockers.includes("generation run permits auto-publishing"));
 });
 
+test("accepts the canonical generation-run slots shape and keeps coverage before generation", () => {
+  const result = buildStudioReadiness({
+    sourceStatus: "ready",
+    brief,
+    treatmentCoverage,
+    volumePlan,
+    generationRunManifest: {
+      kind: "grow_generation_run",
+      version: "grow-generation-run-v1",
+      slots: [{
+        platform: "linkedin",
+        dayIndex: 0,
+        slotIndex: 0,
+        variantId: "variant-1",
+        status: "ready",
+        readiness: { status: "ready", blockers: [] },
+        blockers: [],
+        generatedArtifactRef: "artifact:variant-1",
+        reviewQueueRef: "review:variant-1",
+        reviewQueueStatus: "pending",
+        humanReviewRequired: true,
+      }],
+      summary: { slots: 1, ready: 1, blocked: 0, missing: 0, duplicate: 0, unexpected: 0 },
+      readiness: { status: "ready", blockers: [] },
+      humanReviewRequired: true,
+      generatesCopy: false,
+      creatorBodyCopyAllowed: false,
+      autoApproval: false,
+      autoScheduling: false,
+      autoPublishing: false,
+      sideEffects: "none",
+    },
+    reviewBundle: approvedReview,
+    delivery,
+    learning,
+  });
+
+  assert.equal(stage(result, "generation")?.status, "ready");
+  assert.deepEqual(result.stages.map(({ stage: name }) => name), [
+    "source", "brief", "treatment-coverage", "volume", "generation", "review", "delivery", "learning",
+  ]);
+
+  const blockedCoverage = buildStudioReadiness({
+    sourceStatus: "ready",
+    brief,
+    treatmentCoverage: { ...treatmentCoverage, readiness: { status: "blocked", blockers: ["format is unreviewed"] } },
+    volumePlan,
+    generationRunManifest: {
+      kind: "grow_generation_run",
+      version: "grow-generation-run-v1",
+      slots: [{
+        platform: "linkedin", dayIndex: 0, slotIndex: 0, variantId: "variant-1", status: "ready",
+        readiness: { status: "ready", blockers: [] }, blockers: [], humanReviewRequired: true,
+        generatedArtifactRef: "artifact:variant-1", reviewQueueRef: "review:variant-1", reviewQueueStatus: "pending",
+      }],
+      summary: { slots: 1, ready: 1, blocked: 0, missing: 0, duplicate: 0, unexpected: 0 },
+      readiness: { status: "ready", blockers: [] }, humanReviewRequired: true,
+      generatesCopy: false, creatorBodyCopyAllowed: false, autoApproval: false,
+      autoScheduling: false, autoPublishing: false, sideEffects: "none",
+    },
+    reviewBundle: approvedReview,
+    delivery,
+    learning,
+  });
+  assert.equal(stage(blockedCoverage, "treatment-coverage")?.status, "blocked");
+  assert.ok(stage(blockedCoverage, "generation")?.blockers.includes("generation waits for treatment coverage"));
+});
+
+test("does not trust a generation summary over slot identity or unexpected candidates", () => {
+  const base = {
+    kind: "grow_generation_run" as const,
+    version: "grow-generation-run-v1" as const,
+    sourceReference: "source:essay-1",
+    substanceReference: "substance:essay-1",
+    summary: { slots: 1, ready: 1, blocked: 0, missing: 0, duplicate: 0, unexpected: 0 },
+    readiness: { status: "ready" as const, blockers: [] },
+    humanReviewRequired: true as const,
+    generatesCopy: false as const,
+    creatorBodyCopyAllowed: false as const,
+    autoApproval: false as const,
+    autoScheduling: false as const,
+    autoPublishing: false as const,
+    sideEffects: "none" as const,
+  };
+  const row = {
+    platform: "linkedin", dayIndex: 0, slotIndex: 0, variantId: "other-variant", status: "ready" as const,
+    readiness: { status: "ready" as const, blockers: [] }, blockers: [], humanReviewRequired: true as const,
+    generatedArtifactRef: "artifact:other", reviewQueueRef: "review:other", reviewQueueStatus: "pending",
+  };
+  const mismatched = buildStudioReadiness({
+    sourceStatus: "ready", brief, treatmentCoverage, volumePlan,
+    generationRunManifest: { ...base, slots: [row], unexpectedCandidates: [] },
+    reviewBundle: approvedReview, delivery, learning,
+  });
+  assert.equal(stage(mismatched, "generation")?.status, "blocked");
+  assert.ok(stage(mismatched, "generation")?.blockers.includes("generation run slots do not match the volume plan"));
+
+  const unexpected = buildStudioReadiness({
+    sourceStatus: "ready", brief, treatmentCoverage, volumePlan,
+    generationRunManifest: {
+      ...base,
+      slots: [{ ...row, variantId: "variant-1", generatedArtifactRef: "artifact:variant-1", reviewQueueRef: "review:variant-1" }],
+      unexpectedCandidates: [{ ...row, platform: "x", variantId: "extra", status: "unexpected", readiness: { status: "blocked", blockers: ["unexpected"] } }],
+    },
+    reviewBundle: approvedReview, delivery, learning,
+  });
+  assert.equal(stage(unexpected, "generation")?.status, "blocked");
+  assert.ok(stage(unexpected, "generation")?.blockers.includes("generation run has unexpected candidates"));
+});
+
 test("keeps a missing brief blocked even when later facts are supplied", () => {
   const result = buildStudioReadiness({
     sourceStatus: "ready",

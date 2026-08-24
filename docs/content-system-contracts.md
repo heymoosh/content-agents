@@ -949,15 +949,36 @@ read-only JSON/Markdown operator view; they do not send, publish, or write.
 ### `studio_readiness` (scaffolded; aggregate operator view exists)
 
 `src/grow/studio-readiness.ts` composes caller-supplied readiness for the
-source, generation brief, review bundle, delivery record, and comment-learning
-view. It keeps missing or blocked stages visible and exposes the separate human
-gates. It is a body-free inspection artifact: it does not include the brief,
-source substance, creator text, generated copy, publishing records, or learning
-interpretation, and it never approves or publishes anything.
+source, generation brief, treatment coverage, volume plan, generation run,
+review bundle, delivery record, and comment-learning view. Its lifecycle is
+explicitly `source -> brief -> treatment-coverage -> volume -> generation ->
+review -> delivery -> learning`; missing or blocked pre-generation stages keep
+generation blocked. It keeps separate human gates and is a body-free inspection
+artifact: it does not include the brief, source substance, creator text,
+generated copy, publishing records, or learning interpretation, and it never
+approves or publishes anything.
 `src/grow/studio-readiness-cli.ts` and `npm run grow:studio-readiness` provide a
 read-only JSON/Markdown operator projection of that envelope. Malformed or
 missing inputs fail closed; the command preserves blockers and never writes,
 publishes, or includes source substance.
+
+### `generation_run` (scaffolded; explicit artifact/review handoff exists)
+
+`src/grow/generation-run.ts` reconciles a deterministic `volume_plan` with
+caller-supplied metadata for each generated artifact and its still-pending
+human-review queue reference. It requires an explicit, ready
+`grow_treatment_coverage` report before the run can be ready. Missing, duplicate,
+wrong-platform, wrong-variant, wrong-assignment, blocked, and unexpected records
+remain explicit blockers; the adapter never selects or invents a replacement.
+
+The manifest carries references and slot identity only. It has
+`generatesCopy: false`, `creatorBodyCopyAllowed: false`,
+`humanReviewRequired: true`, `autoApproval: false`, `autoScheduling: false`,
+`autoPublishing: false`, and `sideEffects: none`. It does not invoke a model,
+read or write draft files, create queue rows, approve, schedule, publish, or
+send. `src/grow/generation-run-cli.ts` and `npm run grow:generation-run`
+expose deterministic JSON/Markdown output and fail closed on malformed or
+body-bearing envelopes.
 
 ### `manual_platform_observation` (scaffolded; collectorless intake exists)
 

@@ -50,6 +50,17 @@ function record(value: unknown, field: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function assertAllowedFields(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  field: string,
+): void {
+  const accepted = new Set(allowed);
+  for (const key of Object.keys(value)) {
+    if (!accepted.has(key)) fail(`${field} contains unsupported field "${key}"`);
+  }
+}
+
 function jsonEnvelope(raw: string): Record<string, unknown> {
   let parsed: unknown;
   try {
@@ -148,11 +159,19 @@ function readinessObject(value: unknown, field: string): Record<string, unknown>
 function volumePlan(value: unknown): StudioReadinessVolumePlan | null {
   if (value === undefined || value === null) return null;
   const plan = record(value, "volumePlan");
+  assertAllowedFields(plan, [
+    "sourceReference", "substanceReference", "slots", "humanReviewRequired", "humanGate",
+    "generatesCopy", "creatorBodyCopyAllowed", "sideEffects",
+  ], "volume plan");
   if (Object.hasOwn(plan, "slots") && !Array.isArray(plan.slots)) {
     fail("volume plan slots must be an array");
   }
   for (const [index, slot] of (plan.slots as unknown[] | undefined ?? []).entries()) {
     const slotRecord = record(slot, `volume plan slot ${index + 1}`);
+    assertAllowedFields(slotRecord, [
+      "id", "slotId", "slotKey", "platform", "dayIndex", "slotIndex", "variantId",
+      "experimentAssignment", "readiness", "status", "blockers", "humanReviewRequired", "humanGate",
+    ], `volume plan slot ${index + 1}`);
     if (Object.hasOwn(slotRecord, "blockers")) optionalArray(slotRecord.blockers, `volume plan slot ${index + 1} blockers`);
     readinessObject(slotRecord.readiness, `volume plan slot ${index + 1} readiness`);
     optionalBoolean(slotRecord.humanReviewRequired, `volume plan slot ${index + 1} humanReviewRequired`);
@@ -167,12 +186,41 @@ function volumePlan(value: unknown): StudioReadinessVolumePlan | null {
 function generationRun(value: unknown): StudioReadinessGenerationRun | null {
   if (value === undefined || value === null) return null;
   const run = record(value, "generationRunManifest");
+  assertAllowedFields(run, [
+    "kind", "version", "sourceReference", "substanceReference", "slots", "rows", "unexpectedCandidates",
+    "coverage", "summary", "readiness", "treatmentCoverage",
+    "humanReviewRequired", "reviewGate", "humanGate", "generatesCopy", "creatorBodyCopyAllowed",
+    "sideEffects", "autoApproval", "autoScheduling", "autoPublishing",
+  ], "generation run");
+  if (run.kind !== undefined && run.kind !== "grow_generation_run") {
+    fail("generation run kind must be grow_generation_run");
+  }
+  if (run.version !== undefined && run.version !== "grow-generation-run-v1") {
+    fail("generation run version must be grow-generation-run-v1");
+  }
+  if (run.kind === "grow_generation_run" || run.version === "grow-generation-run-v1") {
+    if (run.generatesCopy !== false) fail("built generation run must not generate copy");
+    if (run.creatorBodyCopyAllowed !== false) fail("built generation run must forbid creator body copy");
+    if (run.autoApproval !== false || run.autoScheduling !== false || run.autoPublishing !== false) {
+      fail("built generation run must disable automatic approval, scheduling, and publishing");
+    }
+    if (run.sideEffects !== "none") fail("built generation run must have no side effects");
+  }
+  if (Object.hasOwn(run, "slots") && !Array.isArray(run.slots)) {
+    fail("generation run slots must be an array");
+  }
   if (Object.hasOwn(run, "rows") && !Array.isArray(run.rows)) {
     fail("generation run rows must be an array");
   }
-  const rows = (run.rows as unknown[] | undefined) ?? [];
+  const rows = (run.rows as unknown[] | undefined) ?? (run.slots as unknown[] | undefined) ?? [];
   for (const [index, row] of rows.entries()) {
     const rowRecord = record(row, `generation run row ${index + 1}`);
+    assertAllowedFields(rowRecord, [
+      "id", "slotId", "slotKey", "volumeSlotId", "volumePlanSlotId", "variantId",
+      "platform", "dayIndex", "slotIndex", "experimentAssignment", "generatedArtifactRef",
+      "reviewQueueRef", "reviewQueueStatus", "status", "readiness", "blockers",
+      "humanReviewRequired", "humanGate",
+    ], `generation run row ${index + 1}`);
     const readiness = rowRecord.readiness;
     const readinessStatus = readiness !== null && typeof readiness === "object" && !Array.isArray(readiness)
       ? (readiness as Record<string, unknown>).status
@@ -184,9 +232,26 @@ function generationRun(value: unknown): StudioReadinessGenerationRun | null {
     readinessObject(rowRecord.readiness, `generation run row ${index + 1} readiness`);
     optionalBoolean(rowRecord.humanReviewRequired, `generation run row ${index + 1} humanReviewRequired`);
   }
+  if (run.unexpectedCandidates !== undefined) {
+    if (!Array.isArray(run.unexpectedCandidates)) fail("generation run unexpectedCandidates must be an array");
+    for (const [index, candidate] of run.unexpectedCandidates.entries()) {
+      const candidateRecord = record(candidate, `generation run unexpected candidate ${index + 1}`);
+      assertAllowedFields(candidateRecord, [
+        "platform", "dayIndex", "slotIndex", "variantId", "experimentAssignment", "status", "readiness", "blockers",
+        "generatedArtifactRef", "reviewQueueRef", "reviewQueueStatus", "humanReviewRequired", "humanGate",
+      ], `generation run unexpected candidate ${index + 1}`);
+      if (Object.hasOwn(candidateRecord, "blockers")) optionalArray(candidateRecord.blockers, `generation run unexpected candidate ${index + 1} blockers`);
+      readinessObject(candidateRecord.readiness, `generation run unexpected candidate ${index + 1} readiness`);
+      optionalBoolean(candidateRecord.humanReviewRequired, `generation run unexpected candidate ${index + 1} humanReviewRequired`);
+    }
+  }
   const coverage = run.coverage;
   if (coverage !== undefined) {
     const coverageRecord = record(coverage, "generation run coverage");
+    assertAllowedFields(coverageRecord, [
+      "status", "oneToOne", "one_to_one", "expectedVariantIds", "generatedVariantIds",
+      "duplicateVariantIds", "missingVariantIds", "blockers",
+    ], "generation run coverage");
     for (const field of ["expectedVariantIds", "generatedVariantIds", "duplicateVariantIds", "missingVariantIds", "blockers"]) {
       if (Object.hasOwn(coverageRecord, field)) optionalArray(coverageRecord[field], `generation run coverage ${field}`);
     }
@@ -195,6 +260,19 @@ function generationRun(value: unknown): StudioReadinessGenerationRun | null {
     }
     optionalBoolean(coverageRecord.oneToOne, "generation run coverage oneToOne");
   }
+  const summary = run.summary;
+  if (summary !== undefined) {
+    const summaryRecord = record(summary, "generation run summary");
+    assertAllowedFields(summaryRecord, ["slots", "ready", "blocked", "missing", "duplicate", "unexpected"], "generation run summary");
+    for (const field of ["slots", "ready", "blocked", "missing", "duplicate", "unexpected"]) {
+      if (summaryRecord[field] !== undefined
+        && (typeof summaryRecord[field] !== "number" || !Number.isInteger(summaryRecord[field]) || summaryRecord[field] < 0)) {
+        fail(`generation run summary ${field} must be a non-negative integer`);
+      }
+    }
+  }
+  if (run.readiness !== undefined) readinessObject(run.readiness, "generation run readiness");
+  if (run.treatmentCoverage !== undefined) readinessObject(run.treatmentCoverage, "generation run treatment coverage");
   optionalBoolean(run.humanReviewRequired, "generation run humanReviewRequired");
   optionalBoolean(run.generatesCopy, "generation run generatesCopy");
   optionalBoolean(run.creatorBodyCopyAllowed, "generation run creatorBodyCopyAllowed");
@@ -208,6 +286,10 @@ function generationRun(value: unknown): StudioReadinessGenerationRun | null {
 function treatmentCoverage(value: unknown): StudioReadinessTreatmentCoverage | null {
   if (value === undefined || value === null) return null;
   const coverage = record(value, "treatmentCoverage");
+  assertAllowedFields(coverage, [
+    "kind", "version", "rows", "unexpectedCandidates", "summary", "readiness",
+    "generatesCopy", "creatorBodyCopyAllowed", "bodyFree", "sideEffects",
+  ], "treatment coverage");
   if (coverage.kind !== undefined && coverage.kind !== "grow_treatment_coverage") {
     fail("treatment coverage kind must be grow_treatment_coverage");
   }
@@ -215,6 +297,38 @@ function treatmentCoverage(value: unknown): StudioReadinessTreatmentCoverage | n
     fail("treatment coverage version must be grow-treatment-coverage-v1");
   }
   const built = coverage.kind === "grow_treatment_coverage" || coverage.version === "grow-treatment-coverage-v1";
+  const rows = coverage.rows;
+  if (rows !== undefined) {
+    if (!Array.isArray(rows)) fail("treatment coverage rows must be an array");
+    for (const [index, row] of rows.entries()) {
+      const rowRecord = record(row, `treatment coverage row ${index + 1}`);
+      assertAllowedFields(rowRecord, ["identity", "candidateIds", "status", "readiness"], `treatment coverage row ${index + 1}`);
+      if (Object.hasOwn(rowRecord, "candidateIds")) optionalArray(rowRecord.candidateIds, `treatment coverage row ${index + 1} candidateIds`);
+      const identity = rowRecord.identity;
+      if (identity !== undefined) {
+        const identityRecord = record(identity, `treatment coverage row ${index + 1} identity`);
+        assertAllowedFields(identityRecord, ["platform", "medium", "format", "treatmentId", "experimentId", "variables"], `treatment coverage row ${index + 1} identity`);
+      }
+      readinessObject(rowRecord.readiness, `treatment coverage row ${index + 1} readiness`);
+    }
+  }
+  const unexpected = coverage.unexpectedCandidates;
+  if (unexpected !== undefined) {
+    if (!Array.isArray(unexpected)) fail("treatment coverage unexpectedCandidates must be an array");
+    for (const [index, candidate] of unexpected.entries()) {
+      const candidateRecord = record(candidate, `treatment coverage unexpected candidate ${index + 1}`);
+      assertAllowedFields(candidateRecord, ["candidateId", "identity", "status", "readiness"], `treatment coverage unexpected candidate ${index + 1}`);
+      if (candidateRecord.identity !== undefined) {
+        const identityRecord = record(candidateRecord.identity, `treatment coverage unexpected candidate ${index + 1} identity`);
+        assertAllowedFields(identityRecord, ["platform", "medium", "format", "treatmentId", "experimentId", "variables"], `treatment coverage unexpected candidate ${index + 1} identity`);
+      }
+      readinessObject(candidateRecord.readiness, `treatment coverage unexpected candidate ${index + 1} readiness`);
+    }
+  }
+  if (coverage.summary !== undefined) {
+    const summary = record(coverage.summary, "treatment coverage summary");
+    assertAllowedFields(summary, ["requested", "matched", "missing", "duplicate", "blocked", "unexpected"], "treatment coverage summary");
+  }
   const readiness = record(coverage.readiness, "treatment coverage readiness");
   if (readiness.status !== "ready" && readiness.status !== "blocked") fail("treatment coverage readiness status must be ready or blocked");
   if (Object.hasOwn(readiness, "blockers")) optionalArray(readiness.blockers, "treatment coverage readiness blockers");
@@ -231,6 +345,12 @@ function treatmentCoverage(value: unknown): StudioReadinessTreatmentCoverage | n
 /** Parse the body-free operator envelope and feed only metadata to existing readiness builders. */
 export function loadStudioReadinessEnvelope(raw: string): StudioReadinessInput {
   const input = jsonEnvelope(raw);
+  assertAllowedFields(input, [
+    "sourceStatus", "source", "generationBrief", "brief", "treatmentCoverage", "coverage", "treatmentCoverageView",
+    "volumePlan", "volume", "volumePlanManifest", "generationRunManifest", "generationRun", "generationManifest", "generation",
+    "reviewBundle", "reviewProjection", "review", "deliveryRecord", "delivery", "learningPacket", "learning",
+    "commentLearningView", "commentLearning",
+  ], "input envelope");
   const briefValue = input.generationBrief ?? input.brief;
   const coverageValue = input.treatmentCoverage ?? input.coverage ?? input.treatmentCoverageView;
   const volumeValue = input.volumePlan ?? input.volume ?? input.volumePlanManifest;

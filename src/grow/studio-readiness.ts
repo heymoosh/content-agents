@@ -76,6 +76,9 @@ export interface StudioReadinessGenerationRow {
   readonly dayIndex?: number | null;
   readonly slotIndex?: number | null;
   readonly status?: string;
+  readonly generatedArtifactRef?: string | null;
+  readonly reviewQueueRef?: string | null;
+  readonly reviewQueueStatus?: string | null;
   readonly readiness?: { readonly status?: string; readonly blockers?: readonly string[] } | string;
   readonly blockers?: readonly string[];
   readonly humanReviewRequired?: boolean;
@@ -84,8 +87,25 @@ export interface StudioReadinessGenerationRow {
 
 /** Minimal structural seam for the forthcoming generation-run manifest. */
 export interface StudioReadinessGenerationRun {
+  readonly kind?: string;
+  readonly version?: string;
+  readonly sourceReference?: string;
+  readonly substanceReference?: string;
+  /** The canonical generation-run output uses `slots`; `rows` remains a structural alias. */
+  readonly slots?: readonly StudioReadinessGenerationRow[];
   readonly rows?: readonly StudioReadinessGenerationRow[];
+  readonly unexpectedCandidates?: readonly StudioReadinessGenerationRow[];
   readonly coverage?: StudioReadinessGenerationCoverage;
+  readonly summary?: {
+    readonly slots?: number;
+    readonly ready?: number;
+    readonly blocked?: number;
+    readonly missing?: number;
+    readonly duplicate?: number;
+    readonly unexpected?: number;
+  };
+  readonly readiness?: { readonly status?: string; readonly blockers?: readonly string[] };
+  readonly treatmentCoverage?: { readonly status?: string; readonly blockers?: readonly string[] };
   readonly humanReviewRequired?: boolean;
   readonly reviewGate?: StudioReadinessHumanGateFact;
   readonly humanGate?: StudioReadinessHumanGateFact;
@@ -316,26 +336,85 @@ function generationVariantIds(plan: StudioReadinessVolumePlan | null): string[] 
   return values.every((value): value is string => typeof value === "string") ? values : null;
 }
 
+function generationRows(run: StudioReadinessGenerationRun): readonly StudioReadinessGenerationRow[] | null {
+  if (Array.isArray(run.slots)) return run.slots;
+  if (Array.isArray(run.rows)) return run.rows;
+  return null;
+}
+
+function generationRowIdentity(row: StudioReadinessGenerationRow): string | null {
+  if (typeof row.platform !== "string"
+    || typeof row.dayIndex !== "number"
+    || typeof row.slotIndex !== "number"
+    || typeof row.variantId !== "string") return null;
+  return JSON.stringify([row.platform, row.dayIndex, row.slotIndex, row.variantId]);
+}
+
 function generationCoverageBlockers(
   run: StudioReadinessGenerationRun,
   plan: StudioReadinessVolumePlan | null,
 ): string[] {
   const blockers: string[] = [];
+  const rows = generationRows(run);
   const coverage = run.coverage;
-  if (coverage?.status !== "complete") blockers.push("generation run coverage is incomplete");
+  const summary = run.summary;
+  if (run.readiness?.status === "blocked") {
+    blockers.push(...(run.readiness.blockers?.length ? run.readiness.blockers : ["generation run readiness is blocked"]));
+  }
+
+  if (summary !== undefined) {
+    if (summary.slots === undefined || summary.ready === undefined || summary.blocked === undefined
+      || summary.missing === undefined || summary.duplicate === undefined || summary.unexpected === undefined) {
+      blockers.push("generation run summary is incomplete");
+    } else {
+      if (rows !== null && summary.slots !== rows.length) blockers.push("generation run summary does not match its slots");
+      if (summary.blocked > 0) blockers.push("generation run contains blocked slots");
+      if (summary.missing > 0) blockers.push("generation run has missing slots");
+      if (summary.duplicate > 0) blockers.push("generation run has duplicate slots");
+      if (summary.unexpected > 0) blockers.push("generation run has unexpected candidates");
+      if (summary.ready !== summary.slots) blockers.push("generation run coverage is not complete");
+    }
+  } else if (coverage?.status !== "complete") {
+    blockers.push("generation run coverage is incomplete");
+  }
 
   const expected = ids(coverage?.expectedVariantIds);
   const generated = ids(coverage?.generatedVariantIds);
   const duplicate = ids(coverage?.duplicateVariantIds);
   const missing = ids(coverage?.missingVariantIds);
-  const rowIds = Array.isArray(run.rows)
-    ? run.rows.map((row) => row.variantId).filter((value): value is string => typeof value === "string")
+  const rowIds = rows !== null
+    ? rows.map((row) => row.variantId).filter((value): value is string => typeof value === "string")
     : [];
   const plannedIds = generationVariantIds(plan);
 
+  if (rows !== null && run.slots !== undefined) {
+    const identities = rows.map(generationRowIdentity);
+    if (identities.some((value) => value === null)) blockers.push("generation run slots have incomplete identity");
+    const present = identities.filter((value): value is string => value !== null);
+    if (new Set(present).size !== present.length) blockers.push("generation run contains duplicate slot identities");
+    if (plan !== null && Array.isArray(plan.slots)) {
+      const plannedIdentities = plan.slots.map(generationRowIdentity);
+      if (plannedIdentities.some((value) => value === null)) blockers.push("volume plan slots have incomplete identity");
+      const sortedPlanned = plannedIdentities.filter((value): value is string => value !== null).sort();
+      const sortedGenerated = present.slice().sort();
+      if (!sameIds(sortedPlanned, sortedGenerated)) blockers.push("generation run slots do not match the volume plan");
+    }
+  }
+  if (run.unexpectedCandidates !== undefined && run.unexpectedCandidates.length > 0) {
+    blockers.push("generation run has unexpected candidates");
+  }
+
   const declaredOneToOne = coverage?.oneToOne ?? coverage?.one_to_one;
   let oneToOne = declaredOneToOne === true;
-  if (expected !== null && generated !== null) {
+  if (summary !== undefined) {
+    oneToOne = summary.slots !== undefined
+      && summary.ready !== undefined
+      && summary.ready === summary.slots
+      && (summary.blocked ?? 1) === 0
+      && (summary.missing ?? 1) === 0
+      && (summary.duplicate ?? 1) === 0
+      && (summary.unexpected ?? 1) === 0;
+  } else if (expected !== null && generated !== null) {
     const sortedExpected = [...expected].sort();
     const sortedGenerated = [...generated].sort();
     const identifiersAreOneToOne = sameIds(sortedExpected, sortedGenerated)
@@ -363,16 +442,18 @@ function generationStage(
   run: StudioReadinessGenerationRun | null,
   plan: StudioReadinessVolumePlan | null,
   volumeProjection: StudioReadinessStageProjection,
+  treatmentCoverageProjection: StudioReadinessStageProjection,
 ): StudioReadinessStageProjection {
   if (run === null) return stage("generation", "blocked", ["generation run manifest is missing"]);
 
   const blockers: string[] = [];
-  if (!Array.isArray(run.rows)) {
+  const rows = generationRows(run);
+  if (rows === null) {
     blockers.push("generation run rows are missing");
-  } else if (run.rows.length === 0) {
+  } else if (rows.length === 0) {
     blockers.push("generation run has no rows");
   } else {
-    for (const row of run.rows) {
+    for (const row of rows) {
       const status = rowStatus(row);
       const rowBlockerValues = rowBlockers(row);
       if (status === "blocked") {
@@ -383,9 +464,19 @@ function generationStage(
         blockers.push(...rowBlockerValues);
       }
       if (row.humanReviewRequired === false) blockers.push("generation run rows do not require human review");
+      if (run.slots !== undefined) {
+        if (typeof row.generatedArtifactRef !== "string" || row.generatedArtifactRef.trim() === "") {
+          blockers.push("generation run slot artifact reference is missing");
+        }
+        if (typeof row.reviewQueueRef !== "string" || row.reviewQueueRef.trim() === "") {
+          blockers.push("generation run slot review queue reference is missing");
+        }
+        if (row.reviewQueueStatus !== "pending") blockers.push("generation run slot review queue is not pending");
+      }
     }
   }
   blockers.push(...generationCoverageBlockers(run, plan));
+  if (treatmentCoverageProjection.status !== "ready") blockers.push("generation waits for treatment coverage");
   if (volumeProjection.status !== "ready") {
     blockers.push(plan === null ? "generation waits for volume plan" : "generation waits for volume readiness");
   }
@@ -547,7 +638,7 @@ export function buildStudioReadiness(input: StudioReadinessInput): StudioReadine
   const briefProjection = briefStage(brief);
   const treatmentCoverageProjection = treatmentCoverageStage(treatmentCoverage);
   const volumeProjection = volumeStage(volume);
-  const generationProjection = generationStage(generation, volume, volumeProjection);
+  const generationProjection = generationStage(generation, volume, volumeProjection, treatmentCoverageProjection);
   const reviewProjection = reviewStage(review);
   const deliveryRecord = input.delivery !== undefined ? input.delivery : input.deliveryRecord ?? null;
   const deliveryProjection = deliveryStage(deliveryRecord, review, reviewProjection, source, briefProjection);

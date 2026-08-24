@@ -80,10 +80,41 @@ test("parses and validates explicit volume and generation envelopes", () => {
   })), /volume plan slots must be an array/);
   assert.throws(() => buildStudioReadinessFromJson(JSON.stringify({
     generationRunManifest: { ...generationRunManifest, rows: [{ variantId: "variant-1", body: "copy" }] },
-  })), /generation run row 1 must contain a status/);
+  })), /unsupported field "body"|generation run row 1 must contain a status/);
   assert.throws(() => buildStudioReadinessFromJson(JSON.stringify({
     treatmentCoverage: { ...treatmentCoverage, kind: "grow_treatment_coverage", generatesCopy: true },
   })), /treatment coverage must not generate copy|treatment coverage generatesCopy/);
+  assert.throws(() => buildStudioReadinessFromJson(JSON.stringify({ source: { status: "ready" }, body: "copy" })), /unsupported field "body"/);
+});
+
+test("accepts a genuine versioned generation-run artifact", () => {
+  const readiness = buildStudioReadinessFromJson(JSON.stringify({
+    source: { status: "ready" },
+    treatmentCoverage,
+    volumePlan,
+    generationRunManifest: {
+      kind: "grow_generation_run",
+      version: "grow-generation-run-v1",
+      sourceReference: "source:essay-1",
+      substanceReference: "substance:essay-1",
+      slots: [{
+        platform: "linkedin", dayIndex: 0, slotIndex: 0, variantId: "variant-1", status: "ready",
+        readiness: { status: "ready", blockers: [] }, blockers: [], humanReviewRequired: true,
+        generatedArtifactRef: "artifact:variant-1", reviewQueueRef: "review:variant-1", reviewQueueStatus: "pending",
+      }],
+      unexpectedCandidates: [],
+      summary: { slots: 1, ready: 1, blocked: 0, missing: 0, duplicate: 0, unexpected: 0 },
+      readiness: { status: "ready", blockers: [] },
+      humanReviewRequired: true,
+      generatesCopy: false,
+      creatorBodyCopyAllowed: false,
+      autoApproval: false,
+      autoScheduling: false,
+      autoPublishing: false,
+      sideEffects: "none",
+    },
+  }));
+  assert.equal(readiness.stages.find((entry) => entry.stage === "generation")?.status, "ready");
 });
 
 test("renders deterministic, body-free readiness metadata", () => {

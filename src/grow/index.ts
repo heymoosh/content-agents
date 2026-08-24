@@ -121,6 +121,22 @@ export {
 } from "./treatment-coverage.js";
 
 export {
+  buildGenerationRun,
+  buildGenerationRunManifest,
+  createGenerationRun,
+  createGenerationRunManifest,
+  GENERATION_RUN_VERSION,
+  type GenerationRun,
+  type GenerationRunCandidate,
+  type GenerationRunInput,
+  type GenerationRunSlot,
+  type GenerationRunSlotIdentity,
+  type GenerationRunSlotStatus,
+  type GenerationRunSummary,
+  type GenerationRunUnexpectedCandidate,
+} from "./generation-run.js";
+
+export {
   normalizeGrowQueueFacts,
   normalizeGrowReviewQueueFacts,
   normalizeGrowSchedulerFacts,
@@ -173,3 +189,20 @@ export {
   type GenerationModelBoundary,
   type GenerationTemplateReusePolicy,
 } from "./generation-brief.js";
+
+export {
+  buildStudioReadiness,
+  createStudioReadiness,
+  aggregateStudioReadiness,
+  STUDIO_READINESS_VERSION,
+  type StudioHumanGate,
+  type StudioHumanGateStatus,
+  type StudioReadiness,
+  type StudioReadinessGenerationRun,
+  type StudioReadinessInput,
+  type StudioReadinessStage,
+  type StudioReadinessStageProjection,
+  type StudioReadinessStatus,
+  type StudioReadinessTreatmentCoverage,
+  type StudioReadinessVolumePlan,
+} from "./studio-readiness.js";
