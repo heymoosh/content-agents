@@ -154,6 +154,16 @@ export {
 } from "./draft-request.js";
 
 export {
+  buildDraftBatch,
+  createDraftBatch,
+  buildDraftRequestBatch,
+  DRAFT_BATCH_VERSION,
+  type DraftBatch,
+  type DraftBatchInput,
+  type DraftBatchTreatmentInput,
+} from "./draft-batch.js";
+
+export {
   buildExperimentOutcomeLedger,
   createExperimentOutcomeLedger,
   type ExperimentDeclaredObservation,

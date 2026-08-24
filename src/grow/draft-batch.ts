@@ -157,8 +157,15 @@ function artifactPart(value: string): string {
 }
 
 function requestFor(input: DraftBatchInput, treatment: DraftBatchTreatmentInput): DraftRequest {
-  const id = [treatment.platform, treatment.medium, treatment.format, treatment.treatmentRef, ...treatment.experimentRefs]
-    .map(artifactPart).filter(Boolean).join("-");
+  const id = [
+    ["platform", treatment.platform],
+    ["medium", treatment.medium],
+    ["format", treatment.format],
+    ["treatment", treatment.treatmentRef],
+    ["experiments", treatment.experimentRefs.join("~")],
+    ["hooks", treatment.hookTemplateRefs.join("~")],
+  ].map(([label, value]) => `${label}-${artifactPart(value)}`).filter(Boolean).join("-")
+    + `-key-${Buffer.from(identityKey(treatment), "utf8").toString("base64url")}`;
   const expectedOutputArtifactRef = `artifact:draft-request-${id}`;
   const lineage = {
     sourceThoughtRef: text(input.sourceThoughtRef, "sourceThoughtRef"),

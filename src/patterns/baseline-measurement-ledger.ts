@@ -42,6 +42,11 @@ export interface BaselineMeasurementLedger {
   readonly sideEffects: "none";
 }
 
+export interface BaselineMeasurementLedgerIo {
+  readonly readJsonl: () => string;
+  readonly appendJsonl: (value: string) => void;
+}
+
 export interface BaselineMeasurementReadiness {
   readonly status: "ready" | "blocked";
   readonly blockers: readonly string[];
@@ -189,6 +194,34 @@ export function appendBaselineMeasurement(
   return createBaselineMeasurementLedger([...ledger.rows, row]);
 }
 
+/** Read the append-only JSONL representation without repairing or dropping rows. */
+export function readBaselineMeasurementLedger(io: BaselineMeasurementLedgerIo): BaselineMeasurementLedger {
+  const raw = io.readJsonl();
+  if (typeof raw !== "string") throw new TypeError("baseline ledger read must return text");
+  const rows = raw.split("\n").filter((line) => line.trim() !== "").map((line, index) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line) as unknown;
+    } catch {
+      throw new TypeError(`baseline ledger line ${index + 1} is not valid JSON`);
+    }
+    return normalizeFact(parsed as BaselineMeasurementFact);
+  });
+  return createBaselineMeasurementLedger(rows);
+}
+
+/** Append exactly one new fact after validating the existing JSONL ledger and duplicate identity. */
+export function appendBaselineMeasurementToLedger(
+  input: BaselineMeasurementFact,
+  io: BaselineMeasurementLedgerIo,
+): BaselineMeasurementFact {
+  const existing = readBaselineMeasurementLedger(io);
+  const next = appendBaselineMeasurement(existing, input).rows.at(-1);
+  if (!next) throw new TypeError("baseline measurement append produced no row");
+  io.appendJsonl(`${JSON.stringify(next)}\n`);
+  return next;
+}
+
 export function assessBaselineMeasurementReadiness(row: BaselineMeasurementFact): BaselineMeasurementReadiness {
   const blockers: string[] = [];
   if (row.accountId === null) blockers.push("account is missing");
@@ -212,3 +245,5 @@ export function assessBaselineMeasurementReadiness(row: BaselineMeasurementFact)
 
 export const append = appendBaselineMeasurement;
 export const readiness = assessBaselineMeasurementReadiness;
+export const read = readBaselineMeasurementLedger;
+export const appendToLedger = appendBaselineMeasurementToLedger;

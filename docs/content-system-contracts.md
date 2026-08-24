@@ -189,6 +189,35 @@ append operations. Duplicate IDs, in-place edits, missing comparison facts,
 inferred membership, body/model/PII/ranking fields, and winner claims fail
 closed; blocked and unreviewed rows remain visible.
 
+`src/patterns/reviewed-evidence-ledger-bridge.ts` is the pure projection from
+the existing `reviewed_evidence_intake` report into append-ready account and
+source-ledger inputs. It carries the intake's explicit readiness blockers,
+keeps pending, blocked, and unmapped dispositions visible, and never supplies
+missing identity, pool, baseline, or review facts. It owns no file or database
+write; the ledger append boundary remains the caller's explicit decision.
+
+### `baseline_measurement_ledger` (scaffolded; append-only JSONL seam exists)
+
+Owner: `research` collects the measurement; Muxin owns review. This ledger
+records only caller-supplied settled `/new` facts. It does not fetch, calculate,
+infer, rank, select, or rewrite the existing baseline store.
+
+Required fields:
+
+```text
+id, account_id, platform, route=/new, settled=true, sample.window_start,
+sample.window_end, metric.name, metric.numerator, metric.denominator, method,
+observed_at, collected_at, baseline_scope, baseline_source, evidence_refs,
+reviewer_status, unavailable_reason
+```
+
+`src/patterns/baseline-measurement-ledger.ts` keeps incomplete, manual, and
+unavailable facts as blocked rows with explicit blockers. A fact is ready only
+when the sample window, metric denominator, method, dates, scope/source,
+evidence refs, and reviewed status are present. The injected JSONL adapter
+appends one validated fact at a time and rejects duplicate IDs or malformed
+rows; it does not mutate the established baseline data.
+
 ### `account_example_table` (scaffolded; pure projection exists)
 
 `src/patterns/account-table.ts` projects the reviewed account overlay and
@@ -476,6 +505,13 @@ ranking, and side effects are false. `src/grow/draft-request-cli.ts` and
 `npm run grow:draft-request` render deterministic JSON/Markdown and fail closed
 on missing or mismatched identity, unsupported body/prompt fields, or approval
 that still has blockers.
+
+`src/grow/draft-batch.ts` is the volume fan-out seam. Given one original thought
+and an explicit treatment list, it emits one body-free pending request per
+unique platform/medium/format/treatment/hook/experiment identity. It preserves
+source lineage, allows common-hook mad-lib template references, and rejects
+creator-body, model, PII, ranking, and winner inputs. It never generates copy,
+approves, schedules, publishes, or writes files.
 
 ### `grow_treatment_coverage` (scaffolded; read-only reconciliation exists)
 

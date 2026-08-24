@@ -54,7 +54,7 @@ test("builds a deterministic body-free request per exact treatment", () => {
     generationBriefRef: "brief:original-1",
     volumePlanRef: "volume:original-1",
     treatmentCoverageRef: "coverage:original-1",
-    expectedOutputArtifactRef: "artifact:draft-request-linkedin-text-short-post-treatment-observation-experiment-opening-a",
+    expectedOutputArtifactRef: "artifact:draft-request-platform-linkedin-medium-text-format-short-post-treatment-treatment-observation-experiments-experiment-opening-a-hooks-hook-common-question-key-WyJsaW5rZWRpbiIsInRleHQiLCJzaG9ydC1wb3N0IiwidHJlYXRtZW50Om9ic2VydmF0aW9uIixbImhvb2s6Y29tbW9uLXF1ZXN0aW9uIl0sWyJleHBlcmltZW50Om9wZW5pbmctYSJdXQ",
   });
   assert.equal(first.requests[0]?.humanReview.status, "pending");
   assert.equal(first.requests[0]?.generatesCopy, false);
@@ -76,6 +76,45 @@ test("fails closed on duplicate exact identities, including reordered refs", () 
     }),
     /duplicate.*treatment/i,
   );
+});
+
+test("keeps output identities unique when only hook-template refs differ", () => {
+  const batch = buildDraftBatch({
+    ...base,
+    treatments: [
+      { ...base.treatments[0]!, hookTemplateRefs: ["hook-a"] },
+      { ...base.treatments[0]!, hookTemplateRefs: ["hook-b"] },
+    ],
+  });
+
+  assert.equal(new Set(batch.requests.map((request) => request.id)).size, 2);
+  assert.equal(new Set(batch.requests.map((request) => request.expectedOutputArtifactRef)).size, 2);
+});
+
+test("keeps experiment and hook reference boundaries distinct in output IDs", () => {
+  const batch = buildDraftBatch({
+    ...base,
+    treatments: [
+      { ...base.treatments[0]!, hookTemplateRefs: ["h2"], experimentRefs: ["e1", "h1"] },
+      { ...base.treatments[0]!, hookTemplateRefs: ["h1", "h2"], experimentRefs: ["e1"] },
+    ],
+  });
+
+  assert.equal(new Set(batch.requests.map((request) => request.id)).size, 2);
+  assert.equal(new Set(batch.requests.map((request) => request.expectedOutputArtifactRef)).size, 2);
+});
+
+test("keeps punctuation-normalized treatment refs distinct in output IDs", () => {
+  const batch = buildDraftBatch({
+    ...base,
+    treatments: [
+      { ...base.treatments[0]!, treatmentRef: "treatment:a.b" },
+      { ...base.treatments[0]!, treatmentRef: "treatment:a-b" },
+    ],
+  });
+
+  assert.equal(new Set(batch.requests.map((request) => request.id)).size, 2);
+  assert.equal(new Set(batch.requests.map((request) => request.expectedOutputArtifactRef)).size, 2);
 });
 
 test("fails closed on incomplete identities and forbidden input fields", () => {

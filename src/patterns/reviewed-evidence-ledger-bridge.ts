@@ -120,15 +120,15 @@ export interface ReviewedBaselineIntakeRow {
   readonly [key: string]: unknown;
 }
 
-/** Shape accepted by the account ledger after this bridge's projection. */
+/** Account projection; rows with null required fields remain visibly blocked until a caller completes them. */
 export interface AccountReviewInput {
   readonly id: string;
-  readonly currentAccountKey: string;
-  readonly platform: string;
+  readonly currentAccountKey: IntakeScalar;
+  readonly platform: IntakeScalar;
   readonly handle: string | null;
   readonly creator: string | null;
   readonly stableAccountId: string | null;
-  readonly stableAccountIdStatus: "confirmed" | "unconfirmed" | "blocked" | "unmapped";
+  readonly stableAccountIdStatus: "confirmed" | "unconfirmed" | "blocked" | "unmapped" | null;
   readonly topics: string[] | "unknown" | null;
   readonly focus: string[] | "unknown" | null;
   readonly nicheLabel: IntakeScalar;
@@ -145,7 +145,7 @@ export interface AccountReviewInput {
   readonly caveats: string[] | "unknown" | null;
   readonly reviewer: IntakeScalar;
   readonly reviewNote: IntakeScalar;
-  readonly disposition: "reviewed" | "pending" | "blocked" | "unmapped";
+  readonly disposition: "reviewed" | "pending" | "blocked" | "unmapped" | null;
   readonly dispositionReason: IntakeScalar;
   readonly reviewed_at: IntakeScalar;
   readonly supersedesId: null;
@@ -163,6 +163,8 @@ export type SourceEvidenceLedgerRecordInput = Record<string, unknown> & {
 export interface ReviewedEvidenceLedgerBridge {
   readonly accountReviewInputs: AccountReviewInput[];
   readonly sourceEvidenceRecordInputs: SourceEvidenceLedgerRecordInput[];
+  /** Baseline rows stay intact for the separate baseline-measurement-ledger projection. */
+  readonly baselineIntakeRows: ReviewedBaselineIntakeRow[];
   readonly blockers: Array<{ readonly kind: "account" | "evidence" | "baseline"; readonly id: string | null; readonly blockers: string[] }>;
 }
 
@@ -186,11 +188,6 @@ function rejectForbidden(value: unknown, path: string, seen = new WeakSet<object
 }
 
 function scalar(value: IntakeScalar): string | null { return value === "unknown" ? null : value; }
-function required(value: IntakeScalar, field: string): string {
-  const result = scalar(value);
-  if (result === null || result === "") throw new Error(`${field} is required for an append-ready input`);
-  return result;
-}
 function copy<T>(value: T): T {
   if (Array.isArray(value)) return value.map((item) => copy(item)) as T;
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, nested]) => [key, copy(nested)])) as T;
@@ -198,16 +195,15 @@ function copy<T>(value: T): T {
 }
 
 function accountInput(row: ReviewedAccountIntakeRow, baselineRefs: string[] | "unknown" | null): AccountReviewInput {
-  const disposition = row.disposition ?? (row.readiness.status === "unmapped" ? "unmapped" : "blocked");
   const stableStatus = row.stableAccountIdStatus === "confirmed" || row.stableAccountIdStatus === "unconfirmed" || row.stableAccountIdStatus === "blocked" || row.stableAccountIdStatus === "unmapped"
-    ? row.stableAccountIdStatus : disposition === "unmapped" ? "unmapped" : "blocked";
+    ? row.stableAccountIdStatus : null;
   return {
-    id: row.id, currentAccountKey: required(row.currentAccountKey, "currentAccountKey"), platform: required(row.platform, "platform"),
+    id: row.id, currentAccountKey: row.currentAccountKey, platform: row.platform,
     handle: scalar(row.handle), creator: scalar(row.creator), stableAccountId: scalar(row.stableAccountId), stableAccountIdStatus: stableStatus,
     topics: copy(row.topics), focus: copy(row.focus), nicheLabel: row.nicheLabel, researchPoolMembership: copy(row.researchPoolMembership),
     popularityScope: row.popularityScope, sampleScope: row.sampleScope, baselineScope: row.baselineScope, baselineSource: row.baselineSource,
     medium: row.medium, format: row.format, audienceSnapshot: copy(row.audienceSnapshot), evidenceRefs: copy(row.evidenceRefs), baselineRefs,
-    caveats: copy(row.caveats), reviewer: row.reviewer, reviewNote: row.dispositionReason, disposition, dispositionReason: row.dispositionReason,
+    caveats: copy(row.caveats), reviewer: row.reviewer, reviewNote: row.dispositionReason, disposition: row.disposition, dispositionReason: row.dispositionReason,
     reviewed_at: row.reviewedAt, supersedesId: null,
   };
 }
@@ -221,7 +217,7 @@ function sourceInput(row: ReviewedSourceEvidenceIntakeRow, baselineRefs: string[
     pool: row.pool, membershipReason: row.membershipReason, nicheLabel: null, topics: null, focus: null, medium: row.medium, format: row.format,
     audienceSizeSnapshot: copy(row.audienceSizeSnapshot), metricSnapshot: copy(row.metricSnapshot), popularityScope: row.popularityScope,
     sampleScope: row.sampleScope, observedAt: row.observedAt, collectedAt: row.collectedAt, selectionRule: null, baselineScope: row.baselineScope,
-    provenance: row.provenance, evidenceRefs: copy(row.evidenceRefs ?? row.evidenceLinks), baselineRefs, baselineSource: row.baselineSource,
+    provenance: row.provenance, evidenceRefs: copy(row.evidenceRefs), evidenceLinks: copy(row.evidenceLinks), baselineRefs, baselineSource: row.baselineSource,
     bodyComplete: row.bodyComplete, reviewStatus: row.reviewStatus, recordStatus: row.status, caveats: copy(row.caveats), lineage: copy(row.lineage),
     readiness: copy(row.readiness), bodyIncluded: false,
   };
@@ -257,6 +253,7 @@ export function bridgeReviewedEvidenceIntake(report: ReviewedEvidenceIntakeRepor
   return {
     accountReviewInputs: accountRows.map((row) => accountInput(row, baselineRefsByAccount.get(scalar(row.stableAccountId) ?? scalar(row.currentAccountKey) ?? "") ?? null)),
     sourceEvidenceRecordInputs: evidenceRows.map((row) => sourceInput(row, baselineRefsByAccount.get(scalar(row.accountId) ?? "") ?? null)),
+    baselineIntakeRows: baselineRows.map((row) => copy(row)),
     blockers: blockerRows,
   };
 }

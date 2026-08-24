@@ -2,8 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   appendBaselineMeasurement,
+  appendBaselineMeasurementToLedger,
   assessBaselineMeasurementReadiness,
   createBaselineMeasurementLedger,
+  readBaselineMeasurementLedger,
   type BaselineMeasurementFact,
 } from "./baseline-measurement-ledger.js";
 
@@ -94,4 +96,18 @@ test("requires explicit /new caller facts and does not mutate the input ledger",
   assert.throws(() => appendBaselineMeasurement(ledger, fact({ id: "measurement-2", route: "/collect" } as unknown as Partial<BaselineMeasurementFact>)), /route must be \/new/);
   assert.throws(() => appendBaselineMeasurement(ledger, fact({ id: "measurement-2", evidenceRefs: ["  "] })), /evidence refs/);
   assert.equal(next.rows.length, 1);
+});
+
+test("round-trips append-only JSONL persistence without rewriting existing facts", () => {
+  let raw = "";
+  const io = {
+    readJsonl: () => raw,
+    appendJsonl: (value: string) => { raw += value; },
+  };
+
+  const appended = appendBaselineMeasurementToLedger(fact(), io);
+  assert.equal(appended.id, "measurement-1");
+  assert.equal(raw.split("\n").filter(Boolean).length, 1);
+  assert.deepEqual(readBaselineMeasurementLedger(io).rows, [appended]);
+  assert.throws(() => appendBaselineMeasurementToLedger(fact(), io), /duplicate id/);
 });

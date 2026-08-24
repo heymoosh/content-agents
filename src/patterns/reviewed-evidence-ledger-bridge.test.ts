@@ -104,9 +104,69 @@ test("preserves pending, blocked, and unmapped rows plus every explicit blocker"
   ]);
 });
 
+test("retains explicit baseline intake rows instead of reducing them to blocker labels", () => {
+  const baseline = {
+    id: "baseline-alpha",
+    accountId: "account-alpha",
+    platform: "x",
+    source: "operator report",
+    settledSampleDate: "2026-08-20",
+    window: { start: "2026-08-13", end: "2026-08-19" },
+    numerator: 12,
+    denominator: 40,
+    metric: "likes",
+    sampleSize: 40,
+    unavailableReason: null,
+    evidenceLinks: ["evidence://baseline-alpha"],
+    evidenceRefs: ["evidence://baseline-alpha"],
+    caveats: [],
+    reviewer: "muxin",
+    reviewedAt: "2026-08-21",
+    reviewStatus: "reviewed",
+    readiness: { status: "ready", blockers: [] },
+  } as const;
+  const bridged = bridgeReviewedEvidenceIntake(report({
+    rows: { accounts: [], evidence: [], baselines: [baseline] },
+  }));
+
+  assert.deepEqual(bridged.baselineIntakeRows, [baseline]);
+  assert.deepEqual(bridged.blockers, []);
+});
+
 test("rejects forbidden fields instead of dropping them", () => {
   const bad = report({ rows: { accounts: [{ body: "secret" } as never], evidence: [], baselines: [] } });
   assert.throws(() => bridgeReviewedEvidenceIntake(bad), /body.*unsupported|body.*not accepted/i);
   const badNested = report({ rows: { accounts: [], evidence: [{ metricSnapshot: { model: "gpt" } } as never], baselines: [] } });
   assert.throws(() => bridgeReviewedEvidenceIntake(badNested), /model.*unsupported|model.*not accepted/i);
+});
+
+test("preserves unknown disposition, identity status, and evidence-link distinction", () => {
+  const bridged = bridgeReviewedEvidenceIntake(report({
+    rows: {
+      accounts: [{
+        kind: "reviewed_account_intake_row", version: "reviewed-evidence-intake-v1", id: "account:pending",
+        currentAccountKey: "x|pending", platform: "x", handle: null, creator: null,
+        stableAccountId: "unknown", stableAccountIdStatus: "not-yet-reviewed", topics: null, focus: null,
+        nicheLabel: null, researchPoolMembership: null, popularityScope: null, sampleScope: null,
+        baselineScope: null, baselineSource: null, medium: null, format: null, audienceSnapshot: null,
+        evidenceLinks: null, evidenceRefs: null, caveats: null, reviewer: null, reviewedAt: null,
+        disposition: null, dispositionReason: null, readiness: { status: "blocked", blockers: ["disposition"] }, bodyIncluded: false,
+      }],
+      evidence: [{
+        kind: "reviewed_source_evidence_intake_row", version: "reviewed-evidence-intake-v1", id: "evidence:links-only",
+        sourceId: "source-1", postId: "post-1", accountId: "account-1", platform: "x", medium: "text", format: "short",
+        pool: null, membershipReason: null, audienceSizeSnapshot: null, metricSnapshot: null, comparisonClaimed: false,
+        popularityScope: null, sampleScope: null, baselineScope: null, baselineSource: null,
+        evidenceLinks: ["link://only"], evidenceRefs: null, bodyComplete: false, caveats: null, provenance: null,
+        observedAt: null, collectedAt: null, reviewStatus: "pending", status: "blocked", lineage: null,
+        readiness: { status: "blocked", blockers: ["evidenceRefs"] }, bodyIncluded: false,
+      }],
+      baselines: [],
+    },
+  }));
+
+  assert.equal(bridged.accountReviewInputs[0]?.stableAccountIdStatus, null);
+  assert.equal(bridged.accountReviewInputs[0]?.disposition, null);
+  assert.equal(bridged.sourceEvidenceRecordInputs[0]?.evidenceRefs, null);
+  assert.deepEqual(bridged.sourceEvidenceRecordInputs[0]?.evidenceLinks, ["link://only"]);
 });
