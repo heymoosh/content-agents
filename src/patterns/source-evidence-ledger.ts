@@ -191,6 +191,14 @@ function present(record: LooseRecord, keys: readonly string[]): unknown {
   return undefined;
 }
 
+/** Prefer explicit evidence refs, but do not let a null/empty compatibility alias hide links. */
+function evidenceReferences(record: LooseRecord): unknown {
+  const refs = present(record, ["evidenceRefs", "evidence_refs"]);
+  if (refs !== undefined && refs !== null && refs !== "unknown" && (!Array.isArray(refs) || refs.length > 0)) return refs;
+  const links = present(record, ["evidenceLinks", "evidence_links"]);
+  return links === undefined ? refs : links;
+}
+
 function text(value: unknown, path: string): SourceEvidenceLedgerScalar<string> {
   if (value === undefined || value === null) return null;
   if (value === "unknown") return "unknown";
@@ -399,7 +407,7 @@ function normalizeRecord(value: unknown): SourceEvidenceLedgerRecord {
     selectionRule: text(present(raw, ["selectionRule", "selection_rule"]), "record.selectionRule"),
     baselineScope: text(present(raw, ["baselineScope", "baseline_scope"]), "record.baselineScope"),
     provenance: text(present(raw, ["provenance"]), "record.provenance"),
-    evidenceRefs: stringList(present(raw, ["evidenceRefs", "evidence_refs", "evidenceLinks", "evidence_links"]), "record.evidenceRefs"),
+    evidenceRefs: stringList(evidenceReferences(raw), "record.evidenceRefs"),
     baselineRefs: stringList(present(raw, ["baselineRefs", "baseline_refs"]), "record.baselineRefs"),
     baselineSource: text(present(raw, ["baselineSource", "baseline_source"]), "record.baselineSource"),
     bodyComplete: booleanValue(present(raw, ["bodyComplete", "body_complete", "bodyIsComplete", "body_is_complete"]), "record.bodyComplete"),

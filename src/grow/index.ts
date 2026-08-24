@@ -180,6 +180,16 @@ export {
 } from "./draft-batch-inspection.js";
 
 export {
+  buildDraftBatchGenerationRun,
+  createDraftBatchGenerationRun,
+  buildGenerationRunFromDraftBatch,
+  DRAFT_BATCH_GENERATION_RUN_VERSION,
+  type DraftBatchGenerationRun,
+  type DraftBatchGenerationRunInput,
+  type DraftBatchRunBinding,
+} from "./draft-batch-run.js";
+
+export {
   buildExperimentOutcomeLedger,
   createExperimentOutcomeLedger,
   type ExperimentDeclaredObservation,

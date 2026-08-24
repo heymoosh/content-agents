@@ -131,13 +131,20 @@ export function buildDraftBatchGenerationRun(input: DraftBatchGenerationRunInput
   const bindings = envelope.bindings.map(normalizedBinding);
   const seenBindingKeys = new Set<string>();
   const seenRequestIds = new Set<string>();
+  const seenSlotKeys = new Set<string>();
   for (const binding of bindings) {
     const key = bindingKey(binding);
     if (seenBindingKeys.has(key)) throw new Error(`duplicate binding: ${key}`);
     seenBindingKeys.add(key);
+    const slotKey = identityKey(binding);
+    if (seenSlotKeys.has(slotKey)) throw new Error(`duplicate slot binding: ${slotKey}`);
+    seenSlotKeys.add(slotKey);
     if (seenRequestIds.has(binding.requestId)) throw new Error(`duplicate binding for request ${binding.requestId}`);
     seenRequestIds.add(binding.requestId);
     const request = requestFor(draftBatch.requests, binding.requestId);
+    if (binding.platform !== request.platform) {
+      throw new Error(`binding platform must match draft request platform for ${binding.requestId}`);
+    }
     if (binding.generatedArtifactRef !== request.expectedOutputArtifactRef) {
       throw new Error(`binding generatedArtifactRef must equal request expectedOutputArtifactRef for ${binding.requestId}`);
     }

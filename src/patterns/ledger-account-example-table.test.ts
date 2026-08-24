@@ -121,3 +121,11 @@ test("uses only current corrections and keeps blocked source evidence visible", 
   assert.equal(result.readiness.status, "blocked");
   assert.match(result.readiness.blockers.join("\n"), /evidence links are missing|metric snapshot is incomplete|body is not complete evidence/i);
 });
+
+test("falls back to bridge evidenceLinks when evidenceRefs is null or empty", () => {
+  const accounts = buildAccountReviewLedger([account()]);
+  const sources = buildSourceEvidenceLedger([source({ evidenceId: "evidence:alice:links", evidenceRefs: null, evidenceLinks: ["https://example.test/bridge-link"] })]);
+  const result = buildLedgerAccountExampleTable({ accountLedger: accounts, sourceLedger: sources });
+  assert.deepEqual(result.table.rows[0]?.evidenceLinks, ["https://example.test/account", "https://example.test/bridge-link", "https://example.test/post"]);
+  assert.equal(result.table.rows[0]?.readiness.status, "ready");
+});
