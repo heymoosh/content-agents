@@ -93,3 +93,22 @@ export {
   type CommentLearningView,
   type CommentLearningViewInput,
 } from "./comment-learning.js";
+
+export {
+  normalizeGrowQueueFacts,
+  normalizeGrowReviewQueueFacts,
+  normalizeGrowSchedulerFacts,
+  normalizeGrowPublishSchedulerFacts,
+  type GrowQueueFacts,
+  type GrowQueueFactsInput,
+  type GrowSchedulerFacts,
+  type GrowSchedulerFactsInput,
+} from "./queue-facts.js";
+
+export {
+  buildVentureHandoffView,
+  createVentureHandoffView,
+  type VentureHandoffFamily,
+  type VentureHandoffHypothesis,
+  type VentureHandoffView,
+} from "./venture-handoff.js";

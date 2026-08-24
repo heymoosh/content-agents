@@ -165,6 +165,13 @@ visible and blocked. It never derives a pool, copies a body, or selects a
 winner. The source/post evidence row remains authoritative for comparison
 scopes and caveats; account-overlay values never overwrite its denominators.
 
+`src/patterns/overlay-coverage.ts` reports one deterministic status per
+current catalog account key, including duplicate or missing mappings, stable
+ID presence, missing overlay fields, and linked comparison-evidence readiness.
+An unmapped key remains visible as `unmapped`; a row with incomplete metadata
+or duplicate mappings is `blocked`. The report is a coverage diagnostic, not
+an inferred completion claim or a winner table.
+
 ### `claim` (scaffolded)
 
 Owner: `muxin` for final assertion; `system` may extract a candidate.
@@ -302,6 +309,13 @@ delivery record, review-queue fact, and scheduler fact. It reports `blocked` or
 `drifted` when IDs, lineage, approval, lifecycle, or scheduler evidence
 disagree. It never repairs a queue row, claims a slot, cancels a post, or calls
 a publisher.
+
+`src/grow/queue-facts.ts` is the pure normalization boundary for facts read
+from the existing review queue or scheduler adapters. It preserves explicit
+IDs and lineage, maps only declared lifecycle values, and keeps pending,
+unknown, blocked, or invalid values conservative. It performs no filesystem
+read/write, does not approve or schedule anything, and exposes `sideEffects: none`
+before those facts enter reconciliation.
 
 ### `experiment` (scaffolded; typed deterministic record exists)
 
@@ -455,6 +469,13 @@ hypotheses with lineage, evidence refs, qualification, confidence, and a
 pending Muxin decision. It preserves missing evidence and non-qualified
 comments, never claims demand, includes no comment body in the projection, and
 does not create a Venture artifact or write to Signals.
+
+`src/grow/venture-handoff.ts` joins this view to the normalized learning
+packet at the Signals-to-Venture boundary. It keeps comment, funnel, and
+business families separate and remains blocked until Muxin has adopted the
+proposal and the declared Venture gate is `ready` or `accepted`. It is a
+read-only gate view: it does not create a Venture artifact, write Signals,
+claim demand, or send a reply.
 
 ## 5. Venture boundary
 
