@@ -17,6 +17,10 @@ The new Grow artifacts are planning, measurement, reconciliation, and delivery-r
 not copy generation or automatic publishing. This document describes the target contract; it does
 not make existing rows reviewed by inference.
 
+The current mined inventory is 499 posts, 292 analyses, 12 baseline records, 50 derived opener
+records, and 225 staged Reddit inbox posts. It is gitignored and unreviewed. Those counts describe
+available material, not reviewed evidence, best creators, or proof of platform-wide virality.
+
 ## 1. What the system must do
 
 Muxin supplies the insight, claims, observations, taste, and final yes. The system handles the
@@ -168,6 +172,26 @@ present, each current account key has one reviewed row or an explicit `unmapped`
 reviewed values are backed by real evidence links, and all unreviewed or incomplete live rows are
 marked blocked. The account overlay is not complete merely because rows exist. Current live rows
 remain blocked until real reviewed metadata is entered.
+
+### Next increment: per-platform mechanism blueprint (`platform-treatment-blueprint-v1`)
+
+This is the evidence layer for “what makes content work on this platform and format.” It is an
+explicit reviewed-or-hypothesis overlay, not an automatic summary of the corpus. Each row keeps
+the platform, medium, format, evidence pool, niche/topic, analysis and source references, baseline
+references, discovery surface, response intent, and five body-free mechanism descriptions:
+`hook`, `structure`, `retentionPayoff`, `cta`, and `format`.
+
+Niche, broad-platform, and format evidence stay separate. A row may describe a common hook as a
+mad-lib mechanism, but it never stores creator body text, exact creator wording, generated copy,
+or a winner/ranking claim. Missing evidence, missing baseline, an unreviewed overlay, or a
+hypothesis status remains a named readiness blocker. `src/patterns/platform-treatment-blueprint.ts`
+provides the deterministic validator and projection; it does not read or rewrite the corpus.
+
+**Acceptance predicate:** every row has an explicit identity, pool, topic, evidence references,
+baseline references, mechanism set, caveats, and review/originality status. The output must remain
+body-free and must explicitly disallow generated copy, creator-body copying, universal virality,
+and winner claims. This makes the next step clear: populate reviewed rows from the existing
+analysis/source evidence, then connect the ready rows to Grow treatment experiments.
 
 ## 3. Research and evidence architecture
 
@@ -373,7 +397,9 @@ provides the curated, body-free metadata boundary for hook mechanisms, and `patt
 exposes deterministic filtered JSON/Markdown. `src/grow/variants.ts` can carry a hook-template reference
 and source-slot map as metadata only; it keeps copy generation,
 creator-body reuse, and approval blocked. These are typed operator seams, not proof that the live corpus has
-been reviewed or that the app is wired end to end.
+been reviewed or that the app is wired end to end. `src/patterns/platform-treatment-blueprint.ts`
+adds the corresponding per-platform mechanism overlay. Its readiness is evidence readiness, not a
+virality score, and it remains separate from platform limits and cadence in `config/platforms.yaml`.
 `src/grow/legacy-content-adapter.ts` is the read-only bridge from an existing
 `content/<slug>` folder into that Grow projection. It preserves source and cut
 references, non-default cut prefixes, legacy review-queue row IDs/statuses,
@@ -742,6 +768,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Seeded targets | 352 rows across 13 configured platforms | Stable, provenance-aware target records with explicit scope and caveats | Partial |
 | Corpus | `src/patterns/data-status.ts` reports 499 corpus entries (292 previously collected plus 207 newly admitted; 18 staged duplicates skipped), 292 analyses, 12 baselines, 225 replayable Reddit inbox entries, the derived opener bank, 11 browser artifacts, and 9 RSS artifacts; all are available/parse-clean in the permanent gitignored data checkout, but the report is marked unreviewed | Normalized source/account/evidence catalog with queryable pool membership and reviewed niche/broad/format coverage | Partial |
 | Patterns | 31 hook patterns; 8 curated measured/hypothesis metadata rows are seeded in `config/patterns/hook-template-ledger.jsonl`, with `src/patterns/hook-template-ledger.ts` and `patterns:hook-templates` providing the body-free adapter; account/source review rows remain unpopulated | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
+| Platform-viral mechanisms | `src/patterns/platform-treatment-blueprint.ts` validates explicit platform × medium × format rows with niche/broad/format pool, topic, evidence, baseline, and hook/structure/retention/CTA/format mechanism references; current live rows are not populated or review-ready | Reviewed per-platform mechanism rows that drive controlled hook, story, format, and response experiments without claiming universal virality | Scaffolded |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it; `src/grow/delivery-binding.ts` reconciles that slice with explicit queue/scheduler/provider facts | Connect the accounting view to live review and scheduler records without allowing it to approve, schedule, or publish | Partial |
 | Source-to-publish path | Existing extraction, review, and publish engines; typed `src/grow/variants.ts` and `src/grow/generation-brief.ts` emit provisional no-copy platform/format specifications, `src/grow/volume-plan.ts` allocates those variants into deterministic daily slots, `src/grow/treatment-coverage.ts` reconciles requested treatment cells, `src/grow/draft-batch.ts` fans one thought into unique exact treatment requests, `src/grow/generation-run.ts` records explicit artifact/review references, `src/grow/draft-request.ts` binds one original thought to one treatment without composing copy, `src/grow/grow-this-plan.ts` joins the lifecycle read-only, and `npm run grow:this` exposes the next-action view, while delivery and outcome ledgers preserve the later handoff | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |

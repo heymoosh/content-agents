@@ -919,6 +919,49 @@ around Muxin's original claim, experience, example, evidence, and point of
 view. The template supplies a structure, not a creator's body or signature
 wording.
 
+### `platform-treatment-blueprint-v1` (scaffolded; explicit body-free overlay)
+
+`src/patterns/platform-treatment-blueprint.ts` validates and projects an
+explicit per-platform mechanism row. It is the evidence contract for what a
+platform/format treatment is trying to do, not a virality score or an
+automatic corpus summary.
+
+Each input row requires:
+
+```text
+id, overlayKind, platform, medium, format, evidencePool, niche, topic,
+analysisRefs, sourceRefs, baselineRefs, discoverySurfaces, responseIntent,
+mechanisms, patternRefs, hookTemplateRefs, platformConfigRef, spinAngleRef,
+evidenceStatus, caveats, reviewStatus, originalityStatus, reviewer, reviewedAt
+```
+
+`evidencePool` is explicitly `niche`, `broad`, or `format`; the broad value is
+displayed as broad-platform and is never merged with a niche row. `niche` and
+`topic` are preserved fields, not values inferred from a creator, rank, or
+model. `mechanisms` contains five body-free references: `hook`, `structure`,
+`retentionPayoff`, `cta`, and `format`. Each mechanism has an ID, name,
+abstract sequence, Muxin source slots, and native platform affordances. It
+does not contain post bodies, creator bodies, exact creator wording, prompts,
+model output, or generated copy.
+
+The output adds deterministic `readiness` blockers and these hard boundaries:
+
+```text
+bodyIncluded: false
+generatesCopy: false
+creatorBodyCopyAllowed: false
+winnerClaimsAllowed: false
+universalViralityClaimAllowed: false
+sideEffects: none
+```
+
+Hypothesis, insufficient, blocked, unreviewed, missing-baseline, and missing
+source rows remain visible and blocked. A ready row means the explicit
+overlay has passed its declared evidence/review/originality checks; it does
+not mean the treatment is universally viral. The module is pure and does not
+read or mutate the gitignored corpus. Populating these rows from the existing
+analysis/source records is a separate human-reviewed evidence task.
+
 ### `pattern_evidence_readiness` (scaffolded; pure composition exists)
 
 `src/patterns/evidence-readiness.ts` composes the pool inventory, source
