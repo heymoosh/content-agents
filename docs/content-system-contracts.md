@@ -8,6 +8,14 @@ The account metadata overlay and source/post comparison boundary in this
 document are scaffolds, not live reviewed data. Current live rows remain
 blocked until real, human-reviewed metadata is entered.
 
+The gitignored mined-data checkout currently has a metadata-only readiness
+report: 292 corpus entries, 292 analyses, 12 baseline records, 225 staged
+Reddit inbox entries, 11 browser artifacts, and 9 RSS artifacts. These counts
+are available and parse-clean in the inspected checkout, but
+`reviewStatus: unreviewed` remains authoritative. The report does not expose
+body text and does not establish best creators, platform-wide winners, or
+reviewed account metadata.
+
 ## 1. Status vocabulary and common rules
 
 Each record has an immutable `id`, `record_type`, `schema_version`,
@@ -172,6 +180,15 @@ An unmapped key remains visible as `unmapped`; a row with incomplete metadata
 or duplicate mappings is `blocked`. The report is a coverage diagnostic, not
 an inferred completion claim or a winner table.
 
+### `pattern_data_status` (current read-only inventory; unreviewed)
+
+`src/patterns/data-status.ts` accepts an explicit data directory and reports
+availability, parse validity, record counts, platform counts, baseline keys,
+and optional browser/RSS file counts for the mined artifacts. It does not
+regenerate, rewrite, or expose body text. Its `reviewStatus` is always
+`unreviewed`: these counts do not establish human-reviewed account metadata,
+best creators, platform-wide winners, or permission to reuse creator body copy.
+
 ### `claim` (scaffolded)
 
 Owner: `muxin` for final assertion; `system` may extract a candidate.
@@ -322,6 +339,17 @@ repository records into that normalizer. It accepts an already-read
 `QueueRow` or an explicit scheduler `Claim` plus caller-supplied lifecycle,
 delivery, and lineage facts. It does not read files itself, treat a claim as
 approval, invent lineage, claim a slot, or mutate the queue or scheduler.
+
+### `skill_contract` (scaffolded; lightweight manifest exists)
+
+`src/agents/skill-contract.ts` describes the bounded content-studio stages:
+capture/develop, patterns, format-for-platforms, human-review, publish,
+learning, and Venture. Each has exact input fact keys, one output fact, an
+owner, an invocation boundary, a human gate, and explicit prohibitions on
+hidden writes, hidden model/skill calls, creator body-copy reuse, and
+unmeasured demand or causality claims. `evaluateSkillContract` checks only
+fact-key presence and non-empty values. The manifest is a migration aid for
+making existing skills lighter; it does not invoke or replace them.
 
 ### `phase_contract` (scaffolded; executable definition exists)
 

@@ -9,8 +9,8 @@ claim that the current corpus is comprehensive.
 pool-evidence boundary are scaffolded. Typed source-evidence, comparison-readiness, operator
 readiness, account-example-table, overlay-coverage, Grow-variant, Grow-this, review-bundle,
 capacity, delivery, queue-facts, live-facts, reconciliation, phase-contract, generation-brief,
-experiment-outcome, experiment-record, learning-packet, comment-learning, Venture-handoff, and
-model-boundary adapters now make the next joins explicit,
+skill-contract, data-status, experiment-outcome, experiment-record, learning-packet,
+comment-learning, Venture-handoff, and model-boundary adapters now make the next joins explicit,
 but current live rows remain blocked for pool comparison until real reviewed metadata is entered.
 The new Grow artifacts are planning, measurement, reconciliation, and delivery-readiness seams,
 not copy generation or automatic publishing. This document describes the target contract; it does
@@ -308,6 +308,12 @@ judgment points. It does not make the final content, brand, routing, publish, or
 Each skill owns one bounded output and its validation. No skill should silently call a downstream
 skill with a new claim or bypass review.
 
+`src/agents/skill-contract.ts` is the lightweight manifest for this architecture. It describes
+the seven bounded stages, their required fact keys, one output fact, owner, human gate, and
+prohibited hidden side effects or downstream claims. It is a read-only contract, not a replacement
+for every existing SKILL.md. The migration path is to make each skill smaller around one contract
+and let Grow-this orchestrate the sequence.
+
 ### Workstream dependency order
 
 Build the workstreams in this order. Later workstreams may consume earlier artifacts, but may not
@@ -362,7 +368,9 @@ without claiming or scheduling; `src/blueprint/phase-contracts.ts` makes the fou
 machine-checkable without asserting that their live producers exist; `src/grow/generation-brief.ts`
 describes deterministic platform/format experiment fan-out with mad-lib hook-template reuse and no
 body copy; and `src/grow/venture-handoff.ts` keeps the Signals-to-Venture view behind both human
-gates.
+gates. `src/patterns/data-status.ts` provides a metadata-only, read-only report over an explicit
+gitignored data directory so file availability and counts cannot be confused with reviewed account
+metadata or proof of platform-wide best content.
 
 ## 6. Model and subagent responsibilities
 
@@ -513,7 +521,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Area | Current fact | Target state | Status |
 |---|---|---|---|
 | Seeded targets | 352 rows across 13 configured platforms | Stable, provenance-aware target records with explicit scope and caveats | Partial |
-| Corpus | 292 entries across 13 corpus platforms | Normalized source/account/evidence catalog with queryable pool membership | Partial |
+| Corpus | `src/patterns/data-status.ts` reports 292 corpus entries, 292 analyses, 12 baselines, 225 staged Reddit inbox entries, 11 browser artifacts, and 9 RSS artifacts; all are available/parse-clean in the permanent gitignored data checkout, but the report is marked unreviewed | Normalized source/account/evidence catalog with queryable pool membership and reviewed niche/broad/format coverage | Partial |
 | Patterns | 31 hook patterns | Common hook templates with source citations, adaptation notes, originality review, and original Muxin substance | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
 | Internal candidates versus publish volume | `src/grow/capacity.ts` emits a deterministic, side-effect-free capacity manifest with candidate/approved counts, human capacity, slots, pauses, and rollback conditions; `src/grow/delivery-record.ts` consumes a capacity slice without claiming it | Connect the accounting view to live review and scheduler records without allowing it to approve or publish | Partial |
@@ -527,7 +535,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables, `src/grow/experiment-record.ts` adds scoped records, and `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
 | Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet, `src/grow/comment-learning.ts`, and `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
-| Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts and permits common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
+| Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts, `src/agents/skill-contract.ts` records the lightweight stage boundaries, and both permit common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
 
 This blueprint does not authorize implementation by itself. Each future change should name the
 phase, artifacts, acceptance predicate, human decision, and explicit non-goals it satisfies.
