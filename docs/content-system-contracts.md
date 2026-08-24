@@ -579,6 +579,27 @@ pending Muxin decision. It preserves missing evidence and non-qualified
 comments, never claims demand, includes no comment body in the projection, and
 does not create a Venture artifact or write to Signals.
 
+### `grow_learning_bundle` (scaffolded; side-effect-free feed-context join exists)
+
+`src/grow/learning-bundle.ts` joins an explicit `CommentLearningView` to
+reviewed `SourceEvidenceRow` feed context and an operator-supplied proposal.
+Every proposal carries exact basis hypothesis IDs, feed-context IDs, lineage,
+scope, sample size, caveats, and Muxin's pending/adopted/declined decision.
+Feed context must be reviewed, ready, body-complete, pool-labelled, metrically
+complete, provenance-dated, linked, and tied to the same source lineage. The
+join is descriptive evidence context; it does not copy creator bodies, prove
+demand, or rank feed evidence.
+
+`qualification: qualified` is admissible only with a qualified funnel or
+business hypothesis (`qualified_inquiry`, `call`, `opportunity`, or `purchase`)
+with evidence refs. A comment or feed-attention signal remains a hypothesis.
+Missing, mismatched, or incomplete facts remain blocked, including an adopted
+proposal that is not evidence-complete. `src/grow/learning-bundle-cli.ts` and
+`npm run grow:learning-bundle` expose deterministic JSON/Markdown output from
+an explicit envelope. The adapter has `autoClaimsDemand: false`,
+`ventureArtifacts: false`, and `sideEffects: none`; it does not write Signals,
+create Venture artifacts, reply, or publish.
+
 `src/grow/venture-handoff.ts` joins this view to the normalized learning
 packet at the Signals-to-Venture boundary. It keeps comment, funnel, and
 business families separate and remains blocked until Muxin has adopted the

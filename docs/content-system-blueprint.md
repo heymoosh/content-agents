@@ -343,7 +343,9 @@ coverage/catalog
 5. **Comments/Signals** links post and conversation observations, funnel events, and experiments
    without collapsing attention into demand or strategy proof. `src/grow/comment-learning.ts`
    exposes a deterministic product/lead hypothesis view with evidence and a pending Muxin decision;
-   it does not claim demand or create Venture artifacts.
+   `src/grow/learning-bundle.ts` joins those hypotheses to explicitly reviewed feed context for
+   a scoped, sample-sized product/lead proposal; it does not claim demand or create Venture
+   artifacts.
 6. **Venture** receives only qualified, caveated inputs and remains governed by its own decision and
    approval gates. The Venture-handoff view is a read-only gate check, not an artifact creator.
 
@@ -451,6 +453,11 @@ complete body evidence.
 view over that planning boundary. `src/grow/comment-learning-cli.ts` and
 `npm run grow:comment-learning` provide the corresponding body-free operator view over explicitly
 captured comment, funnel, and business facts; both remain read-only and human-gated.
+`src/grow/learning-bundle.ts` and `npm run grow:learning-bundle` join those hypotheses to
+explicitly reviewed source/post evidence using exact lineage and evidence references. Feed context
+is descriptive context only; qualification requires an evidence-backed funnel or business basis,
+and missing or mismatched context remains blocked. The bundle preserves Muxin's pending/adopted/
+declined decision and creates no Venture artifact, demand claim, reply, or write.
 `src/review/approved-reply-task.ts` adds the missing response seam: a proposed reply can be
 reviewed, approved, declined, or kept pending, but no state in this adapter sends or publishes it.
 `src/grow/studio-readiness.ts` aggregates source, brief, review, delivery, and learning readiness
@@ -603,10 +610,12 @@ own gate decides whether the input becomes a Venture artifact or phase transitio
 linked signal, decision record, Venture artifact, and approval record. The owner is Venture after
 comments/Signals has produced qualified inputs.
 
-The current side-effect-free bridges are `src/review/learning-packet.ts` and
-`src/grow/comment-learning.ts`. They are review views, not automatic handoffs: they keep
-observation, interpretation, Muxin's decision, and Venture's gate separate. A comment can inform
-a product or lead hypothesis, but cannot by itself establish willingness to pay or unlock Venture.
+The current side-effect-free bridges are `src/review/learning-packet.ts`,
+`src/grow/comment-learning.ts`, and `src/grow/learning-bundle.ts`. They are review views, not
+automatic handoffs: they keep observation, interpretation, Muxin's decision, and Venture's gate
+separate. A comment can inform a product or lead hypothesis, but cannot by itself establish
+willingness to pay or unlock Venture. The learning bundle can add reviewed feed context, but that
+context remains descriptive until a qualified funnel or business basis and the human gates exist.
 
 **Not in scope:** turning content engagement into proof of demand, bypassing Venture decisions, or
 making Venture the owner of every Studio idea.
@@ -641,7 +650,7 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; `patterns:pool-evidence-cli` exposes explicit catalog/raw-input views while comparison readiness checks memberships and evidence scopes and keeps missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; `src/patterns/review-pool-coverage.ts` reports only explicit reviewed labels and keeps metadata coverage separate from comparison readiness; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables and explicit claim refs, `src/grow/experiment-record.ts` adds scoped records, `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families, `src/grow/experiment-outcome-cli.ts` exposes that ledger read-only, `src/grow/volume-plan-cli.ts` exposes copy-free slot assignments, and `src/review/funnel-events.ts` validates canonical attribution facts | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
-| Venture handoff | Venture has its own phases and gates; a side-effect-free learning packet, `src/grow/comment-learning.ts`, and `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
+| Venture handoff | Venture has its own phases and gates; side-effect-free learning packet, `src/grow/comment-learning.ts`, `src/grow/learning-bundle.ts`, and `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, reviewed feed context, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
 | Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts, `src/agents/skill-contract.ts` records the lightweight stage boundaries, and `src/agents/skill-invocation.ts` records key-only readiness; all permit common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
 

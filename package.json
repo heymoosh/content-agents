@@ -112,6 +112,7 @@
     "grow:brief": "tsx src/grow/brief-cli.ts",
     "grow:studio-readiness": "tsx src/grow/studio-readiness-cli.ts",
     "grow:comment-learning": "tsx src/grow/comment-learning-cli.ts",
+    "grow:learning-bundle": "tsx src/grow/learning-bundle-cli.ts",
     "grow:experiment-outcome": "tsx src/grow/experiment-outcome-cli.ts",
     "grow:volume-plan": "tsx src/grow/volume-plan-cli.ts",
     "review:comment-intake": "tsx src/review/comment-intake-cli.ts",

@@ -95,6 +95,18 @@ export {
 } from "./comment-learning.js";
 
 export {
+  buildLearningBundle,
+  createLearningBundle,
+  LEARNING_BUNDLE_VERSION,
+  renderLearningBundleJson,
+  renderLearningBundleMarkdown,
+  type LearningBundle,
+  type LearningBundleInput,
+  type LearningBundleProposal,
+  type LearningBundleProposalInput,
+} from "./learning-bundle.js";
+
+export {
   normalizeGrowQueueFacts,
   normalizeGrowReviewQueueFacts,
   normalizeGrowSchedulerFacts,
