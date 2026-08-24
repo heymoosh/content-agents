@@ -162,6 +162,12 @@ plus the blocking gaps that must be resolved before a comparison can be
 called complete. It is an operator view only: it carries no winner field,
 does not promote a row, and does not include source body or copy.
 
+`src/patterns/source-evidence-cli.ts` and `npm run patterns:source-evidence`
+provide the read-only command adapter. It accepts one explicit JSON/file
+envelope containing `corpus` and `analyses`, renders JSON, Markdown, or both,
+and preserves explicit pool, scope, metric, provenance, review, and readiness
+blockers without emitting body fields or inferring winners.
+
 ### `account_example_table` (scaffolded; pure projection exists)
 
 `src/patterns/account-table.ts` projects the reviewed account overlay and
@@ -771,6 +777,13 @@ and business outcomes. The adapter validates record shapes, renders a
 body-free learning view, preserves evidence blockers and Muxin's decision, and
 never infers demand or creates replies, Signals, or Venture artifacts.
 
+`src/review/comment-intake-cli.ts` and `npm run review:comment-intake` normalize
+one explicit manual comment observation. Their default projection is body-free;
+`--include-comment-text` is an explicit operator opt-in for the normalized raw
+or redacted representation. Both modes retain moderation, consent, lineage,
+evidence, and the blocked Venture handoff, and never infer demand or send a
+reply.
+
 ### `approved_reply_task_operator_view` (scaffolded; human-gated response seam exists)
 
 `src/review/approved-reply-task.ts` normalizes an explicit proposed response
@@ -809,6 +822,11 @@ infer, rank, select a winner, or copy a post body.
 `src/patterns/manual-platform-report.ts` aggregates normalized observations by
 platform, collection status, explicit role/pool, body flags, and missing facts.
 It is descriptive-only and cannot establish a winner or platform coverage.
+`src/patterns/manual-platform-report-cli.ts` and
+`npm run patterns:manual-platform-report` expose that report from one explicit
+JSON/file observation source with deterministic JSON/Markdown output. Invalid
+rows fail closed, and explicit role/pool/status values are preserved rather than
+inferred.
 
 ### `volume_plan` (scaffolded; deterministic slot projection exists)
 
@@ -817,6 +835,10 @@ brief into deterministic per-platform daily slots using the brief's declared
 volume or an explicit override. Each slot retains variant and experiment
 references, readiness blockers, and a pending human review gate. It does not
 compose copy, read source substance, schedule, publish, or approve.
+`src/grow/volume-plan-cli.ts` and `npm run grow:volume-plan` expose the same
+projection from an explicit generation-brief envelope and optional volume
+overrides. The command is planning-only and never creates copy or claims a
+publish slot is approved.
 
 ### `experiment_outcome_cli` (scaffolded; read-only measurement adapter exists)
 
