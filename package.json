@@ -137,6 +137,7 @@
     "grow:draft-batch-run": "tsx src/grow/draft-batch-run-cli.ts",
     "review:comment-intake": "tsx src/review/comment-intake-cli.ts",
     "review:approved-reply": "tsx src/review/approved-reply-task-cli.ts",
+    "studio:coord": "node --import tsx src/studio-coord/cli.ts",
     "worktree:setup": "npm ci --no-audit --no-fund",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
