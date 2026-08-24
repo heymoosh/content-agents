@@ -616,6 +616,22 @@ pending Muxin decision. It preserves missing evidence and non-qualified
 comments, never claims demand, includes no comment body in the projection, and
 does not create a Venture artifact or write to Signals.
 
+### `outcome_ledger` (scaffolded; append-only persistence boundary exists)
+
+`src/grow/outcome-ledger.ts` stores normalized funnel events and business
+outcomes as append-only JSONL facts. Each row keeps its outcome family,
+lineage, evidence refs, collection window, attribution confidence, and
+revision link when a later row supersedes an earlier fact. Unknown attribution
+is represented explicitly with a null content item and a reason. The ledger
+rejects post bodies, model outputs, rankings, and winner claims; it does not
+infer attribution, aggregate Signals, close experiments, or create Venture
+records. `src/grow/outcome-ledger-cli.ts` and `npm run grow:outcome-ledger`
+provide deterministic JSON/Markdown inspection over an explicit local source.
+The pure `appendOutcomeRow`/`appendOutcomeLedger` functions are the separate
+append-only persistence seam; the CLI itself does not write a ledger.
+Persistence remains separate from the human decision to interpret or adopt a
+result.
+
 ### `grow_learning_bundle` (scaffolded; side-effect-free feed-context join exists)
 
 `src/grow/learning-bundle.ts` joins an explicit `CommentLearningView` to
@@ -669,17 +685,30 @@ content_item_refs, scope, sample_size, provenance, caveats,
 content_human_decision, venture_gate, venture_decision, status, lineage
 ```
 
-`input_kind` is `pattern`, `comment`, `audience_observation`, `funnel_event`,
-or `business_outcome`. `content_human_decision` must be `approved` before
+`input_kind` names the Content evidence kind, with the abstract kinds above
+available for the contract and implementation-specific kinds allowed when
+their lineage is explicit. `content_human_decision` must be `approved` before
 handoff. `venture_gate` names the required Venture evidence predicate and
 must include its rules version. `venture_decision` is null until Venture's
-own phase gate records `accepted`, `rejected`, or `needs-more-evidence`.
+own phase gate records an independent `accept`, `reject`, or
+`request-more-evidence` fact. The implementation uses camelCase field names
+inside the typed pointer and exposes the snake_case record vocabulary here as
+the boundary contract.
 
 This record is a pointer and evidence packet, not a phase unlock. It cannot
 create a Venture decision, artifact, response gate, checkpoint, or publish
 approval. Venture's response, decision, artifact, editorial, delivery, and
 checkpoint gates remain authoritative. Venture-originated content still
 creates normal `cut`, `content_item`, `variant`, and human-review records.
+
+`src/grow/venture-input.ts` is the Content-owned implementation of this
+pointer seam. It requires an approved Muxin content decision, preserves only
+body-free source/evidence/lineage references, and leaves the Venture decision
+independent and null until Venture supplies its own phase fact. Comments alone
+remain hypothesis or needs-more-evidence input. The readiness view and
+`src/grow/venture-input-cli.ts` / `npm run grow:venture-input` are read-only
+operator projections; they never write Venture artifacts, advance a phase,
+approve publishing, or treat a Content approval as Venture acceptance.
 
 ## 6. Platform, format, and pattern evidence
 
@@ -830,6 +859,18 @@ the current explicit baseline ledger. The command is read-only and reports
 configured accounts with an unconfirmed `handle: null` as explicit
 `handle_not_confirmed` blockers. It does not discard them silently, and it does
 not call a null handle a baseline gap that can be measured.
+
+### `measurement_run` (scaffolded; bounded execution manifest exists)
+
+`src/patterns/measurement-run.ts` records one explicit baseline measurement
+run: account identity, route and collection method, sample policy, collection
+window, operator/evidence refs, and any measured baseline result. Supported,
+manual, unsupported, blocked, and unconfirmed routes remain distinct. The
+manifest does not crawl a platform, fetch post bodies, infer a metric, rank
+creators, or write `baselines.jsonl`; it is the execution desk and evidence
+manifest that a separately authorized collector or human can complete.
+`src/patterns/measurement-run-cli.ts` and `npm run patterns:measurement-run`
+render the same body-free manifest deterministically.
 
 ### `platform_pool_matrix` (scaffolded; explicit coverage accounting)
 
