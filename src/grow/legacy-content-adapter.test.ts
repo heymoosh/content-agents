@@ -187,3 +187,35 @@ test("keeps dismissed, mismatched, and malformed advice decisions blocked", () =
     assert.ok(short.blockers.includes("Muxin cut decision is not persisted in the legacy folder"));
   });
 });
+
+test("keeps ambiguous multiple accepted decisions blocked for one lens", () => {
+  withTempFolder((folder) => {
+    mkdirSync(join(folder, "cuts", "short"), { recursive: true });
+    writeFileSync(join(folder, "source.md"), "Muxin's thought\n");
+    writeFileSync(join(folder, "cuts", "short", "cut.md"), "Muxin's short cut\n");
+    writeQueue(folder, [
+      "| short/short-1 | tiktok | short | derivatives/short-short-1.md | — | — | — | pending | review | from /cycle |",
+    ]);
+    mkdirSync(join(folder, "develop"), { recursive: true });
+    const card = (id: string) => ({
+      id,
+      kind: "angle",
+      title: "Short",
+      summary: "ignored",
+      lens: "short",
+      sourceLines: [1],
+      status: "accepted",
+      acceptedLens: "short",
+      decidedAt: "2026-08-24T12:00:00Z",
+    });
+    writeFileSync(join(folder, "develop", "advice.json"), JSON.stringify({
+      version: 1,
+      rounds: [{ index: 1, trigger: "initial", cards: [card("r1-c1"), card("r1-c2")] }],
+    }));
+
+    const short = adaptLegacyContentFolder(folder).cuts.find((cut) => cut.lens === "short");
+    assert.ok(short);
+    assert.equal(short.cutDecision, null);
+    assert.ok(short.blockers.includes("Muxin cut decision is not persisted in the legacy folder"));
+  });
+});

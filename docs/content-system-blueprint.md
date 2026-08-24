@@ -556,7 +556,9 @@ still requiring the durable delivery record.
 `npm run patterns:reviewed-evidence-intake` provide the matching intake gate
 for reviewed account metadata, source evidence, and `/new` baseline rows,
 keeping niche, broad-platform, and format pools separate and preserving every
-missing or unmapped comparison fact.
+missing or unmapped comparison fact. An empty intake is explicitly blocked with
+`no reviewed evidence rows supplied`, so absence of rows cannot look like
+comparison readiness.
 `src/patterns/manual-platform-intake.ts` keeps a manually
 observed platform/post visible when a collector is unavailable, with explicit scope, provenance,
 metrics, caveats, and blocked fields rather than silently treating the platform as covered.

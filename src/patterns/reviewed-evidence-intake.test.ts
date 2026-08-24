@@ -138,6 +138,21 @@ test("normalizes reviewed account, evidence, and baseline rows into explicit gro
   assert.equal(report.sideEffects, "none");
 });
 
+test("fails closed when no reviewed evidence rows are supplied", () => {
+  const report = buildReviewedEvidenceIntake({
+    accountMetadataRows: [],
+    sourceEvidenceRows: [],
+    baselineSamples: [],
+  });
+
+  assert.equal(report.readiness.status, "blocked");
+  assert.equal(report.readiness.total, 0);
+  assert.equal(report.readiness.blockerCount, 1);
+  assert.equal(report.summary.blockerCounts["no reviewed evidence rows supplied"], 1);
+  assert.equal(report.bodyIncluded, false);
+  assert.equal(report.sideEffects, "none");
+});
+
 test("keeps explicit unmapped, unreviewed, incomplete, and mismatched rows blocked", () => {
   const report = buildReviewedEvidenceIntake(input({
     accountMetadataRows: [

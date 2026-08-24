@@ -428,8 +428,10 @@ needed by comparison. It normalizes explicit niche, broad, and format pool
 membership, topic/focus, audience snapshots, source evidence, scopes,
 denominators, caveats, review status, and lineage into separate deterministic
 groups. Missing, unmapped, incomplete, or cross-mismatched rows remain
-blocked; creator body, model, ranking, winner, and selection fields are
-rejected. It does not collect, rank, calculate, merge, select, or write.
+blocked, and an empty intake is blocked with the explicit blocker `no reviewed
+evidence rows supplied`; creator body, model, ranking, winner, and selection
+fields are rejected. It does not collect, rank, calculate, merge, select, or
+write.
 `src/patterns/reviewed-evidence-intake-cli.ts` and
 `npm run patterns:reviewed-evidence-intake` expose the body-free operator view.
 

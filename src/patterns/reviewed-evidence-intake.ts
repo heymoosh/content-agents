@@ -742,9 +742,13 @@ export function buildReviewedEvidenceIntake(input: ReviewedEvidenceIntakeInput):
   const evidenceSummary = countRows(crossReferenced.evidence);
   const baselineSummary = countRows(crossReferenced.baselines);
   const total = countRows(allRows);
+  const emptyInput = allRows.length === 0;
+  const intakeBlockerCounts = blockerCounts(allRows);
+  if (emptyInput) intakeBlockerCounts["no reviewed evidence rows supplied"] = 1;
   const readiness = {
-    status: total.blocked === 0 && total.unmapped === 0 ? "ready" as const : "blocked" as const,
+    status: !emptyInput && total.blocked === 0 && total.unmapped === 0 ? "ready" as const : "blocked" as const,
     ...total,
+    blockerCount: total.blockerCount + (emptyInput ? 1 : 0),
   };
   return {
     kind: "reviewed_evidence_intake",
@@ -755,7 +759,7 @@ export function buildReviewedEvidenceIntake(input: ReviewedEvidenceIntakeInput):
       evidence: evidenceSummary,
       baselines: baselineSummary,
       total,
-      blockerCounts: blockerCounts(allRows),
+      blockerCounts: intakeBlockerCounts,
     },
     readiness,
     bodyIncluded: false,
