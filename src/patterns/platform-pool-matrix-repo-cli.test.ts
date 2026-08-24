@@ -13,7 +13,13 @@ test("loads explicit review facts and renders the repo matrix", () => {
   assert.equal(main(["--reviews", "reviews.json", "--format", "markdown"], {
     loadCatalog: () => catalog,
     readBaselines: () => [],
-    readFile: () => JSON.stringify([{ currentAccountKey: "x|alpha", reviewStatus: "pending" }]),
+    readFile: () => JSON.stringify([{
+      currentAccountKey: "x|alpha",
+      reviewStatus: "pending",
+      reviewedPoolMembership: [{ pool: "niche", reason: "pending fixture" }],
+      medium: "text",
+      format: "short post",
+    }]),
   }, { write: (value) => { output = value; } }), 0);
   assert.match(output, /Unassigned or blocked pool targets/);
   assert.match(output, /pending/);

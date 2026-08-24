@@ -779,14 +779,19 @@ explicit target rows from reviewed catalog and evidence facts.
 `src/patterns/platform-pool-matrix-repo.ts` and
 `npm run patterns:platform-pool-matrix-repo` are that repo adapter. They join
 catalog rows to review facts by exact `currentAccountKey` and baseline facts by
-exact normalized account key. A missing or unrecognized research-pool label is
-reported in `blockedTargets`; it is never assigned to `niche`. Multiple medium
-or format labels become null with an explicit provenance blocker rather than a
-cross-product. Review states `pending`, `blocked`, and `unmapped` remain visible
-in the matrix, and no creator body or winner claim is emitted.
+exact normalized account key. Pool, medium, and format values in usable matrix
+targets come only from the explicit review fact; catalog labels are context for
+blocked handoff rows and are never promoted into a review decision. Missing
+reviewed labels are reported in `blockedTargets`; invalid reviewed pool labels
+fail closed rather than becoming targets. Neither case is assigned to `niche`.
+Multiple independent catalog labels are not
+cross-producted. Review states `pending`, `blocked`, and `unmapped` remain
+visible when explicit reviewed labels exist, and no creator body or winner claim
+is emitted.
 With the current gitignored checkout, the command reports 0 matrix targets and
-371 blocked rows because the catalog has no explicit pool labels; that is a
-coverage fact and not permission to classify those rows from niche or platform.
+371 blocked rows because explicit review metadata has not yet been entered;
+that is a coverage fact and not permission to classify those rows from catalog
+niche, account name, platform, or other unreviewed labels.
 
 `src/patterns/pool-review-handoff.ts` and
 `npm run patterns:pool-review-handoff` provide the narrow human handoff for that

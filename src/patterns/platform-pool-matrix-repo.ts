@@ -14,6 +14,10 @@ export const PLATFORM_POOL_MATRIX_REPO_VERSION = "platform-pool-matrix-repo-v1" 
 export interface PlatformPoolReviewFact {
   readonly currentAccountKey: string;
   readonly reviewStatus: MatrixReviewStatus;
+  /** Explicit human metadata; catalog researchPools/mediaForms/formats are never promoted. */
+  readonly reviewedPoolMembership?: readonly { readonly pool: PoolName; readonly reason: string }[] | "unknown" | null;
+  readonly medium?: string | "unknown" | null;
+  readonly format?: string | "unknown" | null;
 }
 
 export type PlatformPoolBaselineFact = string | Pick<AccountBaseline, "platform" | "handle">;
@@ -50,16 +54,54 @@ function reviewStatus(value: unknown, field: string): MatrixReviewStatus {
   return value;
 }
 
-function reviewIndex(value: PlatformPoolMatrixRepoInputs["reviews"]): Map<string, MatrixReviewStatus> {
+function reviewIndex(value: PlatformPoolMatrixRepoInputs["reviews"]): Map<string, PlatformPoolReviewFact> {
   if (value === undefined) return new Map();
-  const rows = value instanceof Map ? [...value.entries()].map(([currentAccountKey, status]) => ({ currentAccountKey, reviewStatus: status })) : value;
+  const rows: readonly PlatformPoolReviewFact[] = value === undefined
+    ? []
+    : Array.isArray(value)
+      ? value
+      : [...value.entries()].map(([currentAccountKey, status]) => ({ currentAccountKey, reviewStatus: status }));
   if (!Array.isArray(rows)) fail("reviews must be an array or map");
-  const index = new Map<string, MatrixReviewStatus>();
+  const index = new Map<string, PlatformPoolReviewFact>();
   for (const [position, row] of rows.entries()) {
     if (typeof row !== "object" || row === null || Array.isArray(row)) fail(`reviews[${position}] must be an object`);
     const currentAccountKey = nonEmpty(row.currentAccountKey, `reviews[${position}].currentAccountKey`);
     if (index.has(currentAccountKey)) fail(`reviews[${position}] duplicates ${currentAccountKey}`);
-    index.set(currentAccountKey, reviewStatus(row.reviewStatus, `reviews[${position}].reviewStatus`));
+    const membership = row.reviewedPoolMembership;
+    let normalizedMembership: PlatformPoolReviewFact["reviewedPoolMembership"] = membership;
+    if (membership !== undefined && membership !== null && membership !== "unknown") {
+      if (!Array.isArray(membership)) fail(`reviews[${position}].reviewedPoolMembership must be an array, null, unknown, or absent`);
+      const seen = new Set<string>();
+      const normalizedRows: Array<{ readonly pool: PoolName; readonly reason: string }> = [];
+      for (const [membershipIndex, item] of membership.entries()) {
+        if (typeof item !== "object" || item === null || Array.isArray(item)) fail(`reviews[${position}].reviewedPoolMembership[${membershipIndex}] must be an object`);
+        const pool = nonEmpty(item.pool, `reviews[${position}].reviewedPoolMembership[${membershipIndex}].pool`).toLowerCase();
+        if (!(POOL_NAMES as readonly string[]).includes(pool)) fail(`reviews[${position}].reviewedPoolMembership[${membershipIndex}].pool is not recognized`);
+        const reason = nonEmpty(item.reason, `reviews[${position}].reviewedPoolMembership[${membershipIndex}].reason`);
+        if (seen.has(pool)) fail(`reviews[${position}].reviewedPoolMembership duplicates ${pool}`);
+        seen.add(pool);
+        normalizedRows.push({ pool: pool as PoolName, reason });
+      }
+      normalizedRows.sort((left, right) => left.pool.localeCompare(right.pool));
+      normalizedMembership = normalizedRows;
+    }
+    let normalizedMedium: PlatformPoolReviewFact["medium"] = row.medium;
+    let normalizedFormat: PlatformPoolReviewFact["format"] = row.format;
+    for (const field of ["medium", "format"] as const) {
+      const candidate = row[field];
+      if (candidate !== undefined && candidate !== null && candidate !== "unknown") {
+        const normalized = nonEmpty(candidate, `reviews[${position}].${field}`);
+        if (field === "medium") normalizedMedium = normalized;
+        else normalizedFormat = normalized;
+      }
+    }
+    index.set(currentAccountKey, {
+      currentAccountKey,
+      reviewStatus: reviewStatus(row.reviewStatus, `reviews[${position}].reviewStatus`),
+      ...(membership !== undefined ? { reviewedPoolMembership: normalizedMembership } : {}),
+      ...(row.medium !== undefined ? { medium: normalizedMedium } : {}),
+      ...(row.format !== undefined ? { format: normalizedFormat } : {}),
+    });
   }
   return index;
 }
@@ -90,20 +132,20 @@ function baselineIndex(value: PlatformPoolMatrixRepoInputs["baselines"]): Set<st
   return keys;
 }
 
-function normalizedPools(row: CatalogRow): PoolName[] {
-  return [...new Set(row.researchPools.filter((pool): pool is PoolName => (POOL_NAMES as readonly string[]).includes(pool)))].sort();
+function normalizedPools(review: PlatformPoolReviewFact | undefined): PoolName[] {
+  if (!review || !Array.isArray(review.reviewedPoolMembership)) return [];
+  return [...new Set(review.reviewedPoolMembership.map((membership) => membership.pool))].sort();
 }
 
-function label(value: readonly string[], field: string): { value: string | null; blocker: string | null } {
-  if (value.length === 0) return { value: null, blocker: `${field} label absent` };
-  if (value.length > 1) return { value: null, blocker: `multiple ${field} labels lack explicit tuple provenance` };
-  return { value: value[0], blocker: null };
+function label(value: string | "unknown" | null | undefined, field: string): { value: string | null; blocker: string | null } {
+  if (value === undefined || value === null || value === "unknown" || value.trim() === "") return { value: null, blocker: `${field} label absent from reviewed metadata` };
+  return { value, blocker: null };
 }
 
-function targetFor(row: CatalogRow, pool: PoolName, reviews: Map<string, MatrixReviewStatus>, baselines: Set<string>): PlatformPoolMatrixTarget {
-  const medium = label(row.mediaForms, "medium");
-  const format = label(row.formats, "format");
-  const status = reviews.get(row.key) ?? "unreviewed";
+function targetFor(row: CatalogRow, pool: PoolName, review: PlatformPoolReviewFact | undefined, baselines: Set<string>): PlatformPoolMatrixTarget {
+  const medium = label(review?.medium, "medium");
+  const format = label(review?.format, "format");
+  const status = review?.reviewStatus ?? "unreviewed";
   const blockers = [
     !row.configured ? "target not configured" : null,
     !row.collected ? "source not collected" : null,
@@ -111,7 +153,6 @@ function targetFor(row: CatalogRow, pool: PoolName, reviews: Map<string, MatrixR
     baselines.has(row.key) ? null : "baseline not measured",
     medium.blocker,
     format.blocker,
-    row.researchPools.some((pool) => !(POOL_NAMES as readonly string[]).includes(pool)) ? "one or more research pool labels are not recognized" : null,
   ].filter((value): value is string => value !== null);
   return {
     id: row.key,
@@ -128,10 +169,9 @@ function targetFor(row: CatalogRow, pool: PoolName, reviews: Map<string, MatrixR
 }
 
 /**
- * Populates the explicit matrix only from exact catalog/review/baseline facts. It never
- * cross-products independent catalog arrays: multiple media or format labels become null with a
- * provenance blocker, and rows without a recognized pool become blockedTargets rather than being
- * silently assigned to niche.
+ * Populates the explicit matrix only from exact catalog/review/baseline facts. Pool, medium, and
+ * format values come from reviewed metadata; catalog labels remain context-only. Rows without a
+ * reviewed pool become blockedTargets rather than being silently assigned to niche.
  */
 export function buildPlatformPoolMatrixRepoReport(
   catalog: PatternCatalog,
@@ -143,22 +183,21 @@ export function buildPlatformPoolMatrixRepoReport(
   const blockedTargets: PlatformPoolMatrixBlockedTarget[] = [];
   const targets: PlatformPoolMatrixTarget[] = [];
   for (const row of catalog.rows) {
-    const pools = normalizedPools(row);
-    const invalidPool = row.researchPools.some((pool) => !(POOL_NAMES as readonly string[]).includes(pool));
+    const review = reviews.get(row.key);
+    const pools = normalizedPools(review);
     if (pools.length === 0) {
       blockedTargets.push({
         id: row.key,
         platform: row.platform,
         researchPools: [...row.researchPools],
-        blockers: [row.researchPools.length === 0 ? "research pool label absent" : "research pool is not a recognized matrix pool"],
+        blockers: [
+          review === undefined ? "review metadata is missing" : "reviewed research pool membership absent",
+          ...(review?.reviewStatus && review.reviewStatus !== "reviewed" ? [`review status is ${review.reviewStatus}`] : []),
+        ],
       });
       continue;
     }
-    for (const pool of pools) targets.push(targetFor(row, pool, reviews, baselines));
-    if (invalidPool) {
-      // The valid explicit pool rows remain usable, while the unrecognized label is retained as a
-      // blocker on those rows instead of being silently discarded.
-    }
+    for (const pool of pools) targets.push(targetFor(row, pool, review, baselines));
   }
   const matrix = buildPlatformPoolMatrix(targets);
   return {
