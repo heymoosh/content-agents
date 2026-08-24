@@ -126,6 +126,28 @@ test("keeps supported Reddit explicit and leaves manual or unsupported platforms
   assert.equal(reddit?.route.disposition, "supported");
 });
 
+test("surfaces a deterministic next action without claiming baseline readiness", () => {
+  const result = buildMeasurementRun(input([
+    row({ account: { id: "measured", reviewStatus: "reviewed" }, target: { id: "target", reviewStatus: "reviewed" } }),
+    row({ account: { id: "planned", reviewStatus: "reviewed" }, target: { id: "target", reviewStatus: "reviewed" }, result: { status: "planned", evidenceRefs: [] } }),
+    row({ account: { id: "manual", reviewStatus: "reviewed" }, target: { id: "target", reviewStatus: "reviewed" }, platform: "x", route: { route: "timeline", method: "manual", disposition: "manual" }, result: { status: "planned", evidenceRefs: [] } }),
+    row({ account: { id: "unsupported", reviewStatus: "reviewed" }, target: { id: "target", reviewStatus: "reviewed" }, platform: "pinterest", route: { route: "search", method: "api", disposition: "supported" }, result: { status: "planned", evidenceRefs: [] } }),
+    row({ account: { id: "unconfirmed", reviewStatus: "unconfirmed" }, target: { id: "target", reviewStatus: "reviewed" }, result: { status: "planned", evidenceRefs: [] } }),
+    row({ account: { id: "blocked", reviewStatus: "reviewed" }, target: { id: "target", reviewStatus: "reviewed" }, baseline: { id: null, term: null, evidenceRefs: [] }, result: { status: "planned", evidenceRefs: [] } }),
+  ]));
+
+  const actions = new Map(result.rows.map((item) => [item.accountId, item.nextAction]));
+  assert.deepEqual(Object.fromEntries(actions), {
+    blocked: "resolve_blockers",
+    manual: "collect_manual_evidence",
+    measured: "record_explicit_baseline_fact",
+    planned: "run_supported_route",
+    unconfirmed: "confirm_identity",
+    unsupported: "stop_unsupported_route",
+  });
+  assert.doesNotMatch(JSON.stringify(result), /best|viral|winner|baseline-ready|baselineReady|median|ratio/i);
+});
+
 test("supports the full status vocabulary and preserves explicit result references", () => {
   const statuses = ["planned", "in_progress", "measured", "blocked", "unconfirmed"] as const;
   const rows = statuses.map((status, index) => row({

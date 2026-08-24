@@ -410,7 +410,9 @@ available. Neither route writes the ledger or closes experiments. `src/grow/vent
 it requires Muxin's content approval while leaving Venture's independent decision null until its
 own gate supplies a fact. `src/patterns/measurement-run.ts` records the explicit route, sample
 policy, window, operator, and evidence for a `/new` baseline run, including manual and unsupported
-routes, without pretending that a manifest is a measurement.
+routes, without pretending that a manifest is a measurement. Each row also
+surfaces a deterministic operator next action; `record_explicit_baseline_fact`
+still requires a separate reviewed ledger fact and never means “baseline ready.”
 `src/patterns/data-status.ts` provides a metadata-only, read-only report over an explicit
 gitignored data directory so file availability and counts cannot be confused with reviewed account
 metadata or proof of platform-wide best content. It now reports the derived `openers.jsonl` bank

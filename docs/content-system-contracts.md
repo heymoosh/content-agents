@@ -1008,9 +1008,14 @@ not call a null handle a baseline gap that can be measured.
 run: account identity, route and collection method, sample policy, collection
 window, operator/evidence refs, and any measured baseline result. Supported,
 manual, unsupported, blocked, and unconfirmed routes remain distinct. The
-manifest does not crawl a platform, fetch post bodies, infer a metric, rank
-creators, or write `baselines.jsonl`; it is the execution desk and evidence
-manifest that a separately authorized collector or human can complete.
+manifest also emits a deterministic `nextAction` for identity confirmation,
+manual evidence collection, blocker resolution, supported-route execution,
+explicit baseline-fact recording, or stopping an unsupported route. A measured
+row's action means the operator must supply and review a separate baseline fact;
+it never means baseline readiness. The manifest does not crawl a platform,
+fetch post bodies, infer a metric, rank creators, or write `baselines.jsonl`;
+it is the execution desk and evidence manifest that a separately authorized
+collector or human can complete.
 `src/patterns/measurement-run-cli.ts` and `npm run patterns:measurement-run`
 render the same body-free manifest deterministically.
 

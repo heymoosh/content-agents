@@ -24,6 +24,13 @@ export type MeasurementRouteMethod = "api" | "browser" | "manual";
 export type MeasurementRouteDisposition = "supported" | "manual" | "unsupported";
 export type MeasurementSampleSelection = "reviewed" | "declared" | "winner-only" | "unknown";
 export type MeasurementSampleConfirmation = "confirmed" | "unconfirmed";
+export type MeasurementRunNextAction =
+  | "confirm_identity"
+  | "collect_manual_evidence"
+  | "resolve_blockers"
+  | "run_supported_route"
+  | "record_explicit_baseline_fact"
+  | "stop_unsupported_route";
 
 export interface MeasurementRunIdentityInput {
   readonly id: string;
@@ -139,6 +146,7 @@ export interface MeasurementRunRow {
   readonly blockers: string[];
   readonly caveats: string[];
   readonly readiness: MeasurementRunReadiness;
+  readonly nextAction: MeasurementRunNextAction;
   readonly sideEffects: "none";
 }
 
@@ -352,6 +360,21 @@ function normalizeInputRow(value: unknown, index: number): MeasurementRunInputRo
   return { account, target, platform, route, samplePolicy, collectionWindow, operator, evidenceRefs, baseline, result, blockers, caveats };
 }
 
+function nextAction(
+  account: MeasurementRunIdentity,
+  target: MeasurementRunIdentity,
+  route: MeasurementRunRoute,
+  status: MeasurementRunStatus,
+  blockers: readonly string[],
+): MeasurementRunNextAction {
+  if (route.disposition === "unsupported") return "stop_unsupported_route";
+  if (route.disposition === "manual") return "collect_manual_evidence";
+  if (account.reviewStatus !== "reviewed" || target.reviewStatus !== "reviewed") return "confirm_identity";
+  if (blockers.length > 0) return "resolve_blockers";
+  if (status === "measured") return "record_explicit_baseline_fact";
+  return "run_supported_route";
+}
+
 function buildRow(input: MeasurementRunInputRow, index: number): MeasurementRunRow {
   const account = normalizeIdentity(input.account, `rows[${index}].account`);
   const target = normalizeIdentity(input.target, `rows[${index}].target`);
@@ -404,6 +427,7 @@ function buildRow(input: MeasurementRunInputRow, index: number): MeasurementRunR
   else if (unconfirmedOnly) status = "unconfirmed";
   else if (blockerList.length > 0) status = "blocked";
   else status = requestedResult.status;
+  const action = nextAction(account, target, route, status, blockerList);
 
   return {
     kind: "measurement_run_row",
@@ -427,6 +451,7 @@ function buildRow(input: MeasurementRunInputRow, index: number): MeasurementRunR
     blockers: blockerList,
     caveats,
     readiness: { status: blockerList.length === 0 ? "ready" : "blocked", blockers: blockerList },
+    nextAction: action,
     sideEffects: "none",
   };
 }
@@ -500,9 +525,9 @@ export function renderMeasurementRunMarkdown(manifest: MeasurementRunManifest): 
     "",
     `Rows: ${manifest.summary.rows}; ready: ${manifest.summary.readyRows}; blocked: ${manifest.summary.blockedRows}`,
     "",
-    "| Key | Account | Target | Platform | Route | Method | Status | Baseline | Evidence refs | Blockers | Caveats |",
-    "|---|---|---|---|---|---|---|---|---|---|---|",
-    ...manifest.rows.map((row) => `| ${markdownText(row.key)} | ${markdownText(row.accountId)} | ${markdownText(row.targetId)} | ${markdownText(row.platform)} | ${markdownText(row.route.route)} | ${markdownText(row.route.method)} | ${markdownText(row.status)} | ${markdownText(row.baselineId)} / ${markdownText(row.baselineTerm)} | ${markdownText(row.evidenceRefs.join(", "))} | ${markdownText(row.blockers.join(", "))} | ${markdownText(row.caveats.join(", "))} |`),
+    "| Key | Account | Target | Platform | Route | Method | Status | Next action | Baseline | Evidence refs | Blockers | Caveats |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|",
+    ...manifest.rows.map((row) => `| ${markdownText(row.key)} | ${markdownText(row.accountId)} | ${markdownText(row.targetId)} | ${markdownText(row.platform)} | ${markdownText(row.route.route)} | ${markdownText(row.route.method)} | ${markdownText(row.status)} | ${markdownText(row.nextAction)} | ${markdownText(row.baselineId)} / ${markdownText(row.baselineTerm)} | ${markdownText(row.evidenceRefs.join(", "))} | ${markdownText(row.blockers.join(", "))} | ${markdownText(row.caveats.join(", "))} |`),
     "",
     "This is a body-free, model-free, read-only manifest. No collection, network, model, ranking, or winner side effects are performed.",
     "",
