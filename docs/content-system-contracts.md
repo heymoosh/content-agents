@@ -788,6 +788,18 @@ With the current gitignored checkout, the command reports 0 matrix targets and
 371 blocked rows because the catalog has no explicit pool labels; that is a
 coverage fact and not permission to classify those rows from niche or platform.
 
+`src/patterns/pool-review-handoff.ts` and
+`npm run patterns:pool-review-handoff` provide the narrow human handoff for that
+gap. The adapter joins each exact catalog account key to the existing explicit
+pool-review coverage and adds account identity, configured/collected state,
+audience-size evidence, niche, topics, focus, and observed formats/media forms.
+The displayed pool labels, disposition, status, blockers, and next action come
+only from validated review coverage. Catalog `researchPools` are deliberately
+not copied into the handoff as decisions. Missing coverage remains unmapped;
+unknown, pending, blocked, and empty explicit choices remain review blockers.
+The JSON/Markdown projection is deterministic, body-free, stdout-only, and does
+not infer, rank, fetch, approve, persist, select, or publish.
+
 ### `review_session` (scaffolded; human handoff only)
 
 `src/patterns/review-session.ts` joins an explicit `account_review_queue_batch`
