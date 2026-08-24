@@ -45,7 +45,7 @@ test("catalog keeps configured targets distinct from collected evidence and aggr
       body: "",
       transcript_source: "captions",
       niche: "civic-democracy",
-      media: { form: "video", body_is_complete: false },
+      media: { form: "short-video", body_is_complete: false },
     } as Partial<CorpusEntry>),
   ], [
     {
@@ -67,17 +67,18 @@ test("catalog keeps configured targets distinct from collected evidence and aggr
   const collected = catalog.rows[0];
   assert.equal(collected.accountId, "x|collected");
   assert.equal(collected.accountIdStatus, "derived");
+  assert.equal(collected.niche, "building-solopreneur");
   assert.equal(collected.configured, true);
   assert.equal(collected.collected, true);
   assert.equal(collected.evidenceCount, 2);
   assert.equal(collected.admissibleCount, 1);
   assert.equal(collected.bodyCompleteCount, 1);
   assert.equal(collected.bodyIncompleteCount, 1);
-  assert.deepEqual(collected.topics, ["building-solopreneur", "civic-democracy", "labor"]);
+  assert.deepEqual(collected.topics, ["civic-democracy", "labor"]);
   assert.deepEqual(collected.focus, ["long-form", "systems"]);
   assert.deepEqual(collected.researchPools, ["broad", "format", "niche"]);
-  assert.deepEqual(collected.formats, ["image", "text", "video"]);
-  assert.deepEqual(collected.mediaForms, ["image", "video"]);
+  assert.deepEqual(collected.formats, ["image", "short-video", "text", "video"]);
+  assert.deepEqual(collected.mediaForms, ["image", "short-video"]);
   assert.deepEqual(collected.popularityScopes, ["niche", "platform-wide"]);
   assert.deepEqual(collected.sampleScopes, ["search-biased"]);
   assert.deepEqual(collected.baselineSources, ["timeline-window"]);
@@ -104,8 +105,10 @@ test("catalog keeps configured targets distinct from collected evidence and aggr
   assert.match(markdown, /niche, platform-wide/);
   assert.match(markdown, /search-biased/);
   assert.match(markdown, /timeline-window/);
-  assert.match(markdown, /building-solopreneur, civic-democracy/);
-  assert.match(markdown, /image, text, video/);
+  assert.match(markdown, /Niche label/);
+  assert.match(markdown, /building-solopreneur/);
+  assert.match(markdown, /civic-democracy, labor/);
+  assert.match(markdown, /image, short-video, text, video/);
   assert.match(markdown, /2 \/ 1 \/ 1/);
   assert.match(markdown, /followers 1200 from profile/);
 

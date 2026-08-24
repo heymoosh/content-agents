@@ -3,16 +3,15 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { normalizeHandle } from "./corpus.js";
-import type { AccountSeed, CorpusEntry, PatternMiningConfig } from "./types.js";
+import { MEDIA_FORMS } from "./types.js";
+import type { AccountSeed, PatternMiningConfig } from "./types.js";
 
 const CONFIG_PATH = join(repoRoot, "config", "pattern-mining.yaml");
 const CORPUS_PATH = join(repoRoot, "data", "patterns", "corpus.jsonl");
 const ANALYSES_PATH = join(repoRoot, "data", "patterns", "analyses.jsonl");
 
 type LooseRecord = Record<string, unknown>;
-const FORMAT_ENUMS = new Set([
-  "audio", "carousel", "image", "link-preview", "mixed", "text", "text-only", "video",
-]);
+const FORMAT_ENUMS = new Set<string>([...MEDIA_FORMS, "text"]);
 const RESEARCH_POOL_ENUMS = new Set(["niche", "broad", "format"]);
 
 export interface CatalogAudience {
@@ -29,6 +28,7 @@ export interface CatalogRow {
   platform: string;
   handle: string | null;
   creator: string | null;
+  niche: string | null;
   sourceKind: "handle" | "source";
   configured: boolean;
   collected: boolean;
@@ -193,14 +193,15 @@ export function buildCatalog(config: PatternMiningConfig, corpus: unknown[] = []
       platform,
       handle,
       creator: seed?.creator ?? text(post?.creator) ?? text(analysis[0]?.creator),
+      niche: text(seed?.niche) ?? text(post?.niche) ?? text(analysis[0]?.niche),
       sourceKind: handle ? "handle" : "source",
       configured: seed !== undefined,
       collected: state.posts.length > 0,
       audience: audienceFrom(seed, state.posts),
       topics: nonEmptyStrings([
-        seed?.niche, ...(seed?.topics ?? []),
-        ...state.posts.flatMap((row) => [row.niche, row.topics]),
-        ...analysis.flatMap((row) => [row.niche, row.topics]),
+        ...(seed?.topics ?? []),
+        ...state.posts.map((row) => row.topics),
+        ...analysis.map((row) => row.topics),
       ]),
       focus: nonEmptyStrings([
         ...(seed?.focus ?? []),
@@ -248,21 +249,21 @@ export function renderCatalogJson(config: PatternMiningConfig, corpus: unknown[]
 
 export function renderCatalogMarkdown(catalog: PatternCatalog): string {
   const cell = (value: string): string => value.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
-  const list = (values: string[]): string => values.length ? values.join(", ") : "unknown";
+  const list = (values: string[]): string => values.length ? values.join(", ") : "null";
   const audience = (row: CatalogRow): string => {
-    if (row.audience.size === null) return "unknown";
+    if (row.audience.size === null) return "null";
     const size = row.audience.size.toLocaleString("en-US");
-    const type = row.audience.countType ?? "unknown type";
+    const type = row.audience.countType ?? "null type";
     return `${size} ${type}${row.audience.asOf ? ` (${row.audience.asOf})` : ""}`;
   };
   const lines = [
     "# Pattern source catalog", "", `Configured targets: ${catalog.summary.configuredTargets} | Collected sources: ${catalog.summary.collectedSources}`,
-    "", "| Source | Account ID | Platform | Status | Audience (size/type/as-of) | Focus | Research pool(s) | Popularity scope(s) | Sample scope(s) | Baseline source(s) | Topics | Formats | Media | Evidence/admissible/complete/incomplete | Last collected | Last analyzed | Caveats |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|",
+    "", "| Source | Account ID | Platform | Status | Audience (size/type/as-of) | Niche label | Focus | Research pool(s) | Popularity scope(s) | Sample scope(s) | Baseline source(s) | Topics | Formats | Media | Evidence/admissible/complete/incomplete | Last collected | Last analyzed | Caveats |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---:|---|---|---|",
   ];
   for (const row of catalog.rows) {
     const status = row.configured ? (row.collected ? "configured + collected" : "configured, uncollected") : "collected only";
     const completeness = `${row.evidenceCount} / ${row.admissibleCount} / ${row.bodyCompleteCount} / ${row.bodyIncompleteCount}`;
-    lines.push(`| ${cell(row.handle ?? row.creator ?? row.key)} | ${cell(row.accountId)} | ${cell(row.platform)} | ${status} | ${cell(audience(row))} | ${cell(list(row.focus))} | ${cell(list(row.researchPools))} | ${cell(list(row.popularityScopes))} | ${cell(list(row.sampleScopes))} | ${cell(list(row.baselineSources))} | ${cell(list(row.topics))} | ${cell(list(row.formats))} | ${cell(list(row.mediaForms))} | ${completeness} | ${row.lastCollectedAt ?? "unknown"} | ${row.lastAnalyzedAt ?? "unknown"} | ${cell(list(row.caveats))} |`);
+    lines.push(`| ${cell(row.handle ?? row.creator ?? row.key)} | ${cell(row.accountId)} | ${cell(row.platform)} | ${status} | ${cell(audience(row))} | ${cell(row.niche ?? "null")} | ${cell(list(row.focus))} | ${cell(list(row.researchPools))} | ${cell(list(row.popularityScopes))} | ${cell(list(row.sampleScopes))} | ${cell(list(row.baselineSources))} | ${cell(list(row.topics))} | ${cell(list(row.formats))} | ${cell(list(row.mediaForms))} | ${completeness} | ${row.lastCollectedAt ?? "null"} | ${row.lastAnalyzedAt ?? "null"} | ${cell(list(row.caveats))} |`);
   }
   return `${lines.join("\n")}\n`;
 }

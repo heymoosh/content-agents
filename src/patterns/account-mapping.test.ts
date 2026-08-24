@@ -14,6 +14,7 @@ function catalog(rows: Partial<PatternCatalog["rows"][number]>[]): PatternCatalo
       handle: "@placeholder",
       creator: "Placeholder",
       sourceKind: "handle" as const,
+      niche: null,
       configured: true,
       collected: true,
       audience: { size: null, countType: null, provenance: null, asOf: null },

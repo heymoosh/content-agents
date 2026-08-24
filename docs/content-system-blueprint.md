@@ -33,6 +33,34 @@ The UI calls the production step **Format for platforms**. The internal engine m
 judgment, and what will be measured. Routing notes, line citations, pattern IDs, and model traces
 stay behind the conversation but remain available for audit.
 
+### Volume is not publish capacity
+
+The system must distinguish **internal candidate volume** from **approved publish volume**. A
+candidate is an inspectable draft, treatment, or experiment option generated for comparison. It is
+not a commitment to review, schedule, or publish it. Approved publish volume is the smaller set of
+variants Muxin has explicitly approved and the scheduler can place within each platform's configured
+cadence. Generation may produce several candidates per source and platform; it must never imply
+that all candidates will be reviewed or shipped.
+
+The eventual operating target is at least one reviewed, publishable item per selected platform per
+day, subject to a human-review capacity that Muxin sets and can lower at any time. "Publishable"
+means approved, evidence and lineage complete, originality and voice checks passed, and a valid
+platform slot exists. It does not mean that a post is guaranteed to publish: a platform outage,
+missing asset, changed approval, or scheduler failure can pause delivery. The target is not a
+current capability or a promise of daily output on every platform.
+
+Capacity planning must record, per day and platform, candidate count, review capacity, approved
+count, available slots, scheduled count, and the reason for any gap. Platform `posts_per_week`,
+`max_slots_per_day`, slot days, and slot times remain hard constraints. Human review is the
+bottleneck by design, so the system should queue fewer candidates when the review backlog, quality
+defects, or decision time exceeds the agreed limit. It must pause new generation or scheduling for
+a platform when review capacity is exhausted, required evidence is missing, originality is
+uncertain, a publish error is unresolved, or a rollback condition is met. Rollback means stop the
+affected treatment or platform cadence, preserve the records, and return to the last known-good
+approved configuration. Resume requires a human decision supported by an inspectable reason and
+evidence. No part of this target authorizes auto-approval, auto-publishing, auto-replies, or
+unbounded scraping.
+
 ## 2. Shared vocabulary and lineage
 
 Use these normalized terms in records, prompts, and screens. Do not create near-synonyms for the
@@ -89,7 +117,7 @@ mapping and are not converted into target-state certainty.
 
 **Phase 1 acceptance predicate:** the phase is complete only when every current account composite
 key has exactly one reviewed mapping row or an explicit `unmapped` disposition, every row has a
-stable target `account_id` or a recorded reason it cannot yet receive one, the four missing fields
+stable target `account_id` or a recorded reason it cannot yet receive one, the six missing fields
 are present with the null/unknown policy applied, and no target pool, scope, or identity claim is
 presented as complete beyond the available evidence.
 
@@ -186,6 +214,37 @@ judgment points. It does not make the final content, brand, routing, publish, or
 Each skill owns one bounded output and its validation. No skill should silently call a downstream
 skill with a new claim or bypass review.
 
+### Workstream dependency order
+
+Build the workstreams in this order. Later workstreams may consume earlier artifacts, but may not
+pretend that a target contract exists while its producer is still current-state or partial.
+
+```text
+coverage/catalog
+  -> pool evidence
+  -> Grow variants
+  -> review/publish
+  -> comments/Signals
+  -> Venture
+```
+
+1. **Coverage/catalog** establishes stable IDs, account mappings, source records, and honest
+   current-versus-target coverage. It is the inventory foundation.
+2. **Pool evidence** adds bounded evidence, pool membership, denominators, dates, selection rules,
+   and caveats. It may identify hypotheses, not manufacture winners.
+3. **Grow variants** turns an approved source or raw thought into cuts and platform treatments,
+   retaining lineage, variables, rationale, and the mad-lib originality boundary.
+4. **Review/publish** exposes decisions, enforces human approval, claims only valid platform slots,
+   and records scheduling and delivery outcomes.
+5. **Comments/Signals** links post and conversation observations, funnel events, and experiments
+   without collapsing attention into demand or strategy proof.
+6. **Venture** receives only qualified, caveated inputs and remains governed by its own decision and
+   approval gates.
+
+The dependency order is a sequencing constraint, not a claim that each workstream is currently
+implemented. A later workstream can be prototyped with explicit fixtures, but its output must be
+labelled provisional and must not be presented as live evidence.
+
 ## 6. Model and subagent responsibilities
 
 Use the cheapest acceptable subscription or local route by default, and log paid calls and model
@@ -246,43 +305,59 @@ can carry `from-venture` or `from-studio`, but both use the same Content pipelin
 
 ### Phase 1: blueprint and inventory
 
-**Ship when:** the vocabulary, lineage, three pools, popularity rules, adaptation boundary, skill
-boundaries, model policy, approval states, Human Inference hypotheses, and current-vs-target matrix
-are documented; existing seeded material is connected by stable IDs or an explicit mapping plan;
-coverage caveats are visible.
+**Ship predicate:** Given the existing seeded material, the blueprint and inventory inputs, and the
+current account/source records, the owner produces the vocabulary, lineage, three pools, popularity
+rules, adaptation boundary, skill boundaries, model policy, approval states, Human Inference
+hypotheses, and current-vs-target matrix. The output is a reviewable inventory and explicit mapping
+plan with coverage caveats. Muxin decides whether the scope and caveats are acceptable. Evidence is
+the inventory, mapping rows, source links, and coverage report. The owner is coverage/catalog.
 
 **Not in scope:** broad scraping, a repo-wide rewrite, a universal score, auto-publishing,
 auto-replies, or claiming corpus completeness.
 
 ### Phase 2: evidence-aware research
 
-**Ship when:** normalized source/account/evidence records preserve provenance; every winner or
-pattern summary cites its source records and scope; pool membership is queryable; selection rules,
-denominators, dates, caveats, and originality checks are reviewable; weak evidence is labeled as a
-hypothesis.
+**Ship predicate:** Given the catalog and a declared research question, the owner produces
+normalized source, account, and evidence records with provenance, queryable pool membership, and
+reviewable selection rules, denominators, dates, caveats, source citations, and originality checks.
+Muxin decides whether a summary is usable as an observation, hypothesis, or experiment input.
+Evidence is the bounded evidence set, pattern summaries, source links, and review notes. The owner
+is pool evidence.
 
 **Not in scope:** training on exact creator text, replacing human judgment with ranking, or
 generalizing from a single account or small sample.
 
 ### Phase 3: Grow-this experiments
 
-**Ship when:** one raw input can produce a readable cut, multiple platform/format variants, a
-review bundle, an approved publish record, and outcome records; each artifact has lineage and
-experiment variables; the UI explains treatment rationale and pending decisions; Signals preserves
-the four outcome classes separately.
+**Ship predicate:** Given one raw input, a selected platform set, available evidence, and the
+configured review and slot capacity, the owner produces a readable cut, bounded platform/format
+variants, a review bundle, and publish-ready records. Each output retains lineage, experiment
+variables, treatment rationale, evidence status, and pending decisions. Muxin decides which items
+are approved, edited, rejected, or sent for another pass. Evidence is the cut, variant bundle,
+decision record, scheduler record, and any outcome record. The owner is Grow variants, with
+review/publish owning the approval and delivery gate.
 
 **Not in scope:** silent platform selection, publishing without approval, auto-replies, or changing
 voice/pillars/routing from metrics alone.
 
 ### Phase 4: Venture learning
 
-**Ship when:** qualified patterns, comments, funnel events, and business outcomes can be handed to
-Venture with provenance and caveats; comments and engagement remain observations until Venture's
-gate opens; a human can adopt or decline each proposed change; Venture-originated content returns
-through the same Content review path.
+**Ship predicate:** Given measured variants, qualified comments, funnel events, and business
+outcomes, the owner produces a caveated Venture input with provenance, scope, sample size, and
+decision context. Muxin decides whether to adopt, decline, or request more evidence, and Venture's
+own gate decides whether the input becomes a Venture artifact or phase transition. Evidence is the
+linked signal, decision record, Venture artifact, and approval record. The owner is Venture after
+comments/Signals has produced qualified inputs.
 
 **Not in scope:** turning content engagement into proof of demand, bypassing Venture decisions, or
 making Venture the owner of every Studio idea.
+
+### Phase contract fields
+
+Every phase record must name the inputs, outputs, owner, human decision, evidence, and non-goals.
+The predicates above are the ship contract. A phase is not complete because a script ran, a file
+exists, or a model returned a plausible answer. If an input is missing, the output is incomplete or
+provisional and the next phase remains locked.
 
 ## 10. Coverage matrix: current facts versus target state
 
@@ -295,8 +370,11 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Corpus | 292 entries across 13 corpus platforms | Normalized source/account/evidence catalog with queryable pool membership | Partial |
 | Patterns | 31 hook patterns | Structural patterns with source citations, originality review, and no substitution copy | Partial |
 | Full posts | 47 full-post records | Records linked to source, account, pool, metric denominator, and selection reason | Partial |
+| Internal candidates versus publish volume | Current systems generate or queue artifacts in several places, but do not yet expose one shared capacity view | Separate candidate counts from approved publish counts, with human capacity, platform slots, pauses, and rollback records | Target |
 | Source-to-publish path | Existing extraction, review, and publish engines | One Grow-this conversation from raw thought through approved variants and measured outcomes | Partial |
 | Review gate | Human review and publish approval already required | Explicit per-artifact states, rationale, lineage, and no-AI-smell check | Partial |
+| Phase contracts | This blueprint names broad phase outcomes; the parallel contracts document is not yet treated as an implemented runtime contract | `docs/content-system-contracts.md` records executable inputs, outputs, owners, decisions, evidence, non-goals, and failure/pause conditions | Target |
+| Coverage report | `src/patterns/coverage.ts` and `patterns:coverage` now emit a deterministic descriptive report over the catalog; it is a scaffold, not a completeness claim | Coverage report becomes a trusted operator view with reviewed account IDs, explicit pool/scope metadata, denominators, and target gaps | Partial |
 | Research pools | Niche, broad, and format distinction documented | Separate ingestion, ranking, retrieval, and reporting | Target |
 | Experiment lineage | Metrics and bets exist in specialized systems | Variant-level variables linked to comments, funnel events, Signals, and Venture | Target |
 | Venture handoff | Venture has its own phases and gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |

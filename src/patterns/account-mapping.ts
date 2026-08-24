@@ -53,7 +53,7 @@ export function buildAccountMapping(catalog: PatternCatalog): AccountMappingArti
 }
 
 export function renderAccountMappingMarkdown(mapping: AccountMappingArtifact): string {
-  const cell = (value: string | null): string => (value ?? "unknown").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
+  const cell = (value: string | null): string => (value ?? "null").replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
   const { summary } = mapping;
   const lines = [
     "# Account identity mapping review",
