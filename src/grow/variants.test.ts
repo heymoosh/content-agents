@@ -41,8 +41,31 @@ describe("createGrowVariantManifest", () => {
     assert.equal(manifest.candidates[0]?.status, "needs-human-review");
     assert.match(manifest.candidates[0]?.reviewRequirement ?? "", /human/i);
     assert.equal(manifest.generatesCopy, false);
+    assert.equal(manifest.creatorBodyCopyAllowed, false);
     assert.equal(manifest.sideEffects, "none");
     assert.equal("copy" in (manifest.candidates[0] ?? {}), false);
+  });
+
+  test("normalizes opaque claim refs and clones them into candidates", () => {
+    const claimRefs = ["claim:zeta", " claim:alpha ", "claim:zeta"];
+    const manifest = createGrowVariantManifest(plan, [{
+      medium: "text",
+      format: "post",
+      reason: "Carry claim lineage into the planning handoff.",
+      claim_refs: claimRefs,
+    }]);
+    const [first, second] = manifest.candidates;
+
+    assert.deepEqual(first?.claimRefs, ["claim:alpha", "claim:zeta"]);
+    assert.deepEqual(second?.claimRefs, ["claim:alpha", "claim:zeta"]);
+    assert.notEqual(first?.claimRefs, second?.claimRefs);
+    assert.equal(manifest.generatesCopy, false);
+    assert.equal(manifest.creatorBodyCopyAllowed, false);
+    assert.equal(manifest.sideEffects, "none");
+
+    claimRefs.push("claim:later");
+    first?.claimRefs.push("claim:mutated");
+    assert.deepEqual(second?.claimRefs, ["claim:alpha", "claim:zeta"]);
   });
 
   test("carries and normalizes the evidence-aware blueprint handoff", () => {
@@ -212,25 +235,30 @@ describe("createGrowVariantManifest", () => {
   });
 
   test("marks omitted evidence and review decisions blocked instead of ready", () => {
-    const [candidate] = createGrowVariantManifest(plan, [{
-      medium: "text",
-      format: "post",
-      reason: "Baseline treatment.",
-    }]).candidates;
+    for (const claimRefs of [undefined, []] as const) {
+      const [candidate] = createGrowVariantManifest(plan, [{
+        medium: "text",
+        format: "post",
+        reason: "Baseline treatment.",
+        claimRefs,
+      }]).candidates;
 
-    assert.equal(candidate?.evidenceStatus, "blocked");
-    assert.equal(candidate?.audienceScope, null);
-    assert.equal(candidate?.cta, "none");
-    assert.equal(candidate?.responseIntent, null);
-    assert.equal(candidate?.experimentId, null);
-    assert.equal(candidate?.voiceCheck, "pending");
-    assert.equal(candidate?.originalityCheck, "pending");
-    assert.equal(candidate?.readiness.status, "blocked");
-    assert.ok(candidate?.readiness.blockingFields.includes("evidenceStatus"));
-    assert.ok(candidate?.readiness.blockingFields.includes("audienceScope"));
-    assert.ok(candidate?.readiness.blockingFields.includes("responseIntent"));
-    assert.ok(candidate?.readiness.blockingFields.includes("experimentId"));
-    assert.ok(candidate?.readiness.blockingFields.includes("humanGate"));
+      assert.equal(candidate?.claimRefs.length, 0);
+      assert.equal(candidate?.evidenceStatus, "blocked");
+      assert.equal(candidate?.audienceScope, null);
+      assert.equal(candidate?.cta, "none");
+      assert.equal(candidate?.responseIntent, null);
+      assert.equal(candidate?.experimentId, null);
+      assert.equal(candidate?.voiceCheck, "pending");
+      assert.equal(candidate?.originalityCheck, "pending");
+      assert.equal(candidate?.readiness.status, "blocked");
+      assert.ok(candidate?.readiness.blockingFields.includes("claimRefs"));
+      assert.ok(candidate?.readiness.blockingFields.includes("evidenceStatus"));
+      assert.ok(candidate?.readiness.blockingFields.includes("audienceScope"));
+      assert.ok(candidate?.readiness.blockingFields.includes("responseIntent"));
+      assert.ok(candidate?.readiness.blockingFields.includes("experimentId"));
+      assert.ok(candidate?.readiness.blockingFields.includes("humanGate"));
+    }
   });
 
   test("rejects invalid evidence or human-review states and incomplete source refs", () => {
@@ -293,12 +321,14 @@ describe("createGrowVariantManifest", () => {
       experimentId: "exp-1",
       patternRefs: ["p2", "p1"],
       evidenceRefs: ["e2", "e1"],
+      claimRefs: ["claim-2", "claim-1"],
       experimentVariables: { z: "last", a: "first" },
     }]);
     const two = createGrowVariantManifest(plan, [{
       experimentVariables: { a: "first", z: "last" },
       evidenceRefs: ["e1", "e2"],
       patternRefs: ["p1", "p2"],
+      claim_refs: ["claim-1", "claim-2"],
       experimentId: " exp-1 ",
       responseIntent: "Observe unsolicited replies.",
       cta: " none ",

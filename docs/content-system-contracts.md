@@ -290,10 +290,12 @@ are present. Approval is per variant or an explicitly named bundle.
 `src/grow/variants.ts` currently emits a no-copy `grow-variant-manifest-v1`
 with source descriptor provenance, platform/medium/format, treatment reason,
 audience/CTA intent, experiment identity and variables, pattern/evidence
-references, evidence status, voice/originality review state, and
-`needs-human-review` status. It is an inspectable planning artifact only. It
-does not read source bodies, generate copy, create review-queue rows,
-schedule, publish, or claim that a variant is approved.
+references, explicit claim references, optional hook-template metadata,
+evidence status, voice/originality review state, and `needs-human-review`
+status. It is an inspectable planning artifact only. It does not read source
+bodies, generate copy, create review-queue rows, schedule, publish, or claim
+that a variant is approved. Missing claim references remain a readiness
+blocker; the manifest does not verify that the referenced claim exists.
 
 ### `grow_review_bundle` (scaffolded; side-effect-free reference bundle exists)
 
@@ -509,6 +511,9 @@ source_note, attribution, evidence_refs, status, lineage
 or `unknown`), `touch_at`, and `confidence`. An `unknown` touch requires
 `content_item_id: null` and `unattributed_reason`; all other touch types
 require a content item. `value` is null when not applicable, not zero.
+`src/review/funnel-events.ts` provides the pure normalizer and conservative
+readiness assessment for this shape. It does not capture live events, infer
+attribution, or aggregate Signals.
 
 ### `business_outcome` (future)
 
@@ -662,6 +667,16 @@ around Muxin's original claim, experience, example, evidence, and point of
 view. The template supplies a structure, not a creator's body or signature
 wording.
 
+### `pattern_evidence_readiness` (scaffolded; pure composition exists)
+
+`src/patterns/evidence-readiness.ts` composes the pool inventory, source
+evidence, comparison-readiness, and operator-readiness adapters into one
+deterministic read-only artifact. It accepts an explicit catalog, corpus,
+analysis records, and review rows. It does not fill missing pools from the
+catalog, expose post bodies, select winners, or write data. Empty or
+incomplete reviews keep comparison and operator readiness blocked. The
+artifact is an inspection join, not proof that the live corpus is reviewed.
+
 ### Increment acceptance predicates and current status
 
 The account metadata and pool-evidence increment is accepted only when all of
@@ -692,7 +707,8 @@ Every `variant` must carry the following treatment object:
 ```text
 {
   platform, medium, format, treatment_reason, audience_scope, cta,
-  experiment_id, variables, pattern_refs, evidence_status, hook_template?
+  experiment_id, variables, pattern_refs, claim_refs, evidence_status,
+  hook_template?
 }
 ```
 

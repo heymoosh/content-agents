@@ -99,6 +99,8 @@ export interface GrowTreatmentDefinition {
   reason: string;
   patternRefs?: readonly string[];
   evidenceRefs?: readonly string[];
+  claimRefs?: readonly string[];
+  claim_refs?: readonly string[];
   patternEvidenceRefs?: readonly GrowPatternEvidenceRefInput[];
   hookTemplate?: GrowHookTemplateInput | null;
   evidenceStatus?: GrowEvidenceStatus;
@@ -124,6 +126,7 @@ export interface GrowVariantCandidate {
   treatmentReason: string;
   patternRefs: string[];
   evidenceRefs: string[];
+  claimRefs: string[];
   patternEvidenceRefs: GrowPatternEvidenceRef[];
   hookTemplate: GrowHookTemplate | null;
   evidenceStatus: GrowEvidenceStatus;
@@ -300,6 +303,7 @@ interface NormalizedTreatment {
   reason: string;
   patternRefs: string[];
   evidenceRefs: string[];
+  claimRefs: string[];
   patternEvidenceRefs: GrowPatternEvidenceRef[];
   hookTemplate: GrowHookTemplate | null;
   evidenceStatus: GrowEvidenceStatus;
@@ -333,6 +337,7 @@ function normalizedTreatments(plan: GrowPlan, supplied: readonly GrowTreatmentDe
       treatment.reason,
       treatment.patternRefs,
       treatment.evidenceRefs,
+      treatment.claimRefs,
       treatment.patternEvidenceRefs,
       treatment.hookTemplate,
       treatment.evidenceStatus,
@@ -381,6 +386,7 @@ function normalizedTreatment(plan: GrowPlan, treatment: GrowTreatmentDefinition)
     reason: requiredText(treatment.reason, "treatment reason"),
     patternRefs: uniqueSorted(treatment.patternRefs, "pattern ref"),
     evidenceRefs: uniqueSorted(treatment.evidenceRefs, "evidence ref"),
+    claimRefs: uniqueSorted(treatment.claimRefs ?? treatment.claim_refs, "claim ref"),
     patternEvidenceRefs: normalizedPatternEvidenceRefs(treatment.patternEvidenceRefs),
     hookTemplate: normalizedHookTemplate(treatment.hookTemplate),
     evidenceStatus: normalizedEvidenceStatus(treatment.evidenceStatus),
@@ -420,12 +426,13 @@ function humanGate(plan: GrowPlan): GrowHumanGate {
   };
 }
 
-function readinessFor(candidate: Pick<GrowVariantCandidate, "evidenceStatus" | "audienceScope" | "responseIntent" | "experimentId" | "evidenceRefs" | "patternEvidenceRefs" | "hookTemplate" | "voiceCheck" | "originalityCheck">, gate: GrowHumanGate): GrowVariantReadiness {
+function readinessFor(candidate: Pick<GrowVariantCandidate, "evidenceStatus" | "audienceScope" | "responseIntent" | "experimentId" | "evidenceRefs" | "claimRefs" | "patternEvidenceRefs" | "hookTemplate" | "voiceCheck" | "originalityCheck">, gate: GrowHumanGate): GrowVariantReadiness {
   const blockingFields: string[] = [];
   if (candidate.evidenceStatus === "blocked" || candidate.evidenceStatus === "insufficient") blockingFields.push("evidenceStatus");
   if (candidate.audienceScope === null || candidate.audienceScope.toLowerCase() === "unknown") blockingFields.push("audienceScope");
   if (candidate.responseIntent === null || candidate.responseIntent.toLowerCase() === "unknown") blockingFields.push("responseIntent");
   if (candidate.experimentId === null || candidate.experimentId.toLowerCase() === "unknown") blockingFields.push("experimentId");
+  if (candidate.claimRefs.length === 0) blockingFields.push("claimRefs");
   if (candidate.evidenceStatus === "supported" && candidate.evidenceRefs.length === 0 && candidate.patternEvidenceRefs.length === 0) {
     blockingFields.push("evidenceRefs");
   }
@@ -473,6 +480,7 @@ export function createGrowVariantManifest(
       treatmentReason: treatment.reason,
       patternRefs: [...treatment.patternRefs],
       evidenceRefs: [...treatment.evidenceRefs],
+      claimRefs: [...treatment.claimRefs],
       patternEvidenceRefs: treatment.patternEvidenceRefs.map((ref) => ({
         ...ref,
         metricSnapshot: { ...ref.metricSnapshot },
@@ -514,6 +522,7 @@ export function createGrowVariantManifest(
       candidate.treatmentReason,
       candidate.patternRefs,
       candidate.evidenceRefs,
+      candidate.claimRefs,
       candidate.patternEvidenceRefs,
       candidate.hookTemplate,
       candidate.evidenceStatus,
