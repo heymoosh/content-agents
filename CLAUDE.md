@@ -24,6 +24,15 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    lines from the source; light edits for platform format only. NEVER compose new claims,
    arguments, or worldview statements in Muxin's voice. Every such derivative must carry
    `source_lines` frontmatter tracing the lines it was built from.
+   - **Scoped exception -- common platform hook templates.** The newer Grow/patterns path may
+     generate a platform-specific opening from a common, widely shared hook template in mad-lib
+     form, using Muxin's supplied thought, claim, experience, evidence, and point of view. This
+     may change the hook's wording and order, but it may not invent a factual claim, copy a
+     distinctive creator-specific phrase sequence, or copy a creator's body, story, or examples.
+     The adapted hook must retain provenance to the selected pattern/evidence and pass Muxin's
+     voice and human-review gates. Exact creator wording is analysis, quotation, attribution, or
+     a licensed exception only. Legacy extraction-only modes remain extraction-first until their
+     own skill migration explicitly adopts this exception.
    - **Scoped exception — video scripts.** Video shorts are a deliberate exception: Claude (via the
      `text-polish` provider — `claude-cli`, on Muxin's subscription, $0; `npm run script:draft`, in
      the `/video` skill) drafts a hook-driven script from the essay's *ideas* — not verbatim-traced.

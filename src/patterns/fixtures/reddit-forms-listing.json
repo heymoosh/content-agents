@@ -1,0 +1,195 @@
+{
+ "kind": "Listing",
+ "data": {
+  "after": null,
+  "children": [
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": true,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb001",
+     "title": "A text post with a real body",
+     "selftext": "Invented self text.",
+     "author": "fixture_a",
+     "permalink": "/r/Fixturesub/comments/bbb001/a_text_post_with_a_real_body/",
+     "url": "https://old.reddit.com/r/Fixturesub/comments/bbb001/a_text_post_with_a_real_body/",
+     "score": 40,
+     "upvote_ratio": 0.9,
+     "num_comments": 3,
+     "created_utc": 1786136000
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": true,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb002",
+     "title": "A title carrying the whole post",
+     "selftext": "",
+     "author": "fixture_b",
+     "permalink": "/r/Fixturesub/comments/bbb002/a_title_carrying_the_whole_post/",
+     "url": "https://old.reddit.com/r/Fixturesub/comments/bbb002/a_title_carrying_the_whole_post/",
+     "score": 95,
+     "upvote_ratio": 0.88,
+     "num_comments": 12,
+     "created_utc": 1786049600
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": false,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb003",
+     "title": "Screenshot of the thing that broke",
+     "selftext": "",
+     "post_hint": "image",
+     "author": "fixture_c",
+     "permalink": "/r/Fixturesub/comments/bbb003/screenshot_of_the_thing_that_broke/",
+     "url": "https://i.redd.it/fixture003.png",
+     "score": 520,
+     "upvote_ratio": 0.99,
+     "num_comments": 44,
+     "created_utc": 1785963200
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": false,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb004",
+     "title": "Six slides on how I ship",
+     "selftext": "",
+     "is_gallery": true,
+     "gallery_data": {
+      "items": [
+       {
+        "media_id": "x1"
+       },
+       {
+        "media_id": "x2"
+       },
+       {
+        "media_id": "x3"
+       }
+      ]
+     },
+     "author": "fixture_d",
+     "permalink": "/r/Fixturesub/comments/bbb004/six_slides_on_how_i_ship/",
+     "url": "https://www.reddit.com/gallery/bbb004",
+     "score": 77,
+     "upvote_ratio": 0.9,
+     "num_comments": 5,
+     "created_utc": 1785876800
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": false,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb005",
+     "title": "Just made my first app",
+     "selftext": "",
+     "is_video": true,
+     "media": {
+      "reddit_video": {
+       "duration": 38,
+       "width": 720,
+       "height": 1280
+      }
+     },
+     "author": "fixture_e",
+     "permalink": "/r/Fixturesub/comments/bbb005/just_made_my_first_app/",
+     "url": "https://v.redd.it/fixture005",
+     "score": 5777,
+     "upvote_ratio": 0.98,
+     "num_comments": 240,
+     "created_utc": 1785790400
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": false,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb006",
+     "title": "Full walkthrough of the build",
+     "selftext": "",
+     "is_video": true,
+     "media": {
+      "reddit_video": {
+       "duration": 1400,
+       "width": 1920,
+       "height": 1080
+      }
+     },
+     "author": "fixture_f",
+     "permalink": "/r/Fixturesub/comments/bbb006/full_walkthrough_of_the_build/",
+     "url": "https://v.redd.it/fixture006",
+     "score": 310,
+     "upvote_ratio": 0.9,
+     "num_comments": 18,
+     "created_utc": 1785704000
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": true,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb007",
+     "title": "Which of these would you use",
+     "selftext": "",
+     "poll_data": {
+      "total_vote_count": 812
+     },
+     "author": "fixture_g",
+     "permalink": "/r/Fixturesub/comments/bbb007/which_of_these_would_you_use/",
+     "url": "https://old.reddit.com/r/Fixturesub/comments/bbb007/which_of_these_would_you_use/",
+     "score": 64,
+     "upvote_ratio": 0.87,
+     "num_comments": 30,
+     "created_utc": 1785617600
+    }
+   },
+   {
+    "kind": "t3",
+    "data": {
+     "is_self": false,
+     "stickied": false,
+     "pinned": false,
+     "removed_by_category": null,
+     "id": "bbb008",
+     "title": "New study on attention and sleep",
+     "selftext": "",
+     "post_hint": "link",
+     "author": "fixture_h",
+     "permalink": "/r/Fixturesub/comments/bbb008/new_study_on_attention_and_sleep/",
+     "url": "https://example.org/study",
+     "score": 150,
+     "upvote_ratio": 0.92,
+     "num_comments": 21,
+     "created_utc": 1785531200
+    }
+   }
+  ]
+ }
+}

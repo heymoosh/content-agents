@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { launchPlatform } from "./browser.js";
-import { PULLERS } from "./registry.js";
+import { DEFAULT_PULL_PLATFORMS, PULLERS } from "./registry.js";
 import { PullError, classifyUnknown, CULPRIT, type PullFailureKind } from "./errors.js";
 import type { PullPlatform } from "./types.js";
 
@@ -48,7 +48,7 @@ async function main() {
   const headed = args.includes("--headed");
   const runIngest = args.includes("--ingest");
   const targets = args.filter((a) => !a.startsWith("--")) as PullPlatform[];
-  const platforms = targets.length ? targets : (Object.keys(PULLERS) as PullPlatform[]);
+  const platforms = targets.length ? targets : DEFAULT_PULL_PLATFORMS;
 
   let pulled = 0;
   const failures: { platform: string; kind: PullFailureKind }[] = [];

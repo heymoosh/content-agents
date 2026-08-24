@@ -223,6 +223,13 @@ describe("classifyOutlier", () => {
   test("an entry with no numbers at all is not an outlier and both scores stay null", () => {
     const e = entry();
     const v = classifyOutlier(e, [e], thresholds);
-    assert.deepEqual(v, { isOutlier: false, ratio: null, multiple: null, baselineMetric: null, reason: "none" });
+    assert.deepEqual(v, {
+      isOutlier: false,
+      ratio: null,
+      multiple: null,
+      baselineMetric: null,
+      baselineSource: null,
+      reason: "none",
+    });
   });
 });
