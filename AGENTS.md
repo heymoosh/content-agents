@@ -11,6 +11,11 @@ build you are touching:
 The root `CLAUDE.md` remains as a Claude Code compatibility file for now; all scoped build walls
 use `AGENTS.md` so any agent can discover them consistently.
 
+- **Orchestration is opt-in only.** For normal requests, reason directly from the user's request,
+  named documents, and relevant implementation. Do not invoke or consult triage, planning, card,
+  backlog, SimpleKanban, conductor, or related orchestration workflows unless Muxin explicitly
+  requests that workflow by name. Do not read or modify the backlog merely because a task could
+  become a card. Repository architecture and safety rules still apply.
 - Inner loop: verify every change with `npm run check`.
 - Behavior gate: run `TODO: e2e/integration command` once, only when user-visible behavior changed.
 - Heavy checks (mutation testing, full matrices) are CI-only — never run them locally.
