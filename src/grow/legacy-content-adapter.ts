@@ -1,6 +1,8 @@
 import { basename, join } from "node:path";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { readQueue, rowLens, type QueueRow } from "../publish/queue.js";
+import { readAdvice } from "../review/develop.js";
+import { findLoggedRef, type LoggedRef } from "../review/reconcile.js";
 import {
   buildGrowThisPlan,
   type GrowThisCutDecision,
@@ -33,6 +35,7 @@ export interface LegacyContentVariant {
   readonly status: LegacyVariantStatus;
   readonly queueOrigin: string | null;
   readonly publishedInLog: boolean;
+  readonly publishRef: LoggedRef | null;
 }
 
 export interface LegacyPublishLogSummary {
@@ -91,10 +94,11 @@ function normalizeVariantStatus(status: string, publishedInLog: boolean): Legacy
   return "unknown";
 }
 
-function readPublishLog(folder: string, queueRows: readonly QueueRow[]): LegacyPublishLogSummary {
+function readPublishLog(folder: string, queueRows: readonly QueueRow[]): { summary: LegacyPublishLogSummary; text: string } {
   const path = join(folder, "publish-log.md");
-  if (!existsSync(path)) return { present: false, entryCount: 0, publishedVariantIds: [] };
-  const lines = readFileSync(path, "utf8").split("\n");
+  if (!existsSync(path)) return { summary: { present: false, entryCount: 0, publishedVariantIds: [] }, text: "" };
+  const text = readFileSync(path, "utf8");
+  const lines = text.split("\n");
   const queueIds = new Set(queueRows.map((row) => row.id));
   const published = new Set<string>();
   let entryCount = 0;
@@ -105,13 +109,21 @@ function readPublishLog(folder: string, queueRows: readonly QueueRow[]): LegacyP
     if (match && queueIds.has(match[1].trim())) published.add(match[1].trim());
   }
   return {
-    present: true,
-    entryCount,
-    publishedVariantIds: [...published].sort((left, right) => left.localeCompare(right)),
+    text,
+    summary: {
+      present: true,
+      entryCount,
+      publishedVariantIds: [...published].sort((left, right) => left.localeCompare(right)),
+    },
   };
 }
 
-function queueVariant(slug: string, row: QueueRow, publishedIds: ReadonlySet<string>): LegacyContentVariant {
+function queueVariant(
+  slug: string,
+  row: QueueRow,
+  publishLogText: string,
+  publishedIds: ReadonlySet<string>,
+): LegacyContentVariant {
   const publishedInLog = publishedIds.has(row.id);
   return {
     rowId: row.id,
@@ -122,6 +134,7 @@ function queueVariant(slug: string, row: QueueRow, publishedIds: ReadonlySet<str
     status: normalizeVariantStatus(row.status, publishedInLog),
     queueOrigin: row.origin ?? null,
     publishedInLog,
+    publishRef: findLoggedRef(publishLogText, row.id),
   };
 }
 
@@ -204,25 +217,37 @@ function cutArtifactPath(folder: string, lens: string): string {
   return lens === "extract" ? join(folder, "source.md") : join(folder, "cuts", lens, "cut.md");
 }
 
+function acceptedCutDecision(folder: string, lens: string): GrowThisCutDecision | null {
+  const advice = readAdvice(folder);
+  if (advice === null) return null;
+  const matches = advice.rounds.flatMap((round) => round.cards).filter((card) =>
+    card.kind === "angle" && card.status === "accepted" && card.acceptedLens === lens);
+  if (matches.length !== 1) return null;
+  const decidedAt = matches[0]?.decidedAt;
+  if (decidedAt === null || decidedAt === undefined || Number.isNaN(Date.parse(decidedAt))) return null;
+  return { status: "approved", decidedBy: "muxin", decidedAt };
+}
+
 /** Build a body-free normalized lineage view from one existing legacy content folder. */
 export function adaptLegacyContentFolder(folder: string): LegacyContentAdapterResult {
   const slug = stableSlug(folder);
   if (!existsSync(folder)) throw new Error("content folder does not exist: " + folder);
   const queue = existsSync(join(folder, "review-queue.md")) ? readQueue(folder).rows : [];
-  const publishLog = readPublishLog(folder, queue);
-  const publishedIds = new Set(publishLog.publishedVariantIds);
+  const publishLogRead = readPublishLog(folder, queue);
+  const publishedIds = new Set(publishLogRead.summary.publishedVariantIds);
   const sourceRef = ref("source", "source:" + slug, "legacy-content-folder");
   const cuts = cutLenses(folder, queue).map((lens): LegacyContentCut => {
     const rows = queue.filter((row) => rowLens(row.id) === lens);
-    const variants = rows.map((row) => queueVariant(slug, row, publishedIds));
+    const variants = rows.map((row) => queueVariant(slug, row, publishLogRead.text, publishedIds));
     const cutRef = ref("cut", "cut:" + slug + ":" + lens, "legacy-cut-artifact");
     const sourceStatus: GrowThisStageStatus = existsSync(join(folder, "source.md")) ? "ready" : "blocked";
     const cutStatus: GrowThisStageStatus = existsSync(cutArtifactPath(folder, lens)) ? "ready" : "blocked";
+    const cutDecision = acceptedCutDecision(folder, lens);
     const blockers = [
       ...(sourceStatus === "ready" ? [] : ["source.md is missing"]),
       ...(cutStatus === "ready" ? [] : ["cut artifact is missing"]),
       ...(rows.length ? [] : ["review-queue has no variant rows for this cut"]),
-      "Muxin cut decision is not persisted in the legacy folder",
+      ...(cutDecision ? [] : ["Muxin cut decision is not persisted in the legacy folder"]),
       "treatment rationale is not persisted in the legacy queue",
       "evidence refs are not persisted in the legacy queue",
       "voice and originality checks are not persisted in the legacy queue",
@@ -234,7 +259,7 @@ export function adaptLegacyContentFolder(folder: string): LegacyContentAdapterRe
       variants,
       sourceStatus,
       cutStatus,
-      cutDecision: null,
+      cutDecision,
       blockers: uniqueSorted(blockers),
     } satisfies Omit<LegacyContentCut, "growThisInput">;
     return { ...base, growThisInput: cutInput(slug, sourceRef, base) };
@@ -247,7 +272,7 @@ export function adaptLegacyContentFolder(folder: string): LegacyContentAdapterRe
     slug,
     sourceRef,
     cuts,
-    publishLog,
+    publishLog: publishLogRead.summary,
     blockers,
     bodyIncluded: false,
     sideEffects: "none",

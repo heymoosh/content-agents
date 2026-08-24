@@ -57,7 +57,7 @@ test("adapts source, extract/non-extract cuts, queue rows, and publish evidence 
     writeFileSync(join(folder, "publish-log.md"), [
       "# Publish log",
       "",
-      "- 2026-08-24T12:00:00.000Z — short/short-1 → provider draft 123",
+      "- 2026-08-24T12:00:00.000Z — short/short-1 → typefully draft 123",
       "",
     ].join("\n"));
 
@@ -68,6 +68,7 @@ test("adapts source, extract/non-extract cuts, queue rows, and publish evidence 
     assert.deepEqual(result.cuts[0].variants.map((variant) => variant.rowId), ["extract-1"]);
     assert.deepEqual(result.cuts[1].variants.map((variant) => variant.rowId), ["short/short-1"]);
     assert.equal(result.cuts[1].variants[0].status, "published");
+    assert.deepEqual(result.cuts[1].variants[0].publishRef, { provider: "typefully", refId: "123" });
     assert.deepEqual(result.publishLog.publishedVariantIds, ["short/short-1"]);
     assert.equal(result.cuts[1].cutRef.id, `cut:${result.slug}:short`);
     assert.equal(result.cuts[1].variantRefs[0].id, `variant:${result.slug}:short/short-1`);
@@ -103,5 +104,86 @@ test("keeps legacy missing lineage and missing files blocked instead of inferrin
     assert.ok(plan.readiness.blockers.includes("cut record is not marked ready"));
     assert.ok(plan.readiness.blockers.includes("Muxin cut decision is pending"));
     assertBodyFree(plan);
+  });
+});
+
+test("consumes one explicit accepted Develop cut decision without treating file existence as approval", () => {
+  withTempFolder((folder) => {
+    mkdirSync(join(folder, "cuts", "short"), { recursive: true });
+    mkdirSync(join(folder, "develop"), { recursive: true });
+    writeFileSync(join(folder, "source.md"), "Muxin's thought\n");
+    writeFileSync(join(folder, "cuts", "short", "cut.md"), "Muxin's short cut\n");
+    writeQueue(folder, [
+      "| short/short-1 | tiktok | short | derivatives/short-short-1.md | — | — | — | pending | review | from /cycle |",
+    ]);
+    writeFileSync(join(folder, "develop", "advice.json"), JSON.stringify({
+      version: 1,
+      rounds: [{
+        index: 1,
+        trigger: "initial",
+        cards: [{
+          id: "r1-c1",
+          kind: "angle",
+          title: "Short cut",
+          summary: "ignored advisor rationale",
+          lens: "short",
+          sourceLines: [1],
+          status: "accepted",
+          acceptedLens: "short",
+          decidedAt: "2026-08-24T12:00:00Z",
+        }],
+      }],
+    }));
+
+    const result = adaptLegacyContentFolder(folder);
+    const short = result.cuts.find((cut) => cut.lens === "short");
+    assert.ok(short);
+    assert.deepEqual(short.cutDecision, {
+      status: "approved",
+      decidedBy: "muxin",
+      decidedAt: "2026-08-24T12:00:00Z",
+    });
+    assert.equal(short.blockers.includes("Muxin cut decision is not persisted in the legacy folder"), false);
+    const plan = buildLegacyGrowPlan(result, "short");
+    assert.equal(plan.gates.cut.status, "approved");
+    assert.equal(plan.lifecycle.find((stage) => stage.stage === "cut")?.status, "ready");
+    assert.equal(plan.readiness.status, "blocked");
+    assert.ok(plan.readiness.blockers.some((blocker) => /human review|evidence/.test(blocker)));
+  });
+});
+
+test("keeps dismissed, mismatched, and malformed advice decisions blocked", () => {
+  withTempFolder((folder) => {
+    mkdirSync(join(folder, "cuts", "short"), { recursive: true });
+    writeFileSync(join(folder, "source.md"), "Muxin's thought\n");
+    writeFileSync(join(folder, "cuts", "short", "cut.md"), "Muxin's short cut\n");
+    writeQueue(folder, [
+      "| short/short-1 | tiktok | short | derivatives/short-short-1.md | — | — | — | pending | review | from /cycle |",
+    ]);
+    mkdirSync(join(folder, "develop"), { recursive: true });
+    const writeAdvice = (card: Record<string, unknown>) => writeFileSync(
+      join(folder, "develop", "advice.json"),
+      JSON.stringify({ version: 1, rounds: [{ index: 1, trigger: "initial", cards: [card] }] }),
+    );
+    const base = {
+      id: "r1-c1", kind: "angle", title: "Short", summary: "ignored", lens: "short",
+      sourceLines: [1], acceptedLens: "short", decidedAt: "2026-08-24T12:00:00Z",
+    };
+    for (const card of [
+      { ...base, status: "dismissed" },
+      { ...base, status: "accepted", acceptedLens: "other" },
+      { ...base, status: "accepted", decidedAt: "not-a-date" },
+    ]) {
+      writeAdvice(card);
+      const short = adaptLegacyContentFolder(folder).cuts.find((cut) => cut.lens === "short");
+      assert.ok(short);
+      assert.equal(short.cutDecision, null);
+      assert.ok(short.blockers.includes("Muxin cut decision is not persisted in the legacy folder"));
+    }
+    writeFileSync(join(folder, "develop", "advice.json"), "not-json\n");
+    const short = adaptLegacyContentFolder(folder).cuts.find((cut) => cut.lens === "short");
+    assert.ok(short);
+    assert.equal(short.cutDecision, null);
+    assert.ok(short.blockers.includes("Muxin cut decision is not persisted in the legacy folder"));
   });
 });

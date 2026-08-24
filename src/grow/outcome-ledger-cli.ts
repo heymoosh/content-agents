@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import {
   buildOutcomeLedger,
   normalizeOutcomeRow,
+  readOutcomeLedger,
   type OutcomeLedger,
   type OutcomeRow,
 } from "./outcome-ledger.js";
@@ -18,7 +19,8 @@ export interface OutcomeLedgerCliIo {
 
 export type OutcomeLedgerCliSource =
   | { readonly kind: "json-string"; readonly value: string }
-  | { readonly kind: "file"; readonly path: string };
+  | { readonly kind: "file"; readonly path: string }
+  | { readonly kind: "ledger"; readonly path: string };
 
 export type OutcomeLedgerCliFormat = "json" | "markdown" | "both";
 
@@ -157,16 +159,21 @@ function optionValue(argv: readonly string[], index: number, option: string): st
 export function parseOutcomeLedgerArgs(argv: readonly string[]): OutcomeLedgerCliOptions {
   let inputPath: string | undefined;
   let jsonText: string | undefined;
+  let ledgerPath: string | undefined;
   let format: OutcomeLedgerCliFormat = "json";
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--input" || argument === "--file") {
-      if (inputPath !== undefined || jsonText !== undefined) throw new Error("exactly one of --json or --input/--file is allowed");
+      if (inputPath !== undefined || jsonText !== undefined || ledgerPath !== undefined) throw new Error("exactly one of --json, --input/--file, or --ledger is allowed");
       inputPath = optionValue(argv, index, argument);
       index += 1;
     } else if (argument === "--json") {
-      if (inputPath !== undefined || jsonText !== undefined) throw new Error("exactly one of --json or --input/--file is allowed");
+      if (inputPath !== undefined || jsonText !== undefined || ledgerPath !== undefined) throw new Error("exactly one of --json, --input/--file, or --ledger is allowed");
       jsonText = optionValue(argv, index, argument);
+      index += 1;
+    } else if (argument === "--ledger") {
+      if (inputPath !== undefined || jsonText !== undefined || ledgerPath !== undefined) throw new Error("exactly one of --json, --input/--file, or --ledger is allowed");
+      ledgerPath = optionValue(argv, index, argument);
       index += 1;
     } else if (argument === "--format") {
       const value = optionValue(argv, index, argument);
@@ -177,7 +184,8 @@ export function parseOutcomeLedgerArgs(argv: readonly string[]): OutcomeLedgerCl
       throw new Error(`unknown argument: ${argument}`);
     }
   }
-  if (inputPath === undefined && jsonText === undefined) throw new Error("exactly one of --json or --input/--file is required");
+  if (inputPath === undefined && jsonText === undefined && ledgerPath === undefined) throw new Error("exactly one of --json, --input/--file, or --ledger is required");
+  if (ledgerPath !== undefined) return { source: { kind: "ledger", path: ledgerPath }, format };
   return {
     source: inputPath === undefined ? { kind: "json-string", value: jsonText as string } : { kind: "file", path: inputPath },
     format,
@@ -194,9 +202,16 @@ export async function main(argv: readonly string[] = process.argv.slice(2), io: 
   const effectiveIo: OutcomeLedgerCliIo = { ...defaultIo, ...io };
   try {
     const options = parseOutcomeLedgerArgs(argv);
-    const raw = options.source.kind === "json-string" ? options.source.value : await effectiveIo.readFile(options.source.path);
-    if (typeof raw !== "string") fail("input file must contain text");
-    const ledger = buildOutcomeLedgerFromJson(raw);
+    let ledger: OutcomeLedger;
+    if (options.source.kind === "ledger") {
+      ledger = buildOutcomeLedger(readOutcomeLedger(options.source.path));
+    } else {
+      const raw = options.source.kind === "json-string"
+        ? options.source.value
+        : await effectiveIo.readFile(options.source.path);
+      if (typeof raw !== "string") fail("input file must contain text");
+      ledger = buildOutcomeLedgerFromJson(raw);
+    }
     await effectiveIo.write(renderOutcomeLedger(ledger, options.format));
     return 0;
   } catch (error) {

@@ -377,8 +377,12 @@ been reviewed or that the app is wired end to end.
 `src/grow/legacy-content-adapter.ts` is the read-only bridge from an existing
 `content/<slug>` folder into that Grow projection. It preserves source and cut
 references, non-default cut prefixes, legacy review-queue row IDs/statuses,
-and publish-log observations, while leaving missing Grow treatment rationale,
-evidence, voice/originality checks, and cut decisions blocked. `npm run grow:this`
+and row-scoped recognized publish-log references, while leaving unrecorded or
+ambiguous Grow treatment rationale, evidence, voice/originality checks, and cut
+decisions blocked. An explicit accepted Develop angle decision is consumed as a
+Muxin cut approval only when its lens and decision timestamp match unambiguously.
+These legacy publish observations never fabricate a Grow delivery record or
+publish approval. `npm run grow:this`
 accepts `--folder <content-folder> [--lens <lens>]` for this path, so real
 legacy studio artifacts can be inspected without hand-authoring a JSON plan.
 The adapter returns no body text and performs no generation, approval, queue,
@@ -400,7 +404,9 @@ gates. `src/agents/skill-invocation.ts` records key-only readiness for one decla
 metadata-only boundary visible.
 `src/grow/outcome-ledger.ts` is the append-only persistence boundary for funnel and business facts;
 it preserves unknown attribution and revisions without embedding bodies, model output, ranking, or
-winner inference. `src/grow/venture-input.ts` is the Content-owned, body-free pointer into Venture;
+winner inference. `npm run grow:outcome-ledger -- --ledger <path>` reads that append-only JSONL
+directly with line-numbered, fail-closed parse errors; the existing explicit JSON/input forms remain
+available. Neither route writes the ledger or closes experiments. `src/grow/venture-input.ts` is the Content-owned, body-free pointer into Venture;
 it requires Muxin's content approval while leaving Venture's independent decision null until its
 own gate supplies a fact. `src/patterns/measurement-run.ts` records the explicit route, sample
 policy, window, operator, and evidence for a `/new` baseline run, including manual and unsupported

@@ -458,10 +458,13 @@ the projection runs; its output is body-free, keeps `winner: null`, and has
 The same CLI accepts `--folder <content-folder> [--lens <lens>]`. That route
 uses `src/grow/legacy-content-adapter.ts` to read the existing source/cut
 artifacts, review queue, and publish log into stable Grow references. Legacy
-queue statuses and publish observations are retained as facts, but they cannot
-stand in for a persisted Grow cut decision, evidence refs, treatment rationale,
-voice/originality checks, or human review-bundle decision. Missing artifacts
-remain blocked, and the adapter never returns body text or performs writes,
+queue statuses and row-scoped recognized publish references are retained as facts,
+but they cannot stand in for Grow delivery or publish approval, evidence refs,
+treatment rationale, voice/originality checks, or a human review-bundle decision.
+When `develop/advice.json` contains exactly one accepted angle for the requested
+lens with a valid decision timestamp, the adapter consumes it as Muxin's
+persisted cut approval; missing, dismissed, mismatched, ambiguous, or malformed
+advice remains blocked. The adapter never returns body text or performs writes,
 generation, approval, scheduling, or publishing.
 
 `src/patterns/hook-template-ledger.ts` is the curated hook-mechanism read
@@ -761,7 +764,9 @@ is represented explicitly with a null content item and a reason. The ledger
 rejects post bodies, model outputs, rankings, and winner claims; it does not
 infer attribution, aggregate Signals, close experiments, or create Venture
 records. `src/grow/outcome-ledger-cli.ts` and `npm run grow:outcome-ledger`
-provide deterministic JSON/Markdown inspection over an explicit local source.
+provide deterministic JSON/Markdown inspection over an explicit local source;
+`--ledger <path>` reads the append-only JSONL ledger directly and reports
+malformed rows with their line number while failing closed.
 The pure `appendOutcomeRow`/`appendOutcomeLedger` functions are the separate
 append-only persistence seam; the CLI itself does not write a ledger.
 Persistence remains separate from the human decision to interpret or adopt a
