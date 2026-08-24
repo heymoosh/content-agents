@@ -317,6 +317,34 @@ unknown, blocked, or invalid values conservative. It performs no filesystem
 read/write, does not approve or schedule anything, and exposes `sideEffects: none`
 before those facts enter reconciliation.
 
+`src/grow/live-facts.ts` is the narrow read-side bridge from established
+repository records into that normalizer. It accepts an already-read
+`QueueRow` or an explicit scheduler `Claim` plus caller-supplied lifecycle,
+delivery, and lineage facts. It does not read files itself, treat a claim as
+approval, invent lineage, claim a slot, or mutate the queue or scheduler.
+
+### `phase_contract` (scaffolded; executable definition exists)
+
+`src/blueprint/phase-contracts.ts` defines the four blueprint phases as
+deterministic read-only contracts: coverage/catalog, pool-evidence,
+growth/delivery, and learning/venture. Each contract names its owner, required
+inputs, outputs, human gates, evidence, non-goals, and pause conditions.
+`evaluatePhaseContract` checks only explicitly supplied fact names. Missing or
+unknown facts block; the evaluator does not infer that a producer, review, or
+human decision exists. This is an executable contract definition, not proof
+that the live phase is complete.
+
+### `generation_brief` (scaffolded; planning boundary exists)
+
+`src/grow/generation-brief.ts` retains the source and original-substance
+references and deterministically fans out platform x format x treatment
+specifications while recording the requested daily volume per platform. The
+volume field is planning metadata, not an implicit publish promise or a hidden
+fan-out multiplier. The brief allows common social
+hooks to be reused as `template-madlib` structures while forbidding creator
+body-copy reuse. It contains no body text, winner, demand claim, publish call,
+or scheduler action. Human review remains required before release.
+
 ### `experiment` (scaffolded; typed deterministic record exists)
 
 The typed adapter in `src/grow/experiment-record.ts` normalizes one question,
