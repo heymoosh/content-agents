@@ -231,6 +231,22 @@ export {
 } from "./grow-this-plan.js";
 
 export {
+  buildGrowThisPlanOperatorView,
+  main as growThisPlanCliMain,
+  parseGrowThisPlanArgs,
+  parseGrowThisPlanInput,
+  renderGrowThisPlan,
+  renderGrowThisPlanJson,
+  renderGrowThisPlanMarkdown,
+  GROW_THIS_PLAN_CLI_VERSION,
+  GrowThisPlanCliValidationError,
+  type GrowThisNextAction,
+  type GrowThisPlanCliFormat,
+  type GrowThisPlanCliOptions,
+  type GrowThisPlanOperatorView,
+} from "./grow-this-plan-cli.js";
+
+export {
   buildCommentLearningView,
   createCommentLearningView,
   type CommentLearningHypothesis,

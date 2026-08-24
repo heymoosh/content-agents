@@ -448,6 +448,13 @@ When supplied, the generation-review-delivery join must match this plan's
 review bundle and variant; its blockers and safety boundary flow into delivery
 readiness, but it never replaces the durable delivery record.
 
+`src/grow/grow-this-plan-cli.ts` and `npm run grow:this` expose this projection
+as a deterministic operator view. The CLI accepts one explicit JSON plan or
+file, reports the first blocked/pending lifecycle stage, and can render JSON,
+Markdown, or both. It rejects body, model, credential, and winner fields before
+the projection runs; its output is body-free, keeps `winner: null`, and has
+`sideEffects: none`. It does not queue, schedule, publish, or generate copy.
+
 `src/grow/reconciliation.ts` is a read-side comparison of the review bundle,
 delivery record, review-queue fact, and scheduler fact. It reports `blocked` or
 `drifted` when IDs, lineage, approval, lifecycle, or scheduler evidence

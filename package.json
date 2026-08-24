@@ -118,6 +118,7 @@
     "patterns:ledger-account-example-table": "tsx src/patterns/ledger-account-example-table-cli.ts",
     "patterns:reviewed-account-registry": "tsx src/patterns/reviewed-account-registry-cli.ts",
     "grow:plan": "tsx src/grow/cli.ts",
+    "grow:this": "tsx src/grow/grow-this-plan-cli.ts",
     "grow:brief": "tsx src/grow/brief-cli.ts",
     "grow:studio-readiness": "tsx src/grow/studio-readiness-cli.ts",
     "grow:generation-run": "tsx src/grow/generation-run-cli.ts",
