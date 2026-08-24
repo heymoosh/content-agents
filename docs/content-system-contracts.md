@@ -409,7 +409,10 @@ volume field is planning metadata, not an implicit publish promise or a hidden
 fan-out multiplier. The brief allows common social
 hooks to be reused as `template-madlib` structures while forbidding creator
 body-copy reuse. It contains no body text, winner, demand claim, publish call,
-or scheduler action. Human review remains required before release.
+or scheduler action. When supplied, explicit platform/format readiness facts
+are copied onto each matching treatment; a missing or blocked fact is exposed
+as a readiness blocker instead of being inferred. Human review remains
+required before release.
 
 ### `experiment` (scaffolded; typed deterministic record exists)
 
@@ -685,6 +688,11 @@ winner. It keeps configured-but-uncollected surfaces visible, separates
 collected evidence from reviewed evidence and baselines, and reports
 conservative blockers. It has no network or filesystem side effects and does
 not expose post bodies.
+
+`src/patterns/readiness.ts` and `npm run patterns:readiness` provide the
+read-only operator entry point that composes evidence and platform readiness.
+It accepts an explicit review JSON file, reports missing or invalid review
+input, and never promotes a row to reviewed by inference or writes data.
 
 ### `comment_observation_intake` (scaffolded; manual/local adapter exists)
 

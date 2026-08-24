@@ -26,6 +26,22 @@ export interface GenerationExperimentMatrix {
   dimensions: GenerationExperimentDimension[];
 }
 
+export type GenerationReadinessStatus = "ready" | "blocked";
+
+export interface GenerationPlatformFormatReadinessFact {
+  platform: string;
+  format: string;
+  readiness: {
+    status: GenerationReadinessStatus;
+    blockers: readonly string[];
+  };
+}
+
+export interface GenerationBriefReadiness {
+  status: GenerationReadinessStatus;
+  blockers: string[];
+}
+
 export interface GenerationBriefInput {
   sourceReference: string;
   substanceReference: string;
@@ -37,6 +53,7 @@ export interface GenerationBriefInput {
   patternTemplateRefs: readonly string[];
   dailyVolumePerPlatform?: number | Readonly<Record<string, number>>;
   experimentMatrix?: GenerationExperimentMatrixInput;
+  platformFormatReadiness?: readonly GenerationPlatformFormatReadinessFact[];
 }
 
 export interface GenerationTemplateReusePolicy {
@@ -81,6 +98,7 @@ export interface GenerationBriefVariant {
   patternTemplateRef: string;
   treatment: GenerationBriefTreatment;
   experimentAssignment: Record<string, string> | null;
+  readiness?: GenerationBriefReadiness;
   humanGate: GenerationHumanGate;
   specificationOnly: true;
 }
@@ -198,6 +216,62 @@ function normalizeExperimentMatrix(
   return { dimensions: dimensions.sort((left, right) => compareStrings(left.name, right.name)) };
 }
 
+function readinessKey(platform: string, format: string): string {
+  return JSON.stringify([platform, format]);
+}
+
+function normalizePlatformFormatReadiness(
+  platforms: readonly string[],
+  formats: readonly string[],
+  value: readonly GenerationPlatformFormatReadinessFact[] | undefined,
+): Map<string, GenerationBriefReadiness> | null {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) throw new Error("platformFormatReadiness must be an array");
+
+  const platformSet = new Set(platforms);
+  const formatSet = new Set(formats);
+  const facts = new Map<string, GenerationBriefReadiness>();
+  for (const fact of value) {
+    if (fact === null || typeof fact !== "object" || Array.isArray(fact)) {
+      throw new Error("platform-format readiness fact must be an object");
+    }
+    const platform = requiredText(fact.platform, "readiness platform");
+    const format = requiredText(fact.format, "readiness format");
+    if (!platformSet.has(platform)) throw new Error(`readiness contains unknown platform "${platform}"`);
+    if (!formatSet.has(format)) throw new Error(`readiness contains unknown format "${format}"`);
+
+    const readiness = fact.readiness as { status: unknown; blockers: unknown };
+    if (readiness === null || typeof readiness !== "object" || Array.isArray(readiness)) {
+      throw new Error("platform-format readiness must contain a readiness object");
+    }
+    if (readiness.status !== "ready" && readiness.status !== "blocked") {
+      throw new Error("platform-format readiness status must be ready or blocked");
+    }
+    if (!Array.isArray(readiness.blockers)) {
+      throw new Error("platform-format readiness blockers must be an array");
+    }
+    const blockers = [...new Set(readiness.blockers.map((blocker: unknown) => requiredText(blocker, "readiness blocker")))];
+    if (readiness.status === "blocked" && blockers.length === 0) blockers.push("platform/format readiness is blocked");
+
+    const key = readinessKey(platform, format);
+    if (facts.has(key)) throw new Error(`duplicate readiness for ${platform}/${format}`);
+    facts.set(key, { status: readiness.status, blockers });
+  }
+  return facts;
+}
+
+function readinessFor(
+  platform: string,
+  format: string,
+  facts: Map<string, GenerationBriefReadiness> | null,
+): GenerationBriefReadiness | undefined {
+  if (facts === null) return undefined;
+  return facts.get(readinessKey(platform, format)) ?? {
+    status: "blocked",
+    blockers: ["platform/format readiness fact is absent"],
+  };
+}
+
 function experimentAssignments(matrix: GenerationExperimentMatrix | null): Array<Record<string, string> | null> {
   if (!matrix) return [null];
   let assignments: Array<Record<string, string>> = [{}];
@@ -245,6 +319,11 @@ export function createGenerationBrief(input: GenerationBriefInput): GenerationBr
   );
   const dailyVolumePerPlatform = normalizeDailyVolume(platforms, input.dailyVolumePerPlatform);
   const experimentMatrix = normalizeExperimentMatrix(input.experimentMatrix);
+  const platformFormatReadiness = normalizePlatformFormatReadiness(
+    platforms,
+    formats,
+    input.platformFormatReadiness,
+  );
   const assignments = experimentAssignments(experimentMatrix);
   const variants: GenerationBriefVariant[] = [];
   const humanGate: GenerationHumanGate = {
@@ -260,6 +339,7 @@ export function createGenerationBrief(input: GenerationBriefInput): GenerationBr
         for (const topicLane of topicLanes) {
           for (const patternTemplateRef of patternTemplateRefs) {
             for (const experimentAssignment of assignments) {
+              const readiness = readinessFor(platform, format, platformFormatReadiness);
               variants.push({
                 id: variantId(platform, format, mediaMode, topicLane, patternTemplateRef, experimentAssignment),
                 platform,
@@ -269,6 +349,7 @@ export function createGenerationBrief(input: GenerationBriefInput): GenerationBr
                 patternTemplateRef,
                 treatment: { mediaMode, topicLane, patternTemplateRef },
                 experimentAssignment: experimentAssignment ? { ...experimentAssignment } : null,
+                ...(readiness ? { readiness: { status: readiness.status, blockers: [...readiness.blockers] } } : {}),
                 humanGate: { ...humanGate },
                 specificationOnly: true,
               });

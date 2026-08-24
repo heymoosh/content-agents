@@ -117,6 +117,53 @@ test("requires human approval before release and defers model invocation", () =>
   assert.deepEqual(brief.reviewGate, { required: true, before: "publish", approvalOwner: "human" });
 });
 
+test("projects platform-format readiness conservatively without changing hook or human gates", () => {
+  const brief = createGenerationBrief({
+    ...baseInput,
+    platformFormatReadiness: [
+      {
+        platform: "linkedin",
+        format: "short-post",
+        readiness: { status: "ready", blockers: [] },
+      },
+      {
+        platform: "x",
+        format: "short-post",
+        readiness: { status: "blocked", blockers: ["format is not reviewed"] },
+      },
+    ],
+  });
+
+  const linkedinShortPost = brief.variants.find((variant) => variant.platform === "linkedin" && variant.format === "short-post");
+  const xShortPost = brief.variants.find((variant) => variant.platform === "x" && variant.format === "short-post");
+  const linkedinThread = brief.variants.find((variant) => variant.platform === "linkedin" && variant.format === "thread");
+
+  assert.deepEqual(linkedinShortPost?.readiness, { status: "ready", blockers: [] });
+  assert.deepEqual(xShortPost?.readiness, { status: "blocked", blockers: ["format is not reviewed"] });
+  assert.deepEqual(linkedinThread?.readiness, {
+    status: "blocked",
+    blockers: ["platform/format readiness fact is absent"],
+  });
+  assert.deepEqual(brief.templateReusePolicy, {
+    mode: "template-madlib",
+    commonSocialHooks: "allowed",
+    creatorBodyCopy: "forbidden",
+  });
+  assert.equal(brief.modelBoundary.boundaries.commonHookMadLibAllowed, true);
+  assert.deepEqual(xShortPost?.humanGate, {
+    required: true,
+    before: "publish",
+    approvalOwner: "human",
+    status: "pending",
+  });
+});
+
+test("omitting platform-format readiness preserves the legacy variant shape", () => {
+  const brief = createGenerationBrief(baseInput);
+
+  for (const variant of brief.variants) assert.equal(Object.hasOwn(variant, "readiness"), false);
+});
+
 test("rejects empty values, missing platforms, and invalid daily volume", () => {
   assert.throws(() => createGenerationBrief({ ...baseInput, sourceReference: " " }), /sourceReference must not be empty/);
   assert.throws(() => createGenerationBrief({ ...baseInput, platforms: [] }), /at least one platform is required/);

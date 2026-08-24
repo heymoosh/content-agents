@@ -235,11 +235,52 @@ test("a carousel is staged with body_is_complete false and no invented on-screen
   assert.equal(entry.media.media_count, 2);
 });
 
+test("a carousel preserves its first source slide URL as asset provenance", () => {
+  const post = toThreadsPost(carouselPost()) as ThreadsPost;
+  const { entry } = stageEntry(post, { handle: "buildsolo", creator: "Sam Builds", niche: "solopreneur" });
+  assert.ok(entry);
+  assert.equal(entry.media.asset_url, "https://cdn.example/slide1.jpg");
+  assert.equal(entry.media.onscreen_text, null);
+  assert.equal(entry.media.body_is_complete, false);
+});
+
+test("a downloaded slide path is preserved as asset provenance when present", () => {
+  const post = toThreadsPost(carouselPost()) as ThreadsPost;
+  const { entry } = stageEntry(post, {
+    handle: "buildsolo",
+    creator: "Sam Builds",
+    niche: "solopreneur",
+    slideDir: "/tmp/slides/buildsolo-Cdef456",
+  });
+  assert.ok(entry);
+  assert.equal(entry.media.asset_url, "/tmp/slides/buildsolo-Cdef456");
+  assert.equal(entry.media.body_is_complete, false);
+});
+
+test("a video preserves an explicit source media URL as asset provenance", () => {
+  const post = toThreadsPost(
+    textPost({ video_versions: [{ url: "https://cdn.example/video.mp4" }], video_duration: 42 })
+  ) as ThreadsPost;
+  const { entry } = stageEntry(post, { handle: "buildsolo", creator: "Sam Builds", niche: "solopreneur" });
+  assert.ok(entry);
+  assert.equal(entry.media.asset_url, "https://cdn.example/video.mp4");
+  assert.equal(entry.media.body_is_complete, false);
+});
+
+test("asset provenance stays null when a media payload has no URL and no downloaded path", () => {
+  const post = toThreadsPost(carouselPost({ carousel_media: [{}, {}] })) as ThreadsPost;
+  const { entry } = stageEntry(post, { handle: "buildsolo", creator: "Sam Builds", niche: "solopreneur" });
+  assert.ok(entry);
+  assert.equal(entry.media.asset_url, null);
+  assert.equal(entry.media.body_is_complete, false);
+});
+
 test("a plain text post is staged with body_is_complete true", () => {
   const post = toThreadsPost(textPost()) as ThreadsPost;
   const { entry } = stageEntry(post, { handle: "buildsolo", creator: "Sam Builds", niche: "solopreneur" });
   assert.equal(entry?.media.body_is_complete, true);
   assert.equal(entry?.media.form, "text-only");
+  assert.equal(entry?.media.asset_url, null);
 });
 
 test("a video is staged as kind video with transcript_source caption, the singular one", () => {
@@ -315,6 +356,7 @@ test("every staged shape passes the real corpus validator", () => {
     assert.ok(validated);
     assert.equal(validated.platform, "threads");
     assert.equal(validated.media?.body_is_complete, entry.media.body_is_complete);
+    assert.equal(validated.media?.asset_url, entry.media.asset_url);
   }
 });
 

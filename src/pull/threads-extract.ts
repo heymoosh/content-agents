@@ -43,6 +43,7 @@ export interface ThreadsPost {
   form: MediaForm;
   mediaCount: number | null;
   slides: ThreadsSlide[];
+  assetUrl: string | null;
   durationSeconds: number | null;
   hasCaptions: boolean | null;
   aspect: MediaAspect | null;
@@ -152,6 +153,25 @@ function slidesOf(node: Record<string, unknown>): ThreadsSlide[] {
   return slides;
 }
 
+function stableUrl(value: unknown): string | null {
+  const url = str(value);
+  return url !== null && /^https?:\/\//i.test(url) ? url : null;
+}
+
+function mediaAssetUrlOf(node: Record<string, unknown>, slides: ThreadsSlide[]): string | null {
+  const imageUrl = slides.map((slide) => stableUrl(slide.url)).find((url): url is string => url !== null);
+  if (imageUrl) return imageUrl;
+
+  if (Array.isArray(node.video_versions)) {
+    for (const version of node.video_versions) {
+      if (!isRecord(version)) continue;
+      const url = stableUrl(version.url);
+      if (url) return url;
+    }
+  }
+  return null;
+}
+
 function aspectOf(node: Record<string, unknown>): MediaAspect | null {
   const width = num(node.original_width);
   const height = num(node.original_height);
@@ -230,6 +250,7 @@ export function toThreadsPost(node: Record<string, unknown>): ThreadsPost | null
     form,
     mediaCount: carousel !== null && carousel > 1 ? carousel : null,
     slides,
+    assetUrl: mediaAssetUrlOf(node, slides),
     durationSeconds: duration,
     // A burned-in or served caption track is not something the media object states plainly, so
     // this stays unknown rather than being answered from the presence of a video.
@@ -339,6 +360,7 @@ export interface StagedThreadsEntry {
     media_count: number | null;
     has_captions: boolean | null;
     aspect: MediaAspect | null;
+    asset_url: string | null;
     body_is_complete: boolean;
   };
   notes?: string;
@@ -376,6 +398,14 @@ export function stageEntry(post: ThreadsPost, opts: StageOptions): StageResult {
 
   const isVideo = post.form === "video" || post.form === "short-video";
   const slideDir = opts.slideDir ?? null;
+  // Preserve only provenance already handed to us: the downloaded slide directory when one was
+  // written, otherwise the first explicit media URL from the source payload. This records where
+  // the media can be recovered later without fetching anything here or making any claim about its
+  // contents.
+  const assetUrl =
+    slideDir !== null && slideDir.trim() !== ""
+      ? slideDir
+      : post.assetUrl;
 
   const entry: StagedThreadsEntry = {
     platform: "threads",
@@ -404,6 +434,7 @@ export function stageEntry(post: ThreadsPost, opts: StageOptions): StageResult {
       media_count: post.mediaCount,
       has_captions: post.hasCaptions,
       aspect: post.aspect,
+      asset_url: assetUrl,
       body_is_complete: bodyIsComplete(post.form, body),
     },
   };

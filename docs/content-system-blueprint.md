@@ -388,6 +388,12 @@ not fetch comments, infer demand, or publish replies. The Instagram route preser
 returned media asset URL as provenance while keeping caption-only and onscreen-text limitations
 unchanged. These are bounded readiness seams, not evidence that every platform or comment source is
 currently connected.
+`npm run patterns:readiness` composes those evidence and platform projections for operator
+inspection; it reports absent or invalid review input rather than making the corpus look reviewed.
+`src/grow/generation-brief.ts` can carry explicit platform/format readiness blockers onto planning
+variants while remaining copy-free and human-gated. The Threads extractor now preserves explicit
+media URLs or downloaded slide paths as asset provenance, without treating them as read media or
+complete body evidence.
 
 ## 6. Model and subagent responsibilities
 
