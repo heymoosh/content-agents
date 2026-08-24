@@ -254,9 +254,9 @@ const ROUTES: Route[] = [
   // to the ingest clock would stamp "arrived today" on an email that arrived a week ago, which is a
   // date nobody supplied written down as though someone had. The form pre-fills today so it is one
   // keystroke when today is right, but the value that gets stored is hers either way.
-  // Everything past shape is ingestResponse's, including
-  // requireRulesVersionMatch and requireResearchHashKey (which fires only when an identifier is
-  // actually supplied, and whose sentence names the env var to set).
+  // Everything past shape is ingestResponse's, including requireRulesVersionMatch. A missing
+  // privacy key is translated below only for this response route; the research store retains its
+  // own general refusal for account-level capture.
   //
   // WHAT COMES BACK IS A CONFIRMATION, NEVER THE TEXT. venture-schema-contract.md 5.4 and the
   // room's own promise ("I never show you the answers, only the count") both say the response log
@@ -303,6 +303,16 @@ const ROUTES: Route[] = [
         throw new Error(
           "an identifier needs both halves: which platform, and their id or email there. Leave both " +
             "empty and this response counts as its own person"
+        );
+      }
+      // Do not let a missing key turn an identified response into an unidentifiable one. The
+      // shared research store keeps the final fail-closed guard, but this boundary can tell Muxin
+      // exactly what to configure for response identifier capture.
+      if (platform && !process.env.RESEARCH_HASH_KEY?.trim()) {
+        throw new Error(
+          "this installation isn't set up yet to safely store who a response is from. Leave the " +
+            "platform and id blank for now, this response still counts. (A developer needs to set " +
+            "RESEARCH_HASH_KEY before identifiers can be captured.)"
         );
       }
       const at = now();

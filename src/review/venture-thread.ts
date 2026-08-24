@@ -278,9 +278,19 @@ export interface VentureThread {
   /** Elapsed calendar days since the kickoff event, or null when there is no kickoff. */
   elapsedDays: number | null;
   messages: ThreadMsg[];
+  /** Earlier-phase artifact cards retained for history; current-phase cards stay in messages. */
+  history: VentureHistoryGroup[];
   rail: RailGroup[];
   refs: { name: string; stamp: string }[];
 }
+
+export interface VentureHistoryGroup {
+  phase: number;
+  artifacts: CardMsg[];
+}
+
+/** Keep the history ledger useful without allowing a long-lived venture to grow the response forever. */
+export const MAX_HISTORY_ARTIFACTS = 24;
 
 export interface RailGroup {
   name: string;
@@ -761,6 +771,21 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
     messages.push(day14Choice(input.day14Candidates, input.rulesVersion));
   }
 
+  // Earlier cards are history, not current-room rendering. Retain the newest bounded slice, then
+  // regroup it by phase so the API exposes what was previously drafted without changing the
+  // message stream that page.ts already renders.
+  const historical = artifacts
+    .filter((a) => a.venture_phase < state.current_phase)
+    .sort((a, b) => a.updated_at.localeCompare(b.updated_at) || a.artifact_id.localeCompare(b.artifact_id))
+    .slice(-MAX_HISTORY_ARTIFACTS);
+  const historyByPhase = new Map<number, CardMsg[]>();
+  for (const a of historical) {
+    const cards = historyByPhase.get(a.venture_phase) ?? [];
+    cards.push(cardFor(a, input.minEvidence));
+    historyByPhase.set(a.venture_phase, cards);
+  }
+  const history = [...historyByPhase.entries()].sort(([a], [b]) => a - b).map(([phase, cards]) => ({ phase, artifacts: cards }));
+
   // 7. The open checkpoint, last, because it is the thing that is actually blocking.
   const openId = openCheckpointId(state);
   if (openId) {
@@ -776,6 +801,7 @@ export function buildVentureThread(input: ThreadInput): VentureThread {
     statusText: input.statusText,
     elapsedDays: elapsedDays(canon, input.now),
     messages,
+    history,
     rail: railGroups(answers, decisions, artifacts),
     refs: [
       { name: "venture/rules.md", stamp: input.rulesVersion },

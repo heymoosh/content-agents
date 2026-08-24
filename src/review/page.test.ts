@@ -15,6 +15,7 @@ import {
   LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
   groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
   intakeProgressLine, intakeUnanswered, intakeSaveLine, intakeSlugError,
+  ventureMultiPickIds, followupDraftRequest, outreachDraftRequest, outreachMessageReviseRequest, notesPickRequest,
   type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
 import { mkdtempSync } from "node:fs";
@@ -366,7 +367,10 @@ const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS, ...INTAKE_
 //
 // `/api/jobs/` keeps its existing prefix-level treatment in the first guard (the client builds
 // those paths from a job id the same way), so those four are listed here rather than re-plumbed.
-const DECLARED_JOB_REGEX_PATHS = ["/api/jobs/:id/stop", "/api/jobs/:id/log", "/api/jobs/:id/answer", "/api/jobs/:id/retry"];
+const DECLARED_JOB_REGEX_PATHS = [
+  "/api/jobs/:id/stop", "/api/jobs/:id/log", "/api/jobs/:id/answer", "/api/jobs/:id/retry",
+  "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
+];
 
 /** `/^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/` → `/api/venture/:slug/intake/:n/draft`. */
 export function canonicalRegexRoute(pattern: string): string {
@@ -1912,8 +1916,9 @@ test("Studio capture: the dispatch never posts to a route that cannot take free 
   assert.ok(enqueuesJob("/api/develop/start"));
   assert.ok(!enqueuesJob("/api/signals/backlog"));
   // Outreach and Venture get a room switch and a plain sentence, not a fabricated job.
-  assert.ok(section.includes('setRoom("outreach"); flash("Opened Outreach. Your words are still in the capture box.");'));
-  assert.ok(section.includes('setRoom("venture"); flash("Opened Venture. Your words are still in the capture box.");'));
+  assert.ok(section.includes('pendingCaptureText = t; setRoom(room.toLowerCase());'));
+  assert.ok(section.includes('Nothing was submitted.'));
+  assert.ok(section.includes('CAPTURE KEPT HERE'));
   assert.ok(!/room==="Outreach".*post\(/s.test(section.slice(section.indexOf("function takeCaptureTo"), section.indexOf("function consumeCapturedBeats"))));
 });
 
@@ -1926,6 +1931,115 @@ test("Studio capture copy: no em dashes, and nothing claims a job was started", 
   for (const r of ["Outreach", "Venture"] as const) {
     assert.ok(/cannot start/.test(captureVerdict(r).line), r + " must say plainly that it cannot start one");
   }
+});
+
+test("Studio director copy: the visible attribution uses punctuation allowed by the voice rules", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const studio = html.slice(html.indexOf('<section class="view" id="roomStudio"'), html.indexOf('<section class="view" id="roomFiction"'));
+  assert.ok(studio.includes("Your director."));
+  assert.ok(!studio.includes("— your director"));
+});
+
+test("ventureMultiPickIds: toggles choices but never lets the client exceed requiredCount", () => {
+  assert.deepEqual(ventureMultiPickIds(3, [], "a"), ["a"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "b"], "c"), ["a", "b", "c"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "b", "c"], "d"), ["a", "b", "c"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "b", "c"], "b"), ["a", "c"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "a"], "b"), ["a", "b"]);
+});
+
+test("Venture multi-pick markup: the UI submits the server-required set and keeps the refusal path", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes("function vMultiSubmit(choice)"));
+  assert.ok(script.includes('candidateIds:ids'), "the submit payload must be the selected set");
+  assert.ok(script.includes('data-vmulti-submit="'), "the choice panel needs a submit action");
+  assert.ok(script.includes("The server still checks the count, override reason, and whether this decision is already immutable."));
+  assert.ok(html.includes("LEDGER / HISTORY"), "the Venture room needs a visible history area");
+  assert.ok(html.includes("Earlier artifacts and live records appear here when the server exposes them."));
+});
+
+test("followupDraftRequest: selected engine is sent, with Claude preserved as the fallback", () => {
+  assert.deepEqual(followupDraftRequest("outreach/leads/acme", "Rae", "grok"), {
+    dir: "outreach/leads/acme", recipient: "Rae", engine: "grok",
+  });
+  assert.deepEqual(followupDraftRequest("outreach/leads/acme"), {
+    dir: "outreach/leads/acme", engine: "claude",
+  });
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('class="fu-draft-control"'), "the Follow-ups action needs a picker wrapper");
+  assert.ok(script.includes('post("/api/followups/draft-follow-up", followupDraftRequest(dir, person, engine))'));
+  assert.ok(script.includes('engine:engine || "claude"'), "missing selector keeps the old Claude default");
+});
+
+test("Outreach directed drafts and revisions expose one engine picker and send its value", () => {
+  assert.deepEqual(outreachDraftRequest("leads/acme", "keep it warm", "Rae", "grok"), {
+    dir: "leads/acme", direction: "keep it warm", recipient: "Rae", engine: "grok",
+  });
+  assert.deepEqual(outreachMessageReviseRequest("leads/acme", "messages/1.md", "shorter", "codex"), {
+    dir: "leads/acme", file: "messages/1.md", instruction: "shorter", engine: "codex",
+  });
+  assert.equal(outreachDraftRequest("leads/acme", "say hello").engine, "claude");
+  assert.equal(outreachMessageReviseRequest("leads/acme", "messages/1.md", "warmer").engine, "claude");
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('const outreachEngine = l.kind!=="content-example" ? engineSelectHtml() : "";'), "the Outreach thread needs an engine picker");
+  assert.ok(!script.includes('engineSelectHtml("outreachEngine")'), "Outreach must not emit duplicate selector ids");
+  assert.ok(script.includes('querySelector(".engine-select")'), "Outreach actions must read the thread-local picker");
+  assert.ok(script.includes('outreachDraftRequest(dir, direction, recipient, engine)'), "directed drafts must build an engine-aware request");
+  assert.ok(script.includes('post("/api/outreach/draft", outreachDraftRequest(dir, direction, recipient, engine))'));
+  assert.ok(script.includes('outreachMessageReviseRequest(dir, file, instruction, engine)'), "message revisions must build an engine-aware request");
+  assert.ok(script.includes('post("/api/outreach/message/revise", outreachMessageReviseRequest(dir, file, instruction, engine))'));
+  assert.ok(script.includes('engine:engine || "claude"'), "Outreach keeps Claude when no selector is available");
+});
+
+test("Notes picker sends the selected engine", () => {
+  assert.deepEqual(notesPickRequest([1, 3], "grok"), { indices: [1, 3], engine: "grok" });
+  assert.deepEqual(notesPickRequest([2]), { indices: [2], engine: "claude" });
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('post("/api/notes/pick", notesPickRequest(indices, $("#studioEngine").value))'));
+});
+
+test("Content workbench actions expose local engine selectors and use them", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes('class="wb-reply"'), "each workbench reply action needs its own control group");
+  assert.ok(html.includes('class="wb-handoff"'), "each workbench handoff needs its own control group");
+  assert.ok(script.includes('refreshEngineControls(box);'), "rebuilt workbench selectors must receive engine availability state");
+  assert.ok(script.includes('t.closest(".wb-reply")?.querySelector(".engine-select")'));
+  assert.ok(script.includes('t.closest(".wb-handoff")?.querySelector(".engine-select")'));
+  assert.ok(!script.includes('post("/api/develop/reply", {slug, reply, engine:$("#studioEngine").value})'));
+  assert.ok(!script.includes('post("/api/develop/format", {slug, lenses, engine:$("#studioEngine").value})'));
+});
+
+test("Fiction drafting and second passes expose a local engine selector and send it", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('post("/api/fiction/draft",{series:ficSeries, beats:t, engine})'));
+  assert.ok(script.includes('post("/api/fiction/repass",{series:ficSeries, chapter:chapter.number, note:note, engine})'));
+  assert.ok(script.includes('const engine = draftBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
+  assert.ok(script.includes('const engine = passBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
+  assert.ok(script.includes('refreshEngineControls($("#fictionMain"));'));
+});
+
+test("Studio polish keeps engine choices, capture submits, and room loads understandable", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('content-agents-preferred-engine'), "engine preference should survive a reload");
+  assert.ok(script.includes('Claude · Writing') && script.includes('Grok · Ideation') && script.includes('GPT (Codex) · Analysis'),
+    "engine options should explain their strengths inline");
+  assert.ok(script.includes("captureSubmitting"), "capture handoffs need one shared in-flight guard");
+  assert.ok(script.includes('showRoomLoading("workbench")') && script.includes('showRoomLoading("outreachList")') && script.includes('showRoomLoading("ventureThread")'),
+    "the three async rooms should expose a loading state");
+  assert.ok(script.includes('post("/api/fiction/check",{series:ficSeries, chapter:chapter.number, engine})'),
+    "the canon check must send the selected engine");
+});
+
+test("Venture run-step control: queues one selected-engine draft step at the current phase", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes('id="ventureRunStepBtn"'), "Venture needs a phase-run action");
+  assert.ok(html.includes("Run the next draft step"));
+  assert.ok(html.includes("stops at the next human gate"), "the action must preserve the human gate");
+  assert.ok(script.includes('post("/api/venture/"+encodeURIComponent(ventureSlug)+"/run-step", {engine, phase:VENTURE_THREAD.phase})'));
+  assert.ok(script.includes("function runVentureStep()"));
 });
 
 // The desk boots into Studio (Muxin, 2026-08-23), because the capture box is there now and booting

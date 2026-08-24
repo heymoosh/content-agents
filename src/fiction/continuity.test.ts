@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,6 +14,7 @@ import {
   readContinuityReport,
   CONTINUITY_STEPS,
   unfixableReason,
+  continuityEngineSpawn,
 } from "./continuity.js";
 
 const BODY = [
@@ -234,5 +235,45 @@ test("the step labels stay short prose written to Muxin, with no trailing period
     assert.ok(label.length < 48, `too long: ${label}`);
     assert.ok(!label.endsWith("."), `trailing period: ${label}`);
     assert.ok(!/[—–]/.test(label), `em dash: ${label}`);
+  }
+});
+
+describe("continuityEngineSpawn -- the canon check stays read-only on every engine", () => {
+  test("claude: no permission-mode flag, an empty tool list, and the configured model", () => {
+    const { command, args } = continuityEngineSpawn("claude", "READ ONLY");
+    assert.equal(command, "claude");
+    assert.deepEqual(args, ["-p", "READ ONLY", "--model", "sonnet", "--tools", ""]);
+    assert.ok(!args.includes("--permission-mode"), "a report-only run must never carry an approval flag");
+  });
+
+  test("grok: same read-only shape as claude, no model override invented for it", () => {
+    const { command, args } = continuityEngineSpawn("grok", "READ ONLY");
+    assert.equal(command, "grok");
+    assert.deepEqual(args, ["-p", "READ ONLY", "--tools", ""]);
+  });
+
+  test("codex: --sandbox read-only, not the workspace-write default every other codex call gets", () => {
+    const { command, args } = continuityEngineSpawn("codex", "READ ONLY");
+    assert.equal(command, "codex");
+    assert.deepEqual(args, ["exec", "--sandbox", "read-only", "--skip-git-repo-check", "READ ONLY"]);
+  });
+});
+
+test("runContinuityCheck takes an engine option without requiring callModel to change", async () => {
+  const root = mkdtempSync(join(tmpdir(), "fiction-continuity-engine-"));
+  try {
+    const dir = join(root, "stories", "a-series");
+    mkdirSync(join(dir, "chapters"), { recursive: true });
+    writeFileSync(join(dir, "series.yaml"), "slug: a-series\n");
+    writeFileSync(join(dir, "canon.md"), "# Canon\n");
+    writeFileSync(join(dir, "chapters", "chapter-01.md"), `---\nseries: a-series\nchapter: 1\n---\n\n${BODY}\n`);
+
+    // An injected callModel always wins over the engine choice (it IS the model call), which is
+    // what lets every other test in this file stay engine-agnostic. This only proves passing
+    // `engine` alongside `callModel` is accepted and does not change the report shape.
+    const report = await runContinuityCheck(dir, 1, { root, engine: "codex", callModel: async () => wellFormed() });
+    assert.equal(report.conflicts.length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

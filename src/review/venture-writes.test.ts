@@ -865,18 +865,20 @@ test("responses: an unknown venture 404s rather than creating one", () => {
   });
 });
 
-test("responses: the missing-hash-key refusal reaches Muxin in store.ts's own words", () => {
-  withRoot(() => {
+test("responses: a missing hash key gives identifier-capture guidance and writes nothing", () => {
+  withRoot((root) => {
     const before = process.env.RESEARCH_HASH_KEY;
     delete process.env.RESEARCH_HASH_KEY;
     try {
       kickoff();
-      // Not this module's sentence to write or to soften: requireResearchHashKey owns it, and a
-      // reworded copy here would drift from the one the CLI shows for the same missing config.
+      const beforeResponse = snapshot(root);
       assert.equal(
         refusal(`/api/venture/${SLUG}/responses`, baseResponse({ raw_identifier: { platform: "email", stable_user_id: "a@b.co" } })),
-        "RESEARCH_HASH_KEY is required before research capture can write observations"
+        "this installation isn't set up yet to safely store who a response is from. Leave the " +
+          "platform and id blank for now, this response still counts. (A developer needs to set " +
+          "RESEARCH_HASH_KEY before identifiers can be captured.)"
       );
+      assert.deepEqual(changedPaths(beforeResponse, snapshot(root)), []);
     } finally {
       if (before !== undefined) process.env.RESEARCH_HASH_KEY = before;
     }

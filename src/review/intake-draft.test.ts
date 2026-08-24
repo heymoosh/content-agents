@@ -8,6 +8,8 @@ import {
   readIntakeDraft,
   readIntakeDrafts,
   clearIntakeDrafts,
+  saveIntakeSectionDraft,
+  readIntakeSections,
   MAX_QUESTION,
 } from "./intake-draft.js";
 
@@ -191,5 +193,36 @@ test("reading from a directory that does not exist is empty, not a crash", () =>
     assert.deepEqual(readIntakeDrafts("my-venture", missing).drafts, []);
     assert.equal(readIntakeDraft("my-venture", 1, missing).draft, null);
     assert.equal(clearIntakeDrafts("my-venture", missing).cleared, false);
+  });
+});
+
+test("voice and scorecard section drafts round-trip independently", () => {
+  withRoot((root) => {
+    const voice = saveIntakeSectionDraft("my-venture", "voice", "worldview_statement", "I believe this.", root);
+    const scorecard = saveIntakeSectionDraft("my-venture", "scorecard", "ongoing_pace", "three posts a week", root);
+    assert.equal(voice.ok, true);
+    assert.equal(scorecard.ok, true);
+    const sections = readIntakeSections("my-venture", root);
+    assert.equal(sections.ok, true);
+    assert.equal(sections.sections.voice.worldview_statement?.text, "I believe this.");
+    assert.equal(sections.sections.scorecard.ongoing_pace?.text, "three posts a week");
+  });
+});
+
+test("section drafts reject unknown fields and non-text values", () => {
+  withRoot((root) => {
+    assert.equal(saveIntakeSectionDraft("my-venture", "voice", "ongoing_pace", "no", root).ok, false);
+    assert.equal(saveIntakeSectionDraft("my-venture", "scorecard", "unknown", "no", root).ok, false);
+    assert.equal(saveIntakeSectionDraft("my-venture", "voice", "natural_phrases", 42, root).ok, false);
+  });
+});
+
+test("clearing intake drafts removes both question and section buffers", () => {
+  withRoot((root) => {
+    saveIntakeDraft("my-venture", 1, "answer", root);
+    saveIntakeSectionDraft("my-venture", "voice", "natural_phrases", "hello", root);
+    const cleared = clearIntakeDrafts("my-venture", root);
+    assert.equal(cleared.cleared, true);
+    assert.deepEqual(readIntakeSections("my-venture", root).sections, { voice: {}, scorecard: {} });
   });
 });

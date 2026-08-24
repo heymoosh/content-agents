@@ -109,6 +109,7 @@ export interface JobView {
   id: string;
   kind: string;
   label: string;
+  engine?: string;
   status: string; // "queued" | "running" | "blocked" | "done" | "failed" | "stopped"
   error?: string | null;
   elapsedMs?: number | null;
@@ -167,6 +168,73 @@ export function ventureDotColor(tone: string): string {
 export function ventureDayLine(elapsedDays: number | null | undefined): string {
   if (elapsedDays === null || elapsedDays === undefined) return "";
   return elapsedDays === 0 ? "started today" : "day " + (elapsedDays + 1) + " since kickoff";
+}
+
+export interface VentureHistoryCardView {
+  artifactId: string;
+  title: string;
+  state: string;
+}
+
+export interface VentureHistoryGroupView {
+  phase: number;
+  artifacts: VentureHistoryCardView[];
+}
+
+/** Render the bounded, server-provided earlier-phase ledger without inventing artifact state. */
+export function ventureHistoryHtml(history: VentureHistoryGroupView[]): string {
+  const esc = (s: string) =>
+    s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+  const groups = history.filter((group) => group.artifacts.length > 0);
+  if (!groups.length) return "";
+  const count = groups.reduce((total, group) => total + group.artifacts.length, 0);
+  return '<details class="v-history"><summary>EARLIER PHASES · ' + count + ' ARTIFACTS</summary>' +
+    groups.map((group) => '<div class="v-history-group"><div class="vmono">PHASE ' + group.phase + '</div>' +
+      group.artifacts.map((artifact) => '<div class="v-history-card"><div class="vtitle">' + esc(artifact.title || artifact.artifactId) + '</div>' +
+        '<div class="vnote">' + esc(artifact.state) + '</div><div class="from">' + esc(artifact.artifactId) + '</div></div>').join("") +
+      '</div>').join("") +
+    '</details>';
+}
+
+/** Keep a Venture multi-pick draft bounded by the server-declared required count. */
+export function ventureMultiPickIds(requiredCount: number, selectedIds: string[], candidateId: string): string[] {
+  const current = [...new Set(selectedIds)];
+  if (current.includes(candidateId)) return current.filter((id) => id !== candidateId);
+  return current.length >= requiredCount ? current : [...current, candidateId];
+}
+
+/** Follow-up drafting keeps the old Claude request shape when no picker is available. */
+export function followupDraftRequest(dir: string, person?: string, engine = "claude"): {
+  dir: string;
+  recipient?: string;
+  engine: string;
+} {
+  return { dir, ...(person ? { recipient: person } : {}), engine: engine || "claude" };
+}
+
+/** Directed Outreach drafts carry the selected engine without changing the old recipient default. */
+export function outreachDraftRequest(
+  dir: string,
+  direction: string,
+  recipient?: string,
+  engine = "claude",
+): { dir: string; direction: string; recipient?: string; engine: string } {
+  return { dir, direction, ...(recipient ? { recipient } : {}), engine: engine || "claude" };
+}
+
+/** Message revision uses the same per-thread engine choice and keeps Claude as the fallback. */
+export function outreachMessageReviseRequest(
+  dir: string,
+  file: string,
+  instruction: string,
+  engine = "claude",
+): { dir: string; file: string; instruction: string; engine: string } {
+  return { dir, file, instruction, engine: engine || "claude" };
+}
+
+/** Substack note drafting carries the Studio picker into the production queue. */
+export function notesPickRequest(indices: number[], engine = "claude"): { indices: number[]; engine: string } {
+  return { indices, engine: engine || "claude" };
 }
 
 // ── the intake interview ─────────────────────────────────────────────────────────────────────────
@@ -245,6 +313,7 @@ export function jobRoom(kind: string): JobRoom {
   // precisely so it lands here instead of under Content with the Formatter.
   if (kind === "scout" || kind === "draft-follow-up" || kind === "outreach-revise") return "Outreach";
   if (kind === "pull" || kind === "strategy" || kind === "insights" || kind === "ask-insights" || kind === "brief-revise") return "Signals";
+  if (kind === "venture-analysis" || kind === "venture-step") return "Venture";
   if (kind === "charles-draft") return "Charles";
   if (kind === "fiction-draft" || kind === "fiction-continuity") return "Fiction";
   // url/file/text/notes/continue/video/develop/develop-reply/revise/duplicate — the production crew
@@ -556,10 +625,10 @@ export const JOB_ENQUEUE_ROUTES: readonly string[] = [
   "/api/strategy/ask-insights", "/api/strategy/pull",
   "/api/outreach/scout", "/api/outreach/draft", "/api/outreach/message/revise",
   "/api/charles/draft", "/api/followups/draft-follow-up",
-  "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check",
+  "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check", "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
 ];
 export function enqueuesJob(path: string): boolean {
-  return JOB_ENQUEUE_ROUTES.includes(path);
+  return JOB_ENQUEUE_ROUTES.includes(path) || /^\/api\/venture\/[^/]+\/analyze$/.test(path);
 }
 
 // `roomOf` is injectable only so the Fiction-failure rule below can be exercised against a made-up
@@ -1631,6 +1700,9 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .ingest textarea { width:100%; min-height:130px; font:15px/1.6 inherit; padding:13px 15px;
     border:1px solid var(--muted); border-radius:10px; background:#fff; resize:vertical; }
   .ingest-actions { display:flex; gap:9px; align-items:center; margin-top:11px; flex-wrap:wrap; }
+  .engine-choice { display:inline-flex; align-items:center; gap:7px; color:#6e6659; font-size:12px; white-space:nowrap; }
+  .engine-choice select { min-width:112px; }
+  .engine-choice span { font-weight:600; }
   button.primary { background:var(--accent); color:var(--paper); border-color:var(--accent); font-weight:600; }
   .hint { font-size:12px; color:var(--muted); flex:1; min-width:220px; line-height:1.4; }
   .notes-panel { max-width:820px; margin:16px auto 0; background:var(--card); border:1px solid var(--line);
@@ -1923,6 +1995,8 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     color:var(--paper); padding:9px 16px; border-radius:8px; font-size:13px; opacity:0;
     transition:.2s; pointer-events:none; }
   .flash.show { opacity:1; }
+  .connection-state { margin:0 40px; padding:10px 14px; border:1px solid #e8d5a8; border-radius:7px;
+    background:#fdf8ec; color:#6b531c; font-size:13px; line-height:1.5; }
   .worktree-banner { background:var(--red-bg); color:var(--red); font-size:12.5px; font-weight:600;
     text-align:center; padding:6px 16px; border-bottom:1px solid var(--red); }
   /* Develop tab: advisor recommendation cards. The one signature element is the verbatim
@@ -2036,6 +2110,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <span class="hint" id="lastRefreshed" style="min-width:0"></span>
   <button id="refresh" title="Refreshes only the room you're looking at">Refresh</button>
 </header>
+<div class="connection-state" id="connectionState" hidden role="alert"></div>
 <main>
   <section class="view" id="roomContent">
     <div class="sheet" id="stripContent" hidden style="padding:24px 56px 10px"></div>
@@ -2061,12 +2136,14 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <textarea id="src" placeholder="Start typing. Paste a link, a file path, or half a sentence. Nothing is a form. (⌘/Ctrl+Enter hands it over)"></textarea>
       <div class="capture-verdict" id="captureVerdict" hidden></div>
       <div class="ingest-actions" id="captureActions">
+        <label class="engine-choice"><span>Run with</span><select class="engine-select" id="studioEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
         <button class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Put it where it goes</button>
         <button id="devStartBtn">Hand it to your director</button>
         <button id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
         <button id="notesBtn">Browse Substack Notes</button>
       </div>
       <div class="hint" id="captureHint">Put it where it goes reads what you wrote, picks the room, and tells you which one it picked. A bare link it asks about first, because that could be two things. It starts nothing, and nothing goes out.</div>
+      <div class="hint" id="engineStatus">Engines are checked when the run starts.</div>
       <div class="link-ask" id="linkAsk" hidden>
         <div class="link-ask-head">Where should this go?</div>
         <div class="link-ask-btns">
@@ -2081,7 +2158,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <span class="d-avatar">d</span>
         <div>
           <div class="d-line-main">Your creative director is here when you want a read.</div>
-          <div class="d-line-sub">Won't touch a word without your say. Handles the platforms, the visuals, the posting. Asks you only for the calls that are yours. <span style="color:#5b46b8;">— your director</span></div>
+          <div class="d-line-sub">Won't touch a word without your say. Handles the platforms, the visuals, the posting. Asks you only for the calls that are yours. <span style="color:#5b46b8;">Your director.</span></div>
         </div>
       </div>
       <div class="notes-panel" id="notesPanel" hidden>
@@ -2128,10 +2205,11 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <option value="essay">Essay</option>
           <option value="reply">Reply to a link</option>
         </select>
+        <label class="engine-choice"><span>Run with</span><select class="engine-select" id="charlesEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
         <input id="charlesInput" style="flex:1;min-width:220px" placeholder="Topic/angle, or a URL to react to (reply) — optional otherwise" />
         <button class="primary" id="charlesDraftBtn">Draft</button>
       </div>
-      <div class="hint">Runs the real /charles skill on your subscription ($0 marginal), same as Format directly does for Content. Lands in the queue below as "pending" — nothing posts on its own.</div>
+      <div class="hint">Runs the real /charles skill with the engine you choose. Lands in the queue below as "pending". Nothing posts on its own.</div>
     </div>
     <div class="sheet">
       <div class="sheet-head"><h2>Persona brief</h2><span class="grow"></span><button id="charlesBriefCopyBtn">Copy</button></div>
@@ -2149,10 +2227,24 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" style="padding:18px 40px">
       <div class="sheet-head"><h2>Venture</h2><span class="grow"></span>
         <select id="ventureSlug"></select>
+        <label class="engine-choice"><span>Analyze with</span><select class="engine-select" id="ventureEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
+        <button id="ventureAnalyzeBtn">Analyze this step</button>
+        <button class="primary" id="ventureRunStepBtn">Run the next draft step</button>
         <span class="src" id="ventureDay"></span>
         <button id="ventureStartBtn">Start a venture</button>
       </div>
-      <div class="sheet-sub">The 14-day build, read straight out of canon. Nothing on this screen is stored as a conversation: every line below is derived from the ledger, the decisions, the artifacts and your own intake answers.</div>
+      <div class="sheet-sub">The 14-day build, read straight out of canon. Nothing on this screen is stored as a conversation: every line below is derived from the ledger, the decisions, the artifacts and your own intake answers. The selected engine runs one validated draft step, then stops at the next human gate. It never selects, approves, or publishes.</div>
+    </div>
+    <div class="sheet" id="ventureIntakeSections" style="padding:22px 40px">
+      <div class="sheet-head"><h3>Intake guardrails</h3><span class="grow"></span><span class="src">Voice and scorecard fields save as you type</span></div>
+      <div class="sheet-sub">These fields are separate from the 25-question interview. They survive a reload, never advance a phase, and remain durable notes for this venture until you choose to use them.</div>
+      <div class="empty" style="padding:18px 0">Choose a venture to load its intake guardrails.</div>
+    </div>
+    <div class="sheet" id="ventureCaptureHandoff" hidden></div>
+    <div class="sheet" id="ventureAnalysisPanel" hidden style="padding:22px 40px">
+      <div class="sheet-head"><h3>Selected engine's read</h3><span class="grow"></span><span class="src" id="ventureAnalysisEngine"></span></div>
+      <div class="sheet-sub">Read-only advice about what is ready, what you need to decide, and what must wait. It does not write canon or advance a phase.</div>
+      <div class="md" id="ventureAnalysisOut" style="margin-top:12px"></div>
     </div>
     <div class="sheet vroom" id="ventureRead">
       <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
@@ -2178,8 +2270,9 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
+        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
         <button class="primary" id="insightsBtn">Generate insights</button>
-        <span class="hint">Runs the analytics reports live against the current database, then asks Claude (your subscription, $0) for a short skim: what's working, what's not, the numbers that matter, plus any data-hygiene next steps. The prior-cycle brief is linked, dated, not dumped in full. Nothing here writes data or publishes anything.</span>
+        <span class="hint">Runs the analytics reports live, then asks your selected engine for a short skim. Nothing here writes data or publishes anything.</span>
       </div>
       <div class="insights-panel" id="insightsPanel" hidden>
         <div class="md" id="insightsOut"></div>
@@ -2202,11 +2295,11 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <div class="md" id="briefBody">Loading…</div>
         <div class="aibox show">
           <input placeholder="tell Claude what to change in the brief…" id="briefAskInput" />
-          <button class="send" id="briefAskBtn">Send to Claude</button>
+          <button class="send" id="briefAskBtn">Send to engine</button>
         </div>
         <span class="hint">Edits land in the brief file itself. Formatting and strategy runs read the latest brief every time, so a change here feeds forward with no extra step.</span>
       </div>
-      <span class="hint">Refresh brief runs the REAL /strategy (your subscription, $0): grades bets against fresh data and writes a new dated brief, same as running it in a terminal.</span>
+      <span class="hint">Refresh brief runs the REAL /strategy with the selected engine: grades bets against fresh data and writes a new dated brief.</span>
     </div>
     <div class="notes-panel">
       <div class="notes-head">
@@ -2228,8 +2321,9 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
     <div class="sheet" id="stripOutreach" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet" id="outreachPane">
-      <div class="sheet-head"><h2 id="outreachHead">Leads</h2></div>
+      <div class="sheet-head"><h2 id="outreachHead">Leads</h2><span class="grow"></span><label class="engine-choice"><span>Scout with</span><select class="engine-select" id="scoutEngine"><option value="claude">Claude</option><option value="grok">Grok</option></select></label></div>
       <div class="sheet-sub">Everyone your scout found, grouped by the reason they are on the desk. Pick one to read the research and shape a message. Only you ever send it.</div>
+      <div id="outreachCaptureHandoff" hidden></div>
       <div id="outreachList" style="margin-top:14px"><div class="empty">Loading…</div></div>
     </div>
     <div class="sheet" id="followupsPane" hidden>
@@ -2253,24 +2347,104 @@ const DECIDED = new Set(["published","discard","locked"]);
 // innerHTML living on the row/DOM gets clobbered by that unrelated refresh, well before the actual
 // operation finishes (card fbfea28b). Keying by id/slug instead of the row object also survives
 // load() swapping in a fresh row object mid-await.
-const aiPending = new Set();       // row ids with an in-flight Ask-Claude revise
+const aiPending = new Set();       // row ids with an in-flight engine revise
+const aiEngine = new Map();        // row id -> selected engine while the run is in flight
 const dupPending = new Map();      // row id -> target platform, for an in-flight Duplicate
+const dupEngine = new Map();       // row id -> selected engine while the run is in flight
 const storyboardSlugs = new Set(); // piece slugs with an in-flight storyboard (video) job
 
 function flash(msg){ const f=$("#flash"); f.textContent=msg; f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),1400); }
+function connectionState(message){
+  const box=$("#connectionState");
+  if(!box) return;
+  box.textContent=message;
+  box.hidden=false;
+}
+function connectionRecovered(){
+  const box=$("#connectionState");
+  if(box) box.hidden=true;
+}
 function esc(s){ return (s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+const ENGINE_LABELS = {claude:"Claude", grok:"Grok", codex:"GPT (Codex)"};
+const ENGINE_ROLES = {claude:"Writing", grok:"Ideation", codex:"Analysis"};
+const ENGINE_OPTIONS = '<option value="claude">Claude · Writing</option><option value="grok">Grok · Ideation</option><option value="codex">GPT (Codex) · Analysis</option>';
+let ENGINE_STATUS = {claude:true, grok:true, codex:true};
+function engineLabel(id){ return ENGINE_LABELS[id] || "Claude"; }
+const ENGINE_PREFERENCE_KEY = "content-agents-preferred-engine";
+function preferredEngine(){
+  try { const value = localStorage.getItem(ENGINE_PREFERENCE_KEY); return ENGINE_LABELS[value] ? value : "claude"; }
+  catch(e){ return "claude"; }
+}
+function rememberEngine(value){
+  if(!ENGINE_LABELS[value]) return;
+  try { localStorage.setItem(ENGINE_PREFERENCE_KEY, value); } catch(e) {}
+}
+function engineSelectHtml(id){ return '<label class="engine-choice"><span>Run with</span><select class="engine-select"'+(id?' id="'+id+'"':'')+'>'+ENGINE_OPTIONS+'</select></label>'; }
+function refreshEngineControls(root=document){
+  const preferred = preferredEngine();
+  root.querySelectorAll(".engine-select").forEach(sel=>{
+    [...sel.options].forEach(opt=>{ opt.disabled = ENGINE_STATUS[opt.value] === false; });
+    const hasPreferred = [...sel.options].some(opt=>opt.value === preferred);
+    if(!sel.dataset.engineTouched && hasPreferred) sel.value = ENGINE_STATUS[preferred] === false ? "claude" : preferred;
+    if(sel.value && ENGINE_STATUS[sel.value] === false) sel.value = "claude";
+  });
+}
+document.addEventListener("change", e=>{
+  const target = e.target;
+  if(target?.classList?.contains("engine-select")){
+    target.dataset.engineTouched = "true";
+    rememberEngine(target.value);
+  }
+});
+async function loadEngines(){
+  try{
+    const r = await fetch("/api/engines"); const d = await r.json();
+    for(const e of (d.engines||[])) {
+      ENGINE_STATUS[e.id] = !!e.installed;
+      document.querySelectorAll(".engine-select option[value=\\""+e.id+"\\"]").forEach(opt=>{
+        opt.title = (e.roleHint ? e.roleHint+" · " : "")+(e.description||"");
+      });
+    }
+    refreshEngineControls();
+    const unavailable = (d.engines||[]).filter(e=>!e.installed).map(e=>e.label);
+    const note = $("#engineStatus");
+    const guidance = (d.engines||[]).map(e=>e.label+" for "+String(e.roleHint||"its task").toLowerCase()).join(" · ");
+  if(note) note.textContent = (unavailable.length ? unavailable.join(", ")+" unavailable here. " : "")+guidance+". Your last choice is remembered, and every run can override it. Sign-in is checked when a run starts.";
+  }catch(e){ connectionState("Engine availability could not be checked. The server will validate your choice when you run it."); }
+}
+
+function showRoomLoading(id){
+  const box = $("#"+id);
+  if(!box || box.querySelector(".room-loading")) return;
+  box.insertAdjacentHTML("afterbegin", '<div class="room-loading" aria-live="polite" style="display:flex;flex-direction:column;gap:9px;padding:14px 0;opacity:.72"><span style="display:block;width:38%;height:11px;border-radius:6px;background:#e9e0d1"></span><span style="display:block;width:84%;height:10px;border-radius:6px;background:#eee7dc"></span><span style="display:block;width:66%;height:10px;border-radius:6px;background:#eee7dc"></span><span class="src">Loading the latest desk state…</span></div>');
+}
+function hideRoomLoading(id){ $("#"+id)?.querySelector(".room-loading")?.remove(); }
 
 async function load(){
-  const r = await fetch("/api/queue"); DATA = await r.json();
-  render();
+  try {
+    const r = await fetch("/api/queue");
+    if(!r.ok) throw new Error("queue "+r.status);
+    DATA = await r.json();
+    render();
+    connectionRecovered();
+  } catch(e) {
+    connectionState("Content Studio could not load the approval queue. Your existing drafts are unchanged. Check the server, then refresh.");
+  }
 }
 // Armed when a POST that enqueues a job goes OUT. Some of those routes only answer once the whole
 // job has finished, so waiting for the response would be too late to ever show its progress.
 let jobsPollArmedUntil = 0;
 async function post(path, body){
   if(enqueuesJob(path)) jobsPollArmedUntil = Date.now() + JOBS_POLL_MS * 3;
-  const r = await fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-  return r.json();
+  try {
+    const r = await fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    const data = await r.json();
+    connectionRecovered();
+    return data;
+  } catch(e) {
+    connectionState("Content Studio could not reach its server. Your existing files and approvals are unchanged. Check the server, then try again.");
+    return {ok:false,error:"Could not reach Content Studio. Check the server and try again."};
+  }
 }
 
 function statusLabel(s){ return s ? s : "needs"; }
@@ -2338,7 +2512,7 @@ function rowEl(piece, row){
   const cancelErr = row.cancelError ? '<div class="recon-mismatch">⚠ cancel failed: '+esc(row.cancelError)+'</div>' : "";
   const manual = row.manualComment ? '<div class="notes">↳ add as first comment in Typefully: '+esc(row.manualComment)+'</div>' : "";
   const editBtn = row.editable ? '<button data-act="edit">Edit</button>' : "";
-  const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Ask Claude</button>' : "";
+  const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Revise with an engine</button>' : "";
   // "Generate storyboard" (card 9e20a616): the video-path dead end — a video-script row you can't
   // approve because storyboard.md doesn't exist yet, and no way to run /video without a terminal.
   // storyboardSlugs (module-level, keyed by piece.slug — card fbfea28b) tracks the in-flight state
@@ -2346,7 +2520,7 @@ function rowEl(piece, row){
   const storyboardBtn = row.canGenerateStoryboard
     ? (storyboardSlugs.has(piece.slug)
         ? '<span class="hint">✨ generating storyboard… (the Studio room has progress)</span>'
-        : '<button class="storyboard" data-act="gen-storyboard">🎬 Generate storyboard</button>')
+        : '<span class="storyboard-control">'+engineSelectHtml()+'<button class="storyboard" data-act="gen-storyboard">🎬 Generate storyboard</button></span>')
     : "";
   // "Duplicate to platform" (card 9304e4a5's missing "create a post for another platform"):
   // options come from DATA.textPlatforms (server's TEXT_PLATFORMS), excluding this row's own
@@ -2385,15 +2559,15 @@ function rowEl(piece, row){
     // explanation instead of a silent no-op.
     '<div class="aibox'+((row.aiError||aiPending.has(row.id))?" show":"")+'">'+
       (aiPending.has(row.id)
-        ? '<div class="thinking">✨ Claude is revising… (your subscription, ~10-30s)</div>'
-        : '<input placeholder="tell Claude what to change…" /><button class="send" data-act="ai-send">Send to Claude</button>'+
+        ? '<div class="thinking">✨ '+esc(engineLabel(aiEngine.get(row.id)))+' is revising. The room strip carries the live clock.</div>'
+        : engineSelectHtml()+'<input placeholder="tell the selected engine what to change…" /><button class="send" data-act="ai-send">Run revision</button>'+
           (row.aiError ? '<div class="aierr">⚠ '+esc(row.aiError)+'</div>' : ""))+
     '</div>'+
     (row.duplicatable
       ? '<div class="dupbox'+((row.dupError||dupPending.has(row.id))?" show":"")+'">'+
         (dupPending.has(row.id)
-          ? '<div class="thinking">✨ Claude is drafting the '+esc(dupPending.get(row.id))+' version. The strip at the top of this room carries the clock.</div>'
-          : '<select>'+dupOptions+'</select><button class="send" data-act="dup-send">Duplicate</button>'+
+          ? '<div class="thinking">✨ '+esc(engineLabel(dupEngine.get(row.id)))+' is drafting the '+esc(dupPending.get(row.id))+' version. The room strip carries the live clock.</div>'
+          : engineSelectHtml()+'<select class="dup-platform">'+dupOptions+'</select><button class="send" data-act="dup-send">Duplicate</button>'+
             (row.dupError ? '<div class="duperr">⚠ '+esc(row.dupError)+'</div>' : ""))+
       '</div>'
       : "");
@@ -2449,20 +2623,25 @@ async function onAction(e, piece, row, el){
     if(aiPending.has(row.id)) return; // already in flight — don't fire a second real spawn (card fbfea28b)
     const inp = el.querySelector(".aibox input"); const instruction = inp ? inp.value.trim() : "";
     if(!instruction){ flash("Type what you want changed first"); return; }
+    const engineSelect = el.querySelector(".aibox .engine-select");
+    const engine = engineSelect ? engineSelect.value : "claude";
     row.aiError = null;
+    aiEngine.set(row.id, engine);
     aiPending.add(row.id); rerender(); // thinking indicator now survives a background job poll's load()
     try {
-      const r = await post("/api/revise",{slug:piece.slug,id:row.id,instruction});
+      const r = await post("/api/revise",{slug:piece.slug,id:row.id,instruction,engine});
       // Durable inline error on the row (survives rerender) instead of a 1.4s auto-hiding toast —
       // the toast alone made a real failure ("Claude ran but didn't change anything") vanish before
       // it registered as anything but "nothing's working."
-      if(r.ok){ row.body = r.body; flash("Revised by Claude"); }
+      if(r.ok){ row.body = r.body; flash("Revised with "+engineLabel(engine)); }
       else { row.aiError = r.error || "error"; }
-    } finally { aiPending.delete(row.id); rerender(); }
+    } finally { aiPending.delete(row.id); aiEngine.delete(row.id); rerender(); }
   } else if (act === "gen-storyboard"){
     e.target.disabled = true;
-    const r = await post("/api/video/generate",{slug:piece.slug});
-    if(r.ok){ storyboardSlugs.add(piece.slug); flash("Queued — generating storyboard (the Studio room has progress)"); loadJobs(); }
+    const storyboardEngine = el.querySelector(".storyboard-control .engine-select");
+    const engine = storyboardEngine ? storyboardEngine.value : "claude";
+    const r = await post("/api/video/generate",{slug:piece.slug,engine});
+    if(r.ok){ storyboardSlugs.add(piece.slug); flash("Queued with "+engineLabel(engine)+"; generating storyboard"); loadJobs(); }
     else { e.target.disabled = false; flash(r.error || "Could not queue /video"); }
     rerender();
   } else if (act === "dup"){
@@ -2470,16 +2649,19 @@ async function onAction(e, piece, row, el){
     if(!box.classList.contains("show")) row.dupError = null; // closing dismisses any stale error
   } else if (act === "dup-send"){
     if(dupPending.has(row.id)) return; // already in flight — don't fire a second real spawn (card fbfea28b)
-    const sel = el.querySelector(".dupbox select");
+    const sel = el.querySelector(".dupbox .dup-platform");
     const platform = sel ? sel.value : "";
     if(!platform){ flash("No other platform to duplicate to"); return; }
+    const engineSelect = el.querySelector(".dupbox .engine-select");
+    const engine = engineSelect ? engineSelect.value : "claude";
     row.dupError = null;
+    dupEngine.set(row.id, engine);
     dupPending.set(row.id, platform); rerender(); // thinking indicator now survives a background job poll's load()
     try {
-      const r = await post("/api/duplicate",{slug:piece.slug,id:row.id,platform});
-      if(r.ok){ flash("Duplicated to "+platform+" — new pending row added"); await load(); }
+      const r = await post("/api/duplicate",{slug:piece.slug,id:row.id,platform,engine});
+      if(r.ok){ flash("Duplicated to "+platform+" with "+engineLabel(engine)+"; new pending row added"); await load(); }
       else { row.dupError = r.error || "error"; rerender(); }
-    } finally { dupPending.delete(row.id); rerender(); }
+    } finally { dupPending.delete(row.id); dupEngine.delete(row.id); rerender(); }
   } else if (act === "cancel"){
     if(!confirm("Cancel this scheduled post? This removes the live draft/post at the provider.")) return;
     e.target.disabled = true;
@@ -2510,6 +2692,7 @@ function render(){
   $("#count").textContent = String(pending);
   $("#count").hidden = pending === 0;
   if (!shown) main.innerHTML = '<div class="empty">Nothing '+(showDecided?"here yet":"awaiting review")+'. 🎉</div>';
+  refreshEngineControls();
   // Step 3 of the wizard renders the SAME rows out of the same DATA, so a status change anywhere
   // has to repaint it too. renderContentWizard never calls back into render().
   if (typeof renderContentWizard === "function") renderContentWizard();
@@ -2540,6 +2723,7 @@ function setRoom(t){
   if (t==="fiction"){ loadFiction(); }
   if (t==="charles"){ loadCharles(); }
   if (t==="venture"){ loadVentureList(); }
+  renderCaptureHandoff();
 }
 document.querySelectorAll(".room").forEach(b=>b.addEventListener("click", ()=>setRoom(b.dataset.room)));
 function setOutreachSub(s){
@@ -2646,10 +2830,11 @@ async function askBrief(){
   if(!instruction){ flash("Type what you want changed first"); return; }
   $("#briefAskBtn").disabled = true;
   const prevHtml = $("#briefBody").innerHTML;
-  $("#briefBody").textContent = "✨ Claude is revising the brief… (your subscription, ~10-30s)";
-  const r = await post("/api/strategy/ask", {instruction});
+  const engine = $("#signalsEngine").value;
+  $("#briefBody").textContent = "✨ "+engineLabel(engine)+" is revising the brief. The room strip carries the live clock.";
+  const r = await post("/api/strategy/ask", {instruction, engine});
   $("#briefAskBtn").disabled = false;
-  if(r.ok){ $("#briefBody").innerHTML = mdToHtml(r.content); $("#briefPath").textContent = r.path; inp.value = ""; flash("Brief revised by Claude"); }
+  if(r.ok){ $("#briefBody").innerHTML = mdToHtml(r.content); $("#briefPath").textContent = r.path; inp.value = ""; flash("Brief revised with "+engineLabel(engine)); }
   else { $("#briefBody").innerHTML = prevHtml; flash("Revise failed: "+(r.error||"error")); }
 }
 $("#briefAskBtn").addEventListener("click", askBrief);
@@ -2665,10 +2850,11 @@ async function refreshBriefRun(){
   // No clock here. The progress strip at the top of this room is the ONE measured duration for
   // this job, and it counts from when the job was queued. A second timer started at the click
   // disagreed with it on the same screen, which is the exact defect this design was corrected for.
-  body.innerHTML = '<p class="thinking">✨ Running the full /strategy skill. It grades your bets and writes a new dated brief, which takes minutes. The strip at the top of this room carries the clock, and the Studio room has the log.</p>';
+  const engine = $("#signalsEngine").value;
+  body.innerHTML = '<p class="thinking">✨ Running /strategy with '+esc(engineLabel(engine))+'. It grades your bets and writes a new dated brief. The room strip carries the live clock.</p>';
   loadJobs(); // make the strategy job visible in the Studio room right away
   try {
-    const r = await post("/api/strategy/refresh-brief", {});
+    const r = await post("/api/strategy/refresh-brief", {engine});
     if(r.ok){ flash("Brief refreshed: "+(r.path||"")); await loadBrief(); }
     else { body.innerHTML = prevHtml; flash(r.error || "Refresh failed — see the job log"); }
   } catch (e) {
@@ -2690,7 +2876,8 @@ function fmtDays(n){ return n+" day"+(n===1?"":"s"); }
 function renderInsightsMeta(r){
   const parts = [];
   if(r.engine === "gpt-codex") parts.push('<span style="color:#5b46b8;font-weight:600">analyst · GPT (Codex)</span>');
-  else if(r.engine === "claude-cli") parts.push('<span style="color:#5b46b8;font-weight:600">analyst · Claude</span>'+(r.fallbackReason?' <span title="'+esc(r.fallbackReason)+'">(GPT unavailable — hover for why)</span>':''));
+  else if(r.engine === "claude" || r.engine === "claude-cli") parts.push('<span style="color:#5b46b8;font-weight:600">analyst · Claude</span>');
+  else if(r.engine === "grok") parts.push('<span style="color:#5b46b8;font-weight:600">analyst · Grok</span>');
   if(r.freshness) parts.push('Data current as of <b>'+esc(r.freshness.date)+'</b> ('+fmtDays(r.freshness.ageDays)+' ago)');
   if(r.brief){
     const label = esc(r.brief.date || r.brief.path) + (r.brief.ageDays!=null ? ' ('+fmtDays(r.brief.ageDays)+' old)' : '');
@@ -2707,8 +2894,10 @@ async function generateInsights(){
   $("#insightsThread").innerHTML = "";
   // No estimate here. Nothing ever measured the guess that used to sit in this line, and the strip
   // at the top of this room already shows the real elapsed time for this job.
-  $("#insightsOut").innerHTML = '<p class="hint">Running the reports, then asking Claude for a synthesis. The strip at the top of this room carries the clock.</p>';
-  const r = await post("/api/strategy/insights", {});
+  const engine = $("#signalsEngine").value;
+  const intro = engine === "claude" ? "Running the reports, then asking Claude for a synthesis." : "Running the reports, then asking "+engineLabel(engine)+" for a synthesis.";
+  $("#insightsOut").innerHTML = '<p class="hint">'+esc(intro)+' The room strip carries the live clock.</p>';
+  const r = await post("/api/strategy/insights", {engine});
   $("#insightsBtn").disabled = false;
   if(r.ok){ $("#insightsOut").innerHTML = renderInsightsMeta(r) + mdToHtml(r.summary); insightsHistory = [{role:"assistant", content:r.summary}]; }
   else { $("#insightsOut").innerHTML = "<p>Failed: "+esc(r.error||"error")+"</p>"; }
@@ -2737,9 +2926,10 @@ async function askInsights(){
   // No clock here either. Card a14693da replaced a fixed ETA with a click-local ticker, which was
   // right at the time; the room strip now carries the one measured elapsed count for this job, so
   // a second timer on the same screen would just disagree with it.
-  thinking.innerHTML = '✨ Claude is looking into it. It may re-run a report first. The strip at the top of this room carries the clock.';
+  const engine = $("#signalsEngine").value;
+  thinking.innerHTML = '✨ '+esc(engineLabel(engine))+' is looking into it. It may re-run a report first. The room strip carries the live clock.';
   $("#insightsThread").appendChild(thinking);
-  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory});
+  const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine});
   $("#insightsAskBtn").disabled = false;
   insightsHistory.push({role:"assistant", content: r.ok ? r.answer : "Failed: "+(r.error||"error")});
   renderThread();
@@ -2927,7 +3117,7 @@ function outreachOpeningLine(l){
 // ── Triage: the queue, grouped by why ──
 function triageHtml(){
   const groups = groupLeadsBySegment(OUTREACH_LEADS);
-  if(!groups.length) return '<div class="empty">No leads yet. Scout new leads (top right) runs the discovery agent; /outreach add seeds one by hand.</div>';
+  if(!groups.length) return '<div class="empty">No leads yet. Scout new leads above runs the discovery agent. Nothing is contacted or sent automatically.</div>';
   const body = groups.map(g=>
     '<div class="tri-group">'+
       '<div class="tri-head"><span class="tri-name">'+esc(g.name)+'</span><span class="tri-note">'+esc(g.note)+'</span></div>'+
@@ -3075,6 +3265,7 @@ function threadHtml(l){
   // what she typed, so the thread only offers it once the lead is one she said to pursue.
   const canDraft = !l.latestMessage && l.kind!=="content-example" && (l.status==="pursue"||l.status==="qualified");
   const direction = (canDraft || pending || l.latestMessage) && l.kind!=="content-example" ? directionHtml(l) : "";
+  const outreachEngine = l.kind!=="content-example" ? engineSelectHtml() : "";
   const decideBtns = l.kind==="content-example" ? "" :
     '<div class="wb-handoff">'+
       (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Worth pursuing</button><button class="out-pass" data-dir="'+esc(l.dir)+'">Pass</button>' : "")+
@@ -3091,7 +3282,7 @@ function threadHtml(l){
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="seg-chip '+esc(seg)+'">'+esc(info.label)+'</span>'+fitChip+'<span class="src">'+esc(info.line)+'</span><span class="grow"></span>'+provChip+'</div>'+
     '<div class="wb-label" style="margin:14px 0 0;">Why this matters to you, in plain terms'+legacy+'</div>'+
     '<div class="dossier-why">'+esc(mmr.headline)+'</div>'+
-    mm + whoBoxHtml(l) + direction + outreachMessageBox(l) + sendStepsHtml(l) + decideBtns + notes +
+    mm + whoBoxHtml(l) + outreachEngine + direction + outreachMessageBox(l) + sendStepsHtml(l) + decideBtns + notes +
     (l.url?'<div class="src" style="margin-top:10px;"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>':"")+
   '</div>'+outreachMarginHtml(l)+'</div>';
 }
@@ -3103,16 +3294,20 @@ function renderOutreachBox(){
   if(!leads.length){
     activeLeadDir = null;
     $("#outreachHead").textContent = "Leads";
-    box.innerHTML = '<div class="empty">No leads yet. Scout new leads (top right) runs the discovery agent; /outreach add seeds one by hand.</div>';
+    box.innerHTML = '<div class="empty">No leads yet. Scout new leads above runs the discovery agent. Nothing is contacted or sent automatically.</div>';
     return;
   }
   if(activeLeadDir && !leads.some(l=>l.dir===activeLeadDir)) activeLeadDir = null;
   const active = activeLeadDir ? leads.find(l=>l.dir===activeLeadDir) : null;
   $("#outreachHead").textContent = active ? "The thread" : "Leads";
   box.innerHTML = active ? threadHtml(active) : triageHtml();
+  refreshEngineControls(box);
   box.querySelectorAll("button.tri-row").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = b.dataset.dir; renderOutreachBox(); }));
   box.querySelectorAll("button.out-back").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = null; renderOutreachBox(); }));
-  box.querySelectorAll("button.dir-send").forEach(b=>b.addEventListener("click", ()=>outreachDraft(b.dataset.dir, b)));
+  box.querySelectorAll("button.dir-send").forEach(b=>b.addEventListener("click", ()=>{
+    const select = b.closest(".dossier-grid")?.querySelector(".engine-select");
+    outreachDraft(b.dataset.dir, b, select ? select.value : "claude");
+  }));
   // Kept out of the render loop on purpose: re-rendering per keystroke would eat the caret. The
   // typed text is stashed so a refresh mid-thought does not lose it, and the button just enables.
   box.querySelectorAll("textarea.dir-input").forEach(t=>t.addEventListener("input", ()=>{
@@ -3127,7 +3322,10 @@ function renderOutreachBox(){
   box.querySelectorAll("button.out-copy").forEach(b=>b.addEventListener("click", ()=>outreachCopy(b)));
   box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
   box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
-  box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>outreachMsgRevise(b)));
+  box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>{
+    const select = b.closest(".dossier-grid")?.querySelector(".engine-select");
+    outreachMsgRevise(b, select ? select.value : "claude");
+  }));
   box.querySelectorAll("button.who-add").forEach(b=>b.addEventListener("click", ()=>outreachAddContact(b.dataset.dir, b.dataset.name, "")));
   box.querySelectorAll("button.who-save").forEach(b=>b.addEventListener("click", ()=>{
     const wrap = b.closest(".who-box");
@@ -3207,7 +3405,7 @@ async function outreachMsgSave(b){
   else { b.disabled = false; flash(r.error || "Failed to save"); }
 }
 
-async function outreachMsgRevise(b){
+async function outreachMsgRevise(b, engine){
   const dir = b.dataset.dir, file = b.dataset.file;
   if(msgPending.has(dir)) return; // already in flight — never a second real claude -p spawn
   const inp = b.closest(".aibox").querySelector(".msg-revise-input");
@@ -3216,7 +3414,7 @@ async function outreachMsgRevise(b){
   msgError.delete(dir);
   msgPending.add(dir); renderOutreachBox();
   try {
-    const r = await post("/api/outreach/message/revise", {dir, file, instruction});
+    const r = await post("/api/outreach/message/revise", outreachMessageReviseRequest(dir, file, instruction, engine));
     if(r.ok){ flash("Message revised"); await loadOutreach(); }
     else { msgError.set(dir, r.error || "Failed to revise"); }
   } catch (e) {
@@ -3230,16 +3428,17 @@ async function outreachMsgRevise(b){
 async function scoutRun(){
   if(scoutInFlight) return;
   scoutInFlight = true;
+  const engine = $("#scoutEngine")?.value || "claude";
   const box = $("#outreachList");
   const banner = document.createElement("div");
   banner.className = "hint";
   banner.style.padding = "10px 4px";
-  banner.textContent = "✨ Scouting for new leads with bounded searches on your subscription. It takes minutes. The strip at the top of this room carries the clock, and the Studio room has the log.";
+  banner.textContent = "✨ Scouting for new leads with "+engineLabel(engine)+" and bounded searches on your subscription. It takes minutes. The strip at the top of this room carries the clock, and the Studio room has the log.";
   box.prepend(banner);
   loadJobs(); // make the scout job visible in the Studio room right away
   try {
-    const r = await post("/api/outreach/scout", {});
-    if(r.ok){ flash("Scout finished — leads reloaded"); }
+    const r = await post("/api/outreach/scout", {engine});
+    if(r.ok){ flash("Scout finished with "+engineLabel(engine)+" — leads reloaded"); }
     else flash(r.error || "Scout failed — see the job log");
   } catch (e) {
     flash(e instanceof Error ? e.message : String(e));
@@ -3253,27 +3452,37 @@ async function scoutRun(){
 // real "when it was last pitched" exists, so the triage rail waits for both rather than guessing.
 async function loadOutreach(){
   const box = $("#outreachList");
-  if(!OUTREACH_LEADS) box.innerHTML = '<div class="empty">Loading…</div>';
-  const [leadsRes, fuRes] = await Promise.all([
-    fetch("/api/outreach/leads"),
-    fetch("/api/followups").catch(()=>null),
-  ]);
-  const d = await leadsRes.json();
-  OUTREACH_LEADS = d.leads || [];
-  OUTREACH_TOUCH = {};
-  if(fuRes && fuRes.ok){
-    try {
-      const fu = await fuRes.json();
-      const b = fu.buckets || {};
-      const rows = [].concat(b.client||[], b.platform||[]);
-      for(const row of rows){
-        if(!row.dir || !row.lastTouch) continue;
-        const prev = OUTREACH_TOUCH[row.dir];
-        if(!prev || row.lastTouch > prev) OUTREACH_TOUCH[row.dir] = row.lastTouch;
+  showRoomLoading("outreachList");
+  try {
+    const [leadsRes, fuRes] = await Promise.all([
+      fetch("/api/outreach/leads"),
+      fetch("/api/followups").catch(()=>null),
+    ]);
+    if(!leadsRes.ok) throw new Error("outreach "+leadsRes.status);
+    const d = await leadsRes.json();
+    OUTREACH_LEADS = d.leads || [];
+    OUTREACH_TOUCH = {};
+    if(fuRes && fuRes.ok){
+      try {
+        const fu = await fuRes.json();
+        const b = fu.buckets || {};
+        const rows = [].concat(b.client||[], b.platform||[]);
+        for(const row of rows){
+          if(!row.dir || !row.lastTouch) continue;
+          const prev = OUTREACH_TOUCH[row.dir];
+          if(!prev || row.lastTouch > prev) OUTREACH_TOUCH[row.dir] = row.lastTouch;
+        }
+      } catch (e) { /* no ledger yet: every row reads "never pitched", which is the truth */ }
       }
-    } catch (e) { /* no ledger yet: every row reads "never pitched", which is the truth */ }
+    renderOutreachBox();
+    hideRoomLoading("outreachList");
+    connectionRecovered();
+  } catch(e) {
+    hideRoomLoading("outreachList");
+    box.innerHTML = '<div class="load-error" role="alert"><strong>Could not load Outreach.</strong><div>Your lead files are unchanged. Check the server, then try again.</div><button type="button" id="outreachRetry">Try again</button></div>';
+    $("#outreachRetry")?.addEventListener("click", loadOutreach);
+    connectionState("Content Studio could not load Outreach. Your lead files are unchanged.");
   }
-  renderOutreachBox();
 }
 
 
@@ -3324,7 +3533,7 @@ function wbMarginHtml(s){
     : '<div class="wb-margin-sub">No director notes on this piece yet.</div>';
   const reply = devWorking(s.slug)
     ? '<div class="dev-working">✨ your director is working on a round… (Studio has the log)</div>'
-    : '<div class="wb-reply"><input class="wb-reply-input" placeholder="Push back, or ask for another angle…" data-slug="'+esc(s.slug)+'" />'+
+    : '<div class="wb-reply">'+engineSelectHtml()+'<input class="wb-reply-input" placeholder="Push back, or ask for another angle…" data-slug="'+esc(s.slug)+'" />'+
       '<button class="wb-reply-send" data-slug="'+esc(s.slug)+'">'+(s.rounds.length?"Send to your director":"Ask for a read")+'</button>'+
       '<span class="mono-note">a round takes 30s to a few min. real time.</span></div>';
   return '<div class="session-margin">'+
@@ -3367,7 +3576,7 @@ function wbSessionEl(s){
   for(const card of openAngles) main += wbAngleHtml(s.slug, card);
   const lensChecks = ["extract"].concat(s.cuts.map(c=>c.lens)).map(l =>
     '<label class="toggle"><input type="checkbox" class="dev-fmt-lens" value="'+esc(l)+'" checked /> '+esc(l)+'</label>').join("");
-  main += '<div class="wb-handoff"><button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Hand it to the team →</button>'+
+  main += '<div class="wb-handoff">'+engineSelectHtml()+'<button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Hand it to the team →</button>'+
     '<span class="note">They shape it for each platform, make the visuals, hold it for posting. Every draft comes back below for your yes.</span>'+lensChecks+'</div>';
   if(s.pending) main += '<div class="wb-links"><span class="wb-link wb-goto-review">'+s.pending+' draft'+(s.pending===1?"":"s")+' below, waiting for your yes ↓</span></div>';
   sheet.innerHTML = '<div class="session-grid"><div class="session-main">'+main+'</div>'+wbMarginHtml(s)+'</div>';
@@ -3377,21 +3586,36 @@ function renderWorkbench(){
   const box = $("#workbench");
   box.innerHTML = "";
   for(const s of WB_SESSIONS) box.appendChild(wbSessionEl(s));
+  refreshEngineControls(box);
 }
 async function loadContent(){
-  const r = await fetch("/api/content"); const d = await r.json();
-  WB_SESSIONS = d.sessions || [];
-  renderWorkbench();
-  renderContentWizard();
+  showRoomLoading("workbench");
+  try {
+    const r = await fetch("/api/content");
+    if(!r.ok) throw new Error("content "+r.status);
+    const d = await r.json();
+    WB_SESSIONS = d.sessions || [];
+    renderWorkbench();
+    renderContentWizard();
+    hideRoomLoading("workbench");
+    connectionRecovered();
+  } catch(e) {
+    hideRoomLoading("workbench");
+    $("#workbench").innerHTML = '<div class="load-error" role="alert"><strong>Could not load the Workbench.</strong><div>Your existing drafts are unchanged. Check the server, then try again.</div><button type="button" id="contentRetry">Try again</button></div>';
+    $("#contentRetry")?.addEventListener("click", loadContent);
+    connectionState("Content Studio could not load the Workbench. Your existing drafts are unchanged.");
+  }
 }
 async function devStart(){
   const ta = $("#src"); const source = ta.value.trim();
-  if(!source){ flash("Write or paste something first"); return; }
-  $("#devStartBtn").disabled = true;
-  const r = await post("/api/develop/start",{source});
-  $("#devStartBtn").disabled = false;
-  if(r.ok){ ta.value=""; flash("Handed over — your director is reading"); loadJobs(); }
-  else flash(r.error || "Could not hand it over");
+  if(!source || captureSubmitting) { if(!source) flash("Write or paste something first"); return; }
+  const engine = $("#studioEngine").value;
+  setCaptureSubmitting(true);
+  try {
+    const r = await post("/api/develop/start",{source, engine});
+    if(r.ok){ ta.value=""; flash("Handed over to "+engineLabel(engine)); loadJobs(); }
+    else flash(r.error || "Could not hand it over");
+  } finally { setCaptureSubmitting(false); }
 }
 $("#devStartBtn").addEventListener("click", devStart);
 // Delegated — the workbench is rebuilt wholesale on every load, same pattern as the notes list.
@@ -3413,6 +3637,8 @@ $("#workbench").addEventListener("click", async (e)=>{
   } else if (t.classList.contains("wb-reply-send")){
     const slug = t.dataset.slug;
     const inp = t.closest(".wb-reply").querySelector(".wb-reply-input");
+    const localEngine = t.closest(".wb-reply")?.querySelector(".engine-select");
+    const engine = localEngine ? localEngine.value : "claude";
     const reply = inp ? inp.value.trim() : "";
     const session = WB_SESSIONS.find(x=>x.slug===slug);
     const hasRounds = session && session.rounds.length;
@@ -3420,18 +3646,20 @@ $("#workbench").addEventListener("click", async (e)=>{
     devReplyPending.add(slug); renderWorkbench();
     try {
       const r = reply
-        ? await post("/api/develop/reply", {slug, reply})
-        : await post("/api/develop/start", {slug});
-      if(r.ok){ flash("Handed over — your director is on it"); await loadJobs(); }
+        ? await post("/api/develop/reply", {slug, reply, engine})
+        : await post("/api/develop/start", {slug, engine});
+      if(r.ok){ flash("Handed over to "+engineLabel(engine)); await loadJobs(); }
       else flash(r.error || "Could not queue the round");
     } finally { devReplyPending.delete(slug); renderWorkbench(); }
   } else if (t.classList.contains("dev-format-btn")){
     const slug = t.dataset.slug;
     const lenses = [...t.closest(".session-main").querySelectorAll(".dev-fmt-lens")].filter(c=>c.checked).map(c=>c.value);
     if(!lenses.length){ flash("Pick at least one cut"); return; }
+    const localEngine = t.closest(".wb-handoff")?.querySelector(".engine-select");
+    const engine = localEngine ? localEngine.value : "claude";
     t.disabled = true;
-    const r = await post("/api/develop/format", {slug, lenses});
-    if(r.ok){ flash("Handed to the team — "+r.jobs.length+" formatting job(s); drafts land below for your yes"); loadJobs(); }
+    const r = await post("/api/develop/format", {slug, lenses, engine});
+    if(r.ok){ flash("Handed to the team with "+engineLabel(engine)+"; "+r.jobs.length+" job(s) queued"); loadJobs(); }
     else { t.disabled = false; flash(r.error || "Could not queue formatting"); }
   } else if (t.classList.contains("wb-cut-edit")){
     const cutEl = t.closest(".wb-cut");
@@ -3546,7 +3774,7 @@ function readsFromCells(t, cuts){
 }
 // ── end of the treatment mirror ──
 
-const CW_STEPS = [["1","Pick a source"],["2","Decide the treatment"],["3","Approve the drafts"]];
+const CW_STEPS = [["1","Pick a source"],["2","Review the treatment"],["3","Approve the drafts"]];
 const CW_TAGCLASS = { "SUBSTACK":"substack", "YOURS":"yours", "READ IN":"readin" };
 
 function cwSources(){ return WB_SESSIONS || []; }
@@ -3833,7 +4061,7 @@ $("#contentWizard").addEventListener("click", (e)=>{
 // "Draft it": her typed direction rides into THIS run's prompt via POST /api/outreach/draft. It
 // wins over the stored pitch angle where they disagree. Iterating on the result is a different
 // button ("Update it"), and it reuses the revise path that already existed.
-async function outreachDraft(dir, btn){
+async function outreachDraft(dir, btn, engine){
   if(outPending.has(dir)) return; // already in flight — don't fire a second real claude -p spawn
   const wrap = btn ? btn.closest(".dir-box") : null;
   const input = wrap ? wrap.querySelector(".dir-input") : null;
@@ -3852,9 +4080,7 @@ async function outreachDraft(dir, btn){
     // person its follow-up clock will belong to.
     const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
     const recipient = lead && lead.contacts && lead.contacts.length ? lead.contacts[0].name : undefined;
-    const body = {dir, direction};
-    if(recipient) body.recipient = recipient;
-    const r = await post("/api/outreach/draft", body);
+    const r = await post("/api/outreach/draft", outreachDraftRequest(dir, direction, recipient, engine));
     if(r.ok){ drafted = true; outDirection.delete(dir); flash("Drafted. Shape it here before you ever send it."); }
     else outError.set(dir, r.error || "Failed to draft");
     await loadOutreach();
@@ -3889,16 +4115,81 @@ let ficPassNote = "";
 let ficFixed = {};        // spans fixed in this session, so the rail says "fixed" until the next check
 // ── Venture room ────────────────────────────────────────────────────────────────────────────────
 //
-// Read-only. Deliberately NO controls: the write routes exist, but a button this PR does not wire
-// is a dead button, which is exactly what the wiring guard exists to catch, and a disabled composer
-// is a promise this screen cannot keep. The decision panels render as lists, and the one that is
-// awaiting Muxin says so without pretending to be clickable.
+// The thread is read-only except for explicit, server-gated controls: the selected-engine analysis
+// read and one validated draft-step enqueue. Neither control selects, approves, publishes, or
+// advances a phase; the thread continues to render the server's human gates.
 //
 // Almost nothing is computed here. src/review/venture-thread.ts already derived the whole view
 // model server-side; this walks it and writes markup. The two exceptions are the mirrors below.
 let VENTURE_SLUGS = [];
 let ventureSlug = null;
 let VENTURE_THREAD = null;
+let ventureAnalysisPending = false;
+let ventureRunStepPending = false;
+const INTAKE_FIELDS = {
+  voice: ["writing_samples", "worldview_statement", "natural_phrases", "refused_phrases_tones"],
+  scorecard: ["required_live_posts", "ongoing_pace", "views_or_clicks_target", "opt_in_target", "response_quality_test", "sustainability_test"],
+};
+const INTAKE_LABELS = {
+  writing_samples:"Writing samples", worldview_statement:"Worldview statement", natural_phrases:"Natural phrases", refused_phrases_tones:"Refused phrases or tones",
+  required_live_posts:"Required live posts", ongoing_pace:"Ongoing pace", views_or_clicks_target:"Views or clicks target", opt_in_target:"Opt-in target",
+  response_quality_test:"Response-quality test", sustainability_test:"Sustainability test",
+};
+let VENTURE_INTAKE = {voice:{}, scorecard:{}};
+const intakeTimers = new Map();
+function intakeKey(section, field){ return section+":"+field; }
+function intakeValue(section, field){
+  const value = VENTURE_INTAKE[section] && VENTURE_INTAKE[section][field];
+  return value && typeof value === "object" ? String(value.text || "") : String(value || "");
+}
+function renderVentureIntake(){
+  const box = $("#ventureIntakeSections");
+  if(!box) return;
+  const body = Object.entries(INTAKE_FIELDS).map(([section, fields])=>
+    '<div style="margin-top:18px"><div class="wb-label">'+esc(section==="voice"?"Voice":"Scorecard")+'</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px">'+fields.map(field=>{
+      const key = intakeKey(section, field);
+      return '<label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:#5a5346"><span>'+esc(INTAKE_LABELS[field]||field)+' <span data-intake-state="'+esc(key)+'" style="font:10px ui-monospace,monospace;color:#a89a80">saved</span></span>'+
+        '<textarea data-intake-section="'+esc(section)+'" data-intake-field="'+esc(field)+'" rows="3" placeholder="Add a durable guardrail for this section" style="width:100%;box-sizing:border-box;resize:vertical;border:1px solid #e0d6c0;border-radius:7px;padding:9px 10px;background:#fffdf8;font:14px/1.5 Georgia,serif">'+esc(intakeValue(section, field))+'</textarea></label>';
+    }).join('')+'</div></div>'
+  ).join('');
+  box.innerHTML = '<div class="sheet-head"><h3>Intake guardrails</h3><span class="grow"></span><span class="src">Voice and scorecard fields save as you type</span></div>'+
+    '<div class="sheet-sub">These fields are separate from the 25-question interview. They survive a reload, never advance a phase, and remain durable notes for this venture until you choose to use them.</div>'+body;
+  box.querySelectorAll("textarea[data-intake-section]").forEach(ta=>ta.addEventListener("input",()=>{
+    const section=ta.dataset.intakeSection, field=ta.dataset.intakeField, key=intakeKey(section,field);
+    VENTURE_INTAKE[section][field] = ta.value;
+    const state=box.querySelector('[data-intake-state="'+key+'"]');
+    if(state) state.textContent = "saving…";
+    clearTimeout(intakeTimers.get(key));
+    intakeTimers.set(key, setTimeout(()=>saveVentureIntakeField(section, field, ta.value), 500));
+  }));
+}
+async function loadVentureIntakeSections(){
+  const box=$("#ventureIntakeSections");
+  if(!box || !ventureSlug) return;
+  try {
+    const r=await fetch("/api/venture/"+encodeURIComponent(ventureSlug)+"/intake/sections");
+    const j=await r.json();
+    if(!r.ok || !j.ok) throw new Error(j.error||"could not load intake guardrails");
+    VENTURE_INTAKE={voice:{...(j.sections&&j.sections.voice||{})},scorecard:{...(j.sections&&j.sections.scorecard||{})}};
+    renderVentureIntake();
+  } catch(e) {
+    box.innerHTML='<div class="load-error" role="alert"><strong>Could not load intake guardrails.</strong><div>Check your connection, then try again. Your saved answers are unchanged.</div><button type="button" id="ventureIntakeRetry">Try again</button></div>';
+    $("#ventureIntakeRetry")?.addEventListener("click", loadVentureIntakeSections);
+  }
+}
+async function saveVentureIntakeField(section, field, text){
+  const key=intakeKey(section,field);
+  const state=$("#ventureIntakeSections [data-intake-state=\\""+key+"\\"]");
+  try {
+    const r=await post("/api/venture/"+encodeURIComponent(ventureSlug)+"/intake/section",{section,field,text});
+    if(r.ok){ if(state) state.textContent="saved"; }
+    else { if(state) state.textContent="not saved"; flash(r.error||"This intake field was not saved. Try again"); }
+  } catch(e) {
+    if(state) state.textContent="not saved";
+    flash("This intake field was not saved. Check your connection and try again");
+  }
+}
 
 // Rule 5 mirrors of ventureDotColor / ventureDayLine in page.ts. Change one, change both.
 function vDot(tone){
@@ -3922,24 +4213,93 @@ async function loadVentureList(){
   if(!VENTURE_SLUGS.length){
     ventureSlug = null;
     sel.hidden = true;
+    $("#ventureEngine").disabled = true;
+    $("#ventureAnalyzeBtn").disabled = true;
+    $("#ventureRunStepBtn").disabled = true;
+    $("#ventureAnalysisPanel").hidden = true;
     $("#ventureDay").textContent = "";
+    $("#ventureIntakeSections").innerHTML = '<div class="sheet-head"><h3>Intake guardrails</h3></div><div class="empty" style="padding:18px 0">Start or choose a venture to edit its durable voice and scorecard fields.</div>';
     $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. "Start a venture" above runs the whole intake interview here — 25 questions, one at a time.</div>';
     $("#ventureRail").innerHTML = "";
     return;
   }
   sel.hidden = false;
+  $("#ventureEngine").disabled = false;
+  $("#ventureAnalyzeBtn").disabled = false;
+  $("#ventureRunStepBtn").disabled = false;
   if(!ventureSlug || !VENTURE_SLUGS.includes(ventureSlug)) ventureSlug = VENTURE_SLUGS[0];
   sel.value = ventureSlug;
   await loadVenture();
 }
 async function loadVenture(){
   if(!ventureSlug) return loadVentureList();
-  const r = await fetch("/api/venture/"+encodeURIComponent(ventureSlug)+"/thread");
-  const j = await r.json();
-  if(!j.ok){ $("#ventureThread").innerHTML = '<div class="empty">'+esc(j.error||"could not read this venture")+'</div>'; return; }
-  VENTURE_THREAD = j.thread;
-  renderVenture();
+  const requestedSlug = ventureSlug;
+  showRoomLoading("ventureThread");
+  try {
+    const r = await fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread");
+    if(!r.ok) throw new Error("venture "+r.status);
+    const j = await r.json();
+    if(requestedSlug !== ventureSlug){ hideRoomLoading("ventureThread"); return; }
+    if(!j.ok) throw new Error(j.error || "could not read this venture");
+    VENTURE_THREAD = j.thread;
+    $("#ventureRunStepBtn").disabled = false;
+    renderVenture();
+    hideRoomLoading("ventureThread");
+    await loadVentureIntakeSections();
+    connectionRecovered();
+  } catch(e) {
+    hideRoomLoading("ventureThread");
+    $("#ventureThread").innerHTML = '<div class="load-error" role="alert"><strong>Could not load Venture.</strong><div>Your existing venture files are unchanged. Check the server, then try again.</div><button type="button" id="ventureRetry">Try again</button></div>';
+    $("#ventureRetry")?.addEventListener("click", loadVenture);
+    connectionState("Content Studio could not load Venture. Your existing files are unchanged.");
+  }
 }
+async function analyzeVenture(){
+  if(!ventureSlug || ventureAnalysisPending) return;
+  const engine = $("#ventureEngine").value;
+  ventureAnalysisPending = true;
+  $("#ventureAnalyzeBtn").disabled = true;
+  $("#ventureAnalysisPanel").hidden = false;
+  $("#ventureAnalysisEngine").textContent = engineLabel(engine);
+  $("#ventureAnalysisOut").innerHTML = '<p class="thinking">✨ '+esc(engineLabel(engine))+' is reading the current venture state. The room strip carries the live clock.</p>';
+  try {
+    const r = await post("/api/venture/"+encodeURIComponent(ventureSlug)+"/analyze", {engine});
+    if(r.ok){
+      $("#ventureAnalysisEngine").textContent = "analyst · "+engineLabel(r.engine || engine);
+      $("#ventureAnalysisOut").innerHTML = mdToHtml(r.analysis || "No advice returned.");
+    } else {
+      $("#ventureAnalysisOut").innerHTML = '<p>Failed: '+esc(r.error||"error")+'</p>';
+    }
+  } catch(e) {
+    $("#ventureAnalysisOut").innerHTML = '<p>Failed: '+esc(e instanceof Error ? e.message : String(e))+'</p>';
+  } finally {
+    ventureAnalysisPending = false;
+    $("#ventureAnalyzeBtn").disabled = !ventureSlug;
+  }
+}
+$("#ventureAnalyzeBtn").addEventListener("click", analyzeVenture);
+async function runVentureStep(){
+  if(!ventureSlug || !VENTURE_THREAD || ventureRunStepPending) return;
+  const engine = $("#ventureEngine").value;
+  ventureRunStepPending = true;
+  $("#ventureRunStepBtn").disabled = true;
+  $("#ventureRunStepBtn").textContent = "Queueing draft step…";
+  try {
+    const r = await post("/api/venture/"+encodeURIComponent(ventureSlug)+"/run-step", {engine, phase:VENTURE_THREAD.phase});
+    if(r.ok){
+      flash("Draft step queued with "+engineLabel(r.engine || engine)+"; it stops at the next human gate");
+      await loadVenture();
+      loadJobs();
+    } else flash(r.error || "Could not queue the draft step");
+  } catch(e) {
+    flash(e instanceof Error ? e.message : String(e));
+  } finally {
+    ventureRunStepPending = false;
+    $("#ventureRunStepBtn").disabled = !ventureSlug;
+    $("#ventureRunStepBtn").textContent = "Run the next draft step";
+  }
+}
+$("#ventureRunStepBtn").addEventListener("click", runVentureStep);
 // ── writes ───────────────────────────────────────────────────────────────────────────────────────
 //
 // Two rules, and everything below follows from them.
@@ -3984,6 +4344,7 @@ async function ventureWrite(path, body, okMsg, key){
     }
     ventureOpen = null;
     ventureBusy = false;
+    $("#ventureAnalysisPanel").hidden = true;
     await loadVenture();
     if(okMsg) flash(okMsg);
     return j;
@@ -4054,6 +4415,46 @@ function vSubmitReason(choice, item){
   // Deliberately NOT blocked here when empty: selectWithOverride owns that refusal and its wording
   // is better than anything this layer would invent. Sending it through is how she sees it.
   const body = { candidateIds:[item.candidateId] };
+  if(choice.reasonAlwaysRequired) body.rationale = text; else body.overrideReason = text;
+  ventureWrite("/decisions/"+encodeURIComponent(choice.decisionId)+"/select", body, "Recorded in canon", key);
+}
+
+function ventureMultiPickIds(requiredCount, selectedIds, candidateId){
+  const current = [...new Set(selectedIds)];
+  if(current.includes(candidateId)) return current.filter(id=>id!==candidateId);
+  return current.length >= requiredCount ? current : [...current, candidateId];
+}
+function vMultiSelection(choice){
+  const key = "choice:"+choice.decisionId+":multi";
+  return ventureOpen && ventureOpen.key === key && Array.isArray(ventureOpen.candidateIds)
+    ? ventureOpen.candidateIds : [];
+}
+function vMultiToggle(choice, item){
+  const key = "choice:"+choice.decisionId+":multi";
+  const ids = ventureMultiPickIds(choice.requiredCount, vMultiSelection(choice), item.candidateId);
+  ventureOpen = { key, kind:"multi", value:"", error:"", candidateIds:ids };
+  renderVenture();
+}
+function vMultiSubmit(choice){
+  const key = "choice:"+choice.decisionId+":multi";
+  const ids = vMultiSelection(choice);
+  if(ids.length !== choice.requiredCount) return;
+  const selected = choice.items.filter(item=>ids.includes(item.candidateId));
+  const needsReason = choice.reasonAlwaysRequired ||
+    (choice.overrideDiscipline && selected.some(item=>!item.recommended));
+  if(needsReason){
+    ventureOpen = { key, kind:"multi-reason", value:"", error:"", candidateIds:ids,
+      reasonAlwaysRequired:!!choice.reasonAlwaysRequired };
+    renderVenture();
+    return;
+  }
+  ventureWrite("/decisions/"+encodeURIComponent(choice.decisionId)+"/select", { candidateIds:ids }, "Recorded in canon", key);
+}
+function vSubmitMultiReason(choice){
+  const key = "choice:"+choice.decisionId+":multi";
+  const ids = ventureOpen && Array.isArray(ventureOpen.candidateIds) ? ventureOpen.candidateIds : [];
+  const text = (ventureOpen && ventureOpen.value || "").trim();
+  const body = { candidateIds:ids };
   if(choice.reasonAlwaysRequired) body.rationale = text; else body.overrideReason = text;
   ventureWrite("/decisions/"+encodeURIComponent(choice.decisionId)+"/select", body, "Recorded in canon", key);
 }
@@ -4212,8 +4613,8 @@ function vSlot(prefix, m){
     form = '<div class="lbl">WHAT HAPPENED TO IT</div>'
       + '<div class="ask">Taken down, unpublished, link dead. The record that it was live is kept either way, and this sits beside it.</div>'
       + '<textarea id="vFormVal" rows="3">'+esc(o.value)+'</textarea>' + vFormButtons("It came down");
-  } else if(o.kind === "reason"){
-    form = '<div class="lbl">'+(o.reasonAlways?"YOUR REASON":"REASON FOR OVERRIDING THE RECOMMENDATION")+'</div>'
+  } else if(o.kind === "reason" || o.kind === "multi-reason"){
+    form = '<div class="lbl">'+(o.reasonAlwaysRequired || o.reasonAlways?"YOUR REASON":"REASON FOR OVERRIDING THE RECOMMENDATION")+'</div>'
       + '<div class="ask">One line is enough. It goes in the audit trail beside the choice.</div>'
       + '<input id="vFormVal" value="'+esc(o.value)+'" placeholder="One line is enough" />' + vFormButtons("Record it");
   } else if(o.kind === "pace"){
@@ -4244,12 +4645,14 @@ function vFormButtons(label){
     + '<button id="vFormCancel">Never mind</button></div>';
 }
 function vChoice(m){
+  const draftIds = m.requiredCount > 1 ? vMultiSelection(m) : [];
   const rows = m.items.map(it=>{
-    const mark = it.selected ? "●" : it.recommended ? "○" : "·";
+    const selected = it.selected || draftIds.includes(it.candidateId);
+    const mark = selected ? "●" : it.recommended ? "○" : "·";
     // Only a decision still awaiting her is clickable. A settled one is a record, not a control:
     // decisions.ts refuses a second selection outright (rules.md §11 item 15, immutability).
     const pick = m.live ? ' pick" data-vpick="'+esc(m.decisionId)+'" data-vcand="'+esc(it.candidateId)+'"' : '"';
-    return '<div class="vchoice-row'+pick+'><span class="mark">'+mark+'</span><span>'
+    return '<div class="vchoice-row'+(selected?' selected':'')+pick+'><span class="mark">'+mark+'</span><span>'
       + '<span class="n">'+esc(it.title)+'</span>'
       + (it.why ? '<span class="w">'+esc(it.why)+'</span>' : "")
       + (it.scoreLine ? '<span class="sc">'+esc(it.scoreLine)+'</span>' : "")
@@ -4273,11 +4676,12 @@ function vChoice(m){
       ? '<span class="vmono" style="color:'+vDot("amber")+'">'+(m.requiredCount>1?"PICK "+m.requiredCount:"PICK ONE")+'</span>'
       : '<span class="vmono">DECIDED</span>')
     + '<span class="vmono" style="color:#b0a488">'+esc(m.rulesVersion)+'</span></div>';
-  // A multi-pick decision (idea-ranking takes three) has no control here yet: one click cannot
-  // express a set, and inventing a selection UI that the server would then reject on count is worse
-  // than saying so. It is the one decision kind this PR leaves read-only, and it says why.
   if(m.live && m.requiredCount > 1){
-    h += '<div class="vnote" style="margin-top:9px">This one takes '+m.requiredCount+' together. Pick them with the venture CLI for now.</div>';
+    const ready = draftIds.length === m.requiredCount;
+    h += '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:13px">'
+      + '<span class="vmono" style="color:'+(ready?vDot("green"):vDot("amber"))+'">SELECTED '+draftIds.length+' OF '+m.requiredCount+'</span>'
+      + '<button class="primary" data-vmulti-submit="'+esc(m.decisionId)+'"'+(ready?'':' disabled')+'>Submit these '+m.requiredCount+'</button>'
+      + '</div><div class="vnote" style="margin-top:9px">Choose exactly '+m.requiredCount+' together. The server still checks the count, override reason, and whether this decision is already immutable.</div>';
   }
   h += vSlot("choice:"+m.decisionId, m);
   return h+'</div>';
@@ -4419,8 +4823,15 @@ function renderVenture(){
     if(m.kind==="checkpoint") return vCheckpoint(m);
     return "";
   }).join("");
-  $("#ventureRail").innerHTML = '<div><div class="vmono">WHAT THIS IS BUILT ON</div>'
-    + '<div class="vnote" style="font-size:12px;margin-top:2px">Every line here came from a file, and says which one.</div></div>'
+  const historyHtml = (t.history||[]).map(g=>'<details class="venture-history" style="margin-top:12px" open><summary class="vmono">EARLIER PHASE '+esc(g.phase)+' · WHAT WAS DRAFTED ('+g.artifacts.length+')</summary>'
+    + g.artifacts.map(a=>'<div class="vnote" style="margin-top:9px;padding:10px;border:1px solid var(--line);border-radius:8px">'
+      + '<div class="vtitle" style="font-size:14px">'+esc(a.title)+'</div>'
+      + '<div class="from" style="margin-top:4px">'+esc(a.state)+' · '+esc(a.rail)+'</div>'
+      + (a.bodyPath ? '<div class="from" style="margin-top:4px">'+esc(a.bodyPath)+'</div>' : '')
+      + '</div>').join('')+'</details>').join('');
+  $("#ventureRail").innerHTML = '<div><div class="vmono">LEDGER / HISTORY</div>'
+    + '<div class="vnote" style="font-size:12px;margin-top:2px">Earlier artifacts and live records appear here when the server exposes them. Nothing is inferred.</div></div>'
+    + historyHtml
     + t.rail.map(g=>'<div style="display:flex;flex-direction:column;gap:9px">'
       + '<div class="vrail-grp">'+esc(g.name)+'</div>'
       + g.items.map(it=>'<div class="vrail-item"><i></i><span style="min-width:0;display:flex;flex-direction:column;gap:2px">'
@@ -4437,7 +4848,13 @@ function renderVenture(){
     + '</div>';
 }
 document.addEventListener("change", e=>{
-  if(e.target && e.target.id === "ventureSlug"){ ventureSlug = e.target.value; loadVenture(); }
+  if(e.target && e.target.id === "ventureSlug"){
+    ventureSlug = e.target.value;
+    VENTURE_THREAD = null;
+    $("#ventureRunStepBtn").disabled = true;
+    $("#ventureAnalysisPanel").hidden = true;
+    loadVenture();
+  }
 });
 // One delegated listener: renderVenture() replaces the whole subtree on every refetch, so per-node
 // handlers would be re-bound constantly and a stale one could fire against a rebuilt thread.
@@ -4453,6 +4870,11 @@ document.addEventListener("click", e=>{
       const c = (VENTURE_THREAD.messages||[]).find(m=>m.kind==="choice" && o.key.indexOf("choice:"+m.decisionId+":")===0);
       const cand = o.key.slice(o.key.lastIndexOf(":")+1);
       if(c){ ventureOpen.value = val(); return vSubmitReason(c, { candidateId: cand }); }
+      return;
+    }
+    if(o.kind === "multi-reason"){
+      const c = (VENTURE_THREAD.messages||[]).find(m=>m.kind==="choice" && o.key === "choice:"+m.decisionId+":multi");
+      if(c){ ventureOpen.value = val(); return vSubmitMultiReason(c); }
       return;
     }
     const id = o.key.split(":")[1];
@@ -4482,8 +4904,14 @@ document.addEventListener("click", e=>{
   if(pick){
     const c = (VENTURE_THREAD.messages||[]).find(x=>x.kind==="choice" && x.decisionId===pick.dataset.vpick);
     const it = c && c.items.find(i=>i.candidateId===pick.dataset.vcand);
-    // A multi-pick decision has no single-click meaning; the panel says so instead of guessing.
     if(c && it && c.requiredCount === 1) return vPick(c, it);
+    if(c && it && c.requiredCount > 1) return vMultiToggle(c, it);
+    return;
+  }
+  const multiSubmit = t.closest("[data-vmulti-submit]");
+  if(multiSubmit){
+    const c = (VENTURE_THREAD.messages||[]).find(x=>x.kind==="choice" && x.decisionId===multiSubmit.dataset.vmultiSubmit);
+    if(c) return vMultiSubmit(c);
     return;
   }
   if(t.id === "vAddResponse") return vOpenResponse();
@@ -4919,7 +5347,7 @@ async function loadFiction(){
   const r = await fetch("/api/fiction");
   FICTION = (await r.json()).series || [];
   if(!FICTION.length){
-    $("#fictionMain").innerHTML = '<div class="empty">No series on the desk yet. Start one with /story new in a terminal.</div>';
+    $("#fictionMain").innerHTML = '<div class="empty">No Fiction series is on the desk yet. Create a series in your existing story workflow, then return here to draft and check scenes.</div>';
     $("#fictionSide").innerHTML = "";
     consumeCapturedBeats(); // nothing to fill; it says so rather than silently swallowing her text
     return;
@@ -5010,6 +5438,7 @@ function renderFiction(){
     '<div style="background:#fffdf8;border:1px solid #d8cfbb;border-radius:8px;padding:20px 22px;max-width:600px">'+
       '<textarea id="ficBeats" rows="3" placeholder="Say the beats. Who is in it, what turns, what you want it to feel like." style="width:100%;box-sizing:border-box;border:none;outline:none;background:transparent;padding:0;resize:vertical;font:400 18px/1.6 Georgia,serif;color:var(--ink)"></textarea>'+
       '<div style="display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid #efe7d6">'+
+        engineSelectHtml()+
         '<button class="primary" id="ficDraftBtn" style="flex:none;white-space:nowrap">Draft it</button>'+
         '<span class="src">It writes a first pass and checks the canon while it goes. You read it before anything is kept.</span>'+
       '</div>'+
@@ -5044,12 +5473,14 @@ function renderFiction(){
     '</div>'+
     '<div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
       '<button id="ficRecheck">Check the canon again</button>'+
-      '<span class="src" style="max-width:340px">It is written to stories/'+esc(ficSeries)+'/'+esc(chapter.path)+'. Nothing is approved, locked or published, and no branch or pull request was made.</span>'+
+      engineSelectHtml()+
+      '<span class="src" style="max-width:340px">It is written to stories/'+esc(ficSeries)+'/'+esc(chapter.path)+'. Nothing is approved, locked or published, and no branch or pull request was made. Read-only: it never edits the chapter itself.</span>'+
     '</div>'+
     '<div style="margin-top:26px;max-width:600px">'+
       '<div class="wb-margin-cap">SECOND PASS · SAY WHAT TO CHANGE</div>'+
       '<div style="display:flex;gap:10px;align-items:center;border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:9px 13px;margin-top:8px">'+
         '<input id="ficPass" value="'+esc(ficPassNote)+'" placeholder="More tension, less explaining" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:400 16px/1.5 Georgia,serif;color:var(--ink)" />'+
+        engineSelectHtml()+
         '<button class="primary" id="ficPassBtn"'+(passJob?' disabled':'')+' style="white-space:nowrap">Run it again</button>'+
       '</div>'+
       '<div class="src" style="margin-top:8px">'+(passJob
@@ -5093,15 +5524,17 @@ function renderFiction(){
     series.docs.map(x=>'<div class="lead-chip'+(x.path===ficDocPath?" on":"")+'" style="display:flex" data-path="'+esc(x.path)+'">'+esc(x.label)+'</div>').join("")+
     '<div class="wb-reply"><div class="wb-margin-cap">PROMOTE THE SERIES</div>'+
     '<span class="wb-link" id="ficPromoNote">Start a launch note in Content</span>'+
-    '<span class="mono-note">Promo is the only bridge to the rest of the studio: teasers quote LOCKED chapters verbatim. Character art: /illustrate '+esc(ficSeries)+' character &lt;name&gt; in a terminal.</span></div>';
+    '<span class="mono-note">Promo is the only bridge to the rest of the studio: teasers quote LOCKED chapters verbatim. Character art is not wired into this room yet.</span></div>';
 
+  refreshEngineControls($("#fictionMain"));
   document.querySelectorAll("#fictionSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ ficDocPath=c.dataset.path; loadFiction(); }));
   const draftBtn = $("#ficDraftBtn");
   if(draftBtn) draftBtn.addEventListener("click", ()=>{
     const t = ($("#ficBeats").value||"").trim();
     if(!t){ flash("Say the beats first"); return; }
-    post("/api/fiction/draft",{series:ficSeries, beats:t}).then(r=>{
-      if(r.ok){ flash("Drafting. It checks the canon while it goes."); loadFiction(); }
+    const engine = draftBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";
+    post("/api/fiction/draft",{series:ficSeries, beats:t, engine}).then(r=>{
+      if(r.ok){ flash("Drafting with "+engineLabel(engine)+". It checks the canon while it goes."); loadFiction(); }
       else flash(r.error||"Could not start it");
     });
   });
@@ -5115,15 +5548,17 @@ function renderFiction(){
   if(passBtn) passBtn.addEventListener("click", ()=>{
     const note = (ficPassNote||"").trim();
     if(!note){ flash("Say what to change first"); return; }
-    post("/api/fiction/repass",{series:ficSeries, chapter:chapter.number, note:note}).then(r=>{
-      if(r.ok){ ficPassNote=""; flash("Second pass queued. The draft above stays until it lands."); loadFiction(); }
+    const engine = passBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";
+    post("/api/fiction/repass",{series:ficSeries, chapter:chapter.number, note:note, engine}).then(r=>{
+      if(r.ok){ ficPassNote=""; flash("Second pass queued with "+engineLabel(engine)+". The draft above stays until it lands."); loadFiction(); }
       else flash(r.error||"Could not start it");
     });
   });
   const recheck = $("#ficRecheck");
   if(recheck) recheck.addEventListener("click", ()=>{
-    post("/api/fiction/check",{series:ficSeries, chapter:chapter.number}).then(r=>{
-      if(r.ok){ flash("Reading it against your canon"); loadFiction(); } else flash(r.error||"Could not start it");
+    const engine = recheck.closest("div")?.querySelector(".engine-select")?.value || "claude";
+    post("/api/fiction/check",{series:ficSeries, chapter:chapter.number, engine}).then(r=>{
+      if(r.ok){ flash("Reading it against your canon with "+engineLabel(engine)); loadFiction(); } else flash(r.error||"Could not start it");
     });
   });
   document.querySelectorAll("#fictionSide [data-fix]").forEach(b=>b.addEventListener("click", ()=>{
@@ -5168,12 +5603,12 @@ async function draftCharles(){
   if(mode==="reply" && !input){ flash("Paste a URL to reply to first"); return; }
   const btn = $("#charlesDraftBtn");
   btn.disabled = true; btn.textContent = "Drafting… (check Studio for progress)";
-  const r = await post("/api/charles/draft", {mode, input});
+  const r = await post("/api/charles/draft", {mode, input, engine:$("#charlesEngine").value});
   btn.disabled = false; btn.textContent = "Draft";
   if(r.ok){
     $("#charlesInput").value = "";
     charlesId = r.id;
-    flash("Drafted — waiting in the queue below");
+    flash("Drafted with "+engineLabel($("#charlesEngine").value)+"; waiting in the queue below");
     if(currentTab==="charles") loadCharles();
   } else flash(r.error || "Could not draft");
 }
@@ -5283,7 +5718,7 @@ function renderSignals(){
   $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
   const box = $("#signalsTop");
   if(!SIGNALS.briefPath){
-    box.innerHTML = '<div class="empty">No strategy brief yet. Run Refresh brief below (or /strategy in a terminal) and this page fills in.</div>';
+    box.innerHTML = '<div class="empty">No strategy brief yet. Use Refresh brief below to create the first one. It may take a few minutes, and progress appears in Studio.</div>';
     return;
   }
   const fitCards = (SIGNALS.confidence||[]).map(c=>{
@@ -5512,9 +5947,17 @@ function renderStudio(){
   }));
 }
 async function loadStudio(){
-  const r = await fetch("/api/studio");
-  STUDIO = await r.json();
-  renderStudio();
+  try {
+    const r = await fetch("/api/studio");
+    if(!r.ok) throw new Error("studio "+r.status);
+    STUDIO = await r.json();
+    renderStudio();
+    connectionRecovered();
+  } catch(e) {
+    $("#studioMain").innerHTML = '<div class="load-error" role="alert"><strong>Could not load the Studio overview.</strong><div>Your queue and drafts are unchanged. Check the server, then try again.</div><button type="button" id="studioRetry">Try again</button></div>';
+    $("#studioRetry")?.addEventListener("click", loadStudio);
+    connectionState("Content Studio could not load the overview. Your queue and drafts are unchanged.");
+  }
 }
 
 // ── Follow-ups ledger (Content Studio Riff 3g) ──
@@ -5560,7 +6003,7 @@ function followupRowHtml(row){
   const status = pending
     ? '<div class="hint" style="margin-left:26px;">drafting… (the Studio room has progress + log)</div>'
     : err ? '<div class="aierr" style="margin-left:26px;">⚠ '+esc(err)+'</div>' : "";
-  const draftBtn = row.dir && !disabled ? '<button class="fu-draft" data-dir="'+esc(row.dir)+'" data-person="'+esc(row.person||"")+'"'+(pending?" disabled":"")+'>'+(pending?"Drafting…":"Draft a follow-up")+'</button>' : "";
+  const draftBtn = row.dir && !disabled ? '<span class="fu-draft-control">'+engineSelectHtml()+'<button class="fu-draft" data-dir="'+esc(row.dir)+'" data-person="'+esc(row.person||"")+'"'+(pending?" disabled":"")+'>'+(pending?"Drafting…":"Draft a follow-up")+'</button></span>' : "";
   const noteInput = disabled ? "" : '<input class="fu-note" placeholder="optional note (kept in the ledger)…" />';
   return '<div class="fu-row">'+
     '<div class="fu-head"><span class="fu-dot" style="background:'+fuDotColor(row.status)+'"></span>'+
@@ -5588,6 +6031,7 @@ function renderFollowupsBox(){
   const visible = rows.filter(r=>fuFilter==="all"||r.bucket===fuFilter);
   box.innerHTML = '<div class="lead-rail">'+chips+'</div>'+
     (visible.length ? visible.map(followupRowHtml).join("") : '<div class="empty">Nothing here yet. A row appears when you lock a message or mark a send.</div>');
+  refreshEngineControls(box);
   box.querySelectorAll(".lead-chip").forEach(c=>c.addEventListener("click",()=>{ fuFilter=c.dataset.f; renderFollowupsBox(); }));
   box.querySelectorAll(".fu-toggle").forEach(t=>t.addEventListener("click",()=>{
     if(fuOpen.has(t.dataset.key)) fuOpen.delete(t.dataset.key); else fuOpen.add(t.dataset.key);
@@ -5599,7 +6043,10 @@ function renderFollowupsBox(){
   box.querySelectorAll("button.fu-responded").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-responded", args(b))));
   box.querySelectorAll("button.fu-contacted").forEach(b=>b.addEventListener("click", ()=>followupAction("mark-contacted", args(b))));
   box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", args(b))));
-  box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>followupDraft(b.dataset.dir, b.dataset.person)));
+  box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>{
+    const select = b.closest(".fu-draft-control")?.querySelector(".engine-select");
+    followupDraft(b.dataset.dir, b.dataset.person, select ? select.value : "claude");
+  }));
 }
 async function loadFollowups(){
   const box = $("#followupsList");
@@ -5615,12 +6062,15 @@ async function followupAction(action, body){
   if(r.ok){ flash(action==="mark-responded" ? "Marked replied" : action==="mark-contacted" ? "Nudge logged — clock restarted" : "Moved on"); loadFollowups(); }
   else flash(r.error || "Failed");
 }
-async function followupDraft(dir, person){
+function followupDraftRequest(dir, person, engine){
+  return { dir:dir, ...(person ? {recipient:person} : {}), engine:engine || "claude" };
+}
+async function followupDraft(dir, person, engine){
   if(fuPending.has(dir)) return; // already in flight — never a second real claude -p spawn
   fuError.delete(dir);
   fuPending.add(dir); renderFollowupsBox();
   try {
-    const r = await post("/api/followups/draft-follow-up", person ? {dir, recipient: person} : {dir});
+    const r = await post("/api/followups/draft-follow-up", followupDraftRequest(dir, person, engine));
     if(r.ok){ flash("Follow-up drafted — shape it on the Leads pane"); await loadFollowups(); }
     else { fuError.set(dir, r.error || "Failed to draft"); }
   } catch (e) {
@@ -5661,10 +6111,11 @@ function jobsPollDue(jobs, now, armedUntil){
   return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
 }
 const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/develop/start","/api/develop/reply","/api/develop/format","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check"];
-function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path); }
+function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path); }
 function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
   if(kind==="pull"||kind==="strategy"||kind==="insights"||kind==="ask-insights"||kind==="brief-revise") return "Signals";
+  if(kind==="venture-analysis"||kind==="venture-step") return "Venture";
   if(kind==="charles-draft") return "Charles";
   if(kind==="fiction-draft"||kind==="fiction-continuity") return "Fiction";
   return "Content";
@@ -5774,7 +6225,7 @@ function renderJobs(){
     html += '<div class="jrow'+cls+'">'+
       '<div class="jrow-head"><span style="min-width:0">'+
         '<span class="jrow-rail" style="color:'+rail.color+'">'+esc(rail.text)+'</span>'+
-        '<span class="jrow-text">'+esc(j.label)+'</span></span>'+
+        '<span class="jrow-text">'+esc(j.label)+'</span><span class="src"> · '+esc(engineLabel(j.engine))+'</span></span>'+
       '<span class="jrow-clock">'+esc(jobClock(j, jobsAhead(JOBS, j)))+'</span></div>'+
       (pct!=null ? '<div class="jrow-bar"><span style="width:'+pct+'%;background:'+rail.color+'"></span></div>' : "")+
       (dots.length ? '<div class="jsteps">'+stepsHtml(dots)+
@@ -5956,7 +6407,7 @@ async function loadJobs(){
       if(currentTab==="studio") loadStudio(); // counts and the team panel just changed
       if(currentTab==="fiction") loadFiction(); // a landed scene or canon check is what she is waiting on
     }
-  }catch(e){}
+  }catch(e){ connectionState("Content Studio could not load the job queue. Your existing files are unchanged. Check the server, then refresh."); }
 }
 async function clearJobs(){
   const r = await post("/api/jobs/clear",{});
@@ -5965,12 +6416,14 @@ async function clearJobs(){
 }
 async function addSource(){
   const ta = $("#src"); const source = ta.value.trim();
-  if(!source){ flash("Paste something first"); return; }
-  $("#addBtn").disabled = true;
-  const r = await post("/api/atomize",{source});
-  $("#addBtn").disabled = false;
-  if(r.ok){ ta.value=""; flash("Queued — Claude is drafting"); loadJobs(); }
-  else flash(r.error || "Could not queue");
+  if(!source || captureSubmitting) { if(!source) flash("Paste something first"); return; }
+  const engine = $("#studioEngine").value;
+  setCaptureSubmitting(true);
+  try {
+    const r = await post("/api/atomize",{source, engine});
+    if(r.ok){ ta.value=""; flash("Queued with "+engineLabel(engine)); loadJobs(); }
+    else flash(r.error || "Could not queue");
+  } finally { setCaptureSubmitting(false); }
 }
 // ── Studio capture: one front door (v7 Studio) ───────────────────────────────────────────────
 // Inline mirror of classifyCapture() / captureVerdict() in this file's exported section. The client
@@ -5997,7 +6450,17 @@ function captureVerdict(room){
 // ── end of the capture mirror ──
 
 let pendingCaptureBeats = null; // her words, waiting for the Fiction composer to actually render
+let pendingCaptureText = null;  // her words, visible in the destination room until she clears them
 let linkAskUrl = null;          // the bare link the two-button ask is open on
+let captureSubmitting = false;  // the two Studio handoffs share one guard, so Enter cannot double-queue
+function setCaptureSubmitting(busy){
+  captureSubmitting = busy;
+  ["#addBtn", "#devStartBtn"].forEach(id=>{ const button=$(id); if(button) button.disabled=busy; });
+}
+// Read for Content and File for Signals both act on the SAME linkAskUrl and each only disabled its
+// own button, so a click on one while the other was still in flight fired two submissions off one
+// piece of text. This flag makes the two actions (and Cancel) mutually exclusive.
+let captureLinkActionPending = false;
 
 function captureText(){ return ($("#src").value||"").trim(); }
 function hideCaptureVerdict(){ $("#captureVerdict").hidden = true; }
@@ -6042,14 +6505,13 @@ function showCaptureVerdict(room){
   box.querySelectorAll(".cap-move").forEach(b=>b.addEventListener("click", ()=>showCaptureVerdict(b.dataset.room)));
 }
 // Content needs no move: the two Content buttons are already on this screen, right under the box.
-// Outreach and Venture have no free-text entry, so the honest move is to open the room and say the
-// words are still here. Only Fiction can actually carry them, as the beats the composer keeps.
+// Outreach and Venture have no free-text entry, so the honest move keeps the text visible in the
+// destination room and offers a return path instead of implying that a hidden textarea received it.
 function takeCaptureTo(room){
   const t = captureText();
   if(!t){ flash("Write or paste something first"); return; }
   if(room==="Fiction"){ pendingCaptureBeats = t; setRoom("fiction"); return; }
-  if(room==="Outreach"){ setRoom("outreach"); flash("Opened Outreach. Your words are still in the capture box."); return; }
-  if(room==="Venture"){ setRoom("venture"); flash("Opened Venture. Your words are still in the capture box."); return; }
+  if(room==="Outreach" || room==="Venture"){ pendingCaptureText = t; setRoom(room.toLowerCase()); flash("Kept your capture visible in "+room+". Nothing was submitted."); return; }
 }
 // Called from loadFiction() once the room has rendered, both when a composer exists and when it
 // does not. A scene that already has beats has no textarea to fill, and a desk with no series at
@@ -6068,6 +6530,25 @@ function consumeCapturedBeats(){
   }
   pendingCaptureBeats = null;
 }
+function renderCaptureHandoff(){
+  const targets = [
+    ["outreach", "outreachCaptureHandoff", "Outreach"],
+    ["venture", "ventureCaptureHandoff", "Venture"],
+  ];
+  for(const [room, id, label] of targets){
+    const box = $("#"+id);
+    if(!box) continue;
+    if(!pendingCaptureText || currentTab !== room){ box.hidden = true; box.innerHTML = ""; continue; }
+    box.hidden = false;
+    box.innerHTML = '<div style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+
+      '<div class="wb-label">CAPTURE KEPT HERE</div>'+
+      '<div style="font:400 16px/1.6 Georgia,serif;white-space:pre-wrap;margin-top:6px">'+esc(pendingCaptureText)+'</div>'+
+      '<div class="actions" style="margin-top:10px"><button class="cap-return">Back to Studio capture</button><button class="cap-clear">Clear this capture</button><span class="src">This room has no free-text composer, so nothing was submitted or started.</span></div>'+
+      '</div>';
+    box.querySelector(".cap-return")?.addEventListener("click", ()=>{ setRoom("studio"); $("#src").focus(); });
+    box.querySelector(".cap-clear")?.addEventListener("click", ()=>{ pendingCaptureText=null; $("#src").value=""; renderCaptureHandoff(); flash("Capture cleared"); });
+  }
+}
 function routeCapture(){
   const v = classifyCapture(captureText());
   if(v.kind==="empty"){ flash("Write or paste something first"); return; }
@@ -6077,12 +6558,18 @@ function routeCapture(){
 }
 // "Versions for Content" is exactly what the director already does with a URL: reads it and
 // proposes cuts. Same route as "Hand it to your director", relabelled for the question being asked.
+function setLinkAskPending(pending){
+  captureLinkActionPending = pending;
+  $("#linkReadBtn").disabled = pending;
+  $("#linkFileBtn").disabled = pending;
+  $("#linkCancelBtn").disabled = pending;
+}
 async function linkReadForContent(){
   const url = linkAskUrl;
-  if(!url) return;
-  $("#linkReadBtn").disabled = true;
-  const r = await post("/api/develop/start",{source:url});
-  $("#linkReadBtn").disabled = false;
+  if(!url || captureLinkActionPending) return;
+  setLinkAskPending(true);
+  const r = await post("/api/develop/start",{source:url, engine:$("#studioEngine").value});
+  setLinkAskPending(false);
   if(r.ok){ closeLinkAsk(true); flash("Handed over. Your director is reading it."); loadJobs(); }
   else flash(r.error || "Could not hand it over");
 }
@@ -6090,13 +6577,13 @@ async function linkReadForContent(){
 // funnel data and no job kind that takes a URL, so this must never imply traffic attribution.
 async function linkFileForSignals(){
   const url = linkAskUrl;
-  if(!url) return;
-  $("#linkFileBtn").disabled = true;
+  if(!url || captureLinkActionPending) return;
+  setLinkAskPending(true);
   const r = await post("/api/signals/backlog",{
     title: "Look at "+url,
     detail: "Filed from the Studio capture box as a place readers may have come from. No referrer or traffic data exists for it here, so this card is a note to look at it, not a measurement.",
   });
-  $("#linkFileBtn").disabled = false;
+  setLinkAskPending(false);
   const already = ((r.error||"")+"").includes("already");
   if(r.ok || already){ closeLinkAsk(true); flash(r.ok ? "Filed to the backlog" : "Already on the backlog"); }
   else flash(r.error || "Could not file it");
@@ -6104,7 +6591,10 @@ async function linkFileForSignals(){
 $("#routeBtn").addEventListener("click", routeCapture);
 $("#linkReadBtn").addEventListener("click", linkReadForContent);
 $("#linkFileBtn").addEventListener("click", linkFileForSignals);
-$("#linkCancelBtn").addEventListener("click", ()=>{ closeLinkAsk(true); hideCaptureVerdict(); });
+$("#linkCancelBtn").addEventListener("click", ()=>{
+  if(captureLinkActionPending){ flash("Wait for it to finish first"); return; }
+  closeLinkAsk(true); hideCaptureVerdict();
+});
 // A verdict is about the text that produced it, so editing the text retires it.
 $("#src").addEventListener("input", hideCaptureVerdict);
 
@@ -6116,6 +6606,9 @@ let notesShowDrafted = false;
 // checkbox (Muxin, 2026-07-16). A selection survives being filtered out of view; Draft selected
 // drafts everything in this set.
 const selectedNoteIdxs = new Set();
+function notesPickRequest(indices, engine){
+  return {indices, engine:engine || "claude"};
+}
 function noteMeta(n){
   const d = n.publishedAt ? n.publishedAt.slice(0,10) : "????-??-??";
   // draftedTag ("in review now" / "published Nd ago" / "drafted before, discarded") comes from the
@@ -6153,7 +6646,7 @@ async function draftSelectedNotes(){
   const indices = [...selectedNoteIdxs].sort((a,b)=>a-b);
   if(!indices.length){ flash("Pick at least one note"); return; }
   $("#notesDraftBtn").disabled = true;
-  const r = await post("/api/notes/pick",{indices});
+  const r = await post("/api/notes/pick", notesPickRequest(indices, $("#studioEngine").value));
   $("#notesDraftBtn").disabled = false;
   if(r.ok){
     flash(r.jobs.length+" note(s) queued");
@@ -6192,6 +6685,7 @@ setRoom(${JSON.stringify(BOOT_ROOM)});
 // loadStudio() is in here because Studio is the boot room: without it the first paint of the desk
 // she actually opens on is an empty "Loading…". load() still runs at boot even though its sheet is
 // in another room, because the Content nav button's pending badge reads off it.
+loadEngines();
 Promise.all([loadStudio(), load(), loadJobs(), loadContent()]).finally(markRefreshed);
 </script>
 </body>

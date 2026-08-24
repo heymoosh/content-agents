@@ -1101,11 +1101,18 @@ export function fixtureScriptHtml(): string {
     if (!panel || !open) return;
     panel.addEventListener("click", function(e){
       var b = e.target.closest ? e.target.closest("button") : null; if (!b) return;
-      if (b.id === "fxHide") { panel.hidden = true; open.hidden = false; return; }
+      if (b.id === "fxHide") {
+        panel.hidden = true; panel.style.display = "none";
+        open.hidden = false; open.style.display = "block";
+        return;
+      }
       if (b.dataset.fxroom) { if (typeof window.setRoom === "function") window.setRoom(b.dataset.fxroom); return; }
       if (b.dataset.fx) apply(b.dataset.fx);
     });
-    open.addEventListener("click", function(){ panel.hidden = false; open.hidden = true; });
+    open.addEventListener("click", function(){
+      panel.hidden = false; panel.style.display = "flex";
+      open.hidden = true; open.style.display = "none";
+    });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
