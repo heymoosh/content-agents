@@ -374,6 +374,16 @@ exposes deterministic filtered JSON/Markdown. `src/grow/variants.ts` can carry a
 and source-slot map as metadata only; it keeps copy generation,
 creator-body reuse, and approval blocked. These are typed operator seams, not proof that the live corpus has
 been reviewed or that the app is wired end to end.
+`src/grow/legacy-content-adapter.ts` is the read-only bridge from an existing
+`content/<slug>` folder into that Grow projection. It preserves source and cut
+references, non-default cut prefixes, legacy review-queue row IDs/statuses,
+and publish-log observations, while leaving missing Grow treatment rationale,
+evidence, voice/originality checks, and cut decisions blocked. `npm run grow:this`
+accepts `--folder <content-folder> [--lens <lens>]` for this path, so real
+legacy studio artifacts can be inspected without hand-authoring a JSON plan.
+The adapter returns no body text and performs no generation, approval, queue,
+scheduling, or publishing side effect.
+
 `src/patterns/overlay-coverage.ts` reports the explicit per-account mapping status and missing
 fields; `src/grow/queue-facts.ts` normalizes supplied queue/scheduler facts without filesystem
 writes; `src/grow/live-facts.ts` adapts existing queue rows and scheduler claims into that boundary

@@ -455,6 +455,15 @@ Markdown, or both. It rejects body, model, credential, and winner fields before
 the projection runs; its output is body-free, keeps `winner: null`, and has
 `sideEffects: none`. It does not queue, schedule, publish, or generate copy.
 
+The same CLI accepts `--folder <content-folder> [--lens <lens>]`. That route
+uses `src/grow/legacy-content-adapter.ts` to read the existing source/cut
+artifacts, review queue, and publish log into stable Grow references. Legacy
+queue statuses and publish observations are retained as facts, but they cannot
+stand in for a persisted Grow cut decision, evidence refs, treatment rationale,
+voice/originality checks, or human review-bundle decision. Missing artifacts
+remain blocked, and the adapter never returns body text or performs writes,
+generation, approval, scheduling, or publishing.
+
 `src/patterns/hook-template-ledger.ts` is the curated hook-mechanism read
 boundary. The checked-in starter ledger at
 `config/patterns/hook-template-ledger.jsonl` contains eight curated

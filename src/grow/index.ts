@@ -247,6 +247,18 @@ export {
 } from "./grow-this-plan-cli.js";
 
 export {
+  adaptLegacyContentFolder,
+  buildLegacyGrowPlan,
+  createLegacyContentAdapter,
+  LEGACY_CONTENT_ADAPTER_VERSION,
+  type LegacyContentAdapterResult,
+  type LegacyContentCut,
+  type LegacyContentVariant,
+  type LegacyPublishLogSummary,
+  type LegacyVariantStatus,
+} from "./legacy-content-adapter.js";
+
+export {
   buildCommentLearningView,
   createCommentLearningView,
   type CommentLearningHypothesis,

@@ -8,12 +8,16 @@ import {
   type GrowThisStage,
   type GrowThisStageStatus,
 } from "./grow-this-plan.js";
+import { adaptLegacyContentFolder, buildLegacyGrowPlan } from "./legacy-content-adapter.js";
 
 export const GROW_THIS_PLAN_CLI_VERSION = "grow-this-plan-cli-v1" as const;
 export type GrowThisPlanCliFormat = "json" | "markdown" | "both";
 
 export interface GrowThisPlanCliOptions {
-  readonly source: { readonly kind: "json"; readonly value: string } | { readonly kind: "file"; readonly path: string };
+  readonly source:
+    | { readonly kind: "json"; readonly value: string }
+    | { readonly kind: "file"; readonly path: string }
+    | { readonly kind: "folder"; readonly path: string; readonly lens: string };
   readonly format: GrowThisPlanCliFormat;
 }
 
@@ -100,6 +104,9 @@ export function parseGrowThisPlanInput(raw: string): GrowThisPlanInput {
 export function parseGrowThisPlanArgs(argv: readonly string[]): GrowThisPlanCliOptions {
   let json: string | undefined;
   let file: string | undefined;
+  let folder: string | undefined;
+  let lens = "extract";
+  let lensSupplied = false;
   let format: GrowThisPlanCliFormat = "json";
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -109,14 +116,25 @@ export function parseGrowThisPlanArgs(argv: readonly string[]): GrowThisPlanCliO
     } else if (argument === "--file") {
       if (file !== undefined) fail("--file may only be supplied once");
       file = optionValue(argv, index, argument); index += 1;
+    } else if (argument === "--folder") {
+      if (folder !== undefined) fail("--folder may only be supplied once");
+      folder = optionValue(argv, index, argument); index += 1;
+    } else if (argument === "--lens") {
+      if (lensSupplied) fail("--lens may only be supplied once");
+      lens = optionValue(argv, index, argument);
+      lensSupplied = true;
+      index += 1;
     } else if (argument === "--format") {
       const value = optionValue(argv, index, argument);
       if (value !== "json" && value !== "markdown" && value !== "both") fail("--format must be json, markdown, or both");
       format = value; index += 1;
     } else fail(`unknown argument: ${argument}`);
   }
-  if (json !== undefined && file !== undefined) fail("exactly one of --json or --file is allowed");
-  if (json === undefined && file === undefined) fail("exactly one of --json or --file is required");
+  const sourceCount = [json, file, folder].filter((value) => value !== undefined).length;
+  if (sourceCount > 1) fail("exactly one of --json, --file, or --folder is allowed");
+  if (sourceCount === 0) fail("exactly one of --json, --file, or --folder is required");
+  if (lensSupplied && folder === undefined) fail("--lens requires --folder");
+  if (folder !== undefined) return { source: { kind: "folder", path: folder, lens }, format };
   return { source: json === undefined ? { kind: "file", path: file as string } : { kind: "json", value: json }, format };
 }
 
@@ -135,8 +153,7 @@ function nextAction(plan: GrowThisPlan): GrowThisNextAction {
   return { stage: actionable.stage, status: actionable.status, message: `Start the ${actionable.stage} stage when its preceding evidence and human gate are complete.` };
 }
 
-export function buildGrowThisPlanOperatorView(input: GrowThisPlanInput): GrowThisPlanOperatorView {
-  const plan = buildGrowThisPlan(input);
+function operatorView(plan: GrowThisPlan): GrowThisPlanOperatorView {
   return {
     kind: "grow_this_plan_operator_view",
     version: GROW_THIS_PLAN_CLI_VERSION,
@@ -145,6 +162,10 @@ export function buildGrowThisPlanOperatorView(input: GrowThisPlanInput): GrowThi
     bodyIncluded: false,
     sideEffects: "none",
   };
+}
+
+export function buildGrowThisPlanOperatorView(input: GrowThisPlanInput): GrowThisPlanOperatorView {
+  return operatorView(buildGrowThisPlan(input));
 }
 
 export function renderGrowThisPlanJson(view: GrowThisPlanOperatorView): string {
@@ -186,18 +207,19 @@ export function renderGrowThisPlan(view: GrowThisPlanOperatorView, format: GrowT
   return `${renderGrowThisPlanJson(view)}\n${renderGrowThisPlanMarkdown(view)}`;
 }
 
-function readSource(source: GrowThisPlanCliOptions["source"]): string {
-  return source.kind === "json" ? source.value : readFileSync(source.path, "utf8");
-}
-
 export function main(
   argv: readonly string[] = process.argv.slice(2),
   io: { readonly readFile?: (path: string) => string; readonly write?: (value: string) => void; readonly error?: (value: string) => void } = {},
 ): number {
   try {
     const options = parseGrowThisPlanArgs(argv);
-    const raw = options.source.kind === "json" ? options.source.value : (io.readFile ?? ((path: string) => readFileSync(path, "utf8")))(options.source.path);
-    const view = buildGrowThisPlanOperatorView(parseGrowThisPlanInput(raw));
+    const view = options.source.kind === "folder"
+      ? operatorView(buildLegacyGrowPlan(adaptLegacyContentFolder(options.source.path), options.source.lens))
+      : buildGrowThisPlanOperatorView(parseGrowThisPlanInput(
+        options.source.kind === "json"
+          ? options.source.value
+          : (io.readFile ?? ((path: string) => readFileSync(path, "utf8")))(options.source.path),
+      ));
     (io.write ?? ((value: string) => process.stdout.write(value)))(renderGrowThisPlan(view, options.format));
     return 0;
   } catch (error) {

@@ -1,5 +1,8 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildGrowThisPlanOperatorView,
   main,
@@ -61,6 +64,12 @@ describe("Grow-this operator CLI", () => {
     assert.throws(() => parseGrowThisPlanArgs([]), /exactly one/);
     assert.throws(() => parseGrowThisPlanArgs(["--json", raw(), "--file", "plan.json"]), /exactly one/);
     assert.throws(() => parseGrowThisPlanArgs(["--json", raw(), "--format", "yaml"]), /--format/);
+    assert.deepEqual(parseGrowThisPlanArgs(["--folder", "content/example", "--lens", "short"]), {
+      source: { kind: "folder", path: "content/example", lens: "short" },
+      format: "json",
+    } satisfies GrowThisPlanCliOptions);
+    assert.throws(() => parseGrowThisPlanArgs(["--folder", "content/example", "--json", raw()]), /exactly one/);
+    assert.throws(() => parseGrowThisPlanArgs(["--lens", "short", "--json", raw()]), /--lens requires --folder/);
   });
 
   test("reports the first human/evidence blocker without bodies or winners", () => {
@@ -99,5 +108,31 @@ describe("Grow-this operator CLI", () => {
 
     assert.equal(main(["--json", JSON.stringify({ ...input(), body: "creator text" })], fileIo), 1);
     assert.match(errors.at(-1) ?? "", /unsupported|body-free/i);
+  });
+
+  test("main can project a real legacy content folder without hand-authored JSON", () => {
+    const folder = mkdtempSync(join(tmpdir(), "content-agents-grow-cli-"));
+    try {
+      writeFileSync(join(folder, "source.md"), "Muxin's thought\n");
+      writeFileSync(join(folder, "review-queue.md"), [
+        "# Review queue",
+        "",
+        "| id | platform | format | asset | native | brand | cta | status | notes | origin |",
+        "|---|---|---|---|---|---|---|---|---|---|",
+        "| x-1 | x | text | derivatives/x-1.md | — | — | — | pending | review | from /cycle |",
+        "",
+      ].join("\n"));
+      const output: string[] = [];
+      const errors: string[] = [];
+      assert.equal(main(["--folder", folder], {
+        write: (value: string) => output.push(value),
+        error: (value: string) => errors.push(value),
+      }), 0);
+      assert.match(output[0] ?? "", /grow_this_plan_operator_view/);
+      assert.match(output[0] ?? "", /source record is not marked ready|human review/);
+      assert.deepEqual(errors, []);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 });
