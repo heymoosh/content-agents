@@ -449,6 +449,10 @@ infer pool membership, rank creators, or declare winners.
 variants while remaining copy-free and human-gated. The Threads extractor now preserves explicit
 media URLs or downloaded slide paths as asset provenance, without treating them as read media or
 complete body evidence.
+`src/grow/treatment-coverage.ts` reconciles requested platform/medium/format/treatment/experiment
+cells against candidate metadata using complete identity and keeps missing, duplicate, blocked,
+and unexpected cells visible without generating copy. `npm run grow:treatment-coverage` exposes the
+same body-free report.
 `src/grow/brief-cli.ts` and `npm run grow:brief` provide a deterministic JSON/Markdown operator
 view over that planning boundary. `src/grow/comment-learning-cli.ts` and
 `npm run grow:comment-learning` provide the corresponding body-free operator view over explicitly
@@ -616,6 +620,11 @@ automatic handoffs: they keep observation, interpretation, Muxin's decision, and
 separate. A comment can inform a product or lead hypothesis, but cannot by itself establish
 willingness to pay or unlock Venture. The learning bundle can add reviewed feed context, but that
 context remains descriptive until a qualified funnel or business basis and the human gates exist.
+`src/grow/venture-handoff.ts` accepts an explicit bundle/proposal selection when callers are ready
+to cross the boundary; it carries only selected proposal metadata and blocks missing,
+hypothesis-only, blocked, mismatched, or non-unique selections.
+`src/grow/venture-handoff-cli.ts` and `npm run grow:venture-handoff` expose that gate view as
+deterministic JSON/Markdown without creating Venture artifacts or sending replies.
 
 **Not in scope:** turning content engagement into proof of demand, bypassing Venture decisions, or
 making Venture the owner of every Studio idea.
@@ -647,10 +656,11 @@ claim. “Partial” means some supporting material exists, not that the archite
 | Baseline measurement gate | `src/patterns/baseline-gap-report.ts` exposes explicit `/new` measurement gaps, `src/patterns/baseline-repo-report.ts` reads the configured targets and current ledger, `src/patterns/baseline-sample-cli.ts` builds a measured baseline only from an explicit settled sample, and `src/patterns/review-session.ts` carries the remaining review blockers; the current repo-level report shows 350 handle-bearing targets, 5 already-measured rows, 345 measurement gaps, and 2 intentionally unconfirmed handles | Measured `/new` baselines for every comparison account before any honest multiple or best-per-platform claim | Scaffolded |
 | Platform/pool matrix | `src/patterns/platform-pool-matrix.ts` and `patterns:platform-pool-matrix` group only explicit platform, niche/broad/format-pool, medium/format, collection, review, and baseline facts; `src/patterns/platform-pool-matrix-repo.ts` and `patterns:platform-pool-matrix-repo` populate those rows from exact catalog/review/baseline joins while keeping unassigned labels blocked; `src/patterns/pool-review-handoff.ts` and `patterns:pool-review-handoff` expose the account/topic/format context needed to complete those explicit choices; the current repo run has 0 matrix targets and 371 blocked rows because explicit review metadata has not yet been entered | Reviewed platform × pool × format coverage with explicit account examples and no inferred best creator | Scaffolded |
 | Best example/creator comparison | `src/patterns/pool-best-report.ts` and `patterns:best-report` compare only reviewed source/post rows with explicit pool, niche label, metric, denominator, selection rule, dates, provenance, body-complete evidence, and recorded baseline terms; exact ties remain ties and incomplete or incomparable sets remain blocked | Separate niche and broad-platform best-example/best-creator results with a declared comparison set and no account-size or follower-count ranking | Scaffolded |
+| Treatment coverage | `src/grow/treatment-coverage.ts` and `grow:treatment-coverage` reconcile complete platform × medium × format × treatment × experiment-variable identities against candidate metadata; missing, duplicate, blocked, and unexpected cells remain visible and no copy is generated | Every requested treatment cell accounted for before generation/review, with media and volume experiments kept distinct | Scaffolded |
 | Pool-evidence inventory | `pool-evidence-inventory-v1` is deterministic and provisional; `patterns:pool-evidence-cli` exposes explicit catalog/raw-input views while comparison readiness checks memberships and evidence scopes and keeps missing rows blocked | A complete, reviewed Phase 2 evidence inventory with normalized records, citations, caveats, and originality checks | Scaffolded |
 | Research pools | Niche, broad, and format distinction documented; `src/patterns/review-pool-coverage.ts` reports only explicit reviewed labels and keeps metadata coverage separate from comparison readiness; account rows are rollups only | Separate ingestion, ranking, retrieval, and reporting from authoritative source/post-level evidence | Partial |
 | Experiment lineage | Metrics and bets exist in specialized systems; Grow candidates retain experiment identity/variables and explicit claim refs, `src/grow/experiment-record.ts` adds scoped records, `src/grow/experiment-outcomes.ts` links comments, funnel events, business outcomes, and optional Venture refs without collapsing families, `src/grow/experiment-outcome-cli.ts` exposes that ledger read-only, `src/grow/volume-plan-cli.ts` exposes copy-free slot assignments, and `src/review/funnel-events.ts` validates canonical attribution facts | Link experiment records to comments, funnel events, Signals, and Venture without collapsing outcome families | Partial |
-| Venture handoff | Venture has its own phases and gates; side-effect-free learning packet, `src/grow/comment-learning.ts`, `src/grow/learning-bundle.ts`, and `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, reviewed feed context, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
+| Venture handoff | Venture has its own phases and gates; side-effect-free learning packet, `src/grow/comment-learning.ts`, `src/grow/learning-bundle.ts`, and bundle-aware `src/grow/venture-handoff.ts` preserve qualified observations, product/lead hypotheses, reviewed feed context, selected proposal metadata, and dual human gates | Qualified, caveated inputs with human adopt/decline and shared Content path | Partial |
 | Human Inference lanes | Adjacent lanes identified as hypotheses | Lane-level tests and enough evidence to keep, revise, or retire a hypothesis | Target |
 | Model boundaries | Subscription-first and human approval rules exist; `src/agents/model-boundary.ts` records bounded role/task/route/audit facts, `src/agents/skill-contract.ts` records the lightweight stage boundaries, and `src/agents/skill-invocation.ts` records key-only readiness; all permit common-hook mad-lib adaptation without creator-body copying | Logged model/subagent roles, bounded briefs, and auditable outputs | Partial |
 

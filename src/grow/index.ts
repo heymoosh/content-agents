@@ -107,6 +107,20 @@ export {
 } from "./learning-bundle.js";
 
 export {
+  buildGrowTreatmentCoverage,
+  createGrowTreatmentCoverage,
+  GROW_TREATMENT_COVERAGE_VERSION,
+  growTreatmentIdentityKey,
+  normalizeGrowTreatmentIdentity,
+  type GrowTreatmentCandidateInput,
+  type GrowTreatmentCoverage,
+  type GrowTreatmentCoverageInput,
+  type GrowTreatmentCoverageRow,
+  type GrowTreatmentIdentity,
+  type GrowTreatmentIdentityInput,
+} from "./treatment-coverage.js";
+
+export {
   normalizeGrowQueueFacts,
   normalizeGrowReviewQueueFacts,
   normalizeGrowSchedulerFacts,
@@ -137,8 +151,10 @@ export {
 export {
   buildVentureHandoffView,
   createVentureHandoffView,
+  VENTURE_HANDOFF_VIEW_VERSION,
   type VentureHandoffFamily,
   type VentureHandoffHypothesis,
+  type VentureHandoffProposalMetadata,
   type VentureHandoffView,
 } from "./venture-handoff.js";
 

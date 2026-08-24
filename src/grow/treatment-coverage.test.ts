@@ -90,7 +90,7 @@ test("preserves missing, duplicate, blocked, and unexpected states", () => {
   ]);
   assert.deepEqual(report.rows.find((row) => row.identity.treatmentId === "blocked")?.readiness, {
     status: "blocked",
-    blockers: ["humanGate", "voiceCheck"],
+    blockers: ["candidate readiness is blocked", "humanGate", "voiceCheck"],
   });
   assert.deepEqual(report.unexpectedCandidates.map((row) => row.candidateId), ["candidate-unexpected"]);
   assert.equal(report.unexpectedCandidates[0]?.status, "unexpected");

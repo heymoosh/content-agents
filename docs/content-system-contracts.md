@@ -421,6 +421,21 @@ are copied onto each matching treatment; a missing or blocked fact is exposed
 as a readiness blocker instead of being inferred. Human review remains
 required before release.
 
+### `grow_treatment_coverage` (scaffolded; read-only reconciliation exists)
+
+`src/grow/treatment-coverage.ts` reconciles explicit requested treatment
+cells with already-produced candidate metadata. Matching uses the complete
+identity of platform, medium, format, treatment ID, experiment ID, and sorted
+experiment variables. Missing, duplicate, blocked, and unexpected candidates
+remain visible; no treatment is inferred from a platform-only match.
+`src/grow/treatment-coverage-cli.ts` and `npm run grow:treatment-coverage`
+expose deterministic JSON/Markdown output.
+
+This is coverage evidence, not generation or delivery. The report is body-free,
+does not carry copy or asset contents, and declares `generatesCopy: false`,
+`creatorBodyCopyAllowed: false`, and `sideEffects: none`. It cannot approve,
+schedule, publish, invoke a model, or write a queue.
+
 ### `experiment` (scaffolded; typed deterministic record exists)
 
 The typed adapter in `src/grow/experiment-record.ts` normalizes one question,
@@ -606,6 +621,17 @@ business families separate and remains blocked until Muxin has adopted the
 proposal and the declared Venture gate is `ready` or `accepted`. It is a
 read-only gate view: it does not create a Venture artifact, write Signals,
 claim demand, or send a reply.
+
+When a `grow_learning_bundle` is supplied, the handoff requires an explicit
+`proposalId`, exact bundle/packet lineage, a unique selected proposal, a
+qualified status, a ready proposal/feed context, and a Muxin decision matching
+the packet and learning view. It preserves only body-free proposal metadata:
+basis IDs, feed-context IDs and blockers, scope, sample size, caveats,
+qualification, lineage, and evidence-backed hypothesis summaries. Missing,
+blocked, hypothesis-only, mismatched, or non-unique proposals remain blocked;
+the handoff never chooses a proposal implicitly.
+`src/grow/venture-handoff-cli.ts` and `npm run grow:venture-handoff` expose the
+same body-free gate view without creating a Venture artifact or sending a reply.
 
 ## 5. Venture boundary
 
