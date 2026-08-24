@@ -715,12 +715,37 @@ copy or a full post body. The report permits downstream common-hook mad-lib
 adaptation under human review, but does not rank creators, infer winners, or
 authorize creator-body copying.
 
+`src/patterns/opener-report-cli.ts` and `npm run patterns:opener-report` are the
+read-only operator adapter. They accept one explicit JSON/file source and render
+JSON, Markdown, or both; malformed opener rows fail closed and accidental body
+fields are not admitted into the report.
+
 ### `account_review_queue_batch` (scaffolded; deterministic pagination exists)
 
 `src/patterns/review-batch.ts` returns one deterministic page of non-reviewed
 account queue rows with status counts, next actions, and explicit human-review
 fields. Empty queues expose page one and reject later pages. The projection does
 not write review state, infer metadata, rank accounts, select winners, or publish.
+
+`src/patterns/review-batch-cli.ts` and `npm run patterns:review-batch` provide the
+same view from an explicit queue artifact. Page size and page number are required
+positive integers, and the adapter remains stdout-only and human-gated.
+
+### `pattern_data_status_cli` (scaffolded; metadata-only operator command)
+
+`src/patterns/data-status-cli.ts` and `npm run patterns:data-status` expose the
+gitignored pattern-data inventory from an explicit `--data-dir`. The command
+reports artifact availability, counts, and validation metadata, including the
+derived opener bank, but never emits opener text or corpus bodies and never
+changes the data directory.
+
+### `pool_evidence_cli` (scaffolded; explicit inventory command)
+
+`src/patterns/pool-evidence-cli.ts` and `npm run patterns:pool-evidence-cli`
+accept either an explicit catalog/raw-input JSON envelope or the existing
+config/corpus/analysis paths. They expose niche, broad, and format membership
+only when explicitly present, preserve blocked rows, and do not infer pools,
+rank accounts, or select winners.
 
 ### `generation_brief_cli` (scaffolded; read-only operator adapter exists)
 
