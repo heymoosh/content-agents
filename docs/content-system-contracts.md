@@ -9,7 +9,7 @@ document are scaffolds, not live reviewed data. Current live rows remain
 blocked until real, human-reviewed metadata is entered.
 
 The gitignored mined-data checkout currently has a metadata-only readiness
-report: 292 corpus entries, 292 analyses, 12 baseline records, 225 staged
+report: 499 corpus entries (292 previously collected plus 207 newly admitted; 18 staged duplicates skipped), 292 analyses, 12 baseline records, 225 staged
 Reddit inbox entries, 11 browser artifacts, and 9 RSS artifacts. These counts
 are available and parse-clean in the inspected checkout, but
 `reviewStatus: unreviewed` remains authoritative. The report does not expose
