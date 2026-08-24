@@ -436,7 +436,7 @@ rejected. It does not collect, rank, calculate, merge, select, or write.
 ### `grow_this_plan` (scaffolded; pure lifecycle projection exists)
 
 `src/grow/grow-this-plan.ts` joins the supplied source, cut, variant, review,
-delivery, experiment, and outcome references into one deterministic
+delivery, optional per-slot generation-review-delivery join, experiment, and outcome references into one deterministic
 conversation view. It exposes stage statuses, evidence blockers, and required
 human gates for cut, review, and delivery. Callers must supply source/cut
 readiness facts and an explicit Muxin cut decision; reference presence does not
@@ -444,6 +444,9 @@ prove that a stage ran or measured an outcome. Supplied records remain
 authoritative.
 The projection contains no body text, never selects a winner, and never calls
 the review queue, scheduler, publisher, Signals, or Venture.
+When supplied, the generation-review-delivery join must match this plan's
+review bundle and variant; its blockers and safety boundary flow into delivery
+readiness, but it never replaces the durable delivery record.
 
 `src/grow/reconciliation.ts` is a read-side comparison of the review bundle,
 delivery record, review-queue fact, and scheduler fact. It reports `blocked` or

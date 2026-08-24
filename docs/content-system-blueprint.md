@@ -357,7 +357,7 @@ labelled provisional and must not be presented as live evidence.
 ### Current orchestration seams
 
 `src/grow/grow-this-plan.ts` is the current read-only conversation projection. It joins the
-source, cut, variant, review, delivery, experiment, and outcome references into one lifecycle,
+source, cut, variant, review, delivery, optional per-slot generation-review-delivery join, experiment, and outcome references into one lifecycle,
 surfaces human gates and evidence blockers, and suppresses winner inference and body text. It
 does not call the review queue, scheduler, publisher, Signals, or Venture. `src/patterns/account-table.ts`
 is the account/example navigation table requested for both niche and broad-platform examples; it

@@ -1,6 +1,7 @@
 import type { GrowDeliveryRecord } from "./delivery-record.js";
 import type { ExperimentOutcomeLedger } from "./experiment-outcomes.js";
 import type { ExperimentRecord } from "./experiment-record.js";
+import type { GrowGenerationReviewDelivery } from "./generation-review-delivery.js";
 import type {
   GrowReviewBundle,
   GrowReviewReference,
@@ -29,6 +30,8 @@ export interface GrowThisPlanInput {
   readonly cutStatus?: GrowThisStageStatus;
   readonly cutDecision?: GrowThisCutDecision | null;
   readonly reviewBundle: GrowReviewBundle;
+  /** Optional per-slot review-to-delivery join; it never replaces the delivery record. */
+  readonly generationReviewDelivery?: GrowGenerationReviewDelivery | null;
   readonly deliveryRef?: GrowReviewReference | null;
   readonly delivery?: GrowDeliveryRecord | null;
   readonly experimentRef?: GrowReviewReference | null;
@@ -123,6 +126,39 @@ function cutGate(decision: GrowThisCutDecision | null | undefined): GrowThisHuma
   return gate(approved ? "approved" : status, blockers);
 }
 
+function generationReviewDeliveryBlockers(
+  join: GrowGenerationReviewDelivery | null | undefined,
+  reviewId: string,
+  variantIds: readonly string[],
+): string[] {
+  if (join === null || join === undefined) return [];
+  const blockers: string[] = [];
+  if (join.readiness.status !== "ready") {
+    blockers.push(...(join.readiness.blockers.length > 0 ? join.readiness.blockers : ["generation review delivery is blocked"]));
+  }
+  if (join.bodyFree !== true) blockers.push("generation review delivery must be body-free");
+  if (join.generatesCopy !== false) blockers.push("generation review delivery must not generate copy");
+  if (join.creatorBodyCopyAllowed !== false) blockers.push("generation review delivery must not allow creator body copy");
+  if (join.humanApprovalRequired !== true) blockers.push("generation review delivery must require human approval");
+  if (join.autoApproval !== false) blockers.push("generation review delivery permits auto-approval");
+  if (join.autoScheduling !== false) blockers.push("generation review delivery permits auto-scheduling");
+  if (join.autoPublishing !== false) blockers.push("generation review delivery permits auto-publishing");
+  if (join.sideEffects !== "none") blockers.push("generation review delivery has side effects");
+  const rows = join.rows.filter((row) => row.reviewBundleId === reviewId && variantIds.includes(row.slot.variantId));
+  if (rows.length === 0) blockers.push("generation review delivery does not match review bundle and variant");
+  for (const row of rows) {
+    if (row.readiness.status !== "ready") {
+      blockers.push(...(row.readiness.blockers.length > 0 ? row.readiness.blockers : ["generation review delivery row is blocked"]));
+    }
+    if (row.deliveryBinding.readiness.status !== "ready") {
+      blockers.push(...(row.deliveryBinding.readiness.blockers.length > 0
+        ? row.deliveryBinding.readiness.blockers
+        : ["generation review delivery binding is blocked"]));
+    }
+  }
+  return unique(blockers);
+}
+
 /**
  * Join caller-supplied Grow records into a deterministic lifecycle projection.
  * No body fields are read, no winner is selected, and no queue, scheduler, or publisher is called.
@@ -170,7 +206,10 @@ export function buildGrowThisPlan(input: GrowThisPlanInput): GrowThisPlan {
   if (input.delivery && deliveryIds[0] !== input.delivery.id) deliveryBlockers.push("delivery reference does not match record");
   if (input.delivery && input.delivery.reviewBundleId !== review.id) deliveryBlockers.push("delivery record does not match review bundle");
   if (input.delivery?.readiness.status === "blocked") deliveryBlockers.push(...input.delivery.readiness.blockers.map((blocker) => `delivery: ${blocker}`));
-  const deliveryStatus: GrowThisStageStatus = !deliveryIds.length ? "not-started" : deliveryBlockers.length ? "blocked" : "ready";
+  deliveryBlockers.push(...generationReviewDeliveryBlockers(input.generationReviewDelivery, review.id, variantIds));
+  const deliveryStatus: GrowThisStageStatus = !deliveryIds.length
+    ? deliveryBlockers.length ? "blocked" : "not-started"
+    : deliveryBlockers.length ? "blocked" : "ready";
 
   const experimentBlockers: string[] = [];
   if (experimentIds.length && (input.experiment === null || input.experiment === undefined)) experimentBlockers.push("experiment record is missing");

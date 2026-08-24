@@ -7,6 +7,7 @@ import {
 import type { GrowDeliveryRecord } from "./delivery-record.js";
 import type { ExperimentOutcomeLedger } from "./experiment-outcomes.js";
 import type { ExperimentRecord } from "./experiment-record.js";
+import type { GrowGenerationReviewDelivery } from "./generation-review-delivery.js";
 
 const source = { recordType: "source", id: "source-1", relation: "origin" };
 const cut = { recordType: "cut", id: "cut-1", relation: "selected" };
@@ -25,6 +26,31 @@ const outcomeLedger = {
   experimentId: "experiment-1",
   readiness: { status: "ready", blockers: [] },
 } as unknown as ExperimentOutcomeLedger;
+
+const generationReviewDelivery = {
+  kind: "grow_generation_review_delivery",
+  version: "grow-generation-review-delivery-v1",
+  sourceReference: "source-1",
+  substanceReference: "substance-1",
+  rows: [{
+    slot: { platform: "linkedin", dayIndex: 0, slotIndex: 0, variantId: "variant-1" },
+    generatedArtifactRef: "artifact-1",
+    reviewQueueRef: "review-queue-1",
+    reviewBundleId: "review-1",
+    deliveryBinding: { readiness: { status: "ready", blockers: [] } },
+    readiness: { status: "ready", blockers: [] },
+  }],
+  summary: { slots: 1, bound: 1, ready: 1, blocked: 0, missingBindings: 0 },
+  readiness: { status: "ready", blockers: [] },
+  bodyFree: true,
+  generatesCopy: false,
+  creatorBodyCopyAllowed: false,
+  humanApprovalRequired: true,
+  autoApproval: false,
+  autoScheduling: false,
+  autoPublishing: false,
+  sideEffects: "none",
+} as unknown as GrowGenerationReviewDelivery;
 
 function input(overrides: Partial<GrowThisPlanInput> = {}): GrowThisPlanInput {
   return {
@@ -106,6 +132,36 @@ describe("Grow-this plan projection", () => {
     assert.equal(result.gates.review.required, true);
     assert.equal(result.lifecycle.find((stage) => stage.stage === "outcome")?.status, "blocked");
     assert.equal(result.winner, null);
+  });
+
+  test("carries a matching per-slot review-delivery blocker without replacing the durable delivery gate", () => {
+    const blockedJoin = {
+      ...generationReviewDelivery,
+      rows: [{
+        ...generationReviewDelivery.rows[0],
+        readiness: { status: "blocked", blockers: ["live queue is missing"] },
+        deliveryBinding: { readiness: { status: "blocked", blockers: ["queue facts are missing"] } },
+      }],
+      readiness: { status: "blocked", blockers: ["live queue is missing"] },
+    } as GrowGenerationReviewDelivery;
+    const result = buildGrowThisPlan(input({ generationReviewDelivery: blockedJoin }));
+
+    assert.equal(result.lifecycle.find((stage) => stage.stage === "delivery")?.status, "blocked");
+    assert.ok(result.lifecycle.find((stage) => stage.stage === "delivery")?.blockers.includes("live queue is missing"));
+    assert.ok(result.lifecycle.find((stage) => stage.stage === "delivery")?.blockers.includes("queue facts are missing"));
+    assert.equal(result.gates.delivery.status, "pending");
+  });
+
+  test("does not accept a review-delivery row for another variant", () => {
+    const result = buildGrowThisPlan(input({
+      generationReviewDelivery: {
+        ...generationReviewDelivery,
+        rows: [{ ...generationReviewDelivery.rows[0], slot: { ...generationReviewDelivery.rows[0].slot, variantId: "variant-other" } }],
+      },
+    } as Partial<GrowThisPlanInput>));
+
+    assert.equal(result.lifecycle.find((stage) => stage.stage === "delivery")?.status, "blocked");
+    assert.ok(result.readiness.blockers.includes("generation review delivery does not match review bundle and variant"));
   });
 
   test("does not approve source or cut stages from references alone", () => {
