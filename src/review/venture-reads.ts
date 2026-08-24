@@ -28,6 +28,7 @@
 
 import { existsSync } from "node:fs";
 import { readArtifacts } from "../venture/artifacts.js";
+import { readArtifactBody } from "../venture/artifact-lifecycle.js";
 import { readCanonEvents } from "../venture/canon.js";
 import { readDecisions } from "../venture/decisions.js";
 import { readIntakeAnswers } from "../venture/intake.js";
@@ -73,7 +74,8 @@ export function handleVentureRead(method: string, pathname: string): VentureRead
   const m = /^\/api\/venture\/([^/]+)\/(.+)$/.exec(pathname);
   if (!m) return null;
   const [, slug, rest] = m;
-  if (!VENTURE_READS[rest]) return null;
+  const param = matchParamRead(rest);
+  if (!VENTURE_READS[rest] && !param) return null;
 
   if (!SAFE_SLUG.test(slug)) {
     return { status: 400, body: { ok: false, error: "bad venture slug" } };
@@ -83,7 +85,49 @@ export function handleVentureRead(method: string, pathname: string): VentureRead
   if (!existsSync(ventureDir(slug))) {
     return { status: 404, body: { ok: false, error: `no such venture: ${slug}` } };
   }
+  if (param) {
+    if (!SAFE_ID.test(param.id)) {
+      return { status: 400, body: { ok: false, error: `bad id: ${JSON.stringify(param.id)}` } };
+    }
+    // Unlike the two composed reads, this one CAN fail on a specific thing that is not there (an
+    // artifact id that does not exist, an artifact with no body file). Those are refusals with the
+    // owning function's own sentence, not 500s, exactly as on the write side.
+    try {
+      return { status: 200, body: { ok: true, ...param.handler(slug, param.id) } };
+    } catch (e) {
+      return { status: 400, body: { ok: false, error: e instanceof Error ? e.message : String(e) } };
+    }
+  }
   return { status: 200, body: { ok: true, ...VENTURE_READS[rest](slug) } };
+}
+
+// The same allowlist venture-writes.ts uses for an artifact id, for the same reason: it becomes
+// part of a filesystem read.
+const SAFE_ID = /^[a-z0-9][\w-]*$/;
+
+// THE ONE READ THAT TAKES A PARAMETER, and the one exception to "two reads, composed".
+//
+// The thread deliberately does not inline body files (venture-thread.ts: "The room links to it; it
+// does not inline a file it has not read"), and that is still right -- shipping every artifact's
+// full text on every write's refetch would put a dozen documents on the wire to render a rail of
+// titles. The editor needs exactly one of them, at the moment it opens, so it asks for one.
+//
+// It reads and writes nothing else: readArtifactBody resolves body_path under ventureDir(slug),
+// checks containment, and answers the text plus the edit stamp.
+const VENTURE_PARAM_READS: { pattern: RegExp; path: string; handler: (slug: string, id: string) => Record<string, unknown> }[] = [
+  {
+    pattern: /^artifacts\/([^/]+)\/body$/,
+    path: "/api/venture/:slug/artifacts/:id/body",
+    handler: (slug, id) => readArtifactBody(slug, id),
+  },
+];
+
+function matchParamRead(rest: string): { id: string; handler: (slug: string, id: string) => Record<string, unknown> } | null {
+  for (const r of VENTURE_PARAM_READS) {
+    const m = r.pattern.exec(rest);
+    if (m) return { id: m[1], handler: r.handler };
+  }
+  return null;
 }
 
 // TWO reads, deliberately. There were ten: one per underlying file, plus the composed thread. The
@@ -135,4 +179,8 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
 };
 
 /** Every venture read path this module answers, for the wiring guard. */
-export const VENTURE_READ_PATHS = ["/api/venture/list", ...Object.keys(VENTURE_READS).map((r) => `/api/venture/:slug/${r}`)];
+export const VENTURE_READ_PATHS = [
+  "/api/venture/list",
+  ...Object.keys(VENTURE_READS).map((r) => `/api/venture/:slug/${r}`),
+  ...VENTURE_PARAM_READS.map((r) => r.path),
+];

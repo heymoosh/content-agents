@@ -12,8 +12,9 @@ import { slugify } from "../util/slug.js";
 import { logCost } from "../util/cost-log.js";
 import { loadOutreachConfig } from "../outreach/config.js";
 import { listLeads } from "../outreach/status.js";
-import { runQualify } from "../outreach/qualify.js";
+import { runQualify, formatEvidenceLine } from "../outreach/qualify.js";
 import { buildResearchSettings } from "../outreach/research.js";
+import { buildEngineSpawn, isEngine } from "../review/engines.js";
 import {
   buildClientPlatformDiscoveryPrompt,
   parseClientPlatformDiscoveryCandidates,
@@ -60,10 +61,16 @@ function existingNamesForKind(kind: DiscoveryKind): string[] {
     .map((l) => l.name);
 }
 
-function formatEvidenceLines(evidence: EvidenceItem[]): string {
+// Reuses qualify.ts's own serializer rather than a second copy of the line format -- the reader
+// (EVIDENCE_LINE_RE) and both writers are one format or they are not a format at all.
+//
+// `capturedAt` is the day this discovery run gathered the evidence, so a scaffolded lead.md carries
+// its own capture dates from the start. Same clock as decisionLogLine below, and equally a real
+// measurement rather than a guess: the run IS the capture.
+function formatEvidenceLines(evidence: EvidenceItem[], capturedAt: string): string {
   if (evidence.length === 0) return "(none yet)";
   return evidence
-    .map((item, i) => `- E${i + 1} | signal: ${item.signal} | person: ${item.person} | source: ${item.source} | quote: ${item.quote} | ${item.description}`)
+    .map((item, i) => formatEvidenceLine(item.captured_at ? item : { ...item, captured_at: capturedAt }, i + 1))
     .join("\n");
 }
 
@@ -72,9 +79,12 @@ function yamlQuote(value: string): string {
   return `"${oneLine.replace(/"/g, '\\"')}"`;
 }
 
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function decisionLogLine(note: string): string {
-  const date = new Date().toISOString().slice(0, 10);
-  return `- ${date}: ${note}`;
+  return `- ${today()}: ${note}`;
 }
 
 function scaffoldReviewQueue(dir: string, name: string): void {
@@ -117,7 +127,7 @@ export function buildClientPlatformLeadFile(
   const disconfirmation = candidate.disconfirmation ? `\n\nDisconfirmation pass: ${candidate.disconfirmation}` : "";
   const body =
     `\n## Profile\n\n${candidate.profile || "(no profile summary returned)"}\n` +
-    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence)}\n` +
+    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence, today())}\n` +
     `\n## Classification\n\n${candidate.classificationNote || "(no rationale provided)"}${disconfirmation}\n` +
     `\n## Pitch\n\n${candidate.pitchAngle || "(not yet drafted)"}\n` +
     `\n## Decision log\n\n${decisionLogLine(`discovered via /scout (theme: "${theme}")`)}\n`;
@@ -143,7 +153,7 @@ export function buildContentExampleLeadFile(candidate: ContentExampleDiscoveryCa
 
   const body =
     `\n## Profile\n\n${candidate.why || "(no summary returned)"}\n` +
-    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence)}\n` +
+    `\n## Evidence\n\n${formatEvidenceLines(candidate.evidence, today())}\n` +
     `\n## Classification\n\n${candidate.why || "(no rationale provided)"}\n` +
     `\n## Pitch\n\n${candidate.angle || "(not yet drafted)"}\n` +
     `\n## Decision log\n\n${decisionLogLine(`discovered via /scout (theme: "${theme}")`)}\n`;
@@ -193,6 +203,8 @@ const SEARCH_BUDGET_HOOK_PATH = join(repoRoot, "src", "outreach", "search-budget
 const TSX_BIN = join(repoRoot, "node_modules", ".bin", "tsx");
 
 async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<string> {
+  const selected = isEngine(process.env.CONTENT_AGENT_ENGINE) ? process.env.CONTENT_AGENT_ENGINE : "claude";
+  if (selected === "codex") throw new Error("Scout supports Claude or Grok web discovery; choose one of those engines.");
   const model = (process.env.CLAUDE_POLISH_MODEL ?? "sonnet").trim();
   const counterFile = join(tmpdir(), `discovery-search-budget-${randomUUID()}.count`);
   let stdout: string;
@@ -202,9 +214,11 @@ async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<
     // (this call never writes files itself; writeClientPlatformLead/writeContentExampleLead own
     // every byte written to disk). search-budget-hook.ts is reused completely unmodified: it only
     // ever reads the two env vars set below, kind-agnostic.
+    const built = buildEngineSpawn(selected, prompt, { timeoutMs: DEFAULT_TIMEOUT_MS, permissionMode: "acceptEdits", model: selected === "claude" ? model : undefined });
+    const args = [...built.args, "--settings", JSON.stringify(buildResearchSettings(SEARCH_BUDGET_HOOK_PATH))];
     const r = await execFileP(
-      "claude",
-      ["-p", prompt, "--model", model, "--permission-mode", "acceptEdits", "--settings", JSON.stringify(buildResearchSettings(SEARCH_BUDGET_HOOK_PATH))],
+      built.command,
+      args,
       {
         cwd: repoRoot,
         timeout: DEFAULT_TIMEOUT_MS,
@@ -220,12 +234,12 @@ async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<
   } catch (e) {
     const err = e as { code?: string; killed?: boolean; stderr?: string };
     if (err.code === "ENOENT") {
-      throw new Error("`claude` CLI not on PATH -- discover.ts needs Claude Code installed");
+      throw new Error(selected+" CLI not on PATH -- Scout needs the selected engine installed");
     }
     if (err.killed) {
-      throw new Error(`claude -p timed out after ${Math.round(DEFAULT_TIMEOUT_MS / 60_000)}min during discovery`);
+      throw new Error(selected+" web discovery timed out after "+Math.round(DEFAULT_TIMEOUT_MS / 60_000)+"min");
     }
-    throw new Error(`claude -p failed: ${err.stderr?.trim() || (e instanceof Error ? e.message : String(e))}`);
+    throw new Error(selected+" web discovery failed: "+(err.stderr?.trim() || (e instanceof Error ? e.message : String(e))));
   } finally {
     if (existsSync(counterFile)) {
       try {
@@ -236,7 +250,7 @@ async function callClaudeDiscover(prompt: string, totalBudget: number): Promise<
     }
   }
   const text = stdout.trim();
-  if (!text) throw new Error("claude -p returned no text during discovery");
+  if (!text) throw new Error(selected+" returned no text during discovery");
   return text;
 }
 
@@ -265,7 +279,7 @@ export interface DiscoverKindResult {
   skipped: string[]; // names the model proposed but were already on file
 }
 
-async function discoverKind(kind: DiscoveryKind, theme: string, maxCandidates: number): Promise<DiscoverKindResult> {
+async function sweepKind(kind: DiscoveryKind, theme: string, maxCandidates: number): Promise<DiscoverKindResult> {
   const config = loadOutreachConfig();
   const excludeNames = existingNamesForKind(kind);
   const created: string[] = [];
@@ -308,31 +322,69 @@ async function discoverKind(kind: DiscoveryKind, theme: string, maxCandidates: n
   return { kind, created, skipped };
 }
 
+// The default per-kind runner: one bounded `claude -p` sweep plus the cost-log row for it. The
+// row lives here rather than in runDiscover's loop because the spend belongs to the kind that
+// incurred it, so an injected runKind never logs a cost for a call it did not make.
+async function discoverKind(kind: DiscoveryKind, theme: string, maxCandidates: number): Promise<DiscoverKindResult> {
+  const result = await sweepKind(kind, theme, maxCandidates);
+  logCost({ step: "discovery:scout", detail: `${kind} (${result.created.length} found)`, costUsd: 0 });
+  return result;
+}
+
 export interface RunDiscoverResult {
   results: DiscoverKindResult[];
   theme: string;
 }
 
-export async function runDiscover(opts: { kinds?: DiscoveryKind[]; theme?: string; limit?: number } = {}): Promise<RunDiscoverResult> {
+// One step per kind, because one kind IS one unit of real work: a single bounded `claude -p` web
+// search followed by the lead folders it writes. The label says what the sweep is looking for.
+export const DISCOVERY_STEP_LABELS: Record<DiscoveryKind, string> = {
+  client: "Scouting companies worth pitching",
+  platform: "Scouting platforms worth pitching",
+  "content-example": "Scouting real examples to write about",
+};
+
+export interface RunDiscoverOptions {
+  kinds?: DiscoveryKind[];
+  theme?: string;
+  limit?: number;
+  // Progress markers for the GUI job queue (src/review/jobs.ts parseStepMarker). Optional: a
+  // caller that passes none gets exactly today's behaviour. main() below is the one wiring that
+  // turns these into `STEP n/total label` lines on stdout.
+  onStep?: (n: number, total: number, label: string) => void;
+  // Injected so the step sequence is unit-testable without spawning `claude` per kind. Nothing
+  // but the test overrides it.
+  runKind?: (kind: DiscoveryKind, theme: string, maxCandidates: number) => Promise<DiscoverKindResult>;
+  // Where the run log is appended. Injectable so a test never writes into the real
+  // data/discovery/run-log.jsonl -- same convention as the notes-spread ledger's test path.
+  runLogPath?: string;
+}
+
+export async function runDiscover(opts: RunDiscoverOptions = {}): Promise<RunDiscoverResult> {
   const kinds = opts.kinds && opts.kinds.length ? opts.kinds : [...DISCOVERY_KINDS];
   const theme = opts.theme?.trim() || defaultTheme();
   const maxCandidates = Math.max(1, Math.min(opts.limit ?? 3, 5)); // hard cap of 5/kind, cost-bounding
+  const step = opts.onStep ?? (() => {});
+  const runKind = opts.runKind ?? discoverKind;
+  // The total is the kinds actually about to run, counted before the first marker — never a guess.
+  const total = kinds.length;
 
   const results: DiscoverKindResult[] = [];
-  for (const kind of kinds) {
-    const result = await discoverKind(kind, theme, maxCandidates);
+  for (const [i, kind] of kinds.entries()) {
+    step(i + 1, total, DISCOVERY_STEP_LABELS[kind]);
+    const result = await runKind(kind, theme, maxCandidates);
     results.push(result);
-    logCost({ step: "discovery:scout", detail: `${kind} (${result.created.length} found)`, costUsd: 0 });
   }
 
-  mkdirSync(dirname(RUN_LOG_PATH), { recursive: true });
+  const runLogPath = opts.runLogPath ?? RUN_LOG_PATH;
+  mkdirSync(dirname(runLogPath), { recursive: true });
   const runLogEntry = {
     timestamp: new Date().toISOString(),
     theme,
     limit: maxCandidates,
     results: results.map((r) => ({ kind: r.kind, created: r.created, skipped: r.skipped })),
   };
-  appendFileSync(RUN_LOG_PATH, JSON.stringify(runLogEntry) + "\n");
+  appendFileSync(runLogPath, JSON.stringify(runLogEntry) + "\n");
 
   return { results, theme };
 }
@@ -356,7 +408,12 @@ function parseArgs(argv: string[]): { kinds?: DiscoveryKind[]; theme?: string; l
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
-  runDiscover(args)
+  runDiscover({
+    ...args,
+    // The STEP markers the job queue reads (src/review/jobs.ts parseStepMarker). Their own lines
+    // on stdout, before each kind's work begins; the findings print after the run, as before.
+    onStep: (n, total, label) => process.stdout.write(`STEP ${n}/${total} ${label}\n`),
+  })
     .then((result) => {
       console.log(`theme: ${result.theme}\n`);
       for (const r of result.results) {

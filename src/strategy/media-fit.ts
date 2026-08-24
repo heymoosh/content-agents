@@ -110,7 +110,7 @@ export function classifyMediaFit(
   now = Date.now()
 ): MediaFitResult {
   if (!strategyCfg.media_thresholds) {
-    throw new Error("config/strategy.yaml is missing media_thresholds (lever B, card 27dc7d2d) — add a media_thresholds.lean_floor entry.");
+    throw new Error("config/strategy.yaml is missing media_thresholds (lever B, card 27dc7d2d). Add a media_thresholds.lean_floor entry.");
   }
   const textCell = computeCell(rows, platform, "text", now);
   const mediaCell = computeCell(rows, platform, mediaType, now);
@@ -155,9 +155,9 @@ function main() {
   const rows = loadRows();
   const ranked = rankMediaFit(rows, cfg, strategyCfg);
 
-  console.log(`# Media-type fit — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Media-type fit, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
-    `Recommendation only — nothing here auto-generates a quote+image variant or invokes /video. /atomize's generation contract (text + quote-card per routed platform) and /video's invocation model (always human-invoked) are unchanged; use a "lean toward" read as a data point when weighing the optional quote+image variant (SKILL.md step 7d) or whether to suggest /video (step 8).\n`
+    `Recommendation only. Nothing here auto-generates a quote+image variant or invokes /video. /atomize's generation contract (text + quote-card per routed platform) and /video's invocation model (always human-invoked) are unchanged; use a "lean toward" read as a data point when weighing the optional quote+image variant (SKILL.md step 7d) or whether to suggest /video (step 8).\n`
   );
 
   if (ranked.length === 0) {
@@ -180,7 +180,7 @@ function main() {
 
   if (thin.length > 0) {
     console.log(
-      `\n${thin.length} platform/media-type pair(s) have insufficient data (n<${cfg.thresholds.min_posts_for_data} or <4wks on either side) — no read yet, not a forced recommendation:`
+      `\n${thin.length} platform/media-type pair(s) have insufficient data (n<${cfg.thresholds.min_posts_for_data} or <4wks on either side), so there is no read yet, not a forced recommendation:`
     );
     for (const r of thin) console.log(`- ${r.platform} / ${r.mediaType}`);
   }

@@ -23,6 +23,13 @@ export interface Evidence {
   provider?: string;
   confirmed_by?: "muxin" | "agent";
   confirmed_at?: string;
+  // When the thing this evidence points at went public, if that differs from when it was
+  // confirmed -- i.e. confirming a post Muxin had ALREADY published before this venture began
+  // (v5 handoff §9.9). Absent means "it went live when it was confirmed", which is what every
+  // delivery path in this repo does. This is the only input the evidence-role derivation needs
+  // that the artifact does not already carry; the role itself is never stored, it is computed on
+  // read by evidence-links.ts's deriveArtifactEvidenceRole (§9.6: never let a caller declare it).
+  published_at?: string;
 }
 
 export interface Failure {
@@ -82,8 +89,21 @@ export interface VentureArtifact {
   unknown_id: string | null;
   claim_refs: ClaimRef[];
 
+  // When Muxin edited the body herself, and null when she has not. It is the ONE fact that decides
+  // whose words the room says the body is (docs/prototype-port-rules.md Rule 4: the AI register is
+  // purple, and prose she wrote must never render in it). A timestamp rather than a flag because
+  // the screen shows the day, and a day it can show is a day something recorded -- never derived
+  // from updated_at, which every approve and every delivery also moves.
+  //
+  // Absent on every line written before this existed, so readLines() normalizes it to null: an old
+  // artifact was not edited by her, which is a different fact from "unknown" only if something
+  // could ever have set it, and nothing could.
+  body_edited_by_muxin_at: string | null;
+
   created_at: string;
   updated_at: string;
+  /** CLI that produced the judgment, when an agent run created this artifact. */
+  engine?: string | null;
 }
 
 // §2.2's valid (editorial, delivery) combinations. Anything not listed here is rejected.
@@ -110,7 +130,13 @@ function readLines(slug: string): VentureArtifact[] {
   return readFileSync(path, "utf8")
     .split("\n")
     .filter((l) => l.trim())
-    .map((l) => JSON.parse(l) as VentureArtifact);
+    .map((l) => {
+      const a = JSON.parse(l) as VentureArtifact;
+      // Every line written before body_edited_by_muxin_at existed. null, never undefined, so a
+      // consumer cannot accidentally treat "the key is missing" as a third state it is not.
+      if (a.body_edited_by_muxin_at === undefined) a.body_edited_by_muxin_at = null;
+      return a;
+    });
 }
 
 // artifacts.jsonl is append-only: each write is a full snapshot line for that artifact_id.
@@ -148,6 +174,7 @@ export interface CreateArtifactInput {
   unknown_id?: string | null;
   claim_refs?: ClaimRef[];
   at: string;
+  engine?: string | null;
 }
 
 // Stamps delivery_mode/publishable from rules.ts's kind table AT CREATE TIME and writes them
@@ -183,8 +210,10 @@ export function createArtifact(
     probe_id: input.probe_id ?? null,
     unknown_id: input.unknown_id ?? null,
     claim_refs: input.claim_refs ?? [],
+    body_edited_by_muxin_at: null,
     created_at: input.at,
     updated_at: input.at,
+    engine: input.engine ?? process.env.CONTENT_AGENT_ENGINE ?? null,
   };
   appendLine(slug, artifact);
   return artifact;
@@ -210,6 +239,10 @@ export interface TransitionPatch {
   // only caller that should ever pass it.
   retraction?: Retraction | null;
   failure?: Failure | null;
+  // Set by editArtifactBody() in artifact-lifecycle.ts, which is the only caller that should ever
+  // pass it -- it is the record of Muxin having rewritten the body herself, and nothing else may
+  // claim that on her behalf.
+  body_edited_by_muxin_at?: string;
 }
 
 export function transitionArtifact(

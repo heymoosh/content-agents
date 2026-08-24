@@ -91,6 +91,14 @@ export function responsesPath(slug: string): string {
   return join(ventureDir(slug), "responses.jsonl");
 }
 
+// This venture's links into the account-level research_observations store (§5.4a), carrying the
+// derived evidence_role and every other judgment that is relative to THIS venture (§5.4b).
+// Gitignored -- an observation's text and respondent hash never reach git, same treatment as
+// responses.jsonl.
+export function evidenceLinksPath(slug: string): string {
+  return join(ventureDir(slug), "evidence-links.jsonl");
+}
+
 // Phase 3 (rules.md §7.5, venture-schema-contract.md §5.4). The durable, re-readable per-cluster
 // analysis output -- count, redacted evidence, common stuck point, desired outcome, and visible
 // consequences per cluster (see src/venture/phase3.ts's ClusterAnalysis). A top-level file, same

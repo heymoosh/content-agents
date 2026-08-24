@@ -227,23 +227,23 @@ describe("formatReport: pure string formatting, no I/O", () => {
     const cadenceRows = [...spanCadenceRows("bluesky", "override", 20), ...spanCadenceRows("bluesky", "default", 10)];
     const report = combineReport(cadenceRows, [], [], cfg(), strategyCfg(), NOW);
     const text = formatReport(report, cfg());
-    assert.match(text, /Lever C — cadence-override follow-through/);
-    assert.match(text, /\| bluesky \| override winning — keep it \| 2\.00x \| 3 \| 3 \|/);
+    assert.match(text, /Lever C, cadence-override follow-through/);
+    assert.match(text, /\| bluesky \| override winning, keep it \| 2\.00x \| 3 \| 3 \|/);
   });
 
   test("a frame-winning read renders its ratio and n's in the Lever D table", () => {
     const frameRows = [...spanFrameRows("x", "atomized", 20), ...spanFrameRows("x", CONTROL_RUN_SOURCE, 10)];
     const report = combineReport([], frameRows, [], cfg(), strategyCfg(), NOW);
     const text = formatReport(report, cfg());
-    assert.match(text, /Lever D — spin-frame fit/);
-    assert.match(text, /\| x \| spin frame winning — keep it \| 2\.00x \| 3 \| 3 \|/);
+    assert.match(text, /Lever D, spin-frame fit/);
+    assert.match(text, /\| x \| spin frame winning, keep it \| 2\.00x \| 3 \| 3 \|/);
   });
 
   test("a clear-winner cta read renders its destination and ratio in the Lever E table", () => {
     const ctaRows = [...spanCtaRows("linkedin", "source", 20), ...spanCtaRows("linkedin", "project", 5)];
     const report = combineReport([], [], ctaRows, cfg(), strategyCfg(), NOW);
     const text = formatReport(report, cfg());
-    assert.match(text, /Lever E — CTA-destination fit/);
+    assert.match(text, /Lever E, CTA-destination fit/);
     assert.match(text, /\| linkedin \| source clearly wins \| 4\.00x \|/);
   });
 

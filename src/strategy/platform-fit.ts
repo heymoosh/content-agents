@@ -190,9 +190,9 @@ function main() {
   const rows = loadRows();
   const ranked = rankPlatformFit(cfg, data, rows, strategyCfg);
 
-  console.log(`# Topic-platform fit — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Topic-platform fit, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
-    `Recommendation only — nothing here changes what /atomize drafts. route.ts's include/skip stays defaults-driven (card 7e550e48); use this to decide by hand whether to update config/routing.yaml's defaults.\n`
+    `Recommendation only. Nothing here changes what /atomize drafts. route.ts's include/skip stays defaults-driven (card 7e550e48); use this to decide by hand whether to update config/routing.yaml's defaults.\n`
   );
 
   if (ranked.length === 0) {
@@ -215,7 +215,7 @@ function main() {
 
   if (thin.length > 0) {
     console.log(
-      `\n${thin.length} pillar/platform pair(s) have insufficient data (n<${cfg.thresholds.min_posts_for_data} or <4wks) — no read yet, not a forced recommendation:`
+      `\n${thin.length} pillar/platform pair(s) have insufficient data (n<${cfg.thresholds.min_posts_for_data} or <4wks), so there is no read yet, not a forced recommendation:`
     );
     for (const r of thin) console.log(`- ${r.platform} / ${r.pillar} (${priorText(r.priorMatch)})`);
   }

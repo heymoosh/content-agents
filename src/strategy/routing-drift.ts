@@ -103,12 +103,12 @@ export function formatDriftFlags(flags: DriftFlag[]): string {
   const lines = [
     `## Routing drift flags\n`,
     `Fit score diverges from config/routing.yaml's defaults list in BOTH of the last two ` +
-      `independent ~4-week windows (not one noisy snapshot). Computed/printed only — this never ` +
+      `independent ~4-week windows (not one noisy snapshot). Computed/printed only, this never ` +
       `writes to config/routing.yaml or config/platforms.yaml. A persistent divergence is a prompt ` +
       `for Muxin to reconsider the defaults by hand, same posture as the angle drift check.\n`,
   ];
   if (flags.length === 0) {
-    lines.push(`No persistent divergences — fit scores track config/routing.yaml's defaults across both windows.`);
+    lines.push(`No persistent divergences. Fit scores track config/routing.yaml's defaults across both windows.`);
     return lines.join("\n");
   }
   lines.push(`| pillar | platform | direction | n | windows checked | no-spin control available |`);

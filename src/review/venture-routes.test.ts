@@ -22,6 +22,7 @@ import { listVentures, ventureRoot } from "../venture/paths.js";
 import { INTAKE_QUESTIONS, readIntakeAnswers, kickoffVenture, type IntakeAnswers } from "../venture/intake.js";
 import { loadRules } from "../venture/rules.js";
 import { appendCanonEvent } from "../venture/canon.js";
+import { createArtifact } from "../venture/artifacts.js";
 
 const ROOT_ENV = "CONTENT_AGENTS_TEST_VENTURE_ROOT";
 
@@ -274,13 +275,20 @@ test("the thread carries what the eight deleted routes used to return", () => {
   });
 });
 
-test("only two read routes remain, and the rest 404 like any unknown path", () => {
+test("the eight granular reads are still gone, and the rest 404 like any unknown path", () => {
   withRoot((root) => {
     seedVenture(root, "full");
     for (const gone of ["state", "artifacts", "decisions", "canon", "gate", "clusters", "rules", "intake/answers"]) {
       assert.equal(handleVentureRead("GET", `/api/venture/full/${gone}`), null, `${gone} should no longer be a route`);
     }
-    assert.deepEqual(VENTURE_READ_PATHS, ["/api/venture/list", "/api/venture/:slug/thread"]);
+    // Three now, not two. The third takes a parameter and is the deliberate exception: the body
+    // editor needs ONE artifact's text, and the thread does not inline body files. Everything the
+    // deleted eight returned is still inside the thread, which is what this list is guarding.
+    assert.deepEqual(VENTURE_READ_PATHS, [
+      "/api/venture/list",
+      "/api/venture/:slug/thread",
+      "/api/venture/:slug/artifacts/:id/body",
+    ]);
   });
 });
 
@@ -298,9 +306,20 @@ test("a venture with nothing recorded yet answers 200 with an honest empty threa
 
 test("an unknown slug 404s, distinct from a known slug with no data", () => {
   withRoot((root) => {
-    seedVenture(root, "exists");
+    const dir = seedVenture(root, "exists");
+    // The parameterized read needs a real id to be 200 on, so the venture gets one artifact with a
+    // body file. The point of the test is unchanged: an unknown SLUG must 404 on every read, and a
+    // known one must not, whichever kind of read it is.
+    createArtifact("exists", loadRules(), {
+      artifact_id: "a-1", phase: 1, artifact_kind: "text-post-note", title: "t",
+      body_path: "phase-1-attention/a-1.md", venture_id: "exists", venture_phase: 1, message_id: "m",
+      at: "2026-08-20T00:00:00.000Z",
+    });
+    mkdirSync(join(dir, "phase-1-attention"), { recursive: true });
+    writeFileSync(join(dir, "phase-1-attention", "a-1.md"), "the drafted words\n");
+
     for (const path of VENTURE_READ_PATHS.filter((p) => p.includes(":slug"))) {
-      const tail = path.replace("/api/venture/:slug/", "");
+      const tail = path.replace("/api/venture/:slug/", "").replace(":id", "a-1");
       const unknown = get(`/api/venture/never-made/${tail}`);
       assert.equal(unknown.status, 404, `${tail} should 404 for an unknown slug`);
       assert.equal((unknown.body as { ok: boolean }).ok, false);

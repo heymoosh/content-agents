@@ -208,6 +208,7 @@ describe("readyForDelivery -- each condition alone is insufficient", () => {
       probe_id: null,
       unknown_id: null,
       claim_refs: [],
+      body_edited_by_muxin_at: null,
       created_at: "t",
       updated_at: "t",
       ...overrides,

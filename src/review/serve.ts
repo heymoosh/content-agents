@@ -20,7 +20,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
 import { repoRoot, openDb } from "../db/db.js";
@@ -75,6 +75,7 @@ import {
   reviseOutreachMessage,
   duplicateToPlatform,
   runQueued,
+  runAgentSpawn,
   runClaudeSpawn,
   runCommandSpawn,
   decodeSpawnFailure,
@@ -94,7 +95,7 @@ import { listCuts } from "../atomize/cuts.js";
 import { renderPage } from "./page.js";
 import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
-import { getAnalyst } from "../providers/registry.js";
+import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, type Engine } from "./engines.js";
 import { readSignals, appendBacklogCard, readOutcomeFamilies, readResearchReport } from "./signals.js";
 import { readTreatment } from "./treatment.js";
 import {
@@ -104,7 +105,8 @@ import {
 import { patchChapterSpan } from "../fiction/patch.js";
 import { readContinuityReport } from "../fiction/continuity.js";
 import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief } from "./charles.js";
-import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts } from "./intake-draft.js";
+import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
+import { enqueueVentureStep } from "./venture-runner.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich) or jobs.ts (classifySource,
@@ -114,6 +116,30 @@ import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts } from "./intake-dra
 export { approveBlockReason, replyToMentionBlockReason, enrich, classifySource, sourceDispatch, revisePrompt, jobLogPath, lastNonEmptyLine, tailLines, jobElapsedMs };
 
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
+
+function requestEngine(value: unknown): Engine {
+  return isEngine(value) ? value : "claude";
+}
+
+function availableEngines() {
+  return ENGINES.map((engine) => {
+    let installed = false;
+    try {
+      execFileSync("which", [ENGINE_COMMANDS[engine]], { stdio: "ignore", timeout: 2_000 });
+      installed = true;
+    } catch {
+      installed = false;
+    }
+    return {
+      id: engine,
+      label: ENGINE_LABELS[engine],
+      description: ENGINE_METADATA[engine].description,
+      roleHint: ENGINE_METADATA[engine].roleHint,
+      installed,
+      note: installed ? "Sign-in is checked when the run starts." : `${ENGINE_COMMANDS[engine]} is not on this server's PATH`,
+    };
+  });
+}
 
 // Claude Code creates ephemeral dev worktrees under .claude/worktrees/<name> — each one has its
 // OWN gitignored data/ and content/, isolated from the real checkout, so a report run here can
@@ -426,7 +452,7 @@ export type InsightsResult = {
 // LLM-dependent) so the GUI can show an "as of" stamp and a dated link instead of trusting the
 // summary text to mention how current anything is. This is otherwise a pure text answer (nothing
 // written to disk), shown straight in the GUI.
-async function generateInsights(): Promise<InsightsResult> {
+async function generateInsights(engine: Engine = "claude"): Promise<InsightsResult> {
   // Fail loud and fast, before spending a Claude call: an empty posts table almost always means
   // this checkout's data/analytics.db is a stale/isolated copy (gitignored, never synced between
   // checkouts — see IS_DEV_WORKTREE), not that there's genuinely no data.
@@ -440,7 +466,7 @@ async function generateInsights(): Promise<InsightsResult> {
         : `\`data/analytics.db\` is gitignored (per-checkout, never synced by git) — either this checkout ` +
           `has never been ingested, or something pulled into a different copy. Run \`npm run ingest\` / ` +
           `\`npm run pull\` here, or check you're in the checkout you expect.\n`);
-    return { summary, freshness: null, brief: null, untagged: 0 };
+    return { summary, engine, freshness: null, brief: null, untagged: 0 };
   }
   const sections: string[] = [];
   for (const key of Object.keys(REPORTS)) {
@@ -492,10 +518,22 @@ async function generateInsights(): Promise<InsightsResult> {
   // interpretation work — falling back to Claude when Codex is unavailable (usage limits
   // included; the fallback reason carries the limit message so the GUI can say when it clears).
   // The prompt is fully self-contained (everything inlined above), which is the analyst contract.
-  const analysis = await runQueued("insights", "Generate insights", async () => {
-    const analyst = await getAnalyst();
-    return analyst.analyze({ prompt, timeoutMs: STRATEGY_TIMEOUT_MS });
-  });
+  const analysis = await runQueued("insights", `Generate insights with ${engine}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: STRATEGY_TIMEOUT_MS,
+      permissionMode: null,
+      tools: engine === "codex" ? undefined : "",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} analysis`,
+      timeoutLabel: `${STRATEGY_TIMEOUT_MS / 1000}s`,
+      exitVerb: `${ENGINE_LABELS[engine]} analysis`,
+      command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    return { text: result.stdout.trim(), engine: engine === "codex" ? "gpt-codex" : engine, fallbackReason: undefined };
+  }, engine);
   return {
     summary: analysis.text,
     engine: analysis.engine,
@@ -509,7 +547,7 @@ async function generateInsights(): Promise<InsightsResult> {
 // Deep-dive follow-up: unlike generateInsights (which we feed pre-fetched data), Claude is allowed
 // to go run one of the same read-only reports itself, or read briefs/config, if the question needs
 // something not already in the conversation. Read-only: it's told never to edit/write/delete.
-async function askInsights(question: string, history: { role: string; content: string }[]): Promise<string> {
+async function askInsights(question: string, history: { role: string; content: string }[], engine: Engine = "claude"): Promise<string> {
   if (!question.trim()) throw new Error("ask something first");
   const transcript = history
     .map((h) => `${h.role === "user" ? "Muxin" : "Claude"}: ${h.content}`)
@@ -531,14 +569,72 @@ async function askInsights(question: string, history: { role: string; content: s
     `no AI-tell filler. Keep it as short as the question allows.`,
   ].join("\n");
   // Routed through the ONE job queue (Codebase review Phase 2) — see generateInsights above.
-  return runQueued("ask-insights", `Ask: ${question.trim().slice(0, 60)}`, async (job) => {
-    const result = await runClaudeSpawn(job, prompt, { timeoutMs: INSIGHTS_ASK_TIMEOUT_MS });
+  return runQueued("ask-insights", `Ask with ${engine}: ${question.trim().slice(0, 50)}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, prompt, {
+      timeoutMs: INSIGHTS_ASK_TIMEOUT_MS,
+      permissionMode: null,
+      tools: engine === "codex" ? undefined : "",
+      sandbox: "read-only",
+    });
     const failure = decodeSpawnFailure(result, job.id, {
-      timeoutVerb: "Claude", timeoutLabel: `${INSIGHTS_ASK_TIMEOUT_MS / 1000}s`, exitVerb: "Claude",
+      timeoutVerb: `${ENGINE_LABELS[engine]} analysis`, timeoutLabel: `${INSIGHTS_ASK_TIMEOUT_MS / 1000}s`,
+      exitVerb: `${ENGINE_LABELS[engine]} analysis`, command: ENGINE_COMMANDS[engine],
     });
     if (failure) throw new Error(failure);
     return result.stdout.trim();
-  });
+  }, engine);
+}
+
+function ventureThreadForAnalysis(slug: string): unknown {
+  const read = handleVentureRead("GET", `/api/venture/${slug}/thread`);
+  if (!read || read.status !== 200) {
+    const body = read?.body as { error?: unknown } | undefined;
+    throw new Error(typeof body?.error === "string" ? body.error : "could not read this venture");
+  }
+  const body = read.body as { thread?: unknown };
+  if (!body.thread) throw new Error("this venture has no readable thread yet");
+  return body.thread;
+}
+
+export function ventureAnalysisPrompt(slug: string, thread: unknown): string {
+  return [
+    `Read .claude/skills/venture/SKILL.md in full before acting.`,
+    `Follow its rules and phase gates as the governing policy for this advice.`,
+    `Do not run /venture, do not execute a phase command, and do not write, edit, delete, or advance any file or ledger.`,
+    `You are giving Muxin a read-only judgment about the current venture state.`,
+    `Identify what is ready now, the next decision or action that belongs to Muxin, the strongest risks or evidence gaps,`,
+    `and what must not happen yet. Keep recommendations grounded only in the supplied server-derived state.`,
+    `Return plain markdown with short headings and bullets. No em dashes and no invented claims, numbers, or evidence.`,
+    ``,
+    `## Venture`,
+    slug,
+    ``,
+    `## Current server-derived state`,
+    "```json",
+    JSON.stringify(thread, null, 2),
+    "```",
+  ].join("\n");
+}
+
+async function analyzeVenture(slug: string, engine: Engine = "claude"): Promise<string> {
+  const thread = ventureThreadForAnalysis(slug);
+  return runQueued("venture-analysis", `Analyze venture ${slug} with ${engine}`, async (job) => {
+    const result = await runAgentSpawn(job, engine, ventureAnalysisPrompt(slug, thread), {
+      timeoutMs: STRATEGY_TIMEOUT_MS,
+      permissionMode: "plan",
+      sandbox: "read-only",
+    });
+    const failure = decodeSpawnFailure(result, job.id, {
+      timeoutVerb: `${ENGINE_LABELS[engine]} venture analysis`,
+      timeoutLabel: `${STRATEGY_TIMEOUT_MS / 1000}s`,
+      exitVerb: `${ENGINE_LABELS[engine]} venture analysis`,
+      command: ENGINE_COMMANDS[engine],
+    });
+    if (failure) throw new Error(failure);
+    const text = result.stdout.trim();
+    if (!text) throw new Error(`${ENGINE_LABELS[engine]} returned no venture analysis`);
+    return text;
+  }, engine);
 }
 
 // "Refresh brief": run the REAL /strategy skill headlessly (same claude -p slash-command dispatch
@@ -548,11 +644,11 @@ async function askInsights(question: string, history: { role: string; content: s
 // what a terminal /strategy run does (Muxin's pick, 2026-07-16: the full run, not a brief-only
 // synthesis). Verified by artifact like every atomize-family job: a new-or-updated brief file must
 // actually exist afterward, or the job fails with the log tail.
-async function refreshBrief(): Promise<{ path: string }> {
+async function refreshBrief(engine: Engine = "claude"): Promise<{ path: string }> {
   const before = latestBriefPath();
   const beforeMtime = before && existsSync(before) ? statSync(before).mtimeMs : 0;
-  return runQueued("strategy", "Refresh strategy brief (/strategy)", async (job) => {
-    const result = await runClaudeSpawn(job, "/strategy", { timeoutMs: STRATEGY_RUN_TIMEOUT_MS });
+  return runQueued("strategy", `Refresh strategy brief with ${engine}`, async (job) => {
+    const result = await runClaudeSpawn(job, enginePrompt(engine, "strategy", "/strategy"), { timeoutMs: STRATEGY_RUN_TIMEOUT_MS });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "/strategy", timeoutLabel: `${STRATEGY_RUN_TIMEOUT_MS / 60_000} min`,
       exitVerb: "/strategy", includeTailOnTimeout: true,
@@ -564,22 +660,23 @@ async function refreshBrief(): Promise<{ path: string }> {
       throw new Error("/strategy ran but no new or updated brief landed in briefs/ — check the job log");
     }
     return { path: after.slice(repoRoot.length + 1) };
-  });
+  }, engine);
 }
 
 // "Scout new leads": run the real web-discovery agent (`npm run scout` → src/discovery/discover.ts,
 // which spawns its own bounded claude -p web searches and writes qualified candidates into
 // outreach/leads/ — see .claude/skills/scout/SKILL.md). Discovery only: nothing here contacts
 // anyone or drafts a message; new leads land status researched/intake for Muxin to Pursue/Pass.
-async function runScout(): Promise<void> {
+async function runScout(engine: Engine = "claude"): Promise<void> {
+  if (engine === "codex") throw new Error("Scout supports Claude or Grok web discovery; choose one of those engines.");
   await runQueued("scout", "Scout new leads (npm run scout)", async (job) => {
-    const result = await runCommandSpawn(job, "npm", ["run", "scout"], { timeoutMs: SCOUT_TIMEOUT_MS });
+    const result = await runCommandSpawn(job, "npm", ["run", "scout"], { timeoutMs: SCOUT_TIMEOUT_MS, env: { CONTENT_AGENT_ENGINE: engine } });
     const failure = decodeSpawnFailure(result, job.id, {
       timeoutVerb: "scout", timeoutLabel: `${SCOUT_TIMEOUT_MS / 60_000} min`,
       exitVerb: "scout", includeTailOnTimeout: true, command: "npm",
     });
     if (failure) throw new Error(failure);
-  });
+  }, engine);
 }
 
 // True while a job of `kind` is queued or running — backs the 409 guard on the two long-running
@@ -669,14 +766,24 @@ export const MAX_DIRECTION_CHARS = 2000;
 // keeps the drafting prompt byte-identical to the one every existing caller already builds.
 export function outreachDraftGuard(
   body: Record<string, unknown>,
-): { error: string } | { dir: string; direction: string | undefined } {
+): { error: string } | { dir: string; direction: string | undefined; engine: Engine } {
   const dir = String(body.dir ?? "");
   if (!isValidLeadDir(dir)) return { error: "not a valid outreach lead folder" };
   const direction = String(body.direction ?? "").trim();
   if (direction.length > MAX_DIRECTION_CHARS) {
     return { error: `keep the direction under ${MAX_DIRECTION_CHARS} characters` };
   }
-  return { dir, direction: direction || undefined };
+  return { dir, direction: direction || undefined, engine: requestEngine(body.engine) };
+}
+
+// Follow-ups have no typed direction and no second draft surface: keep their request guard
+// separate so the optional engine cannot accidentally leak into the directed first-draft route.
+// Invalid engine ids retain the existing default posture, while the job receives the normalized
+// value and therefore cannot silently fall back after enqueueing.
+export function followUpDraftGuard(body: Record<string, unknown>): { error: string } | { dir: string; engine: Engine } {
+  const dir = String(body.dir ?? "");
+  if (!isValidLeadDir(dir)) return { error: "not a valid outreach lead folder" };
+  return { dir, engine: requestEngine(body.engine) };
 }
 
 // Pure, exported for unit testing: append one dated note line under a lead.md's `## Muxin notes`
@@ -849,6 +956,10 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/") {
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(renderPage({ repoRoot, isDevWorktree: IS_DEV_WORKTREE, fixtures: FIXTURES_ON }));
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/api/engines") {
+      json(res, 200, { engines: availableEngines(), default: "claude" });
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/queue") {
@@ -1063,7 +1174,7 @@ const server = createServer(async (req, res) => {
       try {
         const slug = String(b.series ?? "");
         const beats = String(b.beats ?? "");
-        const { job, queued } = addFictionDraftJob(slug, beats);
+        const { job, queued } = addFictionDraftJob(slug, beats, requestEngine(b.engine));
         // The anchor survives a reload, so it is written here rather than left in the page. Only
         // for a run that actually queued: a deduped press returns the draft already in flight, and
         // moving the anchor to beats that run never received would show Muxin one set of beats
@@ -1082,7 +1193,7 @@ const server = createServer(async (req, res) => {
       try {
         json(res, 200, {
           ok: true,
-          job: publicJob(addFictionRepassJob(String(b.series ?? ""), Number(b.chapter ?? 0), String(b.note ?? ""))),
+          job: publicJob(addFictionRepassJob(String(b.series ?? ""), Number(b.chapter ?? 0), String(b.note ?? ""), requestEngine(b.engine))),
         });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1092,7 +1203,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/fiction/check") {
       const b = await readBody(req);
       try {
-        json(res, 200, { ok: true, job: publicJob(addFictionCheckJob(String(b.series ?? ""), Number(b.chapter ?? 0))) });
+        json(res, 200, { ok: true, job: publicJob(addFictionCheckJob(String(b.series ?? ""), Number(b.chapter ?? 0), requestEngine(b.engine))) });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
@@ -1161,7 +1272,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/charles/draft") {
       const b = await readBody(req);
       try {
-        const drafted = await enqueueCharlesDraft(String(b.mode ?? ""), String(b.input ?? ""));
+        const drafted = await enqueueCharlesDraft(String(b.mode ?? ""), String(b.input ?? ""), requestEngine(b.engine));
         json(res, 200, { ok: true, ...drafted });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1238,7 +1349,7 @@ const server = createServer(async (req, res) => {
       const slug = String(b.slug ?? "").trim();
       try {
         if (slug) {
-          json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug)) });
+          json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop", requestEngine(b.engine))) });
           return;
         }
         const source = String(b.source ?? "");
@@ -1255,7 +1366,7 @@ const server = createServer(async (req, res) => {
           json(res, 400, { ok: false, error: "drop a URL, file path, or pasted text here" });
           return;
         }
-        const job = addDevelopJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText);
+        const job = addDevelopJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText, requestEngine(b.engine));
         json(res, 200, { ok: true, job: publicJob(job) });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1278,7 +1389,7 @@ const server = createServer(async (req, res) => {
         // Persist the reply BEFORE enqueueing: the spawn argv stays a fixed `/develop
         // content/<slug>`, and the reply is on disk for the audit trail even if the job dies.
         appendReplyBySlug(slug, reply);
-        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop-reply")) });
+        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop-reply", requestEngine(b.engine))) });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
@@ -1329,7 +1440,7 @@ const server = createServer(async (req, res) => {
           return;
         }
         const queued = lenses.map((lens) =>
-          publicJob(addJob("continue", buildFormatArg(slug, lens), `Format for platforms: ${slug} (${lens})`)),
+          publicJob(addJob("continue", buildFormatArg(slug, lens), `Format for platforms: ${slug} (${lens})`, undefined, requestEngine(b.engine))),
         );
         json(res, 200, { ok: true, jobs: queued });
       } catch (e) {
@@ -1349,10 +1460,10 @@ const server = createServer(async (req, res) => {
         const row = readQueue(folder).rows.find((r) => r.id === id);
         const blocked = replyToMentionBlockReason(row);
         if (blocked) {
-          json(res, 400, { ok: false, error: `Ask Claude is ${blocked}` });
+          json(res, 400, { ok: false, error: `Revision is ${blocked}` });
           return;
         }
-        const body = await reviseDerivative(slug, id, String(b.instruction ?? ""));
+        const body = await reviseDerivative(slug, id, String(b.instruction ?? ""), requestEngine(b.engine));
         json(res, 200, { ok: true, body });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1365,7 +1476,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/video/generate") {
       const b = await readBody(req);
       try {
-        const job = addVideoJob(String(b.slug ?? ""));
+        const job = addVideoJob(String(b.slug ?? ""), requestEngine(b.engine));
         json(res, 200, { ok: true, job: publicJob(job) });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1389,7 +1500,7 @@ const server = createServer(async (req, res) => {
           json(res, 400, { ok: false, error: `Duplicate to platform is ${blocked}` });
           return;
         }
-        const newRow = await duplicateToPlatform(slug, id, String(b.platform ?? ""));
+        const newRow = await duplicateToPlatform(slug, id, String(b.platform ?? ""), requestEngine(b.engine));
         json(res, 200, { ok: true, row: newRow });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1408,7 +1519,7 @@ const server = createServer(async (req, res) => {
         json(res, 400, { ok: false, error: dispatch.error });
         return;
       }
-      const job = addJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText);
+      const job = addJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText, requestEngine(b.engine));
       json(res, 200, { ok: true, job: publicJob(job) });
       return;
     }
@@ -1452,7 +1563,7 @@ const server = createServer(async (req, res) => {
       const results = scaffoldPicked(indices);
       const queued = results
         .filter((r) => r.dir)
-        .map((r) => publicJob(addJob("continue", `--continue ${r.dir}`, `Note: ${r.title}`)));
+        .map((r) => publicJob(addJob("continue", `--continue ${r.dir}`, `Note: ${r.title}`, undefined, requestEngine(b.engine))));
       json(res, 200, { ok: true, results, jobs: queued });
       return;
     }
@@ -1537,7 +1648,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/strategy/ask") {
       const b = await readBody(req);
       try {
-        const { path, content } = await reviseBrief(String(b.instruction ?? ""));
+        const { path, content } = await reviseBrief(String(b.instruction ?? ""), requestEngine(b.engine));
         json(res, 200, { ok: true, path, content });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1554,7 +1665,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
-        const { path } = await refreshBrief();
+        const { path } = await refreshBrief(requestEngine((await readBody(req)).engine));
         json(res, 200, { ok: true, path });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1562,8 +1673,9 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/strategy/insights") {
+      const b = await readBody(req);
       try {
-        const result = await generateInsights();
+        const result = await generateInsights(requestEngine(b.engine));
         json(res, 200, { ok: true, ...result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1575,7 +1687,7 @@ const server = createServer(async (req, res) => {
       const question = String(b.question ?? "");
       const history = Array.isArray(b.history) ? b.history : [];
       try {
-        const answer = await askInsights(question, history);
+        const answer = await askInsights(question, history, requestEngine(b.engine));
         json(res, 200, { ok: true, answer });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1647,8 +1759,9 @@ const server = createServer(async (req, res) => {
         json(res, 409, { ok: false, error: "a scout run is already in progress — see the Add / Queue tab" });
         return;
       }
+      const b = await readBody(req);
       try {
-        await runScout();
+        await runScout(requestEngine(b.engine));
         json(res, 200, { ok: true });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1762,7 +1875,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
-        const { body } = await reviseOutreachMessage(dir, file, String(b.instruction ?? ""));
+        const { body } = await reviseOutreachMessage(dir, file, String(b.instruction ?? ""), requestEngine(b.engine));
         json(res, 200, { ok: true, body });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1790,6 +1903,7 @@ const server = createServer(async (req, res) => {
           b.channel ? String(b.channel) : undefined,
           b.recipient ? String(b.recipient) : undefined,
           guard.direction,
+          guard.engine,
         );
         json(res, 200, { ok: true, result });
       } catch (e) {
@@ -1850,13 +1964,18 @@ const server = createServer(async (req, res) => {
     // inbound rows have nowhere to draft into yet, so this refuses anything outside that tree.
     if (req.method === "POST" && url.pathname === "/api/followups/draft-follow-up") {
       const b = await readBody(req);
-      const dir = String(b.dir ?? "");
-      if (!isValidLeadDir(dir)) {
-        json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
+      const guard = followUpDraftGuard(b);
+      if ("error" in guard) {
+        json(res, 400, { ok: false, error: guard.error });
         return;
       }
       try {
-        const result = await enqueueFollowUpDraft(dir, b.channel ? String(b.channel) : undefined, b.recipient ? String(b.recipient) : undefined);
+        const result = await enqueueFollowUpDraft(
+          guard.dir,
+          b.channel ? String(b.channel) : undefined,
+          b.recipient ? String(b.recipient) : undefined,
+          guard.engine,
+        );
         json(res, 200, { ok: true, result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1887,6 +2006,22 @@ const server = createServer(async (req, res) => {
       json(res, result.ok ? 200 : 400, result);
       return;
     }
+    if (req.method === "POST" && /^\/api\/venture\/[^/]+\/intake\/section$/.test(url.pathname)) {
+      const b = await readBody(req);
+      const result = saveIntakeSectionDraft(url.pathname.split("/")[3], b.section, b.field, b.text);
+      json(res, result.ok ? 200 : 400, result);
+      return;
+    }
+    if (req.method === "GET" && /^\/api\/venture\/[^/]+\/intake\/sections$/.test(url.pathname)) {
+      const result = readIntakeSections(url.pathname.split("/")[3]);
+      json(res, result.ok ? 200 : 400, result);
+      return;
+    }
+    if (req.method === "POST" && /^\/api\/venture\/[^/]+\/intake\/drafts\/clear$/.test(url.pathname)) {
+      const result = clearIntakeDrafts(url.pathname.split("/")[3]);
+      json(res, result.ok ? 200 : 400, result);
+      return;
+    }
     // Restore one question. No draft yet is normal on a fresh question, so it answers 200 with a
     // null draft rather than a 404.
     if (req.method === "GET" && /^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/.test(url.pathname)) {
@@ -1895,7 +2030,42 @@ const server = createServer(async (req, res) => {
       json(res, result.ok ? 200 : 400, result);
       return;
     }
-    // The Venture room's write side (eleven POSTs). Every one wraps the function that already
+    // Read-only Venture judgment. The selected engine sees the same server-derived thread the room
+    // renders and may recommend the next human decision, but it cannot write canon or advance a
+    // phase. The existing Venture write routes remain the only way state changes.
+    if (req.method === "POST" && /^\/api\/venture\/[^/]+\/analyze$/.test(url.pathname)) {
+      const slug = url.pathname.split("/")[3];
+      const b = await readBody(req);
+      try {
+        const engine = requestEngine(b.engine);
+        const analysis = await analyzeVenture(slug, engine);
+        json(res, 200, { ok: true, engine, analysis });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // One selected-engine Venture draft step. The engine proposes JSON read-only; venture-runner
+    // validates the command against the current phase and feeds it to the existing phase CLI, so
+    // the CLI's gates remain authoritative and nothing can auto-select, approve, or publish.
+    if (req.method === "POST" && /^\/api\/venture\/[^/]+\/run-step$/.test(url.pathname)) {
+      const slug = url.pathname.split("/")[3];
+      const b = await readBody(req);
+      const phase = Number(b.phase);
+      if (!Number.isInteger(phase) || phase < 1 || phase > 4) {
+        json(res, 400, { ok: false, error: "phase must be 1, 2, 3, or 4" });
+        return;
+      }
+      try {
+        const engine = requestEngine(b.engine);
+        const result = await enqueueVentureStep(slug, phase, engine);
+        json(res, 200, { ok: true, ...result });
+      } catch (e) {
+        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    // The Venture room's write side (twelve POSTs). Every one wraps the function that already
     // owns the rule -- see src/review/venture-writes.ts. Placed before the read dispatcher below
     // (they cannot collide: one is POST-only, the other GET-only) and after the intake-draft
     // routes above, so POST :slug/intake/<n>/draft still reaches its own handler.

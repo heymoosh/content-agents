@@ -11,6 +11,7 @@ import {
   isValidLeadDir,
   isValidMessageFile,
   outreachDraftGuard,
+  followUpDraftGuard,
   MAX_DIRECTION_CHARS,
   appendLeadNote,
   approveBlockReason,
@@ -28,9 +29,18 @@ import {
   extractSection,
   type SchedulerDeps,
   appendLeadContact,
+  ventureAnalysisPrompt,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
+
+test("ventureAnalysisPrompt is read-only and carries the server-derived state", () => {
+  const prompt = ventureAnalysisPrompt("my-venture", { phase: 2, next: "review" });
+  assert.match(prompt, /\.claude\/skills\/venture\/SKILL\.md/);
+  assert.match(prompt, /do not write, edit, delete, or advance/);
+  assert.match(prompt, /my-venture/);
+  assert.match(prompt, /"phase": 2/);
+});
 
 // "Revise with Claude" (Muxin, 2026-07-03): the GUI shells out to headless `claude -p` to edit one
 // derivative in place. The prompt is the only guardrail against Claude wandering — these lock it in.
@@ -605,19 +615,31 @@ test("outreachDraftGuard refuses anything outside a real outreach/leads/<dir> fo
 
 test("outreachDraftGuard accepts a real lead folder and passes the direction through", () => {
   const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: "  keep it short  " });
-  assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: "keep it short" });
+  assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: "keep it short", engine: "claude" });
 });
 
 test("outreachDraftGuard turns a blank direction into undefined, never an empty string", () => {
   // Load-bearing: `undefined` is what keeps buildDraftPrompt byte-identical for existing callers.
   for (const blank of ["", "   ", "\n\t "]) {
     const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: blank });
-    assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: undefined });
+    assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "claude" });
   }
   assert.deepEqual(outreachDraftGuard({ dir: "outreach/leads/client-acme-co" }), {
     dir: "outreach/leads/client-acme-co",
     direction: undefined,
+    engine: "claude",
   });
+});
+
+test("outreachDraftGuard normalizes the optional engine for the directed draft route", () => {
+  assert.deepEqual(
+    outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "grok" }),
+    { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "grok" },
+  );
+  assert.deepEqual(
+    outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "unsupported" }),
+    { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "claude" },
+  );
 });
 
 test("outreachDraftGuard caps a pasted-document direction before it reaches a spawn", () => {
@@ -626,6 +648,18 @@ test("outreachDraftGuard caps a pasted-document direction before it reaches a sp
   const tooLong = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: "x".repeat(MAX_DIRECTION_CHARS + 1) });
   assert.ok("error" in tooLong);
   assert.match((tooLong as { error: string }).error, /under 2000 characters/);
+});
+
+test("followUpDraftGuard validates the route folder and propagates the optional engine", () => {
+  assert.deepEqual(
+    followUpDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "grok" }),
+    { dir: "outreach/leads/client-acme-co", engine: "grok" },
+  );
+  assert.deepEqual(
+    followUpDraftGuard({ dir: "outreach/leads/client-acme-co" }),
+    { dir: "outreach/leads/client-acme-co", engine: "claude" },
+  );
+  assert.ok("error" in followUpDraftGuard({ dir: "outreach/leads/../escape", engine: "codex" }));
 });
 
 // ── appendLeadNote — Muxin's per-lead notes ("what stood out, why interested"), appended dated

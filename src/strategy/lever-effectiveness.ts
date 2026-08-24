@@ -66,7 +66,7 @@ export const LEVER_TRACKING_GAPS: LeverTrackingGap[] = [
     scriptName: "npm run platform-fit",
     reason:
       "posts.pillar and posts.platform are both persisted and queryable, but nothing stamps whether a " +
-      "post's routing FOLLOWED Lever A's fit read — config/routing.yaml's defaults gate generation " +
+      "post's routing FOLLOWED Lever A's fit read. config/routing.yaml's defaults gate generation " +
       "unconditionally (card 7e550e48), so there is no 'routed via the lever' bucket to compare against a " +
       "baseline. npm run platform-fit / npm run resonance already show current pillar x platform " +
       "performance, but that is a snapshot, not a before/after lift attributable to the lever. Proposed " +
@@ -79,7 +79,7 @@ export const LEVER_TRACKING_GAPS: LeverTrackingGap[] = [
     scriptName: "npm run media-fit",
     reason:
       "posts.media_type is persisted, but /atomize's generation contract (always text + quote-card per " +
-      "routed platform) is unconditional — there is no post whose media choice was made because of Lever " +
+      "routed platform) is unconditional, so there is no post whose media choice was made because of Lever " +
       "B's recommendation versus one that wasn't, so no A/B split exists to attribute an engagement delta " +
       "to. Proposed fix: card 30257501 (needs Muxin's sign-off before it builds).",
   },
@@ -125,11 +125,11 @@ export function buildReport(injectedDb?: ReturnType<typeof openDb>, now = Date.n
 function cadenceLabelText(r: CadenceFollowFitResult): string {
   switch (r.label) {
     case "override-winning":
-      return "override winning — keep it";
+      return "override winning, keep it";
     case "even":
       return "even";
     case "override-losing":
-      return "override losing — default cadence outperforms";
+      return "override losing, default cadence outperforms";
     case "insufficient-data":
       return "insufficient data";
   }
@@ -138,11 +138,11 @@ function cadenceLabelText(r: CadenceFollowFitResult): string {
 function frameLabelText(r: FrameFitResult): string {
   switch (r.label) {
     case "frame-winning":
-      return "spin frame winning — keep it";
+      return "spin frame winning, keep it";
     case "even":
       return "even";
     case "frame-losing":
-      return "spin frame losing — verbatim baseline outperforms";
+      return "spin frame losing, verbatim baseline outperforms";
     case "insufficient-data":
       return "insufficient data";
   }
@@ -162,23 +162,23 @@ function ctaLabelText(r: CtaFitResult): string {
 // Pure formatting — no I/O, so tests can assert on the exact string without a DB or config file.
 export function formatReport(report: LeverEffectivenessReport, cfg: RoutingConfig): string {
   const lines: string[] = [];
-  lines.push(`# Strategy lever effectiveness — ${new Date().toISOString().slice(0, 10)}\n`);
+  lines.push(`# Strategy lever effectiveness, ${new Date().toISOString().slice(0, 10)}\n`);
   lines.push(
     `Card 83166c51 (epic 2ce597d7 "Close the loop") asks whether the 5 recommendation-only levers that ` +
       `epic built actually work. Three of them (C: cadence-fit, D: frame-fit, E: cta-fit) now compute a ` +
-      `real measured delta against a baseline — this report surfaces all three together. The other two ` +
+      `real measured delta against a baseline, and this report surfaces all three together. The other two ` +
       `(A: platform-fit, B: media-fit) still cannot honestly show the card's own example ("posts routed ` +
       `via Lever A show X% lift") today, because no field on \`posts\` records whether a post's routing ` +
-      `or media choice actually followed that lever's recommendation — see "Insufficient tracking" below. ` +
+      `or media choice actually followed that lever's recommendation. See "Insufficient tracking" below. ` +
       `That's a tracking gap, not a thin-data gap: more posts will not fix it on their own.\n`
   );
 
-  lines.push(`## Lever C — cadence-override follow-through (override vs. default cadence)\n`);
+  lines.push(`## Lever C, cadence-override follow-through (override vs. default cadence)\n`);
   const cadenceWithData = report.cadence.filter((r) => r.label !== "insufficient-data");
   const cadenceThin = report.cadence.filter((r) => r.label === "insufficient-data");
   if (report.cadence.length === 0) {
     lines.push(
-      "No platform has any cadence_source-tagged posts yet — either no override has been approved in " +
+      "No platform has any cadence_source-tagged posts yet, either because no override has been approved in " +
         "config/schedule-overrides.yaml, or none have published since. Run npm run tag-source after " +
         "publishing to stamp posts.cadence_source.\n"
     );
@@ -201,7 +201,7 @@ export function formatReport(report: LeverEffectivenessReport, cfg: RoutingConfi
     lines.push("");
   }
 
-  lines.push(`## Lever D — spin-frame fit (spin-on vs. verbatim control baseline)\n`);
+  lines.push(`## Lever D, spin-frame fit (spin-on vs. verbatim control baseline)\n`);
   const frameWithData = report.frame.filter((r) => r.label !== "insufficient-data");
   const frameThin = report.frame.filter((r) => r.label === "insufficient-data");
   if (report.frame.length === 0) {
@@ -228,7 +228,7 @@ export function formatReport(report: LeverEffectivenessReport, cfg: RoutingConfi
     lines.push("");
   }
 
-  lines.push(`## Lever E — CTA-destination fit\n`);
+  lines.push(`## Lever E, CTA-destination fit\n`);
   const ctaWithData = report.cta.filter((r) => r.label !== "insufficient-data");
   const ctaThin = report.cta.filter((r) => r.label === "insufficient-data");
   if (report.cta.length === 0) {
@@ -254,7 +254,7 @@ export function formatReport(report: LeverEffectivenessReport, cfg: RoutingConfi
 
   lines.push(`## Insufficient tracking (Levers A/B)\n`);
   lines.push(
-    "Not \"insufficient data\" — an attribution field literally doesn't exist yet for these two levers, " +
+    "Not \"insufficient data\": an attribution field literally doesn't exist yet for these two levers, " +
       "so no before/after lift can be shown honestly, at any sample size.\n"
   );
   lines.push(`| Lever | Signal | Why it can't be measured today |`);
@@ -264,9 +264,9 @@ export function formatReport(report: LeverEffectivenessReport, cfg: RoutingConfi
   }
   lines.push(
     `\nEach lever's own script (${report.trackingGaps.map((g) => g.scriptName).join(", ")}) still shows the ` +
-      "underlying pillar/media performance — just not a delta attributable to the lever's recommendation. " +
+      "underlying pillar/media performance, just not a delta attributable to the lever's recommendation. " +
       "Closing this gap needs a deliberate, Muxin-approved control mechanism (mirroring Lever D's periodic " +
-      "spin-control run) — proposed as cards 2ed2bc5a (Lever A) and 30257501 (Lever B), pending her sign-off. " +
+      "spin-control run), proposed as cards 2ed2bc5a (Lever A) and 30257501 (Lever B), pending her sign-off. " +
       "Out of scope for this report."
   );
 

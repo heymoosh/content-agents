@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { openDb, repoRoot } from "../db/db.js";
 import { runDriftCheck } from "./routing-drift.js";
-import { readSourceClass, readSourceKind, triageEffects } from "../atomize/source-triage.js";
+import { readSourceClass, readSourceKind, readSourceOrigin, triageEffects } from "../atomize/source-triage.js";
 
 // Intelligent content router: decide which platforms a piece should be posted to,
 // from analytics (resonance) + editorial config (config/routing.yaml) + a graceful
@@ -263,7 +263,7 @@ export function decideForPillar(pillar: string, cfg: RoutingConfig, data: Loaded
         decision,
         score: fit.score,
         confidence: "data",
-        rationale: `config default: ${decision} — data shows ${fit.score!.toFixed(2)}× platform norm (n=${fit.n})`,
+        rationale: `config default: ${decision}, data shows ${fit.score!.toFixed(2)}× platform norm (n=${fit.n})`,
       });
     } else {
       const why = fit.n === 0 ? "no tagged data yet" : fit.weeks < 4 ? "<4wks data" : `only n=${fit.n} posts`;
@@ -273,15 +273,15 @@ export function decideForPillar(pillar: string, cfg: RoutingConfig, data: Loaded
         score: null,
         confidence: "cold-start",
         rationale: inDefaults
-          ? `cold-start (${why}) — posting broadly to gather signal`
-          : `cold-start (${why}) — not a default target for this pillar`,
+          ? `cold-start (${why}), posting broadly to gather signal`
+          : `cold-start (${why}), not a default target for this pillar`,
       });
     }
   }
 
   // Format assets are always generated, never platform-gated.
   for (const asset of cfg.thresholds.always_consider) {
-    out.push({ platform: asset, decision: "include", score: null, confidence: "always", rationale: "format asset — always generated" });
+    out.push({ platform: asset, decision: "include", score: null, confidence: "always", rationale: "format asset, always generated" });
   }
   return out;
 }
@@ -366,7 +366,7 @@ export function applyExplorationOverride(merged: MergedDecision[], pillar: strin
       decision: "include",
       confidence: "exploration",
       rationale:
-        `exploration probe (card 92bb2ae6): off-assignment probe for "${pillar}" on ${platform} this cycle — ` +
+        `exploration probe (card 92bb2ae6): off-assignment probe for "${pillar}" on ${platform} this cycle. ` +
         `stamp the drafted derivative exploration_probe: true (see src/strategy/exploration.ts)`,
       pillars: [...new Set([...d.pillars, pillar])],
     };
@@ -389,7 +389,78 @@ export function applySourceTriage(merged: MergedDecision[], excludePlatforms: st
       ...d,
       decision: "skip",
       confidence: "rule",
-      rationale: `source-triage: excluded by source_class (source.md) — was: ${d.rationale}`,
+      rationale: `source-triage: excluded by source_class (source.md). Was: ${d.rationale}`,
+    };
+  });
+}
+
+// The origin block (v5 handoff §9.9): a piece ingested from a URL carries, in source.md's
+// `origin`, the address it is ALREADY LIVE at. Routing it back to that platform would generate a
+// derivative of a post its own audience there has already seen — a duplicate. So a platform the
+// origin resolves to is a HARD exclusion: it outranks config/routing.yaml's `include` default,
+// because posting a duplicate is worse than missing a channel.
+//
+// Registrable domains we can map to a routing channel HONESTLY. Suffix-matched, so
+// `www.linkedin.com`, `mobile.twitter.com` and `humaninference.substack.com` all resolve.
+// Deliberately absent, because guessing would be worse than routing normally:
+//   - mastodon — federated across thousands of instance hosts, and this repo configures none
+//     (config/platforms.yaml carries cadence/style for `mastodon` but no instance domain).
+//   - community:<id> — config/platforms.yaml's `communities` records notes only, no URL or host.
+//   - a Substack publication on its own custom domain — the host carries no substack.com marker.
+// Each of those falls through to `undefined` below and the piece routes exactly as it does today.
+const ORIGIN_PLATFORM_DOMAINS: Record<string, string> = {
+  "x.com": "x",
+  "twitter.com": "x",
+  "linkedin.com": "linkedin",
+  "bsky.app": "bluesky",
+  "threads.net": "threads",
+  "threads.com": "threads",
+  "substack.com": "substack",
+};
+
+// Map a source.md `origin` value onto a routing channel id, or undefined when it names no
+// platform we can resolve with confidence. Non-URL origins (`file:<name>`, `voice-memo:<name>`,
+// `pasted-text`) name no platform at all and always return undefined — the piece was never
+// published anywhere, so nothing is blocked. FAIL OPEN is the rule here: an unrecognized origin
+// routes normally rather than silently losing a channel to a guess.
+export function originPlatform(origin: string): string | undefined {
+  const trimmed = origin.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return undefined;
+  let host: string;
+  try {
+    host = new URL(trimmed).hostname.toLowerCase();
+  } catch {
+    return undefined; // malformed URL — fail open, same as an unrecognized host
+  }
+  for (const [domain, platform] of Object.entries(ORIGIN_PLATFORM_DOMAINS)) {
+    if (host === domain || host.endsWith(`.${domain}`)) return platform;
+  }
+  return undefined;
+}
+
+// Force the piece's own origin platform to `skip`, confidence "rule" — the same un-overridable
+// hard-veto confidence an editorial `never` rule and applySourceTriage already use, so
+// applyExplorationOverride can't punch through it and validate.ts's checkRoutingGate enforces it
+// on any derivative drafted anyway. The exclusion is RECORDED, never silent: the routing.md row
+// stays, with a rationale naming the origin and preserving the decision it replaced.
+//
+// DEMOTE-ONLY, exactly like applySourceTriage: it never appends a decision for a platform that
+// wasn't already a candidate. Two reasons. (1) A channel that was never in play has nothing to
+// exclude, and inventing a `skip` row for it would put a claim on screen that routing never made.
+// (2) applySubstackRepost below appends `substack` only when it is absent, so an invented
+// `substack | skip` row here would silently kill the Muxin-approved Note repost (card df11d0db).
+// That repost is the ONE deliberate republish-to-origin in this pipeline — she decided it — which
+// is why main() runs this block BEFORE applySubstackRepost, not after.
+export function applyOriginBlock(merged: MergedDecision[], origin: string): MergedDecision[] {
+  const platform = originPlatform(origin);
+  if (!platform) return merged;
+  return merged.map((d) => {
+    if (d.platform !== platform || d.decision === "skip") return d;
+    return {
+      ...d,
+      decision: "skip",
+      confidence: "rule",
+      rationale: `origin block: this piece is already live there (source.md origin: ${origin}). Was: ${d.rationale}`,
     };
   });
 }
@@ -413,26 +484,29 @@ export function applySubstackRepost(merged: MergedDecision[], pillars: string[],
       decision: "include",
       score: null,
       confidence: "rule",
-      rationale: "source_kind: substack-note — reposting the Note back to Substack (src/publish/substack.ts)",
+      rationale: "source_kind: substack-note, reposting the Note back to Substack (src/publish/substack.ts)",
       pillars: [...pillars],
     },
   ];
 }
 
-function routingMd(pillars: string[], merged: MergedDecision[]): string {
-  const fit = (d: MergedDecision) => (d.score == null ? "—" : d.score.toFixed(2));
+// Exported for the round-trip guards in src/review/treatment.test.ts and
+// src/atomize/validate.test.ts: they parse this writer's real output rather than a hand-typed
+// fixture, so a heading or table change can never again silently break a reader.
+export function routingMd(pillars: string[], merged: MergedDecision[]): string {
+  const fit = (d: MergedDecision) => (d.score == null ? "-" : d.score.toFixed(2));
   const rows = merged
     .map((d) => `| ${d.platform} | ${d.decision} | ${fit(d)} | ${d.confidence} | ${d.rationale} |`)
     .join("\n");
   const header =
     pillars.length > 1
-      ? `# Routing — ${pillars.join(" + ")} — ${new Date().toISOString().slice(0, 10)}\n\n` +
+      ? `# Routing: ${pillars.join(" + ")} (${new Date().toISOString().slice(0, 10)})\n\n` +
         `Generated by \`npm run route\` from analytics + config/routing.yaml, merged across ${pillars.length} pillars in one ` +
         `pass: a platform is \`include\` if ANY pillar includes it, UNLESS any pillar's editorial \`never\` rule vetoes it ` +
         `(that veto wins regardless of other pillars). Only \`include\` platforms are atomized and queued; Muxin's ` +
         `review-queue approval stays the final gate. \`npm run validate\` hard-fails any derivative drafted for a ` +
         `platform marked \`skip\` here.\n\n`
-      : `# Routing — ${pillars[0]} — ${new Date().toISOString().slice(0, 10)}\n\n` +
+      : `# Routing: ${pillars[0]} (${new Date().toISOString().slice(0, 10)})\n\n` +
         `Generated by \`npm run route\` from analytics + config/routing.yaml. Only \`include\` platforms are atomized ` +
         `and queued; Muxin's review-queue approval stays the final gate. \`npm run validate\` hard-fails any derivative ` +
         `drafted for a platform marked \`skip\` here.\n\n`;
@@ -457,7 +531,7 @@ function main() {
     const targets = [...new Set(PILLARS.flatMap((p) => decideForPillar(p, cfg, data).map((d) => d.platform)))]
       .filter((t) => !cfg.thresholds.always_consider.includes(t))
       .sort();
-    console.log(`# Routing map — ${new Date().toISOString().slice(0, 10)}\n`);
+    console.log(`# Routing map, ${new Date().toISOString().slice(0, 10)}\n`);
     console.log(`Where each pillar should post. \`include\`/\`skip\` from analytics + config/routing.yaml; format assets (${cfg.thresholds.always_consider.join(", ")}) always generated.\n`);
     console.log(`| Pillar | ${targets.join(" | ")} |`);
     console.log(`|---|${targets.map(() => "---").join("|")}|`);
@@ -465,7 +539,7 @@ function main() {
       const dec = decideForPillar(pillar, cfg, data);
       const cells = targets.map((t) => {
         const d = dec.find((x) => x.platform === t);
-        return d ? d.decision : "—";
+        return d ? d.decision : "-";
       });
       console.log(`| ${pillar} | ${cells.join(" | ")} |`);
     }
@@ -499,6 +573,12 @@ function main() {
     if (sourceClass) {
       merged = applySourceTriage(merged, triageEffects(sourceClass).excludePlatforms);
     }
+    // Origin block (v5 handoff §9.9) runs here — after source triage, BEFORE applySubstackRepost
+    // and before --explore. Before the repost hook because a Substack Note going back to Substack
+    // is the one republish-to-origin Muxin approved on purpose (card df11d0db); before --explore
+    // because an exploration probe must never punch through a hard exclusion, same as an
+    // editorial `never` rule.
+    merged = applyOriginBlock(merged, readSourceOrigin(abs));
     merged = applySubstackRepost(merged, pillars, readSourceKind(abs));
   }
 

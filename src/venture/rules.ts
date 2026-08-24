@@ -71,6 +71,14 @@ export interface CheckpointRule {
   // decision kind with no `selected` DecisionRecord for the slug blocks the checkpoint exactly like
   // a missing required artifact kind does.
   required_decision_kinds?: DecisionKind[];
+  // checkpoint-1 only today (rules.yaml). "This checkpoint requires controlled collection": an
+  // artifact whose evidence is derived `historical_prior` -- it points at something that went
+  // public BEFORE this venture kicked off -- does not count toward it (venture/rules.md §5.6,
+  // venture-schema-contract.md §5.4b, v5 handoff §9.6). Checkpoint 1 is the gate that is supposed
+  // to prove three posts were freshly drafted, approved and confirmed live THROUGH this venture,
+  // so a pre-venture win clearing it would make the gate mean nothing. Checkpoints that don't
+  // declare it are unaffected -- checkpoint-2's attestation-backed kinds in particular.
+  require_current_evidence?: boolean;
   // Overrides the ledger event id this checkpoint clears/reads as, from the default
   // `<slug>/<checkpointId>` (checkpoint-1, checkpoint-2) to `<slug>/<ledger_event_id>`. Only
   // checkpoint-3 sets this (venture-schema-contract.md §5.3 names the real event

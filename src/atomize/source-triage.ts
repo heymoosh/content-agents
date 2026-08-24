@@ -55,6 +55,16 @@ export function readSourceKind(dir: string): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+// READ <dir>/source.md's `origin` — the fact new-content.ts/new-notes.ts recorded about where
+// this piece came from (a live URL for a URL ingest, else `file:<name>`, `voice-memo:<name>` or
+// `pasted-text`). route.ts's origin block (v5 handoff §9.9) uses this to refuse routing a piece
+// back to the platform it is already live on. Empty string when absent/unreadable — same
+// fail-open convention as readSourceKind above, so an unrecorded origin routes normally.
+export function readSourceOrigin(dir: string): string {
+  const v = readSourceFm(dir).origin;
+  return typeof v === "string" ? v.trim() : "";
+}
+
 // The informational "no beat-2 belief statement found" side effect (see triageEffects doc below)
 // — read the same way, from the same recorded fact, never re-derived.
 export function hasMissingBeat2(dir: string): boolean {

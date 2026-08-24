@@ -517,6 +517,21 @@ test("only the current phase's cards are drawn, so the thread does not grow with
   assert.deepEqual(ids, ["now"]);
 });
 
+test("earlier-phase artifacts remain available in bounded history while current rendering stays unchanged", () => {
+  const earlier = artifact({ artifact_id: "old", venture_phase: 1, phase: 1 });
+  const current = artifact({ artifact_id: "now", venture_phase: 2, phase: 2 });
+  const t = buildVentureThread(input({ state: state({ current_phase: 2 }), artifacts: [earlier, current] }));
+  const currentIds = t.messages.filter((m) => m.kind === "card").map((m) => (m.kind === "card" ? m.artifactId : ""));
+  assert.deepEqual(currentIds, ["now"]);
+  assert.deepEqual(t.history.map((group) => group.phase), [1]);
+  assert.deepEqual(t.history[0].artifacts.map((card) => card.artifactId), ["old"]);
+
+  const manyEarlier = Array.from({ length: 100 }, (_, i) => artifact({ artifact_id: `old-${i}`, venture_phase: 1, phase: 1 }));
+  const bounded = buildVentureThread(input({ state: state({ current_phase: 2 }), artifacts: [...manyEarlier, current] }));
+  const historyCount = bounded.history.reduce((n, group) => n + group.artifacts.length, 0);
+  assert.ok(historyCount <= 24, `history must stay bounded, got ${historyCount}`);
+});
+
 // ── the client mirror (port-rules Rule 5) ────────────────────────────────────────────────────────
 
 test("the two page.ts helpers ship to the browser as mirrors, and the room uses them", () => {

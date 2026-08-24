@@ -7,6 +7,7 @@ import {
   hasQuote,
   isValidEvidenceItem,
   type EvidenceItem,
+  formatEvidenceLine,
   type QualifyInput, upsertFrontmatterField } from "./qualify.js";
 
 const WORLDVIEW_ITEM: EvidenceItem = {
@@ -16,6 +17,7 @@ const WORLDVIEW_ITEM: EvidenceItem = {
   source: "https://example.com/interview",
   quote: "we shipped the process before anyone checked the assumption underneath it",
   description: "founder interview re: untested assumption",
+  captured_at: null,
 };
 
 const PERSON_ITEM: EvidenceItem = {
@@ -25,6 +27,7 @@ const PERSON_ITEM: EvidenceItem = {
   source: "https://example.com/jane-blog",
   quote: "the system worked fine, the question is who it worked for",
   description: "eng lead blog post",
+  captured_at: null,
 };
 
 function baseInput(overrides: Partial<QualifyInput> = {}): QualifyInput {
@@ -279,4 +282,83 @@ test("upsertFrontmatterField updates an existing field and inserts a missing one
   const inserted = upsertFrontmatterField(header, "why_mutual", '"the read"');
   assert.match(inserted, /why_mutual: "the read"\n---\n/);
   assert.equal(upsertFrontmatterField("no frontmatter here", "x", "y"), "no frontmatter here");
+});
+
+// ── captured_at: the optional trailing segment ──────────────────────────────────────────────────
+//
+// Every lead.md already on disk was written before this field existed and nothing rewrites those
+// files, so the OLD line shape has to keep parsing forever. These lines are copied verbatim out of
+// outreach/leads/ rather than written for the test, which is the only version of this check that
+// can actually catch a format change.
+describe("parseEvidence: captured_at", () => {
+  const REAL_UNDATED_LINE =
+    '- E1 | signal: greenfield | person: | source: https://www.businesswire.com/news/home/20250423372243/en/x | quote: "Beyond Notetaking: Fireflies Offers 200+ Agentic AI Apps" | April 2025 shift from a single notetaking product into a wide, still-forming portfolio.';
+  const REAL_VAULT_LINE =
+    '- E2 | signal: greenfield | person: Krish Ramineni | source: vault:Research/Company Research/Fireflies/Krish LinkedIn.md | quote: "I\'m hiring founders! We\'re expanding into multiple new products at Fireflies." | Direct 0-to-1 language for genuinely undecided new product bets.';
+
+  test("a line written before the field existed parses, and is undated rather than defaulted", () => {
+    const [item] = parseEvidence(`## Evidence\n\n${REAL_UNDATED_LINE}\n`);
+    assert.equal(item.id, "E1");
+    assert.equal(item.signal, "greenfield");
+    assert.equal(item.source, "https://www.businesswire.com/news/home/20250423372243/en/x");
+    assert.equal(item.description, "April 2025 shift from a single notetaking product into a wide, still-forming portfolio.");
+    assert.equal(item.captured_at, null);
+  });
+
+  test("a vault-sourced legacy line parses unchanged too", () => {
+    const [item] = parseEvidence(`## Evidence\n\n${REAL_VAULT_LINE}\n`);
+    assert.equal(item.person, "Krish Ramineni");
+    assert.equal(item.source, "vault:Research/Company Research/Fireflies/Krish LinkedIn.md");
+    assert.equal(item.description, "Direct 0-to-1 language for genuinely undecided new product bets.");
+    assert.equal(item.captured_at, null);
+  });
+
+  test("a dated line reads its date and keeps the note whole", () => {
+    const line = `${REAL_UNDATED_LINE} | captured: 2026-08-23`;
+    const [item] = parseEvidence(`## Evidence\n\n${line}\n`);
+    assert.equal(item.captured_at, "2026-08-23");
+    assert.equal(item.description, "April 2025 shift from a single notetaking product into a wide, still-forming portfolio.");
+  });
+
+  test("a note that merely mentions a capture is not mistaken for a date", () => {
+    const line = "- E1 | signal: recency | person: | source: https://acme.co | quote: (none) | captured on video, no date given";
+    const [item] = parseEvidence(`## Evidence\n\n${line}\n`);
+    assert.equal(item.captured_at, null);
+    assert.equal(item.description, "captured on video, no date given");
+  });
+
+  // The one pre-existing difference a round trip has always had: an empty `person:` field comes
+  // back as "person: " with the separator's own space, because the writer interpolates a blank.
+  // That predates captured_at and is not what these tests are about, so it is normalized away
+  // rather than pinned — everything else must come back byte for byte.
+  const norm = (line: string) => line.replace(/\| person:\s*\|/, "| person: |");
+
+  test("round trip: an undated line re-serializes still undated", () => {
+    for (const line of [REAL_UNDATED_LINE, REAL_VAULT_LINE]) {
+      const [item] = parseEvidence(`## Evidence\n\n${line}\n`);
+      const written = formatEvidenceLine(item, Number(item.id.slice(1)));
+      assert.equal(norm(written), norm(line), "re-writing an undated line must not invent a date");
+      assert.ok(!/captured:/.test(written), "no capture segment may appear on a line that had none");
+    }
+  });
+
+  test("round trip: a vault line with a real person comes back byte for byte", () => {
+    const [item] = parseEvidence(`## Evidence\n\n${REAL_VAULT_LINE}\n`);
+    assert.equal(formatEvidenceLine(item, 2), REAL_VAULT_LINE);
+  });
+
+  test("round trip: a dated line re-serializes with the same date", () => {
+    const line = `${REAL_VAULT_LINE} | captured: 2026-08-23`;
+    const [item] = parseEvidence(`## Evidence\n\n${line}\n`);
+    assert.equal(item.captured_at, "2026-08-23");
+    assert.equal(formatEvidenceLine(item, 2), line);
+  });
+
+  test("the date changes nothing about whether an item is valid", () => {
+    const dated = { ...WORLDVIEW_ITEM, captured_at: "2026-08-23" };
+    assert.equal(isValidEvidenceItem(dated), isValidEvidenceItem(WORLDVIEW_ITEM));
+    assert.equal(isValidEvidenceItem(dated), true);
+    const badSource = { ...WORLDVIEW_ITEM, source: "(none)", captured_at: "2026-08-23" };
+    assert.equal(isValidEvidenceItem(badSource), false, "a date must never rescue an item with no source");
+  });
 });

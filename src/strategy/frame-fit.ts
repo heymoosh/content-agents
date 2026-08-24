@@ -101,7 +101,7 @@ export function classifyFrame(
   now = Date.now()
 ): FrameFitResult {
   if (!strategyCfg.frame_thresholds) {
-    throw new Error("config/strategy.yaml is missing frame_thresholds (lever D, card a4c5b42b) — add a frame_thresholds block.");
+    throw new Error("config/strategy.yaml is missing frame_thresholds (lever D, card a4c5b42b). Add a frame_thresholds block.");
   }
   const group = rows.filter((r) => r.platform === platform);
   const spinOn = group.filter((r) => SPIN_ON_SOURCES.includes(r.source ?? ""));
@@ -139,11 +139,11 @@ export function rankFrameFit(rows: Row[], cfg: RoutingConfig, strategyCfg: Strat
 function labelText(label: FrameLabel): string {
   switch (label) {
     case "frame-winning":
-      return "spin frame winning — keep it";
+      return "spin frame winning, keep it";
     case "even":
       return "even";
     case "frame-losing":
-      return "spin frame losing — verbatim baseline outperforms";
+      return "spin frame losing, verbatim baseline outperforms";
     case "insufficient-data":
       return "insufficient data";
   }
@@ -155,13 +155,13 @@ function main() {
   const rows = loadRows();
   const ranked = rankFrameFit(rows, cfg, strategyCfg);
 
-  console.log(`# Spin-frame fit — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Spin-frame fit, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
-    `Recommendation only — nothing here changes what /atomize drafts. src/atomize/spin.ts's per-platform ` +
+    `Recommendation only. Nothing here changes what /atomize drafts. src/atomize/spin.ts's per-platform ` +
       `angle stays as-is; this compares the always-on spin frame against the verbatim control baseline ` +
       `(src/strategy/spin-control.ts) by engagement, per platform, for Muxin to act on by hand. Weighting ` +
       `individual angles (case-skeleton, directive-level frames) by conversion is deferred until those tags ` +
-      `are persisted to the analytics DB — see the follow-up card filed alongside this lever.\n`
+      `are persisted to the analytics DB. See the follow-up card filed alongside this lever.\n`
   );
 
   if (ranked.length === 0) {
@@ -187,7 +187,7 @@ function main() {
 
   if (thin.length > 0) {
     console.log(
-      `\n${thin.length} platform(s) read insufficient data — either side has n<${cfg.thresholds.min_posts_for_data}, ` +
+      `\n${thin.length} platform(s) read insufficient data: either side has n<${cfg.thresholds.min_posts_for_data}, ` +
         `<4wks of span, or no spin-control-run coverage yet at all (source untagged, or spin-control.ts hasn't ` +
         `placed a baseline for that platform yet):`
     );

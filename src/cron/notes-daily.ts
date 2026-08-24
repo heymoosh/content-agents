@@ -76,7 +76,7 @@ async function main() {
   const limitIdx = args.indexOf("--limit");
   const fetchLimit = limitIdx >= 0 ? Math.max(1, parseInt(args[limitIdx + 1] ?? "20", 10) || 20) : 20;
 
-  console.log(`\nnotes-daily${isDryRun ? " [DRY RUN — no network, no writes]" : ""}`);
+  console.log(`\nnotes-daily${isDryRun ? " [DRY RUN, no network, no writes]" : ""}`);
   console.log("=".repeat(50));
 
   // 1. Load ledger — set of already-seen note IDs.
@@ -110,7 +110,7 @@ async function main() {
   console.log(`New (not yet seen): ${newNotes.length} note(s).`);
 
   if (newNotes.length === 0) {
-    console.log("Nothing new — all fetched notes already in ledger.");
+    console.log("Nothing new. All fetched notes are already in the ledger.");
     return;
   }
 
@@ -124,7 +124,7 @@ async function main() {
   }
 
   if (isDryRun) {
-    console.log("\nDry-run complete — no ledger entries written, no network calls.");
+    console.log("\nDry-run complete, no ledger entries written, no network calls.");
     return;
   }
 
@@ -140,7 +140,7 @@ async function main() {
   }
   console.log(`\nLedger: marked ${newNotes.length} note(s) as seen.`);
   console.log(
-    "Nothing drafted or published — run \"Pull Substack Notes\" in the review GUI " +
+    "Nothing drafted or published. Run \"Pull Substack Notes\" in the review GUI " +
       "(npm run review) locally to draft the good ones with real per-platform Spin."
   );
 }

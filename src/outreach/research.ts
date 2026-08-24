@@ -13,6 +13,7 @@ import { logCost } from "../util/cost-log.js";
 import { loadOutreachConfig } from "./config.js";
 import {
   parseEvidence,
+  formatEvidenceLine,
   extractSection,
   setFrontmatterField,
   upsertFrontmatterField,
@@ -249,10 +250,6 @@ export function parseResearchResponse(text: string): ParsedResearch {
   };
 }
 
-function formatEvidenceLine(item: EvidenceItem, index: number): string {
-  return `- E${index} | signal: ${item.signal} | person: ${item.person} | source: ${item.source} | quote: ${item.quote} | ${item.description}`;
-}
-
 function yamlQuote(value: string): string {
   const oneLine = value.replace(/\s+/g, " ").trim();
   return `"${oneLine.replace(/"/g, '\\"')}"`;
@@ -282,6 +279,13 @@ export function mergeResearchIntoLead(opts: {
   body: string;
   parsed: ParsedResearch;
   kind?: LeadKind;
+  /**
+   * The day THIS research pass ran, stamped onto the evidence it just gathered. Optional, and
+   * omitting it leaves the new items undated rather than dating them from a clock read here --
+   * this function is pure and its callers own the date. The items already in the file are never
+   * touched either way: an item that arrived before the field existed stays undated forever.
+   */
+  capturedAt?: string;
 }): { header: string; body: string } {
   const { parsed } = opts;
   const kind = opts.kind ?? "client";
@@ -304,7 +308,13 @@ export function mergeResearchIntoLead(opts: {
 
   body = replaceSection(body, "## Evidence", (old) => {
     const oldItems = isPlaceholderSection(old) || !old ? [] : parseEvidence(`## Evidence\n\n${old}\n`);
-    const combined = [...oldItems, ...parsed.evidence];
+    // Only the items this pass brought in get the date, and only when they carry none already.
+    // oldItems are re-serialized exactly as they parsed, so re-writing the section never invents a
+    // capture date for evidence that was gathered before dates were recorded.
+    const freshItems = opts.capturedAt
+      ? parsed.evidence.map((e) => (e.captured_at ? e : { ...e, captured_at: opts.capturedAt! }))
+      : parsed.evidence;
+    const combined = [...oldItems, ...freshItems];
     if (combined.length === 0) return "(none yet)";
     return combined.map((item, i) => formatEvidenceLine(item, i + 1)).join("\n");
   });
@@ -477,8 +487,8 @@ export async function runResearch(dirArg: string): Promise<RunResearchResult> {
   const parsed = parseResearchResponse(text);
   const defaultClassification = kind === "platform" ? "weak" : "unclear";
 
-  const merged = mergeResearchIntoLead({ header, body, parsed, kind });
   const date = new Date().toISOString().slice(0, 10);
+  const merged = mergeResearchIntoLead({ header, body, parsed, kind, capturedAt: date });
   const logLine = `- ${date}: research pass (search_budget_per_signal=${config.searchBudgetPerSignal}, evidence_found=${parsed.evidence.length}, classification=${parsed.classification || defaultClassification})`;
   const finalBody = `${merged.body.replace(/\n+$/, "")}\n${logLine}\n`;
 

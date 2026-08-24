@@ -50,7 +50,7 @@ function main() {
   const platforms = [...new Set(rows.map((r) => r.platform))].sort();
   const cell = (pl: string, pillar: string) => {
     const group = rows.filter((r) => r.platform === pl && r.pillar === pillar);
-    if (group.length === 0) return "—";
+    if (group.length === 0) return "-";
     const avgEng = group.reduce((s, r) => s + eng(r), 0) / group.length;
     const wSum = group.reduce((s, r) => s + weight(r), 0);
     const rcEng = wSum > 0 ? group.reduce((s, r) => s + eng(r) * weight(r), 0) / wSum : 0;
@@ -58,7 +58,7 @@ function main() {
     return `${avgEng.toFixed(1)} (rc ${rcEng.toFixed(1)}) · n=${group.length} · ${replies}r`;
   };
 
-  console.log(`# Topic resonance map — ${new Date().toISOString().slice(0, 10)}\n`);
+  console.log(`# Topic resonance map, ${new Date().toISOString().slice(0, 10)}\n`);
   console.log(
     `Cell = avg engagement (replies ×3, reposts ×2, likes ×1) · rc = recency-weighted (${HALF_LIFE_WEEKS}-wk half-life) · n posts · total replies\n`
   );
@@ -68,7 +68,7 @@ function main() {
     console.log(`| ${pillar} | ${platforms.map((pl) => cell(pl, pillar)).join(" | ")} |`);
   }
   console.log(
-    `\n> Cells with n<3 are anecdotes, not patterns. Where rc is far below the raw avg, the pillar's wins are aging out — discount it.`
+    `\n> Cells with n<3 are anecdotes, not patterns. Where rc is far below the raw avg, the pillar's wins are aging out, so discount it.`
   );
 }
 

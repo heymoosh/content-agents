@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
+import ts from "typescript";
 import { repoRoot } from "../db/db.js";
 import {
   parseBriefSignals,
@@ -35,6 +36,26 @@ The funnel goal is unchanged.
 
 ## Directives for atomization
 `;
+
+// BOTH wordings of the INSUFFICIENT status must parse, forever. src/strategy/snapshot.ts wrote the
+// em-dash form until 2026-08-23 and the comma form after (root CLAUDE.md rule 5), and briefs already
+// in briefs/ are never rewritten. The status cell is captured as free text rather than matched
+// against a literal, so this is a guard on that staying true, not on the wording itself.
+test("parseBriefSignals reads the INSUFFICIENT status in both the old and the current wording", () => {
+  const table = (status: string) =>
+    ["## Data confidence", "", "| Channel | Posts | Weeks of data | Status |", "|---|---|---|---|", `| threads | 3 | 2 | ${status} |`, ""].join("\n");
+  const oldForm = parseBriefSignals(table("INSUFFICIENT (<4 wks) — directional only")).confidence[0];
+  const newForm = parseBriefSignals(table("INSUFFICIENT (<4 wks), directional only")).confidence[0];
+  for (const read of [oldForm, newForm]) {
+    assert.equal(read.channel, "threads");
+    assert.equal(read.posts, 3);
+    assert.equal(read.weeks, 2);
+    assert.match(read.status, /INSUFFICIENT/);
+  }
+  // the wording is carried through verbatim, never normalized to one form or the other
+  assert.equal(oldForm.status, "INSUFFICIENT (<4 wks) — directional only");
+  assert.equal(newForm.status, "INSUFFICIENT (<4 wks), directional only");
+});
 
 test("parseBriefSignals reads the confidence table and the marked recommendations", () => {
   const { confidence, recommendations } = parseBriefSignals(BRIEF);
@@ -130,12 +151,12 @@ test("attention and conversation read real numbers from the latest metrics captu
     assert.deepEqual(families.attention.impressions, {
       state: "measured",
       value: 1840,
-      posts_measured: 2,
-      posts_unmeasured: 0,
+      records_measured: 2,
+      records_unmeasured: 0,
     });
-    assert.deepEqual(families.conversation.likes, { state: "measured", value: 12, posts_measured: 2, posts_unmeasured: 0 });
+    assert.deepEqual(families.conversation.likes, { state: "measured", value: 12, records_measured: 2, records_unmeasured: 0 });
     // A genuine zero is a measurement, not an absence.
-    assert.deepEqual(families.conversation.replies, { state: "measured", value: 4, posts_measured: 2, posts_unmeasured: 0 });
+    assert.deepEqual(families.conversation.replies, { state: "measured", value: 4, records_measured: 2, records_unmeasured: 0 });
     assert.equal(families.never_collapsed, true);
     assert.equal("total" in families, false);
   } finally {
@@ -152,8 +173,8 @@ test("a post with no metrics row counts as unmeasured rather than as a zero", ()
     assert.deepEqual(families.attention.impressions, {
       state: "measured",
       value: 500,
-      posts_measured: 1,
-      posts_unmeasured: 1,
+      records_measured: 1,
+      records_unmeasured: 1,
     });
   } finally {
     db.close();
@@ -198,8 +219,8 @@ test("conversation folds in the four conversational research sources, actives on
     assert.deepEqual(conversation.research_observations, {
       state: "measured",
       value: 5,
-      posts_measured: 4,
-      posts_unmeasured: 0,
+      records_measured: 4,
+      records_unmeasured: 0,
     });
     assert.deepEqual(conversation.research_observations_by_source, {
       comment: 1,
@@ -238,9 +259,9 @@ test("audience splits measured follower growth from unmeasurable visits and opt-
     aud.run("substack", "2026-08-01T00:00:00Z", "follower_delta", 11);
 
     const { audience } = readOutcomeFamilies(db, { generatedAt: "2026-08-12T00:00:00Z" });
-    assert.deepEqual(audience.new_follows, { state: "measured", value: 11, posts_measured: 2, posts_unmeasured: 0 });
-    assert.deepEqual(audience.follower_total, { state: "measured", value: 950, posts_measured: 1, posts_unmeasured: 0 });
-    assert.deepEqual(audience.follower_delta, { state: "measured", value: 11, posts_measured: 1, posts_unmeasured: 0 });
+    assert.deepEqual(audience.new_follows, { state: "measured", value: 11, records_measured: 2, records_unmeasured: 0 });
+    assert.deepEqual(audience.follower_total, { state: "measured", value: 950, records_measured: 1, records_unmeasured: 0 });
+    assert.deepEqual(audience.follower_delta, { state: "measured", value: 11, records_measured: 1, records_unmeasured: 0 });
     // The unmeasurable half stays unmeasurable, and the family is never rolled into one figure.
     assert.equal(audience.landing_visits.state, "not_measured");
     assert.equal(audience.opt_ins.state, "not_measured");
@@ -415,10 +436,79 @@ test("an empty research table reads as unmeasured, but a populated one with no c
     assert.deepEqual(read.research_observations, {
       state: "measured",
       value: 0,
-      posts_measured: 0,
-      posts_unmeasured: 0,
+      records_measured: 0,
+      records_unmeasured: 0,
     });
   } finally {
     populated.close();
+  }
+});
+
+// ── rule 5: no em dash reaches the screen ────────────────────────────────────────────────────────
+// Root CLAUDE.md rule 5 and config/voice.yaml ban the em dash from every word a human reads, and
+// two separate routes had been carrying one to Muxin's screen. The Signals room renders the review
+// modules' `reason` and `source` strings verbatim, fetched at runtime, so no static page test ever
+// sees them. The strategy modules print the markdown reports she reads in her terminal and that
+// /strategy folds into briefs/YYYY-MM-DD-strategy-brief.md; snapshot.ts's data-confidence table is
+// then rendered verbatim by the Signals room on top of that, and route.ts's rationale strings land
+// in each content folder's routing.md, which she reads directly and which the Content room renders.
+//
+// This is a source-level guard over all of it: it parses each file with the TypeScript scanner and
+// looks inside string and template literals only. Comments keep their em dashes (nobody reads those
+// on screen), and treatment.ts's routing-heading regex keeps its em dashes too (it MATCHES a
+// heading Muxin's own files already carry, it does not print one). If this test fails, do not just
+// delete the dash: rewrite the sentence with a period, a comma, a colon, or parentheses, whichever
+// sounds right read aloud.
+const EM_DASH = "—";
+const READER_FACING_MODULES: { dir: string; files: string[] }[] = [
+  { dir: "review", files: ["signals.ts", "treatment.ts", "fixtures.ts"] },
+  // The two cron routines print a run summary Muxin reads in the job log.
+  { dir: "cron", files: ["bluesky-mentions.ts", "notes-daily.ts"] },
+  {
+    dir: "strategy",
+    files: [
+      "angle-refresh.ts",
+      "audience.ts",
+      "cadence-fit.ts",
+      "cta-fit.ts",
+      "exploration.ts",
+      "frame-fit.ts",
+      "grade-bets.ts",
+      "lever-effectiveness.ts",
+      "media-fit.ts",
+      "origin-compare.ts",
+      "platform-fit.ts",
+      "resonance.ts",
+      "route.ts",
+      "routing-drift.ts",
+      "snapshot.ts",
+      "spin-control.ts",
+    ],
+  },
+];
+
+test("no string a reader-facing module can print carries an em dash", () => {
+  for (const { dir, files } of READER_FACING_MODULES) {
+    for (const file of files) {
+      const path = join(repoRoot, "src", dir, file);
+      const source = ts.createSourceFile(file, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true);
+      const offenders: string[] = [];
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isStringLiteralLike(node) ||
+          ts.isTemplateHead(node) ||
+          ts.isTemplateMiddle(node) ||
+          ts.isTemplateTail(node)
+        ) {
+          if (node.text.includes(EM_DASH)) {
+            const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
+            offenders.push(`${dir}/${file}:${line + 1} ${node.text.trim()}`);
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+      assert.deepEqual(offenders, [], `em dash in a string a reader can see:\n${offenders.join("\n")}`);
+    }
   }
 });

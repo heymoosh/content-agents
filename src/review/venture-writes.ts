@@ -1,4 +1,4 @@
-// The Venture room's write side: the eleven POSTs behind its buttons.
+// The Venture room's write side: the twelve POSTs behind its buttons.
 //
 // Sibling of venture-reads.ts and the same shape — one dispatcher, serve.ts wires it in five
 // lines. What is different, and what this file is really about, is that every one of these
@@ -19,20 +19,29 @@
 // server faults, they are the system declining to record something that is not true yet.
 //
 // Deliberately NOT here, and not half-built: POST :slug/deliver (deliverVenture makes real network
-// calls and belongs behind the job queue, like every other long-running action in this server) and
-// pasted-response ingest (ingestResponse needs a per-response attribution and an audience-
-// eligibility judgment that a pasted blob cannot supply — it needs a real job, not a form field).
+// calls and belongs behind the job queue, like every other long-running action in this server).
+//
+// Response ingest USED to sit in that same sentence, refused on the grounds that a pasted blob
+// cannot supply a per-response attribution or an audience-eligibility judgment. That objection was
+// right about a blob, and it is answered by not building one: :slug/responses below takes ONE
+// response at a time with both of those judgments as explicit fields Muxin fills in, which is
+// exactly the input ingestResponse has always demanded ("a judgment call by whoever transcribed
+// this response ... it never infers it"). Nothing splits a paste into N responses, and nothing
+// guesses who sent one. Muxin decided the room needs this: without it the Phase 3 response gate
+// cannot be moved from the desk at all, which left Phase 3 a CLI-only phase inside a GUI build.
 
 import { transitionArtifact, readArtifact, type VentureArtifact } from "../venture/artifacts.js";
-import { approveArtifact, discardArtifact, restoreArtifact, retractArtifact } from "../venture/artifact-lifecycle.js";
+import { approveArtifact, discardArtifact, editArtifactBody, restoreArtifact, retractArtifact } from "../venture/artifact-lifecycle.js";
 import { updateResearchReadFinding } from "../venture/artifacts.js";
 import { selectByKind } from "../venture/decisions.js";
 import { clearCheckpoint, recordPace } from "../venture/checkpoint.js";
 import { confirmManualDelivery, type ManualProof } from "../venture/deliver.js";
 import { day14Decide } from "../venture/phase4.js";
+import { ingestResponse, type EmotionalIntensity, type ResponseSource } from "../venture/responses.js";
 import { loadRules } from "../venture/rules.js";
 import { ventureDir } from "../venture/paths.js";
 import { clearIntakeDrafts } from "./intake-draft.js";
+import { commitIntake } from "./intake-commit.js";
 import { existsSync } from "node:fs";
 
 export interface VentureWriteResult {
@@ -59,6 +68,12 @@ interface Route {
   // directory would make the clear-on-commit call fail exactly when it is meant to run.
   requiresVenture?: false;
 }
+
+// Spelled out rather than imported as values because both are TYPE unions in responses.ts, so
+// there is no runtime list to import. venture-writes.test.ts asserts each entry against the type,
+// which is what stops a new source or intensity being added there and forgotten here.
+const RESPONSE_SOURCES: readonly ResponseSource[] = ["survey", "email", "comment", "dm", "other"];
+const EMOTIONAL_INTENSITIES: readonly EmotionalIntensity[] = ["low", "medium", "high"];
 
 function now(): string {
   return new Date().toISOString();
@@ -124,6 +139,29 @@ const ROUTES: Route[] = [
     method: "POST",
     pattern: /^\/api\/venture\/([^/]+)\/artifacts\/([^/]+)\/retract$/,
     handler: (slug, [id], body) => ({ artifact: retractArtifact(slug, id, str(body, "attestation") ?? "", now()) }),
+  },
+
+  // Muxin's own rewrite of a draft body. The verb venture-schema-contract.md 2.2 lists and the
+  // room could not offer: before this, her whole say over an artifact was approve or discard.
+  //
+  // The POST is :id/edit, not :id/body, because every write in this file is named for the verb it
+  // performs and page.test.ts asserts the artifact route set and the CardAction id set are
+  // literally the same words. The GET that reads the text back is :id/body, which is the resource.
+  //
+  // editArtifactBody owns every rule -- which states may still be edited, that a body file exists,
+  // that an empty body is not an edit -- and its refusals name what to do instead ("take it down or
+  // report the delivery failed, then edit it"), so they pass through like every other one here.
+  // What this route must not do is decide whose words the result is: the function stamps
+  // body_edited_by_muxin_at, the thread reads the stamp, and the register follows from that one
+  // recorded fact rather than from anything the client says about itself.
+  {
+    method: "POST",
+    pattern: /^\/api\/venture\/([^/]+)\/artifacts\/([^/]+)\/edit$/,
+    handler: (slug, [id], body) => {
+      const text = str(body, "body");
+      if (text === undefined) throw new Error("send the edited text as body");
+      return { artifact: editArtifactBody(slug, id, text, now()) };
+    },
   },
 
   // Confirming something went live. The proof shape and the evidence floor are both
@@ -203,6 +241,105 @@ const ROUTES: Route[] = [
     },
   },
 
+  // --- response log ----------------------------------------------------------------------------
+  //
+  // ONE response, transcribed by hand. Not a blob split into many: rules.md 7.2's eligibility is a
+  // judgment about one person against the venture's target audience, and there is no honest way to
+  // read it off a paste. Both judgments the log needs -- is this person in the audience, and is
+  // there a stable identifier to dedupe them by -- arrive as explicit fields, never inferred here.
+  //
+  // The field names are the response-ingest CLI's own JSON keys (src/venture/phase3.ts), not a
+  // second dialect: the same body works on both surfaces, and the required-field list below is the
+  // same one the CLI's requireNonEmpty checks -- received_at included, deliberately. Defaulting it
+  // to the ingest clock would stamp "arrived today" on an email that arrived a week ago, which is a
+  // date nobody supplied written down as though someone had. The form pre-fills today so it is one
+  // keystroke when today is right, but the value that gets stored is hers either way.
+  // Everything past shape is ingestResponse's, including requireRulesVersionMatch. A missing
+  // privacy key is translated below only for this response route; the research store retains its
+  // own general refusal for account-level capture.
+  //
+  // WHAT COMES BACK IS A CONFIRMATION, NEVER THE TEXT. venture-schema-contract.md 5.4 and the
+  // room's own promise ("I never show you the answers, only the count") both say the response log
+  // does not read back, so this returns the id, the duplicate flag and the gate counts -- never the
+  // record, whose exact_quote and respondent_hash have no business crossing this boundary.
+  {
+    method: "POST",
+    pattern: /^\/api\/venture\/([^/]+)\/responses$/,
+    handler: (slug, _params, body) => {
+      const source = str(body, "source");
+      if (!source || !RESPONSE_SOURCES.includes(source as ResponseSource)) {
+        throw new Error(`where did this response come from? one of: ${RESPONSE_SOURCES.join(", ")}`);
+      }
+      const intensity = str(body, "emotional_intensity");
+      if (!intensity || !EMOTIONAL_INTENSITIES.includes(intensity as EmotionalIntensity)) {
+        throw new Error(`how strongly did they say it? one of: ${EMOTIONAL_INTENSITIES.join(", ")}`);
+      }
+      // No default. Whether this person is in the audience decides whether they count toward the
+      // 20/30, so a missing answer stops here rather than being read as a quiet yes or no.
+      if (typeof body.target_audience_eligible !== "boolean") {
+        throw new Error(
+          "say whether this person is in the audience you are testing -- it decides whether they " +
+            "count toward the goal, and it is your call, not something I can read off their words"
+        );
+      }
+      const required = {
+        received_at: str(body, "received_at"),
+        exact_quote: str(body, "exact_quote"),
+        redacted_quote: str(body, "redacted_quote"),
+        stuck_point: str(body, "stuck_point"),
+      };
+      const missing = Object.entries(required)
+        .filter(([, v]) => !v?.trim())
+        .map(([k]) => k.replace(/_/g, " "));
+      if (missing.length) throw new Error(`still needs: ${missing.join(", ")}`);
+
+      const rawId = body.raw_identifier as { platform?: unknown; stable_user_id?: unknown } | undefined | null;
+      const platform = typeof rawId?.platform === "string" ? rawId.platform.trim() : "";
+      const stableUserId = typeof rawId?.stable_user_id === "string" ? rawId.stable_user_id.trim() : "";
+      // Both halves or neither. A platform with no id cannot be hashed, and an id with no platform
+      // would collide across platforms; either way a half-filled identifier silently becomes a
+      // fresh unique respondent, which is the one outcome that quietly moves the count.
+      if (Boolean(platform) !== Boolean(stableUserId)) {
+        throw new Error(
+          "an identifier needs both halves: which platform, and their id or email there. Leave both " +
+            "empty and this response counts as its own person"
+        );
+      }
+      // Do not let a missing key turn an identified response into an unidentifiable one. The
+      // shared research store keeps the final fail-closed guard, but this boundary can tell Muxin
+      // exactly what to configure for response identifier capture.
+      if (platform && !process.env.RESEARCH_HASH_KEY?.trim()) {
+        throw new Error(
+          "this installation isn't set up yet to safely store who a response is from. Leave the " +
+            "platform and id blank for now, this response still counts. (A developer needs to set " +
+            "RESEARCH_HASH_KEY before identifiers can be captured.)"
+        );
+      }
+      const at = now();
+      const result = ingestResponse(
+        slug,
+        {
+          source: source as ResponseSource,
+          receivedAt: required.received_at!.trim(),
+          rawIdentifier: platform ? { platform, stableUserId } : null,
+          targetAudienceEligible: body.target_audience_eligible,
+          exactQuote: required.exact_quote!,
+          redactedQuote: required.redacted_quote!,
+          stuckPoint: required.stuck_point!,
+          desiredOutcome: str(body, "desired_outcome")?.trim() || null,
+          emotionalIntensity: intensity as EmotionalIntensity,
+          exclusionReason: str(body, "exclusion_reason")?.trim() || null,
+        },
+        at
+      );
+      return {
+        response_id: result.record.response_id,
+        likely_duplicate: result.likelyDuplicate,
+        gate: result.gate,
+      };
+    },
+  },
+
   // --- intake scratch buffer -------------------------------------------------------------------
   //
   // Built in intake-draft.ts and never routed; its own comment says the room will call it right
@@ -214,6 +351,22 @@ const ROUTES: Route[] = [
     pattern: /^\/api\/venture\/([^/]+)\/intake\/drafts\/clear$/,
     requiresVenture: false,
     handler: (slug) => ({ result: clearIntakeDrafts(slug) }),
+  },
+  // The end of the interview: the one route that turns 25 scratch drafts into a real venture. Also
+  // requiresVenture:false, and for the strongest form of that reason — this route is what CREATES
+  // venture/<slug>/. See src/review/intake-commit.ts: it reads the answers back off the draft
+  // store, adds the voice-evidence rule kickoffVenture does not carry, and hands everything else
+  // to kickoffVenture unchanged.
+  //
+  // Answers a refusal as 200 with {ok:false} inside `result`, unlike every route above it. That is
+  // deliberate: an unfinished interview is a fact about the drafts, not a bad request, and the
+  // body carries the `missing` question numbers the screen marks its boxes from. A 400 would make
+  // a normal half-finished interview read as an error.
+  {
+    method: "POST",
+    pattern: /^\/api\/venture\/([^/]+)\/intake\/commit$/,
+    requiresVenture: false,
+    handler: (slug, _params, body) => ({ result: commitIntake(slug, { voice: body.voice, scorecard: body.scorecard }) }),
   },
 ];
 
@@ -260,12 +413,15 @@ export const VENTURE_WRITE_PATHS = [
   "/api/venture/:slug/artifacts/:id/discard",
   "/api/venture/:slug/artifacts/:id/restore",
   "/api/venture/:slug/artifacts/:id/retract",
+  "/api/venture/:slug/artifacts/:id/edit",
   "/api/venture/:slug/artifacts/:id/confirm-live",
   "/api/venture/:slug/artifacts/:id/failed",
   "/api/venture/:slug/artifacts/:id/findings/:findingId",
   "/api/venture/:slug/checkpoint/:id/clear",
   "/api/venture/:slug/pace",
+  "/api/venture/:slug/responses",
   "/api/venture/:slug/intake/drafts/clear",
+  "/api/venture/:slug/intake/commit",
 ];
 
 // Asserted by venture-writes.test.ts: the dispatch table has exactly this many routes, so a route

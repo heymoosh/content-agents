@@ -141,7 +141,7 @@ async function main() {
   const parsedLimit = limitIdx >= 0 ? parseInt(args[limitIdx + 1] ?? "30", 10) : 30;
   const fetchLimit = Math.max(1, Number.isNaN(parsedLimit) ? 30 : parsedLimit);
 
-  console.log(`\nbluesky-mentions${isDryRun ? " [DRY RUN — no network, no writes]" : ""}`);
+  console.log(`\nbluesky-mentions${isDryRun ? " [DRY RUN, no network, no writes]" : ""}`);
   console.log("=".repeat(50));
 
   // 1. Load ledger — set of already-seen notification URIs.
@@ -173,7 +173,7 @@ async function main() {
   console.log(`New mention/reply notification(s): ${newMentions.length}`);
 
   if (newMentions.length === 0) {
-    console.log("Nothing new — all fetched notifications already in the ledger (or not a mention/reply).");
+    console.log("Nothing new. All fetched notifications are already in the ledger (or not a mention/reply).");
     return;
   }
 
@@ -187,7 +187,7 @@ async function main() {
   }
 
   if (isDryRun) {
-    console.log("\nDry-run complete — no ledger entries written, no network calls.");
+    console.log("\nDry-run complete, no ledger entries written, no network calls.");
     return;
   }
 
@@ -205,7 +205,7 @@ async function main() {
     });
   }
   console.log(`\nLedger: marked ${newMentions.length} notification(s) as seen.`);
-  console.log("Nothing drafted or published — draft a reply for one of these with src/atomize/reply-draft.ts.");
+  console.log("Nothing drafted or published. Draft a reply for one of these with src/atomize/reply-draft.ts.");
 
   // 5. Fold newly-seen mentions into the shared Follow-ups tracker so they surface in the
   //    Follow-ups tab's inbound bucket (src/outreach/tracker.ts). Read-modify-append only — no

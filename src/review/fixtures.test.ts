@@ -219,18 +219,18 @@ test("every fixture value is obviously fake on inspection", () => {
     const jobs = (s.overrides["/api/jobs"] as { jobs: JobView[] } | undefined)?.jobs ?? [];
     for (const j of jobs) {
       assert.match(j.id, /^fixture-/, "a fixture job id could never collide with a real one");
-      assert.match(j.label, /^FIXTURE — /, "a fixture job label says so on screen");
+      assert.match(j.label, /^FIXTURE: /, "a fixture job label says so on screen");
       for (const step of j.steps ?? []) assert.match(step, /^FIXTURE /);
-      if (j.error) assert.match(j.error, /^FIXTURE — /);
-      if (j.ask) assert.match(j.ask.question, /^FIXTURE — /);
-      if (j.lastStdoutLine) assert.match(j.lastStdoutLine, /^FIXTURE — /);
+      if (j.error) assert.match(j.error, /^FIXTURE: /);
+      if (j.ask) assert.match(j.ask.question, /^FIXTURE: /);
+      if (j.lastStdoutLine) assert.match(j.lastStdoutLine, /^FIXTURE: /);
     }
   }
   const scene = scenario("fiction-scene").overrides["/api/fiction/scene"] as {
     beats: string; chapter: { title: string; body: string };
   };
-  assert.match(scene.beats, /^FIXTURE — /);
-  assert.match(scene.chapter.title, /^FIXTURE — /);
+  assert.match(scene.beats, /^FIXTURE: /);
+  assert.match(scene.chapter.title, /^FIXTURE: /);
   assert.match(scene.chapter.body, /^FIXTURE\./);
 });
 
@@ -378,6 +378,7 @@ test("the refusal message says how to get back to real data", () => {
 interface FakeEl {
   id: string;
   hidden: boolean;
+  style: Record<string, string>;
   innerHTML: string;
   textContent: string;
   addEventListener(type: string, fn: (e: unknown) => void): void;
@@ -387,6 +388,7 @@ interface FakeEl {
 function fakeEl(id: string): FakeEl {
   const el: FakeEl = {
     id, hidden: false, innerHTML: "", textContent: "",
+    style: {},
     addEventListener(_t, fn) { el.handler = fn; },
   };
   return el;
@@ -444,6 +446,21 @@ test("the interceptor installs, and refuses every write without letting it reach
   assert.deepEqual(fx.passthrough, [], "not one write request reached the real fetch");
 });
 
+test("fixture panel hide and reopen explicitly toggle display state", async () => {
+  const fx = await bootInterceptor();
+  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, true);
+  assert.equal(fx.els.fxPanel.style.display, "none");
+  assert.equal(fx.els.fxOpen.hidden, false);
+  assert.equal(fx.els.fxOpen.style.display, "block");
+
+  fx.els.fxOpen.handler?.({ target: { closest: () => ({ id: "fxOpen", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, false);
+  assert.equal(fx.els.fxPanel.style.display, "flex");
+  assert.equal(fx.els.fxOpen.hidden, true);
+  assert.equal(fx.els.fxOpen.style.display, "none");
+});
+
 test("with nothing forced, every read passes straight through to the real server", async () => {
   const fx = await bootInterceptor();
   assert.equal(await fx.get("/api/jobs"), "REAL");
@@ -471,8 +488,8 @@ test("a forced fiction scene answers all three fiction reads, query string and a
   const scene = (await (await fx.get("/api/fiction/scene?series=fixture-series") as unknown as Response).json()) as {
     beats: string; chapter: { title: string };
   };
-  assert.match(scene.beats, /^FIXTURE — /);
-  assert.equal(scene.chapter.title, "FIXTURE — Chapter one");
+  assert.match(scene.beats, /^FIXTURE: /);
+  assert.equal(scene.chapter.title, "FIXTURE: Chapter one");
   const series = (await (await fx.get("/api/fiction") as unknown as Response).json()) as { series: { slug: string }[] };
   assert.equal(series.series[0].slug, "fixture-series");
   await (await fx.get("/api/fiction/doc?series=fixture-series&path=bible.md") as unknown as Response).json();

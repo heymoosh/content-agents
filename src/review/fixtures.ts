@@ -73,7 +73,7 @@ const FIXTURE_STEPS = ["FIXTURE step one", "FIXTURE step two", "FIXTURE step thr
 
 function job(over: Partial<FixtureJob> & { id: string; kind: string; status: string }): FixtureJob {
   return {
-    label: "FIXTURE — not a real job",
+    label: "FIXTURE: not a real job",
     error: null,
     elapsedMs: null,
     lastStdoutLine: null,
@@ -101,16 +101,16 @@ const JOB_STATES: { id: string; label: string; job: FixtureJob }[] = [
   {
     id: "job-queued",
     label: "queued",
-    job: job({ id: "fixture-job-queued", kind: "url", status: "queued", label: "FIXTURE — a job waiting its turn" }),
+    job: job({ id: "fixture-job-queued", kind: "url", status: "queued", label: "FIXTURE: a job waiting its turn" }),
   },
   {
     id: "job-running",
     label: "running",
     job: job({
       id: "fixture-job-running", kind: "url", status: "running",
-      label: "FIXTURE — a job that is not running",
+      label: "FIXTURE: a job that is not running",
       steps: FIXTURE_STEPS, stepTotal: 4, step: 1, elapsedMs: FAKE_ELAPSED,
-      lastStdoutLine: "FIXTURE — a heartbeat line no subprocess printed",
+      lastStdoutLine: "FIXTURE: a heartbeat line no subprocess printed",
     }),
   },
   {
@@ -118,9 +118,9 @@ const JOB_STATES: { id: string; label: string; job: FixtureJob }[] = [
     label: "blocked (awaiting)",
     job: job({
       id: "fixture-job-blocked", kind: "url", status: "blocked",
-      label: "FIXTURE — a job stopped on a question",
+      label: "FIXTURE: a job stopped on a question",
       steps: FIXTURE_STEPS, stepTotal: 4, step: 2, elapsedMs: FAKE_ELAPSED,
-      ask: { question: "FIXTURE — a question no skill asked. Either answer is fake.", options: ["FIXTURE option A", "FIXTURE option B"] },
+      ask: { question: "FIXTURE: a question no skill asked. Either answer is fake.", options: ["FIXTURE option A", "FIXTURE option B"] },
       answer: null,
     }),
   },
@@ -132,9 +132,9 @@ const JOB_STATES: { id: string; label: string; job: FixtureJob }[] = [
     label: "blocked (answered)",
     job: job({
       id: "fixture-job-answered", kind: "url", status: "blocked",
-      label: "FIXTURE — a job whose question was answered",
+      label: "FIXTURE: a job whose question was answered",
       steps: FIXTURE_STEPS, stepTotal: 4, step: 2, elapsedMs: FAKE_ELAPSED,
-      ask: { question: "FIXTURE — a question no skill asked. Either answer is fake.", options: ["FIXTURE option A", "FIXTURE option B"] },
+      ask: { question: "FIXTURE: a question no skill asked. Either answer is fake.", options: ["FIXTURE option A", "FIXTURE option B"] },
       answer: "FIXTURE option A",
     }),
   },
@@ -143,9 +143,9 @@ const JOB_STATES: { id: string; label: string; job: FixtureJob }[] = [
     label: "failed",
     job: job({
       id: "fixture-job-failed", kind: "url", status: "failed",
-      label: "FIXTURE — a failure that did not happen",
+      label: "FIXTURE: a failure that did not happen",
       steps: FIXTURE_STEPS, stepTotal: 4, step: 2, failedAtStep: 2, retryable: true,
-      elapsedMs: FAKE_ELAPSED, error: "FIXTURE — no process ran, so nothing actually broke.",
+      elapsedMs: FAKE_ELAPSED, error: "FIXTURE: no process ran, so nothing actually broke.",
       finishedAt: NOW as unknown as number,
     }),
   },
@@ -154,7 +154,7 @@ const JOB_STATES: { id: string; label: string; job: FixtureJob }[] = [
     label: "done",
     job: job({
       id: "fixture-job-done", kind: "url", status: "done",
-      label: "FIXTURE — a job that finished nothing",
+      label: "FIXTURE: a job that finished nothing",
       steps: FIXTURE_STEPS, stepTotal: 4, step: 4, elapsedMs: FAKE_ELAPSED,
       finishedAt: NOW as unknown as number,
     }),
@@ -171,7 +171,7 @@ const JOB_STATES: { id: string; label: string; job: FixtureJob }[] = [
     label: "stopped",
     job: job({
       id: "fixture-job-stopped", kind: "url", status: "stopped",
-      label: "FIXTURE — a job nobody stopped",
+      label: "FIXTURE: a job nobody stopped",
       steps: FIXTURE_STEPS, stepTotal: 4, step: 2, elapsedMs: FAKE_ELAPSED,
       finishedAt: NOW as unknown as number,
     }),
@@ -199,13 +199,13 @@ const FIC_SLUG = "fixture-series";
 // The beats are Muxin's OWN words on a real screen, so they render in the Georgia serif register
 // (page.ts decides that by field, not by us). Fixture prose therefore goes in the field that
 // matches the register it stands in for — never into an AI-purple field.
-const FIC_BEATS = "FIXTURE — beats nobody typed. Two people, one room, one thing left unsaid.";
+const FIC_BEATS = "FIXTURE: beats nobody typed. Two people, one room, one thing left unsaid.";
 
 const FIC_SERIES = {
   series: [
     {
       slug: FIC_SLUG,
-      title: "FIXTURE — a series that does not exist",
+      title: "FIXTURE: a series that does not exist",
       docs: [
         { id: "bible", label: "The world (story bible)", path: "bible.md", editable: true },
       ],
@@ -244,7 +244,7 @@ const FIC_STATES: { id: string; label: string; scene: unknown }[] = [
       beats: FIC_BEATS,
       chapter: {
         number: 1,
-        title: "FIXTURE — Chapter one",
+        title: "FIXTURE: Chapter one",
         status: "draft",
         body:
           "FIXTURE. No chapter was drafted to produce this paragraph, and none of it is anybody's prose.\n\n" +
@@ -260,10 +260,339 @@ const FIC_STATES: { id: string; label: string; scene: unknown }[] = [
 // An empty read is a real, shippable screen state (Rule 3: "measured-as-zero and not-measured-at-all
 // are different"), so each of these is the honest empty payload of the route it fakes.
 
+const FXS_AT = "2026-08-18T09:00:00.000Z";
+const FXS_NOW = "2026-08-21T09:00:00.000Z";
+
+// ── Signals: the four outcome families, and the redacted research read ───────────────────────────
+//
+// GET /api/signals/outcomes and GET /api/research/report. Every string carries FIXTURE so a
+// screenshot cannot be mistaken for a real read, and the numbers exist to exercise the states the
+// screen must keep apart: a real total, a measured zero, a sum over no posts at all, and a metric
+// with no source to measure it from.
+
+function fxMeasured(value: number, measured: number, unmeasured: number): Record<string, unknown> {
+  return { state: "measured", value, records_measured: measured, records_unmeasured: unmeasured };
+}
+function fxUnmeasured(reason: string): Record<string, unknown> {
+  return { state: "not_measured", reason: "FIXTURE: " + reason };
+}
+
+const FX_SAMPLE_RULE = {
+  kind: "weeks_of_data",
+  threshold_weeks: 4,
+  source: "FIXTURE: not the repo's real INSUFFICIENT rule, a fixture standing in for it",
+};
+
+function fxOutcomes(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    generated_at: FXS_AT,
+    attention: {
+      family: "attention",
+      question: "FIXTURE: did people see it?",
+      impressions: fxMeasured(123456, 9, 2),
+    },
+    conversation: {
+      family: "conversation",
+      question: "FIXTURE: did people reply, comment, save, share, or DM?",
+      likes: fxMeasured(0, 9, 2), // a MEASURED zero: nine posts carried the column and it added to nothing
+      replies: fxMeasured(0, 0, 11), // a sum over NO posts, which is a different sentence
+      reposts: fxMeasured(77, 9, 2),
+      saves: fxUnmeasured("no saves column exists in this fixture database"),
+      comments: fxUnmeasured("no comments column exists in this fixture database"),
+      research_observations: fxUnmeasured("no research capture has run in this fixture database"),
+      research_observations_by_source: {},
+    },
+    audience: {
+      family: "audience",
+      question: "FIXTURE: did it bring a landing visit, an opt-in, subscriber growth, or a survey response?",
+      new_follows: fxMeasured(31, 9, 2),
+      follower_total: fxMeasured(1580, 2, 0),
+      follower_delta: fxMeasured(12, 2, 0),
+      landing_visits: fxUnmeasured("no landing-page analytics ingest exists"),
+      opt_ins: fxUnmeasured("no landing-page analytics ingest exists"),
+      survey_responses: fxUnmeasured("survey responses live inside a venture and Signals never reads those"),
+      partial_note: "FIXTURE: part of this family is measured and part has no source at all.",
+    },
+    business: {
+      family: "business",
+      question: "FIXTURE: did it lead to a qualified inquiry, a call, an opportunity, or a purchase?",
+      qualified_inquiries: fxUnmeasured("no funnel record exists"),
+      calls: fxUnmeasured("no funnel record exists"),
+      opportunities: fxUnmeasured("no funnel record exists"),
+      purchases: fxUnmeasured("no funnel record exists"),
+      empty_state: "FIXTURE: until the landing page is live and taking payment there is nothing to measure here. It stays this way, not a zero.",
+    },
+    confidence: [
+      { platform: "bluesky", posts: 3, weeks: 2, status: "INSUFFICIENT (<4 wks), directional only", sufficient: false },
+      { platform: "linkedin", posts: 8, weeks: 11, status: "OK", sufficient: true },
+    ],
+    sample_rule: FX_SAMPLE_RULE,
+    never_collapsed: true,
+    ...over,
+  };
+}
+
+// Nothing has gone out yet: no platform rows at all, and every family a sum over nothing. This is
+// the state the screen must NOT render as four measured zeros.
+function fxOutcomesPreLaunch(): Record<string, unknown> {
+  const base = fxOutcomes() as Record<string, Record<string, unknown>>;
+  const zeroed = (fam: Record<string, unknown>): Record<string, unknown> => {
+    const out: Record<string, unknown> = { ...fam };
+    for (const [k, v] of Object.entries(fam)) {
+      if (v && typeof v === "object" && (v as { state?: string }).state === "measured") out[k] = fxMeasured(0, 0, 0);
+    }
+    return out;
+  };
+  return {
+    ...base,
+    attention: zeroed(base.attention),
+    conversation: zeroed(base.conversation),
+    audience: zeroed(base.audience),
+    confidence: [],
+  };
+}
+
+const FX_RESEARCH_AVAILABLE: Record<string, unknown> = {
+  state: "available",
+  capture_configured: true,
+  report: {
+    generated_at: FXS_AT,
+    observation_counts: { reply: 14, comment: 3 },
+    active_observation_counts: { reply: 12, comment: 3 },
+    metrics: {},
+    note_metrics: [],
+    reply_observations: [
+      { observation_id: "fx-1", note_id: "fx-note", reply_id: "fx-r1", parent_reply_id: null, published_at: FXS_AT,
+        redacted_text: "FIXTURE: a redacted reply, stored without the exact words" },
+      { observation_id: "fx-2", note_id: "fx-note", reply_id: "fx-r2", parent_reply_id: null, published_at: FXS_AT,
+        redacted_text: "FIXTURE: another redacted reply" },
+    ],
+    creator_reply_observations: 2,
+    audience_respondent_summary: {
+      observation_count: 13, unique_respondents: 8,
+      observations_without_respondent_hash: 1, max_observations_per_respondent: 3,
+      respondent_observation_distribution: { "1": 5, "3": 1 },
+    },
+    largest_audience_thread: {
+      observation_count: 6, known_respondents: 4,
+      observations_without_respondent_hash: 0, max_observations_per_respondent: 2,
+    },
+    coverage: [
+      { run_at: FXS_AT, source: "substack_notes", window_start: FXS_AT, window_end: FXS_NOW, status: "complete", records_captured: 14, gap_reason: null },
+    ],
+  },
+};
+
+const FX_RESEARCH_UNAVAILABLE: Record<string, unknown> = {
+  state: "unavailable",
+  capture_configured: false,
+  reason: "FIXTURE: RESEARCH_HASH_KEY is not set, so research capture cannot write observations and the table is empty",
+  report: null,
+};
+
+// ── Content: the three-step wizard ───────────────────────────────────────────────────────────────
+//
+// GET /api/content (the source picker), GET /api/content/treatment (the per-channel grid) and
+// GET /api/queue (the drafts the third step approves). The channel list is chosen to put every
+// FitBasis on one screen at once, because the whole point of the basis is that a COLD START from
+// no data must not look like a STRONG FIT from a measured score.
+
+const FX_SLUG = "2026-08-18-fixture-a-piece-that-does-not-exist";
+
+function fxSession(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    slug: FX_SLUG,
+    title: "FIXTURE: a piece nobody wrote",
+    date: "2026-08-18",
+    sourceBody: "FIXTURE: the source text of a piece that does not exist on disk.",
+    rounds: [],
+    cuts: [{ lens: "extract", title: "FIXTURE: the cut", body: "FIXTURE: a cut body", sourceLines: [4, "9-11"] }],
+    pending: 2,
+    origin: "file:FIXTURE.md",
+    sourceKind: "",
+    canonicalUrl: null,
+    publishedAt: null,
+    tag: "YOURS",
+    tagBasis: "FIXTURE: origin file:FIXTURE.md, and nothing here has published it",
+    ...over,
+  };
+}
+
+function fxChannel(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    channel: "x",
+    pillars: ["human-ai"],
+    decision: "include",
+    recordedDecision: "include",
+    score: null,
+    confidence: null,
+    rationale: null,
+    fitLabel: null,
+    fitBasis: "unknown",
+    belowFloor: false,
+    reuse: { key: "x", allowed: true, everPlaced: false, lastPlacedAt: null, daysSince: null, minDays: 14, reason: null },
+    reuseNote: null,
+    slot: { time: FXS_NOW, label: "FIXTURE: Tue 09:00 PT" },
+    ...over,
+  };
+}
+
+const FX_TREATMENT: Record<string, unknown> = {
+  slug: FX_SLUG,
+  pillars: ["human-ai"],
+  pillarSource: "routing.md",
+  floor: 0.6,
+  channels: [
+    fxChannel({ channel: "x", score: 1.4, confidence: "data", fitLabel: "STRONG FIT", fitBasis: "measured" }),
+    fxChannel({ channel: "linkedin", score: 0.8, confidence: "data", fitLabel: "REACH ONLY", fitBasis: "measured",
+      reuse: { key: "linkedin", allowed: false, everPlaced: true, lastPlacedAt: FXS_AT, daysSince: 12, minDays: 60, reason: "FIXTURE: inside the window" } }),
+    fxChannel({ channel: "threads", score: 0.4, confidence: "data", fitLabel: "POOR FIT", fitBasis: "measured", belowFloor: true,
+      reuse: { key: "threads", allowed: true, everPlaced: true, lastPlacedAt: FXS_AT, daysSince: 40, minDays: 14, reason: null } }),
+    fxChannel({ channel: "bluesky", score: null, confidence: "cold-start", fitLabel: "COLD START", fitBasis: "insufficient-data",
+      reuse: { key: "bluesky", allowed: true, everPlaced: false, lastPlacedAt: null, daysSince: null, minDays: 21, reason: null } }),
+    fxChannel({ channel: "mastodon", score: null, confidence: "rule", fitLabel: null, fitBasis: "editorial-rule", decision: "skip", recordedDecision: "include",
+      reuse: { key: "mastodon", allowed: true, everPlaced: false, lastPlacedAt: null, daysSince: null, minDays: 21, reason: null } }),
+    fxChannel({ channel: "quote-card", score: null, confidence: "always", fitLabel: null, fitBasis: "format-asset",
+      reuse: null, reuseNote: "FIXTURE: reuse for a quote card is enforced per fan-out target, not on the card itself",
+      slot: { time: FXS_NOW, label: "next-free-slot" } }),
+  ],
+  scoredBelowFloorButEnabled: ["threads"],
+};
+
+function fxRow(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: "fx-row",
+    platform: "x",
+    format: "text",
+    kind: "text",
+    status: "",
+    body: "FIXTURE: a draft nobody wrote.",
+    notes: "",
+    editable: false,
+    revisable: false,
+    duplicatable: false,
+    sourceLines: [4],
+    ...over,
+  };
+}
+
+const FX_QUEUE: Record<string, unknown> = {
+  pieces: [
+    {
+      slug: FX_SLUG,
+      title: "FIXTURE: a piece nobody wrote",
+      rows: [
+        fxRow({ id: "fx-x-1", platform: "x" }),
+        fxRow({ id: "fx-x-2", platform: "x", status: "approve" }),
+        // she flagged this one: the tab badge counts it, the bulk yes must not touch it
+        fxRow({ id: "fx-x-3", platform: "x", status: "revise", notes: "FIXTURE: needs a colder open" }),
+        fxRow({ id: "fx-li-1", platform: "linkedin", body: "FIXTURE: the LinkedIn draft." }),
+        fxRow({ id: "fx-li-2", platform: "linkedin", status: "approve", body: "FIXTURE: already yes." }),
+        fxRow({ id: "fx-card-1", platform: "quote-card", kind: "image", format: "quote-card", body: "" }),
+      ],
+    },
+  ],
+  pending: 4,
+  liveStateAsOf: null,
+  textPlatforms: ["x", "linkedin", "bluesky"],
+};
+
+const FX_CONTENT_BASE: Record<string, unknown> = {
+  "/api/content": {
+    sessions: [
+      fxSession(),
+      fxSession({
+        slug: "2026-08-12-fixture-a-note-of-hers", title: "FIXTURE: a Note of hers", pending: 0,
+        origin: "https://substack.com/@fixture/note/c-1", sourceKind: "substack-note",
+        canonicalUrl: "https://substack.com/@fixture/note/c-1", publishedAt: "2026-08-12",
+        tag: "SUBSTACK", tagBasis: "FIXTURE: source.md records source_kind: substack-note", cuts: [],
+      }),
+      fxSession({
+        slug: "2026-08-10-fixture-someone-elses-essay", title: "FIXTURE: someone else's essay", pending: 0,
+        origin: "https://example.com/p/not-hers", canonicalUrl: "https://example.com/p/not-hers", publishedAt: "2026-08-10",
+        tag: "READ IN", tagBasis: "FIXTURE: origin host example.com, which is not one of your configured destinations", cuts: [],
+      }),
+    ],
+  },
+  "/api/content/treatment": FX_TREATMENT,
+  "/api/queue": FX_QUEUE,
+};
+
+const CONTENT_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "content-wizard",
+    group: "Content wizard",
+    label: "every fit basis at once",
+    room: "content",
+    overrides: FX_CONTENT_BASE,
+  },
+  {
+    id: "content-wizard-no-pillar",
+    group: "Content wizard",
+    label: "no routing.md, so no fit call",
+    room: "content",
+    overrides: {
+      ...FX_CONTENT_BASE,
+      "/api/content/treatment": {
+        ...FX_TREATMENT,
+        pillars: [],
+        pillarSource: "none",
+        scoredBelowFloorButEnabled: [],
+        channels: (FX_TREATMENT.channels as Record<string, unknown>[]).map((c) => ({
+          ...c, decision: null, recordedDecision: null, score: null, confidence: null,
+          fitLabel: null, fitBasis: "unknown", belowFloor: false,
+        })),
+      },
+    },
+  },
+  {
+    id: "content-wizard-no-drafts",
+    group: "Content wizard",
+    label: "a source with no drafts yet",
+    room: "content",
+    overrides: {
+      ...FX_CONTENT_BASE,
+      "/api/queue": { pieces: [], pending: 0, liveStateAsOf: null, textPlatforms: ["x", "linkedin", "bluesky"] },
+    },
+  },
+  {
+    id: "content-treatment-error",
+    group: "Content wizard",
+    label: "the treatment read fails",
+    room: "content",
+    overrides: { ...FX_CONTENT_BASE, "/api/content/treatment": { error: "FIXTURE: bad slug" } },
+  },
+];
+
+const SIGNALS_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "signals-outcomes",
+    group: "Signals outcomes",
+    label: "four families, every state",
+    room: "signals",
+    overrides: { "/api/signals/outcomes": fxOutcomes(), "/api/research/report": FX_RESEARCH_AVAILABLE },
+  },
+  {
+    id: "signals-outcomes-pre-launch",
+    group: "Signals outcomes",
+    label: "nothing live yet",
+    room: "signals",
+    overrides: { "/api/signals/outcomes": fxOutcomesPreLaunch(), "/api/research/report": FX_RESEARCH_UNAVAILABLE },
+  },
+  {
+    id: "signals-research-unavailable",
+    group: "Signals outcomes",
+    label: "research capture never ran",
+    room: "signals",
+    overrides: { "/api/signals/outcomes": fxOutcomes(), "/api/research/report": FX_RESEARCH_UNAVAILABLE },
+  },
+];
+
 const EMPTY_BY_ROOM: Record<string, Record<string, unknown>> = {
   content: {
     "/api/queue": { pieces: [], pending: 0, liveStateAsOf: null, textPlatforms: ["x", "linkedin", "bluesky"] },
     "/api/content": { sessions: [] },
+    "/api/content/treatment": { error: "no source picked in this fixture set" },
   },
   studio: {
     "/api/studio": { counts: { draftsToReview: 0, dossiersToRead: 0, followupsDue: 0, postsHolding: 0 }, needsYou: [], team: [] },
@@ -276,7 +605,9 @@ const EMPTY_BY_ROOM: Record<string, Record<string, unknown>> = {
   fiction: { "/api/fiction": { series: [] } },
   signals: {
     "/api/signals": { briefPath: null, briefDate: null, confidence: [], recommendations: [] },
-    "/api/strategy/brief": { ok: false, error: "FIXTURE — no strategy brief in this fixture set." },
+    "/api/signals/outcomes": fxOutcomesPreLaunch(),
+    "/api/research/report": FX_RESEARCH_UNAVAILABLE,
+    "/api/strategy/brief": { ok: false, error: "FIXTURE: no strategy brief in this fixture set." },
     "/api/strategy/raw": { ok: true, files: [] },
   },
   charles: { "/api/charles": { posts: [] } },
@@ -318,7 +649,7 @@ function fxArtifact(over: Partial<VentureArtifact> & { artifact_id: string; titl
     delivery_mode: "manual", publishable: false, editorial_status: "draft", delivery_status: "awaiting_approval",
     evidence: null, retraction: null, failure: null, origin_type: "venture", venture_id: "fixture-venture",
     venture_phase: 1, message_id: "fx", cta_id: null, rules_version: "fixture-rules", probe_id: null,
-    unknown_id: null, claim_refs: [], created_at: FX_AT, updated_at: FX_AT,
+    unknown_id: null, claim_refs: [], body_edited_by_muxin_at: null, created_at: FX_AT, updated_at: FX_AT,
     ...over,
   } as VentureArtifact;
 }
@@ -326,32 +657,45 @@ function fxArtifact(over: Partial<VentureArtifact> & { artifact_id: string; titl
 const ev = (type: Evidence["type"], value: string): Evidence => ({ type, value, confirmed_by: "muxin", confirmed_at: FX_AT });
 
 const FX_LIVE_URL = fxArtifact({
-  artifact_id: "p1-essay-01", title: "FIXTURE — why the ballot measure nobody reads decides the most",
+  artifact_id: "p1-essay-01", title: "FIXTURE: why the ballot measure nobody reads decides the most",
   body_path: "phase-1-attention/p1-essay-01.md", editorial_status: "approved", delivery_status: "live_confirmed",
   evidence: ev("url", "https://example.invalid/fixture-essay"),
-  claim_refs: [{ claim: "FIXTURE — a traced claim", ref: "intake:q7" }],
+  claim_refs: [{ claim: "FIXTURE: a traced claim", ref: "intake:q7" }],
 });
 const FX_LIVE_AGENT = fxArtifact({
-  artifact_id: "p1-note-01", title: "FIXTURE — the note the agent posted", artifact_kind: "text-post-note",
+  artifact_id: "p1-note-01", title: "FIXTURE: the note the agent posted", artifact_kind: "text-post-note",
   delivery_mode: "app", publishable: true, editorial_status: "approved", delivery_status: "live_confirmed",
   evidence: ev("agent", "substack-notes"),
 });
 // The row the whole badge system exists for: live on Muxin's word alone, which must never render
 // with the same mark as the two above.
 const FX_LIVE_WORD = fxArtifact({
-  artifact_id: "p1-note-02", title: "FIXTURE — the one you told me went up", artifact_kind: "welcome-email",
+  artifact_id: "p1-note-02", title: "FIXTURE: the one you told me went up", artifact_kind: "welcome-email",
   editorial_status: "approved", delivery_status: "live_confirmed",
   evidence: ev("attestation", "I pasted it into Substack on the 18th and it is up."),
 });
 const FX_APPROVED_NOT_LIVE = fxArtifact({
-  artifact_id: "p1-essay-02", title: "FIXTURE — approved, and not live", body_path: "phase-1-attention/p1-essay-02.md",
+  artifact_id: "p1-essay-02", title: "FIXTURE: approved, and not live", body_path: "phase-1-attention/p1-essay-02.md",
   editorial_status: "approved", delivery_status: "handed_off",
 });
 const FX_RETRACTED = fxArtifact({
-  artifact_id: "p1-essay-03", title: "FIXTURE — the one that came down",
+  artifact_id: "p1-essay-03", title: "FIXTURE: the one that came down",
   editorial_status: "discarded", delivery_status: "cancelled",
   evidence: ev("url", "https://example.invalid/fixture-retracted"),
   retraction: { attestation: "I unpublished it, the link is dead now.", retracted_at: FX_NOW, retracted_by: "muxin" } as Retraction,
+});
+
+// The pair the body editor exists to keep apart, side by side: one body still in the AI register,
+// one Muxin has been through herself. Without a fixture for the second, the only way to review that
+// register is to have a real venture with a real edit in it.
+const FX_AI_DRAFT = fxArtifact({
+  artifact_id: "p1-essay-04", title: "FIXTURE: still my draft, and it says so",
+  body_path: "phase-1-attention/p1-essay-04.md",
+});
+const FX_EDITED_BY_MUXIN = fxArtifact({
+  artifact_id: "p1-essay-05", title: "FIXTURE: the one you rewrote",
+  body_path: "phase-1-attention/p1-essay-05.md",
+  body_edited_by_muxin_at: FX_NOW,
 });
 
 function fxCheckpoint(required: VentureArtifact[], over: Partial<CheckpointState> = {}): CheckpointState {
@@ -377,11 +721,11 @@ const FX_DECISION: DecisionRecord = {
   decision_id: "p1-platform-01", decision_kind: "platform-recommendation", rules_version: "fixture-rules",
   input_refs: ["intake:q18"],
   candidates: [
-    { candidate_id: "substack", label: "FIXTURE — Substack", scores: { reach: 4, fit: 5 }, evidence_refs: [], rationale: "FIXTURE — where the essays already live." },
-    { candidate_id: "linkedin", label: "FIXTURE — LinkedIn", scores: { reach: 5, fit: 2 }, evidence_refs: [], rationale: "FIXTURE — bigger room, wrong room." },
+    { candidate_id: "substack", label: "FIXTURE: Substack", scores: { reach: 4, fit: 5 }, evidence_refs: [], rationale: "FIXTURE: where the essays already live." },
+    { candidate_id: "linkedin", label: "FIXTURE: LinkedIn", scores: { reach: 5, fit: 2 }, evidence_refs: [], rationale: "FIXTURE: bigger room, wrong room." },
   ],
   recommended_candidate_ids: ["substack"], selected_candidate_ids: ["linkedin"], selected_by: "muxin",
-  override_reason: "FIXTURE — the people I want are on LinkedIn, and I would rather be early there.",
+  override_reason: "FIXTURE: the people I want are on LinkedIn, and I would rather be early there.",
   rationale: null, status: "selected", created_at: FX_AT, decided_at: FX_AT,
 };
 
@@ -401,27 +745,27 @@ const FX_AWAITING: DecisionRecord = {
 // One live row short of clearing, so the Clear button starts disabled and the server's own refusal
 // is one click away.
 const FX_NOT_LIVE = fxArtifact({
-  artifact_id: "p1-essay-04", title: "FIXTURE — approved, still not live",
+  artifact_id: "p1-essay-04", title: "FIXTURE: approved, still not live",
   editorial_status: "approved", delivery_status: "handed_off",
 });
 
 // A manual hand-off with a url floor: the confirm-live form asks for a link.
 const FX_HANDED_OFF = fxArtifact({
-  artifact_id: "p1-essay-05", title: "FIXTURE — waiting on you to put it live",
+  artifact_id: "p1-essay-05", title: "FIXTURE: waiting on you to put it live",
   editorial_status: "approved", delivery_status: "handed_off",
 });
 const FX_FAILED = fxArtifact({
-  artifact_id: "p1-essay-06", title: "FIXTURE — the one that did not go up",
+  artifact_id: "p1-essay-06", title: "FIXTURE: the one that did not go up",
   editorial_status: "approved", delivery_status: "failed",
-  failure: { provider: null, message: "FIXTURE — Substack rejected the paste.", retryable: true, at: FX_NOW },
+  failure: { provider: null, message: "FIXTURE: Substack rejected the paste.", retryable: true, at: FX_NOW },
 });
 
 const FX_ANSWERS = {
-  q1: "FIXTURE — help people vote on the local measures that actually change their street.",
-  q2: "FIXTURE — people who already vote in the big races and skip everything under them.",
-  q18: "FIXTURE — Substack. I already write there and it does not feel like performing.",
-  q20: "FIXTURE — about forty minutes a day, and I will be honest when that slips.",
-  q24: "FIXTURE — it should never become a thing that tells people how to vote.",
+  q1: "FIXTURE: help people vote on the local measures that actually change their street.",
+  q2: "FIXTURE: people who already vote in the big races and skip everything under them.",
+  q18: "FIXTURE: Substack. I already write there and it does not feel like performing.",
+  q20: "FIXTURE: about forty minutes a day, and I will be honest when that slips.",
+  q24: "FIXTURE: it should never become a thing that tells people how to vote.",
 };
 
 function fxThread(over: Partial<ThreadInput>) {
@@ -453,7 +797,7 @@ const VENTURE_WRITE_SCENARIOS: FixtureScenario[] = [
     group: "Venture",
     label: "a decision waiting on you",
     room: "venture",
-    note: "Click the non-recommended row to reach the override-reason interrupt — a fixture cannot pre-open client state.",
+    note: "Click the non-recommended row to reach the override-reason interrupt. A fixture cannot pre-open client state.",
     overrides: {
       "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
       "/api/venture/fixture-venture/thread": { ok: true, thread: fxThread({ decisions: [FX_AWAITING], artifacts: [] }) },
@@ -522,6 +866,22 @@ const VENTURE_SCENARIOS: FixtureScenario[] = [
     },
   },
   {
+    id: "venture-authorship",
+    group: "Venture",
+    label: "my draft beside the one you rewrote",
+    room: "venture",
+    overrides: {
+      "/api/venture/list": { ok: true, ventures: ["fixture-venture"] },
+      "/api/venture/fixture-venture/thread": {
+        ok: true,
+        thread: fxThread({
+          artifacts: [FX_AI_DRAFT, FX_EDITED_BY_MUXIN],
+          state: fxState(1, { "checkpoint-1": fxCheckpoint([FX_AI_DRAFT, FX_EDITED_BY_MUXIN]) }),
+        }),
+      },
+    },
+  },
+  {
     id: "venture-retracted",
     group: "Venture",
     label: "a retracted post keeps its evidence",
@@ -561,9 +921,9 @@ export const FIXTURE_SCENARIOS: FixtureScenario[] = [
       "/api/jobs": {
         jobs: [job({
           id: `fixture-job-${room.toLowerCase()}`, kind, status: "running",
-          label: `FIXTURE — a ${room} job that is not running`,
+          label: `FIXTURE: a ${room} job that is not running`,
           steps: FIXTURE_STEPS, stepTotal: 4, step: 1, elapsedMs: FAKE_ELAPSED,
-          lastStdoutLine: "FIXTURE — a heartbeat line no subprocess printed",
+          lastStdoutLine: "FIXTURE: a heartbeat line no subprocess printed",
         })],
       },
     },
@@ -574,6 +934,8 @@ export const FIXTURE_SCENARIOS: FixtureScenario[] = [
   })),
   ...VENTURE_SCENARIOS,
   ...VENTURE_WRITE_SCENARIOS,
+  ...CONTENT_SCENARIOS,
+  ...SIGNALS_SCENARIOS,
   ...Object.entries(EMPTY_BY_ROOM).map(([tab, overrides]) => ({
     id: `empty-${tab}`, group: "Empty", label: tab, room: tab, overrides,
   })),
@@ -739,11 +1101,18 @@ export function fixtureScriptHtml(): string {
     if (!panel || !open) return;
     panel.addEventListener("click", function(e){
       var b = e.target.closest ? e.target.closest("button") : null; if (!b) return;
-      if (b.id === "fxHide") { panel.hidden = true; open.hidden = false; return; }
+      if (b.id === "fxHide") {
+        panel.hidden = true; panel.style.display = "none";
+        open.hidden = false; open.style.display = "block";
+        return;
+      }
       if (b.dataset.fxroom) { if (typeof window.setRoom === "function") window.setRoom(b.dataset.fxroom); return; }
       if (b.dataset.fx) apply(b.dataset.fx);
     });
-    open.addEventListener("click", function(){ panel.hidden = false; open.hidden = true; });
+    open.addEventListener("click", function(){
+      panel.hidden = false; panel.style.display = "flex";
+      open.hidden = true; open.style.display = "none";
+    });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();

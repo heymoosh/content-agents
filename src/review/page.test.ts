@@ -11,7 +11,17 @@ import {
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
   jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
+  classifyCapture, captureVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
+  LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
+  groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
+  intakeProgressLine, intakeUnanswered, intakeSaveLine, intakeSlugError,
+  ventureMultiPickIds, followupDraftRequest, outreachDraftRequest, outreachMessageReviseRequest, notesPickRequest,
+  type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { saveIntakeDraft } from "./intake-draft.js";
+import { INTAKE_QUESTIONS } from "../venture/intake.js";
 
 test("replyContextHtml: a 'reply to mention' row renders its reply_to_text inline", () => {
   const row = {
@@ -186,6 +196,7 @@ import { renderPage } from "./page.js";
 import { repoRoot } from "../db/db.js";
 import { VENTURE_READ_PATHS } from "./venture-reads.js";
 import { VENTURE_WRITE_PATHS } from "./venture-writes.js";
+import { INTAKE_DRAFT_PATHS } from "./intake-draft.js";
 import { CARD_ACTION_IDS } from "./venture-thread.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -219,18 +230,12 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
 //
 // To add one: append the path and a comment in this format saying what it is and why its UI is
 // not here yet. Keep the list at or near zero.
-const PENDING_UI_ROUTES = new Set([
-  // The Content room's "decide the treatment" read layer (fit label per channel, that channel's
-  // own reuse window, next free slot). Backend shipped separately from the page.ts surface.
-  "/api/content/treatment",
-  // Card D: the four outcome families grouped at read time out of data/analytics.db
-  // (docs/venture-schema-contract.md §5.8). Built backend-only by agreement; page.ts is owned by
-  // another worker, so the Signals screen that calls this has not landed yet.
-  "/api/signals/outcomes",
-  // The redacted account-level research read (contract §5.4b), exposed to the GUI in the same
-  // backend-only Card D change. Same reason: its Signals surface lands separately.
-  "/api/research/report",
-]);
+// Empty, and meant to stay that way. The three routes that used to sit here
+// (/api/content/treatment, /api/signals/outcomes, /api/research/report) are all called by the page
+// now: the Content room's three-step wizard reads the first, the Signals room's outcome families
+// read the other two. Add an entry only for a route whose UI genuinely has not landed yet, and
+// delete it the moment it has.
+const PENDING_UI_ROUTES = new Set<string>([]);
 
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
   const script = emittedScripts().join("\n");
@@ -294,14 +299,22 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
 // The mechanism is identical in spirit and identical in the property that matters — each entry
 // asserts its route is STILL uncalled, so wiring the room turns the entry red and the only way
 // back to green is deleting it. Keep the list at or near zero.
-const PENDING_UI_VENTURE: { route: string; reason: string }[] = [
-  { route: "/api/venture/:slug/intake/drafts/clear", reason: "the intake interview screen, which is not built yet" },
-];
+const PENDING_UI_VENTURE: { route: string; reason: string }[] = [];
 
 // A parameterised route counts as called when the emitted script both reaches into /api/venture/
 // and names this route's own literal segments — the client builds these as
 // "/api/venture/" + slug + "/artifacts/" + id + "/approve", so ":slug"/":id" never appear as text
 // and the fixed segments around them are what to look for.
+//
+// The segments are matched as QUOTED fragments, not as bare substrings, and that distinction is
+// load-bearing rather than fussy. A concatenated path writes each literal run between two quotes
+// ("/intake/" + n + "/draft"), so requiring the quotes costs nothing — and without them
+// "/api/venture/:slug/intake/drafts" reads as called by the clear button alone, because
+// "/intake/drafts/clear" contains "/intake/drafts" as a substring. That is a route reported as
+// wired when nothing fetches it, which is the exact failure this guard exists to catch.
+function quotedRunPresent(script: string, run: string): boolean {
+  return script.includes('"' + run + '"') || script.includes("'" + run + "'");
+}
 function venturePathIsCalled(script: string, route: string): boolean {
   if (!route.includes(":")) return script.includes(route);
   if (!script.includes("/api/venture/")) return false;
@@ -314,10 +327,21 @@ function venturePathIsCalled(script: string, route: string): boolean {
   if (verb && (CARD_ACTION_IDS as readonly string[]).includes(verb)) {
     return script.includes('"/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id');
   }
-  return route
-    .split("/")
-    .filter((seg) => seg && !seg.startsWith(":") && seg !== "api" && seg !== "venture")
-    .every((seg) => script.includes("/" + seg));
+  // Split the path into the literal runs a concatenation would write between its parameters:
+  // "/api/venture/:slug/intake/:n/draft" → ["/api/venture/", "/intake/", "/draft"]. Every run has
+  // to appear quoted.
+  const runs: string[] = [];
+  let run = "";
+  for (const seg of route.split("/").slice(1)) {
+    if (seg.startsWith(":")) {
+      runs.push(run + "/");
+      run = "";
+    } else {
+      run += "/" + seg;
+    }
+  }
+  if (run) runs.push(run);
+  return runs.every((r) => quotedRunPresent(script, r));
 }
 
 test("every artifact-lifecycle route has a CardAction id, and every id has a route", () => {
@@ -325,7 +349,60 @@ test("every artifact-lifecycle route has a CardAction id, and every id has a rou
   assert.deepEqual([...lifecycle].sort(), [...CARD_ACTION_IDS].sort(), "the action id union and the artifact routes must be the same set");
 });
 
-const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS];
+// The intake-draft routes are the third source: unlike the other venture routes they are written
+// straight into serve.ts rather than through handleVentureRead/handleVentureWrite, so neither
+// dispatcher's path list carries them. Folding them in here is what makes them subject to the same
+// called-or-parked rule as everything else; the test below is what stops the NEXT such route from
+// being written without a declaration at all.
+const VENTURE_PATHS = [...VENTURE_READ_PATHS, ...VENTURE_WRITE_PATHS, ...INTAKE_DRAFT_PATHS];
+
+// Every regex-dispatched route in serve.ts must be declared in one of the path lists above.
+//
+// This closes the hole all three intake-draft routes fell through. The first wiring guard finds
+// routes by scanning for `url.pathname === "..."` literals and cannot see a regex; the second
+// reads its list from the venture dispatchers and cannot see a route written straight into
+// serve.ts. A regex route that is in neither is invisible to both — it can ship with no caller,
+// and no test notices. So: extract every `/^\/api\/...$/.test(url.pathname)` pattern out of
+// serve.ts's own source, canonicalize it back to a :param path, and require it to be declared.
+//
+// `/api/jobs/` keeps its existing prefix-level treatment in the first guard (the client builds
+// those paths from a job id the same way), so those four are listed here rather than re-plumbed.
+const DECLARED_JOB_REGEX_PATHS = [
+  "/api/jobs/:id/stop", "/api/jobs/:id/log", "/api/jobs/:id/answer", "/api/jobs/:id/retry",
+  "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
+];
+
+/** `/^\/api\/venture\/[^/]+\/intake\/\d+\/draft$/` → `/api/venture/:slug/intake/:n/draft`. */
+export function canonicalRegexRoute(pattern: string): string {
+  return pattern
+    .replace(/^\^/, "")
+    .replace(/\$$/, "")
+    .replace(/\\\//g, "/")
+    .replace(/\(\[\^\/\]\+\)|\[\^\/\]\+/g, ":slug")
+    .replace(/\\d\+/g, ":n");
+}
+
+test("wiring guard: every regex-dispatched route in serve.ts is declared in a path list", () => {
+  const serveSrc = readFileSync(join(HERE, "serve.ts"), "utf8");
+  const declared = new Set([...VENTURE_PATHS, ...DECLARED_JOB_REGEX_PATHS]);
+  const found: string[] = [];
+  for (const m of serveSrc.matchAll(/\/(\^\\\/api\\\/[^\n]*?\$)\/\.test\(url\.pathname\)/g)) {
+    found.push(canonicalRegexRoute(m[1]));
+  }
+  assert.ok(found.length >= 7, `expected serve.ts's regex routes to be found, got ${found.length}`);
+  for (const route of found) {
+    // Only the FIRST :param of a venture path is the slug; a later [^/]+ is an id, and the
+    // declarations spell those out. Compare on shape rather than on the parameter's name.
+    const shape = (p: string) => p.replace(/:[a-zA-Z]+/g, ":x");
+    const ok = [...declared].some((d) => shape(d) === shape(route));
+    assert.ok(
+      ok,
+      `serve.ts dispatches ${route} by regex, and no path list declares it. A regex route is ` +
+        `invisible to both wiring guards until it is declared — add it to INTAKE_DRAFT_PATHS, ` +
+        `VENTURE_READ_PATHS/VENTURE_WRITE_PATHS, or DECLARED_JOB_REGEX_PATHS above.`
+    );
+  }
+});
 
 test("wiring guard: every venture route is either called by the page or parked in PENDING_UI_VENTURE", () => {
   const script = emittedScripts().join("\n");
@@ -773,6 +850,7 @@ test("job surface copy: no em dashes and no 'atomize' in the strings this PR add
 import {
   outreachSegment, OUTREACH_SEGMENTS, groupLeadsBySegment, lastPitchedLabel, threadSegLabel,
   matchmakerRead, contactsLine, isEvidenceSourceValid, evidenceSourceView, NO_SOURCE_RECORDED,
+  evidenceCapturedView, NO_CAPTURE_DATE_RECORDED,
   outreachSendState, outreachSendNote, outreachSendBadge, leadSendLogLine,
   outreachThreadPhase, firstSentence, outreachOpeningLine,
 } from "./page.js";
@@ -911,12 +989,67 @@ test("evidenceSourceView: a valid URL is clickable, a vault path is text, anythi
   assert.deepEqual(evidenceSourceView(undefined), { kind: "none", text: NO_SOURCE_RECORDED });
 });
 
-test("evidenceSourceView: never invents a date, because EvidenceItem carries no timestamp", () => {
+test("evidenceSourceView: the source line stays a source line and never carries a date", () => {
+  // EvidenceItem now HAS a captured_at, and it renders on its own row (evidenceCapturedView
+  // below). The source cell still must not borrow from it: the prototype's hardcoded
+  // "observed Aug 6" sat exactly here, and a dateless source must keep reading as a dateless
+  // source rather than reaching for the item's timestamp.
   for (const src of ["https://posthog.com/blog", "vault:People/Annika L.md", "(none)", "", "tbd"]) {
     const v = evidenceSourceView(src);
     assert.ok(!/observed/i.test(v.text), "an evidence source must never read as an observation date: " + v.text);
     assert.ok(!/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(v.text));
   }
+});
+
+// ── captured_at: dated, undated, and no evidence at all ─────────────────────────────────────────
+
+test("evidenceCapturedView: a recorded date and no recorded date are two different sentences", () => {
+  assert.deepEqual(evidenceCapturedView("2026-08-23"), { dated: true, text: "captured 2026-08-23" });
+  assert.deepEqual(evidenceCapturedView(null), { dated: false, text: NO_CAPTURE_DATE_RECORDED });
+  assert.deepEqual(evidenceCapturedView(undefined), { dated: false, text: NO_CAPTURE_DATE_RECORDED });
+  assert.deepEqual(evidenceCapturedView(""), { dated: false, text: NO_CAPTURE_DATE_RECORDED });
+  assert.notEqual(evidenceCapturedView("2026-08-23").text, evidenceCapturedView(null).text);
+});
+
+test("evidenceCapturedView: an undated item never renders as though it were dated", () => {
+  // The failure this guards is the whole reason the field has three states: every lead.md already
+  // on disk was written before captured_at existed, nothing rewrites those files, so undated is a
+  // permanent state and not a loading one. No mtime, no today, no blank that reads like a date.
+  for (const v of [null, undefined, "", "   ", "today", "unknown", "(none)", "2026-08", "Aug 23 2026"]) {
+    const out = evidenceCapturedView(v);
+    assert.equal(out.dated, false, JSON.stringify(v));
+    assert.equal(out.text, NO_CAPTURE_DATE_RECORDED, JSON.stringify(v));
+    assert.ok(!/\d{4}-\d{2}-\d{2}/.test(out.text), "an undated item must not render a date: " + out.text);
+    assert.ok(!/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(out.text));
+  }
+});
+
+test("evidenceCapturedView: the browser copy answers every vector identically (Rule 5)", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin the capture-date mirror ──");
+  const end = script.indexOf("// ── end of the capture-date mirror ──");
+  assert.ok(start > -1, "the inline capture-date mirror must reach the browser");
+  assert.ok(end > start, "the capture-date mirror's end marker must follow it");
+  const mirror = new Function(
+    script.slice(start, end) + "\nreturn evidenceCapturedView;"
+  )() as typeof evidenceCapturedView;
+  for (const v of ["2026-08-23", "1999-01-01", null, undefined, "", "  ", "today", "2026-08", "Aug 23 2026"]) {
+    assert.deepEqual(mirror(v), evidenceCapturedView(v), JSON.stringify(v));
+  }
+});
+
+test("the evidence rail renders the capture date in the browser, in its own two registers", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("evidenceCapturedView(e.captured_at)"), "the rail must read the item's own date");
+  assert.ok(html.includes('cv.dated?"ev-cap":"ev-nocap"'), "dated and undated must take different classes");
+  // ...and the two classes must actually LOOK different, or the distinction is only in the markup.
+  // Asserted against the emitted CSS because that is the only place it exists.
+  const cap = /\.ev-cap \{([^}]*)\}/.exec(html);
+  const nocap = /\.ev-nocap \{([^}]*)\}/.exec(html);
+  assert.ok(cap && nocap, "both registers need a rule of their own, or the two collapse");
+  assert.ok(/font-style:italic/.test(nocap![1]), "the undated register is set apart in style: " + nocap![1]);
+  assert.ok(!/font-style:italic/.test(cap![1]), "and the dated one is not");
+  assert.notEqual(/color:(#[0-9a-f]+)/.exec(cap![1])?.[1], /color:(#[0-9a-f]+)/.exec(nocap![1])?.[1], "and in colour");
 });
 
 test("outreachSendState: locking is the only per-message fact the repo measures", () => {
@@ -1630,4 +1763,793 @@ test("stopJob claims nothing when the job had already settled", async () => {
   await make({ ok: false, error: "no such job" })("j1");
   assert.equal(flashed[0], "no such job");
   assert.equal(reloads.length, 2, "a failed stop must not trigger a reload as if something changed");
+});
+
+// ── Studio capture: the classifier, its mirror, and the bare-link ask ────────────────────────────
+// The capture box moved from the Content room to the top of Studio, and grew a classifier that
+// picks a room. Three things must hold, and each has bitten this file before:
+//   - the rule itself, including precedence (first match wins, and the order is load-bearing);
+//   - the inline browser copy behaving IDENTICALLY to the export (Rule 5 — fixing one and
+//     forgetting the other went green twice);
+//   - the dispatch never claiming to start work that has no route behind it.
+
+type CaptureFn = (t: string) => { kind: string; room?: string; url?: string };
+type VerdictFn = (room: string) => { room: string; line: string; actionLabel: string | null };
+
+// Pulls the client's own copy of the two helpers back out of the emitted <script> and evaluates it.
+// String-presence would pass on a mangled regex (`\s` emitted as `s`, `\/` emitted as `/` opening a
+// line comment); running the extracted code cannot.
+function captureMirror(): { classifyCapture: CaptureFn; captureVerdict: VerdictFn } {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("const BARE_URL_RE");
+  const end = script.indexOf("// ── end of the capture mirror ──");
+  assert.ok(start > -1, "the inline classifyCapture mirror must reach the browser");
+  assert.ok(end > start, "the capture mirror's end marker must follow it");
+  const src = script.slice(start, end);
+  return new Function(src + "\nreturn { classifyCapture: classifyCapture, captureVerdict: captureVerdict };")() as {
+    classifyCapture: CaptureFn; captureVerdict: VerdictFn;
+  };
+}
+
+// [text, expected room]. The precedence cases are the point: each one matches more than one rule.
+const CAPTURE_ROOM_VECTORS: [string, string][] = [
+  ["follow up with Jamie R. about the pitch", "Outreach"],
+  ["met Dana at the meetup, she runs the fund", "Outreach"],
+  ["reply to https://someplace.com", "Outreach"],       // a keyword beats the bare-URL branch
+  ["intro to plotting", "Outreach"],                     // rule 1 beats Fiction's "plot"
+  ["email the scene to my editor", "Outreach"],          // rule 1 beats Fiction's "scene"
+  ["chapter 4 needs a colder open", "Fiction"],
+  ["elias finally says it out loud", "Fiction"],
+  ["a scene where the offer lands badly", "Fiction"],    // rule 2 beats Venture's "offer"
+  ["what should the price be", "Venture"],
+  ["survey answers are coming in faster than I thought", "Venture"],
+  ["a thought about how atomization actually scales", "Content"],
+  ["I read https://example.com/post today and it stuck with me", "Content"], // a link inside a sentence
+  ["foo.xyz", "Content"],                                // a TLD the bare-link rule does not accept
+];
+
+const CAPTURE_ASK_VECTORS = [
+  "https://example.com",
+  "www.someone.ai",
+  "example.substack.com/p/a-thing",
+  "  https://foo.org  ",
+  "http://localhost.dev/x?y=1",
+];
+
+test("classifyCapture: five branches, first match wins, and the order is load-bearing", () => {
+  for (const [text, room] of CAPTURE_ROOM_VECTORS) {
+    const v = classifyCapture(text);
+    assert.equal(v.kind, "room", text);
+    assert.equal((v as { room: string }).room, room, text);
+  }
+});
+
+test("classifyCapture: a bare link is a question, never a room", () => {
+  for (const text of CAPTURE_ASK_VECTORS) {
+    const v = classifyCapture(text);
+    assert.equal(v.kind, "ask-link", text);
+    assert.equal((v as { url: string }).url, text.trim(), "the ask carries the trimmed link");
+  }
+  // Muxin's decision, recorded so nobody re-litigates it from the v5 handoff's match table (which
+  // sent anything containing http / .com / .ai / .org straight to Signals): the app asks.
+  assert.notEqual(classifyCapture("https://example.com").kind, "room");
+});
+
+test("classifyCapture: empty text classifies as empty, not as Content", () => {
+  for (const t of ["", "   ", "\n\t "]) assert.equal(classifyCapture(t).kind, "empty", JSON.stringify(t));
+});
+
+test("classifyCapture mirror: the browser copy answers identically on every vector (Rule 5)", () => {
+  const mirror = captureMirror().classifyCapture;
+  for (const [text, room] of CAPTURE_ROOM_VECTORS) {
+    assert.deepEqual(mirror(text), classifyCapture(text), text);
+    assert.equal(mirror(text).room, room, text);
+  }
+  for (const text of CAPTURE_ASK_VECTORS) {
+    assert.deepEqual(mirror(text), classifyCapture(text), text);
+    assert.equal(mirror(text).kind, "ask-link", text);
+  }
+  for (const t of ["", "   "]) assert.deepEqual(mirror(t), classifyCapture(t));
+});
+
+test("captureVerdict: every routed capture names the room it chose, and its mirror agrees", () => {
+  const mirror = captureMirror().captureVerdict;
+  for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
+    const v = captureVerdict(room);
+    assert.ok(v.line.includes(room), "the verdict must name the room it picked: " + room);
+    assert.deepEqual(mirror(room), v, "the browser copy of captureVerdict must match: " + room);
+  }
+  // The two rooms with no free-text entry say so, rather than offering a start they cannot perform.
+  assert.ok(captureVerdict("Outreach").line.includes("lead folder"));
+  assert.ok(captureVerdict("Venture").line.includes("no free text"));
+  // Content needs no move: its two buttons are already on this screen.
+  assert.equal(captureVerdict("Content").actionLabel, null);
+  assert.equal(captureVerdict("Fiction").actionLabel, "Take it to Fiction");
+});
+
+test("Studio capture: the box moved out of the Content room and into Studio", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const studio = html.slice(html.indexOf('id="roomStudio"'), html.indexOf('id="roomFiction"'));
+  const content = html.slice(html.indexOf('id="roomContent"'), html.indexOf('id="roomStudio"'));
+  for (const id of ['id="src"', 'id="captureTitle"', 'id="devStartBtn"', 'id="addBtn"', 'id="notesBtn"', 'id="notesPanel"', 'id="routeBtn"']) {
+    assert.ok(studio.includes(id), id + " must live in the Studio room now");
+    assert.ok(!content.includes(id), id + " must no longer be in the Content room");
+  }
+  // The notes browser came with it, so its copy must not still point "below" at a sheet that is
+  // now in a different room.
+  assert.ok(studio.includes("waits for your yes in the Content room"));
+  assert.ok(!html.includes("every draft still waits for your yes below"));
+  // The promo bridge fills #src, so it has to land in the room #src is in.
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('setRoom("studio"); // the capture box lives in Studio now'));
+});
+
+test("the bare-link ask: three controls, the honest explainer, and the honest Signals copy", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes(LINK_ASK_HEADING), "the ask must be headed " + LINK_ASK_HEADING);
+  assert.ok(html.includes("Versions for Content"), "the default-weighted button");
+  assert.ok(html.includes("Source for Signals"), "the filing button");
+  assert.ok(html.includes("Never mind, clear it"), "the cancel");
+  assert.ok(html.includes(LINK_ASK_EXPLAINER), "the explainer ships verbatim");
+  // Signals has no ingest for "a URL a reader came from". The button must not imply one.
+  assert.ok(html.includes(LINK_ASK_SIGNALS_NOTE), "the Signals button must say what it actually does");
+  assert.ok(LINK_ASK_SIGNALS_NOTE.includes("not attribution"));
+  // The ask's own state: an amber rail and a dimmed, read-only textarea while it is open.
+  assert.ok(html.includes(CAPTURE_RAIL_IDLE) && html.includes('id="captureRail"'));
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes(JSON.stringify(CAPTURE_RAIL_ASKING)), "the amber rail label must reach the browser");
+  assert.ok(script.includes('ta.readOnly = true; ta.classList.add("dimmed");'));
+});
+
+// The capture section may only reach routes that exist. Outreach drafting needs a lead folder and
+// Venture has no free-text entry, so a dispatch to either would be a claim this system cannot back.
+test("Studio capture: the dispatch never posts to a route that cannot take free text", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── Studio capture: one front door (v7 Studio)");
+  const end = script.indexOf("// ── Substack Notes checklist");
+  assert.ok(start > -1 && end > start, "the capture client section must be identifiable");
+  const section = script.slice(start, end);
+  const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
+  assert.deepEqual(paths, ["/api/develop/start", "/api/signals/backlog"], "unexpected route in the capture dispatch");
+  // Both are already wired: develop/start enqueues (so it must be armed), signals/backlog files a
+  // card and correctly is not an enqueue route.
+  assert.ok(enqueuesJob("/api/develop/start"));
+  assert.ok(!enqueuesJob("/api/signals/backlog"));
+  // Outreach and Venture get a room switch and a plain sentence, not a fabricated job.
+  assert.ok(section.includes('pendingCaptureText = t; setRoom(room.toLowerCase());'));
+  assert.ok(section.includes('Nothing was submitted.'));
+  assert.ok(section.includes('CAPTURE KEPT HERE'));
+  assert.ok(!/room==="Outreach".*post\(/s.test(section.slice(section.indexOf("function takeCaptureTo"), section.indexOf("function consumeCapturedBeats"))));
+});
+
+test("Studio capture copy: no em dashes, and nothing claims a job was started", () => {
+  const strings = [
+    CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING, LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE,
+    ...(["Content", "Fiction", "Outreach", "Venture"] as const).map((r) => captureVerdict(r).line),
+  ];
+  for (const s of strings) assert.ok(!s.includes("—"), "em dash in capture copy: " + s);
+  for (const r of ["Outreach", "Venture"] as const) {
+    assert.ok(/cannot start/.test(captureVerdict(r).line), r + " must say plainly that it cannot start one");
+  }
+});
+
+test("Studio director copy: the visible attribution uses punctuation allowed by the voice rules", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const studio = html.slice(html.indexOf('<section class="view" id="roomStudio"'), html.indexOf('<section class="view" id="roomFiction"'));
+  assert.ok(studio.includes("Your director."));
+  assert.ok(!studio.includes("— your director"));
+});
+
+test("ventureMultiPickIds: toggles choices but never lets the client exceed requiredCount", () => {
+  assert.deepEqual(ventureMultiPickIds(3, [], "a"), ["a"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "b"], "c"), ["a", "b", "c"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "b", "c"], "d"), ["a", "b", "c"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "b", "c"], "b"), ["a", "c"]);
+  assert.deepEqual(ventureMultiPickIds(3, ["a", "a"], "b"), ["a", "b"]);
+});
+
+test("Venture multi-pick markup: the UI submits the server-required set and keeps the refusal path", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes("function vMultiSubmit(choice)"));
+  assert.ok(script.includes('candidateIds:ids'), "the submit payload must be the selected set");
+  assert.ok(script.includes('data-vmulti-submit="'), "the choice panel needs a submit action");
+  assert.ok(script.includes("The server still checks the count, override reason, and whether this decision is already immutable."));
+  assert.ok(html.includes("LEDGER / HISTORY"), "the Venture room needs a visible history area");
+  assert.ok(html.includes("Earlier artifacts and live records appear here when the server exposes them."));
+});
+
+test("followupDraftRequest: selected engine is sent, with Claude preserved as the fallback", () => {
+  assert.deepEqual(followupDraftRequest("outreach/leads/acme", "Rae", "grok"), {
+    dir: "outreach/leads/acme", recipient: "Rae", engine: "grok",
+  });
+  assert.deepEqual(followupDraftRequest("outreach/leads/acme"), {
+    dir: "outreach/leads/acme", engine: "claude",
+  });
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('class="fu-draft-control"'), "the Follow-ups action needs a picker wrapper");
+  assert.ok(script.includes('post("/api/followups/draft-follow-up", followupDraftRequest(dir, person, engine))'));
+  assert.ok(script.includes('engine:engine || "claude"'), "missing selector keeps the old Claude default");
+});
+
+test("Outreach directed drafts and revisions expose one engine picker and send its value", () => {
+  assert.deepEqual(outreachDraftRequest("leads/acme", "keep it warm", "Rae", "grok"), {
+    dir: "leads/acme", direction: "keep it warm", recipient: "Rae", engine: "grok",
+  });
+  assert.deepEqual(outreachMessageReviseRequest("leads/acme", "messages/1.md", "shorter", "codex"), {
+    dir: "leads/acme", file: "messages/1.md", instruction: "shorter", engine: "codex",
+  });
+  assert.equal(outreachDraftRequest("leads/acme", "say hello").engine, "claude");
+  assert.equal(outreachMessageReviseRequest("leads/acme", "messages/1.md", "warmer").engine, "claude");
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('const outreachEngine = l.kind!=="content-example" ? engineSelectHtml() : "";'), "the Outreach thread needs an engine picker");
+  assert.ok(!script.includes('engineSelectHtml("outreachEngine")'), "Outreach must not emit duplicate selector ids");
+  assert.ok(script.includes('querySelector(".engine-select")'), "Outreach actions must read the thread-local picker");
+  assert.ok(script.includes('outreachDraftRequest(dir, direction, recipient, engine)'), "directed drafts must build an engine-aware request");
+  assert.ok(script.includes('post("/api/outreach/draft", outreachDraftRequest(dir, direction, recipient, engine))'));
+  assert.ok(script.includes('outreachMessageReviseRequest(dir, file, instruction, engine)'), "message revisions must build an engine-aware request");
+  assert.ok(script.includes('post("/api/outreach/message/revise", outreachMessageReviseRequest(dir, file, instruction, engine))'));
+  assert.ok(script.includes('engine:engine || "claude"'), "Outreach keeps Claude when no selector is available");
+});
+
+test("Notes picker sends the selected engine", () => {
+  assert.deepEqual(notesPickRequest([1, 3], "grok"), { indices: [1, 3], engine: "grok" });
+  assert.deepEqual(notesPickRequest([2]), { indices: [2], engine: "claude" });
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('post("/api/notes/pick", notesPickRequest(indices, $("#studioEngine").value))'));
+});
+
+test("Content workbench actions expose local engine selectors and use them", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes('class="wb-reply"'), "each workbench reply action needs its own control group");
+  assert.ok(html.includes('class="wb-handoff"'), "each workbench handoff needs its own control group");
+  assert.ok(script.includes('refreshEngineControls(box);'), "rebuilt workbench selectors must receive engine availability state");
+  assert.ok(script.includes('t.closest(".wb-reply")?.querySelector(".engine-select")'));
+  assert.ok(script.includes('t.closest(".wb-handoff")?.querySelector(".engine-select")'));
+  assert.ok(!script.includes('post("/api/develop/reply", {slug, reply, engine:$("#studioEngine").value})'));
+  assert.ok(!script.includes('post("/api/develop/format", {slug, lenses, engine:$("#studioEngine").value})'));
+});
+
+test("Fiction drafting and second passes expose a local engine selector and send it", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('post("/api/fiction/draft",{series:ficSeries, beats:t, engine})'));
+  assert.ok(script.includes('post("/api/fiction/repass",{series:ficSeries, chapter:chapter.number, note:note, engine})'));
+  assert.ok(script.includes('const engine = draftBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
+  assert.ok(script.includes('const engine = passBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";'));
+  assert.ok(script.includes('refreshEngineControls($("#fictionMain"));'));
+});
+
+test("Studio polish keeps engine choices, capture submits, and room loads understandable", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('content-agents-preferred-engine'), "engine preference should survive a reload");
+  assert.ok(script.includes('Claude · Writing') && script.includes('Grok · Ideation') && script.includes('GPT (Codex) · Analysis'),
+    "engine options should explain their strengths inline");
+  assert.ok(script.includes("captureSubmitting"), "capture handoffs need one shared in-flight guard");
+  assert.ok(script.includes('showRoomLoading("workbench")') && script.includes('showRoomLoading("outreachList")') && script.includes('showRoomLoading("ventureThread")'),
+    "the three async rooms should expose a loading state");
+  assert.ok(script.includes('post("/api/fiction/check",{series:ficSeries, chapter:chapter.number, engine})'),
+    "the canon check must send the selected engine");
+});
+
+test("Venture run-step control: queues one selected-engine draft step at the current phase", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes('id="ventureRunStepBtn"'), "Venture needs a phase-run action");
+  assert.ok(html.includes("Run the next draft step"));
+  assert.ok(html.includes("stops at the next human gate"), "the action must preserve the human gate");
+  assert.ok(script.includes('post("/api/venture/"+encodeURIComponent(ventureSlug)+"/run-step", {engine, phase:VENTURE_THREAD.phase})'));
+  assert.ok(script.includes("function runVentureStep()"));
+});
+
+// The desk boots into Studio (Muxin, 2026-08-23), because the capture box is there now and booting
+// into Content would open on a screen with no way to capture a thought. Three places have to agree,
+// and the first paint has to actually fetch what that room shows.
+test("boot room: Studio, with the nav highlight, currentTab and the first fetch all agreeing", () => {
+  assert.equal(BOOT_ROOM, "studio");
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const onButtons = [...html.matchAll(/<button class="room on" data-room="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(onButtons, [BOOT_ROOM], "exactly one nav room may rest highlighted, and it is the boot room");
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('let currentTab = "' + BOOT_ROOM + '";'), "currentTab must start on the boot room");
+  // Anchored at the boot call site itself: `setRoom("content")` is still legitimate elsewhere, as
+  // the Studio needs-you rows' click-through into the Content room.
+  assert.ok(
+    script.includes('setRoom("' + BOOT_ROOM + '");\n// The desk header'),
+    "the boot setRoom must name the boot room",
+  );
+  // setRoom(boot) fires the room's own reads, but "last refreshed" is stamped off this list, and an
+  // unfetched Studio first-paints as "Loading…". Both Studio reads have to be in it.
+  const boot = script.slice(script.indexOf("Promise.all(["), script.indexOf("finally(markRefreshed)"));
+  for (const fn of ["loadStudio()", "loadJobs()"]) {
+    assert.ok(boot.includes(fn), fn + " must be part of the first paint now that Studio is the boot room");
+  }
+  // The Content pending badge lives in the header rail, so its read still runs at boot.
+  assert.ok(boot.includes("load()"), "the pending-count badge's read must still run at boot");
+});
+
+
+// ── Signals: the four outcome families ──────────────────────────────────────────────────────────
+//
+// Rule 5's strong form: every vector is answered twice, once by the export and once by the copy
+// the browser actually gets, sliced out of the emitted <script> and evaluated. A test that only
+// exercised the export would go green while the browser kept a bug.
+
+type SignalsMirror = {
+  groupDigits: typeof groupDigits;
+  metricLine: typeof metricLine;
+  sampleNote: typeof sampleNote;
+  familyGate: typeof familyGate;
+};
+
+function signalsMirror(): SignalsMirror {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("// ── begin the signals mirror ──");
+  const end = script.indexOf("// ── end of the signals mirror ──");
+  assert.ok(start > -1, "the inline signals mirror must reach the browser");
+  assert.ok(end > start, "the signals mirror's end marker must follow it");
+  return new Function(
+    script.slice(start, end) + "\nreturn { groupDigits, metricLine, sampleNote, familyGate };"
+  )() as SignalsMirror;
+}
+
+const METRIC_VECTORS: MetricReadView[] = [
+  { state: "measured", value: 4180, records_measured: 12, records_unmeasured: 0 },
+  { state: "measured", value: 0, records_measured: 12, records_unmeasured: 0 },   // a MEASURED zero
+  { state: "measured", value: 0, records_measured: 0, records_unmeasured: 11 },   // a sum over nothing
+  { state: "measured", value: 7, records_measured: 1, records_unmeasured: 1 },    // singular wording
+  { state: "measured", value: -3, records_measured: 2, records_unmeasured: 0 },   // a negative delta
+  { state: "measured", value: 1234567, records_measured: 9, records_unmeasured: 2 },
+  { state: "not_measured", reason: "the metrics table has no saves column" },
+];
+
+test("metricLine: measured, measured-as-zero and never-measured are three different cells", () => {
+  const real = metricLine(METRIC_VECTORS[0]);
+  const zero = metricLine(METRIC_VECTORS[1]);
+  const nothing = metricLine(METRIC_VECTORS[2]);
+  const absent = metricLine(METRIC_VECTORS[6]);
+
+  assert.equal(real.value, "4,180");
+  assert.equal(real.tone, "ink");
+
+  // measured-as-zero prints the zero AND says how many posts it was measured on
+  assert.equal(zero.value, "0");
+  assert.match(zero.note, /measured on 12 records/);
+  assert.equal(zero.tone, "ink");
+
+  // a sum over no posts is not the same claim, and is not toned like a measurement
+  assert.equal(nothing.value, "0");
+  assert.match(nothing.note, /sum over nothing/);
+  assert.equal(nothing.tone, "grey");
+  assert.notEqual(nothing.note, zero.note);
+
+  // never measured renders its reason and NEVER a number, a zero, or a bare dash
+  assert.equal(absent.value, "not measured");
+  assert.equal(absent.note, "the metrics table has no saves column");
+  assert.equal(absent.tone, "grey");
+  assert.ok(!/^[-–—]?\d*$/.test(absent.value), "an unmeasured cell must not read as a number or a dash");
+});
+
+test("metricLine: the browser copy answers every vector identically", () => {
+  const mirror = signalsMirror().metricLine;
+  for (const v of METRIC_VECTORS) assert.deepEqual(mirror(v), metricLine(v), JSON.stringify(v));
+});
+
+// The `posts_measured`/`posts_unmeasured` -> `records_measured`/`records_unmeasured` rename (PR
+// #376 documented the mismatch at the declaration and deferred it until page.ts was free). It was
+// a rename and nothing else, so these are the exact sentences the screen shipped before it, pinned
+// byte for byte: if a later change to the field names moves a word, this is what says so.
+test("metricLine: the rename left every rendered sentence byte-identical", () => {
+  assert.deepEqual(metricLine({ state: "measured", value: 4180, records_measured: 12, records_unmeasured: 0 }), {
+    value: "4,180",
+    note: "measured on 12 records",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 7, records_measured: 1, records_unmeasured: 1 }), {
+    value: "7",
+    note: "measured on 1 record, 1 record carried no number",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 1234567, records_measured: 9, records_unmeasured: 2 }), {
+    value: "1,234,567",
+    note: "measured on 9 records, 2 records carried no number",
+    tone: "ink",
+  });
+  assert.deepEqual(metricLine({ state: "measured", value: 0, records_measured: 0, records_unmeasured: 11 }), {
+    value: "0",
+    note: "no record carried this number, so this is a sum over nothing rather than a measured zero",
+    tone: "grey",
+  });
+});
+
+test("groupDigits: grouping is written out, not left to a locale, and both copies agree", () => {
+  const mirror = signalsMirror().groupDigits;
+  for (const n of [0, 7, 999, 1000, 4180, 1234567, -3, -1234, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(mirror(n), groupDigits(n), String(n));
+  }
+  assert.equal(groupDigits(1234567), "1,234,567");
+  assert.equal(groupDigits(-1234), "-1,234");
+});
+
+const RULE = { kind: "weeks_of_data", threshold_weeks: 4, source: "the repo's own INSUFFICIENT rule" };
+const CONF_VECTORS: { platform: string; posts: number; weeks: number; status: string; sufficient: boolean }[][] = [
+  [],
+  [{ platform: "x", posts: 3, weeks: 1, status: "INSUFFICIENT", sufficient: false }],
+  [{ platform: "x", posts: 30, weeks: 9, status: "OK", sufficient: true }],
+  [
+    { platform: "x", posts: 30, weeks: 9, status: "OK", sufficient: true },
+    { platform: "bluesky", posts: 3, weeks: 1, status: "INSUFFICIENT", sufficient: false },
+  ],
+];
+
+test("sampleNote: no posts on record reads as 'nothing measured yet', never as four zeros", () => {
+  assert.match(sampleNote([], RULE), /No posts on record/);
+  assert.match(sampleNote(CONF_VECTORS[1], RULE), /None of the 1 platform on record clears 4 weeks/);
+  assert.match(sampleNote(CONF_VECTORS[2], RULE), /All 1 platform on record clear/);
+  assert.match(sampleNote(CONF_VECTORS[3], RULE), /1 of 2 platforms on record clear 4 weeks/);
+  // the threshold is whatever the read handed over, never a number typed into the page
+  assert.match(sampleNote(CONF_VECTORS[3], { ...RULE, threshold_weeks: 1 }), /1 week of data/);
+});
+
+test("sampleNote and familyGate: the browser copies answer identically", () => {
+  const m = signalsMirror();
+  for (const conf of CONF_VECTORS) {
+    for (const weeks of [1, 4, 12]) {
+      const rule = { ...RULE, threshold_weeks: weeks };
+      assert.equal(m.sampleNote(conf, rule), sampleNote(conf, rule), JSON.stringify([conf.length, weeks]));
+    }
+  }
+  for (const f of ["attention", "conversation", "audience", "business"] as const) {
+    assert.deepEqual(m.familyGate(f), familyGate(f), f);
+  }
+});
+
+test("familyGate: only attention and conversation may feed a suppression call", () => {
+  for (const f of ["attention", "conversation"] as const) {
+    assert.match(familyGate(f).text, /MAY INFORM/);
+  }
+  for (const f of ["audience", "business"] as const) {
+    assert.match(familyGate(f).text, /NEVER USED TO SUPPRESS/);
+  }
+});
+
+test("the Signals screen calls both new reads and renders no prototype fixture number", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('fetch("/api/signals/outcomes")'), "the outcome families must be fetched");
+  assert.ok(script.includes('fetch("/api/research/report")'), "the research read must be fetched");
+  // The prototype's Signals numbers and thresholds have no source in this repo (port rules, Rule 2).
+  for (const n of ["4,180", "trending up", "home base", "still testing"]) {
+    assert.ok(!script.includes(n), "the page must not carry the prototype's fixture value " + n);
+  }
+});
+
+// ── Content: the treatment grid ─────────────────────────────────────────────────────────────────
+
+type TreatmentMirror = {
+  fitLine: typeof fitLine;
+  floorNote: typeof floorNote;
+  reuseLine: typeof reuseLine;
+  readsFromCells: typeof readsFromCells;
+};
+
+function treatmentMirror(): TreatmentMirror {
+  const script = emittedScripts().join("\n");
+  // readsFromCells/reuseLine both call the browser's own fmtDays, so the slice needs it too. Taking
+  // it out of the emitted script (rather than redefining it here) keeps the browser copy on trial.
+  const fmtAt = script.indexOf("function fmtDays(n){");
+  assert.ok(fmtAt > -1, "the browser needs its own fmtDays for the treatment mirror");
+  const fmtSrc = script.slice(fmtAt, script.indexOf("\n", fmtAt));
+  const start = script.indexOf("// ── begin the treatment mirror ──");
+  const end = script.indexOf("// ── end of the treatment mirror ──");
+  assert.ok(start > -1, "the inline treatment mirror must reach the browser");
+  assert.ok(end > start, "the treatment mirror's end marker must follow it");
+  return new Function(
+    fmtSrc + "\n" + script.slice(start, end) + "\nreturn { fitLine, floorNote, reuseLine, readsFromCells };"
+  )() as TreatmentMirror;
+}
+
+function chan(over: Partial<ChannelTreatmentView>): ChannelTreatmentView {
+  return {
+    channel: "x", decision: "include", recordedDecision: "include", score: null,
+    fitLabel: null, fitBasis: "unknown", belowFloor: false,
+    reuse: { key: "x", allowed: true, everPlaced: false, lastPlacedAt: null, daysSince: null, minDays: 14, reason: null },
+    reuseNote: null, slot: { time: "t", label: "Tue 09:00 PT" },
+    ...over,
+  };
+}
+
+const CHANNEL_VECTORS: ChannelTreatmentView[] = [
+  chan({ channel: "x", score: 1.4, fitLabel: "STRONG FIT", fitBasis: "measured" }),
+  chan({ channel: "linkedin", score: 0.8, fitLabel: "REACH ONLY", fitBasis: "measured" }),
+  chan({ channel: "threads", score: 0.42, fitLabel: "POOR FIT", fitBasis: "measured", belowFloor: true }),
+  chan({ channel: "bluesky", fitLabel: "COLD START", fitBasis: "insufficient-data" }),
+  chan({ channel: "mastodon", fitBasis: "editorial-rule", decision: "skip" }),
+  chan({ channel: "quote-card", fitBasis: "format-asset", reuse: null, reuseNote: "enforced per fan-out target" }),
+  chan({ channel: "x", fitBasis: "unknown", decision: null, recordedDecision: null }),
+  chan({ channel: "linkedin", reuse: { key: "linkedin", allowed: false, everPlaced: true, lastPlacedAt: "x", daysSince: 12, minDays: 60, reason: "inside the window" } }),
+  chan({ channel: "x", reuse: { key: "x", allowed: true, everPlaced: true, lastPlacedAt: "x", daysSince: 40, minDays: 14, reason: null } }),
+  chan({ channel: "x", reuse: { key: "x", allowed: false, everPlaced: true, lastPlacedAt: "x", daysSince: null, minDays: 1, reason: null } }),
+];
+
+test("fitLine: a COLD START from no data never looks like a STRONG FIT from a measured score", () => {
+  const strong = fitLine(CHANNEL_VECTORS[0], 0.6);
+  const cold = fitLine(CHANNEL_VECTORS[3], 0.6);
+  assert.equal(strong.label, "STRONG FIT");
+  assert.equal(strong.tone, "green");
+  assert.match(strong.basis, /measured, scoring 1\.4/);
+  assert.equal(cold.label, "COLD START");
+  assert.notEqual(cold.tone, strong.tone, "the two must not share a tone");
+  assert.match(cold.basis, /not enough posts or weeks/);
+  assert.ok(!/measured/.test(cold.basis), "a cold start must never claim a measurement");
+});
+
+test("fitLine: an unscored channel gets words, not one of the four verdicts", () => {
+  const rule = fitLine(CHANNEL_VECTORS[4], 0.6);
+  const asset = fitLine(CHANNEL_VECTORS[5], 0.6);
+  const unknown = fitLine(CHANNEL_VECTORS[6], 0.6);
+  const verdicts = ["STRONG FIT", "REACH ONLY", "POOR FIT", "COLD START"];
+  for (const r of [rule, asset, unknown]) {
+    assert.ok(!verdicts.includes(r.label), r.label + " must not be a fit verdict");
+    assert.ok(r.basis.length > 0, "the label never renders bare");
+    assert.equal(r.tone, "grey");
+  }
+  assert.equal(rule.label, "EDITORIAL RULE");
+  assert.equal(asset.label, "ALWAYS GENERATED");
+  assert.equal(unknown.label, "NOT SCORED");
+});
+
+test("fitLine: the configured floor is printed, never a literal typed into the page", () => {
+  assert.match(fitLine(CHANNEL_VECTORS[1], 0.6).basis, /floor is 0\.6/);
+  assert.match(fitLine(CHANNEL_VECTORS[1], 0.25).basis, /floor is 0\.25/);
+});
+
+test("floorNote: scoring under the floor is information, never an exclusion", () => {
+  assert.equal(floorNote(CHANNEL_VECTORS[0], 0.6), "");
+  const note = floorNote(CHANNEL_VECTORS[2], 0.6);
+  assert.match(note, /stays on/);
+  assert.match(note, /never skips a channel/);
+});
+
+test("reuseLine: every sentence names THIS channel's own window, never one global number", () => {
+  const never = reuseLine(CHANNEL_VECTORS[0]);
+  const held = reuseLine(CHANNEL_VECTORS[7]);
+  const clear = reuseLine(CHANNEL_VECTORS[8]);
+  const card = reuseLine(CHANNEL_VECTORS[5]);
+  assert.match(never.text, /14 days/);
+  assert.match(held.text, /60 days/);
+  assert.equal(held.tone, "amber");
+  assert.match(clear.text, /14 days/);
+  assert.equal(clear.tone, "ink");
+  assert.equal(card.text, "enforced per fan-out target");
+  assert.equal(card.tone, "grey");
+  // the prototype's single global "The window is 14 days" must not survive anywhere
+  for (const v of CHANNEL_VECTORS) assert.ok(!/The window is 14 days/.test(reuseLine(v).text));
+});
+
+test("the treatment mirror answers every channel vector identically", () => {
+  const m = treatmentMirror();
+  for (const v of CHANNEL_VECTORS) {
+    for (const floor of [0.6, 0.25]) {
+      assert.deepEqual(m.fitLine(v, floor), fitLine(v, floor), v.channel + " @ " + floor);
+      assert.equal(m.floorNote(v, floor), floorNote(v, floor), v.channel + " @ " + floor);
+    }
+    assert.deepEqual(m.reuseLine(v), reuseLine(v), v.channel);
+  }
+});
+
+const TREATMENT_VECTORS: { t: TreatmentView; cuts: { lens: string; sourceLines?: (number | string)[] }[] }[] = [
+  {
+    t: { slug: "s", pillars: ["human-ai"], pillarSource: "routing.md", floor: 0.6,
+         channels: [CHANNEL_VECTORS[0], CHANNEL_VECTORS[7]], scoredBelowFloorButEnabled: ["threads"] },
+    cuts: [{ lens: "extract", sourceLines: [4, "9-11"] }],
+  },
+  {
+    t: { slug: "s", pillars: [], pillarSource: "none", floor: 0.6,
+         channels: [CHANNEL_VECTORS[6]], scoredBelowFloorButEnabled: [] },
+    cuts: [],
+  },
+  {
+    t: { slug: "s", pillars: ["civic-tech", "human-ai"], pillarSource: "routing.md", floor: 0.25,
+         channels: [CHANNEL_VECTORS[0]], scoredBelowFloorButEnabled: ["threads", "mastodon"] },
+    cuts: [{ lens: "a", sourceLines: [1] }, { lens: "b", sourceLines: [2] }, { lens: "c" }],
+  },
+];
+
+test("readsFromCells: one channel and one cut read as singular, several read as plural", () => {
+  const one = readsFromCells(TREATMENT_VECTORS[0].t, TREATMENT_VECTORS[0].cuts);
+  const many = readsFromCells(TREATMENT_VECTORS[2].t, TREATMENT_VECTORS[2].cuts);
+  assert.match(one[2].v, /threads scores under the floor of 0\.6 and stays on\./);
+  assert.match(many[2].v, /threads, mastodon score under the floor of 0\.25 and stay on\./);
+  assert.match(one[3].v, /The cut below carries the source lines it was built from,/);
+  assert.match(many[3].v, /All 2 cuts below carry the source lines they were built from,/);
+});
+
+test("readsFromCells: four cells, each standing on a read rather than on the prototype's copy", () => {
+  const [withPillar, noPillar] = TREATMENT_VECTORS.map((v) => readsFromCells(v.t, v.cuts));
+  assert.equal(withPillar.length, 4);
+  assert.deepEqual(withPillar.map((c) => c.k), ["PILLAR", "REUSE WINDOWS", "NOTHING SKIPPED", "YOUR WORDS"]);
+
+  assert.match(withPillar[0].v, /human-ai, read from this piece's routing\.md/);
+  // the held channel names ITS OWN window, and no global constant appears
+  assert.match(withPillar[1].v, /60 days/);
+  assert.ok(!/The window is 14 days/.test(withPillar[1].v));
+  assert.match(withPillar[2].v, /floor of 0\.6/);
+  assert.match(withPillar[2].v, /never skips a channel/);
+  assert.match(withPillar[3].v, /Nothing composed/);
+
+  // no routing.md: no pillar, no score, and NO extraction claim, because no cut carries source lines
+  assert.match(noPillar[0].v, /has no routing\.md/);
+  assert.equal(noPillar[0].tone, "grey");
+  assert.match(noPillar[2].v, /No score to skip anything on/);
+  assert.match(noPillar[3].v, /makes no claim/);
+  assert.equal(noPillar[3].tone, "grey");
+});
+
+test("readsFromCells: the browser copy answers every treatment vector identically", () => {
+  const m = treatmentMirror().readsFromCells;
+  for (const v of TREATMENT_VECTORS) assert.deepEqual(m(v.t, v.cuts), readsFromCells(v.t, v.cuts), v.t.pillarSource);
+});
+
+test("the Content wizard calls the treatment read and offers no control the backend cannot honour", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('"/api/content/treatment?slug="'), "the wizard must read the treatment");
+  // Refused ports: routing decides channels (route.ts), so there is no channel checkbox here, and
+  // nothing in src/ clusters Muxin's own audience.
+  assert.ok(!script.includes("Make the "), "the prototype's 'Make the N drafts' control does not ship");
+  assert.ok(!script.includes("sit in that cluster"), "no cluster-size claim ships");
+  // VENTURE_SLUGS/VENTURE_THREAD are the Venture room's own state; the TAG would be a quoted literal
+  assert.ok(!script.includes('"VENTURE"'), "no source can earn a VENTURE tag, so the tag does not ship");
+  assert.ok(script.includes('"SUBSTACK"') && script.includes('"YOURS"') && script.includes('"READ IN"'),
+    "the three tags that a real source.md fact can earn do ship");
+});
+
+test("the wizard's bulk yes reuses the row status route and says what it approves", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('post("/api/status"'), "a bulk yes must reuse the same write every card uses");
+  assert.ok(script.includes("Yes to all "), "the scoped label ships");
+  assert.ok(script.includes("Nothing outside this channel is touched"), "the scope is stated");
+  assert.ok(script.includes("Nothing posts instantly"), "scheduling is not hidden behind the word approve");
+  // A row she flagged revise must be out of reach: approving it would act against her own note.
+  assert.ok(script.includes("!DECIDED.has(r.status) && !r.status"), "the bulk yes targets untouched drafts only");
+  assert.ok(script.includes("marked revise or blocked"), "the button says what it deliberately leaves alone");
+});
+
+test("cwGroups: the bulk yes counts only untouched drafts, never a row marked revise", () => {
+  // The browser's cwGroups is DOM-bound, so this asserts the shape of the emitted source instead:
+  // the three counts must be distinct, and `fresh` (what the button acts on) must exclude a status.
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function cwGroups(){");
+  assert.ok(start > -1, "cwGroups must reach the browser");
+  const body = script.slice(start, script.indexOf("\nfunction ", start + 10));
+  assert.match(body, /fresh: pending\.filter\(r=>!r\.status\)\.length/);
+  assert.match(body, /flagged: pending\.filter\(r=>!!r\.status\)\.length/);
+  // and a live check of the same predicate over a realistic row set
+  const rows = [
+    { status: "" }, { status: "" }, { status: "approve" }, { status: "revise" },
+    { status: "blocked" }, { status: "published" }, { status: "discard" },
+  ];
+  const DECIDED_SET = new Set(["published", "discard", "locked"]);
+  const pending = rows.filter((r) => !DECIDED_SET.has(r.status) && r.status !== "approve");
+  assert.equal(pending.length, 4, "the badge counts revise and blocked as outstanding");
+  assert.equal(pending.filter((r) => !r.status).length, 2, "but only two are what a bulk yes may touch");
+  assert.equal(pending.filter((r) => !!r.status).length, 2);
+});
+
+// ---------------------------------------------------------------------------
+// The intake interview's Rule 5 mirrors.
+//
+// Same mechanism as captureMirror above: slice the browser's own copies out of the emitted script,
+// `new Function` them, and run every vector through BOTH. String-presence would not catch the
+// failure that matters — an inline copy edited out of step with the export, which goes green while
+// the browser keeps the old answer.
+
+type IntakeMirror = {
+  ivProgressLine: (step: number, total: number) => string;
+  ivUnanswered: (drafts: { n: number; text: string }[], total: number) => number[];
+  ivSaveLine: (s: { state: string; savedAt?: string; error?: string }) => string;
+  ivSlugError: (slug: string) => string | null;
+};
+
+function intakeMirror(): IntakeMirror {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function ivProgressLine(");
+  const end = script.indexOf("// ── end of the intake mirror ──");
+  assert.ok(start > -1, "the inline intake mirrors must reach the browser");
+  assert.ok(end > start, "the intake mirror's end marker must follow it");
+  const src = script.slice(start, end);
+  return new Function(
+    src + "\nreturn { ivProgressLine, ivUnanswered, ivSaveLine, ivSlugError };"
+  )() as IntakeMirror;
+}
+
+test("intakeProgressLine: counted, never estimated, and the two panels are named not numbered", () => {
+  const m = intakeMirror().ivProgressLine;
+  const vectors: [number, number][] = [[1, 25], [7, 25], [25, 25], [26, 25], [27, 25], [0, 25], [28, 25], [3, 4]];
+  for (const [step, total] of vectors) {
+    assert.equal(m(step, total), intakeProgressLine(step, total), `mirror disagrees at step ${step}`);
+  }
+  assert.equal(intakeProgressLine(7, 25), "Question 7 of 25");
+  assert.equal(intakeProgressLine(26, 25), "Voice evidence", "the panels after the interview are named steps");
+  assert.equal(intakeProgressLine(27, 25), "Day 14 scorecard");
+  assert.equal(intakeProgressLine(28, 25), "");
+  // Rule 3: nothing on this screen may render a duration nobody measured.
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("const IV_QUESTIONS");
+  const body = script.slice(start, script.indexOf("async function loadFiction(", start));
+  assert.ok(start > -1 && body.length > 0, "the interview client must reach the browser");
+  assert.doesNotMatch(body, /minutes? (left|remaining)|about \d+ min|est\w* time|takes about/i,
+    "the interview must not estimate how long it takes — nothing here measures that");
+});
+
+test("intakeUnanswered: whitespace is not an answer, and the mirror agrees", () => {
+  const m = intakeMirror().ivUnanswered;
+  const vectors: { n: number; text: string }[][] = [
+    [],
+    [{ n: 1, text: "a" }, { n: 3, text: "c" }],
+    [{ n: 1, text: "   " }, { n: 2, text: "\n" }, { n: 3, text: "x" }],
+    [{ n: 1, text: "" }, { n: 2, text: "ok" }, { n: 5, text: "ok" }],
+  ];
+  for (const drafts of vectors) {
+    assert.deepEqual(m(drafts, 5), intakeUnanswered(drafts, 5), "mirror disagrees");
+  }
+  assert.deepEqual(intakeUnanswered([{ n: 1, text: "   " }, { n: 2, text: "x" }], 3), [1, 3],
+    "a box holding only whitespace is unanswered, exactly as kickoffVenture reads it");
+});
+
+test("intakeSaveLine: 'saved' is only ever said about a write the server confirmed", () => {
+  const m = intakeMirror().ivSaveLine;
+  const vectors = [
+    { state: "" },
+    { state: "saving" },
+    { state: "saved", savedAt: "2026-08-23T09:05:00.000Z" },
+    { state: "saved" },                              // no timestamp: no time claimed
+    { state: "saved", savedAt: "not a date" },
+    { state: "failed", error: "bad venture name" },
+    { state: "failed" },
+  ];
+  for (const v of vectors) assert.equal(m(v), intakeSaveLine(v), `mirror disagrees on ${JSON.stringify(v)}`);
+  assert.equal(intakeSaveLine({ state: "" }), "", "an untouched box claims nothing");
+  assert.equal(intakeSaveLine({ state: "saved" }), "saved", "no savedAt means no clock time is invented");
+  assert.match(intakeSaveLine({ state: "failed", error: "disk full" }), /^NOT SAVED — disk full/);
+  // Rule 2's banned pattern: a bare timer that says "saved" without a response.
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("async function ivSaveNow(");
+  const body = script.slice(start, script.indexOf("\nfunction ivQueue(", start));
+  assert.ok(start > -1, "ivSaveNow must reach the browser");
+  assert.ok(body.includes('j.draft.savedAt'), "the saved time comes off the server's own response");
+  assert.doesNotMatch(body, /setTimeout/, "the save indicator must not be driven by a timer");
+});
+
+test("intakeSlugError mirrors intake-draft.ts's own rule, in both runtimes", () => {
+  const m = intakeMirror().ivSlugError;
+  const vectors = ["voter-choice", "a", "9lives", "", "A", "-x", ".hidden", "a/b", "..", "a b", "a_b-2"];
+  for (const s of vectors) assert.equal(m(s), intakeSlugError(s), `mirror disagrees on ${JSON.stringify(s)}`);
+  // and it agrees with the server's copy, which is the one that actually refuses
+  for (const s of vectors) {
+    const serverOk = saveIntakeDraft(s, 1, "x", mkdtempSync(join(tmpdir(), "iv-slug-"))).ok;
+    assert.equal(intakeSlugError(s) === null, serverOk, `client and server disagree about ${JSON.stringify(s)}`);
+  }
+});
+
+test("the interview screen carries no second copy of the 25 questions", () => {
+  const script = emittedScripts().join("\n");
+  // The list is serialized from src/venture/intake.ts, so every question must be there verbatim...
+  for (const q of INTAKE_QUESTIONS) {
+    assert.ok(script.includes(JSON.stringify(q.question)), `question ${q.id} must reach the browser from the real list`);
+  }
+  // ...and exactly once. A hand-typed second copy is the failure this guards: it would be a change
+  // to what the interview asks (root CLAUDE.md rule 7) hiding inside a GUI diff.
+  const first = INTAKE_QUESTIONS[0].question;
+  assert.equal(script.split(JSON.stringify(first)).length - 1, 1, "the question list must be serialized once, not retyped");
+});
+
+test("the interview types her answers in her own register, and never in the AI one", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const css = html.slice(html.indexOf(".iv-in {"), html.indexOf(".iv-save {"));
+  assert.match(css, /Georgia/, "the box she types in is Georgia — those are her words");
+  assert.match(css, /border-left:2px solid var\(--blue\)/, "and carries the blue rule, the same pair .vmine uses");
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("const IV_QUESTIONS");
+  const body = script.slice(start, script.indexOf("async function loadFiction(", start));
+  assert.doesNotMatch(body, /5b46b8|vdrafted|vpen/, "nothing in the interview may render in the AI-written register");
 });
