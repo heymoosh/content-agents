@@ -13,6 +13,7 @@ import {
 import {
   main,
   parseSourceEvidenceLedgerArgs,
+  renderSourceEvidenceLedgerJson,
   renderSourceEvidenceLedgerMarkdown,
 } from "./source-evidence-ledger-cli.js";
 
@@ -32,6 +33,13 @@ function evidence(overrides: Fixture = {}): Fixture {
     focus: ["how people make decisions"],
     medium: "text",
     format: "short post",
+    audienceSizeSnapshot: {
+      size: 12000,
+      countType: "followers",
+      observedAt: "2026-08-20",
+      collectedAt: "2026-08-21T00:00:00Z",
+      evidenceSource: "profile snapshot",
+    },
     metricSnapshot: {
       metric: "views",
       value: 3200,
@@ -47,6 +55,7 @@ function evidence(overrides: Fixture = {}): Fixture {
     observedAt: "2026-08-20",
     collectedAt: "2026-08-21T00:00:00Z",
     selectionRule: "top observed examples from the fixed reviewed source-post set",
+    baselineScope: "same-account settled posts in the observation window",
     provenance: "reviewed source evidence record",
     evidenceRefs: ["evidence://post/alpha", "capture://post/alpha"],
     baselineRefs: ["baseline://x/new/2026-08-22"],
@@ -84,6 +93,61 @@ test("normalizes the existing source-evidence shape into a durable body-free rec
   assert.equal(row.bodyIncluded, false);
   assert.equal("body" in row, false);
   assert.doesNotMatch(JSON.stringify(row), /PRIVATE CREATOR BODY|model output|winner/i);
+});
+
+test("preserves body-free compatibility metadata in the durable record and inspection", () => {
+  const row = normalizeSourceEvidenceLedgerRecord(evidence({
+    url: "https://example.test/post-alpha",
+    locator: "capture://post/alpha",
+    sourceRole: "reviewed niche example",
+    evidenceLocation: "public post metrics",
+    comparisonClaimed: true,
+    audienceSizeSnapshot: {
+      size: 12000,
+      countType: "followers",
+      observedAt: "2026-08-20",
+      collectedAt: "2026-08-21T00:00:00Z",
+      evidenceSource: "profile snapshot",
+    },
+    baselineScope: "same-account settled posts in the observation window",
+  }));
+  const ledger = buildSourceEvidenceLedger([row]);
+
+  assert.equal(row.url, "https://example.test/post-alpha");
+  assert.equal(row.locator, "capture://post/alpha");
+  assert.equal(row.sourceRole, "reviewed niche example");
+  assert.equal(row.evidenceLocation, "public post metrics");
+  assert.equal(row.comparisonClaimed, true);
+  assert.deepEqual(row.audienceSizeSnapshot, {
+    size: 12000,
+    countType: "followers",
+    observedAt: "2026-08-20",
+    collectedAt: "2026-08-21T00:00:00Z",
+    evidenceSource: "profile snapshot",
+  });
+  assert.equal(row.baselineScope, "same-account settled posts in the observation window");
+  assert.match(renderSourceEvidenceLedgerJson(ledger), /"audienceSizeSnapshot"/);
+  assert.match(renderSourceEvidenceLedgerJson(ledger), /"baselineScope"/);
+  assert.equal(renderSourceEvidenceLedgerMarkdown(ledger), renderSourceEvidenceLedgerMarkdown(buildSourceEvidenceLedger([row])));
+});
+
+test("blocks comparison readiness when audience and baseline comparison facts are missing", () => {
+  const row = normalizeSourceEvidenceLedgerRecord(evidence({
+    comparisonClaimed: true,
+    audienceSizeSnapshot: { size: 12000, countType: null, observedAt: null, collectedAt: null, evidenceSource: null },
+    baselineScope: null,
+    baselineSource: null,
+    baselineRefs: null,
+  }));
+
+  assert.equal(row.readiness.status, "blocked");
+  assert.ok(row.readiness.blockers.includes("audienceSizeSnapshot.countType"));
+  assert.ok(row.readiness.blockers.includes("audienceSizeSnapshot.observedAt"));
+  assert.ok(row.readiness.blockers.includes("audienceSizeSnapshot.collectedAt"));
+  assert.ok(row.readiness.blockers.includes("audienceSizeSnapshot.evidenceSource"));
+  assert.ok(row.readiness.blockers.includes("baselineScope"));
+  assert.ok(row.readiness.blockers.includes("baselineSource"));
+  assert.ok(row.readiness.blockers.includes("baselineRefs"));
 });
 
 test("keeps incomplete and unreviewed rows visible but rejects them from comparison", () => {

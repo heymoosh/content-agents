@@ -22,6 +22,14 @@ export interface SourceEvidenceLedgerMetricSnapshot {
   readonly observedAt: SourceEvidenceLedgerScalar<string>;
 }
 
+export interface SourceEvidenceLedgerAudienceSizeSnapshot {
+  readonly size: SourceEvidenceLedgerScalar<number>;
+  readonly countType: SourceEvidenceLedgerScalar<string>;
+  readonly observedAt: SourceEvidenceLedgerScalar<string>;
+  readonly collectedAt: SourceEvidenceLedgerScalar<string>;
+  readonly evidenceSource: SourceEvidenceLedgerScalar<string>;
+}
+
 export interface SourceEvidenceLedgerLineageRef {
   readonly recordType: string;
   readonly id: string;
@@ -43,6 +51,11 @@ export interface SourceEvidenceLedgerRecord {
   readonly postId: SourceEvidenceLedgerScalar<string>;
   readonly accountId: SourceEvidenceLedgerScalar<string>;
   readonly platform: SourceEvidenceLedgerScalar<string>;
+  readonly url: SourceEvidenceLedgerScalar<string>;
+  readonly locator: SourceEvidenceLedgerScalar<string>;
+  readonly sourceRole: SourceEvidenceLedgerScalar<string>;
+  readonly evidenceLocation: SourceEvidenceLedgerScalar<string>;
+  readonly comparisonClaimed: boolean | null;
   readonly pool: SourceEvidenceLedgerPool | null;
   readonly membershipReason: SourceEvidenceLedgerScalar<string>;
   readonly nicheLabel: SourceEvidenceLedgerScalar<string>;
@@ -50,12 +63,14 @@ export interface SourceEvidenceLedgerRecord {
   readonly focus: string[] | "unknown" | null;
   readonly medium: SourceEvidenceLedgerScalar<string>;
   readonly format: SourceEvidenceLedgerScalar<string>;
+  readonly audienceSizeSnapshot: SourceEvidenceLedgerAudienceSizeSnapshot | "unknown" | null;
   readonly metricSnapshot: SourceEvidenceLedgerMetricSnapshot | "unknown" | null;
   readonly popularityScope: SourceEvidenceLedgerScalar<string>;
   readonly sampleScope: SourceEvidenceLedgerScalar<string>;
   readonly observedAt: SourceEvidenceLedgerScalar<string>;
   readonly collectedAt: SourceEvidenceLedgerScalar<string>;
   readonly selectionRule: SourceEvidenceLedgerScalar<string>;
+  readonly baselineScope: SourceEvidenceLedgerScalar<string>;
   readonly provenance: SourceEvidenceLedgerScalar<string>;
   readonly evidenceRefs: string[] | "unknown" | null;
   readonly baselineRefs: string[] | "unknown" | null;
@@ -114,8 +129,9 @@ const RECORD_KEYS = new Set([
   "kind", "version", "id", "evidenceId", "evidence_id", "sourceId", "source_id", "postId", "post_id",
   "accountId", "account_id", "platform", "pool", "membershipReason", "membership_reason", "poolMembershipReason",
   "nicheLabel", "niche_label", "niche", "topics", "focus", "medium", "format", "metricSnapshot", "metric_snapshot",
+  "audienceSizeSnapshot", "audience_size_snapshot", "audienceSnapshot", "audience_snapshot",
   "popularityScope", "popularity_scope", "sampleScope", "sample_scope", "observedAt", "observed_at", "postedAt", "posted_at",
-  "collectedAt", "collected_at", "selectionRule", "selection_rule", "provenance", "evidenceRefs", "evidence_refs",
+  "collectedAt", "collected_at", "selectionRule", "selection_rule", "baselineScope", "baseline_scope", "provenance", "evidenceRefs", "evidence_refs",
   "evidenceLinks", "evidence_links", "baselineRefs", "baseline_refs", "baselineSource", "baseline_source",
   "bodyComplete", "body_complete", "bodyIsComplete", "body_is_complete", "reviewStatus", "review_status", "status",
   "recordStatus", "record_status", "caveats", "lineage", "readiness", "bodyIncluded", "body_included", "comparisonClaimed",
@@ -123,6 +139,10 @@ const RECORD_KEYS = new Set([
 ]);
 const METRIC_KEYS = new Set([
   "metric", "name", "value", "unit", "numerator", "denominator", "window", "scope", "observedAt", "observed_at",
+]);
+const AUDIENCE_KEYS = new Set([
+  "size", "value", "count", "countType", "count_type", "type", "observedAt", "observed_at", "asOf", "as_of",
+  "collectedAt", "collected_at", "evidenceSource", "evidence_source", "provenance", "source",
 ]);
 const LINEAGE_KEYS = new Set(["recordType", "record_type", "id", "relation"]);
 const READINESS_KEYS = new Set(["status", "blockers", "blockingFields", "blocking_fields", "reason"]);
@@ -216,6 +236,21 @@ function pool(value: unknown, path: string): SourceEvidenceLedgerPool | null {
   return normalized as SourceEvidenceLedgerPool;
 }
 
+function audienceSizeSnapshot(value: unknown, path: string): SourceEvidenceLedgerAudienceSizeSnapshot | "unknown" | null {
+  if (value === undefined || value === null) return null;
+  if (value === "unknown") return "unknown";
+  const raw = object(value, path);
+  rejectUnsafeFields(raw, path);
+  rejectUnknownFields(raw, path, AUDIENCE_KEYS);
+  return {
+    size: numberValue(present(raw, ["size", "value", "count"]), `${path}.size`),
+    countType: text(present(raw, ["countType", "count_type", "type"]), `${path}.countType`),
+    observedAt: text(present(raw, ["observedAt", "observed_at", "asOf", "as_of"]), `${path}.observedAt`),
+    collectedAt: text(present(raw, ["collectedAt", "collected_at"]), `${path}.collectedAt`),
+    evidenceSource: text(present(raw, ["evidenceSource", "evidence_source", "provenance", "source"]), `${path}.evidenceSource`),
+  };
+}
+
 function metricSnapshot(value: unknown, path: string): SourceEvidenceLedgerMetricSnapshot | "unknown" | null {
   if (value === undefined || value === null) return null;
   if (value === "unknown") return "unknown";
@@ -269,10 +304,20 @@ function metricBlockers(metric: SourceEvidenceLedgerRecord["metricSnapshot"]): s
   return blockers;
 }
 
+function audienceBlockers(audience: SourceEvidenceLedgerRecord["audienceSizeSnapshot"]): string[] {
+  if (audience === null || audience === "unknown") return ["audienceSizeSnapshot"];
+  const blockers: string[] = [];
+  for (const field of ["size", "countType", "observedAt", "collectedAt", "evidenceSource"] as const) {
+    if (missing(audience[field])) blockers.push(`audienceSizeSnapshot.${field}`);
+  }
+  return blockers;
+}
+
 /** Report comparison blockers without dropping an incomplete or unreviewed row. */
 export function assessSourceEvidenceLedgerRecord(row: SourceEvidenceLedgerRecord): SourceEvidenceLedgerReadiness {
   const blockers: string[] = [];
   const add = (value: string) => { if (!blockers.includes(value)) blockers.push(value); };
+  const comparisonRequired = row.comparisonClaimed !== false;
   if (missing(row.evidenceId)) add("evidenceId");
   if (missing(row.postId)) add("postId");
   if (missing(row.accountId)) add("accountId");
@@ -284,7 +329,10 @@ export function assessSourceEvidenceLedgerRecord(row: SourceEvidenceLedgerRecord
   if (missingList(row.focus)) add("focus");
   if (missing(row.medium)) add("medium");
   if (missing(row.format)) add("format");
-  for (const blocker of metricBlockers(row.metricSnapshot)) add(blocker);
+  if (comparisonRequired) {
+    for (const blocker of audienceBlockers(row.audienceSizeSnapshot)) add(blocker);
+    for (const blocker of metricBlockers(row.metricSnapshot)) add(blocker);
+  }
   for (const [field, value] of [
     ["popularityScope", row.popularityScope],
     ["sampleScope", row.sampleScope],
@@ -293,8 +341,12 @@ export function assessSourceEvidenceLedgerRecord(row: SourceEvidenceLedgerRecord
     ["selectionRule", row.selectionRule],
     ["provenance", row.provenance],
   ] as const) if (missing(value)) add(field);
+  if (comparisonRequired) {
+    if (missing(row.baselineScope)) add("baselineScope");
+    if (missing(row.baselineSource)) add("baselineSource");
+    if (row.baselineRefs === null || row.baselineRefs === "unknown" || row.baselineRefs.length === 0) add("baselineRefs");
+  }
   if (row.evidenceRefs === null || row.evidenceRefs === "unknown" || row.evidenceRefs.length === 0) add("evidenceRefs");
-  if (row.baselineRefs === null || row.baselineRefs === "unknown" || row.baselineRefs.length === 0) add("baselineRefs");
   if (row.bodyComplete !== true) add("bodyComplete");
   if (missing(row.reviewStatus) || row.reviewStatus !== "reviewed") add("reviewStatus");
   if (row.caveats === null || row.caveats === "unknown") add("caveats");
@@ -321,6 +373,16 @@ function normalizeRecord(value: unknown): SourceEvidenceLedgerRecord {
     postId: text(present(raw, ["postId", "post_id"]), "record.postId"),
     accountId: text(present(raw, ["accountId", "account_id"]), "record.accountId"),
     platform: text(present(raw, ["platform"]), "record.platform"),
+    url: text(present(raw, ["url"]), "record.url"),
+    locator: text(present(raw, ["locator"]), "record.locator"),
+    sourceRole: text(present(raw, ["sourceRole", "source_role"]), "record.sourceRole"),
+    evidenceLocation: text(present(raw, ["evidenceLocation", "evidence_location"]), "record.evidenceLocation"),
+    comparisonClaimed: (() => {
+      const value = present(raw, ["comparisonClaimed", "comparison_claimed"]);
+      if (value === undefined || value === null) return null;
+      if (typeof value !== "boolean") fail("record.comparisonClaimed must be boolean or null");
+      return value;
+    })(),
     pool: pool(present(raw, ["pool"]), "record.pool"),
     membershipReason: text(present(raw, ["membershipReason", "membership_reason", "poolMembershipReason"]), "record.membershipReason"),
     nicheLabel: text(present(raw, ["nicheLabel", "niche_label", "niche"]), "record.nicheLabel"),
@@ -328,12 +390,14 @@ function normalizeRecord(value: unknown): SourceEvidenceLedgerRecord {
     focus: stringList(present(raw, ["focus"]), "record.focus"),
     medium: text(present(raw, ["medium"]), "record.medium"),
     format: text(present(raw, ["format"]), "record.format"),
+    audienceSizeSnapshot: audienceSizeSnapshot(present(raw, ["audienceSizeSnapshot", "audience_size_snapshot", "audienceSnapshot", "audience_snapshot"]), "record.audienceSizeSnapshot"),
     metricSnapshot: metricSnapshot(present(raw, ["metricSnapshot", "metric_snapshot", "metric"]), "record.metricSnapshot"),
     popularityScope: text(present(raw, ["popularityScope", "popularity_scope"]), "record.popularityScope"),
     sampleScope: text(present(raw, ["sampleScope", "sample_scope"]), "record.sampleScope"),
     observedAt: text(present(raw, ["observedAt", "observed_at", "postedAt", "posted_at"]), "record.observedAt"),
     collectedAt: text(present(raw, ["collectedAt", "collected_at"]), "record.collectedAt"),
     selectionRule: text(present(raw, ["selectionRule", "selection_rule"]), "record.selectionRule"),
+    baselineScope: text(present(raw, ["baselineScope", "baseline_scope"]), "record.baselineScope"),
     provenance: text(present(raw, ["provenance"]), "record.provenance"),
     evidenceRefs: stringList(present(raw, ["evidenceRefs", "evidence_refs", "evidenceLinks", "evidence_links"]), "record.evidenceRefs"),
     baselineRefs: stringList(present(raw, ["baselineRefs", "baseline_refs"]), "record.baselineRefs"),
