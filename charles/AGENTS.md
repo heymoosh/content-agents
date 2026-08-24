@@ -15,7 +15,7 @@ Builds 0/1/3. Charles is the deliberate opposite of that voice — ALL CAPS burs
 exclamation marks, British affectation, panic leaking through forced reassurance. Building his
 posts through the shared voice guard would mangle the bit. **He is governed instead by
 `charles/config/persona.yaml`.** Do not run his drafts through `voice.yaml` checks — **except the
-em-dash ban carries over**, same as `stories/CLAUDE.md`'s "Muxin's house rule, fiction included."
+em-dash ban carries over**, same as `stories/AGENTS.md`'s "Muxin's house rule, fiction included."
 Strip em dashes to periods, commas, colons, or parentheses in his drafts too, unless Muxin
 explicitly says otherwise.
 

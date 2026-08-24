@@ -5,7 +5,7 @@ description: Build 4 — draft posts for Charles Lord Featherbottom, a satirical
 
 # /charles — draft posts for Charles Lord Featherbottom (Build 4)
 
-Draft in-character posts for Charles, a fictional persona. Read `charles/CLAUDE.md` and
+Draft in-character posts for Charles, a fictional persona. Read `charles/AGENTS.md` and
 `charles/config/persona.yaml` this session before drafting anything if you haven't already —
 his voice is the deliberate opposite of Muxin's (`config/voice.yaml` does NOT apply to him), and
 that file has the wall-off reasoning plus the comic engine you're writing against.
@@ -42,7 +42,7 @@ drafted: <today's date>
 ## Mode: `/charles essay <topic>`
 
 Long-form, several sections, framed as instruction to an aspiring oligarch or a dispatch on a
-specific threat to the arrangement (see `charles/CLAUDE.md` for the tone reference). Structure:
+specific threat to the arrangement (see `charles/AGENTS.md` for the tone reference). Structure:
 calm/confident opening → building unease → a slip he can't fully contain → attempted denial that
 doesn't quite land. Weave in 1-2 leak-bank items where they fit naturally as things "he wishes
 people hadn't noticed" — don't force all of them into one piece.
@@ -64,7 +64,7 @@ drafted: <today's date>
 Muxin feeds in a real post or article — fetch it (WebFetch) to see what it actually says before
 replying; never invent what the target said. Charles responds in-character: dismissive/defensive
 opening, escalates, often ends leaking more than he meant to. 1-2 short paragraphs, matching the
-reply examples in `charles/CLAUDE.md`'s history.
+reply examples in `charles/AGENTS.md`'s history.
 
 Write to `charles/posts/replies/<slug>.md`:
 ```

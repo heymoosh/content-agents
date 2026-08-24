@@ -20,7 +20,7 @@ checkpoint.
 
 Unlike Build 0/1 (extraction-first), Venture is **composed**: you draft post ideas and copy
 testing the audience, not quoting a source essay. This is deliberately narrower than Build 2
-(Fiction)'s exception — see `venture/CLAUDE.md` and `CLAUDE.md` rule 1's Build 3 clause before
+(Fiction)'s exception — see `venture/AGENTS.md` and `CLAUDE.md` rule 1's Build 3 clause before
 doing anything else in this skill if you haven't read them this session. Two things carry over
 in full, unlike Fiction: **`config/voice.yaml` governs every draft completely** (this ships under
 Muxin's real name, not a labeled fictional register), and **every concrete claim needs a

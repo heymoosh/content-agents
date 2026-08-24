@@ -1,7 +1,7 @@
 // Charles desk (Build 4): reads charles/review-queue.md + the draft files it points at, and lets
 // Muxin approve / revise / discard / edit in place — the same review contract as every other
 // room, just against a 5-column table instead of the main pipeline's 10-column one (see
-// charles/CLAUDE.md). Nothing here posts anything; approving just flips the status cell. Muxin
+// charles/AGENTS.md). Nothing here posts anything; approving just flips the status cell. Muxin
 // still pastes the approved draft to Substack herself. Also serves her original persona brief
 // (verbatim, not the distilled persona.yaml) for a one-click copy to hand to another tool.
 

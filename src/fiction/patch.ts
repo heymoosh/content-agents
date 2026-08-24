@@ -19,7 +19,7 @@ import { hasEmDash } from "./continuity.js";
 // 2. The frontmatter block is preserved byte for byte (splitFrontmatter's `header`), the same way
 //    POST /api/outreach/message/save preserves a message's frontmatter.
 // 3. Fiction chapters are written one sentence per line so GitHub PR comments anchor to a passage
-//    (stories/CLAUDE.md). A replacement carrying two sentences would break that, so the lines the
+//    (stories/AGENTS.md). A replacement carrying two sentences would break that, so the lines the
 //    span touched are re-split, and only those lines.
 
 export class PatchSpanError extends Error {}
