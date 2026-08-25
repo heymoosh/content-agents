@@ -8,6 +8,53 @@ authoritative_documents:
   - docs/multi-engine-plan.md
   - docs/pattern-mining-plan.md
 tasks:
+  - id: cs5-content-workbench-continuity
+    batch_id: studio-fifth-batch-20260825
+    outcome: Studio job links for Content advisor work open the matching Content Workbench session rather than a not-yet-created Review row, without changing any content generation or approval behavior.
+    status: ready
+    depends_on:
+      - cs3-studio-durable-handoff
+    base_sha: 54ce22c07b59bd7359a37b5017cc8c72432c4bae
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-vision.md
+      - src/review/page.ts
+      - src/review/page.test.ts
+      - src/review/studio.ts
+      - src/review/develop.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - content/**
+      - data/**
+      - config/**
+      - src/review/serve.ts
+      - src/review/develop.ts
+      - src/review/rows.ts
+      - src/review/jobs.ts
+      - src/atomize/**
+      - src/publish/**
+    write_paths:
+      - src/review/page.ts
+      - src/review/page.test.ts
+    semantic_locks:
+      - studio:content-workbench-job-continuity
+      - studio:read-only-content-navigation
+    builder_family: codex
+    auditor_family: grok
+    branch: agent/cs5-content-workbench-continuity
+    worktree: /private/tmp/content-agents-cs5-content-workbench-continuity
+    acceptance_commands:
+      - npm run check
+      - node --import tsx --test src/review/page.test.ts src/review/studio.test.ts src/review/develop.test.ts
+    user_visible_behavior: true
+    content_logic_change: false
+    human_gate: none
+    commit_sha: null
+    audit_verdict: pending
   - id: studio-client-job-ui-extraction
     batch_id: studio-first-batch-20260824
     outcome: Extract Node-side pure job UI types/helpers from page.ts into a dedicated module without changing browser output or behavior.
