@@ -13,6 +13,31 @@ export const TASK_STATUSES = [
   "blocked",
 ] as const;
 
+export const MODEL_FAMILIES = ["codex", "grok", "claude"] as const;
+export type ModelFamily = (typeof MODEL_FAMILIES)[number];
+
+const MODEL_FAMILY_SET = new Set<string>(MODEL_FAMILIES);
+
+export function normalizeModelFamily(label: string): ModelFamily {
+  const normalized = label.trim().toLowerCase();
+  const provider = normalized.split("-", 1)[0] ?? "";
+  if (!MODEL_FAMILY_SET.has(provider)) {
+    throw new Error(`unknown model family: ${label}`);
+  }
+  return provider as ModelFamily;
+}
+
+const modelFamilySchema = z.string().min(1).superRefine((label, context) => {
+  try {
+    normalizeModelFamily(label);
+  } catch (error) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: error instanceof Error ? error.message : "unknown model family",
+    });
+  }
+});
+
 const shaSchema = z.string().regex(/^[0-9a-f]{40}$/i, "must be a full 40-character commit SHA");
 const pathSchema = z.string().min(1).superRefine((value, context) => {
   const raw = value.endsWith("/**") ? value.slice(0, -3) : value;
@@ -40,8 +65,8 @@ export const taskSchema = z.object({
   forbidden_paths: z.array(pathSchema),
   write_paths: z.array(pathSchema),
   semantic_locks: z.array(z.string().min(1)),
-  builder_family: z.string().min(1),
-  auditor_family: z.string().min(1),
+  builder_family: modelFamilySchema,
+  auditor_family: modelFamilySchema,
   branch: z.string().min(1).nullable(),
   worktree: z.string().min(1).nullable(),
   acceptance_commands: z.array(z.string().min(1)),
@@ -62,6 +87,14 @@ export const workManifestSchema = z.object({
 
 export type StudioTask = z.infer<typeof taskSchema>;
 export type WorkManifest = z.infer<typeof workManifestSchema>;
+
+function normalizeTask(task: StudioTask): StudioTask {
+  return {
+    ...task,
+    builder_family: normalizeModelFamily(task.builder_family),
+    auditor_family: normalizeModelFamily(task.auditor_family),
+  };
+}
 
 const ACTIVE_LEASE_STATUSES = new Set<StudioTask["status"]>([
   "leased",
@@ -154,7 +187,10 @@ function validateLeaseConflicts(tasks: StudioTask[]): void {
 export function validateWorkManifest(input: unknown): WorkManifest {
   const result = workManifestSchema.safeParse(input);
   if (!result.success) throw schemaError(result.error);
-  const manifest = result.data;
+  const manifest: WorkManifest = {
+    ...result.data,
+    tasks: result.data.tasks.map(normalizeTask),
+  };
   const ids = new Set<string>();
   for (const task of manifest.tasks) {
     if (ids.has(task.id)) throw new Error(`duplicate task id: ${task.id}`);
@@ -223,11 +259,15 @@ export function claimTask(manifest: WorkManifest, taskId: string): WorkManifest 
   return validateWorkManifest({ ...manifest, tasks: manifest.tasks.map((candidate) => candidate.id === taskId ? { ...candidate, status } : candidate) });
 }
 
-const commandResultSchema = z.object({ command: z.string().min(1), passed: z.boolean() }).strict();
+const commandResultSchema = z.object({
+  command: z.string().min(1),
+  passed: z.boolean(),
+  summary: z.string().min(1),
+}).strict();
 export const builderReportSchema = z.object({
   type: z.literal("builder"),
   task_id: z.string().min(1),
-  family: z.string().min(1),
+  family: modelFamilySchema,
   commit_sha: shaSchema,
   changed_paths: z.array(pathSchema).min(1),
   acceptance_commands: z.array(commandResultSchema),
@@ -239,14 +279,14 @@ export const builderReportSchema = z.object({
 export const auditReportSchema = z.object({
   type: z.literal("audit"),
   task_id: z.string().min(1),
-  family: z.string().min(1),
+  family: modelFamilySchema,
   verdict: z.enum(["passed", "failed"]),
   findings: z.array(z.string()),
 }).strict();
 export const integrationReportSchema = z.object({
   type: z.literal("integration"),
   task_id: z.string().min(1),
-  family: z.string().min(1),
+  family: modelFamilySchema,
   verdict: z.literal("passed"),
 }).strict();
 export const taskReportSchema = z.discriminatedUnion("type", [builderReportSchema, auditReportSchema, integrationReportSchema]);
@@ -265,6 +305,19 @@ export interface RunRecord {
   verified_commit?: string;
 }
 
+function normalizeReport(report: TaskReport): TaskReport {
+  return { ...report, family: normalizeModelFamily(report.family) } as TaskReport;
+}
+
+function normalizeRunRecord(run: RunRecord): RunRecord {
+  return {
+    ...run,
+    builder: run.builder ? normalizeReport(run.builder) as BuilderReport : undefined,
+    audit: run.audit ? normalizeReport(run.audit) as AuditReport : undefined,
+    integration: run.integration ? normalizeReport(run.integration) as IntegrationReport : undefined,
+  };
+}
+
 export const runRecordSchema = z.object({
   task_id: z.string().min(1),
   batch_id: z.string().min(1),
@@ -278,13 +331,13 @@ export const runRecordSchema = z.object({
 export function parseRunRecord(input: unknown): RunRecord {
   const result = runRecordSchema.safeParse(input);
   if (!result.success) throw schemaError(result.error);
-  return result.data;
+  return normalizeRunRecord(result.data);
 }
 
 function parseReport(report: unknown): TaskReport {
   const result = taskReportSchema.safeParse(report);
   if (!result.success) throw schemaError(result.error);
-  return result.data;
+  return normalizeReport(result.data);
 }
 
 function passingAcceptance(task: StudioTask, builder: BuilderReport | undefined): void {
@@ -301,17 +354,22 @@ export function applyTaskReport(
   inputReport: unknown,
   existing: RunRecord | null,
 ): { manifest: WorkManifest; run: RunRecord } {
+  const normalizedManifest = validateWorkManifest(manifest);
   const report = parseReport(inputReport);
-  const task = manifest.tasks.find((candidate) => candidate.id === report.task_id);
+  const task = normalizedManifest.tasks.find((candidate) => candidate.id === report.task_id);
   if (!task) throw new Error(`unknown task: ${report.task_id}`);
   let updated: StudioTask;
-  let run: RunRecord = { task_id: task.id, batch_id: task.batch_id, ...(existing ?? {}) };
+  let run: RunRecord = {
+    task_id: task.id,
+    batch_id: task.batch_id,
+    ...(existing ? normalizeRunRecord(existing) : {}),
+  };
 
   if (report.type === "builder") {
     if (!["leased", "building", "needs-fix"].includes(task.status)) {
       throw new Error(`builder report is not allowed from status ${task.status}`);
     }
-    if (report.family.toLowerCase() !== task.builder_family.toLowerCase()) {
+    if (report.family !== task.builder_family) {
       throw new Error(`builder report family ${report.family} does not own task ${task.id}`);
     }
     verifyChangedPaths(task, report.changed_paths);
@@ -319,10 +377,10 @@ export function applyTaskReport(
     updated = { ...task, status: "auditing", commit_sha: report.commit_sha, audit_verdict: "pending" };
   } else if (report.type === "audit") {
     if (task.status !== "auditing") throw new Error(`audit report is not allowed from status ${task.status}`);
-    if (report.family.toLowerCase() === task.builder_family.toLowerCase()) {
+    if (report.family === task.builder_family) {
       throw new Error(`audit must come from a different model family than the builder`);
     }
-    if (report.family.toLowerCase() !== task.auditor_family.toLowerCase()) {
+    if (report.family !== task.auditor_family) {
       throw new Error(`audit report family ${report.family} is not assigned to task ${task.id}`);
     }
     run = { ...run, audit: report };
@@ -335,14 +393,14 @@ export function applyTaskReport(
     }
   } else {
     if (task.status !== "accepted") throw new Error(`task ${task.id} must be accepted before integration`);
-    if (report.family.toLowerCase() === task.builder_family.toLowerCase()) {
+    if (report.family === task.builder_family) {
       throw new Error(`integration audit must come from a different model family than the builder`);
     }
     passingAcceptance(task, run.builder);
     if (run.audit?.verdict !== "passed" || task.audit_verdict !== "passed") {
       throw new Error(`task ${task.id} requires a passing cross-family audit before integration`);
     }
-    if (run.audit.family.toLowerCase() !== task.auditor_family.toLowerCase() || run.audit.family.toLowerCase() === task.builder_family.toLowerCase()) {
+    if (run.audit.family !== task.auditor_family || run.audit.family === task.builder_family) {
       throw new Error(`task ${task.id} requires its assigned cross-family audit before integration`);
     }
     if (!run.diff_verified || run.verified_commit !== task.commit_sha) {
@@ -354,8 +412,8 @@ export function applyTaskReport(
 
   return {
     manifest: validateWorkManifest({
-      ...manifest,
-      tasks: manifest.tasks.map((candidate) => candidate.id === task.id ? updated : candidate),
+      ...normalizedManifest,
+      tasks: normalizedManifest.tasks.map((candidate) => candidate.id === task.id ? updated : candidate),
     }),
     run,
   };
@@ -367,14 +425,16 @@ export function recordVerifiedDiff(
   commit: string,
   existing: RunRecord,
 ): { manifest: WorkManifest; run: RunRecord } {
-  const task = manifest.tasks.find((candidate) => candidate.id === taskId);
+  const normalizedManifest = validateWorkManifest(manifest);
+  const normalizedExisting = normalizeRunRecord(existing);
+  const task = normalizedManifest.tasks.find((candidate) => candidate.id === taskId);
   if (!task) throw new Error(`unknown task: ${taskId}`);
   if (task.commit_sha !== commit) throw new Error(`verified commit ${commit} does not match task commit_sha ${task.commit_sha ?? "(missing)"}`);
-  if (existing.builder?.commit_sha !== commit) throw new Error(`verified commit ${commit} does not match the builder report`);
-  const run = { ...existing, task_id: task.id, batch_id: task.batch_id, diff_verified: true, verified_commit: commit };
+  if (normalizedExisting.builder?.commit_sha !== commit) throw new Error(`verified commit ${commit} does not match the builder report`);
+  const run = { ...normalizedExisting, task_id: task.id, batch_id: task.batch_id, diff_verified: true, verified_commit: commit };
   let updated = task;
   if (run.audit?.verdict === "passed") {
-    if (run.audit.family.toLowerCase() !== task.auditor_family.toLowerCase() || run.audit.family.toLowerCase() === task.builder_family.toLowerCase()) {
+    if (run.audit.family !== task.auditor_family || run.audit.family === task.builder_family) {
       throw new Error(`task ${task.id} requires its assigned cross-family audit before acceptance`);
     }
     passingAcceptance(task, run.builder);
@@ -382,30 +442,32 @@ export function recordVerifiedDiff(
   }
   return {
     manifest: validateWorkManifest({
-      ...manifest,
-      tasks: manifest.tasks.map((candidate) => candidate.id === task.id ? updated : candidate),
+      ...normalizedManifest,
+      tasks: normalizedManifest.tasks.map((candidate) => candidate.id === task.id ? updated : candidate),
     }),
     run,
   };
 }
 
 export function validateTaskEvidence(task: StudioTask, run: RunRecord | null): void {
-  if (!["auditing", "needs-fix", "accepted", "integrated"].includes(task.status)) return;
-  if (!run?.builder) throw new Error(`task ${task.id} status ${task.status} requires a durable builder report`);
-  if (run.task_id !== task.id || run.batch_id !== task.batch_id) throw new Error(`task ${task.id} run record identity does not match its lease`);
-  if (run.builder.family.toLowerCase() !== task.builder_family.toLowerCase()) throw new Error(`task ${task.id} builder report family does not match its lease`);
-  if (run.builder.commit_sha !== task.commit_sha) throw new Error(`task ${task.id} builder report commit does not match commit_sha`);
-  verifyChangedPaths(task, run.builder.changed_paths);
-  if (!["accepted", "integrated"].includes(task.status)) return;
-  passingAcceptance(task, run.builder);
-  if (!run.diff_verified || run.verified_commit !== task.commit_sha) throw new Error(`task ${task.id} has no verified final diff`);
-  if (run.audit?.verdict !== "passed" || task.audit_verdict !== "passed") throw new Error(`task ${task.id} has no passing audit`);
-  if (run.audit.family.toLowerCase() !== task.auditor_family.toLowerCase() || run.audit.family.toLowerCase() === task.builder_family.toLowerCase()) {
-    throw new Error(`task ${task.id} audit is not cross-family`);
+  const normalizedTask = normalizeTask(task);
+  const normalizedRun = run ? normalizeRunRecord(run) : null;
+  if (!["auditing", "needs-fix", "accepted", "integrated"].includes(normalizedTask.status)) return;
+  if (!normalizedRun?.builder) throw new Error(`task ${normalizedTask.id} status ${normalizedTask.status} requires a durable builder report`);
+  if (normalizedRun.task_id !== normalizedTask.id || normalizedRun.batch_id !== normalizedTask.batch_id) throw new Error(`task ${normalizedTask.id} run record identity does not match its lease`);
+  if (normalizedRun.builder.family !== normalizedTask.builder_family) throw new Error(`task ${normalizedTask.id} builder report family does not match its lease`);
+  if (normalizedRun.builder.commit_sha !== normalizedTask.commit_sha) throw new Error(`task ${normalizedTask.id} builder report commit does not match commit_sha`);
+  verifyChangedPaths(normalizedTask, normalizedRun.builder.changed_paths);
+  if (!["accepted", "integrated"].includes(normalizedTask.status)) return;
+  passingAcceptance(normalizedTask, normalizedRun.builder);
+  if (!normalizedRun.diff_verified || normalizedRun.verified_commit !== normalizedTask.commit_sha) throw new Error(`task ${normalizedTask.id} has no verified final diff`);
+  if (normalizedRun.audit?.verdict !== "passed" || normalizedTask.audit_verdict !== "passed") throw new Error(`task ${normalizedTask.id} has no passing audit`);
+  if (normalizedRun.audit.family !== normalizedTask.auditor_family || normalizedRun.audit.family === normalizedTask.builder_family) {
+    throw new Error(`task ${normalizedTask.id} audit is not cross-family`);
   }
-  if (task.status === "integrated") {
-    if (run.integration?.verdict !== "passed" || run.integration.family.toLowerCase() === task.builder_family.toLowerCase()) {
-      throw new Error(`task ${task.id} integrated without a passing cross-family integration audit`);
+  if (normalizedTask.status === "integrated") {
+    if (normalizedRun.integration?.verdict !== "passed" || normalizedRun.integration.family === normalizedTask.builder_family) {
+      throw new Error(`task ${normalizedTask.id} integrated without a passing cross-family integration audit`);
     }
   }
 }

@@ -1,0 +1,8 @@
+{
+  "batch_id": "studio-first-batch-20260824",
+  "type": "integration",
+  "family": "grok",
+  "verdict": "passed",
+  "findings": [],
+  "acceptance_observation": "Independent Grok review compared the three extraction commits with base 18ff66d4e0dc2ffbf54bb46a719b8839ca93e9ff, found no product or lease defects, and confirmed the browser script remained byte-identical. npm run check passed; the targeted Studio/review command reported 364 tests passed, 0 failed, 0 skipped."
+}
