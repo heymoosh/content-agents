@@ -37,5 +37,17 @@
       "A fresh independent audit is pending."
     ]
   },
-  "diff_verified": false
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-research-text-community",
+    "family": "claude",
+    "verdict": "passed",
+    "findings": [
+      "Lease-only diff and clean whitespace check confirmed.",
+      "The source-attempt records and all explicit unknowns satisfy the body-free, non-ranked staging boundary.",
+      "The corrected Markdown is human-readable; all recommendations remain research-further."
+    ]
+  },
+  "diff_verified": true,
+  "verified_commit": "54c3dce24ad62ce7f750f8bb868781e180e6ee6b"
 }

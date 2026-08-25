@@ -37,5 +37,13 @@
       "A fresh independent audit is pending."
     ]
   },
-  "diff_verified": false
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-research-visual-video",
+    "family": "claude",
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "f288fb6e27bb4b2783a60df8b270c21abf3fd6ea"
 }

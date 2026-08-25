@@ -512,7 +512,7 @@ tasks:
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
     outcome: Research the 31 seed accounts on Bluesky, Dev.to, Hacker News, Mastodon, Reddit, and X into a body-free, evidence-backed text-community staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: blocked
+    status: accepted
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -533,7 +533,7 @@ tasks:
     semantic_locks:
       - pattern:broad-research-text-community
     builder_family: codex
-    auditor_family: grok
+    auditor_family: claude
     branch: agent/pattern-research-text-community
     worktree: /private/tmp/content-agents-pattern-research-text-community
     acceptance_commands:
@@ -544,11 +544,11 @@ tasks:
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
     commit_sha: 54c3dce24ad62ce7f750f8bb868781e180e6ee6b
-    audit_verdict: pending
+    audit_verdict: passed
   - id: pattern-research-professional-publishing
     batch_id: pattern-broad-research-20260825
     outcome: Research the 14 seed accounts on LinkedIn, Substack, Substack Notes, and Threads into a body-free, evidence-backed professional-publishing staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: blocked
+    status: accepted
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -574,7 +574,7 @@ tasks:
     semantic_locks:
       - pattern:broad-research-professional-publishing
     builder_family: codex
-    auditor_family: grok
+    auditor_family: claude
     branch: agent/pattern-research-professional-publishing
     worktree: /private/tmp/content-agents-pattern-research-professional-publishing
     acceptance_commands:
@@ -585,11 +585,11 @@ tasks:
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
     commit_sha: 632567ee3b1b1794ae5dd989e343417592a3283b
-    audit_verdict: pending
+    audit_verdict: passed
   - id: pattern-research-visual-video
     batch_id: pattern-broad-research-20260825
     outcome: Research the 20 seed accounts on Instagram, TikTok, and YouTube into a body-free, evidence-backed visual-video staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: blocked
+    status: accepted
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -615,7 +615,7 @@ tasks:
     semantic_locks:
       - pattern:broad-research-visual-video
     builder_family: codex
-    auditor_family: grok
+    auditor_family: claude
     branch: agent/pattern-research-visual-video
     worktree: /private/tmp/content-agents-pattern-research-visual-video
     acceptance_commands:
@@ -626,4 +626,4 @@ tasks:
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
     commit_sha: f288fb6e27bb4b2783a60df8b270c21abf3fd6ea
-    audit_verdict: pending
+    audit_verdict: passed

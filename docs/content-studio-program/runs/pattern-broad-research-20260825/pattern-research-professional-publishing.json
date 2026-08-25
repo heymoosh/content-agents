@@ -38,5 +38,13 @@
       "Cross-family audit pending."
     ]
   },
-  "diff_verified": false
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-research-professional-publishing",
+    "family": "claude",
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "632567ee3b1b1794ae5dd989e343417592a3283b"
 }
