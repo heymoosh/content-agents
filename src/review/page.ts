@@ -139,7 +139,11 @@ export function workbenchSlugForJob(job: WorkbenchJobTarget): string | null {
   const stamped = job.slugs?.find((slug) => typeof slug === "string" && slug.trim());
   if (stamped) return stamped;
   const match = /^(?:Develop|Advisor reply):\s*(.+)$/.exec(job.label.trim());
-  return match?.[1]?.trim() || null;
+  const candidate = match?.[1]?.trim() || "";
+  // Source-start jobs use a human label (URL, filename, or first pasted line) until the
+  // materializer stamps a real slug. Only the date-prefixed folder names this pipeline creates
+  // are safe to infer from a label before that stamp exists.
+  return /^\d{4}-\d{2}-\d{2}-[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate) ? candidate : null;
 }
 
 /**
@@ -1533,7 +1537,11 @@ function setRoom(t){
   $("#roomVenture").hidden = t!=="venture";
   $("#roomSignals").hidden = t!=="signals";
   $("#refresh").textContent = refreshLabelFor(t);
-  if (t==="content"){ loadContent(); }
+  if (t==="content"){
+    const pending = loadContent();
+    renderCaptureHandoff();
+    return pending;
+  }
   if (t==="studio"){ loadStudio(); loadJobs(); }
   if (t==="signals"){ loadSignals(); if(!briefLoaded){ loadBrief(); loadRaw(); } }
   if (t==="outreach"){ setOutreachSub(outreachSub); }
@@ -5052,15 +5060,15 @@ function workbenchSlugForJob(j){
   const stamped = (j.slugs||[]).find(slug=>typeof slug==="string" && slug.trim());
   if(stamped) return stamped;
   const match = /^(?:Develop|Advisor reply):\\s*(.+)$/.exec(String(j.label||"").trim());
-  return match && match[1].trim() ? match[1].trim() : null;
+  const candidate = match && match[1].trim() ? match[1].trim() : "";
+  return /^\\d{4}-\\d{2}-\\d{2}-[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate) ? candidate : null;
 }
 function workbenchJobTarget(j){
   const slug = workbenchSlugForJob(j);
   return slug && WB_SESSIONS.some(s=>s.slug===slug) ? slug : null;
 }
 function openWorkbenchJob(j){
-  setRoom("content");
-  loadContent().then(()=>{
+  Promise.resolve(setRoom("content")).then(()=>{
     const slug = workbenchJobTarget(j);
     if(!slug) return;
     const target = [...document.querySelectorAll(".session[data-wb-slug]")].find(el=>el.dataset.wbSlug===slug);
@@ -5117,12 +5125,13 @@ function renderJobs(){
   }
   box.innerHTML = html;
   box.querySelectorAll("a.jopen").forEach(a=>a.addEventListener("click",(e)=>{
-    e.preventDefault(); setRoom(a.dataset.room);
+    e.preventDefault();
     const job = JOBS.find(j=>j.id===a.dataset.id);
     if(a.dataset.kind==="develop" || a.dataset.kind==="develop-reply"){
       if(job) openWorkbenchJob(job);
       return;
     }
+    setRoom(a.dataset.room);
     if(a.dataset.slug) load().then(()=>{
       const d = [...document.querySelectorAll(".piece .slug")].find(x=>x.textContent===a.dataset.slug);
       if(d) d.scrollIntoView({behavior:"smooth", block:"start"});
