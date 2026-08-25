@@ -11,7 +11,7 @@ import {
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
   jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
-  classifyCapture, captureVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
+  classifyCapture, captureVerdict, captureHandoffVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
   LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
   groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
   intakeProgressLine, intakeUnanswered, intakeSaveLine, intakeSlugError,
@@ -1872,19 +1872,39 @@ test("classifyCapture mirror: the browser copy answers identically on every vect
   for (const t of ["", "   "]) assert.deepEqual(mirror(t), classifyCapture(t));
 });
 
-test("captureVerdict: every routed capture names the room it chose, and its mirror agrees", () => {
+test("durable capture verdict: every routed capture names the room it chose, and its browser mirror agrees", () => {
   const mirror = captureMirror().captureVerdict;
   for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
-    const v = captureVerdict(room);
+    const v = captureHandoffVerdict(room);
     assert.ok(v.line.includes(room), "the verdict must name the room it picked: " + room);
     assert.deepEqual(mirror(room), v, "the browser copy of captureVerdict must match: " + room);
   }
-  // The two rooms with no free-text entry say so, rather than offering a start they cannot perform.
-  assert.ok(captureVerdict("Outreach").line.includes("lead folder"));
-  assert.ok(captureVerdict("Venture").line.includes("no free text"));
-  // Content needs no move: its two buttons are already on this screen.
-  assert.equal(captureVerdict("Content").actionLabel, null);
-  assert.equal(captureVerdict("Fiction").actionLabel, "Take it to Fiction");
+  for (const room of ["Fiction", "Outreach", "Venture"] as const) {
+    assert.ok(captureHandoffVerdict(room).line.includes("choose the next action"));
+  }
+  assert.equal(captureHandoffVerdict("Content").actionLabel, null);
+  assert.equal(captureHandoffVerdict("Fiction").actionLabel, "Keep it in Fiction");
+});
+
+test("Studio capture: the rendered durable-handoff verdict makes no stale routing promise", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  for (const line of [
+    "I read this as Fiction. Keep it in Fiction as a capture, then choose the next action there.",
+    "I read this as Outreach. Keep it in Outreach as a capture, then choose the next action there.",
+    "I read this as Venture. Keep it in Venture as a capture, then choose the next action there.",
+  ]) assert.ok(script.includes(JSON.stringify(line)), line);
+  for (const stale of [
+    "I can put it in the composer as your beats",
+    "Your words stay in the box.",
+    "files a backlog card",
+    "Same route as \"Hand it to your director\"",
+  ]) {
+    assert.ok(!html.includes(stale), "stale rendered promise: " + stale);
+    assert.ok(!script.includes(stale), "stale client promise: " + stale);
+  }
+  assert.ok(script.includes('localStorage.setItem(CAPTURE_HANDOFF_KEY'), "a verdict is saved as a durable handoff");
+  assert.ok(script.includes("Nothing was submitted or started."), "the handoff waits for an explicit next action");
 });
 
 test("Studio capture: the box moved out of the Content room and into Studio", () => {
@@ -1914,9 +1934,10 @@ test("the bare-link ask: three controls, the honest explainer, and the honest Si
   // Signals has no ingest for "a URL a reader came from". This durable handoff must not claim
   // that it files a backlog card or measures attribution.
   const signalsHandoffNote = "Source for Signals keeps it in Signals for your next action. Nothing here records where a reader came from, so this is a note to look at later, not attribution.";
-  assert.ok(html.includes(signalsHandoffNote), "the Signals button must say what it actually does");
-  assert.ok(signalsHandoffNote.includes("not attribution"));
-  assert.ok(!signalsHandoffNote.includes("files a backlog card"));
+  assert.equal(LINK_ASK_SIGNALS_NOTE, signalsHandoffNote, "the page export must match the rendered durable behavior");
+  assert.ok(html.includes(LINK_ASK_SIGNALS_NOTE), "the Signals button must say what it actually does");
+  assert.ok(LINK_ASK_SIGNALS_NOTE.includes("not attribution"));
+  assert.ok(!LINK_ASK_SIGNALS_NOTE.includes("files a backlog card"));
   // The ask's own state: an amber rail and a dimmed, read-only textarea while it is open.
   assert.ok(html.includes(CAPTURE_RAIL_IDLE) && html.includes('id="captureRail"'));
   const script = emittedScripts().join("\n");
