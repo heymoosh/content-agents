@@ -1,0 +1,39 @@
+{
+  "task_id": "studio-client-job-ui-extraction",
+  "batch_id": "studio-first-batch-20260824",
+  "builder": {
+    "type": "builder",
+    "task_id": "studio-client-job-ui-extraction",
+    "family": "codex-builder",
+    "commit_sha": "d4931195a8ed0cc8dc5c6570e4b896d33f4f41d1",
+    "changed_paths": [
+      "src/review/page.ts",
+      "src/review/studio-job-ui.ts"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "Pure job UI helpers and types extracted; browser mirrors preserved.",
+    "risks": [],
+    "unresolved_items": []
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "studio-client-job-ui-extraction",
+    "family": "codex-independent-auditor",
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "d4931195a8ed0cc8dc5c6570e4b896d33f4f41d1",
+  "integration": {
+    "type": "integration",
+    "task_id": "studio-client-job-ui-extraction",
+    "family": "codex-independent-auditor",
+    "verdict": "passed"
+  }
+}
