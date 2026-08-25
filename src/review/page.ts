@@ -904,7 +904,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <button class="primary" id="linkReadBtn">Versions for Content</button>
           <button class="link-ask-cancel" id="linkCancelBtn">Never mind, clear it</button>
         </div>
-        <div class="hint">Source for Signals files a backlog card carrying the link. Nothing here records where a reader came from, so this is a note to look at it later, not attribution.</div>
+        <div class="hint">Source for Signals keeps it in Signals for your next action. Nothing here records where a reader came from, so this is a note to look at later, not attribution.</div>
         <div class="link-ask-why">Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.</div>
       </div>
       <div class="director-line">
@@ -5334,7 +5334,7 @@ async function linkReadForContent(){
   closeLinkAsk(true); setRoom("content"); renderCaptureHandoff();
   flash("Kept it in Content. Choose the next action there.");
 }
-// "Source for Signals" files a backlog card and nothing more. There is no referrer record, no
+// "Source for Signals" keeps an inbox item and nothing more. There is no referrer record, no
 // funnel data and no job kind that takes a URL, so this must never imply traffic attribution.
 async function linkFileForSignals(){
   const url = linkAskUrl;

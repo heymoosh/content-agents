@@ -1911,9 +1911,12 @@ test("the bare-link ask: three controls, the honest explainer, and the honest Si
   assert.ok(html.includes("Source for Signals"), "the filing button");
   assert.ok(html.includes("Never mind, clear it"), "the cancel");
   assert.ok(html.includes(LINK_ASK_EXPLAINER), "the explainer ships verbatim");
-  // Signals has no ingest for "a URL a reader came from". The button must not imply one.
-  assert.ok(html.includes(LINK_ASK_SIGNALS_NOTE), "the Signals button must say what it actually does");
-  assert.ok(LINK_ASK_SIGNALS_NOTE.includes("not attribution"));
+  // Signals has no ingest for "a URL a reader came from". This durable handoff must not claim
+  // that it files a backlog card or measures attribution.
+  const signalsHandoffNote = "Source for Signals keeps it in Signals for your next action. Nothing here records where a reader came from, so this is a note to look at later, not attribution.";
+  assert.ok(html.includes(signalsHandoffNote), "the Signals button must say what it actually does");
+  assert.ok(signalsHandoffNote.includes("not attribution"));
+  assert.ok(!signalsHandoffNote.includes("files a backlog card"));
   // The ask's own state: an amber rail and a dimmed, read-only textarea while it is open.
   assert.ok(html.includes(CAPTURE_RAIL_IDLE) && html.includes('id="captureRail"'));
   const script = emittedScripts().join("\n");
