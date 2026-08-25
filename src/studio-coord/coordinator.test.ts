@@ -93,8 +93,125 @@ test("rejects active file overlaps, semantic conflicts, and same-family audits",
     /semantic lock conflict/i,
   );
   assert.throws(
-    () => validateWorkManifest(manifest([task("a", { auditor_family: "codex" })])),
+    () => validateWorkManifest(manifest([task("a", {
+      builder_family: "codex-builder",
+      auditor_family: "codex-independent-auditor",
+    })])),
     /different model families/i,
+  );
+});
+
+test("normalizes task family aliases and stores different canonical providers", () => {
+  const work = validateWorkManifest(manifest([task("a", {
+    builder_family: "Codex-builder",
+    auditor_family: "Grok-independent-auditor",
+  })]));
+
+  assert.equal(work.tasks[0]?.builder_family, "codex");
+  assert.equal(work.tasks[0]?.auditor_family, "grok");
+});
+
+test("rejects unknown task and report families", () => {
+  assert.throws(
+    () => validateWorkManifest(manifest([task("a", { builder_family: "llama-builder" })])),
+    /unknown model family/i,
+  );
+
+  assert.throws(
+    () => applyTaskReport(
+      validateWorkManifest(manifest([task("a", { status: "building" })])),
+      {
+        type: "builder",
+        task_id: "a",
+        family: "llama-builder",
+        commit_sha: "b".repeat(40),
+        changed_paths: ["src/a/index.ts"],
+        acceptance_commands: [{ command: "npm run check", passed: true }],
+        behavior_impact: "none",
+        logic_impact: "none",
+        risks: [],
+        unresolved_items: [],
+      },
+      null,
+    ),
+    /unknown model family/i,
+  );
+});
+
+test("compares and stores report families by normalized provider", () => {
+  let work = validateWorkManifest(manifest([task("a", {
+    status: "building",
+    builder_family: "codex-builder",
+    auditor_family: "grok-independent-auditor",
+  })]));
+  const builder: BuilderReport = {
+    type: "builder",
+    task_id: "a",
+    family: "codex-builder",
+    commit_sha: "b".repeat(40),
+    changed_paths: ["src/a/index.ts"],
+    acceptance_commands: [{ command: "npm run check", passed: true }],
+    behavior_impact: "none",
+    logic_impact: "none",
+    risks: [],
+    unresolved_items: [],
+  };
+
+  let run;
+  ({ manifest: work, run } = applyTaskReport(work, builder, null));
+  assert.equal(run.builder?.family, "codex");
+
+  const audit: AuditReport = {
+    type: "audit",
+    task_id: "a",
+    family: "grok-independent-auditor",
+    verdict: "passed",
+    findings: [],
+  };
+  ({ manifest: work, run } = applyTaskReport(work, audit, run));
+  assert.equal(run.audit?.family, "grok");
+
+  ({ manifest: work, run } = recordVerifiedDiff(work, "a", builder.commit_sha, run));
+  ({ manifest: work, run } = applyTaskReport(work, {
+    type: "integration",
+    task_id: "a",
+    family: "grok-integration",
+    verdict: "passed",
+  }, run));
+  assert.equal(run.integration?.family, "grok");
+  assert.equal(work.tasks[0]?.status, "integrated");
+});
+
+test("rejects a same-provider audit hidden behind a role suffix", () => {
+  const work = validateWorkManifest(manifest([task("a", {
+    status: "auditing",
+    builder_family: "codex-builder",
+    auditor_family: "grok-auditor",
+    commit_sha: "b".repeat(40),
+  })]));
+
+  assert.throws(
+    () => applyTaskReport(work, {
+      type: "audit",
+      task_id: "a",
+      family: "codex-independent-auditor",
+      verdict: "passed",
+      findings: [],
+    }, {
+      builder: {
+        type: "builder",
+        task_id: "a",
+        family: "codex-builder",
+        commit_sha: "b".repeat(40),
+        changed_paths: ["src/a/index.ts"],
+        acceptance_commands: [{ command: "npm run check", passed: true }],
+        behavior_impact: "none",
+        logic_impact: "none",
+        risks: [],
+        unresolved_items: [],
+      },
+    }),
+    /different model family/i,
   );
 });
 
