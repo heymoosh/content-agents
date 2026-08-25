@@ -193,6 +193,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderPage } from "./page.js";
+import * as pageModule from "./page.js";
 import { repoRoot } from "../db/db.js";
 import { VENTURE_READ_PATHS } from "./venture-reads.js";
 import { VENTURE_WRITE_PATHS } from "./venture-writes.js";
@@ -209,6 +210,44 @@ function emittedScripts(): string[] {
   while ((m = re.exec(html))) scripts.push(m[1]);
   return scripts;
 }
+
+test("advisor job links target the matching Workbench session across every job state", () => {
+  const target = (pageModule as Record<string, unknown>).workbenchJobTarget as (
+    job: { kind: string; label: string; slugs?: string[] },
+    sessions: { slug: string }[],
+  ) => string | null;
+  assert.equal(typeof target, "function");
+  const sessions = [{ slug: "2026-08-25-piece" }];
+  for (const status of ["queued", "running", "done", "failed", "stopped"]) {
+    assert.equal(
+      target({ kind: "develop", label: "Develop: 2026-08-25-piece", slugs: status === "done" ? [sessions[0].slug] : [] }, sessions),
+      sessions[0].slug,
+      `${status} develop job should open its Workbench session`,
+    );
+  }
+  assert.equal(
+    target({ kind: "develop-reply", label: "Advisor reply: 2026-08-25-piece", slugs: [] }, sessions),
+    sessions[0].slug,
+  );
+});
+
+test("advisor job links fall back to Content without claiming a missing Workbench artifact", () => {
+  const target = (pageModule as Record<string, unknown>).workbenchJobTarget as (
+    job: { kind: string; label: string; slugs?: string[] },
+    sessions: { slug: string }[],
+  ) => string | null;
+  assert.equal(target({ kind: "develop", label: "Develop: not-materialized", slugs: [] }, []), null);
+  assert.equal(target({ kind: "text", label: "Format: piece", slugs: ["not-materialized"] }, [{ slug: "not-materialized" }]), null);
+});
+
+test("queue open links carry job kind so advisor navigation is distinct from Review navigation", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('class="jopen" data-id="\'+esc(j.id)+\'"'), "queue links identify the job");
+  assert.ok(script.includes('data-kind="\'+esc(j.kind)+\'"'), "queue links carry the job kind");
+  assert.match(script, /a\.dataset\.kind===\"develop\"/);
+  assert.match(script, /openWorkbenchJob\(job\)/);
+  assert.match(script, /if\(a\.dataset\.slug\) load\(\)/, "non-advisor jobs keep the Review-queue path");
+});
 
 test("wiring guard: every emitted <script> block parses as JavaScript", () => {
   const scripts = emittedScripts();
