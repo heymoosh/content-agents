@@ -121,6 +121,40 @@ export function storyboardJobDone(jobs: { kind: string; slugs?: string[]; status
   return forSlug.every((j) => j.status === "done" || j.status === "failed" || j.status === "stopped");
 }
 
+export interface WorkbenchJobTarget {
+  kind: string;
+  label: string;
+  slugs?: string[];
+}
+
+/**
+ * Resolve the content folder named by an advisor job without relying on its artifact check.
+ *
+ * A folder job has its slug in the label from the moment it is queued, while `slugs` is only
+ * stamped after a successful advisor round. Keeping the label fallback here lets queued, running,
+ * failed, and stopped advisor jobs still point at an already-materialized Workbench session.
+ */
+export function workbenchSlugForJob(job: WorkbenchJobTarget): string | null {
+  if (job.kind !== "develop" && job.kind !== "develop-reply") return null;
+  const stamped = job.slugs?.find((slug) => typeof slug === "string" && slug.trim());
+  if (stamped) return stamped;
+  const match = /^(?:Develop|Advisor reply):\s*(.+)$/.exec(job.label.trim());
+  return match?.[1]?.trim() || null;
+}
+
+/**
+ * Return a Workbench target only when the corresponding read-only session is present. A missing
+ * session deliberately returns null: the caller can still open Content, but must not imply that a
+ * review artifact exists or manufacture one for a job that has not materialized it.
+ */
+export function workbenchJobTarget(
+  job: WorkbenchJobTarget,
+  sessions: readonly { slug: string }[],
+): string | null {
+  const slug = workbenchSlugForJob(job);
+  return slug && sessions.some((session) => session.slug === slug) ? slug : null;
+}
+
 export type CaptureHandoff = { room: string; text: string; id?: string };
 
 // A capture is an inbox item, not a command. This deliberately produces the same shape as a
@@ -2340,6 +2374,7 @@ function wbAngleHtml(slug, card){
 function wbSessionEl(s){
   const sheet = document.createElement("div");
   sheet.className = "sheet session";
+  sheet.dataset.wbSlug = s.slug;
   const expanded = wbExpanded.has(s.slug);
   const longSource = s.sourceBody.length > 420;
   const openAngles = [];
@@ -5012,6 +5047,26 @@ function jobOpenLabel(j){
   if(j.status==="stopped") return "Open " + jobRoom(j.kind);
   return (j.status==="done" ? "Read it in " : "Watch it in ") + jobRoom(j.kind);
 }
+function workbenchSlugForJob(j){
+  if(j.kind!=="develop" && j.kind!=="develop-reply") return null;
+  const stamped = (j.slugs||[]).find(slug=>typeof slug==="string" && slug.trim());
+  if(stamped) return stamped;
+  const match = /^(?:Develop|Advisor reply):\\s*(.+)$/.exec(String(j.label||"").trim());
+  return match && match[1].trim() ? match[1].trim() : null;
+}
+function workbenchJobTarget(j){
+  const slug = workbenchSlugForJob(j);
+  return slug && WB_SESSIONS.some(s=>s.slug===slug) ? slug : null;
+}
+function openWorkbenchJob(j){
+  setRoom("content");
+  loadContent().then(()=>{
+    const slug = workbenchJobTarget(j);
+    if(!slug) return;
+    const target = [...document.querySelectorAll(".session[data-wb-slug]")].find(el=>el.dataset.wbSlug===slug);
+    if(target) target.scrollIntoView({behavior:"smooth", block:"start"});
+  });
+}
 // The per-job Stop control, on the two surfaces a live job appears on. Same button, same handler.
 function stopBtnHtml(j){
   return jobStopOffered(j) ? '<button class="jstop" data-id="'+esc(j.id)+'">Stop it</button>' : "";
@@ -5057,12 +5112,17 @@ function renderJobs(){
         '<span class="grow"></span>'+
         stopBtnHtml(j)+
         (j.startedAt ? '<a href="/api/jobs/'+encodeURIComponent(j.id)+'/log" target="_blank">Open the log</a>' : "")+
-        '<a href="#" class="jopen" data-room="'+esc(jobRoom(j.kind).toLowerCase())+'"'+(j.slugs&&j.slugs.length?' data-slug="'+esc(j.slugs[0])+'"':'')+'>'+esc(jobOpenLabel(j))+'</a>'+
+        '<a href="#" class="jopen" data-id="'+esc(j.id)+'" data-kind="'+esc(j.kind)+'" data-room="'+esc(jobRoom(j.kind).toLowerCase())+'"'+(j.slugs&&j.slugs.length?' data-slug="'+esc(j.slugs[0])+'"':'')+'>'+esc(jobOpenLabel(j))+'</a>'+
       '</div></div>';
   }
   box.innerHTML = html;
   box.querySelectorAll("a.jopen").forEach(a=>a.addEventListener("click",(e)=>{
     e.preventDefault(); setRoom(a.dataset.room);
+    const job = JOBS.find(j=>j.id===a.dataset.id);
+    if(a.dataset.kind==="develop" || a.dataset.kind==="develop-reply"){
+      if(job) openWorkbenchJob(job);
+      return;
+    }
     if(a.dataset.slug) load().then(()=>{
       const d = [...document.querySelectorAll(".piece .slug")].find(x=>x.textContent===a.dataset.slug);
       if(d) d.scrollIntoView({behavior:"smooth", block:"start"});
