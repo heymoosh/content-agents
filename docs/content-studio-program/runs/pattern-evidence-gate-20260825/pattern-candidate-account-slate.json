@@ -1,4 +1,43 @@
 {
   "task_id": "pattern-candidate-account-slate",
-  "batch_id": "pattern-evidence-gate-20260825"
+  "batch_id": "pattern-evidence-gate-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-candidate-account-slate",
+    "family": "codex",
+    "commit_sha": "d091f6211e068b5f8aaed3d7ee00be28794e78c6",
+    "changed_paths": [
+      "docs/content-studio-program/candidate-account-slate-20260825.md",
+      "docs/content-studio-program/runs/pattern-evidence-gate-20260825/candidate-account-slate-decision.json",
+      "docs/content-studio-program/runs/pattern-evidence-gate-20260825/pattern-candidate-account-slate.json",
+      "docs/content-studio-program/tasks/pattern-candidate-account-slate.md",
+      "docs/content-studio-program/work.yaml"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "The coordinator ran the repository TypeScript check after recording the slate."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [],
+    "unresolved_items": []
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-candidate-account-slate",
+    "family": "grok",
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "d091f6211e068b5f8aaed3d7ee00be28794e78c6",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-candidate-account-slate",
+    "family": "grok",
+    "verdict": "passed"
+  }
 }

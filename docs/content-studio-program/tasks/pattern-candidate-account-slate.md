@@ -45,3 +45,9 @@ staging. This packet itself does not create, amend, or select canonical pattern 
 Approve the 65-account evidence-bearing slate for the review-staging packet, request a narrower
 cohort, or hold it. On approval, the coordinator resumes the approved pattern-evidence lane;
 canonical writes remain blocked until the bounded staging work is audited.
+
+## Resolution
+
+Muxin approved option 1 on 2026-08-25: the exact 65-account evidence-bearing slate may enter the
+next body-free review-staging task. This approval does not mark any metadata reviewed or authorize
+a winner claim.

@@ -1,0 +1,11 @@
+{
+  "type": "audit",
+  "task_id": "pattern-candidate-account-slate",
+  "family": "grok",
+  "verdict": "passed",
+  "findings": [
+    "The listed keys are exact and their sorted newline-terminated SHA-256 matches the recorded digest.",
+    "The slate is body-free and makes no reviewed-status, winner, quality, or canonical-data claim.",
+    "The approved next step remains a separately bounded review-staging task that requires explicit metadata and provenance."
+  ]
+}

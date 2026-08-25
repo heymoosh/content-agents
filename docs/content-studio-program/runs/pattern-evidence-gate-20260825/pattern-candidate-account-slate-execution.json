@@ -1,0 +1,10 @@
+{
+  "builder_model": "gpt-5.6-terra",
+  "reasoning_effort": "high",
+  "escalation_reason": null,
+  "audit_model": "grok-4.5",
+  "audit_reasoning_effort": "unreported",
+  "audit_escalation_reason": null,
+  "integration_audit_model": "grok-4.5",
+  "integration_audit_reasoning_effort": "unreported"
+}
