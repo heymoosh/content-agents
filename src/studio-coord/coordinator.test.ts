@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   applyTaskReport,
+  builderReportSchema,
   claimTask,
   describeProgram,
   recordVerifiedDiff,
@@ -126,7 +127,7 @@ test("rejects unknown task and report families", () => {
         family: "llama-builder",
         commit_sha: "b".repeat(40),
         changed_paths: ["src/a/index.ts"],
-        acceptance_commands: [{ command: "npm run check", passed: true }],
+        acceptance_commands: [{ command: "npm run check", passed: true, summary: "check completed without errors" }],
         behavior_impact: "none",
         logic_impact: "none",
         risks: [],
@@ -135,6 +136,30 @@ test("rejects unknown task and report families", () => {
       null,
     ),
     /unknown model family/i,
+  );
+});
+
+test("rejects builder command results without a non-empty summary", () => {
+  const report = {
+    type: "builder" as const,
+    task_id: "a",
+    family: "codex",
+    commit_sha: "b".repeat(40),
+    changed_paths: ["src/a/index.ts"],
+    acceptance_commands: [{ command: "npm run check", passed: true }],
+    behavior_impact: "none",
+    logic_impact: "none",
+    risks: [],
+    unresolved_items: [],
+  };
+
+  assert.equal(builderReportSchema.safeParse(report).success, false);
+  assert.equal(
+    builderReportSchema.safeParse({
+      ...report,
+      acceptance_commands: [{ ...report.acceptance_commands[0], summary: "" }],
+    }).success,
+    false,
   );
 });
 
@@ -150,7 +175,7 @@ test("compares and stores report families by normalized provider", () => {
     family: "codex-builder",
     commit_sha: "b".repeat(40),
     changed_paths: ["src/a/index.ts"],
-    acceptance_commands: [{ command: "npm run check", passed: true }],
+    acceptance_commands: [{ command: "npm run check", passed: true, summary: "check completed without errors" }],
     behavior_impact: "none",
     logic_impact: "none",
     risks: [],
@@ -204,7 +229,7 @@ test("rejects a same-provider audit hidden behind a role suffix", () => {
         family: "codex-builder",
         commit_sha: "b".repeat(40),
         changed_paths: ["src/a/index.ts"],
-        acceptance_commands: [{ command: "npm run check", passed: true }],
+        acceptance_commands: [{ command: "npm run check", passed: true, summary: "check completed without errors" }],
         behavior_impact: "none",
         logic_impact: "none",
         risks: [],
@@ -269,7 +294,7 @@ test("audit failure prevents integration and passing cross-family evidence permi
     family: "codex",
     commit_sha: "b".repeat(40),
     changed_paths: ["src/a/index.ts"],
-    acceptance_commands: [{ command: "npm run check", passed: true }],
+    acceptance_commands: [{ command: "npm run check", passed: true, summary: "check completed without errors" }],
     behavior_impact: "none",
     logic_impact: "none",
     risks: [],
@@ -323,7 +348,7 @@ test("integration rejects failed commands and same-family audit reports", () => 
     family: "codex",
     commit_sha: "b".repeat(40),
     changed_paths: ["src/a/index.ts"],
-    acceptance_commands: [{ command: "npm run check", passed: false }],
+    acceptance_commands: [{ command: "npm run check", passed: false, summary: "check reported a failing assertion" }],
     behavior_impact: "none",
     logic_impact: "none",
     risks: [],

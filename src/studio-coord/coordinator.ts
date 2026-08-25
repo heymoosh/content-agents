@@ -259,7 +259,11 @@ export function claimTask(manifest: WorkManifest, taskId: string): WorkManifest 
   return validateWorkManifest({ ...manifest, tasks: manifest.tasks.map((candidate) => candidate.id === taskId ? { ...candidate, status } : candidate) });
 }
 
-const commandResultSchema = z.object({ command: z.string().min(1), passed: z.boolean() }).strict();
+const commandResultSchema = z.object({
+  command: z.string().min(1),
+  passed: z.boolean(),
+  summary: z.string().min(1),
+}).strict();
 export const builderReportSchema = z.object({
   type: z.literal("builder"),
   task_id: z.string().min(1),
