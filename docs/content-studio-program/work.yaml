@@ -419,7 +419,7 @@ tasks:
   - id: pattern-review-staging-projection
     batch_id: pattern-review-staging-20260825
     outcome: The approved 65-account evidence-bearing cohort has a deterministic body-free review-staging projection with explicit metadata, provenance, and pool-disposition blockers, while all other catalog accounts remain unmapped.
-    status: building
+    status: needs-fix
     depends_on:
       - pattern-candidate-account-slate
     base_sha: a5045699a22bc8dd5e7acd0e9112bdcf7fa52085
@@ -474,5 +474,5 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: reviewed-metadata-and-provenance
-    commit_sha: null
-    audit_verdict: pending
+    commit_sha: 93c4ecd729f65e74f0f8c660da13fc62f043544b
+    audit_verdict: failed
