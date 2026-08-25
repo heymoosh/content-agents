@@ -11,7 +11,7 @@ import {
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
   jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
-  classifyCapture, captureVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
+  classifyCapture, captureVerdict, captureHandoffVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
   LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
   groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
   intakeProgressLine, intakeUnanswered, intakeSaveLine, intakeSlugError,
@@ -251,6 +251,9 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
   // PENDING_UI_VENTURE block below, which reads the real path lists from those modules; here the
   // prefix only has to stop a genuine venture call being reported as a dead button.
   if (serveSrc.includes("handleVentureRead")) routePrefixes.push("/api/venture/");
+  if (serveSrc.includes("handleFictionRoute")) routePrefixes.push("/api/fiction");
+  if (serveSrc.includes("handleCharlesRoute")) routePrefixes.push("/api/charles");
+  if (serveSrc.includes("handleSignalsRoute")) routePrefixes.push("/api/signals", "/api/research");
 
   // client refs: "…/api/foo" (exact) or "…/api/foo/" + concat (prefix). Query strings stop the match.
   const refs = new Set<string>();
@@ -1839,6 +1842,23 @@ test("classifyCapture: empty text classifies as empty, not as Content", () => {
   for (const t of ["", "   ", "\n\t "]) assert.equal(classifyCapture(t).kind, "empty", JSON.stringify(t));
 });
 
+test("captureHandoffSummary: a saved capture is an explicit next action in its owning room", async () => {
+  const { captureHandoffSummary } = await import("./page.js") as unknown as {
+    captureHandoffSummary?: (capture: { room: string; text: string } | null) => unknown;
+  };
+  assert.equal(typeof captureHandoffSummary, "function");
+  if (!captureHandoffSummary) return;
+  const summary = captureHandoffSummary({ room: "Fiction", text: "Elias finally tells the truth." });
+  assert.deepEqual(summary, {
+    room: "fiction",
+    label: "Fiction",
+    text: "Capture waiting in Fiction.",
+    detail: "Elias finally tells the truth.",
+    action: "Open",
+  });
+  assert.equal(captureHandoffSummary(null), null);
+});
+
 test("classifyCapture mirror: the browser copy answers identically on every vector (Rule 5)", () => {
   const mirror = captureMirror().classifyCapture;
   for (const [text, room] of CAPTURE_ROOM_VECTORS) {
@@ -1852,19 +1872,39 @@ test("classifyCapture mirror: the browser copy answers identically on every vect
   for (const t of ["", "   "]) assert.deepEqual(mirror(t), classifyCapture(t));
 });
 
-test("captureVerdict: every routed capture names the room it chose, and its mirror agrees", () => {
+test("durable capture verdict: every routed capture names the room it chose, and its browser mirror agrees", () => {
   const mirror = captureMirror().captureVerdict;
   for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
-    const v = captureVerdict(room);
+    const v = captureHandoffVerdict(room);
     assert.ok(v.line.includes(room), "the verdict must name the room it picked: " + room);
     assert.deepEqual(mirror(room), v, "the browser copy of captureVerdict must match: " + room);
   }
-  // The two rooms with no free-text entry say so, rather than offering a start they cannot perform.
-  assert.ok(captureVerdict("Outreach").line.includes("lead folder"));
-  assert.ok(captureVerdict("Venture").line.includes("no free text"));
-  // Content needs no move: its two buttons are already on this screen.
-  assert.equal(captureVerdict("Content").actionLabel, null);
-  assert.equal(captureVerdict("Fiction").actionLabel, "Take it to Fiction");
+  for (const room of ["Fiction", "Outreach", "Venture"] as const) {
+    assert.ok(captureHandoffVerdict(room).line.includes("choose the next action"));
+  }
+  assert.equal(captureHandoffVerdict("Content").actionLabel, null);
+  assert.equal(captureHandoffVerdict("Fiction").actionLabel, "Keep it in Fiction");
+});
+
+test("Studio capture: the rendered durable-handoff verdict makes no stale routing promise", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  for (const line of [
+    "I read this as Fiction. Keep it in Fiction as a capture, then choose the next action there.",
+    "I read this as Outreach. Keep it in Outreach as a capture, then choose the next action there.",
+    "I read this as Venture. Keep it in Venture as a capture, then choose the next action there.",
+  ]) assert.ok(script.includes(JSON.stringify(line)), line);
+  for (const stale of [
+    "I can put it in the composer as your beats",
+    "Your words stay in the box.",
+    "files a backlog card",
+    "Same route as \"Hand it to your director\"",
+  ]) {
+    assert.ok(!html.includes(stale), "stale rendered promise: " + stale);
+    assert.ok(!script.includes(stale), "stale client promise: " + stale);
+  }
+  assert.ok(script.includes('localStorage.setItem(CAPTURE_HANDOFF_KEY'), "a verdict is saved as a durable handoff");
+  assert.ok(script.includes("Nothing was submitted or started."), "the handoff waits for an explicit next action");
 });
 
 test("Studio capture: the box moved out of the Content room and into Studio", () => {
@@ -1891,9 +1931,13 @@ test("the bare-link ask: three controls, the honest explainer, and the honest Si
   assert.ok(html.includes("Source for Signals"), "the filing button");
   assert.ok(html.includes("Never mind, clear it"), "the cancel");
   assert.ok(html.includes(LINK_ASK_EXPLAINER), "the explainer ships verbatim");
-  // Signals has no ingest for "a URL a reader came from". The button must not imply one.
+  // Signals has no ingest for "a URL a reader came from". This durable handoff must not claim
+  // that it files a backlog card or measures attribution.
+  const signalsHandoffNote = "Source for Signals keeps it in Signals for your next action. Nothing here records where a reader came from, so this is a note to look at later, not attribution.";
+  assert.equal(LINK_ASK_SIGNALS_NOTE, signalsHandoffNote, "the page export must match the rendered durable behavior");
   assert.ok(html.includes(LINK_ASK_SIGNALS_NOTE), "the Signals button must say what it actually does");
   assert.ok(LINK_ASK_SIGNALS_NOTE.includes("not attribution"));
+  assert.ok(!LINK_ASK_SIGNALS_NOTE.includes("files a backlog card"));
   // The ask's own state: an amber rail and a dimmed, read-only textarea while it is open.
   assert.ok(html.includes(CAPTURE_RAIL_IDLE) && html.includes('id="captureRail"'));
   const script = emittedScripts().join("\n");
@@ -1910,16 +1954,15 @@ test("Studio capture: the dispatch never posts to a route that cannot take free 
   assert.ok(start > -1 && end > start, "the capture client section must be identifiable");
   const section = script.slice(start, end);
   const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
-  assert.deepEqual(paths, ["/api/develop/start", "/api/signals/backlog"], "unexpected route in the capture dispatch");
-  // Both are already wired: develop/start enqueues (so it must be armed), signals/backlog files a
-  // card and correctly is not an enqueue route.
-  assert.ok(enqueuesJob("/api/develop/start"));
-  assert.ok(!enqueuesJob("/api/signals/backlog"));
-  // Outreach and Venture get a room switch and a plain sentence, not a fabricated job.
-  assert.ok(section.includes('pendingCaptureText = t; setRoom(room.toLowerCase());'));
-  assert.ok(section.includes('Nothing was submitted.'));
-  assert.ok(section.includes('CAPTURE KEPT HERE'));
-  assert.ok(!/room==="Outreach".*post\(/s.test(section.slice(section.indexOf("function takeCaptureTo"), section.indexOf("function consumeCapturedBeats"))));
+  assert.deepEqual(paths, [], "a capture handoff must not call an API route");
+  assert.ok(section.includes('localStorage.setItem(CAPTURE_HANDOFF_KEY'));
+  assert.ok(section.includes('readCaptureHandoffs()'));
+  assert.ok(section.includes('CAPTURE WAITING HERE'));
+  assert.ok(section.includes('Choose the next action in this room. Nothing was submitted or started.'));
+  for (const id of ["contentCaptureHandoff", "fictionCaptureHandoff", "outreachCaptureHandoff", "ventureCaptureHandoff", "signalsCaptureHandoff", "charlesCaptureHandoff"]) {
+    assert.ok(section.includes(id), id + " must surface a pending capture in its owning room");
+  }
+  assert.ok(!/function takeCaptureTo[\s\S]*?post\(/.test(section), "routing a capture must never start work");
 });
 
 test("Studio capture copy: no em dashes, and nothing claims a job was started", () => {

@@ -239,3 +239,53 @@ tasks:
     human_gate: none
     commit_sha: 3c2abebb6b365dcc88586ad6a5ff34436320df41
     audit_verdict: passed
+  - id: cs3-studio-durable-handoff
+    batch_id: studio-third-batch-20260825
+    outcome: Make Studio capture a durable, explicit handoff into its owning room and include cross-room pending capture work in the Studio judgment surface without silently starting work.
+    status: integrated
+    depends_on: []
+    base_sha: 62d83251bb5a101ac6bc211bfae9dff316efcb9a
+    context_paths:
+      - docs/content-studio-vision.md
+      - src/review/page.ts
+      - src/review/studio.ts
+      - src/review/studio-job-ui.ts
+      - src/review/page.test.ts
+      - src/review/studio.test.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - content/**
+      - data/**
+      - config/**
+      - src/venture/**
+      - src/fiction/**
+      - src/outreach/**
+      - src/review/jobs.ts
+      - src/review/serve-fiction.ts
+      - src/review/serve-charles.ts
+      - src/review/serve-signals.ts
+    write_paths:
+      - src/review/page.ts
+      - src/review/serve.ts
+      - src/review/studio.ts
+      - src/review/page.test.ts
+      - src/review/studio.test.ts
+    semantic_locks:
+      - studio:capture-handoff
+      - studio:judgment-surface
+    builder_family: codex
+    auditor_family: grok
+    branch: agent/cs3-studio-durable-handoff
+    worktree: /private/tmp/content-agents-cs3-studio-durable-handoff
+    acceptance_commands:
+      - npm run check
+      - node --import tsx --test src/review/page.test.ts src/review/studio.test.ts
+    user_visible_behavior: true
+    content_logic_change: false
+    human_gate: none
+    commit_sha: de255300607b21a8a8c071958cc74902d42b2624
+    audit_verdict: passed
