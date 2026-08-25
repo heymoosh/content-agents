@@ -416,3 +416,61 @@ tasks:
     human_gate: resolved-candidate-account-slate
     commit_sha: d091f6211e068b5f8aaed3d7ee00be28794e78c6
     audit_verdict: passed
+  - id: pattern-review-staging-projection
+    batch_id: pattern-review-staging-20260825
+    outcome: The approved 65-account evidence-bearing cohort has a deterministic body-free review-staging projection with explicit metadata, provenance, and pool-disposition blockers, while all other catalog accounts remain unmapped.
+    status: proposed
+    depends_on:
+      - pattern-candidate-account-slate
+    base_sha: null
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+      - src/patterns/review-status.ts
+      - src/patterns/review-metadata.ts
+      - src/patterns/review-queue.ts
+      - src/patterns/review-batch.ts
+      - src/patterns/review-session.ts
+      - src/patterns/source-evidence.ts
+      - src/patterns/reviewed-evidence-intake.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - data/**
+      - content/**
+      - config/**
+      - src/agents/**
+      - src/atomize/**
+      - src/grow/**
+      - src/publish/**
+      - src/review/**
+      - src/venture/**
+      - src/fiction/**
+      - src/charles/**
+      - src/patterns/account-review-ledger.ts
+      - src/patterns/reviewed-evidence-intake.ts
+      - src/patterns/reviewed-evidence-ledger-bridge.ts
+      - src/patterns/source-evidence.ts
+    write_paths:
+      - package.json
+      - src/patterns/review-staging.ts
+      - src/patterns/review-staging-cli.ts
+      - src/patterns/review-staging.test.ts
+      - src/patterns/review-staging-cli.test.ts
+    semantic_locks:
+      - patterns:review-staging-projection
+    builder_family: codex
+    auditor_family: grok
+    branch: null
+    worktree: null
+    acceptance_commands: []
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: reviewed-metadata-and-provenance
+    commit_sha: null
+    audit_verdict: pending
