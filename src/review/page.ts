@@ -4493,6 +4493,12 @@ async function onCharlesAction(act, item){
 // backlog files a card for the Claude Code pipeline; nothing changes by itself.
 let SIGNALS = null;
 const sigSent = new Set();
+// Signals decisions are acknowledgements for this browser page only. Keep the key stable across
+// refreshes of the brief while leaving the API and the backlog handoff untouched; a full reload
+// creates fresh Sets and therefore restores every recommendation.
+const sigAdopted = new Set();
+const sigDeclined = new Set();
+function signalKey(r){ return JSON.stringify([r.type, r.title]); }
 function signalStatusLabel(c){
   return c.status.startsWith("OK") ? c.weeks+" wks of data" : "insufficient · directional only";
 }
@@ -4511,21 +4517,50 @@ function renderSignals(){
       '<span class="l">'+c.posts+' posts on record</span></div>';
   }).join("");
   const weak = (SIGNALS.confidence||[]).filter(c=>!c.status.startsWith("OK"));
+  const declined = (SIGNALS.recommendations||[]).filter(r=>sigDeclined.has(signalKey(r)));
   const recs = (SIGNALS.recommendations||[]).map((r,i)=>{
+    const key = signalKey(r);
+    if(sigDeclined.has(key)) return "";
     const sent = sigSent.has(r.title);
+    const adopted = sigAdopted.has(key);
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
       '<div class="dev-summary">'+esc(r.rationale)+'</div>'+
-      '<div class="actions">'+(sent
-        ? '<span class="scheduled">✓ filed to the backlog — the pipeline grooms it from here</span>'
-        : '<button class="primary sig-send" data-i="'+i+'">Send to backlog</button><span class="src">Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships.</span>')+
+      '<div class="actions">'+
+        '<button class="'+(adopted?'':'primary ')+'sig-adopt" data-i="'+i+'"'+(adopted?' disabled':'')+'>'+(adopted?'Adopted for this session':'Adopt')+'</button>'+
+        '<button class="sig-decline" data-i="'+i+'">Decline</button>'+
+        (sent
+          ? '<span class="scheduled">✓ filed to the backlog — the pipeline grooms it from here</span>'
+          : '<button class="primary sig-send" data-i="'+i+'">Send to backlog</button><span class="src">Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships.</span>')+
+        (adopted ? '<span class="src">Adopted for this session. Nothing changed.</span>' : '')+
       '</div></div>';
   }).join("");
+  const declinedHtml = declined.length
+    ? '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:6px;">Declined this session</div>'+declined.map(r=>
+      '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
+      '<div class="dev-summary">'+esc(r.rationale)+'</div><div class="src">Declined this session. Nothing changed.</div></div>'
+    ).join("")+'</div>'
+    : "";
+  const weakHtml = weak.length
+    ? '<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>'
+    : "";
+  const briefNote = '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>';
   box.innerHTML =
     '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
-    (weak.length?'<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>':"")+
-    '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+
-    '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>'+
-    (recs||'<div class="empty" style="padding:14px">The latest brief carries no recommendations.</div>')+'</div>';
+    weakHtml+
+    '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+briefNote+
+    (recs||'<div class="empty" style="padding:14px">No active recommendations this session.</div>')+'</div>'+declinedHtml;
+  box.querySelectorAll(".sig-adopt").forEach(b=>b.addEventListener("click", ()=>{
+    const r = SIGNALS.recommendations[Number(b.dataset.i)];
+    sigAdopted.add(signalKey(r));
+    flash("Adopted for this session. Nothing changed.");
+    renderSignals();
+  }));
+  box.querySelectorAll(".sig-decline").forEach(b=>b.addEventListener("click", ()=>{
+    const r = SIGNALS.recommendations[Number(b.dataset.i)];
+    sigDeclined.add(signalKey(r));
+    flash("Declined for this session. Nothing changed.");
+    renderSignals();
+  }));
   box.querySelectorAll(".sig-send").forEach(b=>b.addEventListener("click", async ()=>{
     const r = SIGNALS.recommendations[Number(b.dataset.i)];
     b.disabled = true;
