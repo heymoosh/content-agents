@@ -78,11 +78,7 @@ import {
   addDevelopJob,
   addDevelopFolderJob,
   developJobInFlight,
-  addFictionDraftJob,
-  addFictionRepassJob,
-  addFictionCheckJob,
   buildFormatArg,
-  enqueueCharlesDraft,
 } from "./jobs.js";
 import { listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
 import { listCuts } from "../atomize/cuts.js";
@@ -90,18 +86,13 @@ import { renderPage } from "./page.js";
 import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
 import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, type Engine } from "./engines.js";
-import { readSignals, appendBacklogCard, readOutcomeFamilies, readResearchReport } from "./signals.js";
 import { readTreatment } from "./treatment.js";
-import {
-  listFictionSeries, readFictionDoc, saveFictionDoc, fictionDocHistory,
-  readFictionChapter, readSceneBeats, saveSceneBeats, clearSceneBeats, listChapters,
-} from "./fiction.js";
-import { patchChapterSpan } from "../fiction/patch.js";
-import { readContinuityReport } from "../fiction/continuity.js";
-import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief } from "./charles.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
 import { enqueueVentureStep } from "./venture-runner.js";
 import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
+import { handleFictionRoute } from "./serve-fiction.js";
+import { handleCharlesRoute } from "./serve-charles.js";
+import { handleSignalsRoute } from "./serve-signals.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich), jobs.ts (classifySource,
@@ -993,218 +984,9 @@ const server = createServer(async (req, res) => {
     // here formats, queues, or publishes anything. Accept/dismiss are deterministic server-side
     // writes (src/review/develop.ts): an accepted angle becomes a cut whose body is assembled
     // ONLY from Muxin's verbatim source.md lines, never from advisor text (CLAUDE.md rule 1).
-    // Fiction desk (design 3f): canon browse/edit only. Chapters stay in the GitHub /story flow;
-    // canon.md is append-only and renders read-only. The Build 2 wall holds — nothing here
-    // composes prose or crosses into the content pipeline except by Muxin starting a promo note.
-    if (req.method === "GET" && url.pathname === "/api/fiction") {
-      json(res, 200, { series: listFictionSeries() });
-      return;
-    }
-    if (req.method === "GET" && url.pathname === "/api/fiction/doc") {
-      try {
-        const slug = url.searchParams.get("series") ?? "";
-        const path = url.searchParams.get("path") ?? "";
-        const { doc, body } = readFictionDoc(slug, path);
-        json(res, 200, { ok: true, doc, body, history: await fictionDocHistory(slug, path) });
-      } catch (e) {
-        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/fiction/doc") {
-      const b = await readBody(req);
-      try {
-        saveFictionDoc(String(b.series ?? ""), String(b.path ?? ""), String(b.body ?? ""));
-        json(res, 200, { ok: true });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // ── The Fiction room's scene (v7 §2) ───────────────────────────────────────────────────────
-    // One read for the whole room: her beats (the anchor), the drafted scene, and what the canon
-    // check found. Nothing here approves, locks or publishes a chapter — every one still waits on
-    // Muxin, and the GitHub /story flow stays where line editing and the commit history live.
-    if (req.method === "GET" && url.pathname === "/api/fiction/scene") {
-      try {
-        const slug = url.searchParams.get("series") ?? "";
-        // listChapters runs the same slug gate resolveDoc does. Joining the raw query param onto
-        // stories/ here let "../.." walk out and list any chapters/ directory on the disk. Its
-        // result is unused now, but the gate is why the call stays.
-        listChapters(slug);
-        const beats = readSceneBeats(slug);
-        // The one chapter this room actually produced, and nothing else. It used to fall back to
-        // the newest chapter on disk, which handed back one Muxin wrote herself in /story; the room
-        // then labelled her prose "the scene, from your beats" and set it in the AI purple. Her
-        // words are never the AI register. A ?chapter= override is gone with the fallback rather
-        // than gated: it had no caller, and any value it took could name a chapter she wrote.
-        const n = beats?.chapter ?? null;
-        const chapter = n ? readFictionChapter(slug, n) : null;
-        json(res, 200, {
-          ok: true,
-          beats: beats?.beats ?? "",
-          chapter,
-          continuity: n ? readContinuityReport(slug, n) : null,
-        });
-      } catch (e) {
-        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // "Draft it" — her beats become a queued /story run. See jobs.ts's fictionDraftPrompt for why
-    // this dispatches the SKILL rather than `story:draft` (draft.ts is inert for claude-native
-    // series and is a guardrail path).
-    if (req.method === "POST" && url.pathname === "/api/fiction/draft") {
-      const b = await readBody(req);
-      try {
-        const slug = String(b.series ?? "");
-        const beats = String(b.beats ?? "");
-        const { job, queued } = addFictionDraftJob(slug, beats, requestEngine(b.engine));
-        // The anchor survives a reload, so it is written here rather than left in the page. Only
-        // for a run that actually queued: a deduped press returns the draft already in flight, and
-        // moving the anchor to beats that run never received would show Muxin one set of beats
-        // above prose written from another.
-        if (queued) saveSceneBeats(slug, beats);
-        json(res, 200, { ok: true, job: publicJob(job) });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // The second pass ("More tension, less explaining"): its OWN measured job, never an instant
-    // rewrite. The draft on screen does not move until the new one lands.
-    if (req.method === "POST" && url.pathname === "/api/fiction/repass") {
-      const b = await readBody(req);
-      try {
-        json(res, 200, {
-          ok: true,
-          job: publicJob(addFictionRepassJob(String(b.series ?? ""), Number(b.chapter ?? 0), String(b.note ?? ""), requestEngine(b.engine))),
-        });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/fiction/check") {
-      const b = await readBody(req);
-      try {
-        json(res, 200, { ok: true, job: publicJob(addFictionCheckJob(String(b.series ?? ""), Number(b.chapter ?? 0), requestEngine(b.engine))) });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // "Fix the line": replace ONE flagged span in the chapter and re-save. Refuses when that exact
-    // wording is missing or appears more than once, because then there is no single line to fix.
-    if (req.method === "POST" && url.pathname === "/api/fiction/fix") {
-      const b = await readBody(req);
-      try {
-        const result = patchChapterSpan(
-          String(b.series ?? ""), Number(b.chapter ?? 0), String(b.span ?? ""), String(b.replacement ?? ""),
-        );
-        json(res, 200, { ok: true, body: result.body });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // "Start a different scene": drops the anchor only. It never touches a chapter file.
-    if (req.method === "POST" && url.pathname === "/api/fiction/beats/clear") {
-      const b = await readBody(req);
-      try {
-        clearSceneBeats(String(b.series ?? ""));
-        json(res, 200, { ok: true });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // Charles room (Build 4): charles/review-queue.md + the drafts it points at. Same review
-    // contract as everywhere else — approve/revise/discard just flips a status cell here, nothing
-    // posts (see charles/CLAUDE.md).
-    if (req.method === "GET" && url.pathname === "/api/charles") {
-      json(res, 200, { posts: listCharlesPosts() });
-      return;
-    }
-    if (req.method === "GET" && url.pathname === "/api/charles/persona-brief") {
-      try {
-        json(res, 200, { ok: true, text: readPersonaBrief() });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/charles/status") {
-      const b = await readBody(req);
-      try {
-        setCharlesStatus(String(b.id ?? ""), String(b.status ?? ""), b.notes !== undefined ? String(b.notes) : undefined);
-        json(res, 200, { ok: true, post: readCharlesPost(String(b.id ?? "")) });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/charles/doc") {
-      const b = await readBody(req);
-      try {
-        saveCharlesPost(String(b.id ?? ""), String(b.body ?? ""));
-        json(res, 200, { ok: true });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/charles/draft") {
-      const b = await readBody(req);
-      try {
-        const drafted = await enqueueCharlesDraft(String(b.mode ?? ""), String(b.input ?? ""), requestEngine(b.engine));
-        json(res, 200, { ok: true, ...drafted });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // Signals room (design 3e): the deterministic read of the latest brief, and the one write —
-    // sending an adjustment to the repo backlog as a card. Muxin decides; nothing self-adopts.
-    if (req.method === "GET" && url.pathname === "/api/signals") {
-      json(res, 200, readSignals());
-      return;
-    }
-    // Card D: the four outcome families, grouped at read time out of data/analytics.db
-    // (docs/venture-schema-contract.md §5.8). A separate route from /api/signals on purpose —
-    // this is a different read with a different shape, and nothing merges the two into a score.
-    if (req.method === "GET" && url.pathname === "/api/signals/outcomes") {
-      const db = openDb();
-      try {
-        json(res, 200, readOutcomeFamilies(db));
-      } finally {
-        db.close();
-      }
-      return;
-    }
-    // The redacted account-level research read (contract §5.4b), until now unreachable from the
-    // GUI. Aggregate counts and redacted text only; degrades to an honest empty read, never zeros.
-    if (req.method === "GET" && url.pathname === "/api/research/report") {
-      const db = openDb();
-      try {
-        json(res, 200, readResearchReport(db));
-      } finally {
-        db.close();
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/signals/backlog") {
-      const b = await readBody(req);
-      const title = String(b.title ?? "").trim();
-      const detail = String(b.detail ?? "").trim();
-      if (!title || !detail) {
-        json(res, 400, { ok: false, error: "an adjustment needs a title and its rationale" });
-        return;
-      }
-      const signals = readSignals();
-      json(res, 200, appendBacklogCard({ title, detail, briefPath: signals.briefPath, date: new Date().toISOString().slice(0, 10) }));
-      return;
-    }
+    if (await handleFictionRoute({ req, res, url, readBody, json, requestEngine })) return;
+    if (await handleCharlesRoute({ req, res, url, readBody, json, requestEngine })) return;
+    if (await handleSignalsRoute({ req, res, url, readBody, json })) return;
     // Studio home (design 3c): counts, the ranked needs-you list, and the team's honest status.
     if (req.method === "GET" && url.pathname === "/api/studio") {
       json(res, 200, await buildStudioHome());
