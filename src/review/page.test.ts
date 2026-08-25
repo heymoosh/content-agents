@@ -790,6 +790,19 @@ test("Signals: send-to-backlog copy still names the backlog and says nothing cha
   assert.ok(html.includes("filed to the backlog"), "the confirmed state must still name the backlog");
 });
 
+test("Signals: recommendations expose session-only adopt and decline decisions", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('sig-adopt'), "recommendations must offer Adopt");
+  assert.ok(html.includes('class="sig-decline"'), "recommendations must offer Decline");
+  assert.ok(html.includes("Adopted for this session. Nothing changed."), "adopt must be visibly session-only");
+  assert.ok(html.includes("Declined this session"), "declined recommendations need a session section");
+  assert.ok(html.includes("const sigAdopted = new Set()"), "adopt state must live in JavaScript memory");
+  assert.ok(html.includes("const sigDeclined = new Set()"), "decline state must live in JavaScript memory");
+  assert.ok(html.includes("JSON.stringify([r.type, r.title])"), "session decisions must be keyed by type and title");
+  assert.ok(html.includes('sigAdopted.add(signalKey(r))'), "Adopt must only update in-memory state");
+  assert.ok(html.includes('sigDeclined.add(signalKey(r))'), "Decline must only update in-memory state");
+});
+
 // The three job surfaces must actually reach the browser, not just exist as testable mirrors.
 test("client <script> output: the job working panel, room strips and team rail all emit", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
