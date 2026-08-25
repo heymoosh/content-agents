@@ -1,0 +1,6 @@
+{
+  "type": "integration",
+  "task_id": "cs5-content-workbench-continuity",
+  "family": "grok",
+  "verdict": "passed"
+}

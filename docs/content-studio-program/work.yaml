@@ -11,10 +11,10 @@ tasks:
   - id: cs5-content-workbench-continuity
     batch_id: studio-fifth-batch-20260825
     outcome: Studio job links for Content advisor work open the matching Content Workbench session rather than a not-yet-created Review row, without changing any content generation or approval behavior.
-    status: ready
+    status: integrated
     depends_on:
       - cs3-studio-durable-handoff
-    base_sha: 54ce22c07b59bd7359a37b5017cc8c72432c4bae
+    base_sha: 9b67013b2b245e8ac164251a5739eb64c226ee3a
     context_paths:
       - docs/content-studio-program/charter.md
       - docs/content-studio-vision.md
@@ -53,8 +53,8 @@ tasks:
     user_visible_behavior: true
     content_logic_change: false
     human_gate: none
-    commit_sha: null
-    audit_verdict: pending
+    commit_sha: 9726c04a703f814a35b0a324b5f1213e44921ec9
+    audit_verdict: passed
   - id: studio-client-job-ui-extraction
     batch_id: studio-first-batch-20260824
     outcome: Extract Node-side pure job UI types/helpers from page.ts into a dedicated module without changing browser output or behavior.

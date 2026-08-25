@@ -1,0 +1,11 @@
+{
+  "type": "audit",
+  "task_id": "cs5-content-workbench-continuity",
+  "family": "grok",
+  "verdict": "failed",
+  "findings": [
+    "medium: advisor links invoke setRoom(Content) before openWorkbenchJob invokes setRoom(Content) and loadContent again; concurrent Workbench renders can remove the scroll target after it is reached. Eliminate duplicate loads and make the target scroll occur after the one authoritative Content load.",
+    "low: browser helper copies are not exercised by the exported pure-helper tests; add a DOM/script-path guard appropriate to the existing page-test conventions.",
+    "low: label fallback must not mis-target a pre-existing session for non-folder advisor jobs before a real slug is stamped."
+  ]
+}

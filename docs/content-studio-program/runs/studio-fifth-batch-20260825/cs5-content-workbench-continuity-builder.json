@@ -1,0 +1,23 @@
+{
+  "type": "builder",
+  "task_id": "cs5-content-workbench-continuity",
+  "family": "codex",
+  "commit_sha": "9726c04a703f814a35b0a324b5f1213e44921ec9",
+  "changed_paths": ["src/review/page.ts", "src/review/page.test.ts"],
+  "acceptance_commands": [
+    {
+      "command": "npm run check",
+      "passed": true,
+      "summary": "Builder ran the TypeScript check in the leased worktree."
+    },
+    {
+      "command": "node --import tsx --test src/review/page.test.ts src/review/studio.test.ts src/review/develop.test.ts",
+      "passed": true,
+      "summary": "Builder ran the focused suite: 226 tests passed, 0 failed."
+    }
+  ],
+  "behavior_impact": "Advisor job links use one Content load and target only safely identified existing Workbench sessions; other Content jobs retain Review navigation.",
+  "logic_impact": "none",
+  "risks": [],
+  "unresolved_items": []
+}
