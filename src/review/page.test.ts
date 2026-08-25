@@ -251,6 +251,9 @@ test("wiring guard: every client /api path has a serve.ts route, and every route
   // PENDING_UI_VENTURE block below, which reads the real path lists from those modules; here the
   // prefix only has to stop a genuine venture call being reported as a dead button.
   if (serveSrc.includes("handleVentureRead")) routePrefixes.push("/api/venture/");
+  if (serveSrc.includes("handleFictionRoute")) routePrefixes.push("/api/fiction");
+  if (serveSrc.includes("handleCharlesRoute")) routePrefixes.push("/api/charles");
+  if (serveSrc.includes("handleSignalsRoute")) routePrefixes.push("/api/signals", "/api/research");
 
   // client refs: "…/api/foo" (exact) or "…/api/foo/" + concat (prefix). Query strings stop the match.
   const refs = new Set<string>();
@@ -1839,6 +1842,23 @@ test("classifyCapture: empty text classifies as empty, not as Content", () => {
   for (const t of ["", "   ", "\n\t "]) assert.equal(classifyCapture(t).kind, "empty", JSON.stringify(t));
 });
 
+test("captureHandoffSummary: a saved capture is an explicit next action in its owning room", async () => {
+  const { captureHandoffSummary } = await import("./page.js") as unknown as {
+    captureHandoffSummary?: (capture: { room: string; text: string } | null) => unknown;
+  };
+  assert.equal(typeof captureHandoffSummary, "function");
+  if (!captureHandoffSummary) return;
+  const summary = captureHandoffSummary({ room: "Fiction", text: "Elias finally tells the truth." });
+  assert.deepEqual(summary, {
+    room: "fiction",
+    label: "Fiction",
+    text: "Capture waiting in Fiction.",
+    detail: "Elias finally tells the truth.",
+    action: "Open",
+  });
+  assert.equal(captureHandoffSummary(null), null);
+});
+
 test("classifyCapture mirror: the browser copy answers identically on every vector (Rule 5)", () => {
   const mirror = captureMirror().classifyCapture;
   for (const [text, room] of CAPTURE_ROOM_VECTORS) {
@@ -1910,16 +1930,15 @@ test("Studio capture: the dispatch never posts to a route that cannot take free 
   assert.ok(start > -1 && end > start, "the capture client section must be identifiable");
   const section = script.slice(start, end);
   const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
-  assert.deepEqual(paths, ["/api/develop/start", "/api/signals/backlog"], "unexpected route in the capture dispatch");
-  // Both are already wired: develop/start enqueues (so it must be armed), signals/backlog files a
-  // card and correctly is not an enqueue route.
-  assert.ok(enqueuesJob("/api/develop/start"));
-  assert.ok(!enqueuesJob("/api/signals/backlog"));
-  // Outreach and Venture get a room switch and a plain sentence, not a fabricated job.
-  assert.ok(section.includes('pendingCaptureText = t; setRoom(room.toLowerCase());'));
-  assert.ok(section.includes('Nothing was submitted.'));
-  assert.ok(section.includes('CAPTURE KEPT HERE'));
-  assert.ok(!/room==="Outreach".*post\(/s.test(section.slice(section.indexOf("function takeCaptureTo"), section.indexOf("function consumeCapturedBeats"))));
+  assert.deepEqual(paths, [], "a capture handoff must not call an API route");
+  assert.ok(section.includes('localStorage.setItem(CAPTURE_HANDOFF_KEY'));
+  assert.ok(section.includes('readCaptureHandoffs()'));
+  assert.ok(section.includes('CAPTURE WAITING HERE'));
+  assert.ok(section.includes('Choose the next action in this room. Nothing was submitted or started.'));
+  for (const id of ["contentCaptureHandoff", "fictionCaptureHandoff", "outreachCaptureHandoff", "ventureCaptureHandoff", "signalsCaptureHandoff", "charlesCaptureHandoff"]) {
+    assert.ok(section.includes(id), id + " must surface a pending capture in its owning room");
+  }
+  assert.ok(!/function takeCaptureTo[\s\S]*?post\(/.test(section), "routing a capture must never start work");
 });
 
 test("Studio capture copy: no em dashes, and nothing claims a job was started", () => {

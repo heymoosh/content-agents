@@ -106,6 +106,23 @@ export function storyboardJobDone(jobs: { kind: string; slugs?: string[]; status
   return forSlug.every((j) => j.status === "done" || j.status === "failed" || j.status === "stopped");
 }
 
+export type CaptureHandoff = { room: string; text: string; id?: string };
+
+// A capture is an inbox item, not a command. This deliberately produces the same shape as a
+// Studio needs-you row without reaching into any generator, sender, publisher, or policy surface.
+export function captureHandoffSummary(capture: CaptureHandoff | null): {
+  room: string; label: string; text: string; detail: string; action: string;
+} | null {
+  if (!capture?.text.trim() || !capture.room.trim()) return null;
+  return {
+    room: capture.room.toLowerCase(),
+    label: capture.room,
+    text: `Capture waiting in ${capture.room}.`,
+    detail: capture.text.trim().replace(/\s+/g, " ").slice(0, 140),
+    action: "Open",
+  };
+}
+
 
 export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fixtures?: boolean }): string {
   return /* html */ `<!doctype html>
@@ -849,6 +866,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 <main>
   <section class="view" id="roomContent">
     <div class="sheet" id="stripContent" hidden style="padding:24px 56px 10px"></div>
+    <div class="sheet" id="contentCaptureHandoff" hidden></div>
     <div class="sheet" id="contentWizard">
       <div class="cw-steps" id="cwSteps"></div>
       <div id="cwBody"><div class="empty">Loading…</div></div>
@@ -924,6 +942,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   </section>
   <section class="view" id="roomFiction" hidden>
     <div class="sheet" id="stripFiction" hidden style="padding:24px 56px 10px"></div>
+    <div class="sheet" id="fictionCaptureHandoff" hidden></div>
     <div class="sheet session">
       <div class="session-grid">
         <div class="session-main" id="fictionMain"><div class="empty">Loading…</div></div>
@@ -932,6 +951,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomCharles" hidden>
+    <div class="sheet" id="charlesCaptureHandoff" hidden></div>
     <div class="sheet capture">
       <div class="capture-title">Draft a new Charles post</div>
       <div class="ingest-actions" style="align-items:center">
@@ -990,6 +1010,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomSignals" hidden>
+    <div class="sheet" id="signalsCaptureHandoff" hidden></div>
     <div class="sheet" id="stripSignals" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
@@ -4084,7 +4105,7 @@ async function loadFiction(){
   if(!FICTION.length){
     $("#fictionMain").innerHTML = '<div class="empty">No Fiction series is on the desk yet. Create a series in your existing story workflow, then return here to draft and check scenes.</div>';
     $("#fictionSide").innerHTML = "";
-    consumeCapturedBeats(); // nothing to fill; it says so rather than silently swallowing her text
+    renderCaptureHandoff();
     return;
   }
   if(!ficSeries || !FICTION.some(s=>s.slug===ficSeries)) ficSeries = FICTION[0].slug;
@@ -4095,7 +4116,7 @@ async function loadFiction(){
   const sr = await fetch("/api/fiction/scene?series="+encodeURIComponent(ficSeries));
   ficScene = await sr.json();
   renderFiction();
-  consumeCapturedBeats(); // a capture routed here lands in the composer the render just built
+  renderCaptureHandoff();
 }
 function ficStatusWord(hasScene){
   const mine = (JOBS||[]).filter(j=>jobRoom(j.kind)==="Fiction");
@@ -4654,7 +4675,8 @@ function renderStudio(){
     [c.followupsDue, "follow-ups due", "#9a6b12", "followups"],
     [c.postsHolding, "posts holding for slots", "#2f7d46", null],
   ].map(t=>'<div class="stat-tile"'+(t[3]?' style="cursor:pointer" data-goto="'+t[3]+'"':'')+'><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></div>').join("");
-  const rows = (STUDIO.needsYou||[]).map(n=>
+  const captures = readCaptureHandoffs().map(captureHandoffSummary).filter(Boolean).map(c=>({...c, urgent:true}));
+  const rows = [...captures, ...(STUDIO.needsYou||[])].map(n=>
     '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
     '<span class="ny-text">'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
     '<span class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+'>'+esc(n.action)+'</span></div>'
@@ -5184,18 +5206,38 @@ function captureVerdict(room){
 }
 // ── end of the capture mirror ──
 
-let pendingCaptureBeats = null; // her words, waiting for the Fiction composer to actually render
-let pendingCaptureText = null;  // her words, visible in the destination room until she clears them
 let linkAskUrl = null;          // the bare link the two-button ask is open on
 let captureSubmitting = false;  // the two Studio handoffs share one guard, so Enter cannot double-queue
+const CAPTURE_HANDOFF_KEY = "content-studio.capture-handoff.v1";
+function readCaptureHandoffs(){
+  try {
+    const value = JSON.parse(localStorage.getItem(CAPTURE_HANDOFF_KEY) || "null");
+    const rows = Array.isArray(value) ? value : value ? [value] : [];
+    return rows.filter(row=>row && typeof row.room === "string" && typeof row.text === "string" && typeof row.id === "string");
+  } catch { return []; }
+}
+function saveCaptureHandoff(room, text){
+  const capture = { id:String(Date.now())+":"+Math.random().toString(36).slice(2), room, text: String(text).trim() };
+  if(!capture.text) return null;
+  try {
+    localStorage.setItem(CAPTURE_HANDOFF_KEY, JSON.stringify([...readCaptureHandoffs(), capture]));
+    return capture;
+  } catch { return null; }
+}
+function clearCaptureHandoff(id){
+  try { localStorage.setItem(CAPTURE_HANDOFF_KEY, JSON.stringify(readCaptureHandoffs().filter(c=>c.id!==id))); }
+  catch { flash("Could not clear this capture. It is still saved."); }
+}
+function captureHandoffSummary(capture){
+  if(!capture || !String(capture.text || "").trim() || !String(capture.room || "").trim()) return null;
+  const room = String(capture.room);
+  return { room:room.toLowerCase(), label:room, text:"Capture waiting in "+room+".",
+    detail:String(capture.text).trim().replace(/\\s+/g," ").slice(0,140), action:"Open" };
+}
 function setCaptureSubmitting(busy){
   captureSubmitting = busy;
   ["#addBtn", "#devStartBtn"].forEach(id=>{ const button=$(id); if(button) button.disabled=busy; });
 }
-// Read for Content and File for Signals both act on the SAME linkAskUrl and each only disabled its
-// own button, so a click on one while the other was still in flight fired two submissions off one
-// piece of text. This flag makes the two actions (and Cancel) mutually exclusive.
-let captureLinkActionPending = false;
 
 function captureText(){ return ($("#src").value||"").trim(); }
 function hideCaptureVerdict(){ $("#captureVerdict").hidden = true; }
@@ -5224,14 +5266,13 @@ function closeLinkAsk(clearText){
   if(clearText) ta.value = "";
   setCaptureRail(false);
 }
-// States the room it picked, and offers to move it. Nothing here starts a job: the verdict is a
-// sentence plus, where one honestly exists, the single move the app can make for that room.
+// States the room it picked, then offers the explicit action that makes a durable handoff.
 function showCaptureVerdict(room){
   const v = captureVerdict(room);
   const box = $("#captureVerdict");
   const others = ["Content","Fiction","Outreach","Venture"].filter(r=>r!==room);
   box.innerHTML = '<div>'+esc(v.line)+'</div>'+
-    (v.actionLabel ? '<div class="cv-row"><button class="primary cap-go">'+esc(v.actionLabel)+'</button></div>' : '')+
+    '<div class="cv-row"><button class="primary cap-go">Keep it in '+esc(room)+'</button></div>'+
     '<div class="cv-row"><span>Wrong room?</span>'+
       others.map(r=>'<button class="cap-move" data-room="'+r+'">'+r+'</button>').join("")+'</div>';
   box.hidden = false;
@@ -5239,49 +5280,42 @@ function showCaptureVerdict(room){
   if(go) go.addEventListener("click", ()=>takeCaptureTo(room));
   box.querySelectorAll(".cap-move").forEach(b=>b.addEventListener("click", ()=>showCaptureVerdict(b.dataset.room)));
 }
-// Content needs no move: the two Content buttons are already on this screen, right under the box.
-// Outreach and Venture have no free-text entry, so the honest move keeps the text visible in the
-// destination room and offers a return path instead of implying that a hidden textarea received it.
+// Routing saves one durable inbox item, then opens its owning room. It never turns the handoff into
+// a run: Muxin chooses any next action from that room herself.
 function takeCaptureTo(room){
   const t = captureText();
   if(!t){ flash("Write or paste something first"); return; }
-  if(room==="Fiction"){ pendingCaptureBeats = t; setRoom("fiction"); return; }
-  if(room==="Outreach" || room==="Venture"){ pendingCaptureText = t; setRoom(room.toLowerCase()); flash("Kept your capture visible in "+room+". Nothing was submitted."); return; }
-}
-// Called from loadFiction() once the room has rendered, both when a composer exists and when it
-// does not. A scene that already has beats has no textarea to fill, and a desk with no series at
-// all never renders one, so both say so instead of dropping her words on the floor.
-function consumeCapturedBeats(){
-  if(pendingCaptureBeats == null) return;
-  const ta = $("#ficBeats");
-  if(ta){
-    ta.value = pendingCaptureBeats;
-    ta.focus();
-    $("#src").value = "";
-    hideCaptureVerdict();
-    flash("Put in Fiction as your beats. Nothing is drafted yet.");
-  } else {
-    flash("Fiction has no empty composer right now. Your words are still in the capture box.");
-  }
-  pendingCaptureBeats = null;
+  if(!saveCaptureHandoff(room, t)){ flash("Could not save this capture. It is still in the box."); return; }
+  $("#src").value = "";
+  hideCaptureVerdict();
+  setRoom(room.toLowerCase());
+  renderCaptureHandoff();
+  flash("Kept it in "+room+". It is waiting for your next action.");
 }
 function renderCaptureHandoff(){
   const targets = [
+    ["content", "contentCaptureHandoff", "Content"],
+    ["fiction", "fictionCaptureHandoff", "Fiction"],
     ["outreach", "outreachCaptureHandoff", "Outreach"],
     ["venture", "ventureCaptureHandoff", "Venture"],
+    ["signals", "signalsCaptureHandoff", "Signals"],
+    ["charles", "charlesCaptureHandoff", "Charles"],
   ];
   for(const [room, id, label] of targets){
     const box = $("#"+id);
     if(!box) continue;
-    if(!pendingCaptureText || currentTab !== room){ box.hidden = true; box.innerHTML = ""; continue; }
+    const captures = readCaptureHandoffs().filter(c=>c.room===label);
+    if(!captures.length || currentTab !== room){ box.hidden = true; box.innerHTML = ""; continue; }
     box.hidden = false;
-    box.innerHTML = '<div style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+
-      '<div class="wb-label">CAPTURE KEPT HERE</div>'+
-      '<div style="font:400 16px/1.6 Georgia,serif;white-space:pre-wrap;margin-top:6px">'+esc(pendingCaptureText)+'</div>'+
-      '<div class="actions" style="margin-top:10px"><button class="cap-return">Back to Studio capture</button><button class="cap-clear">Clear this capture</button><span class="src">This room has no free-text composer, so nothing was submitted or started.</span></div>'+
-      '</div>';
-    box.querySelector(".cap-return")?.addEventListener("click", ()=>{ setRoom("studio"); $("#src").focus(); });
-    box.querySelector(".cap-clear")?.addEventListener("click", ()=>{ pendingCaptureText=null; $("#src").value=""; renderCaptureHandoff(); flash("Capture cleared"); });
+    box.innerHTML = captures.map(capture=>'<div class="capture-handoff" data-capture-id="'+esc(capture.id)+'" style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+
+      '<div class="wb-label">CAPTURE WAITING HERE</div>'+
+      '<div style="font:400 16px/1.6 Georgia,serif;white-space:pre-wrap;margin-top:6px">'+esc(capture.text)+'</div>'+
+      '<div class="actions" style="margin-top:10px"><button class="cap-return">Back to Studio capture</button><button class="cap-clear">Clear this capture</button><span class="src">Choose the next action in this room. Nothing was submitted or started.</span></div>'+
+      '</div>').join("");
+    box.querySelectorAll(".capture-handoff").forEach(card=>{
+      card.querySelector(".cap-return")?.addEventListener("click", ()=>{ setRoom("studio"); $("#src").focus(); });
+      card.querySelector(".cap-clear")?.addEventListener("click", ()=>{ clearCaptureHandoff(card.dataset.captureId); renderCaptureHandoff(); if(currentTab==="studio") renderStudio(); flash("Capture cleared"); });
+    });
   }
 }
 function routeCapture(){
@@ -5293,41 +5327,26 @@ function routeCapture(){
 }
 // "Versions for Content" is exactly what the director already does with a URL: reads it and
 // proposes cuts. Same route as "Hand it to your director", relabelled for the question being asked.
-function setLinkAskPending(pending){
-  captureLinkActionPending = pending;
-  $("#linkReadBtn").disabled = pending;
-  $("#linkFileBtn").disabled = pending;
-  $("#linkCancelBtn").disabled = pending;
-}
 async function linkReadForContent(){
   const url = linkAskUrl;
-  if(!url || captureLinkActionPending) return;
-  setLinkAskPending(true);
-  const r = await post("/api/develop/start",{source:url, engine:$("#studioEngine").value});
-  setLinkAskPending(false);
-  if(r.ok){ closeLinkAsk(true); flash("Handed over. Your director is reading it."); loadJobs(); }
-  else flash(r.error || "Could not hand it over");
+  if(!url) return;
+  if(!saveCaptureHandoff("Content", url)){ flash("Could not save this capture. It is still in the box."); return; }
+  closeLinkAsk(true); setRoom("content"); renderCaptureHandoff();
+  flash("Kept it in Content. Choose the next action there.");
 }
 // "Source for Signals" files a backlog card and nothing more. There is no referrer record, no
 // funnel data and no job kind that takes a URL, so this must never imply traffic attribution.
 async function linkFileForSignals(){
   const url = linkAskUrl;
-  if(!url || captureLinkActionPending) return;
-  setLinkAskPending(true);
-  const r = await post("/api/signals/backlog",{
-    title: "Look at "+url,
-    detail: "Filed from the Studio capture box as a place readers may have come from. No referrer or traffic data exists for it here, so this card is a note to look at it, not a measurement.",
-  });
-  setLinkAskPending(false);
-  const already = ((r.error||"")+"").includes("already");
-  if(r.ok || already){ closeLinkAsk(true); flash(r.ok ? "Filed to the backlog" : "Already on the backlog"); }
-  else flash(r.error || "Could not file it");
+  if(!url) return;
+  if(!saveCaptureHandoff("Signals", url)){ flash("Could not save this capture. It is still in the box."); return; }
+  closeLinkAsk(true); setRoom("signals"); renderCaptureHandoff();
+  flash("Kept it in Signals. Choose the next action there.");
 }
 $("#routeBtn").addEventListener("click", routeCapture);
 $("#linkReadBtn").addEventListener("click", linkReadForContent);
 $("#linkFileBtn").addEventListener("click", linkFileForSignals);
 $("#linkCancelBtn").addEventListener("click", ()=>{
-  if(captureLinkActionPending){ flash("Wait for it to finish first"); return; }
   closeLinkAsk(true); hideCaptureVerdict();
 });
 // A verdict is about the text that produced it, so editing the text retires it.
