@@ -11,7 +11,7 @@ tasks:
   - id: studio-client-job-ui-extraction
     batch_id: studio-first-batch-20260824
     outcome: Extract Node-side pure job UI types/helpers from page.ts into a dedicated module without changing browser output or behavior.
-    status: auditing
+    status: integrated
     depends_on: []
     base_sha: 18ff66d4e0dc2ffbf54bb46a719b8839ca93e9ff
     context_paths:
@@ -44,11 +44,11 @@ tasks:
     content_logic_change: false
     human_gate: none
     commit_sha: d4931195a8ed0cc8dc5c6570e4b896d33f4f41d1
-    audit_verdict: pending
+    audit_verdict: passed
   - id: studio-scheduling-extraction
     batch_id: studio-first-batch-20260824
     outcome: Extract approval scheduling dispatch from serve.ts into a dedicated module while preserving routing, publisher injection, and approval behavior.
-    status: auditing
+    status: integrated
     depends_on: []
     base_sha: 18ff66d4e0dc2ffbf54bb46a719b8839ca93e9ff
     context_paths:
@@ -79,11 +79,11 @@ tasks:
     content_logic_change: false
     human_gate: none
     commit_sha: 3e4d3bb6209025295aa67646cfa0d36df4cc59ab
-    audit_verdict: pending
+    audit_verdict: passed
   - id: fiction-job-orchestration-extraction
     batch_id: studio-first-batch-20260824
     outcome: Extract Fiction-specific job orchestration from jobs.ts into a dedicated module while retaining generic queue settlement in jobs.ts.
-    status: auditing
+    status: integrated
     depends_on: []
     base_sha: 18ff66d4e0dc2ffbf54bb46a719b8839ca93e9ff
     context_paths:
@@ -114,4 +114,4 @@ tasks:
     content_logic_change: false
     human_gate: none
     commit_sha: 6dd5f97dae3e9ae74954d36c2571ac468dc4bdaf
-    audit_verdict: pending
+    audit_verdict: passed

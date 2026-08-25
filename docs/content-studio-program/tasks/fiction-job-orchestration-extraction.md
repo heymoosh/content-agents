@@ -36,7 +36,7 @@ Preserve Fiction job kinds, IDs, duplicate rules, prompts byte-for-byte, timeout
 
 ## Builder and auditor
 
-- Builder family: `codex-builder`
+- Builder family: `codex`
 - Auditor family: `grok`
 
 ## Acceptance

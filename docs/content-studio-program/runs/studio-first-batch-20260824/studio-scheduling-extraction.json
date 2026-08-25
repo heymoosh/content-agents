@@ -13,17 +13,32 @@
     "acceptance_commands": [
       {
         "command": "npm run check",
-        "passed": true
+        "passed": true,
+        "summary": "tsc --noEmit completed successfully (exit 0)."
       },
       {
         "command": "node --import tsx --test src/review/page.test.ts src/review/serve.test.ts src/review/jobs.test.ts src/review/studio.test.ts",
-        "passed": true
+        "passed": true,
+        "summary": "364 tests passed; 0 failed; 0 skipped."
       }
     ],
     "behavior_impact": "none",
     "logic_impact": "Behavior-preserving extraction; scheduler routing, guards, errors, approval behavior, injected dependencies, and in-flight ownership remain unchanged.",
     "risks": [],
     "unresolved_items": []
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "studio-scheduling-extraction",
+    "family": "grok",
+    "verdict": "passed",
+    "findings": []
+  },
+  "integration": {
+    "type": "integration",
+    "task_id": "studio-scheduling-extraction",
+    "family": "grok",
+    "verdict": "passed"
   },
   "diff_verified": true,
   "verified_commit": "3e4d3bb6209025295aa67646cfa0d36df4cc59ab"

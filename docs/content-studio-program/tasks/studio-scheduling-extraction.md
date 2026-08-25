@@ -36,7 +36,7 @@ Preserve scheduler selection, reuse-guard checks, error strings, approval status
 
 ## Builder and auditor
 
-- Builder family: `codex-builder`
+- Builder family: `codex`
 - Auditor family: `grok`
 
 ## Acceptance

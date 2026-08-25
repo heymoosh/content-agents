@@ -38,7 +38,7 @@ Preserve job-room mappings, labels, colors, timing, status handling, HTML output
 
 ## Builder and auditor
 
-- Builder family: `codex-builder`
+- Builder family: `codex`
 - Auditor family: `grok`
 
 ## Acceptance
