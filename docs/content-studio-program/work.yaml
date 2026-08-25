@@ -543,8 +543,8 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: null
-    audit_verdict: pending
+    commit_sha: 947f1507e01404540fc64cb16ed88a9c753b0f22
+    audit_verdict: failed
   - id: pattern-research-professional-publishing
     batch_id: pattern-broad-research-20260825
     outcome: Research the 14 seed accounts on LinkedIn, Substack, Substack Notes, and Threads into a body-free, evidence-backed professional-publishing staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
@@ -589,7 +589,7 @@ tasks:
   - id: pattern-research-visual-video
     batch_id: pattern-broad-research-20260825
     outcome: Research the 20 seed accounts on Instagram, TikTok, and YouTube into a body-free, evidence-backed visual-video staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: building
+    status: auditing
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -625,5 +625,5 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: null
+    commit_sha: 081d0d3f4dc6630f9492fcd81df194971304a6be
     audit_verdict: pending
