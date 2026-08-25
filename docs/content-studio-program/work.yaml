@@ -481,7 +481,9 @@ tasks:
     outcome: After bounded research has prepared evidence-backed account proposals, Muxin reviews one consolidated candidate slate and supplies explicit metadata/provenance decisions before any canonical account or source-evidence ledger append.
     status: proposed
     depends_on:
-      - pattern-broad-research-dossiers
+      - pattern-research-text-community
+      - pattern-research-professional-publishing
+      - pattern-research-visual-video
     base_sha: null
     context_paths:
       - docs/content-studio-program/candidate-account-slate-20260825.md
@@ -507,9 +509,9 @@ tasks:
     human_gate: consolidated-candidate-account-slate
     commit_sha: null
     audit_verdict: pending
-  - id: pattern-broad-research-dossiers
+  - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
-    outcome: Produce body-free, per-platform candidate-research decision packets from the seed shortlist and bounded additional candidates, keeping independent performance dimensions, source provenance, caveats, and no canonical writes.
+    outcome: Research the 31 seed accounts on Bluesky, Dev.to, Hacker News, Mastodon, Reddit, and X into a body-free, evidence-backed text-community staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
     status: proposed
     depends_on:
       - pattern-review-staging-projection
@@ -526,9 +528,86 @@ tasks:
       - config/**
       - src/**
       - docs/content-agents-backlog.md
-    write_paths: []
+    write_paths:
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/text-community/**
     semantic_locks:
-      - pattern:broad-research-staging
+      - pattern:broad-research-text-community
+    builder_family: codex
+    auditor_family: grok
+    branch: null
+    worktree: null
+    acceptance_commands: []
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-candidate-account-slate
+    commit_sha: null
+    audit_verdict: pending
+  - id: pattern-research-professional-publishing
+    batch_id: pattern-broad-research-20260825
+    outcome: Research the 14 seed accounts on LinkedIn, Substack, Substack Notes, and Threads into a body-free, evidence-backed professional-publishing staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
+    status: proposed
+    depends_on:
+      - pattern-review-staging-projection
+    base_sha: null
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/broad-pattern-research-policy-20260825.md
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+      - src/patterns/manual-platform-intake.ts
+      - src/patterns/manual-platform-report-cli.ts
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/runs/**
+      - docs/content-studio-program/tasks/**
+    write_paths:
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/**
+    semantic_locks:
+      - pattern:broad-research-professional-publishing
+    builder_family: codex
+    auditor_family: grok
+    branch: null
+    worktree: null
+    acceptance_commands: []
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-candidate-account-slate
+    commit_sha: null
+    audit_verdict: pending
+  - id: pattern-research-visual-video
+    batch_id: pattern-broad-research-20260825
+    outcome: Research the 20 seed accounts on Instagram, TikTok, and YouTube into a body-free, evidence-backed visual-video staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
+    status: proposed
+    depends_on:
+      - pattern-review-staging-projection
+    base_sha: null
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/broad-pattern-research-policy-20260825.md
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+      - src/patterns/manual-platform-intake.ts
+      - src/patterns/manual-platform-report-cli.ts
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/runs/**
+      - docs/content-studio-program/tasks/**
+    write_paths:
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/visual-video/**
+    semantic_locks:
+      - pattern:broad-research-visual-video
     builder_family: codex
     auditor_family: grok
     branch: null
