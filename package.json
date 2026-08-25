@@ -150,7 +150,7 @@
     "@atproto/api": "^0.20.38",
     "@mozilla/readability": "^0.6.0",
     "@remotion/bundler": "^4.0.512",
-    "@remotion/captions": "^4.0.512",
+    "@remotion/captions": "^4.0.515",
     "@remotion/cli": "^4.0.507",
     "@remotion/renderer": "^4.0.512",
     "@types/react": "^19.2.17",
