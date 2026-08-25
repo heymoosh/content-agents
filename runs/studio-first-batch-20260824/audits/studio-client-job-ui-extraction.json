@@ -1,7 +1,0 @@
-{
-  "type": "audit",
-  "task_id": "studio-client-job-ui-extraction",
-  "family": "codex-independent-auditor",
-  "verdict": "passed",
-  "findings": []
-}

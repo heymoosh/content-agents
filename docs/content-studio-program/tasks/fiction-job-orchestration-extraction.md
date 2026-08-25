@@ -37,12 +37,18 @@ Preserve Fiction job kinds, IDs, duplicate rules, prompts byte-for-byte, timeout
 ## Builder and auditor
 
 - Builder family: `codex-builder`
-- Auditor family: `codex-independent-auditor`
+- Auditor family: `grok`
 
 ## Acceptance
 
 `npm run check`
 
-## Unresolved decisions
+`node --import tsx --test src/review/page.test.ts src/review/serve.test.ts src/review/jobs.test.ts src/review/studio.test.ts`
 
-Confirm the adapter shape for private `Job` state and whether `GitState` helpers move with the Fiction module. Keep `settleJob` and the global drain mutex authoritative in `jobs.ts`.
+## Resolved decisions
+
+- The private adapter is `FictionJobDependencies`; `jobs.ts` owns the adapter wiring and generic
+  settlement hooks.
+- `GitState` and its drift helpers move with `fiction-jobs.ts` because they enforce Fiction's
+  no-git-mutation invariant.
+- `settleJob` and the global drain mutex remain authoritative in `jobs.ts`.

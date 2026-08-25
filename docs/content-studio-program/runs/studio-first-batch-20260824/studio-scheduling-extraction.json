@@ -4,7 +4,7 @@
   "builder": {
     "type": "builder",
     "task_id": "studio-scheduling-extraction",
-    "family": "codex-builder",
+    "family": "codex",
     "commit_sha": "3e4d3bb6209025295aa67646cfa0d36df4cc59ab",
     "changed_paths": [
       "src/review/serve.ts",
@@ -14,6 +14,10 @@
       {
         "command": "npm run check",
         "passed": true
+      },
+      {
+        "command": "node --import tsx --test src/review/page.test.ts src/review/serve.test.ts src/review/jobs.test.ts src/review/studio.test.ts",
+        "passed": true
       }
     ],
     "behavior_impact": "none",
@@ -21,19 +25,6 @@
     "risks": [],
     "unresolved_items": []
   },
-  "audit": {
-    "type": "audit",
-    "task_id": "studio-scheduling-extraction",
-    "family": "codex-independent-auditor",
-    "verdict": "passed",
-    "findings": []
-  },
   "diff_verified": true,
-  "verified_commit": "3e4d3bb6209025295aa67646cfa0d36df4cc59ab",
-  "integration": {
-    "type": "integration",
-    "task_id": "studio-scheduling-extraction",
-    "family": "codex-independent-auditor",
-    "verdict": "passed"
-  }
+  "verified_commit": "3e4d3bb6209025295aa67646cfa0d36df4cc59ab"
 }

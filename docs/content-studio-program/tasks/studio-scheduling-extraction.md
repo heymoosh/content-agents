@@ -37,12 +37,16 @@ Preserve scheduler selection, reuse-guard checks, error strings, approval status
 ## Builder and auditor
 
 - Builder family: `codex-builder`
-- Auditor family: `codex-independent-auditor`
+- Auditor family: `grok`
 
 ## Acceptance
 
 `npm run check`
 
-## Unresolved decisions
+`node --import tsx --test src/review/page.test.ts src/review/serve.test.ts src/review/jobs.test.ts src/review/studio.test.ts`
 
-Confirm compatibility export placement. Keep route-owned `schedulingInFlight` in `serve.ts`.
+## Resolved decisions
+
+- `serve.ts` retains the compatibility re-exports for `scheduleKind`, `scheduleApproved`, and
+  their types.
+- Route-owned `schedulingInFlight` remains in `serve.ts`.

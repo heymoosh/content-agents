@@ -39,12 +39,16 @@ Preserve job-room mappings, labels, colors, timing, status handling, HTML output
 ## Builder and auditor
 
 - Builder family: `codex-builder`
-- Auditor family: `codex-independent-auditor`
+- Auditor family: `grok`
 
 ## Acceptance
 
 `npm run check`
 
-## Unresolved decisions
+`node --import tsx --test src/review/page.test.ts src/review/serve.test.ts src/review/jobs.test.ts src/review/studio.test.ts`
 
-Confirm the module name. Keep client-side inline helpers duplicated unless a safe string-fragment boundary is established.
+## Resolved decisions
+
+- The module is `src/review/studio-job-ui.ts`.
+- Client-side helpers remain inline because the browser script is emitted as a string fragment and
+  there is no safe shared runtime boundary in this tranche.

@@ -4,7 +4,7 @@
   "builder": {
     "type": "builder",
     "task_id": "fiction-job-orchestration-extraction",
-    "family": "codex-builder",
+    "family": "codex",
     "commit_sha": "6dd5f97dae3e9ae74954d36c2571ac468dc4bdaf",
     "changed_paths": [
       "src/review/jobs.ts",
@@ -14,6 +14,10 @@
       {
         "command": "npm run check",
         "passed": true
+      },
+      {
+        "command": "node --import tsx --test src/review/page.test.ts src/review/serve.test.ts src/review/jobs.test.ts src/review/studio.test.ts",
+        "passed": true
       }
     ],
     "behavior_impact": "none intended; existing exports and Fiction behavior preserved.",
@@ -21,19 +25,6 @@
     "risks": [],
     "unresolved_items": []
   },
-  "audit": {
-    "type": "audit",
-    "task_id": "fiction-job-orchestration-extraction",
-    "family": "codex-independent-auditor",
-    "verdict": "passed",
-    "findings": []
-  },
   "diff_verified": true,
-  "verified_commit": "6dd5f97dae3e9ae74954d36c2571ac468dc4bdaf",
-  "integration": {
-    "type": "integration",
-    "task_id": "fiction-job-orchestration-extraction",
-    "family": "codex-independent-auditor",
-    "verdict": "passed"
-  }
+  "verified_commit": "6dd5f97dae3e9ae74954d36c2571ac468dc4bdaf"
 }
