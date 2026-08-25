@@ -478,10 +478,10 @@ tasks:
     audit_verdict: passed
   - id: pattern-reviewed-metadata-input
     batch_id: pattern-reviewed-metadata-20260825
-    outcome: Muxin supplies explicit body-free metadata and provenance decisions for the approved review cohort, or records a blocked/unmapped disposition for each account, before any canonical account or source-evidence ledger append.
-    status: awaiting-user
+    outcome: After bounded research has prepared evidence-backed account proposals, Muxin reviews one consolidated candidate slate and supplies explicit metadata/provenance decisions before any canonical account or source-evidence ledger append.
+    status: proposed
     depends_on:
-      - pattern-review-staging-projection
+      - pattern-broad-research-dossiers
     base_sha: null
     context_paths:
       - docs/content-studio-program/candidate-account-slate-20260825.md
@@ -504,6 +504,38 @@ tasks:
     acceptance_commands: []
     user_visible_behavior: false
     content_logic_change: false
-    human_gate: reviewed-metadata-and-provenance
+    human_gate: consolidated-candidate-account-slate
+    commit_sha: null
+    audit_verdict: pending
+  - id: pattern-broad-research-dossiers
+    batch_id: pattern-broad-research-20260825
+    outcome: Produce body-free, per-platform candidate-research decision packets from the seed shortlist and bounded additional candidates, keeping independent performance dimensions, source provenance, caveats, and no canonical writes.
+    status: proposed
+    depends_on:
+      - pattern-review-staging-projection
+    base_sha: null
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/broad-pattern-research-policy-20260825.md
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+    write_paths: []
+    semantic_locks:
+      - pattern:broad-research-staging
+    builder_family: codex
+    auditor_family: grok
+    branch: null
+    worktree: null
+    acceptance_commands: []
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-candidate-account-slate
     commit_sha: null
     audit_verdict: pending

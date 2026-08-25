@@ -29,6 +29,29 @@ scope-expanding action; a persistent external/CI blocker; or a product-decision 
 Before presenting a gate, finish every other disjoint eligible task and provide one consolidated
 decision packet that names the blocked work and the work that will resume after Muxin answers.
 
+## Broad pattern-research policy
+
+Muxin authorized the coordinator to treat the current 65 evidence-bearing accounts as a broad
+research seed shortlist, not as viral, approved, best, complete, ranked, or exclusive candidates.
+Researchers may identify additional candidates from the 371-account catalog or bounded public
+research. All new research belongs in isolated, noncanonical staging packages until Muxin reviews
+one consolidated candidate-account slate; never write canonical JSONL datasets before that gate.
+
+Do not use a universal definition or score for "viral." Keep niche relevance, broad-platform
+performance, format-specific performance, relative outperformance against a valid baseline,
+repeatability, and evidence quality separate. Every proposed classification must name identity and
+platform, evidence links or local identifiers, topic/niche, medium/formats, relevant examples,
+available performance and baseline/gap, pool rationale, caveats, confidence, and a recommendation
+to include, exclude, hold, or research further. Absolute reach or engagement must name a
+denominator and measurement context. Unknown remains unknown.
+
+Per-platform decision packets are body-free. They may summarize mechanisms and name useful
+examples but never reproduce creator content. Finish disjoint eligible work before presenting the
+single consolidated candidate-slate gate, including recommended niche/broad/format pools, held or
+rejected candidates, missing platforms/formats, evidence/baseline gaps, and the exact decisions
+Muxin must make. After that answer, continue immediately with exclusive canonical-data stewardship
+and the remaining approved program.
+
 ## Durable layout
 
 - `charter.md`: north star, preserved behavior, safety walls, and authoritative links.

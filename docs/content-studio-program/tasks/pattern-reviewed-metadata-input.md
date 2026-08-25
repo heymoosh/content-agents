@@ -2,9 +2,9 @@
 
 ## Outcome
 
-Muxin supplies explicit, body-free account metadata and provenance decisions for the approved
-65-account review cohort, or records an explicit blocked/unmapped disposition per account. This
-is the required human input before any canonical account or source-evidence ledger append.
+This former manual-input gate is deferred until the research-dossier task has prepared
+evidence-backed proposals. Muxin will then review one consolidated candidate slate rather than
+hand-authoring metadata for a prematurely fixed 65-account list.
 
 ## Decisions already made
 
@@ -43,7 +43,5 @@ do not copy creator bodies into that input.
 
 ## Decision requested
 
-Provide or identify the body-free review metadata/provenance input for the 65 accounts, including
-explicit blocked/unmapped rows where facts are unavailable. Once supplied, the coordinator will
-validate it, run the resulting read-only readiness reports, then scope the separately leased
-canonical ledger append and its independent evidence audit.
+No immediate manual input is requested. The coordinator will return here after bounded research
+has produced a consolidated slate with evidence, caveats, and recommendations.
