@@ -512,10 +512,10 @@ tasks:
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
     outcome: Research the 31 seed accounts on Bluesky, Dev.to, Hacker News, Mastodon, Reddit, and X into a body-free, evidence-backed text-community staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: proposed
+    status: ready
     depends_on:
       - pattern-review-staging-projection
-    base_sha: null
+    base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
     context_paths:
       - docs/content-studio-program/charter.md
       - docs/content-studio-program/broad-pattern-research-policy-20260825.md
@@ -534,9 +534,12 @@ tasks:
       - pattern:broad-research-text-community
     builder_family: codex
     auditor_family: grok
-    branch: null
-    worktree: null
-    acceptance_commands: []
+    branch: agent/pattern-research-text-community
+    worktree: /private/tmp/content-agents-pattern-research-text-community
+    acceptance_commands:
+      - npm run check
+      - node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/text-community/observations.json --format json
+      - git diff --check
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
@@ -545,10 +548,10 @@ tasks:
   - id: pattern-research-professional-publishing
     batch_id: pattern-broad-research-20260825
     outcome: Research the 14 seed accounts on LinkedIn, Substack, Substack Notes, and Threads into a body-free, evidence-backed professional-publishing staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: proposed
+    status: ready
     depends_on:
       - pattern-review-staging-projection
-    base_sha: null
+    base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
     context_paths:
       - docs/content-studio-program/charter.md
       - docs/content-studio-program/broad-pattern-research-policy-20260825.md
@@ -572,9 +575,12 @@ tasks:
       - pattern:broad-research-professional-publishing
     builder_family: codex
     auditor_family: grok
-    branch: null
-    worktree: null
-    acceptance_commands: []
+    branch: agent/pattern-research-professional-publishing
+    worktree: /private/tmp/content-agents-pattern-research-professional-publishing
+    acceptance_commands:
+      - npm run check
+      - node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/observations.json --format json
+      - git diff --check
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
@@ -583,10 +589,10 @@ tasks:
   - id: pattern-research-visual-video
     batch_id: pattern-broad-research-20260825
     outcome: Research the 20 seed accounts on Instagram, TikTok, and YouTube into a body-free, evidence-backed visual-video staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: proposed
+    status: ready
     depends_on:
       - pattern-review-staging-projection
-    base_sha: null
+    base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
     context_paths:
       - docs/content-studio-program/charter.md
       - docs/content-studio-program/broad-pattern-research-policy-20260825.md
@@ -610,9 +616,12 @@ tasks:
       - pattern:broad-research-visual-video
     builder_family: codex
     auditor_family: grok
-    branch: null
-    worktree: null
-    acceptance_commands: []
+    branch: agent/pattern-research-visual-video
+    worktree: /private/tmp/content-agents-pattern-research-visual-video
+    acceptance_commands:
+      - npm run check
+      - node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/visual-video/observations.json --format json
+      - git diff --check
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
