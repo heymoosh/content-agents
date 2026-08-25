@@ -479,7 +479,7 @@ tasks:
   - id: pattern-reviewed-metadata-input
     batch_id: pattern-reviewed-metadata-20260825
     outcome: After bounded research has prepared evidence-backed account proposals, Muxin reviews one consolidated candidate slate and supplies explicit metadata/provenance decisions before any canonical account or source-evidence ledger append.
-    status: proposed
+    status: awaiting-user
     depends_on:
       - pattern-research-text-community
       - pattern-research-professional-publishing
@@ -631,7 +631,7 @@ tasks:
   - id: pattern-professional-evidence-boundary-correction
     batch_id: pattern-broad-research-20260825
     outcome: Remove unsupported editorial-focus, topic, and format assertions from the three access-blocked Threads research rows, preserving only traceable source facts and explicit unknowns in the noncanonical professional-publishing staging package.
-    status: building
+    status: integrated
     depends_on:
       - pattern-research-professional-publishing
     base_sha: fe58d0918111068ef0d20fab45253f78bfb2a748
@@ -666,5 +666,5 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: null
-    audit_verdict: pending
+    commit_sha: 4924a7b0b26b63213322b93fbaf34e33e899af11
+    audit_verdict: passed

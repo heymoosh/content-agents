@@ -1,0 +1,55 @@
+{
+  "task_id": "pattern-professional-evidence-boundary-correction",
+  "batch_id": "pattern-broad-research-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-professional-evidence-boundary-correction",
+    "family": "codex",
+    "commit_sha": "4924a7b0b26b63213322b93fbaf34e33e899af11",
+    "changed_paths": [
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/decision-packet.json",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/decision-packet.md",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/observations.json"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "TypeScript check completed without errors."
+      },
+      {
+        "command": "node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/observations.json --format json",
+        "passed": true,
+        "summary": "14 observations; three Threads rows blocked; body included 0; body complete 0."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "No whitespace errors reported."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "No new source was fetched; three access-blocked Threads rows now preserve unknowns rather than inferred editorial facts."
+    ],
+    "unresolved_items": [
+      "Claude audit pending."
+    ]
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-professional-evidence-boundary-correction",
+    "family": "claude",
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "4924a7b0b26b63213322b93fbaf34e33e899af11",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-professional-evidence-boundary-correction",
+    "family": "claude",
+    "verdict": "passed"
+  }
+}
