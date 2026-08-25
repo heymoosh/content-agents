@@ -152,7 +152,7 @@
     "@remotion/bundler": "^4.0.512",
     "@remotion/captions": "^4.0.512",
     "@remotion/cli": "^4.0.507",
-    "@remotion/renderer": "^4.0.512",
+    "@remotion/renderer": "^4.0.515",
     "@types/react": "^19.2.17",
     "better-sqlite3": "^13.0.3",
     "exceljs": "^4.4.0",
