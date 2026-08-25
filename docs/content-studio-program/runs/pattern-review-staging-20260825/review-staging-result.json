@@ -1,0 +1,15 @@
+{
+  "type": "review-staging-result",
+  "task_id": "pattern-review-staging-projection",
+  "source_command": "node --import tsx src/patterns/review-status.ts --format json; node --import tsx src/patterns/review-staging-cli.ts --input <review-status.json> --format json",
+  "body_included": false,
+  "side_effects": "none",
+  "artifact_sha256": "552166afa23cf7ab36379a3bea7e356fee30456da8fbb086cb72a424af4b4cca",
+  "cohort_size": 65,
+  "cohort_key_sha256": "1dc0bdb96fd447365701e6bcf3cc251b8611a97f4ae701407fb0c4903641479f",
+  "existing_evidence_record_count": 499,
+  "all_rows_unreviewed": true,
+  "canonical_writes_allowed": false,
+  "winner_claims_allowed": false,
+  "next_human_gate": "reviewed-metadata-and-provenance"
+}

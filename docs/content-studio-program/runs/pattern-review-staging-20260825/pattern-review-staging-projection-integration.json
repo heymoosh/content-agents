@@ -1,0 +1,9 @@
+{
+  "type": "integration",
+  "task_id": "pattern-review-staging-projection",
+  "family": "grok",
+  "verdict": "passed",
+  "findings": [
+    "Final blobs and combined patch match exactly between builder series 93c4ecd^..b193c81 and main c94f723^..e1623d2; no other paths changed."
+  ]
+}

@@ -419,7 +419,7 @@ tasks:
   - id: pattern-review-staging-projection
     batch_id: pattern-review-staging-20260825
     outcome: The approved 65-account evidence-bearing cohort has a deterministic body-free review-staging projection with explicit metadata, provenance, and pool-disposition blockers, while all other catalog accounts remain unmapped.
-    status: needs-fix
+    status: integrated
     depends_on:
       - pattern-candidate-account-slate
     base_sha: a5045699a22bc8dd5e7acd0e9112bdcf7fa52085
@@ -474,5 +474,36 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: reviewed-metadata-and-provenance
-    commit_sha: 93c4ecd729f65e74f0f8c660da13fc62f043544b
-    audit_verdict: failed
+    commit_sha: b193c81fd6564d251ad9801c8ebc12875043b062
+    audit_verdict: passed
+  - id: pattern-reviewed-metadata-input
+    batch_id: pattern-reviewed-metadata-20260825
+    outcome: Muxin supplies explicit body-free metadata and provenance decisions for the approved review cohort, or records a blocked/unmapped disposition for each account, before any canonical account or source-evidence ledger append.
+    status: awaiting-user
+    depends_on:
+      - pattern-review-staging-projection
+    base_sha: null
+    context_paths:
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+      - docs/content-studio-program/runs/pattern-review-staging-20260825/review-staging-result.json
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+    write_paths: []
+    semantic_locks:
+      - pattern:reviewed-metadata-and-provenance
+    builder_family: codex
+    auditor_family: grok
+    branch: null
+    worktree: null
+    acceptance_commands: []
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: reviewed-metadata-and-provenance
+    commit_sha: null
+    audit_verdict: pending

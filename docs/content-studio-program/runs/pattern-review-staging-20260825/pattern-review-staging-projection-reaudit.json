@@ -1,0 +1,11 @@
+{
+  "type": "audit",
+  "task_id": "pattern-review-staging-projection",
+  "family": "grok",
+  "verdict": "passed",
+  "findings": [
+    "The approved-key list digest is checked unconditionally.",
+    "Explicit null and unknown review status are preserved, and competing identity envelopes fail closed.",
+    "The five-file adapter has no canonical-data write path or body/model/ranking/winner authority."
+  ]
+}

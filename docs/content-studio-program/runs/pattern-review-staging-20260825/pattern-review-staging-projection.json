@@ -5,7 +5,7 @@
     "type": "builder",
     "task_id": "pattern-review-staging-projection",
     "family": "codex",
-    "commit_sha": "93c4ecd729f65e74f0f8c660da13fc62f043544b",
+    "commit_sha": "b193c81fd6564d251ad9801c8ebc12875043b062",
     "changed_paths": [
       "package.json",
       "src/patterns/review-staging.ts",
@@ -22,7 +22,7 @@
       {
         "command": "node --import tsx --test src/patterns/review-staging.test.ts src/patterns/review-staging-cli.test.ts src/patterns/review-status.test.ts src/patterns/review-metadata.test.ts src/patterns/reviewed-evidence-intake.test.ts",
         "passed": true,
-        "summary": "Coordinator independently ran the focused suite: 26 passed, 0 failed."
+        "summary": "Coordinator independently ran the final focused suite: 28 passed, 0 failed."
       }
     ],
     "behavior_impact": "Adds a read-only, deterministic review-staging projection and CLI for the approved cohort.",
@@ -30,17 +30,19 @@
     "risks": [],
     "unresolved_items": []
   },
-  "diff_verified": true,
-  "verified_commit": "93c4ecd729f65e74f0f8c660da13fc62f043544b",
   "audit": {
     "type": "audit",
     "task_id": "pattern-review-staging-projection",
     "family": "grok",
-    "verdict": "failed",
-    "findings": [
-      "The Grok audit session timed out before it could issue an acceptance verdict, so the change cannot be accepted on this audit run.",
-      "Partial audit inspection found the cohort digest check is conditional; make digest equality unconditional and guard the embedded approved-key list against its recorded digest.",
-      "Preserve explicit null or unknown review status rather than defaulting a supplied null value to unreviewed; add focused coverage."
-    ]
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "b193c81fd6564d251ad9801c8ebc12875043b062",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-review-staging-projection",
+    "family": "grok",
+    "verdict": "passed"
   }
 }

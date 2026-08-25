@@ -1,0 +1,11 @@
+{
+  "type": "final-integration-audit",
+  "batch_id": "pattern-review-staging-20260825",
+  "family": "grok",
+  "verdict": "passed",
+  "findings": [
+    "The correction re-audit passed after unconditional digest validation, null/unknown review-status preservation, and identity-envelope ambiguity refusal were added.",
+    "Cross-family integration audit confirmed that the integrated code exactly matches the audited builder series and is restricted to the lease.",
+    "npm run check passed and the final targeted pattern suite passed: 28 passed, 0 failed."
+  ]
+}

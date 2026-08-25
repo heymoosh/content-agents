@@ -1,0 +1,10 @@
+{
+  "type": "audit",
+  "task_id": "pattern-review-staging-projection",
+  "family": "grok",
+  "verdict": "failed",
+  "findings": [
+    "The first Grok audit session timed out before issuing an acceptance verdict.",
+    "Partial review required unconditional digest validation and preservation of supplied null or unknown review status."
+  ]
+}

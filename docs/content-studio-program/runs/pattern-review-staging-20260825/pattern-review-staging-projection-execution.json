@@ -1,0 +1,10 @@
+{
+  "builder_model": "gpt-5",
+  "reasoning_effort": "high",
+  "routing_note": "The worker reported gpt-5 although gpt-5.6-luna was requested; no acceptance-attempt escalation occurred.",
+  "audit_model": "grok-4.5",
+  "audit_reasoning_effort": "unreported",
+  "audit_retry_reason": "The initial Grok audit session timed out before verdict; its partial findings were corrected before re-audit.",
+  "integration_audit_model": "grok-4.5",
+  "integration_audit_reasoning_effort": "unreported"
+}
