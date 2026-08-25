@@ -382,3 +382,32 @@ tasks:
     human_gate: none
     commit_sha: de255300607b21a8a8c071958cc74902d42b2624
     audit_verdict: passed
+  - id: pattern-candidate-account-slate
+    batch_id: pattern-evidence-gate-20260825
+    outcome: Muxin chooses whether the body-free cohort of account keys with existing evidence may enter subsequent review staging, without selecting canonical patterns or writing pattern data.
+    status: awaiting-user
+    depends_on: []
+    base_sha: null
+    context_paths:
+      - docs/content-studio-program/protocol.md
+      - docs/pattern-mining-plan.md
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+    write_paths: []
+    semantic_locks:
+      - pattern:candidate-account-slate
+    builder_family: codex
+    auditor_family: grok
+    branch: null
+    worktree: null
+    acceptance_commands: []
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: candidate-account-slate
+    commit_sha: null
+    audit_verdict: pending

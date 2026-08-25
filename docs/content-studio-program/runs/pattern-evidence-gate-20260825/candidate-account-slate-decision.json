@@ -1,0 +1,19 @@
+{
+  "type": "candidate-account-slate",
+  "task_id": "pattern-candidate-account-slate",
+  "status": "awaiting-user",
+  "coordinator_model": "gpt-5.6-terra",
+  "coordinator_reasoning_effort": "high",
+  "source_commit": "7b1256ea8d6787cea9105d2e4b2b60ea5ff1b3c7",
+  "source_command": "node --import tsx src/patterns/review-status.ts --format json",
+  "body_included": false,
+  "side_effects": "none",
+  "account_count": 371,
+  "evidence_record_count": 499,
+  "candidate_account_count": 65,
+  "candidate_key_sha256": "1dc0bdb96fd447365701e6bcf3cc251b8611a97f4ae701407fb0c4903641479f",
+  "reviewed_account_count": 0,
+  "unmapped_account_count": 371,
+  "comparison_ready_account_count": 0,
+  "decision": "Muxin must approve, narrow, or hold the exact evidence-bearing candidate cohort before subsequent review staging and any canonical pattern-data work."
+}
