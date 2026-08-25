@@ -1,0 +1,42 @@
+{
+  "task_id": "cs2-serve-walled-room-routes",
+  "batch_id": "studio-second-batch-20260824",
+  "builder": {
+    "type": "builder",
+    "task_id": "cs2-serve-walled-room-routes",
+    "family": "codex",
+    "commit_sha": "059d0acc22c6fd31e54735dccaea5bdf8394f95d",
+    "changed_paths": [
+      "src/review/serve.ts",
+      "src/review/serve-fiction.ts",
+      "src/review/serve-charles.ts",
+      "src/review/serve-signals.ts"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "npm run typecheck completed with tsc --noEmit"
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [],
+    "unresolved_items": []
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "cs2-serve-walled-room-routes",
+    "family": "grok",
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "059d0acc22c6fd31e54735dccaea5bdf8394f95d",
+  "integration": {
+    "type": "integration",
+    "task_id": "cs2-serve-walled-room-routes",
+    "family": "grok",
+    "verdict": "passed"
+  }
+}

@@ -1,0 +1,45 @@
+# cs2-page-room-pure-helpers
+
+- **Batch:** studio-second-batch-20260824
+- **Status:** awaiting-user
+- **Outcome:** Extract Node-testable pure helpers above `renderPage` into room-shaped modules: Outreach matchmaker/triage helpers, Fiction status/canon helpers, Venture/intake view helpers, Signals metric/treatment formatters, and Studio capture/desk boot constants. Preserve stable re-exports from `page.ts`. Leave the embedded HTML, CSS, and browser room renderers within `renderPage` intact.
+- **Dependencies:** none
+- **Exact clean base SHA:** `ccbb5b7f4609a8d98a3e432f03f1010a57cc9b6e`
+- **Context paths:**
+  - `docs/content-studio-vision.md`
+  - `src/review/page.ts`
+  - `src/review/studio-job-ui.ts`
+- **Forbidden paths:**
+  - `docs/content-studio-program/work.yaml`
+  - `docs/content-studio-program/tasks/**`
+  - `docs/content-studio-program/runs/**`
+  - `docs/content-agents-backlog.md`
+  - `**/STATE.md`
+  - `content/**`
+  - `data/**`
+  - `config/**`
+  - `src/review/serve.ts`
+  - `src/review/jobs.ts`
+  - `src/review/studio-scheduling.ts`
+  - `src/review/fiction-jobs.ts`
+  - `src/**` except the listed write paths
+- **Write paths:**
+  - `src/review/page.ts`
+  - `src/review/page-outreach.ts`
+  - `src/review/page-fiction.ts`
+  - `src/review/page-venture.ts`
+  - `src/review/page-signals.ts`
+  - `src/review/page-capture.ts`
+- **Semantic locks:**
+  - `studio:page-room-pure-helpers`
+  - Public `page.ts` exports retain identical signatures and return values
+  - No UI-copy changes, `BOOT_ROOM` or capture-verdict-string changes, or inlined browser-script edits
+- **Builder family:** `codex`
+- **Auditor family:** `grok`
+- **Acceptance commands:**
+  - `npm run check`
+- **User-visible behavior:** false
+- **Content-generation-logic change:** false
+- **Human gate:** none
+- **Unresolved human decisions:** none; splitting inlined client room renderers is explicitly out of scope
+

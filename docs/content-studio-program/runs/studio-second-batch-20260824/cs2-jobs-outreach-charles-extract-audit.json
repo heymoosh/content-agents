@@ -1,0 +1,7 @@
+{
+  "type": "audit",
+  "task_id": "cs2-jobs-outreach-charles-extract",
+  "family": "grok",
+  "verdict": "passed",
+  "findings": []
+}

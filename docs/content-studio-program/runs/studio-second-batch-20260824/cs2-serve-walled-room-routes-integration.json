@@ -1,0 +1,6 @@
+{
+  "type": "integration",
+  "task_id": "cs2-serve-walled-room-routes",
+  "family": "grok",
+  "verdict": "passed"
+}

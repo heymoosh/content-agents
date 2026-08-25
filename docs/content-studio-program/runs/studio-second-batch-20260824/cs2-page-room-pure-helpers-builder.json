@@ -1,0 +1,25 @@
+{
+  "type": "builder",
+  "task_id": "cs2-page-room-pure-helpers",
+  "family": "codex",
+  "commit_sha": "76463ee9e98ba545e4d729f32b7e36fdbe6ca891",
+  "changed_paths": [
+    "src/review/page.ts",
+    "src/review/page-outreach.ts",
+    "src/review/page-fiction.ts",
+    "src/review/page-venture.ts",
+    "src/review/page-signals.ts",
+    "src/review/page-capture.ts"
+  ],
+  "acceptance_commands": [
+    {
+      "command": "npm run check",
+      "passed": true,
+      "summary": "Builder and coordinator both completed npm run typecheck with tsc --noEmit"
+    }
+  ],
+  "behavior_impact": "none",
+  "logic_impact": "none",
+  "risks": [],
+  "unresolved_items": []
+}

@@ -1,0 +1,43 @@
+# cs2-jobs-outreach-charles-extract
+
+- **Batch:** studio-second-batch-20260824
+- **Status:** awaiting-user
+- **Outcome:** Mirror the existing Fiction job extraction: move Outreach job helpers (`outreachMessageRevisePrompt`, `reviseOutreachMessage`, `enqueueOutreachDraft`, `enqueueFollowUpDraft`, `enqueueDirectedDraft`, and their dependencies) and Charles job helpers (`charlesDraftPrompt`, `enqueueCharlesDraft`) into dedicated job modules. Keep shared queue, spawn, and drain ownership plus compatibility re-exports in `jobs.ts`.
+- **Dependencies:** none
+- **Exact clean base SHA:** `ccbb5b7f4609a8d98a3e432f03f1010a57cc9b6e`
+- **Context paths:**
+  - `docs/content-studio-vision.md`
+  - `src/review/jobs.ts`
+  - `src/review/fiction-jobs.ts`
+- **Forbidden paths:**
+  - `docs/content-studio-program/work.yaml`
+  - `docs/content-studio-program/tasks/**`
+  - `docs/content-studio-program/runs/**`
+  - `docs/content-agents-backlog.md`
+  - `**/STATE.md`
+  - `content/**`
+  - `data/**`
+  - `config/**`
+  - `src/review/page.ts`
+  - `src/review/serve.ts`
+  - `src/review/studio-job-ui.ts`
+  - `src/review/studio-scheduling.ts`
+  - `src/**` except the listed write paths
+- **Write paths:**
+  - `src/review/jobs.ts`
+  - `src/review/outreach-jobs.ts`
+  - `src/review/charles-jobs.ts`
+- **Semantic locks:**
+  - `studio:outreach-charles-job-orchestration`
+  - Prompt strings remain byte-identical
+  - `JobKind`, queue serialization, settle rules, and public `jobs.ts` exports remain unchanged
+  - No compose or send path is added or modified
+- **Builder family:** `codex`
+- **Auditor family:** `grok`
+- **Acceptance commands:**
+  - `npm run check`
+- **User-visible behavior:** false
+- **Content-generation-logic change:** false
+- **Human gate:** none
+- **Unresolved human decisions:** none
+
