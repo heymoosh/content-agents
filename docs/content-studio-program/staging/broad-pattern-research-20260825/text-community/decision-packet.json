@@ -1,0 +1,1811 @@
+{
+  "kind": "broad_pattern_research_decision_packet",
+  "version": "broad-pattern-research-decision-packet-v1",
+  "semanticLock": "pattern:broad-research-text-community",
+  "collectionTimestamp": "2026-08-25T00:00:00Z",
+  "policyVersion": "broad-pattern-research-policy-20260825",
+  "scope": {
+    "seedCount": 31,
+    "additionCount": 0
+  },
+  "decisions": [
+    {
+      "platform": "bluesky",
+      "accountKey": "adriennemareebrown.bsky.social",
+      "identity": {
+        "handle": "adriennemareebrown.bsky.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://bsky.app/profile/adriennemareebrown.bsky.social"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 4
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://bsky.app/profile/adriennemareebrown.bsky.social",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "carnage4life.bsky.social",
+      "identity": {
+        "handle": "carnage4life.bsky.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://bsky.app/profile/carnage4life.bsky.social"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://bsky.app/profile/carnage4life.bsky.social",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "danidonovan.com",
+      "identity": {
+        "handle": "danidonovan.com",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://bsky.app/profile/danidonovan.com"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://bsky.app/profile/danidonovan.com",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "simonwillison.net",
+      "identity": {
+        "handle": "simonwillison.net",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://bsky.app/profile/simonwillison.net"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://bsky.app/profile/simonwillison.net",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "devto",
+      "accountKey": "sylwia-lask",
+      "identity": {
+        "handle": "sylwia-lask",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://dev.to/sylwia-lask"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 4
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://dev.to/sylwia-lask",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "hackernews",
+      "accountKey": "hackernews",
+      "identity": {
+        "handle": "hackernews",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://news.ycombinator.com/user?id=hackernews"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 9
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://news.ycombinator.com/user?id=hackernews",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "bagder@mastodon.social",
+      "identity": {
+        "handle": "bagder@mastodon.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://mastodon.social/@bagder"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://mastodon.social/@bagder",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "baldur@toot.cafe",
+      "identity": {
+        "handle": "baldur@toot.cafe",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://toot.cafe/@baldur"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://toot.cafe/@baldur",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "dangillmor@mastodon.social",
+      "identity": {
+        "handle": "dangillmor@mastodon.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://mastodon.social/@dangillmor"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://mastodon.social/@dangillmor",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "dansup@mastodon.social",
+      "identity": {
+        "handle": "dansup@mastodon.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://mastodon.social/@dansup"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://mastodon.social/@dansup",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "gargron@mastodon.social",
+      "identity": {
+        "handle": "gargron@mastodon.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://mastodon.social/@gargron"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://mastodon.social/@gargron",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "heidilifeldman@mastodon.social",
+      "identity": {
+        "handle": "heidilifeldman@mastodon.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://mastodon.social/@heidilifeldman"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://mastodon.social/@heidilifeldman",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "mer__edith@mastodon.world",
+      "identity": {
+        "handle": "mer__edith@mastodon.world",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://mastodon.world/@mer__edith"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://mastodon.world/@mer__edith",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "mmasnick@mastodon.social",
+      "identity": {
+        "handle": "mmasnick@mastodon.social",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://mastodon.social/@mmasnick"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://mastodon.social/@mmasnick",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "molly0xfff@hachyderm.io",
+      "identity": {
+        "handle": "molly0xfff@hachyderm.io",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://hachyderm.io/@molly0xfff"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://hachyderm.io/@molly0xfff",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/adhd",
+      "identity": {
+        "handle": "r/adhd",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/adhd/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 25
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/adhd/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/civictech",
+      "identity": {
+        "handle": "r/civictech",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/civictech/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 25
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/civictech/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/claudeai",
+      "identity": {
+        "handle": "r/claudeai",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/claudeai/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 26
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/claudeai/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/entrepreneur",
+      "identity": {
+        "handle": "r/entrepreneur",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/entrepreneur/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 25
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/entrepreneur/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/lifeprotips",
+      "identity": {
+        "handle": "r/lifeprotips",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/lifeprotips/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 25
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/lifeprotips/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/localllama",
+      "identity": {
+        "handle": "r/localllama",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/localllama/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 25
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/localllama/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/microsaas",
+      "identity": {
+        "handle": "r/microsaas",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/microsaas/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 25
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/microsaas/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/productmanagement",
+      "identity": {
+        "handle": "r/productmanagement",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/productmanagement/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 4
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/productmanagement/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/sideproject",
+      "identity": {
+        "handle": "r/sideproject",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/sideproject/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 27
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/sideproject/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/youshouldknow",
+      "identity": {
+        "handle": "r/youshouldknow",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://www.reddit.com/r/youshouldknow/"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 25
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://www.reddit.com/r/youshouldknow/",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "x",
+      "accountKey": "akshat_world",
+      "identity": {
+        "handle": "akshat_world",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://x.com/akshat_world"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 6
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://x.com/akshat_world",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "x",
+      "accountKey": "arvidkahl",
+      "identity": {
+        "handle": "arvidkahl",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://x.com/arvidkahl"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 5
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://x.com/arvidkahl",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "x",
+      "accountKey": "dickiebush",
+      "identity": {
+        "handle": "dickiebush",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://x.com/dickiebush"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 9
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://x.com/dickiebush",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "x",
+      "accountKey": "levelsio",
+      "identity": {
+        "handle": "levelsio",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://x.com/levelsio"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 5
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://x.com/levelsio",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "x",
+      "accountKey": "nathanbarry",
+      "identity": {
+        "handle": "nathanbarry",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://x.com/nathanbarry"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 5
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://x.com/nathanbarry",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    },
+    {
+      "platform": "x",
+      "accountKey": "sahilbloom",
+      "identity": {
+        "handle": "sahilbloom",
+        "creator": "unknown",
+        "role": "unknown"
+      },
+      "sources": [
+        "https://x.com/sahilbloom"
+      ],
+      "localReferences": {
+        "candidateSlate": "candidate-account-slate-20260825.md",
+        "evidenceCount": 3
+      },
+      "nicheTopic": "unknown",
+      "medium": "text",
+      "formats": [
+        "unknown"
+      ],
+      "examples": [
+        {
+          "source": "https://x.com/sahilbloom",
+          "identifier": "unknown",
+          "bodyIncluded": false
+        }
+      ],
+      "metrics": {
+        "observed": "unknown",
+        "baseline": "unknown",
+        "gap": "No item-level metric or denominator was collected; no account baseline is available."
+      },
+      "baseline": {
+        "status": "unknown",
+        "source": "unknown",
+        "gap": "No baseline source was collected."
+      },
+      "dimensions": {
+        "nicheRelevance": "unknown",
+        "broadPlatformPerformance": "unknown",
+        "formatSpecificPerformance": "unknown",
+        "relativeOutperformance": "unknown",
+        "repeatability": "unknown",
+        "evidenceQuality": "low"
+      },
+      "poolRationale": {
+        "niche": "Research further: niche relevance cannot be assessed from an inaccessible profile URL without item-level evidence.",
+        "broad": "Research further: broad-platform performance cannot be assessed without comparable public item measurements.",
+        "format": "Research further: format-specific performance cannot be assessed without a public item and visible format evidence."
+      },
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "confidence": "low",
+      "recommendation": "research further"
+    }
+  ]
+}

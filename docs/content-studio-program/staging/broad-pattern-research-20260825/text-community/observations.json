@@ -1,0 +1,1988 @@
+{
+  "observations": [
+    {
+      "accountId": "bluesky|adriennemareebrown.bsky.social",
+      "sourceId": "profile:bluesky|adriennemareebrown.bsky.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:bluesky|adriennemareebrown.bsky.social",
+      "platform": "bluesky",
+      "handle": "adriennemareebrown.bsky.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://bsky.app/profile/adriennemareebrown.bsky.social",
+      "stableUrl": "https://bsky.app/profile/adriennemareebrown.bsky.social",
+      "evidenceRefs": [
+        "https://bsky.app/profile/adriennemareebrown.bsky.social"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "bluesky|adriennemareebrown.bsky.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "bluesky|carnage4life.bsky.social",
+      "sourceId": "profile:bluesky|carnage4life.bsky.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:bluesky|carnage4life.bsky.social",
+      "platform": "bluesky",
+      "handle": "carnage4life.bsky.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://bsky.app/profile/carnage4life.bsky.social",
+      "stableUrl": "https://bsky.app/profile/carnage4life.bsky.social",
+      "evidenceRefs": [
+        "https://bsky.app/profile/carnage4life.bsky.social"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "bluesky|carnage4life.bsky.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "bluesky|danidonovan.com",
+      "sourceId": "profile:bluesky|danidonovan.com",
+      "postId": null,
+      "evidenceId": "profile-evidence:bluesky|danidonovan.com",
+      "platform": "bluesky",
+      "handle": "danidonovan.com",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://bsky.app/profile/danidonovan.com",
+      "stableUrl": "https://bsky.app/profile/danidonovan.com",
+      "evidenceRefs": [
+        "https://bsky.app/profile/danidonovan.com"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "bluesky|danidonovan.com",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "bluesky|simonwillison.net",
+      "sourceId": "profile:bluesky|simonwillison.net",
+      "postId": null,
+      "evidenceId": "profile-evidence:bluesky|simonwillison.net",
+      "platform": "bluesky",
+      "handle": "simonwillison.net",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://bsky.app/profile/simonwillison.net",
+      "stableUrl": "https://bsky.app/profile/simonwillison.net",
+      "evidenceRefs": [
+        "https://bsky.app/profile/simonwillison.net"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "bluesky|simonwillison.net",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "devto|sylwia-lask",
+      "sourceId": "profile:devto|sylwia-lask",
+      "postId": null,
+      "evidenceId": "profile-evidence:devto|sylwia-lask",
+      "platform": "devto",
+      "handle": "sylwia-lask",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://dev.to/sylwia-lask",
+      "stableUrl": "https://dev.to/sylwia-lask",
+      "evidenceRefs": [
+        "https://dev.to/sylwia-lask"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "devto|sylwia-lask",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "hackernews|hackernews",
+      "sourceId": "profile:hackernews|hackernews",
+      "postId": null,
+      "evidenceId": "profile-evidence:hackernews|hackernews",
+      "platform": "hackernews",
+      "handle": "hackernews",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://news.ycombinator.com/user?id=hackernews",
+      "stableUrl": "https://news.ycombinator.com/user?id=hackernews",
+      "evidenceRefs": [
+        "https://news.ycombinator.com/user?id=hackernews"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "hackernews|hackernews",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|bagder@mastodon.social",
+      "sourceId": "profile:mastodon|bagder@mastodon.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|bagder@mastodon.social",
+      "platform": "mastodon",
+      "handle": "bagder@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://mastodon.social/@bagder",
+      "stableUrl": "https://mastodon.social/@bagder",
+      "evidenceRefs": [
+        "https://mastodon.social/@bagder"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|bagder@mastodon.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|baldur@toot.cafe",
+      "sourceId": "profile:mastodon|baldur@toot.cafe",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|baldur@toot.cafe",
+      "platform": "mastodon",
+      "handle": "baldur@toot.cafe",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://toot.cafe/@baldur",
+      "stableUrl": "https://toot.cafe/@baldur",
+      "evidenceRefs": [
+        "https://toot.cafe/@baldur"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|baldur@toot.cafe",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|dangillmor@mastodon.social",
+      "sourceId": "profile:mastodon|dangillmor@mastodon.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|dangillmor@mastodon.social",
+      "platform": "mastodon",
+      "handle": "dangillmor@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://mastodon.social/@dangillmor",
+      "stableUrl": "https://mastodon.social/@dangillmor",
+      "evidenceRefs": [
+        "https://mastodon.social/@dangillmor"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|dangillmor@mastodon.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|dansup@mastodon.social",
+      "sourceId": "profile:mastodon|dansup@mastodon.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|dansup@mastodon.social",
+      "platform": "mastodon",
+      "handle": "dansup@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://mastodon.social/@dansup",
+      "stableUrl": "https://mastodon.social/@dansup",
+      "evidenceRefs": [
+        "https://mastodon.social/@dansup"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|dansup@mastodon.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|gargron@mastodon.social",
+      "sourceId": "profile:mastodon|gargron@mastodon.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|gargron@mastodon.social",
+      "platform": "mastodon",
+      "handle": "gargron@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://mastodon.social/@gargron",
+      "stableUrl": "https://mastodon.social/@gargron",
+      "evidenceRefs": [
+        "https://mastodon.social/@gargron"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|gargron@mastodon.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|heidilifeldman@mastodon.social",
+      "sourceId": "profile:mastodon|heidilifeldman@mastodon.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|heidilifeldman@mastodon.social",
+      "platform": "mastodon",
+      "handle": "heidilifeldman@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://mastodon.social/@heidilifeldman",
+      "stableUrl": "https://mastodon.social/@heidilifeldman",
+      "evidenceRefs": [
+        "https://mastodon.social/@heidilifeldman"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|heidilifeldman@mastodon.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|mer__edith@mastodon.world",
+      "sourceId": "profile:mastodon|mer__edith@mastodon.world",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|mer__edith@mastodon.world",
+      "platform": "mastodon",
+      "handle": "mer__edith@mastodon.world",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://mastodon.world/@mer__edith",
+      "stableUrl": "https://mastodon.world/@mer__edith",
+      "evidenceRefs": [
+        "https://mastodon.world/@mer__edith"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|mer__edith@mastodon.world",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|mmasnick@mastodon.social",
+      "sourceId": "profile:mastodon|mmasnick@mastodon.social",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|mmasnick@mastodon.social",
+      "platform": "mastodon",
+      "handle": "mmasnick@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://mastodon.social/@mmasnick",
+      "stableUrl": "https://mastodon.social/@mmasnick",
+      "evidenceRefs": [
+        "https://mastodon.social/@mmasnick"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|mmasnick@mastodon.social",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "mastodon|molly0xfff@hachyderm.io",
+      "sourceId": "profile:mastodon|molly0xfff@hachyderm.io",
+      "postId": null,
+      "evidenceId": "profile-evidence:mastodon|molly0xfff@hachyderm.io",
+      "platform": "mastodon",
+      "handle": "molly0xfff@hachyderm.io",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://hachyderm.io/@molly0xfff",
+      "stableUrl": "https://hachyderm.io/@molly0xfff",
+      "evidenceRefs": [
+        "https://hachyderm.io/@molly0xfff"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "mastodon|molly0xfff@hachyderm.io",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/adhd",
+      "sourceId": "profile:reddit|r/adhd",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/adhd",
+      "platform": "reddit",
+      "handle": "r/adhd",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/adhd/",
+      "stableUrl": "https://www.reddit.com/r/adhd/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/adhd/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/adhd",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/civictech",
+      "sourceId": "profile:reddit|r/civictech",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/civictech",
+      "platform": "reddit",
+      "handle": "r/civictech",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/civictech/",
+      "stableUrl": "https://www.reddit.com/r/civictech/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/civictech/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/civictech",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/claudeai",
+      "sourceId": "profile:reddit|r/claudeai",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/claudeai",
+      "platform": "reddit",
+      "handle": "r/claudeai",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/claudeai/",
+      "stableUrl": "https://www.reddit.com/r/claudeai/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/claudeai/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/claudeai",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/entrepreneur",
+      "sourceId": "profile:reddit|r/entrepreneur",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/entrepreneur",
+      "platform": "reddit",
+      "handle": "r/entrepreneur",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/entrepreneur/",
+      "stableUrl": "https://www.reddit.com/r/entrepreneur/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/entrepreneur/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/entrepreneur",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/lifeprotips",
+      "sourceId": "profile:reddit|r/lifeprotips",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/lifeprotips",
+      "platform": "reddit",
+      "handle": "r/lifeprotips",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/lifeprotips/",
+      "stableUrl": "https://www.reddit.com/r/lifeprotips/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/lifeprotips/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/lifeprotips",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/localllama",
+      "sourceId": "profile:reddit|r/localllama",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/localllama",
+      "platform": "reddit",
+      "handle": "r/localllama",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/localllama/",
+      "stableUrl": "https://www.reddit.com/r/localllama/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/localllama/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/localllama",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/microsaas",
+      "sourceId": "profile:reddit|r/microsaas",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/microsaas",
+      "platform": "reddit",
+      "handle": "r/microsaas",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/microsaas/",
+      "stableUrl": "https://www.reddit.com/r/microsaas/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/microsaas/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/microsaas",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/productmanagement",
+      "sourceId": "profile:reddit|r/productmanagement",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/productmanagement",
+      "platform": "reddit",
+      "handle": "r/productmanagement",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/productmanagement/",
+      "stableUrl": "https://www.reddit.com/r/productmanagement/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/productmanagement/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/productmanagement",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/sideproject",
+      "sourceId": "profile:reddit|r/sideproject",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/sideproject",
+      "platform": "reddit",
+      "handle": "r/sideproject",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/sideproject/",
+      "stableUrl": "https://www.reddit.com/r/sideproject/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/sideproject/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/sideproject",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "reddit|r/youshouldknow",
+      "sourceId": "profile:reddit|r/youshouldknow",
+      "postId": null,
+      "evidenceId": "profile-evidence:reddit|r/youshouldknow",
+      "platform": "reddit",
+      "handle": "r/youshouldknow",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://www.reddit.com/r/youshouldknow/",
+      "stableUrl": "https://www.reddit.com/r/youshouldknow/",
+      "evidenceRefs": [
+        "https://www.reddit.com/r/youshouldknow/"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "reddit|r/youshouldknow",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "x|akshat_world",
+      "sourceId": "profile:x|akshat_world",
+      "postId": null,
+      "evidenceId": "profile-evidence:x|akshat_world",
+      "platform": "x",
+      "handle": "akshat_world",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://x.com/akshat_world",
+      "stableUrl": "https://x.com/akshat_world",
+      "evidenceRefs": [
+        "https://x.com/akshat_world"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "x|akshat_world",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "x|arvidkahl",
+      "sourceId": "profile:x|arvidkahl",
+      "postId": null,
+      "evidenceId": "profile-evidence:x|arvidkahl",
+      "platform": "x",
+      "handle": "arvidkahl",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://x.com/arvidkahl",
+      "stableUrl": "https://x.com/arvidkahl",
+      "evidenceRefs": [
+        "https://x.com/arvidkahl"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "x|arvidkahl",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "x|dickiebush",
+      "sourceId": "profile:x|dickiebush",
+      "postId": null,
+      "evidenceId": "profile-evidence:x|dickiebush",
+      "platform": "x",
+      "handle": "dickiebush",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://x.com/dickiebush",
+      "stableUrl": "https://x.com/dickiebush",
+      "evidenceRefs": [
+        "https://x.com/dickiebush"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "x|dickiebush",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "x|levelsio",
+      "sourceId": "profile:x|levelsio",
+      "postId": null,
+      "evidenceId": "profile-evidence:x|levelsio",
+      "platform": "x",
+      "handle": "levelsio",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://x.com/levelsio",
+      "stableUrl": "https://x.com/levelsio",
+      "evidenceRefs": [
+        "https://x.com/levelsio"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "x|levelsio",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "x|nathanbarry",
+      "sourceId": "profile:x|nathanbarry",
+      "postId": null,
+      "evidenceId": "profile-evidence:x|nathanbarry",
+      "platform": "x",
+      "handle": "nathanbarry",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://x.com/nathanbarry",
+      "stableUrl": "https://x.com/nathanbarry",
+      "evidenceRefs": [
+        "https://x.com/nathanbarry"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "x|nathanbarry",
+          "relation": "seed-account"
+        }
+      ]
+    },
+    {
+      "accountId": "x|sahilbloom",
+      "sourceId": "profile:x|sahilbloom",
+      "postId": null,
+      "evidenceId": "profile-evidence:x|sahilbloom",
+      "platform": "x",
+      "handle": "sahilbloom",
+      "creator": "unknown",
+      "role": "unknown",
+      "topics": "unknown",
+      "focus": "unknown",
+      "audienceSnapshot": {
+        "size": "unknown",
+        "countType": "unknown",
+        "observedAt": "2026-08-25",
+        "collectedAt": "2026-08-25",
+        "evidenceSource": "unknown"
+      },
+      "medium": "text",
+      "format": "unknown",
+      "media": null,
+      "url": "https://x.com/sahilbloom",
+      "stableUrl": "https://x.com/sahilbloom",
+      "evidenceRefs": [
+        "https://x.com/sahilbloom"
+      ],
+      "pool": null,
+      "scope": null,
+      "membershipReason": "unknown",
+      "metricSnapshot": {
+        "metric": "unknown",
+        "value": "unknown",
+        "unit": "unknown",
+        "numerator": "unknown",
+        "denominator": "unknown",
+        "window": "unknown",
+        "scope": "unknown",
+        "observedAt": "2026-08-25"
+      },
+      "popularityScope": "unknown",
+      "sampleScope": "unknown",
+      "baselineScope": "unknown",
+      "baselineSource": "unknown",
+      "observedAt": "2026-08-25",
+      "collectedAt": "2026-08-25",
+      "caveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "collectionStatus": "blocked",
+      "collectionCaveats": [
+        "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
+        "No public item page was collected, so examples, audience values, performance metrics, denominators, measurement windows, and account baselines remain unknown.",
+        "No body, caption, title, hook, transcript, screenshot, prompt, or derived body text is stored."
+      ],
+      "lineage": [
+        {
+          "recordType": "candidate_account_slate",
+          "id": "x|sahilbloom",
+          "relation": "seed-account"
+        }
+      ]
+    }
+  ]
+}

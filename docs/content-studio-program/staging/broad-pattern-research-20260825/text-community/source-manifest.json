@@ -1,0 +1,768 @@
+{
+  "kind": "broad_pattern_research_source_manifest",
+  "version": "broad-pattern-research-source-manifest-v1",
+  "semanticLock": "pattern:broad-research-text-community",
+  "collectionTimestamp": "2026-08-25T00:00:00Z",
+  "policyVersion": "broad-pattern-research-policy-20260825",
+  "packet": "pattern-research-text-community",
+  "scope": {
+    "seedCount": 31,
+    "additionCount": 0,
+    "platforms": [
+      "bluesky",
+      "devto",
+      "hackernews",
+      "mastodon",
+      "reddit",
+      "x"
+    ]
+  },
+  "accounts": [
+    {
+      "platform": "bluesky",
+      "accountKey": "adriennemareebrown.bsky.social",
+      "handle": "adriennemareebrown.bsky.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 4,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "carnage4life.bsky.social",
+      "handle": "carnage4life.bsky.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "danidonovan.com",
+      "handle": "danidonovan.com",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "simonwillison.net",
+      "handle": "simonwillison.net",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "devto",
+      "accountKey": "sylwia-lask",
+      "handle": "sylwia-lask",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 4,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "hackernews",
+      "accountKey": "hackernews",
+      "handle": "hackernews",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 9,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "bagder@mastodon.social",
+      "handle": "bagder@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "baldur@toot.cafe",
+      "handle": "baldur@toot.cafe",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "dangillmor@mastodon.social",
+      "handle": "dangillmor@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "dansup@mastodon.social",
+      "handle": "dansup@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "gargron@mastodon.social",
+      "handle": "gargron@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "heidilifeldman@mastodon.social",
+      "handle": "heidilifeldman@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "mer__edith@mastodon.world",
+      "handle": "mer__edith@mastodon.world",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "mmasnick@mastodon.social",
+      "handle": "mmasnick@mastodon.social",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "molly0xfff@hachyderm.io",
+      "handle": "molly0xfff@hachyderm.io",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/adhd",
+      "handle": "r/adhd",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 25,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/civictech",
+      "handle": "r/civictech",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 25,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/claudeai",
+      "handle": "r/claudeai",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 26,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/entrepreneur",
+      "handle": "r/entrepreneur",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 25,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/lifeprotips",
+      "handle": "r/lifeprotips",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 25,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/localllama",
+      "handle": "r/localllama",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 25,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/microsaas",
+      "handle": "r/microsaas",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 25,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/productmanagement",
+      "handle": "r/productmanagement",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 4,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/sideproject",
+      "handle": "r/sideproject",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 27,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/youshouldknow",
+      "handle": "r/youshouldknow",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 25,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "x",
+      "accountKey": "akshat_world",
+      "handle": "akshat_world",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 6,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "x",
+      "accountKey": "arvidkahl",
+      "handle": "arvidkahl",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 5,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "x",
+      "accountKey": "dickiebush",
+      "handle": "dickiebush",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 9,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "x",
+      "accountKey": "levelsio",
+      "handle": "levelsio",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 5,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "x",
+      "accountKey": "nathanbarry",
+      "handle": "nathanbarry",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 5,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    },
+    {
+      "platform": "x",
+      "accountKey": "sahilbloom",
+      "handle": "sahilbloom",
+      "creator": "unknown",
+      "role": "unknown",
+      "provenance": {
+        "kind": "seed",
+        "source": "candidate-account-slate-20260825",
+        "sourcePath": "docs/content-studio-program/candidate-account-slate-20260825.md",
+        "reason": "Exact evidence-bearing seed listed in the packet-owned platform cohort."
+      },
+      "localEvidenceCount": 3,
+      "localEvidenceReference": "candidate-account-slate-20260825.md"
+    }
+  ],
+  "sources": [
+    {
+      "platform": "bluesky",
+      "accountKey": "adriennemareebrown.bsky.social",
+      "url": "https://bsky.app/profile/adriennemareebrown.bsky.social",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "carnage4life.bsky.social",
+      "url": "https://bsky.app/profile/carnage4life.bsky.social",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "danidonovan.com",
+      "url": "https://bsky.app/profile/danidonovan.com",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "bluesky",
+      "accountKey": "simonwillison.net",
+      "url": "https://bsky.app/profile/simonwillison.net",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "devto",
+      "accountKey": "sylwia-lask",
+      "url": "https://dev.to/sylwia-lask",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "hackernews",
+      "accountKey": "hackernews",
+      "url": "https://news.ycombinator.com/user?id=hackernews",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "bagder@mastodon.social",
+      "url": "https://mastodon.social/@bagder",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "baldur@toot.cafe",
+      "url": "https://toot.cafe/@baldur",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "dangillmor@mastodon.social",
+      "url": "https://mastodon.social/@dangillmor",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "dansup@mastodon.social",
+      "url": "https://mastodon.social/@dansup",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "gargron@mastodon.social",
+      "url": "https://mastodon.social/@gargron",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "heidilifeldman@mastodon.social",
+      "url": "https://mastodon.social/@heidilifeldman",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "mer__edith@mastodon.world",
+      "url": "https://mastodon.world/@mer__edith",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "mmasnick@mastodon.social",
+      "url": "https://mastodon.social/@mmasnick",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "mastodon",
+      "accountKey": "molly0xfff@hachyderm.io",
+      "url": "https://hachyderm.io/@molly0xfff",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/adhd",
+      "url": "https://www.reddit.com/r/adhd/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/civictech",
+      "url": "https://www.reddit.com/r/civictech/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/claudeai",
+      "url": "https://www.reddit.com/r/claudeai/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/entrepreneur",
+      "url": "https://www.reddit.com/r/entrepreneur/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/lifeprotips",
+      "url": "https://www.reddit.com/r/lifeprotips/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/localllama",
+      "url": "https://www.reddit.com/r/localllama/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/microsaas",
+      "url": "https://www.reddit.com/r/microsaas/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/productmanagement",
+      "url": "https://www.reddit.com/r/productmanagement/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/sideproject",
+      "url": "https://www.reddit.com/r/sideproject/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "reddit",
+      "accountKey": "r/youshouldknow",
+      "url": "https://www.reddit.com/r/youshouldknow/",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "x",
+      "accountKey": "akshat_world",
+      "url": "https://x.com/akshat_world",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "x",
+      "accountKey": "arvidkahl",
+      "url": "https://x.com/arvidkahl",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "x",
+      "accountKey": "dickiebush",
+      "url": "https://x.com/dickiebush",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "x",
+      "accountKey": "levelsio",
+      "url": "https://x.com/levelsio",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "x",
+      "accountKey": "nathanbarry",
+      "url": "https://x.com/nathanbarry",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    },
+    {
+      "platform": "x",
+      "accountKey": "sahilbloom",
+      "url": "https://x.com/sahilbloom",
+      "observationDate": "2026-08-25",
+      "type": "public-profile",
+      "accessStatus": "blocked",
+      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+    }
+  ]
+}
