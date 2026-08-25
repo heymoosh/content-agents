@@ -211,6 +211,19 @@ function emittedScripts(): string[] {
   return scripts;
 }
 
+type WorkbenchMirror = {
+  workbenchSlugForJob: (job: { kind: string; label: string; slugs?: string[] }) => string | null;
+  workbenchJobTarget: (job: { kind: string; label: string; slugs?: string[] }) => string | null;
+};
+
+function workbenchMirror(sessions: { slug: string }[]): WorkbenchMirror {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function workbenchSlugForJob(");
+  const end = script.indexOf("function openWorkbenchJob(", start);
+  assert.ok(start >= 0 && end > start, "the Workbench job helpers must reach the browser");
+  return new Function("WB_SESSIONS", script.slice(start, end) + "\nreturn { workbenchSlugForJob, workbenchJobTarget };")(sessions) as WorkbenchMirror;
+}
+
 test("advisor job links target the matching Workbench session across every job state", () => {
   const target = (pageModule as Record<string, unknown>).workbenchJobTarget as (
     job: { kind: string; label: string; slugs?: string[] },
@@ -237,7 +250,31 @@ test("advisor job links fall back to Content without claiming a missing Workbenc
     sessions: { slug: string }[],
   ) => string | null;
   assert.equal(target({ kind: "develop", label: "Develop: not-materialized", slugs: [] }, []), null);
+  assert.equal(target({ kind: "develop", label: "Develop: existing-piece", slugs: [] }, [{ slug: "existing-piece" }]), null,
+    "a human source label cannot target a pre-existing session before the slug is stamped");
   assert.equal(target({ kind: "text", label: "Format: piece", slugs: ["not-materialized"] }, [{ slug: "not-materialized" }]), null);
+});
+
+test("the emitted Workbench resolver stays behavior-identical to the tested server resolver", () => {
+  const sessions = [{ slug: "2026-08-25-piece" }];
+  const browser = workbenchMirror(sessions);
+  const server = (pageModule as Record<string, unknown>).workbenchJobTarget as (
+    job: { kind: string; label: string; slugs?: string[] },
+    sessions: { slug: string }[],
+  ) => string | null;
+  for (const job of [
+    { kind: "develop", label: "Develop: 2026-08-25-piece", slugs: [] },
+    { kind: "develop-reply", label: "Advisor reply: 2026-08-25-piece", slugs: [] },
+    { kind: "develop", label: "Develop: 2026-08-25-piece", slugs: ["2026-08-25-piece"] },
+    { kind: "develop", label: "Develop: existing-piece", slugs: [] },
+    { kind: "text", label: "Format: 2026-08-25-piece", slugs: ["2026-08-25-piece"] },
+  ]) {
+    assert.equal(browser.workbenchJobTarget(job), server(job, sessions), JSON.stringify(job));
+  }
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes("sheet.dataset.wbSlug = s.slug"), "Workbench sessions expose a scroll target");
+  assert.ok(script.includes('querySelectorAll(".session[data-wb-slug]")'), "advisor navigation scrolls Workbench sessions");
+  assert.ok(script.includes('Promise.resolve(setRoom("content")).then'), "advisor navigation has one authoritative Content load");
 });
 
 test("queue open links carry job kind so advisor navigation is distinct from Review navigation", () => {
