@@ -82,6 +82,7 @@
     "scout": "tsx src/discovery/discover.ts",
     "patterns:collect": "tsx src/patterns/collect.ts",
     "patterns:review-status": "tsx src/patterns/review-status.ts",
+    "patterns:review-staging": "tsx src/patterns/review-staging-cli.ts",
     "patterns:catalog": "tsx src/patterns/catalog.ts",
     "patterns:outliers": "tsx src/patterns/collect.ts outliers",
     "patterns:openers": "tsx src/patterns/openers.ts",
