@@ -66,7 +66,7 @@ export interface ReviewStagingRow {
   readonly caveats: string[] | "unknown" | null;
   readonly poolDispositionChoices: readonly ReviewStagingPool[];
   readonly poolDisposition: Readonly<Record<ReviewStagingPool, ReviewStagingDisposition>>;
-  readonly reviewStatus: string;
+  readonly reviewStatus: string | "unknown" | null;
   readonly bodyIncluded: false;
 }
 
@@ -131,6 +131,10 @@ function stableDigest(keys: readonly string[]): string {
   return createHash("sha256").update(`${[...keys].sort(compare).join("\n")}\n`, "utf8").digest("hex");
 }
 
+if (stableDigest(APPROVED_KEYS) !== REVIEW_STAGING_COHORT_DIGEST) {
+  throw new Error("review-staging approved key list does not match its recorded digest");
+}
+
 function rowKey(value: Record<string, unknown>, index: number): string {
   const key = value.currentAccountKey ?? value.accountKey;
   if (typeof key !== "string" || key.trim() === "") fail(`accountMetadataRows[${index}].currentAccountKey must be a non-empty string`);
@@ -163,7 +167,9 @@ function rowProjection(value: unknown, index: number): ReviewStagingRow {
   const sourceReferences = listOrUnknown(value.sourceReferences ?? value.sourceRefs ?? value.evidenceRefs ?? value.evidenceLinks, `accountMetadataRows[${index}].sourceReferences`);
   const caveats = listOrUnknown(value.caveats, `accountMetadataRows[${index}].caveats`);
   const provenance = textOrUnknown(value.provenance, `accountMetadataRows[${index}].provenance`);
-  const reviewStatus = textOrUnknown(value.reviewStatus, `accountMetadataRows[${index}].reviewStatus`) ?? "unreviewed";
+  const reviewStatus = Object.prototype.hasOwnProperty.call(value, "reviewStatus")
+    ? textOrUnknown(value.reviewStatus, `accountMetadataRows[${index}].reviewStatus`)
+    : "unreviewed";
   const metadata: Record<string, unknown> = {};
   for (const field of REQUIRED_REVIEW_FIELDS) {
     const alias = field === "reviewed_at" ? (value.reviewed_at ?? value.reviewedAt) : field === "stableAccountId" ? (value.stableAccountId ?? value.accountId) : field === "researchPoolMembership" ? (value.researchPoolMembership ?? value.reviewedPoolMembership) : value[field];
@@ -236,7 +242,7 @@ export function buildReviewStaging(input: ReviewStagingInput): ReviewStagingArti
   // The allow-list is the recorded snapshot's source-of-truth. The digest is retained in the
   // artifact and checked at the boundary; set comparison also makes a same-sized replacement
   // fail closed even if a caller supplies an accidentally stale digest field.
-  if (digest !== identity.cohortDigest && (missing.length > 0 || outside.length > 0)) {
+  if (digest !== identity.cohortDigest) {
     fail(`approved cohort digest mismatch: source projection does not equal the approved snapshot${outside.length ? `; outside cohort: ${outside.sort(compare).join(", ")}` : ""}${missing.length ? `; missing cohort members: ${missing.join(", ")}` : ""}`);
   }
   const rows = candidateRows.sort((left, right) => compare(left.currentAccountKey, right.currentAccountKey));

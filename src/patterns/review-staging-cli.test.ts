@@ -24,3 +24,8 @@ test("CLI fails closed and reports the semantic lock prefix", () => {
   assert.match(error, /patterns:review-staging/);
   assert.throws(() => parseReviewStagingArgs([]), /one of --json or --input/);
 });
+
+test("CLI rejects competing source identity envelopes", () => {
+  const value = { accountMetadataRows: JSON.parse(raw()).accountMetadataRows, source: { cohortSize: 65 }, sourceProjection: { cohortSize: 64 } };
+  assert.throws(() => parseReviewStagingInput(JSON.stringify(value)), /ambiguous source identity field cohortSize/);
+});

@@ -39,6 +39,16 @@ test("excludes zero-evidence accounts while retaining explicit null and unknown 
   assert.equal(result.rows[0]?.metadata.focus, "unknown");
 });
 
+test("preserves explicit null and unknown review status values", () => {
+  const base = projection().accountMetadataRows as Record<string, unknown>[];
+  const result = buildReviewStaging({
+    ...projection(),
+    accountMetadataRows: base.map((row, index) => index === 0 ? { ...row, reviewStatus: null } : index === 1 ? { ...row, reviewStatus: "unknown" } : row),
+  });
+  assert.equal(result.rows[0]?.reviewStatus, null);
+  assert.equal(result.rows[1]?.reviewStatus, "unknown");
+});
+
 test("fails closed on count, digest, outside-cohort, body, and unsupported metadata drift", () => {
   assert.throws(() => buildReviewStaging({ ...projection(), accountMetadataRows: projection().accountMetadataRows.slice(1) }), /count mismatch/);
   const base = projection().accountMetadataRows;

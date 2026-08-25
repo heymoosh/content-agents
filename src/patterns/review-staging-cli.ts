@@ -32,18 +32,25 @@ export function parseReviewStagingInput(raw: string): ReviewStagingArtifact {
   try { value = JSON.parse(raw) as unknown; } catch { fail("input must be valid JSON"); }
   if (!isRecord(value)) fail("input must be a review-status projection object");
   assertReviewStagingBodyFree(value);
-  const source = isRecord(value.source)
-    ? value.source
-    : isRecord(value.sourceProjection)
-      ? value.sourceProjection
-      : value;
   if (!Array.isArray(value.accountMetadataRows)) fail("input.accountMetadataRows must be an array");
+  const identitySources = [value, value.source, value.sourceProjection].filter(isRecord);
+  const identity = (field: "sourceCommit" | "selectionRule" | "cohortSize" | "cohortDigest"): string | number | undefined => {
+    const supplied = identitySources
+      .filter((source) => Object.prototype.hasOwnProperty.call(source, field))
+      .map((source) => source[field]);
+    if (supplied.length === 0) return undefined;
+    const first = supplied[0];
+    if ((field === "cohortSize" && (typeof first !== "number" || !Number.isFinite(first)))
+      || (field !== "cohortSize" && typeof first !== "string")) fail(`source identity field ${field} has an invalid type`);
+    if (supplied.some((candidate) => candidate !== first)) fail(`ambiguous source identity field ${field}`);
+    return first as string | number;
+  };
   const input: ReviewStagingInput = {
     accountMetadataRows: value.accountMetadataRows,
-    sourceCommit: typeof source.sourceCommit === "string" ? source.sourceCommit : undefined,
-    selectionRule: typeof source.selectionRule === "string" ? source.selectionRule : undefined,
-    cohortSize: typeof source.cohortSize === "number" ? source.cohortSize : undefined,
-    cohortDigest: typeof source.cohortDigest === "string" ? source.cohortDigest : undefined,
+    sourceCommit: identity("sourceCommit") as string | undefined,
+    selectionRule: identity("selectionRule") as string | undefined,
+    cohortSize: identity("cohortSize") as number | undefined,
+    cohortDigest: identity("cohortDigest") as string | undefined,
   };
   return buildReviewStaging(input);
 }
