@@ -15,3 +15,8 @@ The two short Haiku checks were used after Sonnet tool-enabled prompts returned 
 in this noninteractive host. The deterministic evidence supplied to each covered exact seed and
 addition counts, lease-only paths, source caps/provenance, body-free report totals, explicit
 unknowns/caveats, and absence of rankings or unsupported claims.
+
+Claude Haiku also performed the final read-only integration audit after the three accepted ranges
+were sequentially cherry-picked to `main`: it confirmed clean integration, post-integration
+`npm run check`, successful manual report loads, zero included/complete bodies, and no canonical
+or product-code write. Its actual model was `claude-haiku-4-5` at medium effort.

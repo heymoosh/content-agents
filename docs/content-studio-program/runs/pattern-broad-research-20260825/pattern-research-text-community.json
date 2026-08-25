@@ -49,5 +49,11 @@
     ]
   },
   "diff_verified": true,
-  "verified_commit": "54c3dce24ad62ce7f750f8bb868781e180e6ee6b"
+  "verified_commit": "54c3dce24ad62ce7f750f8bb868781e180e6ee6b",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-research-text-community",
+    "family": "claude",
+    "verdict": "passed"
+  }
 }

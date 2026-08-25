@@ -512,7 +512,7 @@ tasks:
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
     outcome: Research the 31 seed accounts on Bluesky, Dev.to, Hacker News, Mastodon, Reddit, and X into a body-free, evidence-backed text-community staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: accepted
+    status: integrated
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -548,7 +548,7 @@ tasks:
   - id: pattern-research-professional-publishing
     batch_id: pattern-broad-research-20260825
     outcome: Research the 14 seed accounts on LinkedIn, Substack, Substack Notes, and Threads into a body-free, evidence-backed professional-publishing staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: accepted
+    status: integrated
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -589,7 +589,7 @@ tasks:
   - id: pattern-research-visual-video
     batch_id: pattern-broad-research-20260825
     outcome: Research the 20 seed accounts on Instagram, TikTok, and YouTube into a body-free, evidence-backed visual-video staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: accepted
+    status: integrated
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
