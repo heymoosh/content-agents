@@ -147,7 +147,7 @@
     "patterns:reddit-backfill": "tsx src/patterns/reddit-backfill.ts"
   },
   "dependencies": {
-    "@atproto/api": "^0.20.38",
+    "@atproto/api": "^0.20.41",
     "@mozilla/readability": "^0.6.0",
     "@remotion/bundler": "^4.0.512",
     "@remotion/captions": "^4.0.512",
