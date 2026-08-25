@@ -1,0 +1,43 @@
+# cs2-serve-walled-room-routes
+
+- **Batch:** studio-second-batch-20260824
+- **Status:** awaiting-user
+- **Outcome:** Extract the Fiction, Charles, and Signals HTTP route clusters, plus pure helpers used only by those clusters, from `createServer` in `src/review/serve.ts` into room route modules. Dispatch through the existing Venture-style pattern without changing methods, paths, response codes, JSON shapes, or route reachability. Strategy/Signals-adjacent `/api/strategy/*` and `/api/research/report` may move only when they remain byte-identical and reachable at their current paths.
+- **Dependencies:** none
+- **Exact clean base SHA:** `ccbb5b7f4609a8d98a3e432f03f1010a57cc9b6e`
+- **Context paths:**
+  - `docs/content-studio-vision.md`
+  - `src/review/serve.ts`
+  - `src/review/studio-scheduling.ts`
+- **Forbidden paths:**
+  - `docs/content-studio-program/work.yaml`
+  - `docs/content-studio-program/tasks/**`
+  - `docs/content-studio-program/runs/**`
+  - `docs/content-agents-backlog.md`
+  - `**/STATE.md`
+  - `content/**`
+  - `data/**`
+  - `config/**`
+  - `src/review/page.ts`
+  - `src/review/jobs.ts`
+  - `src/review/studio-job-ui.ts`
+  - `src/review/fiction-jobs.ts`
+  - `src/**` except the listed write paths
+- **Write paths:**
+  - `src/review/serve.ts`
+  - `src/review/serve-fiction.ts`
+  - `src/review/serve-charles.ts`
+  - `src/review/serve-signals.ts`
+- **Semantic locks:**
+  - `studio:fiction-charles-signals-route-contracts`
+  - Exact contracts for `/api/fiction*`, `/api/charles*`, `/api/signals*`, and any moved `/api/strategy*` or `/api/research/report` handler
+  - Existing `serve.ts` re-exports, approval/publish behavior, and fixture write-refusal behavior remain unchanged
+- **Builder family:** `codex`
+- **Auditor family:** `grok`
+- **Acceptance commands:**
+  - `npm run check`
+- **User-visible behavior:** false
+- **Content-generation-logic change:** false
+- **Human gate:** none
+- **Unresolved human decisions:** none
+

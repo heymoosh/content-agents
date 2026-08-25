@@ -1,0 +1,41 @@
+{
+  "task_id": "cs2-jobs-outreach-charles-extract",
+  "batch_id": "studio-second-batch-20260824",
+  "builder": {
+    "type": "builder",
+    "task_id": "cs2-jobs-outreach-charles-extract",
+    "family": "codex",
+    "commit_sha": "3c2abebb6b365dcc88586ad6a5ff34436320df41",
+    "changed_paths": [
+      "src/review/jobs.ts",
+      "src/review/outreach-jobs.ts",
+      "src/review/charles-jobs.ts"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Builder and coordinator both completed npm run typecheck with tsc --noEmit"
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [],
+    "unresolved_items": []
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "cs2-jobs-outreach-charles-extract",
+    "family": "grok",
+    "verdict": "passed",
+    "findings": []
+  },
+  "diff_verified": true,
+  "verified_commit": "3c2abebb6b365dcc88586ad6a5ff34436320df41",
+  "integration": {
+    "type": "integration",
+    "task_id": "cs2-jobs-outreach-charles-extract",
+    "family": "grok",
+    "verdict": "passed"
+  }
+}

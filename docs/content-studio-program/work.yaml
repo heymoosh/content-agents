@@ -115,3 +115,127 @@ tasks:
     human_gate: none
     commit_sha: 6dd5f97dae3e9ae74954d36c2571ac468dc4bdaf
     audit_verdict: passed
+  - id: cs2-serve-walled-room-routes
+    batch_id: studio-second-batch-20260824
+    outcome: Extract Fiction, Charles, and Signals room HTTP route clusters from serve.ts into dedicated modules while preserving route contracts and existing behavior.
+    status: integrated
+    depends_on: []
+    base_sha: ccbb5b7f4609a8d98a3e432f03f1010a57cc9b6e
+    context_paths:
+      - docs/content-studio-vision.md
+      - src/review/serve.ts
+      - src/review/studio-scheduling.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - content/**
+      - data/**
+      - config/**
+      - src/review/page.ts
+      - src/review/jobs.ts
+      - src/review/studio-job-ui.ts
+      - src/review/fiction-jobs.ts
+    write_paths:
+      - src/review/serve.ts
+      - src/review/serve-fiction.ts
+      - src/review/serve-charles.ts
+      - src/review/serve-signals.ts
+    semantic_locks:
+      - studio:fiction-charles-signals-route-contracts
+    builder_family: codex
+    auditor_family: grok
+    branch: agent/cs2-serve-walled-room-routes
+    worktree: /private/tmp/content-agents-cs2-serve-walled-room-routes
+    acceptance_commands:
+      - npm run check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: none
+    commit_sha: 059d0acc22c6fd31e54735dccaea5bdf8394f95d
+    audit_verdict: passed
+  - id: cs2-page-room-pure-helpers
+    batch_id: studio-second-batch-20260824
+    outcome: Extract Node-testable room-shaped pure page helpers into dedicated modules while preserving page.ts re-exports and browser output.
+    status: integrated
+    depends_on: []
+    base_sha: ccbb5b7f4609a8d98a3e432f03f1010a57cc9b6e
+    context_paths:
+      - docs/content-studio-vision.md
+      - src/review/page.ts
+      - src/review/studio-job-ui.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - content/**
+      - data/**
+      - config/**
+      - src/review/serve.ts
+      - src/review/jobs.ts
+      - src/review/studio-scheduling.ts
+      - src/review/fiction-jobs.ts
+    write_paths:
+      - src/review/page.ts
+      - src/review/page-outreach.ts
+      - src/review/page-fiction.ts
+      - src/review/page-venture.ts
+      - src/review/page-signals.ts
+      - src/review/page-capture.ts
+    semantic_locks:
+      - studio:page-room-pure-helpers
+    builder_family: codex
+    auditor_family: grok
+    branch: agent/cs2-page-room-pure-helpers
+    worktree: /private/tmp/content-agents-cs2-page-room-pure-helpers
+    acceptance_commands:
+      - npm run check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: none
+    commit_sha: 76463ee9e98ba545e4d729f32b7e36fdbe6ca891
+    audit_verdict: passed
+  - id: cs2-jobs-outreach-charles-extract
+    batch_id: studio-second-batch-20260824
+    outcome: Extract Outreach and Charles job orchestration into dedicated modules while retaining shared queue ownership and compatibility re-exports in jobs.ts.
+    status: integrated
+    depends_on: []
+    base_sha: ccbb5b7f4609a8d98a3e432f03f1010a57cc9b6e
+    context_paths:
+      - docs/content-studio-vision.md
+      - src/review/jobs.ts
+      - src/review/fiction-jobs.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - content/**
+      - data/**
+      - config/**
+      - src/review/page.ts
+      - src/review/serve.ts
+      - src/review/studio-job-ui.ts
+      - src/review/studio-scheduling.ts
+    write_paths:
+      - src/review/jobs.ts
+      - src/review/outreach-jobs.ts
+      - src/review/charles-jobs.ts
+    semantic_locks:
+      - studio:outreach-charles-job-orchestration
+    builder_family: codex
+    auditor_family: grok
+    branch: agent/cs2-jobs-outreach-charles-extract
+    worktree: /private/tmp/content-agents-cs2-jobs-outreach-charles-extract
+    acceptance_commands:
+      - npm run check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: none
+    commit_sha: 3c2abebb6b365dcc88586ad6a5ff34436320df41
+    audit_verdict: passed
