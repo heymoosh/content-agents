@@ -484,6 +484,7 @@ tasks:
       - pattern-research-text-community
       - pattern-research-professional-publishing
       - pattern-research-visual-video
+      - pattern-professional-evidence-boundary-correction
     base_sha: null
     context_paths:
       - docs/content-studio-program/candidate-account-slate-20260825.md
@@ -627,3 +628,40 @@ tasks:
     human_gate: consolidated-candidate-account-slate
     commit_sha: f288fb6e27bb4b2783a60df8b270c21abf3fd6ea
     audit_verdict: passed
+  - id: pattern-professional-evidence-boundary-correction
+    batch_id: pattern-broad-research-20260825
+    outcome: Remove unsupported editorial-focus, topic, and format assertions from the three access-blocked Threads research rows, preserving only traceable source facts and explicit unknowns in the noncanonical professional-publishing staging package.
+    status: proposed
+    depends_on:
+      - pattern-research-professional-publishing
+    base_sha: null
+    context_paths:
+      - docs/content-studio-program/broad-pattern-research-policy-20260825.md
+      - docs/content-studio-program/tasks/pattern-research-professional-publishing.md
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/source-manifest.json
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/observations.json
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/decision-packet.json
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/decision-packet.md
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/runs/**
+      - docs/content-studio-program/tasks/**
+      - docs/content-agents-backlog.md
+    write_paths:
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/**
+    semantic_locks:
+      - pattern:professional-evidence-boundary
+    builder_family: codex
+    auditor_family: claude
+    branch: null
+    worktree: null
+    acceptance_commands: []
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-candidate-account-slate
+    commit_sha: null
+    audit_verdict: pending
