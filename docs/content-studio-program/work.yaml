@@ -45,6 +45,52 @@ tasks:
     human_gate: none
     commit_sha: d4931195a8ed0cc8dc5c6570e4b896d33f4f41d1
     audit_verdict: passed
+  - id: cs4-signals-recommendation-decisions
+    batch_id: studio-fourth-batch-20260825
+    outcome: Make Signals recommendations visibly support session-only Adopt and non-permanent Decline actions without changing policy, routing, content generation, or data.
+    status: integrated
+    depends_on:
+      - cs3-studio-durable-handoff
+    base_sha: 13a632e1d59d951da92e57239c0942eb791db098
+    context_paths:
+      - src/review/page.ts
+      - src/review/page.test.ts
+      - src/review/signals.ts
+      - src/review/signals.test.ts
+      - src/review/serve.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - content/**
+      - data/**
+      - briefs/**
+      - venture/**
+      - src/review/signals.ts
+      - src/review/signals.test.ts
+      - src/review/serve.ts
+      - src/review/serve-signals.ts
+      - config/**
+    write_paths:
+      - src/review/page.ts
+      - src/review/page.test.ts
+    semantic_locks:
+      - signals:recommendation-session-decisions
+      - signals:no-policy-or-generation-change
+    builder_family: codex
+    auditor_family: grok
+    branch: agent/cs4-signals-recommendation-decisions
+    worktree: /private/tmp/content-agents-cs4-signals-recommendation-decisions
+    acceptance_commands:
+      - npm run check
+      - node --import tsx --test src/review/page.test.ts src/review/signals.test.ts
+    user_visible_behavior: true
+    content_logic_change: false
+    human_gate: none
+    commit_sha: 55dbd176046306914b2c5b11a754fbcd6e1d6121
+    audit_verdict: passed
   - id: studio-scheduling-extraction
     batch_id: studio-first-batch-20260824
     outcome: Extract approval scheduling dispatch from serve.ts into a dedicated module while preserving routing, publisher injection, and approval behavior.

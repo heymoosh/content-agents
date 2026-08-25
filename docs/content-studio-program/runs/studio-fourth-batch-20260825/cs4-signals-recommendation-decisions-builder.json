@@ -1,0 +1,15 @@
+{
+  "type": "builder",
+  "task_id": "cs4-signals-recommendation-decisions",
+  "family": "codex",
+  "commit_sha": "55dbd176046306914b2c5b11a754fbcd6e1d6121",
+  "changed_paths": ["src/review/page.ts", "src/review/page.test.ts"],
+  "acceptance_commands": [
+    {"command":"npm run check","passed":true,"summary":"Coordinator ran the TypeScript check in the leased worktree after attaching existing dependencies."},
+    {"command":"node --import tsx --test src/review/page.test.ts src/review/signals.test.ts","passed":true,"summary":"Coordinator ran the task suite in the leased worktree; all 220 tests passed."}
+  ],
+  "behavior_impact":"Signals recommendations have session-only Adopt and non-permanent Decline controls with an honest visible state.",
+  "logic_impact":"none",
+  "risks": [],
+  "unresolved_items": []
+}

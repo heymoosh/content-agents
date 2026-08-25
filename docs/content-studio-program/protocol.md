@@ -10,6 +10,25 @@ Only the attended coordinator edits `work.yaml` and the files under `runs/`. Wor
 their leased worktrees, return a commit and JSON report, and never edit coordination records. Do
 not use the repository backlog, conductor, shared worker state, or a worker-authored `STATE.md`.
 
+## Standing authorization and continuation loop
+
+Muxin has authorized the coordinator to continue the entire approved Content Studio program without
+requesting ordinary batch-by-batch approval. This authorization covers reconciling the baseline,
+creating decision-complete packets and isolated worktrees, dispatching and returning bounded work,
+testing, cross-family auditing, sequential integration, commits, pushes, pull requests, and
+auto-merge for verified non-logic work.
+
+The coordinator is persistent: after every task or batch it re-reads `work.yaml`, records the
+completed result, identifies every newly eligible disjoint task, and starts the next safe batch.
+Completing a phase, tranche, or batch is never a stopping condition.
+
+Pause only for a genuine human gate or blocker: Muxin's candidate-account-slate decision before a
+canonical `data/patterns/**` write; Muxin's before/after review for a content-generation-logic
+change; a material unresolved product decision; destructive, irreversible, paid, credentialed, or
+scope-expanding action; a persistent external/CI blocker; or a product-decision merge conflict.
+Before presenting a gate, finish every other disjoint eligible task and provide one consolidated
+decision packet that names the blocked work and the work that will resume after Muxin answers.
+
 ## Durable layout
 
 - `charter.md`: north star, preserved behavior, safety walls, and authoritative links.

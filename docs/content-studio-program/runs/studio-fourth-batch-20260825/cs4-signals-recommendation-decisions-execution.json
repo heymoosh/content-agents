@@ -1,0 +1,1 @@
+{"builder_model":"gpt-5.6-luna","reasoning_effort":"high","escalation_reason":null,"dependency_note":"The clean worktree lacked node_modules; coordinator attached the existing repository dependency directory before independent acceptance verification."}
