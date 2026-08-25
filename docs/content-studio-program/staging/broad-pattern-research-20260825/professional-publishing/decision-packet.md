@@ -26,9 +26,9 @@ denominator, or baseline remains unknown. The recommendation for every seed is `
 | `substack|heathercoxrichardson` | History, American politics, democracy; history-informed explanation | Newsletter; essay | 2,900,000+ subscribers display | research further | low |
 | `substack-notes|robertreich` | Economics, inequality, democracy, public policy; economic and civic explanation | Short text; Note | 1,100,000+ subscribers display | research further | low |
 | `substack-notes|tedgioia` | Music, books, media, culture; culture criticism | Short text; Note | 297,000+ subscribers display | research further | low |
-| `threads|danidonovan` | unknown; focus not assessed | unknown; format not assessed | unknown | research further | low |
-| `threads|rowancheung` | unknown; focus not assessed | unknown; format not assessed | unknown | research further | low |
-| `threads|thedankoe` | unknown; focus not assessed | unknown; format not assessed | unknown | research further | low |
+| `threads|danidonovan` | ADHD, executive function, work; ADHD-informed education | Short text; Threads profile | unknown | research further | low |
+| `threads|rowancheung` | AI, technology, productivity; AI news and tools | Short text; Threads profile | unknown | research further | low |
+| `threads|thedankoe` | Writing, audience building, one-person business; writing-led work | Short text; Threads profile | unknown | research further | low |
 
 ## Evidence and gaps
 
@@ -39,11 +39,10 @@ stored. Profile audience displays are snapshots, not item denominators. Item rea
 impressions, and comparable account baselines are unknown unless explicitly stated in the JSON
 packet. No rate or baseline is calculated.
 
-Pool rationale is provisional and separate: product, AI-building, civic-tech, culture, and
+Pool rationale is provisional and separate: product, AI-building, civic-tech, culture, ADHD, and
 solopreneur topic candidates are named only as follow-up review areas; broad-platform and format
 use are hypotheses where a bounded item reference exists. Threads profile access was limited, so
-topic, focus, medium, format, and pool rationale remain unassessed for those three blocked rows.
-The Elena Verna catalog key is preserved
+those three rows are blocked for further source capture. The Elena Verna catalog key is preserved
 while the first-party Substack profile visibly uses `plgrowth`; this mapping is called out rather
 than silently normalized.
 
