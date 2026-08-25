@@ -631,10 +631,10 @@ tasks:
   - id: pattern-professional-evidence-boundary-correction
     batch_id: pattern-broad-research-20260825
     outcome: Remove unsupported editorial-focus, topic, and format assertions from the three access-blocked Threads research rows, preserving only traceable source facts and explicit unknowns in the noncanonical professional-publishing staging package.
-    status: proposed
+    status: ready
     depends_on:
       - pattern-research-professional-publishing
-    base_sha: null
+    base_sha: fe58d0918111068ef0d20fab45253f78bfb2a748
     context_paths:
       - docs/content-studio-program/broad-pattern-research-policy-20260825.md
       - docs/content-studio-program/tasks/pattern-research-professional-publishing.md
@@ -657,9 +657,12 @@ tasks:
       - pattern:professional-evidence-boundary
     builder_family: codex
     auditor_family: claude
-    branch: null
-    worktree: null
-    acceptance_commands: []
+    branch: agent/pattern-professional-evidence-boundary-correction
+    worktree: /private/tmp/content-agents-pattern-professional-evidence-boundary-correction
+    acceptance_commands:
+      - npm run check
+      - node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/observations.json --format json
+      - git diff --check
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
