@@ -631,7 +631,7 @@ tasks:
   - id: pattern-professional-evidence-boundary-correction
     batch_id: pattern-broad-research-20260825
     outcome: Remove unsupported editorial-focus, topic, and format assertions from the three access-blocked Threads research rows, preserving only traceable source facts and explicit unknowns in the noncanonical professional-publishing staging package.
-    status: ready
+    status: building
     depends_on:
       - pattern-research-professional-publishing
     base_sha: fe58d0918111068ef0d20fab45253f78bfb2a748
