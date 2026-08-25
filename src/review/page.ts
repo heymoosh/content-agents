@@ -57,13 +57,28 @@ import {
   BOOT_ROOM,
   CAPTURE_RAIL_ASKING,
   CAPTURE_RAIL_IDLE,
-  captureVerdict,
 } from "./page-capture.js";
 export * from "./page-outreach.js";
 export * from "./page-fiction.js";
 export * from "./page-venture.js";
 export * from "./page-signals.js";
-export * from "./page-capture.js";
+// Re-export the shared classifier API, while this page owns the copy it actually displays for a
+// durable handoff. page-capture.ts's old Signals note described a backlog write this surface no
+// longer makes, so it is deliberately not re-exported from the rendered-page module.
+export {
+  classifyCapture,
+  captureVerdict,
+  BOOT_ROOM,
+  CAPTURE_RAIL_ASKING,
+  CAPTURE_RAIL_IDLE,
+  LINK_ASK_HEADING,
+  LINK_ASK_EXPLAINER,
+  type CaptureRoom,
+  type CaptureVerdict,
+  type CaptureVerdictView,
+  type DeskRoom,
+} from "./page-capture.js";
+export const LINK_ASK_SIGNALS_NOTE = "Source for Signals keeps it in Signals for your next action. Nothing here records where a reader came from, so this is a note to look at later, not attribution.";
 
 // Pure, DOM-free mirror of the inline "replying to" context line the client <script> below renders
 // for a "reply to mention" row (backend origin — carries reply_to_url/reply_to_text frontmatter
@@ -121,6 +136,18 @@ export function captureHandoffSummary(capture: CaptureHandoff | null): {
     detail: capture.text.trim().replace(/\s+/g, " ").slice(0, 140),
     action: "Open",
   };
+}
+
+// page-capture.ts owns the classifier, but its old verdict copy described pre-handoff behavior.
+// This page owns the durable handoff surface, so its verdict says only what this surface does:
+// save the capture and wait for Muxin's explicit next action in the owning room.
+export function captureHandoffVerdict(room: "Content" | "Fiction" | "Outreach" | "Venture"): {
+  room: string; line: string; actionLabel: string | null;
+} {
+  if (room === "Content") return { room, line: "I read this as Content. Keep it in Content as a capture, then choose the next action there.", actionLabel: null };
+  if (room === "Fiction") return { room, line: "I read this as Fiction. Keep it in Fiction as a capture, then choose the next action there.", actionLabel: "Keep it in Fiction" };
+  if (room === "Outreach") return { room, line: "I read this as Outreach. Keep it in Outreach as a capture, then choose the next action there.", actionLabel: "Keep it in Outreach" };
+  return { room, line: "I read this as Venture. Keep it in Venture as a capture, then choose the next action there.", actionLabel: "Keep it in Venture" };
 }
 
 
@@ -904,7 +931,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <button class="primary" id="linkReadBtn">Versions for Content</button>
           <button class="link-ask-cancel" id="linkCancelBtn">Never mind, clear it</button>
         </div>
-        <div class="hint">Source for Signals files a backlog card carrying the link. Nothing here records where a reader came from, so this is a note to look at it later, not attribution.</div>
+        <div class="hint">${LINK_ASK_SIGNALS_NOTE}</div>
         <div class="link-ask-why">Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.</div>
       </div>
       <div class="director-line">
@@ -5183,7 +5210,7 @@ async function addSource(){
   } finally { setCaptureSubmitting(false); }
 }
 // ── Studio capture: one front door (v7 Studio) ───────────────────────────────────────────────
-// Inline mirror of classifyCapture() / captureVerdict() in this file's exported section. The client
+// Inline mirror of classifyCapture() / captureHandoffVerdict() in this file's exported section. The client
 // script cannot import, so the two copies are kept in sync BY HAND (docs/prototype-port-rules.md
 // Rule 5) and page.test.ts pulls this copy back out of the emitted script and runs the identical
 // vectors through both.
@@ -5199,10 +5226,10 @@ function classifyCapture(text){
   return {kind:"room", room:"Content"};
 }
 function captureVerdict(room){
-  if(room==="Content") return {room:room, line:${JSON.stringify(captureVerdict("Content").line)}, actionLabel:null};
-  if(room==="Fiction") return {room:room, line:${JSON.stringify(captureVerdict("Fiction").line)}, actionLabel:"Take it to Fiction"};
-  if(room==="Outreach") return {room:room, line:${JSON.stringify(captureVerdict("Outreach").line)}, actionLabel:"Open Outreach"};
-  return {room:room, line:${JSON.stringify(captureVerdict("Venture").line)}, actionLabel:"Open Venture"};
+  if(room==="Content") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Content").line)}, actionLabel:null};
+  if(room==="Fiction") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Fiction").line)}, actionLabel:"Keep it in Fiction"};
+  if(room==="Outreach") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Outreach").line)}, actionLabel:"Keep it in Outreach"};
+  return {room:room, line:${JSON.stringify(captureHandoffVerdict("Venture").line)}, actionLabel:"Keep it in Venture"};
 }
 // ── end of the capture mirror ──
 
@@ -5325,8 +5352,7 @@ function routeCapture(){
   showCaptureVerdict(v.room);
   flash("I read this as "+v.room+".");
 }
-// "Versions for Content" is exactly what the director already does with a URL: reads it and
-// proposes cuts. Same route as "Hand it to your director", relabelled for the question being asked.
+// "Versions for Content" holds the link in Content for Muxin to decide what to do with it next.
 async function linkReadForContent(){
   const url = linkAskUrl;
   if(!url) return;
@@ -5334,7 +5360,7 @@ async function linkReadForContent(){
   closeLinkAsk(true); setRoom("content"); renderCaptureHandoff();
   flash("Kept it in Content. Choose the next action there.");
 }
-// "Source for Signals" files a backlog card and nothing more. There is no referrer record, no
+// "Source for Signals" keeps an inbox item and nothing more. There is no referrer record, no
 // funnel data and no job kind that takes a URL, so this must never imply traffic attribution.
 async function linkFileForSignals(){
   const url = linkAskUrl;
