@@ -1,0 +1,28 @@
+{
+  "type": "builder",
+  "task_id": "cs3-studio-durable-handoff",
+  "family": "codex",
+  "commit_sha": "de255300607b21a8a8c071958cc74902d42b2624",
+  "changed_paths": [
+    "src/review/page.ts",
+    "src/review/page.test.ts"
+  ],
+  "acceptance_commands": [
+    {
+      "command": "npm run check",
+      "passed": true,
+      "summary": "Coordinator reran the TypeScript check in the leased worktree; it completed successfully."
+    },
+    {
+      "command": "node --import tsx --test src/review/page.test.ts src/review/studio.test.ts",
+      "passed": true,
+      "summary": "Coordinator reran the task test suite in the leased worktree; all 201 tests passed."
+    }
+  ],
+  "behavior_impact": "Studio captures are durably retained in browser local storage, surface in their owning room and the Studio needs-you queue, and remain pending an explicit user action; all displayed copy now describes that handoff truthfully.",
+  "logic_impact": "none",
+  "risks": [
+    "Capture durability is deliberately limited to the active browser profile; it does not write content, configuration, or policy data."
+  ],
+  "unresolved_items": []
+}
