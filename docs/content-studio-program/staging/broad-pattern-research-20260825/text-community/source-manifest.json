@@ -486,283 +486,345 @@
   ],
   "sources": [
     {
+      "sourceId": "profile:bluesky|adriennemareebrown.bsky.social",
       "platform": "bluesky",
       "accountKey": "adriennemareebrown.bsky.social",
       "url": "https://bsky.app/profile/adriennemareebrown.bsky.social",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:bluesky|carnage4life.bsky.social",
       "platform": "bluesky",
       "accountKey": "carnage4life.bsky.social",
       "url": "https://bsky.app/profile/carnage4life.bsky.social",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:bluesky|danidonovan.com",
       "platform": "bluesky",
       "accountKey": "danidonovan.com",
       "url": "https://bsky.app/profile/danidonovan.com",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:bluesky|simonwillison.net",
       "platform": "bluesky",
       "accountKey": "simonwillison.net",
       "url": "https://bsky.app/profile/simonwillison.net",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:devto|sylwia-lask",
       "platform": "devto",
       "accountKey": "sylwia-lask",
       "url": "https://dev.to/sylwia-lask",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:hackernews|hackernews",
       "platform": "hackernews",
       "accountKey": "hackernews",
       "url": "https://news.ycombinator.com/user?id=hackernews",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|bagder@mastodon.social",
       "platform": "mastodon",
       "accountKey": "bagder@mastodon.social",
       "url": "https://mastodon.social/@bagder",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|baldur@toot.cafe",
       "platform": "mastodon",
       "accountKey": "baldur@toot.cafe",
       "url": "https://toot.cafe/@baldur",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|dangillmor@mastodon.social",
       "platform": "mastodon",
       "accountKey": "dangillmor@mastodon.social",
       "url": "https://mastodon.social/@dangillmor",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|dansup@mastodon.social",
       "platform": "mastodon",
       "accountKey": "dansup@mastodon.social",
       "url": "https://mastodon.social/@dansup",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|gargron@mastodon.social",
       "platform": "mastodon",
       "accountKey": "gargron@mastodon.social",
       "url": "https://mastodon.social/@gargron",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|heidilifeldman@mastodon.social",
       "platform": "mastodon",
       "accountKey": "heidilifeldman@mastodon.social",
       "url": "https://mastodon.social/@heidilifeldman",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|mer__edith@mastodon.world",
       "platform": "mastodon",
       "accountKey": "mer__edith@mastodon.world",
       "url": "https://mastodon.world/@mer__edith",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|mmasnick@mastodon.social",
       "platform": "mastodon",
       "accountKey": "mmasnick@mastodon.social",
       "url": "https://mastodon.social/@mmasnick",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:mastodon|molly0xfff@hachyderm.io",
       "platform": "mastodon",
       "accountKey": "molly0xfff@hachyderm.io",
       "url": "https://hachyderm.io/@molly0xfff",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/adhd",
       "platform": "reddit",
       "accountKey": "r/adhd",
       "url": "https://www.reddit.com/r/adhd/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/civictech",
       "platform": "reddit",
       "accountKey": "r/civictech",
       "url": "https://www.reddit.com/r/civictech/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/claudeai",
       "platform": "reddit",
       "accountKey": "r/claudeai",
       "url": "https://www.reddit.com/r/claudeai/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/entrepreneur",
       "platform": "reddit",
       "accountKey": "r/entrepreneur",
       "url": "https://www.reddit.com/r/entrepreneur/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/lifeprotips",
       "platform": "reddit",
       "accountKey": "r/lifeprotips",
       "url": "https://www.reddit.com/r/lifeprotips/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/localllama",
       "platform": "reddit",
       "accountKey": "r/localllama",
       "url": "https://www.reddit.com/r/localllama/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/microsaas",
       "platform": "reddit",
       "accountKey": "r/microsaas",
       "url": "https://www.reddit.com/r/microsaas/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/productmanagement",
       "platform": "reddit",
       "accountKey": "r/productmanagement",
       "url": "https://www.reddit.com/r/productmanagement/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/sideproject",
       "platform": "reddit",
       "accountKey": "r/sideproject",
       "url": "https://www.reddit.com/r/sideproject/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:reddit|r/youshouldknow",
       "platform": "reddit",
       "accountKey": "r/youshouldknow",
       "url": "https://www.reddit.com/r/youshouldknow/",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:x|akshat_world",
       "platform": "x",
       "accountKey": "akshat_world",
       "url": "https://x.com/akshat_world",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:x|arvidkahl",
       "platform": "x",
       "accountKey": "arvidkahl",
       "url": "https://x.com/arvidkahl",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:x|dickiebush",
       "platform": "x",
       "accountKey": "dickiebush",
       "url": "https://x.com/dickiebush",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:x|levelsio",
       "platform": "x",
       "accountKey": "levelsio",
       "url": "https://x.com/levelsio",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:x|nathanbarry",
       "platform": "x",
       "accountKey": "nathanbarry",
       "url": "https://x.com/nathanbarry",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     },
     {
+      "sourceId": "profile:x|sahilbloom",
       "platform": "x",
       "accountKey": "sahilbloom",
       "url": "https://x.com/sahilbloom",
-      "observationDate": "2026-08-25",
-      "type": "public-profile",
+      "sourceKind": "public-profile",
       "accessStatus": "blocked",
-      "accessNote": "Standard HTTP access was unavailable in the collection environment; no page body was retained."
+      "observationDate": null,
+      "accessAttemptedDate": "2026-08-25",
+      "caveat": "Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained."
     }
   ]
 }

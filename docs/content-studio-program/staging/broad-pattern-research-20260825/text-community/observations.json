@@ -14,7 +14,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -37,13 +37,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -78,7 +78,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -101,13 +101,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -142,7 +142,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -165,13 +165,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -206,7 +206,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -229,13 +229,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -270,7 +270,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -293,13 +293,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -334,7 +334,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -357,13 +357,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -398,7 +398,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -421,13 +421,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -462,7 +462,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -485,13 +485,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -526,7 +526,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -549,13 +549,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -590,7 +590,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -613,13 +613,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -654,7 +654,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -677,13 +677,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -718,7 +718,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -741,13 +741,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -782,7 +782,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -805,13 +805,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -846,7 +846,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -869,13 +869,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -910,7 +910,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -933,13 +933,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -974,7 +974,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -997,13 +997,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1038,7 +1038,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1061,13 +1061,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1102,7 +1102,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1125,13 +1125,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1166,7 +1166,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1189,13 +1189,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1230,7 +1230,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1253,13 +1253,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1294,7 +1294,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1317,13 +1317,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1358,7 +1358,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1381,13 +1381,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1422,7 +1422,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1445,13 +1445,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1486,7 +1486,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1509,13 +1509,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1550,7 +1550,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1573,13 +1573,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1614,7 +1614,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1637,13 +1637,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1678,7 +1678,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1701,13 +1701,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1742,7 +1742,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1765,13 +1765,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1806,7 +1806,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1829,13 +1829,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1870,7 +1870,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1893,13 +1893,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",
@@ -1934,7 +1934,7 @@
       "audienceSnapshot": {
         "size": "unknown",
         "countType": "unknown",
-        "observedAt": "2026-08-25",
+        "observedAt": "unknown",
         "collectedAt": "2026-08-25",
         "evidenceSource": "unknown"
       },
@@ -1957,13 +1957,13 @@
         "denominator": "unknown",
         "window": "unknown",
         "scope": "unknown",
-        "observedAt": "2026-08-25"
+        "observedAt": "unknown"
       },
       "popularityScope": "unknown",
       "sampleScope": "unknown",
       "baselineScope": "unknown",
       "baselineSource": "unknown",
-      "observedAt": "2026-08-25",
+      "observedAt": null,
       "collectedAt": "2026-08-25",
       "caveats": [
         "Standard HTTP access to the public profile URL was blocked by the collection environment; no page body was retained.",

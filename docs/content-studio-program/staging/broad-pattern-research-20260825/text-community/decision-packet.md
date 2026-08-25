@@ -1,260 +1,412 @@
-# Text-community broad pattern research decision packe
+# Text-community broad pattern research decision packet
 
 - Collection timestamp: 2026-08-25T00:00:00Z
 - Semantic lock: `pattern:broad-research-text-community`
 - Cohort: 31 exact seed accounts, 0 additions.
-- Recommendation vocabulary is limited to `research further`; no ranking, score, winner, best, or viral claim is made.
-
-## Collection limitation
-
-Standard HTTP access to public profile URLs was blocked by the collection environment. No page body, item body, caption, title, hook, transcript, screenshot, prompt, or derived body text was retained. Audience values, performance metrics, denominators, windows, baselines, topics, and formats are therefore explicit unknowns.
+- Access status: all 31 direct profile access attempts were blocked; no profile was successfully accessed.
+- No creator material was retained.
 
 ## Account decisions
 
-#
-#
-#
+### bluesky|adriennemareebrown.bsky.social
 
-b
-l
-u
-e
-s
-k
-y
-|
-a
-d
-r
-i
-e
-n
-n
-e
-m
-a
-r
-e
-e
-b
-r
-o
-w
-n
-.
-b
-s
-k
-y
-.
-s
-o
-c
-i
-a
-l
+- Identity: handle `adriennemareebrown.bsky.social`; creator and role: unknown.
+- Source ID: `profile:bluesky|adriennemareebrown.bsky.social`.
+- Public source: https://bsky.app/profile/adriennemareebrown.bsky.social (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 4.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
+### bluesky|carnage4life.bsky.social
 
+- Identity: handle `carnage4life.bsky.social`; creator and role: unknown.
+- Source ID: `profile:bluesky|carnage4life.bsky.social`.
+- Public source: https://bsky.app/profile/carnage4life.bsky.social (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
+### bluesky|danidonovan.com
 
--
+- Identity: handle `danidonovan.com`; creator and role: unknown.
+- Source ID: `profile:bluesky|danidonovan.com`.
+- Public source: https://bsky.app/profile/danidonovan.com (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-I
-d
-e
-n
+### bluesky|simonwillison.net
 
-i
+- Identity: handle `simonwillison.net`; creator and role: unknown.
+- Source ID: `profile:bluesky|simonwillison.net`.
+- Public source: https://bsky.app/profile/simonwillison.net (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-y
-:
+### devto|sylwia-lask
 
-h
-a
-n
-d
-l
-e
+- Identity: handle `sylwia-lask`; creator and role: unknown.
+- Source ID: `profile:devto|sylwia-lask`.
+- Public source: https://dev.to/sylwia-lask (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 4.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-`
-a
-d
-r
-i
-e
-n
-n
-e
-m
-a
-r
-e
-e
-b
-r
-o
-w
-n
-.
-b
-s
-k
-y
-.
-s
-o
-c
-i
-a
-l
-`
-;
+### hackernews|hackernews
 
-c
-r
-e
-a
+- Identity: handle `hackernews`; creator and role: unknown.
+- Source ID: `profile:hackernews|hackernews`.
+- Public source: https://news.ycombinator.com/user?id=hackernews (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 9.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-o
-r
+### mastodon|bagder@mastodon.social
 
-a
-n
-d
+- Identity: handle `bagder@mastodon.social`; creator and role: unknown.
+- Source ID: `profile:mastodon|bagder@mastodon.social`.
+- Public source: https://mastodon.social/@bagder (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-r
-o
-l
-e
-:
+### mastodon|baldur@toot.cafe
 
-u
-n
-k
-n
-o
-w
-n
-.
+- Identity: handle `baldur@toot.cafe`; creator and role: unknown.
+- Source ID: `profile:mastodon|baldur@toot.cafe`.
+- Public source: https://toot.cafe/@baldur (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
+### mastodon|dangillmor@mastodon.social
 
--
+- Identity: handle `dangillmor@mastodon.social`; creator and role: unknown.
+- Source ID: `profile:mastodon|dangillmor@mastodon.social`.
+- Public source: https://mastodon.social/@dangillmor (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-L
-o
-c
-a
-l
+### mastodon|dansup@mastodon.social
 
-e
-v
-i
-d
-e
-n
-c
-e
+- Identity: handle `dansup@mastodon.social`; creator and role: unknown.
+- Source ID: `profile:mastodon|dansup@mastodon.social`.
+- Public source: https://mastodon.social/@dansup (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-r
-e
-f
-e
-r
-e
-n
-c
-e
-:
+### mastodon|gargron@mastodon.social
 
-c
-a
-n
-d
-i
-d
-a
+- Identity: handle `gargron@mastodon.social`; creator and role: unknown.
+- Source ID: `profile:mastodon|gargron@mastodon.social`.
+- Public source: https://mastodon.social/@gargron (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-e
+### mastodon|heidilifeldman@mastodon.social
 
-s
-l
-a
+- Identity: handle `heidilifeldman@mastodon.social`; creator and role: unknown.
+- Source ID: `profile:mastodon|heidilifeldman@mastodon.social`.
+- Public source: https://mastodon.social/@heidilifeldman (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-e
+### mastodon|mer__edith@mastodon.world
 
-c
-o
-u
-n
+- Identity: handle `mer__edith@mastodon.world`; creator and role: unknown.
+- Source ID: `profile:mastodon|mer__edith@mastodon.world`.
+- Public source: https://mastodon.world/@mer__edith (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
+### mastodon|mmasnick@mastodon.social
 
-4
-.
+- Identity: handle `mmasnick@mastodon.social`; creator and role: unknown.
+- Source ID: `profile:mastodon|mmasnick@mastodon.social`.
+- Public source: https://mastodon.social/@mmasnick (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
+### mastodon|molly0xfff@hachyderm.io
 
--
+- Identity: handle `molly0xfff@hachyderm.io`; creator and role: unknown.
+- Source ID: `profile:mastodon|molly0xfff@hachyderm.io`.
+- Public source: https://hachyderm.io/@molly0xfff (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-P
-u
-b
-l
-i
-c
+### reddit|r/adhd
 
-s
-o
-u
-r
-c
-e
-:
+- Identity: handle `r/adhd`; creator and role: unknown.
+- Source ID: `profile:reddit|r/adhd`.
+- Public source: https://www.reddit.com/r/adhd/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 25.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-u
-n
-d
-e
-f
-i
-n
-e
-d
+### reddit|r/civictech
 
-(
-p
-r
-o
-f
-i
-l
-e
-;
+- Identity: handle `r/civictech`; creator and role: unknown.
+- Source ID: `profile:reddit|r/civictech`.
+- Public source: https://www.reddit.com/r/civictech/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 25.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-a
-c
-c
-e
-s
-s
+### reddit|r/claudeai
 
-b
-l
-o
-c
-k
-e
-d
-)
-.
+- Identity: handle `r/claudeai`; creator and role: unknown.
+- Source ID: `profile:reddit|r/claudeai`.
+- Public source: https://www.reddit.com/r/claudeai/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 26.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
+### reddit|r/entrepreneur
 
--
+- Identity: handle `r/entrepreneur`; creator and role: unknown.
+- Source ID: `profile:reddit|r/entrepreneur`.
+- Public source: https://www.reddit.com/r/entrepreneur/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 25.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
 
-T
-o
-p
-i
-c
-/
-n
-i
-c
+### reddit|r/lifeprotips
+
+- Identity: handle `r/lifeprotips`; creator and role: unknown.
+- Source ID: `profile:reddit|r/lifeprotips`.
+- Public source: https://www.reddit.com/r/lifeprotips/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 25.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### reddit|r/localllama
+
+- Identity: handle `r/localllama`; creator and role: unknown.
+- Source ID: `profile:reddit|r/localllama`.
+- Public source: https://www.reddit.com/r/localllama/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 25.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### reddit|r/microsaas
+
+- Identity: handle `r/microsaas`; creator and role: unknown.
+- Source ID: `profile:reddit|r/microsaas`.
+- Public source: https://www.reddit.com/r/microsaas/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 25.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### reddit|r/productmanagement
+
+- Identity: handle `r/productmanagement`; creator and role: unknown.
+- Source ID: `profile:reddit|r/productmanagement`.
+- Public source: https://www.reddit.com/r/productmanagement/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 4.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### reddit|r/sideproject
+
+- Identity: handle `r/sideproject`; creator and role: unknown.
+- Source ID: `profile:reddit|r/sideproject`.
+- Public source: https://www.reddit.com/r/sideproject/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 27.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### reddit|r/youshouldknow
+
+- Identity: handle `r/youshouldknow`; creator and role: unknown.
+- Source ID: `profile:reddit|r/youshouldknow`.
+- Public source: https://www.reddit.com/r/youshouldknow/ (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 25.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### x|akshat_world
+
+- Identity: handle `akshat_world`; creator and role: unknown.
+- Source ID: `profile:x|akshat_world`.
+- Public source: https://x.com/akshat_world (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 6.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### x|arvidkahl
+
+- Identity: handle `arvidkahl`; creator and role: unknown.
+- Source ID: `profile:x|arvidkahl`.
+- Public source: https://x.com/arvidkahl (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 5.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### x|dickiebush
+
+- Identity: handle `dickiebush`; creator and role: unknown.
+- Source ID: `profile:x|dickiebush`.
+- Public source: https://x.com/dickiebush (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 9.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### x|levelsio
+
+- Identity: handle `levelsio`; creator and role: unknown.
+- Source ID: `profile:x|levelsio`.
+- Public source: https://x.com/levelsio (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 5.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### x|nathanbarry
+
+- Identity: handle `nathanbarry`; creator and role: unknown.
+- Source ID: `profile:x|nathanbarry`.
+- Public source: https://x.com/nathanbarry (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 5.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
+
+### x|sahilbloom
+
+- Identity: handle `sahilbloom`; creator and role: unknown.
+- Source ID: `profile:x|sahilbloom`.
+- Public source: https://x.com/sahilbloom (access attempt blocked; observation date: not observed; access attempted: 2026-08-25).
+- Local evidence reference: candidate slate count 3.
+- Topic/niche: unknown. Medium: text. Format: unknown.
+- Examples: none collected. Metrics: unknown, including denominator and measurement window. Baseline: unknown.
+- Dimensions: niche relevance unknown; broad-platform performance unknown; format-specific performance unknown; relative outperformance unknown; repeatability unknown; evidence quality low.
+- Pool rationale: research further for niche, broad-platform, and format pools because item-level evidence is unavailable.
+- Caveat: access was blocked before profile content could be observed; all unknowns remain explicit.
+- Confidence: low. Recommendation: research further.
