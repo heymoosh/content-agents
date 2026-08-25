@@ -1,0 +1,42 @@
+{
+  "task_id": "pattern-research-professional-publishing",
+  "batch_id": "pattern-broad-research-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-research-professional-publishing",
+    "family": "codex",
+    "commit_sha": "632567ee3b1b1794ae5dd989e343417592a3283b",
+    "changed_paths": [
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/decision-packet.json",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/decision-packet.md",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/observations.json",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/source-manifest.json"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Builder reports the TypeScript check completed without errors."
+      },
+      {
+        "command": "node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/observations.json --format json",
+        "passed": true,
+        "summary": "Builder reports 14 observations with zero included and complete bodies."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Builder reports no whitespace errors and a deterministic repeated output."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "The packet retains only a bounded public source set; some platforms and item metrics remain unavailable or access-limited."
+    ],
+    "unresolved_items": [
+      "Cross-family audit pending."
+    ]
+  },
+  "diff_verified": false
+}

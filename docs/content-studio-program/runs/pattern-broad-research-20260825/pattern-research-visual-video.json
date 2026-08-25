@@ -1,0 +1,41 @@
+{
+  "task_id": "pattern-research-visual-video",
+  "batch_id": "pattern-broad-research-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-research-visual-video",
+    "family": "codex",
+    "commit_sha": "f288fb6e27bb4b2783a60df8b270c21abf3fd6ea",
+    "changed_paths": [
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/visual-video/observations.json",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/visual-video/decision-packet.json",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/visual-video/decision-packet.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Builder reports the TypeScript check completed without errors."
+      },
+      {
+        "command": "node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/visual-video/observations.json --format json",
+        "passed": true,
+        "summary": "20 observations across Instagram, TikTok, and YouTube; body included 0; body complete 0."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Builder reports no whitespace errors and deterministic repeat output."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "All public profile routes remain access-limited; item metrics and item evidence remain unknown."
+    ],
+    "unresolved_items": [
+      "A fresh independent audit is pending."
+    ]
+  },
+  "diff_verified": false
+}

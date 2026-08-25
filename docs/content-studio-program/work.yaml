@@ -512,7 +512,7 @@ tasks:
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
     outcome: Research the 31 seed accounts on Bluesky, Dev.to, Hacker News, Mastodon, Reddit, and X into a body-free, evidence-backed text-community staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: building
+    status: blocked
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -543,12 +543,12 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: 947f1507e01404540fc64cb16ed88a9c753b0f22
-    audit_verdict: failed
+    commit_sha: 54c3dce24ad62ce7f750f8bb868781e180e6ee6b
+    audit_verdict: pending
   - id: pattern-research-professional-publishing
     batch_id: pattern-broad-research-20260825
     outcome: Research the 14 seed accounts on LinkedIn, Substack, Substack Notes, and Threads into a body-free, evidence-backed professional-publishing staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: building
+    status: blocked
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -584,12 +584,12 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: null
+    commit_sha: 632567ee3b1b1794ae5dd989e343417592a3283b
     audit_verdict: pending
   - id: pattern-research-visual-video
     batch_id: pattern-broad-research-20260825
     outcome: Research the 20 seed accounts on Instagram, TikTok, and YouTube into a body-free, evidence-backed visual-video staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
-    status: auditing
+    status: blocked
     depends_on:
       - pattern-review-staging-projection
     base_sha: 3801ef49800fd8a74d99ec4d485270571e3b8b4a
@@ -625,5 +625,5 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: 081d0d3f4dc6630f9492fcd81df194971304a6be
+    commit_sha: f288fb6e27bb4b2783a60df8b270c21abf3fd6ea
     audit_verdict: pending

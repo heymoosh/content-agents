@@ -1,0 +1,41 @@
+{
+  "task_id": "pattern-research-text-community",
+  "batch_id": "pattern-broad-research-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-research-text-community",
+    "family": "codex",
+    "commit_sha": "54c3dce24ad62ce7f750f8bb868781e180e6ee6b",
+    "changed_paths": [
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/text-community/decision-packet.md",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/text-community/observations.json",
+      "docs/content-studio-program/staging/broad-pattern-research-20260825/text-community/source-manifest.json"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Builder reports the TypeScript check completed without errors."
+      },
+      {
+        "command": "node --import tsx src/patterns/manual-platform-report-cli.ts --input docs/content-studio-program/staging/broad-pattern-research-20260825/text-community/observations.json --format json",
+        "passed": true,
+        "summary": "31 observations; body included 0; body complete 0; all collection statuses blocked."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Builder reports no whitespace errors and deterministic ordering."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "Public source access remains blocked; performance, audience, topic, format, and baseline evidence remain unknown."
+    ],
+    "unresolved_items": [
+      "A fresh independent audit is pending."
+    ]
+  },
+  "diff_verified": false
+}
