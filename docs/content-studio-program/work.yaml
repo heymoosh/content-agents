@@ -1,8 +1,8 @@
 version: 1
 program: content-studio
 coordinator: codex
-coordinator_branch: agent/content-studio-coordinator-reconcile
-state_revision: 5
+coordinator_branch: agent/content-studio-coordinator-local-merge
+state_revision: 6
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -795,3 +795,180 @@ tasks:
     human_gate: consolidated-candidate-account-slate
     commit_sha: 4924a7b0b26b63213322b93fbaf34e33e899af11
     audit_verdict: passed
+  - id: pattern-stage-evidence-text-community
+    batch_id: pattern-reviewed-evidence-staging-20260826
+    outcome: Produce a body-free, noncanonical reviewed-evidence proposal for the exact 31 text/community accounts and 354 local source records, preserving 14 recommend, 6 hold, and 11 research-further dispositions plus 12 staged baseline artifacts without converting any row into reviewed or canonical state.
+    status: ready
+    depends_on:
+      - pattern-corrected-candidate-account-slate
+    base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/protocol.md
+      - docs/content-studio-program/tasks/pattern-stage-evidence-text-community.md
+      - docs/content-studio-program/staging/corrected-candidate-account-slate-20260825/**
+      - docs/content-studio-program/staging/local-evidence-inventory-20260825/**
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/text-community/**
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+      - package.json
+      - data/patterns/corpus.jsonl
+      - data/patterns/analyses.jsonl
+      - data/patterns/baselines.jsonl
+      - src/patterns/review-metadata.ts
+      - src/patterns/source-evidence.ts
+      - src/patterns/reviewed-evidence-intake.ts
+      - src/patterns/reviewed-evidence-intake-cli.ts
+      - src/patterns/reviewed-evidence-ledger-bridge.ts
+      - src/patterns/reviewed-evidence-ledger-bridge-cli.ts
+      - src/patterns/account-review-ledger.ts
+      - src/patterns/source-evidence-ledger.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/professional-publishing/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/**
+    write_paths:
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/text-community/**
+    semantic_locks:
+      - pattern:reviewed-evidence-staging:text-community
+      - pattern:body-free-local-evidence:text-community
+    builder_family: codex
+    auditor_family: claude
+    branch: agent/pattern-stage-evidence-text-community
+    worktree: /private/tmp/content-agents-pattern-stage-evidence-text-community
+    acceptance_commands:
+      - npm run check
+      - npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-20260826/text-community/intake-input.json --format json
+      - npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-20260826/text-community/intake-report.json --format json
+      - git diff --check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: reviewed-metadata-provenance-and-canonical-write
+    commit_sha: null
+    audit_verdict: pending
+  - id: pattern-stage-evidence-professional-publishing
+    batch_id: pattern-reviewed-evidence-staging-20260826
+    outcome: Produce a body-free, noncanonical reviewed-evidence proposal for the exact 14 professional/publishing accounts and 70 local source records, preserving 11 recommend and 3 research-further dispositions while retaining corrected Threads unknowns.
+    status: ready
+    depends_on:
+      - pattern-corrected-candidate-account-slate
+    base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/protocol.md
+      - docs/content-studio-program/tasks/pattern-stage-evidence-professional-publishing.md
+      - docs/content-studio-program/staging/corrected-candidate-account-slate-20260825/**
+      - docs/content-studio-program/staging/local-evidence-inventory-20260825/**
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/**
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+      - package.json
+      - data/patterns/corpus.jsonl
+      - data/patterns/analyses.jsonl
+      - data/patterns/baselines.jsonl
+      - src/patterns/review-metadata.ts
+      - src/patterns/source-evidence.ts
+      - src/patterns/reviewed-evidence-intake.ts
+      - src/patterns/reviewed-evidence-intake-cli.ts
+      - src/patterns/reviewed-evidence-ledger-bridge.ts
+      - src/patterns/reviewed-evidence-ledger-bridge-cli.ts
+      - src/patterns/account-review-ledger.ts
+      - src/patterns/source-evidence-ledger.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/text-community/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/**
+    write_paths:
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/professional-publishing/**
+    semantic_locks:
+      - pattern:reviewed-evidence-staging:professional-publishing
+      - pattern:body-free-local-evidence:professional-publishing
+    builder_family: codex
+    auditor_family: claude
+    branch: agent/pattern-stage-evidence-professional-publishing
+    worktree: /private/tmp/content-agents-pattern-stage-evidence-professional-publishing
+    acceptance_commands:
+      - npm run check
+      - npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-20260826/professional-publishing/intake-input.json --format json
+      - npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-20260826/professional-publishing/intake-report.json --format json
+      - git diff --check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: reviewed-metadata-provenance-and-canonical-write
+    commit_sha: null
+    audit_verdict: pending
+  - id: pattern-stage-evidence-visual-video
+    batch_id: pattern-reviewed-evidence-staging-20260826
+    outcome: Produce a body-free, noncanonical reviewed-evidence proposal for the exact 20 visual/video accounts and 75 local source records, preserving 5 recommend, 2 hold, and 13 research-further dispositions while keeping caption, transcript, media, and body-completeness gaps explicit.
+    status: ready
+    depends_on:
+      - pattern-corrected-candidate-account-slate
+    base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
+    context_paths:
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/protocol.md
+      - docs/content-studio-program/tasks/pattern-stage-evidence-visual-video.md
+      - docs/content-studio-program/staging/corrected-candidate-account-slate-20260825/**
+      - docs/content-studio-program/staging/local-evidence-inventory-20260825/**
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/visual-video/**
+      - docs/pattern-mining-plan.md
+      - docs/content-system-blueprint.md
+      - package.json
+      - data/patterns/corpus.jsonl
+      - data/patterns/analyses.jsonl
+      - data/patterns/baselines.jsonl
+      - src/patterns/review-metadata.ts
+      - src/patterns/source-evidence.ts
+      - src/patterns/reviewed-evidence-intake.ts
+      - src/patterns/reviewed-evidence-intake-cli.ts
+      - src/patterns/reviewed-evidence-ledger-bridge.ts
+      - src/patterns/reviewed-evidence-ledger-bridge-cli.ts
+      - src/patterns/account-review-ledger.ts
+      - src/patterns/source-evidence-ledger.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/text-community/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/professional-publishing/**
+    write_paths:
+      - docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/**
+    semantic_locks:
+      - pattern:reviewed-evidence-staging:visual-video
+      - pattern:body-free-local-evidence:visual-video
+    builder_family: codex
+    auditor_family: claude
+    branch: agent/pattern-stage-evidence-visual-video
+    worktree: /private/tmp/content-agents-pattern-stage-evidence-visual-video
+    acceptance_commands:
+      - npm run check
+      - npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/intake-input.json --format json
+      - npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/intake-report.json --format json
+      - git diff --check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: reviewed-metadata-provenance-and-canonical-write
+    commit_sha: null
+    audit_verdict: pending
