@@ -485,6 +485,7 @@ tasks:
       - pattern-research-professional-publishing
       - pattern-research-visual-video
       - pattern-professional-evidence-boundary-correction
+      - pattern-local-evidence-inventory
     base_sha: null
     context_paths:
       - docs/content-studio-program/candidate-account-slate-20260825.md
@@ -509,6 +510,46 @@ tasks:
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
     commit_sha: null
+    audit_verdict: pending
+  - id: pattern-local-evidence-inventory
+    batch_id: pattern-local-evidence-inventory-20260825
+    outcome: The existing 499-record local pattern corpus is accurately inventoried body-free, so the candidate slate distinguishes actual local performance evidence from fresh-public-source access limits.
+    status: auditing
+    depends_on:
+      - pattern-research-text-community
+      - pattern-research-professional-publishing
+      - pattern-research-visual-video
+      - pattern-professional-evidence-boundary-correction
+    base_sha: 432b6304531b78715f299fd04bfdc507989528b2
+    context_paths:
+      - docs/content-studio-program/protocol.md
+      - docs/content-studio-program/broad-pattern-research-policy-20260825.md
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+      - data/patterns/corpus.jsonl
+      - data/patterns/analyses.jsonl
+      - data/patterns/baselines.jsonl
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+    write_paths:
+      - docs/content-studio-program/staging/local-evidence-inventory-20260825/**
+    semantic_locks:
+      - pattern:local-evidence-inventory
+    builder_family: codex
+    auditor_family: claude
+    branch: agent/pattern-local-evidence-inventory
+    worktree: /private/tmp/content-agents-pattern-local-evidence-inventory
+    acceptance_commands:
+      - npm run check
+      - npm run patterns:data-status -- --data-dir data/patterns --format json
+      - git diff --check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-candidate-account-slate
+    commit_sha: 76641280ffae77764a292fea75a093b1813b6bc9
     audit_verdict: pending
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825

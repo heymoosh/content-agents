@@ -1,0 +1,44 @@
+{
+  "task_id": "pattern-local-evidence-inventory",
+  "batch_id": "pattern-local-evidence-inventory-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-local-evidence-inventory",
+    "family": "codex",
+    "commit_sha": "76641280ffae77764a292fea75a093b1813b6bc9",
+    "changed_paths": [
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.json",
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "TypeScript check passed."
+      },
+      {
+        "command": "npm run patterns:data-status -- --data-dir data/patterns --format json",
+        "passed": true,
+        "summary": "Read-only artifact status completed; its temporary tsx IPC socket required the host-approved sandbox exception."
+      },
+      {
+        "command": "inventory consistency assertion",
+        "passed": true,
+        "summary": "Corpus total, platform total, account total, and body-free boundary all matched."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "No whitespace errors."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "The corpus is a targeted evidence sample, not a top-creator census or universal viral ranking."
+    ],
+    "unresolved_items": [
+      "Claude cross-family audit is pending because the local Claude CLI reports that it is not logged in."
+    ]
+  }
+}
