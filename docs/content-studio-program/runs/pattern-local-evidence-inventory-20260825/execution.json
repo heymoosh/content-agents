@@ -24,7 +24,8 @@
   },
   "recovery_checkpoint": {
     "recorded_branch": "agent/pattern-local-evidence-inventory-handoff",
-    "recorded_head": "06ac80f0854a118f4f7979bede278738b948fa87",
+    "recorded_head": "7ed46c5305bf322de8bd7c8605b091fc100472c8",
+    "recovery_checkpoint_commit": "7ed46c5305bf322de8bd7c8605b091fc100472c8",
     "base_sha": "432b6304531b78715f299fd04bfdc507989528b2",
     "task_status": "auditing",
     "task_branch": "agent/pattern-local-evidence-inventory",
