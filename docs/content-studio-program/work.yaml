@@ -485,7 +485,7 @@ tasks:
       - pattern-research-professional-publishing
       - pattern-research-visual-video
       - pattern-professional-evidence-boundary-correction
-      - pattern-local-evidence-inventory-clean-commit
+      - pattern-corrected-candidate-account-slate
     base_sha: null
     context_paths:
       - docs/content-studio-program/candidate-account-slate-20260825.md
@@ -592,6 +592,49 @@ tasks:
     human_gate: consolidated-candidate-account-slate
     commit_sha: 4b7644f4b0f4ca71014be4fcd0fe579fcf119fab
     audit_verdict: passed
+  - id: pattern-corrected-candidate-account-slate
+    batch_id: pattern-corrected-candidate-slate-20260825
+    outcome: Replace the obsolete public-access-based all-hold gate with one body-free, local-evidence-backed candidate-account decision packet that keeps source-listing, measured relative-performance, account-baseline, body-completeness, repeat-engagement, metadata, and comparison-universe facts distinct.
+    status: ready
+    depends_on:
+      - pattern-local-evidence-inventory-clean-commit
+    base_sha: c8ba45d5bb636814c4451e8f56d568a6c5d6614c
+    context_paths:
+      - docs/content-studio-program/protocol.md
+      - docs/content-studio-program/broad-pattern-research-policy-20260825.md
+      - docs/content-studio-program/candidate-account-slate-20260825.md
+      - docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.json
+      - docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md
+      - docs/content-studio-program/staging/broad-pattern-research-20260825/**
+      - data/patterns/corpus.jsonl
+      - data/patterns/analyses.jsonl
+      - data/patterns/baselines.jsonl
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+    write_paths:
+      - docs/content-studio-program/staging/corrected-candidate-account-slate-20260825/**
+    semantic_locks:
+      - pattern:corrected-candidate-account-slate
+    builder_family: codex
+    auditor_family: claude
+    branch: agent/pattern-corrected-candidate-account-slate
+    worktree: /private/tmp/content-agents-pattern-corrected-candidate-account-slate
+    acceptance_commands:
+      - npm run check
+      - npm run patterns:data-status -- --data-dir data/patterns --format json
+      - git diff --check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-candidate-account-slate
+    commit_sha: null
+    audit_verdict: pending
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
     outcome: Research the 31 seed accounts on Bluesky, Dev.to, Hacker News, Mastodon, Reddit, and X into a body-free, evidence-backed text-community staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
