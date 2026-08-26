@@ -204,6 +204,61 @@ test("reroutes an unavailable auditor with durable evidence and keeps cross-fami
     ),
     /cannot reroute.*integrated/i,
   );
+
+  const completedAudit = {
+    ...existing,
+    audit: {
+      type: "audit" as const,
+      task_id: "a",
+      family: "claude",
+      verdict: "failed" as const,
+      findings: ["Correction required"],
+    },
+  };
+  assert.throws(
+    () => rerouteAuditor(work, "a", "grok", "Audit shopping", "2026-08-25T20:00:00.000Z", completedAudit),
+    /completed audit/i,
+  );
+});
+
+test("archives the completed audit and audited commit when a correction replaces the builder report", () => {
+  const priorCommit = "b".repeat(40);
+  const nextCommit = "c".repeat(40);
+  const priorBuilder: BuilderReport = {
+    type: "builder",
+    task_id: "a",
+    family: "codex",
+    commit_sha: priorCommit,
+    changed_paths: ["src/a/index.ts"],
+    acceptance_commands: [{ command: "npm run check", passed: true, summary: "passed" }],
+    behavior_impact: "none",
+    logic_impact: "none",
+    risks: [],
+    unresolved_items: [],
+  };
+  const failedAudit: AuditReport = {
+    type: "audit",
+    task_id: "a",
+    family: "grok",
+    verdict: "failed",
+    findings: ["Correction required"],
+  };
+  const correctedBuilder = { ...priorBuilder, commit_sha: nextCommit };
+  const work = validateWorkManifest(manifest([task("a", {
+    status: "needs-fix",
+    commit_sha: priorCommit,
+    audit_verdict: "failed",
+  })]));
+
+  const updated = applyTaskReport(work, correctedBuilder, {
+    task_id: "a",
+    batch_id: "batch-001",
+    builder: priorBuilder,
+    audit: failedAudit,
+  });
+
+  assert.deepEqual(updated.run.audit_history, [{ ...failedAudit, commit_sha: priorCommit }]);
+  assert.equal(updated.run.audit, undefined);
 });
 
 test("rejects unknown task and report families", () => {

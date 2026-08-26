@@ -12,9 +12,11 @@ not use the repository backlog, conductor, shared worker state, or a worker-auth
 
 All coordinator mutations run from the single linked worktree on the `coordinator_branch` recorded
 in `work.yaml`. The CLI rejects coordinator writes from the primary checkout or another branch.
-Every durable manifest write compares and advances `state_revision`; a stale coordinator must
+An OS-atomic exclusive lock serializes the full mutation from state reload through durable writes,
+and every manifest write also compares and advances `state_revision`; a stale coordinator must
 reload instead of overwriting newer state. Read-only `status` and `validate` remain available from
-any checkout.
+any checkout. If a process crashes and leaves `.coordinator-mutation.lock`, the next coordinator
+must confirm its recorded PID is no longer running before removing that one lock file.
 
 When one transition updates both a run record and the manifest, the coordinator persists the
 prospective run evidence first and commits the revision-checked manifest transition last. If the
@@ -121,6 +123,8 @@ files, for example `studio:conversation-routing` or `publish:approval-gate`.
    `reroute-auditor` to select another available cross-family auditor. The run record retains the
    original family, replacement family, timestamp, and concrete availability reason. Unavailability
    is not an audit failure, and the coordinator must not block while an authorized fallback exists.
+   Rerouting is forbidden after an audit report exists; a corrected builder report first archives
+   that report and its audited commit in `audit_history`, then clears the current audit for re-audit.
 8. The coordinator runs `verify-diff` on the final full commit SHA. The task becomes `accepted`
    only after the final diff is in lease, all named acceptance commands passed, and the
    cross-family audit passed. Audit and diff verification may arrive in either order.

@@ -312,6 +312,7 @@ export const auditReportSchema = z.object({
   verdict: z.enum(["passed", "failed"]),
   findings: z.array(z.string()),
 }).strict();
+const auditHistoryEntrySchema = auditReportSchema.extend({ commit_sha: shaSchema }).strict();
 export const integrationReportSchema = z.object({
   type: z.literal("integration"),
   task_id: z.string().min(1),
@@ -322,6 +323,7 @@ export const taskReportSchema = z.discriminatedUnion("type", [builderReportSchem
 export type TaskReport = z.infer<typeof taskReportSchema>;
 export type BuilderReport = z.infer<typeof builderReportSchema>;
 export type AuditReport = z.infer<typeof auditReportSchema>;
+export type AuditHistoryEntry = z.infer<typeof auditHistoryEntrySchema>;
 export type IntegrationReport = z.infer<typeof integrationReportSchema>;
 
 export interface RunRecord {
@@ -329,6 +331,7 @@ export interface RunRecord {
   batch_id?: string;
   builder?: BuilderReport;
   audit?: AuditReport;
+  audit_history?: AuditHistoryEntry[];
   integration?: IntegrationReport;
   diff_verified?: boolean;
   verified_commit?: string;
@@ -352,6 +355,10 @@ function normalizeRunRecord(run: RunRecord): RunRecord {
     ...run,
     builder: run.builder ? normalizeReport(run.builder) as BuilderReport : undefined,
     audit: run.audit ? normalizeReport(run.audit) as AuditReport : undefined,
+    audit_history: run.audit_history?.map((entry) => ({
+      ...normalizeReport(entry) as AuditReport,
+      commit_sha: entry.commit_sha,
+    })),
     integration: run.integration ? normalizeReport(run.integration) as IntegrationReport : undefined,
     audit_routing: run.audit_routing?.map((event) => ({
       ...event,
@@ -366,6 +373,7 @@ export const runRecordSchema = z.object({
   batch_id: z.string().min(1),
   builder: builderReportSchema.optional(),
   audit: auditReportSchema.optional(),
+  audit_history: z.array(auditHistoryEntrySchema).optional(),
   integration: integrationReportSchema.optional(),
   diff_verified: z.boolean().optional(),
   verified_commit: shaSchema.optional(),
@@ -406,6 +414,9 @@ export function rerouteAuditor(
   if (!task) throw new Error(`unknown task: ${taskId}`);
   if (["accepted", "integrated"].includes(task.status)) {
     throw new Error(`task ${task.id} cannot reroute its auditor from status ${task.status}`);
+  }
+  if (existing?.audit) {
+    throw new Error(`task ${task.id} cannot reroute after a completed audit; record a corrected builder report first`);
   }
   const nextFamily = normalizeModelFamily(nextFamilyLabel);
   if (nextFamily === task.builder_family) {
@@ -462,7 +473,18 @@ export function applyTaskReport(
       throw new Error(`builder report family ${report.family} does not own task ${task.id}`);
     }
     verifyChangedPaths(task, report.changed_paths);
-    run = { ...run, builder: report, audit: undefined, integration: undefined, diff_verified: false, verified_commit: undefined };
+    const completedAudit = run.audit && run.builder
+      ? [{ ...run.audit, commit_sha: run.builder.commit_sha }]
+      : [];
+    run = {
+      ...run,
+      builder: report,
+      audit: undefined,
+      audit_history: [...(run.audit_history ?? []), ...completedAudit],
+      integration: undefined,
+      diff_verified: false,
+      verified_commit: undefined,
+    };
     updated = { ...task, status: "auditing", commit_sha: report.commit_sha, audit_verdict: "pending" };
   } else if (report.type === "audit") {
     if (task.status !== "auditing") throw new Error(`audit report is not allowed from status ${task.status}`);

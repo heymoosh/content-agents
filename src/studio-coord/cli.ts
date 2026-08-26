@@ -22,10 +22,12 @@ import {
   type WorkManifest,
 } from "./coordinator.js";
 import { inspectCleanBaseline, inspectCleanWorktree, inspectCoordinatorMutationContext, verifyTaskCommit } from "./git.js";
+import { withCoordinatorFileLock } from "./lock.js";
 
 const root = process.cwd();
 const programDir = join(root, "docs", "content-studio-program");
 const workPath = join(programDir, "work.yaml");
+const mutationLockPath = join(programDir, ".coordinator-mutation.lock");
 
 function readJson(path: string): unknown {
   try {
@@ -184,10 +186,10 @@ function main(args: string[]): void {
   const [command, ...rest] = args;
   if (command === "status" && rest.length === 0) return status();
   if (command === "validate" && rest.length === 0) return validate();
-  if (command === "claim" && rest.length === 1) return claim(rest[0]!);
-  if (command === "verify-diff" && rest.length === 2) return verifyDiff(rest[0]!, rest[1]!);
-  if (command === "report" && rest.length === 2) return report(rest[0]!, rest[1]!);
-  if (command === "reroute-auditor" && rest.length === 3) return reroute(rest[0]!, rest[1]!, rest[2]!);
+  if (command === "claim" && rest.length === 1) return withCoordinatorFileLock(mutationLockPath, () => claim(rest[0]!));
+  if (command === "verify-diff" && rest.length === 2) return withCoordinatorFileLock(mutationLockPath, () => verifyDiff(rest[0]!, rest[1]!));
+  if (command === "report" && rest.length === 2) return withCoordinatorFileLock(mutationLockPath, () => report(rest[0]!, rest[1]!));
+  if (command === "reroute-auditor" && rest.length === 3) return withCoordinatorFileLock(mutationLockPath, () => reroute(rest[0]!, rest[1]!, rest[2]!));
   usage();
 }
 

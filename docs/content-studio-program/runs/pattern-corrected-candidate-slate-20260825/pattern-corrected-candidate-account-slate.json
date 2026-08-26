@@ -39,6 +39,20 @@
   },
   "diff_verified": true,
   "verified_commit": "d220c40b276d879e41983a4165ff4b7f6f2b219b",
+  "audit_history": [
+    {
+      "type": "audit",
+      "task_id": "pattern-corrected-candidate-account-slate",
+      "family": "claude",
+      "verdict": "failed",
+      "findings": [
+        "Blocking: regenerate the Markdown R column so its 65 account rows match JSON/corpus admitted/comparator totals (132/123).",
+        "Blocking: use one source-winner definition consistently across scope, platform, and account rows; current account rows sum 232 while scope/platform state 207.",
+        "The prior cohort-count, Reddit sub-count, hold-rationale, body-free, lease, and decision-gate issues are corrected or pass."
+      ],
+      "commit_sha": "3acb35ba48611f5654974672860fa011aff7cdb2"
+    }
+  ],
   "audit_routing": [
     {
       "from_family": "claude",
