@@ -5,7 +5,7 @@
     "type": "builder",
     "task_id": "pattern-stage-evidence-consolidated-review-claude",
     "family": "claude",
-    "commit_sha": "6c2b648eaad82c62f65dead7ad8d70f733a47488",
+    "commit_sha": "099c6b18d6325f82ca75f1835808f565985b6fa8",
     "changed_paths": [
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/summary.json",
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/morning-review.md",
@@ -17,7 +17,7 @@
       {
         "command": "npm run check",
         "passed": true,
-        "summary": "Typecheck passed after correction."
+        "summary": "Typecheck passed after final prose correction."
       },
       {
         "command": "node docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs",
@@ -27,14 +27,14 @@
       {
         "command": "git diff --check",
         "passed": true,
-        "summary": "Whitespace check passed for the corrected five-file leased diff."
+        "summary": "Whitespace check passed for the final five-file leased diff."
       }
     ],
     "behavior_impact": "None; review documentation and a read-only verifier only.",
     "logic_impact": "None; no generation, review, publishing, or canonical ledger logic changed.",
     "risks": [
       "The verifier intentionally fails closed if future lane proposal wording or readiness/status contracts change.",
-      "Professional metadata uses unknown on all 14 accounts in the actual lane report; the packet preserves that instead of the failed audit's mistaken 62/3 shorthand."
+      "Professional lane placeholders and local-corpus scope labels remain unreviewed facts about staging state, not approved metadata."
     ],
     "unresolved_items": [
       "All 576 staged rows remain blocked pending Muxin's decisions.",
@@ -55,20 +55,21 @@
         "Passing checks: five-file lease, 65 unique disjoint account keys, 499 sources, 12 baselines, 576 blocked rows, 30/8/27 proposals, body-free output, bounded usable decision sheet, no em dashes, npm run check, current verifier, and git diff --check."
       ],
       "commit_sha": "337304b7176f14ecfde18469255d7b09b0cf6880"
+    },
+    {
+      "type": "audit",
+      "task_id": "pattern-stage-evidence-consolidated-review-claude",
+      "family": "codex",
+      "verdict": "failed",
+      "findings": [
+        "High: verified-facts-vs-unknowns.md claims disposition pending on all 499 evidence rows, but evidence rows have no disposition field; text and visual status/reviewStatus are null, while professional status is blocked and reviewStatus pending.",
+        "High: verified-facts-vs-unknowns.md flattens professional audience and scope fields to null. Professional accounts and evidence use explicit unknown and local-corpus scope values recorded by that lane.",
+        "Medium: morning-review.md calls local source/evidence counts already-published counts, while the lane packets describe them as local source records.",
+        "Passing checks: fully fail-closed verifier and both negative mutations, 65/499/12 totals, 576 blocked with zero ready/unmapped, 30/8/27 proposals, five-file lease, actual professional 14-unknown and 11-partial/3-blocked semantics, body-free authority denials, no outside catalog figure, no em dashes, npm run check, exact verifier, and git diff --check."
+      ],
+      "commit_sha": "6c2b648eaad82c62f65dead7ad8d70f733a47488"
     }
   ],
   "diff_verified": true,
-  "verified_commit": "6c2b648eaad82c62f65dead7ad8d70f733a47488",
-  "audit": {
-    "type": "audit",
-    "task_id": "pattern-stage-evidence-consolidated-review-claude",
-    "family": "codex",
-    "verdict": "failed",
-    "findings": [
-      "High: verified-facts-vs-unknowns.md claims disposition pending on all 499 evidence rows, but evidence rows have no disposition field; text and visual status/reviewStatus are null, while professional status is blocked and reviewStatus pending.",
-      "High: verified-facts-vs-unknowns.md flattens professional audience and scope fields to null. Professional accounts and evidence use explicit unknown and local-corpus scope values recorded by that lane.",
-      "Medium: morning-review.md calls local source/evidence counts already-published counts, while the lane packets describe them as local source records.",
-      "Passing checks: fully fail-closed verifier and both negative mutations, 65/499/12 totals, 576 blocked with zero ready/unmapped, 30/8/27 proposals, five-file lease, actual professional 14-unknown and 11-partial/3-blocked semantics, body-free authority denials, no outside catalog figure, no em dashes, npm run check, exact verifier, and git diff --check."
-    ]
-  }
+  "verified_commit": "099c6b18d6325f82ca75f1835808f565985b6fa8"
 }
