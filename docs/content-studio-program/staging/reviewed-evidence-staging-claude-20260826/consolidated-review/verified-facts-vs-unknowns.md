@@ -22,10 +22,11 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
   `platform|handle` join (text-community and visual-video document the exact match method in their
   decision packets; professional-publishing takes the key from the same corrected slate). The 65
   keys are unique strings; no key repeats across or within lanes.
-- **Baseline provenance (text-community only).** The 12 baseline rows are matched one-to-one to 6
-  named Reddit accounts by `platform|handle`; `metric`, `sampleSize`, and `window` are the source
-  projection's real values, copied as-is. The other two lanes carry zero baseline rows because
-  their corrected-slate accounts record `b: 0`; no baseline is invented for them.
+- **Baseline provenance (text-community only).** The 12 baseline rows map two rows each to 6
+  named Reddit accounts by `platform|handle` (a many-to-one account mapping, not one row per
+  account). `metric`, `sampleSize`, and `window` are the source projection's real values, copied
+  as-is. The other two lanes carry zero baseline rows because their corrected-slate accounts
+  record `b: 0`; no baseline is invented for them.
 - **Body-completeness split, where recorded.** Text-community: 172 evidence rows `bodyComplete:
   true`, 140 `false`, 42 `null` (all 42 Mastodon). Visual-video: Instagram 0/13 true (11 false, 2
   null), TikTok 37/38 true, YouTube 24/24 true. Professional-publishing's per-account
@@ -67,11 +68,16 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
 
 ### Audience
 
-- Text-community and visual-video: `audienceSnapshot` and `audienceSizeSnapshot` are `null` for
-  every account and every evidence row in both lanes. Professional-publishing uses the literal
-  placeholder string `"unknown"` instead of `null`: `audienceSnapshot` is `"unknown"` on all 14
-  account rows, and `audienceSizeSnapshot` is `"unknown"` on all 70 evidence rows. No follower
-  count, subscriber count, or audience-size figure is asserted anywhere in this package.
+- Text-community and visual-video: `audienceSnapshot` is an account-row field, present and `null`
+  on every one of the 51 account rows (31 + 20) in both lanes; account rows carry no
+  `audienceSizeSnapshot` field at all. `audienceSizeSnapshot` is an evidence-row field, present and
+  `null` on every one of the 429 evidence rows (354 + 75) in both lanes; evidence rows carry no
+  `audienceSnapshot` field at all. The two fields never coexist on the same row, so "absent on that
+  row type" and "present and null" are distinct facts and are not conflated here.
+  Professional-publishing uses the literal placeholder string `"unknown"` instead of `null`, on the
+  same row-type split: `audienceSnapshot` is `"unknown"` on all 14 account rows, and
+  `audienceSizeSnapshot` is `"unknown"` on all 70 evidence rows. No follower count, subscriber
+  count, or audience-size figure is asserted anywhere in this package.
 
 ### Scope (popularity / sample / baseline)
 
@@ -108,9 +114,12 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
 
 - Cross-reference blockers: every text-community evidence row (354) carries "account reference is
   unmapped or ambiguous" because `accountId` is `null` throughout that lane's source projection.
-  Visual-video's 75 evidence rows resolve this cross-reference (each carries its own real
-  `sourceId`/`postId`) but remain blocked on the same identity/pool/format/audience fields as every
-  other lane, plus "account metadata is not ready" since the parent account is itself pending.
+  Visual-video's 75 evidence rows resolve this cross-reference because each row's own `accountId`
+  (its `platform` plus normalized `handle`, e.g. `instagram|adriennemareebrown`) matches its
+  account row's key exactly: `sourceId`/`postId` are separate source-record identifiers on the
+  same rows and are not the account join. Every visual-video row remains blocked on the same
+  identity/pool/format/audience fields as every other lane, plus "account metadata is not ready"
+  since the parent account is itself pending.
 - Caption, transcript, and on-screen-text completeness is not collected for any of the 75
   visual-video evidence rows; `format`/`medium` are left `null` there by design, since the source
   projection's own `format` field is a paraphrased structural note, not a category.

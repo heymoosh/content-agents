@@ -2,7 +2,10 @@
 
 Observed 2026-08-26. This page reconciles the three text/community, professional/publishing, and
 visual/video staging lanes into one status table. It does not reclassify, rank, or advance any row.
-Every row in all three lanes stays `pending` or `blocked`.
+All 576 account, evidence, and baseline rows across the three lanes carry `readiness.status:
+"blocked"`, and all 65 account rows carry `disposition: "pending"`. Evidence and baseline rows'
+own `status`/`reviewStatus` fields are lane-specific, not a uniform pending/blocked pair. See
+`verified-facts-vs-unknowns.md` for the exact per-lane shape.
 
 ## Lane packets
 
@@ -28,8 +31,12 @@ Full detail in [summary.json](summary.json). Reconciliation is verified by [veri
 | **Total** | 13 platforms | **65** | **499** | **12** | **30** | **8** | **27** | **0** |
 
 All three lanes report intake readiness `status: "blocked"`. Zero rows anywhere are `ready`,
-`reviewed`, or `unmapped`. The 65 account keys are disjoint across lanes (verified in
-`summary.json`'s reconciliation block and by `verify.mjs`); no key repeats.
+`reviewed`, or `unmapped`. All 65 account rows carry `disposition: "pending"`. Evidence and
+baseline `status`/`reviewStatus` fields differ by lane: text-community and visual-video evidence
+rows carry `status: null` / `reviewStatus: null`; professional-publishing evidence rows carry
+`status: "blocked"` / `reviewStatus: "pending"`; the 12 text-community baseline rows carry no
+`status` field at all and `reviewStatus: null`. The 65 account keys are disjoint across lanes
+(verified in `summary.json`'s reconciliation block and by `verify.mjs`); no key repeats.
 
 ## What this review does and does not authorize
 
@@ -44,8 +51,9 @@ All three lanes report intake readiness `status: "blocked"`. Zero rows anywhere 
 
 **Does not:**
 
-- Does not reclassify, rank, score, or advance any account or evidence row. Every row stays
-  `pending` or `blocked` exactly as its lane's `intake-report.json` reports it.
+- Does not reclassify, rank, score, or advance any account or evidence row. Every row's
+  `readiness.status`, `disposition`, `status`, and `reviewStatus` stay exactly as its lane's
+  `intake-report.json` reports them.
 - Does not select a canonical, best, viral, or winning account or source.
 - Does not write, propose, or imply a `data/patterns/**` canonical record. No canonical write
   follows from this package.

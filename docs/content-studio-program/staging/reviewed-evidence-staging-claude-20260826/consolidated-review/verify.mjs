@@ -30,6 +30,19 @@ const LANE_TOTALS = {
   'visual-video': { accounts: 20, evidence: 75, baselines: 0, recommend: 5, hold: 2, research_further: 13 },
 };
 
+// Lane-specific evidence-row status/reviewStatus shape. Exact per lane, never a cross-lane union:
+// a text-community/visual-video row must be null/null, a professional-publishing row must be
+// exactly "blocked"/"pending" -- either direction of mismatch fails.
+const LANE_EVIDENCE_STATUS_SHAPE = {
+  'text-community': { status: null, reviewStatus: null },
+  'professional-publishing': { status: 'blocked', reviewStatus: 'pending' },
+  'visual-video': { status: null, reviewStatus: null },
+};
+
+// Baseline rows (text-community only, 12 rows) carry no "status" key at all and reviewStatus:
+// null -- a distinct shape from evidence rows, not the lane's evidence shape reused.
+const BASELINE_STATUS_SHAPE = { status: null, reviewStatus: null };
+
 const failures = [];
 
 function fail(msg) {
@@ -53,12 +66,19 @@ function dispositionLabel(reason) {
   return null;
 }
 
-// Reject anything but the two placeholder values these fields are allowed to carry while
-// every row stays pending/blocked: an explicit "reviewed"/"ready"/"unmapped" claim must fail.
-function checkPlaceholderField(lane, rowKind, rowId, fieldName, value, allowedNonNull) {
-  if (value === undefined || value === null) return;
-  if (value === allowedNonNull) return;
-  fail(`${lane}: ${rowKind} ${rowId} has ${fieldName} "${value}", expected null or "${allowedNonNull}"`);
+function isNullish(v) {
+  return v === null || v === undefined;
+}
+
+// Exact-shape check: expected null means the field must be null or absent; expected a string
+// means the field must equal that string exactly. No union of the two is ever accepted, so a
+// field flipping either direction (null -> value or value -> null) fails closed.
+function checkExactField(lane, rowKind, rowId, fieldName, actual, expected) {
+  if (expected === null) {
+    if (!isNullish(actual)) fail(`${lane}: ${rowKind} ${rowId} has ${fieldName} "${actual}", expected null`);
+  } else if (actual !== expected) {
+    fail(`${lane}: ${rowKind} ${rowId} has ${fieldName} "${actual}", expected "${expected}"`);
+  }
 }
 
 function rowId(row) {
@@ -143,6 +163,12 @@ for (const lane of LANES) {
   if (bridgeCounts.accounts !== expected.accounts) fail(`${lane}: ledger-bridge-report.json counts.accounts mismatch (${bridgeCounts.accounts} != ${expected.accounts})`);
   if (bridgeCounts.sources !== expected.evidence) fail(`${lane}: ledger-bridge-report.json counts.sources mismatch (${bridgeCounts.sources} != ${expected.evidence})`);
   if (bridgeCounts.baselines !== expected.baselines) fail(`${lane}: ledger-bridge-report.json counts.baselines mismatch (${bridgeCounts.baselines} != ${expected.baselines})`);
+  // counts.total must equal both the fixed lane row total and the independent sum of its own
+  // accounts/sources/baselines fields -- catches a decremented/edited total even if the three
+  // category counts above are individually untouched.
+  if (bridgeCounts.total !== laneRowTotal) fail(`${lane}: ledger-bridge-report.json counts.total mismatch (${bridgeCounts.total} != ${laneRowTotal})`);
+  const bridgeCategorySum = (bridgeCounts.accounts || 0) + (bridgeCounts.sources || 0) + (bridgeCounts.baselines || 0);
+  if (bridgeCounts.total !== bridgeCategorySum) fail(`${lane}: ledger-bridge-report.json counts.total (${bridgeCounts.total}) does not equal counts.accounts + counts.sources + counts.baselines (${bridgeCategorySum})`);
   if (bridge.bodyIncluded !== false) fail(`${lane}: ledger-bridge-report.json bodyIncluded expected false, found ${bridge.bodyIncluded}`);
   if (bridge.sideEffects !== 'none') fail(`${lane}: ledger-bridge-report.json sideEffects expected "none", found "${bridge.sideEffects}"`);
 
@@ -167,16 +193,18 @@ for (const lane of LANES) {
   if (dispCounts.hold !== expected.hold) fail(`${lane}: hold count mismatch (${dispCounts.hold} != ${expected.hold})`);
   if (dispCounts.research_further !== expected.research_further) fail(`${lane}: research_further count mismatch (${dispCounts.research_further} != ${expected.research_further})`);
 
-  // Every evidence/baseline row's status and reviewStatus must be null or the one pending/blocked
-  // placeholder value; anything else (including an explicit "reviewed"/"ready"/"unmapped" claim)
-  // fails closed instead of being silently ignored.
+  // Every evidence row's status/reviewStatus must match this lane's exact shape -- text-community
+  // and visual-video null/null, professional-publishing "blocked"/"pending" -- with no cross-lane
+  // union: a text-community row reading "blocked" fails just as loudly as a professional-publishing
+  // row reading null. Baseline rows (text-community only) use their own null/null shape.
+  const evidenceShape = LANE_EVIDENCE_STATUS_SHAPE[lane];
   for (const e of evidence) {
-    checkPlaceholderField(lane, 'evidence row', rowId(e), 'status', e.status, 'blocked');
-    checkPlaceholderField(lane, 'evidence row', rowId(e), 'reviewStatus', e.reviewStatus, 'pending');
+    checkExactField(lane, 'evidence row', rowId(e), 'status', e.status, evidenceShape.status);
+    checkExactField(lane, 'evidence row', rowId(e), 'reviewStatus', e.reviewStatus, evidenceShape.reviewStatus);
   }
   for (const b of baselines) {
-    checkPlaceholderField(lane, 'baseline row', rowId(b), 'status', b.status, 'blocked');
-    checkPlaceholderField(lane, 'baseline row', rowId(b), 'reviewStatus', b.reviewStatus, 'pending');
+    checkExactField(lane, 'baseline row', rowId(b), 'status', b.status, BASELINE_STATUS_SHAPE.status);
+    checkExactField(lane, 'baseline row', rowId(b), 'reviewStatus', b.reviewStatus, BASELINE_STATUS_SHAPE.reviewStatus);
   }
 
   // Every row (account, evidence, baseline) must carry readiness.status === "blocked" exactly;
@@ -279,14 +307,39 @@ if (summary) {
     }
     const expected = LANE_TOTALS[lane];
     const laneRowTotal = expected.accounts + expected.evidence + expected.baselines;
-    if (laneSummary.accounts?.total !== expected.accounts) fail(`summary.json lanes.${lane}.accounts.total mismatch`);
-    if (laneSummary.evidence?.total !== expected.evidence) fail(`summary.json lanes.${lane}.evidence.total mismatch`);
-    if (laneSummary.baselines?.total !== expected.baselines) fail(`summary.json lanes.${lane}.baselines.total mismatch`);
+    const intakeSummary = laneReports[lane]?.intake?.summary;
+
+    // Each category block (accounts/evidence/baselines) is checked field-by-field -- total, ready,
+    // blocked, unmapped -- against both the fixed expected shape (ready 0, blocked == count,
+    // unmapped 0) and the lane's own intake-report.json summary block, not just .total. This is
+    // what catches a category's ready flipped 0 -> 1 even though its total is untouched.
+    const categoryExpected = { accounts: expected.accounts, evidence: expected.evidence, baselines: expected.baselines };
+    for (const [key, count] of Object.entries(categoryExpected)) {
+      const c = laneSummary[key];
+      if (!c) {
+        fail(`summary.json lanes.${lane}.${key} missing`);
+        continue;
+      }
+      if (c.total !== count) fail(`summary.json lanes.${lane}.${key}.total mismatch (${c.total} != ${count})`);
+      if (c.ready !== 0) fail(`summary.json lanes.${lane}.${key}.ready expected 0, found ${c.ready}`);
+      if (c.blocked !== count) fail(`summary.json lanes.${lane}.${key}.blocked expected ${count}, found ${c.blocked}`);
+      if (c.unmapped !== 0) fail(`summary.json lanes.${lane}.${key}.unmapped expected 0, found ${c.unmapped}`);
+
+      const ic = intakeSummary?.[key];
+      if (ic) {
+        if (c.total !== ic.total) fail(`summary.json lanes.${lane}.${key}.total (${c.total}) does not match ${lane}/intake-report.json summary.${key}.total (${ic.total})`);
+        if (c.ready !== ic.ready) fail(`summary.json lanes.${lane}.${key}.ready (${c.ready}) does not match ${lane}/intake-report.json summary.${key}.ready (${ic.ready})`);
+        if (c.blocked !== ic.blocked) fail(`summary.json lanes.${lane}.${key}.blocked (${c.blocked}) does not match ${lane}/intake-report.json summary.${key}.blocked (${ic.blocked})`);
+        if (c.unmapped !== ic.unmapped) fail(`summary.json lanes.${lane}.${key}.unmapped (${c.unmapped}) does not match ${lane}/intake-report.json summary.${key}.unmapped (${ic.unmapped})`);
+      }
+    }
+
     if (laneSummary.proposals?.recommend !== expected.recommend) fail(`summary.json lanes.${lane}.proposals.recommend mismatch`);
     if (laneSummary.proposals?.hold !== expected.hold) fail(`summary.json lanes.${lane}.proposals.hold mismatch`);
     if (laneSummary.proposals?.research_further !== expected.research_further) fail(`summary.json lanes.${lane}.proposals.research_further mismatch`);
 
     const laneReadiness = laneSummary.readiness;
+    const intakeReadiness = laneReports[lane]?.intake?.readiness;
     if (!laneReadiness) {
       fail(`summary.json lanes.${lane}.readiness missing`);
     } else {
@@ -295,6 +348,15 @@ if (summary) {
       if (laneReadiness.ready !== 0) fail(`summary.json lanes.${lane}.readiness.ready expected 0, found ${laneReadiness.ready}`);
       if (laneReadiness.blocked !== laneRowTotal) fail(`summary.json lanes.${lane}.readiness.blocked expected ${laneRowTotal}, found ${laneReadiness.blocked}`);
       if (laneReadiness.unmapped !== 0) fail(`summary.json lanes.${lane}.readiness.unmapped expected 0, found ${laneReadiness.unmapped}`);
+      // Cross-checked against the lane's own intake-report.json readiness block, not only the
+      // hardcoded fixed shape above.
+      if (intakeReadiness) {
+        if (laneReadiness.status !== intakeReadiness.status) fail(`summary.json lanes.${lane}.readiness.status (${laneReadiness.status}) does not match ${lane}/intake-report.json readiness.status (${intakeReadiness.status})`);
+        if (laneReadiness.total !== intakeReadiness.total) fail(`summary.json lanes.${lane}.readiness.total (${laneReadiness.total}) does not match ${lane}/intake-report.json readiness.total (${intakeReadiness.total})`);
+        if (laneReadiness.ready !== intakeReadiness.ready) fail(`summary.json lanes.${lane}.readiness.ready (${laneReadiness.ready}) does not match ${lane}/intake-report.json readiness.ready (${intakeReadiness.ready})`);
+        if (laneReadiness.blocked !== intakeReadiness.blocked) fail(`summary.json lanes.${lane}.readiness.blocked (${laneReadiness.blocked}) does not match ${lane}/intake-report.json readiness.blocked (${intakeReadiness.blocked})`);
+        if (laneReadiness.unmapped !== intakeReadiness.unmapped) fail(`summary.json lanes.${lane}.readiness.unmapped (${laneReadiness.unmapped}) does not match ${lane}/intake-report.json readiness.unmapped (${intakeReadiness.unmapped})`);
+      }
     }
 
     const laneKeysInSummary = Array.isArray(laneSummary.accountKeys) ? laneSummary.accountKeys : [];

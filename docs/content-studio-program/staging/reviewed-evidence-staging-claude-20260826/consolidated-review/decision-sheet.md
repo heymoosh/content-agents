@@ -6,8 +6,10 @@ blank.
 **Null rule (stated once, applies to every blank field on this sheet):** a blank or `null` answer
 means "not answered now." It never means false, excluded, or reviewed.
 
-Nothing on this sheet is reviewed metadata or a canonical write. Every row in all three lanes stays
-`pending` or `blocked` until you answer, and this sheet's answers still route through
+Nothing on this sheet is reviewed metadata or a canonical write. Until you answer, all 576 account,
+evidence, and baseline rows across the three lanes keep `readiness.status: "blocked"` and all 65
+account rows keep `disposition: "pending"` (evidence/baseline `status`/`reviewStatus` stay
+lane-specific, per `verified-facts-vs-unknowns.md`), and this sheet's answers still route through
 `pattern-reviewed-metadata-input`, not straight to a canonical `data/patterns/**` record.
 
 ---
@@ -74,8 +76,10 @@ Decide whether a later, exclusive data steward may resolve these three gaps from
 1. Stable account IDs for all 65 accounts (currently `unconfirmed`/`null` everywhere).
    Answer: ______
 2. The `accountId` cross-reference gap on evidence rows (all 354 text-community rows carry "account
-   reference is unmapped or ambiguous"; visual-video's 75 rows resolve this already via
-   `sourceId`/`postId`; professional-publishing's rows carry `platform|handle` as `accountId`).
+   reference is unmapped or ambiguous" because `accountId` is `null`; visual-video's 75 rows
+   already resolve this because each row's own `accountId` (`platform` plus normalized `handle`)
+   matches its account row's key: `sourceId`/`postId` are separate source-record identifiers, not
+   the account join; professional-publishing's rows also carry `platform|handle` as `accountId`).
    Answer: ______
 3. The 12 text-community baseline rows' withheld `numerator`/`denominator`/`settledSampleDate`.
    Answer: ______
