@@ -549,7 +549,7 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: null
+    commit_sha: 76641280ffae77764a292fea75a093b1813b6bc9
     audit_verdict: pending
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
