@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 29
+state_revision: 33
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -975,7 +975,7 @@ tasks:
   - id: pattern-stage-evidence-text-community-claude
     batch_id: pattern-reviewed-evidence-staging-claude-20260826
     outcome: Rebuild the exact 31-account, 354-source, 12-baseline text/community body-free staging proposal with Claude as builder and Codex as auditor, preserving 14 recommend, 6 hold, and 11 research-further dispositions without reviewed or canonical claims.
-    status: building
+    status: auditing
     depends_on:
       - pattern-corrected-candidate-account-slate
     base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
@@ -1028,7 +1028,7 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: reviewed-metadata-provenance-and-canonical-write
-    commit_sha: null
+    commit_sha: cac80e73d43f323b101fa7d7603305b278de476a
     audit_verdict: pending
   - id: pattern-stage-evidence-professional-publishing-claude
     batch_id: pattern-reviewed-evidence-staging-claude-20260826
@@ -1091,7 +1091,7 @@ tasks:
   - id: pattern-stage-evidence-visual-video-claude
     batch_id: pattern-reviewed-evidence-staging-claude-20260826
     outcome: Rebuild the exact 20-account, 75-source visual/video body-free staging proposal with Claude as builder and Codex as auditor, preserving 5 recommend, 2 hold, 13 research-further, and explicit body and media gaps.
-    status: building
+    status: auditing
     depends_on:
       - pattern-corrected-candidate-account-slate
     base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
@@ -1144,5 +1144,5 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: reviewed-metadata-provenance-and-canonical-write
-    commit_sha: 6be528c0cd5ac58b90d2bb452a64e5abce72db86
-    audit_verdict: failed
+    commit_sha: e7a7c23e88ab093a1711d0fbfdc429e94d6f6f63
+    audit_verdict: pending

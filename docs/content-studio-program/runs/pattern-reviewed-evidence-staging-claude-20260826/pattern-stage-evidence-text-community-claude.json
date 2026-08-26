@@ -1,0 +1,51 @@
+{
+  "task_id": "pattern-stage-evidence-text-community-claude",
+  "batch_id": "pattern-reviewed-evidence-staging-claude-20260826",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-stage-evidence-text-community-claude",
+    "family": "claude",
+    "commit_sha": "cac80e73d43f323b101fa7d7603305b278de476a",
+    "changed_paths": [
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-input.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/ledger-bridge-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/decision-packet.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Typecheck passed locally."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-input.json --format json",
+        "passed": true,
+        "summary": "Accepted 31 accounts, 354 source rows, and 12 baselines as blocked or pending, with no side effects."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-report.json --format json",
+        "passed": true,
+        "summary": "Projected 31 accounts, 354 sources, and 12 baselines with bodyIncluded false and sideEffects none."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Whitespace check passed for the leased diff."
+      }
+    ],
+    "behavior_impact": "None; body-free staging artifacts only.",
+    "logic_impact": "None; existing intake and bridge contracts are consumed unchanged.",
+    "risks": [
+      "All rows remain blocked or pending until consolidated human review.",
+      "Account references are matched from the safe projection by normalized platform and handle because projection accountId fields are null."
+    ],
+    "unresolved_items": [
+      "Muxin must review the 31 proposed account dispositions and provenance gaps before any canonical write.",
+      "No ranking or best-account claim is established."
+    ]
+  },
+  "audit_history": [],
+  "diff_verified": true,
+  "verified_commit": "cac80e73d43f323b101fa7d7603305b278de476a"
+}
