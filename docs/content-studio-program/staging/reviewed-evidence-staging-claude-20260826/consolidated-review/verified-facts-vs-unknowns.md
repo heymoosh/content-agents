@@ -44,11 +44,16 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
 
 ### Topic, focus, niche
 
-- Topics, focus, and niche label are `null` for every one of the 65 accounts in every lane; none
-  has been reviewed.
-- The 3 Threads accounts (professional-publishing) additionally carry `topics: "unknown"`,
-  `focus: "unknown"`, `format: "unknown"` at the account level, an explicit boundary preserved from
-  an earlier correction after direct profile access was blocked during research.
+- Topics, focus, and niche label are `null` for the 51 text-community and visual-video accounts
+  (31 + 20); none has been reviewed.
+- The professional-publishing lane's schema instead records the string `"unknown"` for `topics`,
+  `focus`, `nicheLabel`, and `format` on all 14 of its accounts, not only the 3 Threads accounts.
+  Within that lane: the 3 Threads accounts (`threads|danidonovan`, `threads|rowancheung`,
+  `threads|thedankoe`) carry `unknown` as an explicit boundary preserved from an earlier correction
+  after direct profile access was blocked during research; the other 11 accounts (LinkedIn,
+  Substack, Substack Notes) carry the same `unknown` placeholder because disposition is still
+  pending, even though their broad-research profile access was not blocked and returned partial
+  evidence.
 
 ### Pool
 
@@ -81,12 +86,13 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
   identity, stated topics/focus, sometimes a lower-bound audience figure) for 11 of 14 accounts, but
   none of that evidence has moved any reviewed-schema field off `unknown`, because disposition is
   still `pending`. The 3 Threads accounts' profile access was blocked outright.
-- All 31 text-community accounts and all 14 professional-publishing accounts have exactly one
-  public-profile lookup on record, and every one of those lookups is `accessStatus: "blocked"`
-  (text-community: DNS-blocked; professional-publishing: Threads specifically blocked, LinkedIn/
-  Substack/Substack Notes partial-but-unreviewed). Visual-video's 20 public-profile checks all
-  returned `access_status: "limited"` (login walls, robots-policy denials, rate limits, or empty
-  channel shells).
+- All 31 text-community accounts have exactly one public-profile lookup on record, and every one
+  of those lookups is `accessStatus: "blocked"` (DNS-blocked). Professional-publishing's 14
+  accounts each have one profile-access record on file, but they are not uniformly blocked: 11
+  accounts (LinkedIn, Substack, Substack Notes) were not blocked and returned partial evidence per
+  the lane's decision packet; the remaining 3 (Threads) were blocked outright. Visual-video's 20
+  public-profile checks all returned `access_status: "limited"` (login walls, robots-policy
+  denials, rate limits, or empty channel shells).
 
 ### Completeness
 
@@ -104,9 +110,6 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
 - All 12 text-community baseline rows withhold `numerator`, `denominator`, and
   `settledSampleDate` (`unavailableReason` set): the hand-collected pass recorded only a median.
   `id` and `source` are `null` on all 12; the source projection never assigned either field.
-- 345 of the wider 371-account catalog (cited in `charter.md`, outside this package's 65-account
-  scope) still need valid baseline measurement; that is repository-level context, not a claim about
-  these 65 accounts specifically.
 
 None of the gaps above is resolved by this consolidated package. They carry forward exactly as
 each lane's own decision packet states them, pending Muxin's answers in `decision-sheet.md` or a
