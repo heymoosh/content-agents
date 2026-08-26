@@ -45,6 +45,20 @@
       "Account IDs, stable IDs, baseline numerator and denominator, and reviewed scopes remain intentionally unresolved."
     ]
   },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-text-community-claude",
+    "family": "codex",
+    "verdict": "passed",
+    "findings": [
+      "The corrected base-to-final diff remains limited to four leased text/community staging files.",
+      "All 354 source rows match the safe projection; totals reconcile at 31 accounts, 354 sources, 12 baselines, and 14 recommend plus 6 hold plus 11 research-further proposals.",
+      "All six mixed account baselineSource claims are now null, all 12 baseline id and source fields are null, and the actual baseline projection rows are preserved.",
+      "Body completeness now reconciles to 172 true, 140 false, and 42 null, with the separate blocker count of 182 explained correctly.",
+      "All 397 intake rows explicitly carry bodyIncluded false; no raw-body, ranking, winner, reviewed, canonical, or generation claim is present.",
+      "Regenerated intake and bridge reports are byte-exact, and the exact coordinator commands, npm run check, and git diff --check passed locally."
+    ]
+  },
   "audit_history": [
     {
       "type": "audit",
@@ -63,18 +77,10 @@
   ],
   "diff_verified": true,
   "verified_commit": "37fb72d2c2d1e7487cea3ff15350aff0d3213cff",
-  "audit": {
-    "type": "audit",
+  "integration": {
+    "type": "integration",
     "task_id": "pattern-stage-evidence-text-community-claude",
     "family": "codex",
-    "verdict": "passed",
-    "findings": [
-      "The corrected base-to-final diff remains limited to four leased text/community staging files.",
-      "All 354 source rows match the safe projection; totals reconcile at 31 accounts, 354 sources, 12 baselines, and 14 recommend plus 6 hold plus 11 research-further proposals.",
-      "All six mixed account baselineSource claims are now null, all 12 baseline id and source fields are null, and the actual baseline projection rows are preserved.",
-      "Body completeness now reconciles to 172 true, 140 false, and 42 null, with the separate blocker count of 182 explained correctly.",
-      "All 397 intake rows explicitly carry bodyIncluded false; no raw-body, ranking, winner, reviewed, canonical, or generation claim is present.",
-      "Regenerated intake and bridge reports are byte-exact, and the exact coordinator commands, npm run check, and git diff --check passed locally."
-    ]
+    "verdict": "passed"
   }
 }
