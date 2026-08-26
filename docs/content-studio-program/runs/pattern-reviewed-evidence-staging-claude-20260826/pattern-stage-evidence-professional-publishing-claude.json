@@ -1,0 +1,70 @@
+{
+  "task_id": "pattern-stage-evidence-professional-publishing-claude",
+  "batch_id": "pattern-reviewed-evidence-staging-claude-20260826",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-stage-evidence-professional-publishing-claude",
+    "family": "claude",
+    "commit_sha": "4102fc2efd824061f892e9fba94f025e6e9e2233",
+    "changed_paths": [
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/intake-input.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/intake-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/ledger-bridge-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/decision-packet.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Typecheck passed."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/intake-input.json --format json",
+        "passed": true,
+        "summary": "Accepted 14 accounts, 70 actual evidence rows, and 0 baselines as blocked or pending staging."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/intake-report.json --format json",
+        "passed": true,
+        "summary": "Projected 14 accounts and 70 actual sources with bodyIncluded false and sideEffects none."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Whitespace check passed."
+      }
+    ],
+    "behavior_impact": "None; staging artifacts only.",
+    "logic_impact": "None; existing intake and bridge contracts are consumed unchanged.",
+    "risks": [
+      "All rows intentionally remain blocked or pending until consolidated review.",
+      "No reviewed comparison universe or baseline exists for these accounts."
+    ],
+    "unresolved_items": [
+      "Muxin must review the 14 account proposals and 70 source rows.",
+      "Three Threads account metadata gaps remain explicit."
+    ]
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-professional-publishing-claude",
+    "family": "codex",
+    "verdict": "passed",
+    "findings": [
+      "Lease is exact: four files under the professional/publishing staging directory and no other changed paths.",
+      "Independent projection comparison matched all 70 source rows by stable id, sourceId, postId, platform, and bodyComplete; no synthetic rows or inferred baselines were found.",
+      "The package reconciles 14 accounts, 70 evidence rows, zero baselines, and 11 recommend plus 3 research-further proposals while all intake rows remain pending or blocked.",
+      "Corrected Threads topics, focus, and account-level format fields remain unknown, with local per-record formats clearly separated by provenance.",
+      "All exact acceptance commands passed locally; output remains body-free, noncanonical, non-ranking, and side-effect-free."
+    ]
+  },
+  "audit_history": [],
+  "diff_verified": true,
+  "verified_commit": "4102fc2efd824061f892e9fba94f025e6e9e2233",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-stage-evidence-professional-publishing-claude",
+    "family": "codex",
+    "verdict": "passed"
+  }
+}
