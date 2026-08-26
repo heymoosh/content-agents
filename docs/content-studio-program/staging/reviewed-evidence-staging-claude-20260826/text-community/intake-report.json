@@ -861,7 +861,7 @@
         "popularityScope": null,
         "sampleScope": null,
         "baselineScope": null,
-        "baselineSource": "notes-true-median",
+        "baselineSource": null,
         "medium": null,
         "format": null,
         "audienceSnapshot": null,
@@ -874,6 +874,7 @@
         "caveats": [
           "25 distinct poster names appear across this account's 25 local records (a community/aggregator account, not a single-author feed), so no single account-level creator value is asserted here.",
           "baselineSource varies across this account's local records (null on some, notes-true-median on others), so no single account-level baselineSource value is asserted here.",
+          "Corrected 2026-08-26: baselineSource set to null. The projection's per-record baselineSource for this account is mixed (null on some rows, a real value on others); the prior draft incorrectly collapsed that mix into a single account-level value. See sourceEvidenceRows for this account's actual per-record values.",
           "Corrected candidate slate (reddit|r/adhd): records=25, w=20, r=[5, 5], b=2, body[complete,incomplete,unknown]=[25, 0, 0], engagement_records=25, repeat=2+, identity_provenance=local, reviewed_metadata=unreviewed, comparison_universe=gap.",
           "The corrected slate records 20 source-listing winner record(s) for this account. That count is preserved here in prose only; the intake contract's own field set forbids winner/rank/listing keys, and this package does not turn that source-listing flag into an account-level winner claim.",
           "The one public-profile lookup on record for this account is accessStatus=\"blocked\" (Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained.); it is carried here as account-level evidence only, not as a verified working link."
@@ -887,6 +888,7 @@
           "blockers": [
             "audienceSnapshot",
             "baselineScope",
+            "baselineSource",
             "focus",
             "format",
             "medium",
@@ -920,7 +922,7 @@
         "popularityScope": null,
         "sampleScope": null,
         "baselineScope": null,
-        "baselineSource": "notes-true-median",
+        "baselineSource": null,
         "medium": null,
         "format": null,
         "audienceSnapshot": null,
@@ -933,6 +935,7 @@
         "caveats": [
           "25 distinct poster names appear across this account's 25 local records (a community/aggregator account, not a single-author feed), so no single account-level creator value is asserted here.",
           "baselineSource varies across this account's local records (null on some, notes-true-median on others), so no single account-level baselineSource value is asserted here.",
+          "Corrected 2026-08-26: baselineSource set to null. The projection's per-record baselineSource for this account is mixed (null on some rows, a real value on others); the prior draft incorrectly collapsed that mix into a single account-level value. See sourceEvidenceRows for this account's actual per-record values.",
           "Corrected candidate slate (reddit|r/civictech): records=25, w=22, r=[0, 0], b=2, body[complete,incomplete,unknown]=[15, 10, 0], engagement_records=25, repeat=2+, identity_provenance=local, reviewed_metadata=unreviewed, comparison_universe=gap.",
           "The corrected slate records 22 source-listing winner record(s) for this account. That count is preserved here in prose only; the intake contract's own field set forbids winner/rank/listing keys, and this package does not turn that source-listing flag into an account-level winner claim.",
           "The one public-profile lookup on record for this account is accessStatus=\"blocked\" (Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained.); it is carried here as account-level evidence only, not as a verified working link."
@@ -946,6 +949,7 @@
           "blockers": [
             "audienceSnapshot",
             "baselineScope",
+            "baselineSource",
             "focus",
             "format",
             "medium",
@@ -979,7 +983,7 @@
         "popularityScope": null,
         "sampleScope": null,
         "baselineScope": null,
-        "baselineSource": "notes-true-median",
+        "baselineSource": null,
         "medium": null,
         "format": null,
         "audienceSnapshot": null,
@@ -992,6 +996,7 @@
         "caveats": [
           "26 distinct poster names appear across this account's 26 local records (a community/aggregator account, not a single-author feed), so no single account-level creator value is asserted here.",
           "baselineSource varies across this account's local records (null on some, notes-true-median on others), so no single account-level baselineSource value is asserted here.",
+          "Corrected 2026-08-26: baselineSource set to null. The projection's per-record baselineSource for this account is mixed (null on some rows, a real value on others); the prior draft incorrectly collapsed that mix into a single account-level value. See sourceEvidenceRows for this account's actual per-record values.",
           "Corrected candidate slate (reddit|r/claudeai): records=26, w=22, r=[3, 3], b=2, body[complete,incomplete,unknown]=[3, 23, 0], engagement_records=26, repeat=2+, identity_provenance=local, reviewed_metadata=unreviewed, comparison_universe=gap.",
           "The corrected slate records 22 source-listing winner record(s) for this account. That count is preserved here in prose only; the intake contract's own field set forbids winner/rank/listing keys, and this package does not turn that source-listing flag into an account-level winner claim.",
           "The one public-profile lookup on record for this account is accessStatus=\"blocked\" (Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained.); it is carried here as account-level evidence only, not as a verified working link."
@@ -1005,6 +1010,7 @@
           "blockers": [
             "audienceSnapshot",
             "baselineScope",
+            "baselineSource",
             "focus",
             "format",
             "medium",
@@ -1097,7 +1103,7 @@
         "popularityScope": null,
         "sampleScope": null,
         "baselineScope": null,
-        "baselineSource": "notes-true-median",
+        "baselineSource": null,
         "medium": null,
         "format": null,
         "audienceSnapshot": null,
@@ -1110,6 +1116,7 @@
         "caveats": [
           "25 distinct poster names appear across this account's 25 local records (a community/aggregator account, not a single-author feed), so no single account-level creator value is asserted here.",
           "baselineSource varies across this account's local records (null on some, notes-true-median on others), so no single account-level baselineSource value is asserted here.",
+          "Corrected 2026-08-26: baselineSource set to null. The projection's per-record baselineSource for this account is mixed (null on some rows, a real value on others); the prior draft incorrectly collapsed that mix into a single account-level value. See sourceEvidenceRows for this account's actual per-record values.",
           "Corrected candidate slate (reddit|r/lifeprotips): records=25, w=20, r=[5, 5], b=2, body[complete,incomplete,unknown]=[23, 2, 0], engagement_records=25, repeat=2+, identity_provenance=local, reviewed_metadata=unreviewed, comparison_universe=gap.",
           "The corrected slate records 20 source-listing winner record(s) for this account. That count is preserved here in prose only; the intake contract's own field set forbids winner/rank/listing keys, and this package does not turn that source-listing flag into an account-level winner claim.",
           "The one public-profile lookup on record for this account is accessStatus=\"blocked\" (Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained.); it is carried here as account-level evidence only, not as a verified working link."
@@ -1123,6 +1130,7 @@
           "blockers": [
             "audienceSnapshot",
             "baselineScope",
+            "baselineSource",
             "focus",
             "format",
             "medium",
@@ -1331,7 +1339,7 @@
         "popularityScope": null,
         "sampleScope": null,
         "baselineScope": null,
-        "baselineSource": "notes-true-median",
+        "baselineSource": null,
         "medium": null,
         "format": null,
         "audienceSnapshot": null,
@@ -1344,6 +1352,7 @@
         "caveats": [
           "24 distinct poster names appear across this account's 27 local records (a community/aggregator account, not a single-author feed), so no single account-level creator value is asserted here.",
           "baselineSource varies across this account's local records (null on some, notes-true-median on others), so no single account-level baselineSource value is asserted here.",
+          "Corrected 2026-08-26: baselineSource set to null. The projection's per-record baselineSource for this account is mixed (null on some rows, a real value on others); the prior draft incorrectly collapsed that mix into a single account-level value. See sourceEvidenceRows for this account's actual per-record values.",
           "Corrected candidate slate (reddit|r/sideproject): records=27, w=23, r=[2, 2], b=2, body[complete,incomplete,unknown]=[2, 25, 0], engagement_records=27, repeat=2+, identity_provenance=local, reviewed_metadata=unreviewed, comparison_universe=gap.",
           "The corrected slate records 23 source-listing winner record(s) for this account. That count is preserved here in prose only; the intake contract's own field set forbids winner/rank/listing keys, and this package does not turn that source-listing flag into an account-level winner claim.",
           "The one public-profile lookup on record for this account is accessStatus=\"blocked\" (Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained.); it is carried here as account-level evidence only, not as a verified working link."
@@ -1357,6 +1366,7 @@
           "blockers": [
             "audienceSnapshot",
             "baselineScope",
+            "baselineSource",
             "focus",
             "format",
             "medium",
@@ -1561,7 +1571,7 @@
         "popularityScope": null,
         "sampleScope": null,
         "baselineScope": null,
-        "baselineSource": "timeline-window",
+        "baselineSource": null,
         "medium": null,
         "format": null,
         "audienceSnapshot": null,
@@ -1573,6 +1583,7 @@
         ],
         "caveats": [
           "baselineSource varies across this account's local records (null on some, timeline-window on others), so no single account-level baselineSource value is asserted here.",
+          "Corrected 2026-08-26: baselineSource set to null. The projection's per-record baselineSource for this account is mixed (null on some rows, a real value on others); the prior draft incorrectly collapsed that mix into a single account-level value. See sourceEvidenceRows for this account's actual per-record values.",
           "Corrected candidate slate (x|dickiebush): records=9, w=0, r=[2, 2], b=0, body[complete,incomplete,unknown]=[4, 5, 0], engagement_records=9, repeat=2+, identity_provenance=local, reviewed_metadata=unreviewed, comparison_universe=gap.",
           "The one public-profile lookup on record for this account is accessStatus=\"blocked\" (Access attempt was blocked by environment DNS; no profile page was successfully accessed and no page body was retained.); it is carried here as account-level evidence only, not as a verified working link."
         ],
@@ -1585,6 +1596,7 @@
           "blockers": [
             "audienceSnapshot",
             "baselineScope",
+            "baselineSource",
             "focus",
             "format",
             "medium",
@@ -24180,10 +24192,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/adhd:1",
+        "id": null,
         "accountId": "reddit|r/adhd",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-08-14",
@@ -24198,6 +24210,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. READ THIS BEFORE QUOTING A MULTIPLE OFF IT: that hand median counted UPVOTES ONLY, while the corpus scores a post on upvotes plus comments, so this denominator is a little too small and the multiples it produces are a little too high. Right order of magnitude, not an exact figure. Re-measure with npm run patterns:reddit to replace it.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-08-14, window_end=2026-08-16, collected_at=2026-08-23T17:28:19.713Z, terms=None."
         ],
         "reviewer": null,
@@ -24207,10 +24220,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24218,10 +24233,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/adhd:7",
+        "id": null,
         "accountId": "reddit|r/adhd",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-08-14",
@@ -24236,6 +24251,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-08-14, window_end=2026-08-16, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
         ],
         "reviewer": null,
@@ -24245,10 +24261,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24256,48 +24274,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/civictech:11",
+        "id": null,
         "accountId": "reddit|r/civictech",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
-        "settledSampleDate": null,
-        "window": {
-          "start": "2025-11-28",
-          "end": "2026-08-15"
-        },
-        "numerator": null,
-        "denominator": null,
-        "metric": "engagement",
-        "sampleSize": 183,
-        "unavailableReason": "numerator/denominator are not available: the hand-collected pass recorded only the median (and, where present, upvote-only terms), never individual scores or a numerator/denominator pair.",
-        "evidenceLinks": null,
-        "evidenceRefs": null,
-        "caveats": [
-          "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
-          "window_start=2025-11-28, window_end=2026-08-15, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
-        ],
-        "reviewer": null,
-        "reviewedAt": null,
-        "reviewStatus": null,
-        "readiness": {
-          "status": "blocked",
-          "blockers": [
-            "account metadata is not ready",
-            "reviewedAt",
-            "reviewer",
-            "reviewStatus",
-            "settledSampleDate"
-          ]
-        },
-        "bodyIncluded": false
-      },
-      {
-        "kind": "reviewed_baseline_intake_row",
-        "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/civictech:5",
-        "accountId": "reddit|r/civictech",
-        "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2025-11-28",
@@ -24312,6 +24292,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. READ THIS BEFORE QUOTING A MULTIPLE OFF IT: that hand median counted UPVOTES ONLY, while the corpus scores a post on upvotes plus comments, so this denominator is a little too small and the multiples it produces are a little too high. Right order of magnitude, not an exact figure. Re-measure with npm run patterns:reddit to replace it.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2025-11-28, window_end=2026-08-15, collected_at=2026-08-23T17:28:19.713Z, terms=None."
         ],
         "reviewer": null,
@@ -24321,10 +24302,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24332,25 +24315,26 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/claudeai:10",
-        "accountId": "reddit|r/claudeai",
+        "id": null,
+        "accountId": "reddit|r/civictech",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
-          "start": "2026-08-15",
-          "end": "2026-08-16"
+          "start": "2025-11-28",
+          "end": "2026-08-15"
         },
         "numerator": null,
         "denominator": null,
         "metric": "engagement",
-        "sampleSize": 83,
+        "sampleSize": 183,
         "unavailableReason": "numerator/denominator are not available: the hand-collected pass recorded only the median (and, where present, upvote-only terms), never individual scores or a numerator/denominator pair.",
         "evidenceLinks": null,
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
-          "window_start=2026-08-15, window_end=2026-08-16, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
+          "window_start=2025-11-28, window_end=2026-08-15, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
         ],
         "reviewer": null,
         "reviewedAt": null,
@@ -24359,10 +24343,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24370,10 +24356,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/claudeai:4",
+        "id": null,
         "accountId": "reddit|r/claudeai",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-08-15",
@@ -24388,6 +24374,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. READ THIS BEFORE QUOTING A MULTIPLE OFF IT: that hand median counted UPVOTES ONLY, while the corpus scores a post on upvotes plus comments, so this denominator is a little too small and the multiples it produces are a little too high. Right order of magnitude, not an exact figure. Re-measure with npm run patterns:reddit to replace it.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-08-15, window_end=2026-08-16, collected_at=2026-08-23T17:28:19.713Z, terms=None."
         ],
         "reviewer": null,
@@ -24397,10 +24384,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24408,10 +24397,51 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/lifeprotips:2",
+        "id": null,
+        "accountId": "reddit|r/claudeai",
+        "platform": "reddit",
+        "source": null,
+        "settledSampleDate": null,
+        "window": {
+          "start": "2026-08-15",
+          "end": "2026-08-16"
+        },
+        "numerator": null,
+        "denominator": null,
+        "metric": "engagement",
+        "sampleSize": 83,
+        "unavailableReason": "numerator/denominator are not available: the hand-collected pass recorded only the median (and, where present, upvote-only terms), never individual scores or a numerator/denominator pair.",
+        "evidenceLinks": null,
+        "evidenceRefs": null,
+        "caveats": [
+          "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
+          "window_start=2026-08-15, window_end=2026-08-16, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "reviewStatus": null,
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "id",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "settledSampleDate",
+            "source"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_baseline_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": null,
         "accountId": "reddit|r/lifeprotips",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-06-04",
@@ -24426,6 +24456,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. READ THIS BEFORE QUOTING A MULTIPLE OFF IT: that hand median counted UPVOTES ONLY, while the corpus scores a post on upvotes plus comments, so this denominator is a little too small and the multiples it produces are a little too high. Right order of magnitude, not an exact figure. Re-measure with npm run patterns:reddit to replace it.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-06-04, window_end=2026-08-15, collected_at=2026-08-23T17:28:19.713Z, terms=None."
         ],
         "reviewer": null,
@@ -24435,10 +24466,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24446,10 +24479,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/lifeprotips:8",
+        "id": null,
         "accountId": "reddit|r/lifeprotips",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-06-04",
@@ -24464,6 +24497,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-06-04, window_end=2026-08-15, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
         ],
         "reviewer": null,
@@ -24473,10 +24507,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24484,10 +24520,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/productmanagement:3",
+        "id": null,
         "accountId": "reddit|r/productmanagement",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-07-08",
@@ -24502,6 +24538,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. READ THIS BEFORE QUOTING A MULTIPLE OFF IT: that hand median counted UPVOTES ONLY, while the corpus scores a post on upvotes plus comments, so this denominator is a little too small and the multiples it produces are a little too high. Right order of magnitude, not an exact figure. Re-measure with npm run patterns:reddit to replace it.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-07-08, window_end=2026-08-15, collected_at=2026-08-23T17:28:19.713Z, terms=None."
         ],
         "reviewer": null,
@@ -24511,10 +24548,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24522,10 +24561,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/productmanagement:9",
+        "id": null,
         "accountId": "reddit|r/productmanagement",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-07-08",
@@ -24540,6 +24579,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-07-08, window_end=2026-08-15, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
         ],
         "reviewer": null,
@@ -24549,10 +24589,12 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24560,48 +24602,10 @@
       {
         "kind": "reviewed_baseline_intake_row",
         "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/sideproject:12",
+        "id": null,
         "accountId": "reddit|r/sideproject",
         "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
-        "settledSampleDate": null,
-        "window": {
-          "start": "2026-08-19",
-          "end": "2026-08-20"
-        },
-        "numerator": null,
-        "denominator": null,
-        "metric": "engagement",
-        "sampleSize": 160,
-        "unavailableReason": "numerator/denominator are not available: the hand-collected pass recorded only the median (and, where present, upvote-only terms), never individual scores or a numerator/denominator pair.",
-        "evidenceLinks": null,
-        "evidenceRefs": null,
-        "caveats": [
-          "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
-          "window_start=2026-08-19, window_end=2026-08-20, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
-        ],
-        "reviewer": null,
-        "reviewedAt": null,
-        "reviewStatus": null,
-        "readiness": {
-          "status": "blocked",
-          "blockers": [
-            "account metadata is not ready",
-            "reviewedAt",
-            "reviewer",
-            "reviewStatus",
-            "settledSampleDate"
-          ]
-        },
-        "bodyIncluded": false
-      },
-      {
-        "kind": "reviewed_baseline_intake_row",
-        "version": "reviewed-evidence-intake-v1",
-        "id": "baseline:reddit|r/sideproject:6",
-        "accountId": "reddit|r/sideproject",
-        "platform": "reddit",
-        "source": "reddit-hand-collected-notes-2026-08-23",
+        "source": null,
         "settledSampleDate": null,
         "window": {
           "start": "2026-08-19",
@@ -24616,6 +24620,7 @@
         "evidenceRefs": null,
         "caveats": [
           "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. READ THIS BEFORE QUOTING A MULTIPLE OFF IT: that hand median counted UPVOTES ONLY, while the corpus scores a post on upvotes plus comments, so this denominator is a little too small and the multiples it produces are a little too high. Right order of magnitude, not an exact figure. Re-measure with npm run patterns:reddit to replace it.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
           "window_start=2026-08-19, window_end=2026-08-20, collected_at=2026-08-23T17:28:19.713Z, terms=None."
         ],
         "reviewer": null,
@@ -24625,10 +24630,53 @@
           "status": "blocked",
           "blockers": [
             "account metadata is not ready",
+            "id",
             "reviewedAt",
             "reviewer",
             "reviewStatus",
-            "settledSampleDate"
+            "settledSampleDate",
+            "source"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_baseline_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": null,
+        "accountId": "reddit|r/sideproject",
+        "platform": "reddit",
+        "source": null,
+        "settledSampleDate": null,
+        "window": {
+          "start": "2026-08-19",
+          "end": "2026-08-20"
+        },
+        "numerator": null,
+        "denominator": null,
+        "metric": "engagement",
+        "sampleSize": 160,
+        "unavailableReason": "numerator/denominator are not available: the hand-collected pass recorded only the median (and, where present, upvote-only terms), never individual scores or a numerator/denominator pair.",
+        "evidenceLinks": null,
+        "evidenceRefs": null,
+        "caveats": [
+          "Baseline method note carried verbatim from the projection: Lifted from the hand-collected notes of the 2026-08-23 old.reddit pass: an unbiased /new window of settled posts. The individual scores were never recorded, only the median, so `scores` is empty rather than reconstructed. The median counts UPVOTES ONLY, which is recorded in `terms`, so every multiple taken against it counts upvotes only on both sides. A collector-measured baseline counts comments too; re-measure with npm run patterns:reddit to replace this one with a wider sample and its own scores.",
+          "Corrected 2026-08-26: id and source set to null. baselines.json carries no id or source field on any row (only platform, handle, metric, window, sampleSize, method, collected_at) -- the prior draft invented a 'baseline:<accountKey>:<n>' id and a 'reddit-hand-collected-notes-<date>' source label that do not exist in the projection. Both are left null rather than fabricated; the projection's own method and collected_at text is preserved verbatim in this row's other caveats entries.",
+          "window_start=2026-08-19, window_end=2026-08-20, collected_at=2026-08-23T18:17:07.673Z, terms=['likes']."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "reviewStatus": null,
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "id",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "settledSampleDate",
+            "source"
           ]
         },
         "bodyIncluded": false
@@ -24641,7 +24689,7 @@
       "ready": 0,
       "blocked": 31,
       "unmapped": 0,
-      "blockerCount": 439
+      "blockerCount": 445
     },
     "evidence": {
       "total": 354,
@@ -24655,14 +24703,14 @@
       "ready": 0,
       "blocked": 12,
       "unmapped": 0,
-      "blockerCount": 60
+      "blockerCount": 84
     },
     "total": {
       "total": 397,
       "ready": 0,
       "blocked": 397,
       "unmapped": 0,
-      "blockerCount": 5698
+      "blockerCount": 5728
     },
     "blockerCounts": {
       "account metadata is not ready": 12,
@@ -24671,10 +24719,11 @@
       "audienceSizeSnapshot": 354,
       "audienceSnapshot": 31,
       "baselineScope": 385,
-      "baselineSource": 218,
+      "baselineSource": 224,
       "bodyComplete": 182,
       "focus": 31,
       "format": 238,
+      "id": 12,
       "medium": 385,
       "membershipReason": 354,
       "metricSnapshot": 354,
@@ -24688,6 +24737,7 @@
       "reviewStatus": 397,
       "sampleScope": 385,
       "settledSampleDate": 12,
+      "source": 12,
       "stableAccountId": 31,
       "status": 354,
       "topics": 31
@@ -24699,7 +24749,7 @@
     "ready": 0,
     "blocked": 397,
     "unmapped": 0,
-    "blockerCount": 5698
+    "blockerCount": 5728
   },
   "bodyIncluded": false,
   "sideEffects": "none",

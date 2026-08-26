@@ -16,6 +16,49 @@ instead: every evidence and baseline row below carries the actual stable id, url
 `bodyComplete` value that projection assigned to that specific record — nothing here is a
 positional placeholder distributed across an aggregate count.
 
+**Correction pass (2026-08-26, same replacement lease):** a Codex audit of the first commit of
+this package found four defects, all corrected in `intake-input.json` and/or this document without
+touching `src/patterns/**`:
+
+1. Six account rows (`reddit|r/adhd`, `reddit|r/civictech`, `reddit|r/claudeai`,
+   `reddit|r/lifeprotips`, `reddit|r/sideproject`, `x|dickiebush`) had a non-null account-level
+   `baselineSource` even though that account's own evidence rows carry a mix of `null` and a real
+   value. Collapsing a mixed per-record value into a single account claim is exactly the thing this
+   package says it does not do elsewhere (see the 5-account mixed case below) — these six were
+   missed in the first pass. All six now carry `baselineSource: null` at the account level, with a
+   caveat pointing back to the per-record values.
+2. All 12 baseline rows carried an `id` (`baseline:<accountKey>:<n>`) and a `source`
+   (`reddit-hand-collected-notes-<date>`) that do not exist anywhere in `baselines.json` — that file
+   has no `id` or `source` field on any row, only `platform`, `handle`, `metric`, `window`,
+   `sampleSize`, `method`, and `collected_at`. Both were invented rather than read from the
+   projection. The intake contract's `normalizedBaseline()` reads `id`/`source` through `text()`,
+   which accepts `null` without failing (`src/patterns/reviewed-evidence-intake.ts`'s `text()` and
+   `normalizedBaseline()`), so a non-null value is not contractually required. Both fields are now
+   `null` on all 12 rows, with a caveat noting the projection carries neither field.
+3. This document's "182 of 354 evidence rows carry `bodyComplete: null`" claim (both instances,
+   below) was wrong. 182 is the intake CLI's `bodyComplete` **blocker** count — every row where
+   `bodyComplete !== true` (140 rows with an explicit `false` plus 42 rows with `null`) — not a null
+   count. The projection's actual `bodyComplete` distribution across the 354 rows is 172 `true`, 140
+   `false`, 42 `null`; both mentions below are corrected to state that split.
+4. Every one of the 397 `intake-input.json` rows (31 accounts, 354 evidence, 12 baselines) now
+   carries an explicit `"bodyIncluded": false` field. The intake contract accepts this without error
+   — `bodyIncluded` is not in `reviewed-evidence-intake.ts`'s `UNSUPPORTED_KEYS` rejection list — but
+   it is a **contract limitation, not a code change**, that the field has no functional effect on
+   the report: none of `normalizedAccount()`, `normalizedEvidence()`, or `normalizedBaseline()`
+   reads a `bodyIncluded` key from the input row, and `accountOutput()`/`evidenceOutput()`/
+   `baselineOutput()` each unconditionally hardcode `bodyIncluded: false` on the output row
+   regardless of what the input contained. Adding the field to the input rows is honest (it matches
+   what the report will say) but inert; only a code change to those three normalizer functions would
+   let an input-side `bodyIncluded` value actually reach the report, and this correction pass makes
+   no such change.
+
+`intake-report.json` and `ledger-bridge-report.json` were regenerated from the corrected
+`intake-input.json` via the exact commands in "Reconciliation against the report outputs" below;
+every reconciled total in this document (31 accounts / 354 evidence / 12 baselines / 397 total, 14
+recommend / 6 hold / 11 research_further) is unchanged by this correction pass — only the six
+accounts' `baselineSource`, the twelve baselines' `id`/`source`, this document's `bodyComplete`
+prose, and the 397 rows' `bodyIncluded` field changed.
+
 ## What this package covers
 
 Exactly the text/community slice of the corrected 65-account slate
@@ -75,9 +118,12 @@ computed, stratified, or distributed:
   `reviewed-evidence-intake.ts`'s `present()` key-alias list). No row invents or omits this; every
   one of the 354 rows has a real `url` in the projection.
 - **`bodyComplete`**: the projection's own literal value (`true`, `false`, or `null`) on every row,
-  unchanged. 182 of 354 evidence rows carry `bodyComplete: null` in the projection (mostly Reddit
-  source-listing rows and some Mastodon rows) — that null is preserved, not defaulted to
-  `"unknown"` or to a guessed boolean.
+  unchanged. The split across the 354 rows is 172 `true`, 140 `false`, 42 `null`. The 42 `null`
+  rows are all Mastodon; the 140 `false` rows span every platform (106 Reddit, 15 X, 8 Mastodon, 6
+  Bluesky, 5 Hacker News). `null` is preserved, not defaulted to `"unknown"` or to a guessed
+  boolean, and is never conflated with `false`. (The intake CLI's own `bodyComplete` readiness
+  blocker fires on both `false` and `null` alike — 182 rows total — which is a *blocker count*, not
+  a null count; see "Reconciliation against the report outputs" below.)
 - **`provenance`**: the projection's own `provenance` field where present (5 of 354 rows, all on
   `x|nathanbarry` — collection-methodology notes about the tweet syndication endpoint and sampling
   bias, not creator body text). Null everywhere else, because the projection itself left it null
@@ -104,11 +150,19 @@ account, plus the two other named body-free repository documents:
   11 accounts are aggregator/community accounts where the group's rows carry many distinct poster
   names (all 10 Reddit accounts plus Hacker News) — for those, `creator` is left `null` rather than
   picking one poster to stand in for the account, and a `caveats` entry states exactly why.
-- `baselineSource`: the projection's own value, but only where every row in the group agrees; 5
-  accounts (`reddit|r/entrepreneur`, `reddit|r/localllama`, `reddit|r/microsaas`,
-  `reddit|r/youshouldknow`, `x|sahilbloom`) have a mix of `null` and a real value across their
-  rows, so the account-level field is left `null` and a `caveats` entry says the value is mixed
-  rather than absent.
+- `baselineSource`: the projection's own value, but only where every row in the group agrees. Two
+  distinct null cases exist and this document now distinguishes them (corrected 2026-08-26 — the
+  first draft mislabeled both as "mixed"):
+  - 5 accounts (`reddit|r/entrepreneur`, `reddit|r/localllama`, `reddit|r/microsaas`,
+    `reddit|r/youshouldknow`, `x|sahilbloom`) are uniformly `null` — every evidence row in the group
+    carries `baselineSource: null`, so there is no real value to preserve. The account-level field
+    is `null` because the projection never recorded one for this account, not because of a mix.
+  - 6 accounts (`reddit|r/adhd`, `reddit|r/civictech`, `reddit|r/claudeai`, `reddit|r/lifeprotips`,
+    `reddit|r/sideproject`, `x|dickiebush`) genuinely are mixed — some rows carry `null`, others
+    carry a real value (`notes-true-median` for the five Reddit accounts, `timeline-window` for
+    `x|dickiebush`). The account-level field is `null` for these too, but for the opposite reason:
+    collapsing the mix into either value would misstate the group. A `caveats` entry on each of
+    these six says the value is mixed, pointing back to the per-record values.
 - `evidenceLinks`: the one blocked public-profile lookup URL per account, from
   `broad-pattern-research-20260825/text-community/source-manifest.json`'s `sources` array — real,
   present for all 31 accounts, and explicitly `accessStatus: "blocked"` per that document. Carried
@@ -126,7 +180,9 @@ account, plus the two other named body-free repository documents:
 Baseline rows (12) are the projection's own `baselines.json` rows, one per row, matched to their
 Reddit account by `platform|handle` the same way evidence rows were: `metric`, `sampleSize`,
 `window.start`/`window.end` are the projection's real values; `method` (a hand-collection
-methodology note, not creator body text) is preserved verbatim in `caveats`.
+methodology note, not creator body text) is preserved verbatim in `caveats`. `id` and `source` are
+both `null` on all 12 rows (corrected 2026-08-26) — `baselines.json` has no `id` or `source` field
+on any row, so neither is invented; a caveats entry on each row says so explicitly.
 `numerator`/`denominator`/`settledSampleDate` are `null` with an explicit `unavailableReason` —
 the hand-collected pass recorded only a median (and, on 6 of the 12 rows, an upvote-only `terms`
 tag), never individual scores or a numerator/denominator pair, so there is nothing to preserve
@@ -173,15 +229,22 @@ no ledger writer ran and no canonical file changed.
   the cross-reference blocker `"account reference is unmapped or ambiguous"` from the intake CLI
   itself — that is the CLI's own honest read of the same gap, not something this package asserts
   separately.
-- 182 of 354 evidence rows: `bodyComplete: null` in the projection (not `true`/`false`) — mostly
-  Reddit source-listing rows and Mastodon posts the collector could not confirm complete.
+- Of 354 evidence rows: 172 carry `bodyComplete: true`, 140 carry `bodyComplete: false`, and 42
+  carry `bodyComplete: null` (all 42 are Mastodon rows the collector could not confirm complete).
+  182 rows (the 140 `false` plus the 42 `null`) fail the intake CLI's `bodyComplete` readiness
+  blocker, since that blocker requires a literal `true` — that 182 is a blocker count, not a count
+  of `null` rows.
 - 5 of 354 evidence rows carry a real `provenance` note (all `x|nathanbarry`); the remaining 349
   have none, because the projection itself never recorded one for them.
 - Public-profile provenance: every one of the 31 accounts has exactly one broad-pattern-research
   profile-URL lookup on record, and every one of those lookups is `accessStatus: "blocked"` (DNS
   blocked in that collection environment; no page body retained).
 - All 12 baseline rows: `numerator`/`denominator`/`settledSampleDate` withheld
-  (`unavailableReason` set) — the hand-collected pass never recorded individual scores.
+  (`unavailableReason` set) — the hand-collected pass never recorded individual scores. `id` and
+  `source` are also `null` on all 12 — the projection never assigned either.
+- 6 accounts' `baselineSource` is `null` because the underlying evidence rows are a genuine mix of
+  `null` and a real value (see "How each field was populated" above); collapsing that mix into a
+  single claim would misstate the account.
 
 ## Pool-choice questions for Muxin
 
