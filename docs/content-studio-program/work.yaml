@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-reconcile
-state_revision: 0
+state_revision: 3
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -597,7 +597,7 @@ tasks:
   - id: pattern-corrected-candidate-account-slate
     batch_id: pattern-corrected-candidate-slate-20260825
     outcome: Replace the obsolete public-access-based all-hold gate with one body-free, local-evidence-backed candidate-account decision packet that keeps source-listing, measured relative-performance, account-baseline, body-completeness, repeat-engagement, metadata, and comparison-universe facts distinct.
-    status: building
+    status: auditing
     depends_on:
       - pattern-local-evidence-inventory-clean-commit
     base_sha: 61225475a2a539f6f30dec6710b8588c68fee09c
@@ -625,7 +625,7 @@ tasks:
     semantic_locks:
       - pattern:corrected-candidate-account-slate
     builder_family: codex
-    auditor_family: claude
+    auditor_family: grok
     branch: agent/pattern-corrected-candidate-account-slate
     worktree: /private/tmp/content-agents-pattern-corrected-candidate-account-slate
     acceptance_commands:
@@ -635,8 +635,8 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: 3acb35ba48611f5654974672860fa011aff7cdb2
-    audit_verdict: failed
+    commit_sha: d220c40b276d879e41983a4165ff4b7f6f2b219b
+    audit_verdict: pending
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
     outcome: Research the 31 seed accounts on Bluesky, Dev.to, Hacker News, Mastodon, Reddit, and X into a body-free, evidence-backed text-community staging packet; separately classify niche, broad-platform, and format candidacy without canonical writes or a ranking.
