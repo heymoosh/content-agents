@@ -5,7 +5,7 @@
     "type": "builder",
     "task_id": "pattern-stage-evidence-text-community-claude",
     "family": "claude",
-    "commit_sha": "cac80e73d43f323b101fa7d7603305b278de476a",
+    "commit_sha": "37fb72d2c2d1e7487cea3ff15350aff0d3213cff",
     "changed_paths": [
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-input.json",
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-report.json",
@@ -16,49 +16,51 @@
       {
         "command": "npm run check",
         "passed": true,
-        "summary": "Typecheck passed locally."
+        "summary": "Typecheck passed locally after correction."
       },
       {
         "command": "npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-input.json --format json",
         "passed": true,
-        "summary": "Accepted 31 accounts, 354 source rows, and 12 baselines as blocked or pending, with no side effects."
+        "summary": "Accepted corrected 31 accounts, 354 source rows, and 12 baselines as blocked or pending, with no side effects."
       },
       {
         "command": "npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-report.json --format json",
         "passed": true,
-        "summary": "Projected 31 accounts, 354 sources, and 12 baselines with bodyIncluded false and sideEffects none."
+        "summary": "Projected corrected 31 accounts, 354 sources, and 12 baselines with bodyIncluded false and sideEffects none."
       },
       {
         "command": "git diff --check",
         "passed": true,
-        "summary": "Whitespace check passed for the leased diff."
+        "summary": "Whitespace check passed for the corrected leased diff."
       }
     ],
     "behavior_impact": "None; body-free staging artifacts only.",
     "logic_impact": "None; existing intake and bridge contracts are consumed unchanged.",
     "risks": [
-      "All rows remain blocked or pending until consolidated human review.",
-      "Account references are matched from the safe projection by normalized platform and handle because projection accountId fields are null."
+      "Baseline id and source remain null because the safe projection supplies neither field; the resulting blockers are deliberate.",
+      "All rows remain blocked or pending until consolidated human review."
     ],
     "unresolved_items": [
       "Muxin must review the 31 proposed account dispositions and provenance gaps before any canonical write.",
-      "No ranking or best-account claim is established."
+      "Account IDs, stable IDs, baseline numerator and denominator, and reviewed scopes remain intentionally unresolved."
     ]
   },
-  "audit_history": [],
+  "audit_history": [
+    {
+      "type": "audit",
+      "task_id": "pattern-stage-evidence-text-community-claude",
+      "family": "codex",
+      "verdict": "failed",
+      "findings": [
+        "High: account-level baselineSource is populated for six mixed groups even though their projection groups contain both null and non-null values and the packet requires null.",
+        "High: all 12 baseline IDs are synthesized ordinals and their staged source label is absent from the safe baseline projection, whose schema has no id or source field.",
+        "Medium: the decision packet says 182 evidence rows have bodyComplete null; actual input counts are 42 null, 140 false, and 172 true. The 182 figure is a blocker count, not a null count.",
+        "Medium: all 397 intake input rows omit explicit bodyIncluded false even though the task packet requires every row to carry it.",
+        "Passing checks: lease scope, all 354 actual source IDs and copied fields, 31/354/12 totals, 14/6/11 dispositions, no raw bodies/rankings/canonical writes, regenerated reports, npm run check, exact intake and bridge commands, and git diff --check."
+      ],
+      "commit_sha": "cac80e73d43f323b101fa7d7603305b278de476a"
+    }
+  ],
   "diff_verified": true,
-  "verified_commit": "cac80e73d43f323b101fa7d7603305b278de476a",
-  "audit": {
-    "type": "audit",
-    "task_id": "pattern-stage-evidence-text-community-claude",
-    "family": "codex",
-    "verdict": "failed",
-    "findings": [
-      "High: account-level baselineSource is populated for six mixed groups even though their projection groups contain both null and non-null values and the packet requires null.",
-      "High: all 12 baseline IDs are synthesized ordinals and their staged source label is absent from the safe baseline projection, whose schema has no id or source field.",
-      "Medium: the decision packet says 182 evidence rows have bodyComplete null; actual input counts are 42 null, 140 false, and 172 true. The 182 figure is a blocker count, not a null count.",
-      "Medium: all 397 intake input rows omit explicit bodyIncluded false even though the task packet requires every row to carry it.",
-      "Passing checks: lease scope, all 354 actual source IDs and copied fields, 31/354/12 totals, 14/6/11 dispositions, no raw bodies/rankings/canonical writes, regenerated reports, npm run check, exact intake and bridge commands, and git diff --check."
-    ]
-  }
+  "verified_commit": "37fb72d2c2d1e7487cea3ff15350aff0d3213cff"
 }
