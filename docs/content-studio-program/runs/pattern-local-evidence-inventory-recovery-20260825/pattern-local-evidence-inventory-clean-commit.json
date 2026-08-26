@@ -39,6 +39,23 @@
     ],
     "unresolved_items": []
   },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-local-evidence-inventory-clean-commit",
+    "family": "claude",
+    "verdict": "passed",
+    "findings": [
+      "Low, upstream non-blocking: the blocked source-task run record understates commit 76641280ffae77764a292fea75a093b1813b6bc9 as two changed paths; the coordinator will annotate its actual five-path diff separately.",
+      "Low, process non-blocking: the isolated builder worktree lacks the ignored local corpus, so data-status availability was independently confirmed against the preserved primary corpus checkout.",
+      "Informational: the accepted correction commit changes exactly the two leased staging files, preserves both source blobs byte-for-byte, and contains no body, account ranking, canonical write, or universal-score change."
+    ]
+  },
   "diff_verified": true,
-  "verified_commit": "4b7644f4b0f4ca71014be4fcd0fe579fcf119fab"
+  "verified_commit": "4b7644f4b0f4ca71014be4fcd0fe579fcf119fab",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-local-evidence-inventory-clean-commit",
+    "family": "claude",
+    "verdict": "passed"
+  }
 }
