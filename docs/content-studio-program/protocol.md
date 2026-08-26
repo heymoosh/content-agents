@@ -125,6 +125,8 @@ files, for example `studio:conversation-routing` or `publish:approval-gate`.
    is not an audit failure, and the coordinator must not block while an authorized fallback exists.
    Rerouting is forbidden after an audit report exists; a corrected builder report first archives
    that report and its audited commit in `audit_history`, then clears the current audit for re-audit.
+   Replaying an interrupted reroute recognizes the already-durable final routing event and commits
+   the manifest transition without appending duplicate evidence.
 8. The coordinator runs `verify-diff` on the final full commit SHA. The task becomes `accepted`
    only after the final diff is in lease, all named acceptance commands passed, and the
    cross-family audit passed. Audit and diff verification may arrive in either order.

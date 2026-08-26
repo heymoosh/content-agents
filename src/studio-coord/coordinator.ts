@@ -426,6 +426,18 @@ export function rerouteAuditor(
     throw new Error(`task ${task.id} auditor is already assigned to ${nextFamily}`);
   }
   if (!reason.trim()) throw new Error("auditor reroute requires a reason");
+  const priorRouting = existing?.audit_routing?.at(-1);
+  if (priorRouting?.from_family === task.auditor_family && priorRouting.to_family === nextFamily) {
+    return {
+      manifest: validateWorkManifest({
+        ...normalizedManifest,
+        tasks: normalizedManifest.tasks.map((candidate) => candidate.id === task.id
+          ? { ...candidate, auditor_family: nextFamily }
+          : candidate),
+      }),
+      run: normalizeRunRecord({ task_id: task.id, batch_id: task.batch_id, ...existing }),
+    };
+  }
   const event = auditRoutingEventSchema.parse({
     from_family: task.auditor_family,
     to_family: nextFamily,
@@ -473,6 +485,9 @@ export function applyTaskReport(
       throw new Error(`builder report family ${report.family} does not own task ${task.id}`);
     }
     verifyChangedPaths(task, report.changed_paths);
+    if (run.audit && !run.builder) {
+      throw new Error(`task ${task.id} cannot archive an audit without its audited builder report`);
+    }
     const completedAudit = run.audit && run.builder
       ? [{ ...run.audit, commit_sha: run.builder.commit_sha }]
       : [];

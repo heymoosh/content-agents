@@ -37,8 +37,6 @@
       "Pinterest and comparison-universe gaps remain explicit."
     ]
   },
-  "diff_verified": true,
-  "verified_commit": "d220c40b276d879e41983a4165ff4b7f6f2b219b",
   "audit_history": [
     {
       "type": "audit",
@@ -53,6 +51,8 @@
       "commit_sha": "3acb35ba48611f5654974672860fa011aff7cdb2"
     }
   ],
+  "diff_verified": true,
+  "verified_commit": "d220c40b276d879e41983a4165ff4b7f6f2b219b",
   "audit_routing": [
     {
       "from_family": "claude",
@@ -60,5 +60,17 @@
       "reason": "The prior Claude audit produced useful corrections, but that auditor path is no longer available in the stopped session. Route the corrected final commit to Grok for the required independent cross-family audit; execution remains pending explicit authorization to transmit the bounded private task packet and two leased outputs.",
       "recorded_at": "2026-08-26T02:52:51.489Z"
     }
-  ]
+  ],
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-corrected-candidate-account-slate",
+    "family": "grok",
+    "verdict": "passed",
+    "findings": [
+      "No blocking findings: full base-to-final diff contains exactly the two leased packet files.",
+      "Deterministic checks confirmed 65 unique accounts, 13 represented platforms, Pinterest missing, W=207, R=132/123, and dispositions 30/8/27/0 across JSON and Markdown.",
+      "The packet is body-free, non-ranking, noncanonical, keeps all six evidence dimensions separate, preserves unknowns and caveats, and presents a minimal human decision gate.",
+      "Residual: upstream inventory arithmetic was not re-derived from data/** because corpus data was outside the authorized audit lease."
+    ]
+  }
 }

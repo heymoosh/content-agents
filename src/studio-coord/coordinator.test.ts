@@ -117,6 +117,14 @@ test("normalizes task family aliases and stores different canonical providers", 
   assert.equal(work.tasks[0]?.auditor_family, "grok");
 });
 
+test("parses manifests and run records written before coordinator revision fields existed", () => {
+  const current = manifest([task("a")]);
+  const { coordinator_branch: _branch, state_revision: _revision, ...legacy } = current;
+  const parsed = validateWorkManifest(legacy);
+  assert.equal(parsed.coordinator_branch, "agent/content-studio-program");
+  assert.equal(parsed.state_revision, 0);
+});
+
 test("advances coordinator state only from the expected manifest revision", () => {
   const work = validateWorkManifest(manifest([task("a")]));
   assert.equal(work.state_revision, 0);
@@ -204,6 +212,28 @@ test("reroutes an unavailable auditor with durable evidence and keeps cross-fami
     ),
     /cannot reroute.*integrated/i,
   );
+  assert.throws(
+    () => rerouteAuditor(
+      validateWorkManifest(manifest([task("a", { status: "accepted", commit_sha: "b".repeat(40), audit_verdict: "passed" })])),
+      "a",
+      "grok",
+      "Too late",
+      "2026-08-25T20:00:00.000Z",
+      existing,
+    ),
+    /cannot reroute.*accepted/i,
+  );
+
+  const replayed = rerouteAuditor(
+    work,
+    "a",
+    "grok",
+    "Claude CLI was unavailable before the audit could start.",
+    "2026-08-25T20:01:00.000Z",
+    rerouted.run,
+  );
+  assert.equal(replayed.manifest.tasks[0]?.auditor_family, "grok");
+  assert.equal(replayed.run.audit_routing?.length, 1, "interrupted reroute replay must be idempotent");
 
   const completedAudit = {
     ...existing,
@@ -259,6 +289,15 @@ test("archives the completed audit and audited commit when a correction replaces
 
   assert.deepEqual(updated.run.audit_history, [{ ...failedAudit, commit_sha: priorCommit }]);
   assert.equal(updated.run.audit, undefined);
+
+  assert.throws(
+    () => applyTaskReport(work, correctedBuilder, {
+      task_id: "a",
+      batch_id: "batch-001",
+      audit: failedAudit,
+    }),
+    /audit.*builder/i,
+  );
 });
 
 test("rejects unknown task and report families", () => {

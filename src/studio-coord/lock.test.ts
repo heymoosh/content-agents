@@ -21,16 +21,20 @@ test("serializes coordinator mutations across processes", () => {
 
   try {
     withCoordinatorFileLock(lockPath, () => {
-      assert.throws(
-        () => execFileSync(process.execPath, [
+      let error: unknown;
+      try {
+        execFileSync(process.execPath, [
           "--import", "tsx",
           "--input-type=module",
           "--eval", childScript,
           lockPath,
           markerPath,
-        ], { stdio: "pipe" }),
-        /Command failed/,
-      );
+        ], { stdio: "pipe" });
+        assert.fail("second process unexpectedly acquired the coordinator lock");
+      } catch (caught) {
+        error = caught;
+      }
+      assert.match(String((error as { stderr?: Buffer }).stderr), /another coordinator mutation holds/);
     });
     assert.equal(existsSync(markerPath), false);
     assert.doesNotThrow(() => withCoordinatorFileLock(lockPath, () => undefined));
