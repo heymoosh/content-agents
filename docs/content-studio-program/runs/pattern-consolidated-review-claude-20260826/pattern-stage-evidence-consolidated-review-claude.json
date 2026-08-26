@@ -71,5 +71,21 @@
     }
   ],
   "diff_verified": true,
-  "verified_commit": "099c6b18d6325f82ca75f1835808f565985b6fa8"
+  "verified_commit": "099c6b18d6325f82ca75f1835808f565985b6fa8",
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-consolidated-review-claude",
+    "family": "codex",
+    "verdict": "failed",
+    "findings": [
+      "Medium: 12 baselines are described as one-to-one with 6 accounts, but the actual mapping is two rows per account and therefore many-to-one.",
+      "Medium: text/visual audience wording treats absent cross-type fields as null; account rows carry audienceSnapshot null and evidence rows carry audienceSizeSnapshot null.",
+      "Medium: visual account cross-reference resolution comes from accountId platform|handle; sourceId/postId resolve source identifiers, not the account join.",
+      "Low: every row stays pending or blocked is ambiguous because text/visual evidence and baselines have null status/reviewStatus; qualify account disposition separately from readiness.",
+      "Medium: verify.mjs permits either null or blocked/pending in every evidence lane; it must enforce text/visual null/null and professional blocked/pending lane-specifically.",
+      "Medium: verify.mjs does not enforce per-category readiness fields in summary.json; a mutation of text-community accounts.ready passes.",
+      "Low: verify.mjs does not validate ledger-bridge counts.total.",
+      "Passing checks: existing verifier, two earlier negative tests, all fixed totals and authority denials, npm run check, git diff --check, exact five-file lease, body-free output, and no em dashes."
+    ]
+  }
 }
