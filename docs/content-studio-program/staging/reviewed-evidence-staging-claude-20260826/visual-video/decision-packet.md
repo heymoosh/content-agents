@@ -3,6 +3,28 @@
 Observed: 2026-08-25. Lease: `pattern-stage-evidence-visual-video-claude`. Builder family: Claude.
 Auditor family: Codex (cross-family, per protocol.md family rotation).
 
+## Correction (this commit)
+
+The first version of this package (prior commit) built its 75 source-evidence rows by
+distributing each account's reviewed Body C/I/U aggregate across a positional, self-numbered
+placeholder id (`local-corpus-staging:<accountKey>:record-<n>-of-<records>`) with no real
+per-record identity. Codex's audit correctly rejected this as synthesized evidence.
+
+This commit replaces every one of those 75 placeholder rows with the 75 real, body-free
+projected rows for these exact 20 accounts from
+`/private/tmp/content-agents-body-free-projections-20260826/source-evidence.json` (a body-free
+projection of the raw local corpus; its `format` field is a paraphrased structural description
+and `provenance`/text fields never contain captions, transcripts, or article bodies). Each row
+is selected by its own actual `platform` and `handle` fields, normalized (`handle` lower-cased
+with a leading `@` stripped) into the same `platform|handle` account key already used by every
+other document in this lease; the projection has no non-null `accountId` field of its own, so
+this normalization is the only way to select "by actual accountId/platform." No row's
+`bodyComplete`, `id`, `sourceId`, `postId`, `url`, `observedAt`, `collectedAt`, `baselineSource`,
+or `provenance` value is invented, distributed, or aggregated — each is copied from that row's
+own actual field, or left `null` if the projection itself has `null` there. Account-level rows
+are unchanged except for the one caveat that used to claim per-record identifiers "were not
+collected" — corrected to state that they now reconcile against the real projected rows.
+
 Status: isolated, noncanonical review staging only. This package does not write
 `data/patterns/**`, does not rank, does not select a canonical account or source record, and does
 not generate, publish, or reproduce any creator body, caption, transcript, on-screen text, or
@@ -57,17 +79,19 @@ does not itself constitute that review.
    `medium`, `format`, `audienceSnapshot`, `reviewer`, `reviewedAt`) is `null` — not collected in
    this staging pass, per the "preserve null for not collected" rule. `disposition` is `pending`
    for all 20 rows.
-4. Built 75 `reviewed_source_evidence_intake_row` inputs, one per unit of each account's reviewed
-   `records` count, each carrying a self-assigned, obviously-synthetic staging identifier
-   (`local-corpus-staging:<accountKey>:record-<n>-of-<records>` — not a platform post ID; no
-   `sourceId`/`postId` is claimed because none was collected), the account's profile URL as
-   `evidenceLinks` (explicitly caveated as account-level, not a post permalink), and a
-   `bodyComplete` value distributed to match the account's reviewed Body C/I/U split from the
-   corrected slate (e.g. `instagram|adriennemareebrown`'s `body:[0,2,2]` yields 0 complete, 2
-   incomplete, 2 unknown rows). `pool`, `metricSnapshot`, `audienceSizeSnapshot`, `medium`,
-   `format`, `sourceId`, `postId`, `lineage`, `reviewStatus`, and `observedAt` are all `null` — no
-   per-record metric, format, or content fact was collected. `accountId` is set to the account's
-   `currentAccountKey` so the intake's cross-reference check can locate the parent account row.
+4. Built 75 `reviewed_source_evidence_intake_row` inputs by filtering
+   `/private/tmp/content-agents-body-free-projections-20260826/source-evidence.json` to
+   `platform` in `{instagram, tiktok, youtube}` (exactly 75 rows) and mapping each row's own real
+   `id`/`sourceId`/`postId`/`url`/`bodyComplete`/`baselineSource`/`provenance`/`observedAt`/
+   `collectedAt`/`pool`/`reviewStatus`/`status`/`lineage`/`audienceSizeSnapshot`/`popularityScope`/
+   `sampleScope`/`baselineScope` fields straight through (`null` stays `null`; nothing is
+   inferred). `accountId` is the row's own `platform` + normalized `handle`
+   (`@Handle`/`Handle` → lower-cased, `@` stripped), which lands on the same `platform|handle`
+   key as the matching account row for every one of the 75 rows — verified programmatically, zero
+   unmatched rows. `medium`, `format`, `metricSnapshot`, `comparisonClaimed`, and `evidenceRefs`
+   are left `null`: the projection's `format` field is a paraphrased structural description, not
+   a `medium`/`format` category, and mapping it in would itself be an inferred classification.
+   `membershipReason` states the real platform+handle match rule, not a pool or performance claim.
 5. Ran `src/patterns/reviewed-evidence-intake-cli.ts` on `intake-input.json` to produce
    `intake-report.json`, then ran `src/patterns/reviewed-evidence-ledger-bridge-cli.ts` on
    `intake-report.json` to produce `ledger-bridge-report.json`. Both CLIs accepted the input with
@@ -75,35 +99,45 @@ does not itself constitute that review.
 
 ## Results
 
-- `intake-report.json`: `readiness.status = "blocked"`; 20/20 account rows blocked, 75/75 evidence
-  rows blocked, 0/0 baseline rows (empty set, itself reported `ready`/vacuous); every row's
-  `bodyIncluded` is `false`; `sideEffects: "none"`.
+- `intake-report.json`: `readiness = {status: "blocked", total: 95, ready: 0, blocked: 95,
+  unmapped: 0, blockerCount: 1393}`; 20/20 account rows blocked (`blockerCount: 300`), 75/75
+  evidence rows blocked (`blockerCount: 1093`), 0/0 baseline rows (empty set, vacuously
+  non-blocking); every row's `bodyIncluded` is `false`; `sideEffects: "none"`.
 - Every account row is blocked on (at minimum) `stableAccountId`, `topics`, `focus`, `nicheLabel`,
   `researchPoolMembership`, `popularityScope`, `sampleScope`, `baselineScope`, `baselineSource`,
   `medium`, `format`, `audienceSnapshot`, `reviewer`, `reviewedAt`, `reviewStatus` — i.e. every
   identity/pool/format/audience fact this packet deliberately left unreviewed.
-- Every evidence row is blocked on (at minimum) `sourceIdOrPostId`, `pool`, `audienceSizeSnapshot`,
-  `metricSnapshot`, `popularityScope`, `sampleScope`, `baselineScope`, `baselineSource`,
-  `reviewStatus`, `lineage`, `observedAt`, plus `bodyComplete` for the incomplete/unknown-body
-  records and `account reference is unmapped or ambiguous`-style cross-reference gaps.
+- All 75 evidence rows now cross-reference their account row successfully (no "account reference
+  is unmapped or ambiguous" and no "sourceIdOrPostId" blocker survives, because every row carries
+  its own real `sourceId`/`postId`). Each evidence row is still blocked on (at minimum) `pool`,
+  `medium`, `format`, `audienceSizeSnapshot`, `metricSnapshot`, `popularityScope`, `sampleScope`,
+  `baselineScope`, `provenance`, `caveats`, `reviewStatus`, `status`, `lineage`, and `account
+  metadata is not ready` (since the parent account is itself still pending); rows whose real
+  `bodyComplete` is `false` or `null` additionally carry a `bodyComplete` blocker (14 of 75: the
+  11 incomplete + 2 unknown real Instagram rows and 1 incomplete real TikTok row).
 - `ledger-bridge-report.json`: `counts = {accounts: 20, sources: 75, baselines: 0, total: 95}`; 95
   blocker entries (one per row, since none is ready); `bodyIncluded: false`, `sideEffects: "none"`.
 
 ## Gaps kept explicit (not resolved by this package)
 
-- **Body/media completeness.** Instagram: 0 of 13 records body-complete (11 incomplete, 2 unknown
-  across the 4 accounts: `[0,2,2]+[0,1,0]+[0,5,0]+[0,3,0]`). TikTok: 37 of 38
-  complete, 1 incomplete (`tiktok|underthedesknews`). YouTube: 24 of 24 complete at the
-  body-field level, but 0 of these YouTube accounts has any admitted comparator analysis with a
-  measured value (`R` column is 0 or a single uncompared admission for every YouTube row except
-  `aliabdaal` and `melrobbins`), so completeness of the *body* field says nothing about caption,
-  transcript, or on-screen-text availability, which this packet does not check or claim.
-- **Caption / transcript / on-screen-text.** Not collected for any of the 75 rows. No row's
-  `format` or `medium` is populated, so no format-specific completeness claim (e.g. "short-video
-  transcripts exist") is made.
-- **Provenance.** Every row's `provenance` is `"local"` only — the same Meta "L" designation the
-  corrected slate already carries; reviewed-metadata and comparison-universe remain gaps (Meta
-  "U/G") and are represented as `null`/missing fields and blockers, not filled in.
+- **Body/media completeness.** These are now each row's real, projected `bodyComplete` value (not
+  distributed from an aggregate). Instagram: 0 of 13 records `bodyComplete: true` (11 `false`, 2
+  `null`). TikTok: 37 of 38 `true`, 1 `false` (in `tiktok|underthedesknews`). YouTube: 24 of 24
+  `true`. These totals happen to match the corrected slate's aggregate Body C/I/U counts exactly,
+  but that is now a verified fact about the real rows, not an assumption used to build them. 0 of
+  the YouTube accounts has any admitted comparator analysis with a measured value (`R` is 0 or a
+  single uncompared admission for every YouTube row except `aliabdaal` and `melrobbins`), so a
+  `true` body-field value says nothing about caption, transcript, or on-screen-text availability,
+  which this packet still does not check or claim.
+- **Caption / transcript / on-screen-text.** Not collected for any of the 75 rows; `caveats`,
+  `reviewStatus`, `status`, and `lineage` are `null` on every row. No row's `format` or `medium`
+  is populated, so no format-specific completeness claim (e.g. "short-video transcripts exist")
+  is made. The projection's own `format` field (a paraphrased structural description, e.g. post
+  length and layout notes) was deliberately left out of this packet's `format`/`medium` fields —
+  see "Correction" above.
+- **Provenance.** Every one of these 75 rows' `provenance` field is `null` in the source
+  projection, and stays `null` here — nothing is filled in. Reviewed-metadata and
+  comparison-universe remain gaps and are represented as `null`/missing fields and blockers.
 - **Public-research corroboration.** All 20 accounts' public profile checks in
   `broad-pattern-research-20260825/visual-video` returned `access_status: "limited"` (login walls,
   robots-policy denials, rate limits, or empty channel shells). No fresh public metric, caption, or
@@ -121,13 +155,14 @@ review, alongside any equivalent text/community-family package, before any canon
 
 ## Acceptance evidence
 
+- `npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/intake-input.json --format json`
+  — exit 0, wrote `intake-report.json` (20 accounts / 75 real evidence rows / 0 baselines, all
+  blocked, `blockerCount: 1393`).
+- `npm run patterns:reviewed-evidence-ledger-bridge -- --file docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/intake-report.json --format json`
+  — exit 0, wrote `ledger-bridge-report.json` (counts 20/75/0/95, 95 blocker entries, no
+  forbidden/body/model/ranking/winner key rejected because none was ever supplied).
 - `npm run check` — passed (`tsc --noEmit`, no diagnostics).
 - `git diff --check` — passed (no whitespace errors).
-- `npx tsx src/patterns/reviewed-evidence-intake-cli.ts --file intake-input.json --format json` —
-  exit 0, wrote `intake-report.json` (20 accounts / 75 evidence / 0 baselines, all blocked).
-- `npx tsx src/patterns/reviewed-evidence-ledger-bridge-cli.ts --file intake-report.json --format
-  json` — exit 0, wrote `ledger-bridge-report.json` (counts 20/75/0/95, 95 blocker entries, no
-  forbidden/body/model/ranking/winner key rejected because none was ever supplied).
 
 ## Files in this package
 
