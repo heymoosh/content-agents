@@ -5,7 +5,7 @@
     "type": "builder",
     "task_id": "pattern-stage-evidence-consolidated-review-claude",
     "family": "claude",
-    "commit_sha": "099c6b18d6325f82ca75f1835808f565985b6fa8",
+    "commit_sha": "98790ce4cf952679c42b7fef70a78c63ed88c055",
     "changed_paths": [
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/summary.json",
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/morning-review.md",
@@ -17,7 +17,7 @@
       {
         "command": "npm run check",
         "passed": true,
-        "summary": "Typecheck passed after final prose correction."
+        "summary": "Typecheck passed after the seven final-audit corrections."
       },
       {
         "command": "node docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs",
@@ -33,8 +33,8 @@
     "behavior_impact": "None; review documentation and a read-only verifier only.",
     "logic_impact": "None; no generation, review, publishing, or canonical ledger logic changed.",
     "risks": [
-      "The verifier intentionally fails closed if future lane proposal wording or readiness/status contracts change.",
-      "Professional lane placeholders and local-corpus scope labels remain unreviewed facts about staging state, not approved metadata."
+      "The verifier intentionally fails closed on any lane status-shape, summary readiness, bridge-total, proposal wording, or authorization change.",
+      "All placeholder and scope values remain staging facts, not reviewed metadata."
     ],
     "unresolved_items": [
       "All 576 staged rows remain blocked pending Muxin's decisions.",
@@ -68,24 +68,25 @@
         "Passing checks: fully fail-closed verifier and both negative mutations, 65/499/12 totals, 576 blocked with zero ready/unmapped, 30/8/27 proposals, five-file lease, actual professional 14-unknown and 11-partial/3-blocked semantics, body-free authority denials, no outside catalog figure, no em dashes, npm run check, exact verifier, and git diff --check."
       ],
       "commit_sha": "6c2b648eaad82c62f65dead7ad8d70f733a47488"
+    },
+    {
+      "type": "audit",
+      "task_id": "pattern-stage-evidence-consolidated-review-claude",
+      "family": "codex",
+      "verdict": "failed",
+      "findings": [
+        "Medium: 12 baselines are described as one-to-one with 6 accounts, but the actual mapping is two rows per account and therefore many-to-one.",
+        "Medium: text/visual audience wording treats absent cross-type fields as null; account rows carry audienceSnapshot null and evidence rows carry audienceSizeSnapshot null.",
+        "Medium: visual account cross-reference resolution comes from accountId platform|handle; sourceId/postId resolve source identifiers, not the account join.",
+        "Low: every row stays pending or blocked is ambiguous because text/visual evidence and baselines have null status/reviewStatus; qualify account disposition separately from readiness.",
+        "Medium: verify.mjs permits either null or blocked/pending in every evidence lane; it must enforce text/visual null/null and professional blocked/pending lane-specifically.",
+        "Medium: verify.mjs does not enforce per-category readiness fields in summary.json; a mutation of text-community accounts.ready passes.",
+        "Low: verify.mjs does not validate ledger-bridge counts.total.",
+        "Passing checks: existing verifier, two earlier negative tests, all fixed totals and authority denials, npm run check, git diff --check, exact five-file lease, body-free output, and no em dashes."
+      ],
+      "commit_sha": "099c6b18d6325f82ca75f1835808f565985b6fa8"
     }
   ],
   "diff_verified": true,
-  "verified_commit": "099c6b18d6325f82ca75f1835808f565985b6fa8",
-  "audit": {
-    "type": "audit",
-    "task_id": "pattern-stage-evidence-consolidated-review-claude",
-    "family": "codex",
-    "verdict": "failed",
-    "findings": [
-      "Medium: 12 baselines are described as one-to-one with 6 accounts, but the actual mapping is two rows per account and therefore many-to-one.",
-      "Medium: text/visual audience wording treats absent cross-type fields as null; account rows carry audienceSnapshot null and evidence rows carry audienceSizeSnapshot null.",
-      "Medium: visual account cross-reference resolution comes from accountId platform|handle; sourceId/postId resolve source identifiers, not the account join.",
-      "Low: every row stays pending or blocked is ambiguous because text/visual evidence and baselines have null status/reviewStatus; qualify account disposition separately from readiness.",
-      "Medium: verify.mjs permits either null or blocked/pending in every evidence lane; it must enforce text/visual null/null and professional blocked/pending lane-specifically.",
-      "Medium: verify.mjs does not enforce per-category readiness fields in summary.json; a mutation of text-community accounts.ready passes.",
-      "Low: verify.mjs does not validate ledger-bridge counts.total.",
-      "Passing checks: existing verifier, two earlier negative tests, all fixed totals and authority denials, npm run check, git diff --check, exact five-file lease, body-free output, and no em dashes."
-    ]
-  }
+  "verified_commit": "98790ce4cf952679c42b7fef70a78c63ed88c055"
 }
