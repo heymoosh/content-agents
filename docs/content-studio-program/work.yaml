@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 24
+state_revision: 25
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -1091,7 +1091,7 @@ tasks:
   - id: pattern-stage-evidence-visual-video-claude
     batch_id: pattern-reviewed-evidence-staging-claude-20260826
     outcome: Rebuild the exact 20-account, 75-source visual/video body-free staging proposal with Claude as builder and Codex as auditor, preserving 5 recommend, 2 hold, 13 research-further, and explicit body and media gaps.
-    status: needs-fix
+    status: building
     depends_on:
       - pattern-corrected-candidate-account-slate
     base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
