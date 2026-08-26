@@ -41,6 +41,19 @@
       "Stable IDs, account references, baseline gaps, pool choices, and canonical-data authority remain at the human gate."
     ]
   },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-consolidated-review-claude",
+    "family": "codex",
+    "verdict": "passed",
+    "findings": [
+      "Every numeric and semantic claim in the three human-facing files independently matches the allowed lane artifacts, including joins, identifiers, field presence, null/absent/unknown distinctions, statuses, access, scope, provenance, completeness, baselines, and proposal dispositions.",
+      "The base-to-final diff contains exactly the five leased consolidated-review files and the worktree is clean.",
+      "The package reconciles 65 accounts, 499 evidence rows, 12 baselines, 576 blocked with zero ready or unmapped, and 30 recommend plus 8 hold plus 27 research-further proposals.",
+      "The output is body-free, has no em dashes, and grants no reviewed, canonical, best, viral, winner, generation, publishing, or canonical-write authority.",
+      "The exact verifier, npm run check, and git diff --check passed. Six independent mutations of lane status, per-category readiness, bridge total, global readiness, explicit ready/reviewed status, and summary blocked count all failed as expected."
+    ]
+  },
   "audit_history": [
     {
       "type": "audit",
@@ -89,17 +102,10 @@
   ],
   "diff_verified": true,
   "verified_commit": "98790ce4cf952679c42b7fef70a78c63ed88c055",
-  "audit": {
-    "type": "audit",
+  "integration": {
+    "type": "integration",
     "task_id": "pattern-stage-evidence-consolidated-review-claude",
     "family": "codex",
-    "verdict": "passed",
-    "findings": [
-      "Every numeric and semantic claim in the three human-facing files independently matches the allowed lane artifacts, including joins, identifiers, field presence, null/absent/unknown distinctions, statuses, access, scope, provenance, completeness, baselines, and proposal dispositions.",
-      "The base-to-final diff contains exactly the five leased consolidated-review files and the worktree is clean.",
-      "The package reconciles 65 accounts, 499 evidence rows, 12 baselines, 576 blocked with zero ready or unmapped, and 30 recommend plus 8 hold plus 27 research-further proposals.",
-      "The output is body-free, has no em dashes, and grants no reviewed, canonical, best, viral, winner, generation, publishing, or canonical-write authority.",
-      "The exact verifier, npm run check, and git diff --check passed. Six independent mutations of lane status, per-category readiness, bridge total, global readiness, explicit ready/reviewed status, and summary blocked count all failed as expected."
-    ]
+    "verdict": "passed"
   }
 }
