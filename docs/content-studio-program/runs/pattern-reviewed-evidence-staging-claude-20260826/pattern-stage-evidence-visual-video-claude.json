@@ -45,6 +45,19 @@
       "No ranking or best-account claim is established."
     ]
   },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-visual-video-claude",
+    "family": "codex",
+    "verdict": "passed",
+    "findings": [
+      "Base-to-final diff is limited to the four leased visual/video staging files.",
+      "All 75 final evidence rows match the safe projection by id, sourceId, postId, platform, and bodyComplete; zero synthetic IDs remain and zero IDs overlap the rejected synthetic predecessor.",
+      "The package reconciles 20 accounts, 75 sources, zero baselines, and 5 recommend plus 2 hold plus 13 research-further proposals.",
+      "No raw bodies, ranking or winner claims, canonical data writes, or coordinator-state writes are present.",
+      "The exact coordinator intake and --input ledger-bridge commands, npm run check, and git diff --check all passed locally."
+    ]
+  },
   "audit_history": [
     {
       "type": "audit",
@@ -61,17 +74,10 @@
   ],
   "diff_verified": true,
   "verified_commit": "e7a7c23e88ab093a1711d0fbfdc429e94d6f6f63",
-  "audit": {
-    "type": "audit",
+  "integration": {
+    "type": "integration",
     "task_id": "pattern-stage-evidence-visual-video-claude",
     "family": "codex",
-    "verdict": "passed",
-    "findings": [
-      "Base-to-final diff is limited to the four leased visual/video staging files.",
-      "All 75 final evidence rows match the safe projection by id, sourceId, postId, platform, and bodyComplete; zero synthetic IDs remain and zero IDs overlap the rejected synthetic predecessor.",
-      "The package reconciles 20 accounts, 75 sources, zero baselines, and 5 recommend plus 2 hold plus 13 research-further proposals.",
-      "No raw bodies, ranking or winner claims, canonical data writes, or coordinator-state writes are present.",
-      "The exact coordinator intake and --input ledger-bridge commands, npm run check, and git diff --check all passed locally."
-    ]
+    "verdict": "passed"
   }
 }
