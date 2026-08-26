@@ -170,18 +170,23 @@ analysis. The caveat is uneven body completeness by platform and no universal fo
 
 ## Held, excluded, and research-further cohorts
 
-- **Held (15):** Instagram accounts with no body-complete records, Mastodon accounts with unknown
-  body completeness, plus accounts whose admitted analyses or comparator coverage is insufficient
-  for the proposed review stage. The exact rows are in the table and JSON.
+- **Held (8):** five Mastodon accounts are conditional holds because all locally represented body
+  completeness is unknown (a mechanism-analysis gap, not a performance judgment). Three accounts
+  have body-complete records but no admitted comparator analysis: `tiktok|theholisticpsychologist`,
+  `x|sahilbloom`, and `youtube|melrobbins`; these are true comparison-evidence holds. The
+  Instagram rows with incomplete or unknown bodies are `research_further`, not counted as holds.
 - **Excluded (0):** no account is rejected from future consideration solely from this local
   inventory. Rejection would require a human decision or a concrete identity/provenance conflict.
-- **Research further (10):** the four Reddit communities with winner records but no admitted
-  comparator analysis, the six one-record or comparator-free YouTube/Instagram cases. Gaps are
-  missing admitted analysis, missing valid comparator context, or insufficient repeat sample.
+- **Research further (27):** five Reddit communities have source-listing winner records but no
+  admitted comparator analysis: `r/civictech`, `r/entrepreneur`, `r/localllama`, `r/microsaas`,
+  and `r/youshouldknow`. The other 22 rows are non-Reddit accounts with fewer than two admitted
+  analyses or no admitted comparator, including the one-record cases. These are missing-analysis
+  or missing-comparator gaps, not low-performance findings.
 - **Cross-cutting gaps:** all 65 rows need reviewed identity/metadata confirmation; all rows lack
-  a defined comparison universe for “top” claims; Pinterest has no corpus evidence; baseline
-  artifacts cover only six Reddit communities; 169 records are body-incomplete and 44 are
-  body-unknown.
+  a defined comparison universe for “top” claims; Pinterest has no corpus evidence; the stored
+  baseline artifacts contain 12 rows across six Reddit accounts (`r/adhd`, `r/lifeprotips`,
+  `r/productmanagement`, `r/claudeai`, `r/civictech`, and `r/sideproject`), while every other
+  account has a baseline gap; 169 records are body-incomplete and 44 are body-unknown.
 
 ## Minimal human gate and resumption
 
