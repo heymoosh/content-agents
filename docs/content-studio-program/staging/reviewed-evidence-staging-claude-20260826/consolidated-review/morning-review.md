@@ -35,8 +35,8 @@ All three lanes report intake readiness `status: "blocked"`. Zero rows anywhere 
 
 **Does:**
 
-- Reconciles the three lanes' own already-published counts, account keys, and proposed
-  recommend/hold/research-further dispositions into one place, for one morning read.
+- Reconciles the three lanes' own local source/evidence-record counts, account keys, and
+  proposed recommend/hold/research-further dispositions into one place, for one morning read.
 - Carries forward each lane's open pool and metadata questions unanswered, so Muxin can decide or
   defer them here instead of re-reading three packets.
 - Gives Muxin a single approve/narrow/hold surface per lane plus the open questions, in

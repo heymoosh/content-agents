@@ -13,8 +13,11 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
   are `ready`, `reviewed`, or `unmapped` anywhere.
 - **Proposals are proposals, not dispositions.** Each lane preserves the corrected candidate
   slate's own recommend/hold/research-further label as a `dispositionReason` string on the account
-  row; the intake schema's actual `disposition` field is `"pending"` on all 65 accounts and all 499
-  evidence rows. Totals: 30 recommend, 8 hold, 27 research-further.
+  row; the intake schema's actual `disposition` field is `"pending"` on all 65 account rows.
+  Evidence rows carry no `disposition` field at all. All 499 evidence rows are readiness
+  `blocked`: the 354 text-community and 75 visual-video rows carry `status: null` and
+  `reviewStatus: null`; the 70 professional-publishing rows carry `status: "blocked"` and
+  `reviewStatus: "pending"`. Totals: 30 recommend, 8 hold, 27 research-further.
 - **Account-key provenance and disjointness.** Every account key is a lane-verified
   `platform|handle` join (text-community and visual-video document the exact match method in their
   decision packets; professional-publishing takes the key from the same corrected slate). The 65
@@ -64,15 +67,22 @@ Every number traces to a lane's `intake-report.json` or `ledger-bridge-report.js
 
 ### Audience
 
-- `audienceSnapshot` and `audienceSizeSnapshot` are `null` for every account and every evidence row
-  in all three lanes. No follower count, subscriber count, or audience-size figure is asserted
-  anywhere in this package.
+- Text-community and visual-video: `audienceSnapshot` and `audienceSizeSnapshot` are `null` for
+  every account and every evidence row in both lanes. Professional-publishing uses the literal
+  placeholder string `"unknown"` instead of `null`: `audienceSnapshot` is `"unknown"` on all 14
+  account rows, and `audienceSizeSnapshot` is `"unknown"` on all 70 evidence rows. No follower
+  count, subscriber count, or audience-size figure is asserted anywhere in this package.
 
 ### Scope (popularity / sample / baseline)
 
-- `popularityScope`, `sampleScope`, and `baselineScope` are `null` across all 65 accounts and all
-  499 evidence rows. No absolute reach or engagement figure is comparable across accounts or
-  platforms without a stated denominator, and none is stated here.
+- Text-community and visual-video: `popularityScope`, `sampleScope`, and `baselineScope` are
+  `null` across all 51 accounts (31 + 20) and all 429 evidence rows (354 + 75) in both lanes.
+- Professional-publishing: none of these three fields is `null`. All 14 account rows carry
+  `popularityScope: "unknown"`, `sampleScope: "local corpus account sample"`, and
+  `baselineScope: "unknown"`. All 70 evidence rows carry `popularityScope: "local corpus
+  record"`, `sampleScope: "targeted local corpus sample"`, and `baselineScope: "unknown"`.
+- No absolute reach or engagement figure is comparable across accounts or platforms without a
+  stated denominator, and none is stated here.
 - `baselineSource` is `null` at the account level for 11 of the 31 text-community accounts: 5
   because the projection never recorded a value, 6 because the underlying evidence rows are a
   genuine mix of `null` and a real value that would misstate the account if collapsed to one claim.
