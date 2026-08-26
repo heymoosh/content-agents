@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 6
+state_revision: 12
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -798,7 +798,7 @@ tasks:
   - id: pattern-stage-evidence-text-community
     batch_id: pattern-reviewed-evidence-staging-20260826
     outcome: Produce a body-free, noncanonical reviewed-evidence proposal for the exact 31 text/community accounts and 354 local source records, preserving 14 recommend, 6 hold, and 11 research-further dispositions plus 12 staged baseline artifacts without converting any row into reviewed or canonical state.
-    status: ready
+    status: building
     depends_on:
       - pattern-corrected-candidate-account-slate
     base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
@@ -857,7 +857,7 @@ tasks:
   - id: pattern-stage-evidence-professional-publishing
     batch_id: pattern-reviewed-evidence-staging-20260826
     outcome: Produce a body-free, noncanonical reviewed-evidence proposal for the exact 14 professional/publishing accounts and 70 local source records, preserving 11 recommend and 3 research-further dispositions while retaining corrected Threads unknowns.
-    status: ready
+    status: building
     depends_on:
       - pattern-corrected-candidate-account-slate
     base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
@@ -916,7 +916,7 @@ tasks:
   - id: pattern-stage-evidence-visual-video
     batch_id: pattern-reviewed-evidence-staging-20260826
     outcome: Produce a body-free, noncanonical reviewed-evidence proposal for the exact 20 visual/video accounts and 75 local source records, preserving 5 recommend, 2 hold, and 13 research-further dispositions while keeping caption, transcript, media, and body-completeness gaps explicit.
-    status: ready
+    status: building
     depends_on:
       - pattern-corrected-candidate-account-slate
     base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
