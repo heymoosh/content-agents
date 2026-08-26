@@ -28,18 +28,24 @@ invented.
   `docs/content-studio-program/staging/broad-pattern-research-20260825/professional-publishing/source-manifest.json`
   (the `source_kind: "profile"` entry for each of the 14 accounts).
 - Source identifiers, locators, format labels, body-completeness flags, and post/collection
-  dates come from the local corpus snapshot used for the local-evidence inventory
-  (`data/patterns/corpus.jsonl`, read from outside this worktree for identifiers and non-body
-  metadata only; no body, transcript, or analysis text was copied into this staging package).
-  Per-account body-completeness triplets in this local snapshot match the corrected candidate
-  slate's `body` field exactly for all 14 accounts (LinkedIn `[4,2,0]`/`[4,1,0]`/`[5,0,0]`/
-  `[3,2,0]`; Substack `[4,0,0]`/`[3,1,0]`/`[4,0,0]`/`[6,0,0]`/`[3,1,0]`; Substack Notes
-  `[6,0,0]`/`[2,4,0]`; Threads `[3,2,0]`/`[1,4,0]`/`[5,0,0]`), confirming the 70-record
-  reconciliation before this package was built.
+  dates come from the body-free source-evidence projection package supplied for this build
+  (`source-evidence.json`, a read-only, non-body projection of the local corpus keyed by stable
+  record id; no body, transcript, or analysis text was copied into this staging package or read
+  from any raw data directory). All 70 LinkedIn, Substack, Substack Notes, and Threads rows in
+  this package were cross-checked id-for-id against that projection: `sourceId`/`postId`,
+  `platform`, `bodyComplete`, `observedAt`, `collectedAt`, and the profile-post URL all match
+  exactly. Per-account body-completeness triplets derived from that projection match the
+  corrected candidate slate's `body` field exactly for all 14 accounts (LinkedIn `[4,2,0]`/
+  `[4,1,0]`/`[5,0,0]`/`[3,2,0]`; Substack `[4,0,0]`/`[3,1,0]`/`[4,0,0]`/`[6,0,0]`/`[3,1,0]`;
+  Substack Notes `[6,0,0]`/`[2,4,0]`; Threads `[3,2,0]`/`[1,4,0]`/`[5,0,0]`), confirming the
+  70-record reconciliation before this package was built. Each source row's `accountId` is the
+  `platform|handle` pair taken directly from that same projection row (not invented); the
+  projection package's own `accountId` field is null for every row, so no stable per-account ID
+  is asserted at the source-evidence layer.
 - The checked-in local-evidence inventory (`docs/content-studio-program/staging/local-evidence-inventory-20260825/`)
-  confirms the platform totals; the runtime `data/patterns/*.jsonl` files are not present inside
-  this worktree, so identifiers were read from the local corpus snapshot outside it and were not
-  copied into the repository.
+  confirms the platform totals independently of the supplied projection package. The baseline
+  projection (`baselines.json`) contains only Reddit rows, confirming this platform set has zero
+  stored baseline rows, matching the corrected candidate slate's `b: 0` for all 14 accounts.
 
 Known gaps remain explicit: stable account IDs, topics, focus, niche labels, audience snapshots,
 pool memberships, and comparison universes are unreviewed or unknown for every account; source
