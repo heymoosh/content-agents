@@ -1,6 +1,6 @@
 # Corrected candidate-account decision packet
 
-Observed: 2026-08-25  
+Observed: 2026-08-25
 Status: isolated review staging only. This packet does not select canonical accounts, declare an account best, rank accounts, or write `data/patterns/**`.
 
 ## Decision request
