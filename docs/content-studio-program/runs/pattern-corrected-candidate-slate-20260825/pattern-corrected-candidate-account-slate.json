@@ -1,0 +1,51 @@
+{
+  "task_id": "pattern-corrected-candidate-account-slate",
+  "batch_id": "pattern-corrected-candidate-slate-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-corrected-candidate-account-slate",
+    "family": "codex",
+    "commit_sha": "3acb35ba48611f5654974672860fa011aff7cdb2",
+    "changed_paths": [
+      "docs/content-studio-program/staging/corrected-candidate-account-slate-20260825/decision-packet.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "TypeScript check passed."
+      },
+      {
+        "command": "npm run patterns:data-status -- --data-dir data/patterns --format json",
+        "passed": true,
+        "summary": "CLI completed; coordinator will independently retain preserved-corpus status evidence."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "No whitespace errors."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "The corrected slate remains noncanonical and requires Muxin's decision."
+    ],
+    "unresolved_items": [
+      "Pinterest and comparison-universe gaps remain explicit."
+    ]
+  },
+  "diff_verified": true,
+  "verified_commit": "3acb35ba48611f5654974672860fa011aff7cdb2",
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-corrected-candidate-account-slate",
+    "family": "claude",
+    "verdict": "failed",
+    "findings": [
+      "Blocking: regenerate the Markdown R column so its 65 account rows match JSON/corpus admitted/comparator totals (132/123).",
+      "Blocking: use one source-winner definition consistently across scope, platform, and account rows; current account rows sum 232 while scope/platform state 207.",
+      "The prior cohort-count, Reddit sub-count, hold-rationale, body-free, lease, and decision-gate issues are corrected or pass."
+    ]
+  }
+}
