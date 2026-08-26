@@ -560,7 +560,7 @@ tasks:
       - pattern-research-professional-publishing
       - pattern-research-visual-video
       - pattern-professional-evidence-boundary-correction
-    base_sha: d157b3fc591347ba3a342776cff46e498a64f79c
+    base_sha: 39328a404473b2c83e47ecdcc6a66fbb7e029b13
     context_paths:
       - docs/content-studio-program/tasks/pattern-local-evidence-inventory.md
       - docs/content-studio-program/tasks/pattern-local-evidence-inventory-clean-commit.md
