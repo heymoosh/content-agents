@@ -485,7 +485,7 @@ tasks:
       - pattern-research-professional-publishing
       - pattern-research-visual-video
       - pattern-professional-evidence-boundary-correction
-      - pattern-local-evidence-inventory
+      - pattern-local-evidence-inventory-clean-commit
     base_sha: null
     context_paths:
       - docs/content-studio-program/candidate-account-slate-20260825.md
@@ -514,7 +514,7 @@ tasks:
   - id: pattern-local-evidence-inventory
     batch_id: pattern-local-evidence-inventory-20260825
     outcome: The existing 499-record local pattern corpus is accurately inventoried body-free, so the candidate slate distinguishes actual local performance evidence from fresh-public-source access limits.
-    status: auditing
+    status: blocked
     depends_on:
       - pattern-research-text-community
       - pattern-research-professional-publishing
@@ -550,6 +550,47 @@ tasks:
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
     commit_sha: 76641280ffae77764a292fea75a093b1813b6bc9
+    audit_verdict: pending
+  - id: pattern-local-evidence-inventory-clean-commit
+    batch_id: pattern-local-evidence-inventory-recovery-20260825
+    outcome: Re-materialize the already verified body-free local-evidence inventory as a staging-only commit, with exact source-output equivalence and fresh acceptance evidence; do not change corpus, canonical data, task coordination, or inventory conclusions.
+    status: ready
+    depends_on:
+      - pattern-research-text-community
+      - pattern-research-professional-publishing
+      - pattern-research-visual-video
+      - pattern-professional-evidence-boundary-correction
+    base_sha: d157b3fc591347ba3a342776cff46e498a64f79c
+    context_paths:
+      - docs/content-studio-program/tasks/pattern-local-evidence-inventory.md
+      - docs/content-studio-program/tasks/pattern-local-evidence-inventory-clean-commit.md
+      - docs/content-studio-program/protocol.md
+    forbidden_paths:
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-agents-backlog.md
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/pattern-local-evidence-inventory.md
+      - docs/content-studio-program/runs/**
+    write_paths:
+      - docs/content-studio-program/staging/local-evidence-inventory-20260825/**
+    semantic_locks:
+      - pattern:local-evidence-inventory-clean-commit
+    builder_family: codex
+    auditor_family: claude
+    branch: agent/pattern-local-evidence-inventory-clean-commit
+    worktree: /private/tmp/content-agents-pattern-local-evidence-inventory-clean-commit
+    acceptance_commands:
+      - npm run check
+      - npm run patterns:data-status -- --data-dir data/patterns --format json
+      - git diff --check
+      - git diff --exit-code 76641280ffae77764a292fea75a093b1813b6bc9 -- docs/content-studio-program/staging/local-evidence-inventory-20260825
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-candidate-account-slate
+    commit_sha: null
     audit_verdict: pending
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
