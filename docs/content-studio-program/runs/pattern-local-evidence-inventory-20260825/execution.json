@@ -21,5 +21,48 @@
   "resume": {
     "next_action": "Run claude auth status in this worktree. Only after it reports loggedIn true, rerun the body-free Claude audit, record a passed audit report, and then create the corrected local-evidence-backed candidate slate.",
     "integration_state": "Do not integrate this task or modify canonical data/patterns until the Claude audit passes and Muxin resolves the corrected consolidated slate gate."
+  },
+  "recovery_checkpoint": {
+    "recorded_branch": "agent/pattern-local-evidence-inventory-handoff",
+    "recorded_head": "06ac80f0854a118f4f7979bede278738b948fa87",
+    "base_sha": "432b6304531b78715f299fd04bfdc507989528b2",
+    "task_status": "auditing",
+    "task_branch": "agent/pattern-local-evidence-inventory",
+    "task_worktree": "/private/tmp/content-agents-pattern-local-evidence-inventory",
+    "checkout_state": {
+      "current_checkout": "task worktree",
+      "current_checkout_path": "/private/tmp/content-agents-pattern-local-evidence-inventory",
+      "primary_checkout_path": "/Users/Muxin/Documents/GitHub/content-agents",
+      "primary_checkout_used_for_integration": false,
+      "primary_checkout_notes_ledger": "unrelated modified data/notes-spread-ledger.jsonl; not reset, cleaned, staged, committed, or otherwise modified"
+    },
+    "changed_paths": [
+      "docs/content-studio-program/work.yaml",
+      "docs/content-studio-program/tasks/pattern-local-evidence-inventory.md",
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.json",
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md",
+      "docs/content-studio-program/runs/pattern-local-evidence-inventory-20260825/pattern-local-evidence-inventory.json",
+      "docs/content-studio-program/runs/pattern-local-evidence-inventory-20260825/execution.json",
+      "docs/content-studio-program/runs/pattern-local-evidence-inventory-20260825/RESUME.md"
+    ],
+    "acceptance_commands_completed": [
+      "npm run worktree:setup (isolated task worktree only)",
+      "npm run check (passed)",
+      "npm run patterns:data-status -- --data-dir data/patterns --format json (passed; read-only status command required the approved temporary IPC exception)",
+      "body-free inventory consistency assertion (passed)",
+      "git diff --check (passed)",
+      "npm run studio:coord -- validate (passed: 17 tasks, no lease or evidence conflicts)"
+    ],
+    "audit_attempts_and_failures": [
+      "Claude audit attempt 1: claude -p returned Not logged in before reviewing repository content.",
+      "Claude audit attempt 2: claude auth status returned loggedIn false and authMethod none; the subsequent claude -p audit did not run.",
+      "No cross-family audit verdict exists."
+    ],
+    "unresolved_findings": [
+      "The 499-record local inventory is verified by deterministic checks but is not cross-family audited.",
+      "The obsolete public-lookup all-hold candidate gate must not be replaced until the inventory audit passes.",
+      "The task is neither accepted nor integrated, and canonical data/patterns remains unchanged."
+    ],
+    "exact_next_action": "From this task worktree, run claude auth status. If and only if it reports loggedIn true, run the recorded body-free Claude audit; on a passed verdict, record the strict audit report and proceed to the corrected local-evidence-backed candidate slate."
   }
 }
