@@ -100,6 +100,23 @@ export function advanceStateRevision(manifest: WorkManifest, expectedRevision: n
   return validateWorkManifest({ ...normalized, state_revision: expectedRevision + 1 });
 }
 
+export function commitCoordinatorMutation(input: {
+  expectedRevision: number;
+  currentRevision: number;
+  writeRun: () => unknown;
+  writeManifest: () => unknown;
+}): void {
+  if (input.currentRevision !== input.expectedRevision) {
+    throw new Error(
+      `coordinator state revision changed: expected ${input.expectedRevision}, found ${input.currentRevision}`,
+    );
+  }
+  // Prospective run evidence remains replayable with the old manifest state.
+  // Reversing this order can leave a task state that claims missing evidence.
+  input.writeRun();
+  input.writeManifest();
+}
+
 function normalizeTask(task: StudioTask): StudioTask {
   return {
     ...task,

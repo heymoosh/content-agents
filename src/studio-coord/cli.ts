@@ -9,6 +9,7 @@ import {
   applyTaskReport,
   advanceStateRevision,
   claimTask,
+  commitCoordinatorMutation,
   describeProgram,
   parseRunRecord,
   recordVerifiedDiff,
@@ -80,6 +81,21 @@ function saveRun(task: StudioTask, run: RunRecord): void {
   atomicWrite(runPath(task), `${JSON.stringify(run, null, 2)}\n`);
 }
 
+function saveTaskMutation(
+  original: WorkManifest,
+  updated: WorkManifest,
+  task: StudioTask,
+  run: RunRecord,
+): void {
+  const current = loadManifest();
+  commitCoordinatorMutation({
+    expectedRevision: original.state_revision,
+    currentRevision: current.state_revision,
+    writeRun: () => saveRun(task, run),
+    writeManifest: () => saveManifest(updated, original.state_revision),
+  });
+}
+
 function taskById(manifest: WorkManifest, id: string): StudioTask {
   const task = manifest.tasks.find((candidate) => candidate.id === id);
   if (!task) throw new Error(`unknown task: ${id}`);
@@ -131,8 +147,7 @@ function verifyDiff(id: string, commit: string): void {
   const run = loadRun(task, true)!;
   const changed = verifyTaskCommit(task, commit);
   const updated = recordVerifiedDiff(manifest, id, commit, run);
-  saveManifest(updated.manifest, manifest.state_revision);
-  saveRun(task, updated.run);
+  saveTaskMutation(manifest, updated.manifest, task, updated.run);
   console.log(`${id}: verified ${changed.length} changed path(s) at ${commit}`);
 }
 
@@ -145,8 +160,7 @@ function report(id: string, reportFile: string): void {
   const input = parsed.data;
   if (input.task_id !== id) throw new Error(`report task_id ${input.task_id} does not match ${id}`);
   const updated = applyTaskReport(manifest, input, loadRun(task));
-  saveManifest(updated.manifest, manifest.state_revision);
-  saveRun(task, updated.run);
+  saveTaskMutation(manifest, updated.manifest, task, updated.run);
   console.log(`${id}: recorded ${input.type} report; status=${taskById(updated.manifest, id).status}`);
 }
 
@@ -156,8 +170,7 @@ function reroute(id: string, family: string, reasonFile: string): void {
   const task = taskById(manifest, id);
   const reason = readFileSync(resolve(reasonFile), "utf8").trim();
   const updated = rerouteAuditor(manifest, id, family, reason, new Date().toISOString(), loadRun(task));
-  saveManifest(updated.manifest, manifest.state_revision);
-  saveRun(task, updated.run);
+  saveTaskMutation(manifest, updated.manifest, task, updated.run);
   console.log(`${id}: auditor ${task.auditor_family} -> ${taskById(updated.manifest, id).auditor_family}`);
 }
 

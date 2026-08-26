@@ -9,6 +9,7 @@ import {
   recordVerifiedDiff,
   rerouteAuditor,
   advanceStateRevision,
+  commitCoordinatorMutation,
   verifyChangedPaths,
   validateWorkManifest,
   type AuditReport,
@@ -121,6 +122,33 @@ test("advances coordinator state only from the expected manifest revision", () =
   assert.equal(work.state_revision, 0);
   assert.equal(advanceStateRevision(work, 0).state_revision, 1);
   assert.throws(() => advanceStateRevision(work, 1), /state revision.*changed/i);
+});
+
+test("persists run evidence before committing the manifest revision", () => {
+  const calls: string[] = [];
+  assert.throws(
+    () => commitCoordinatorMutation({
+      expectedRevision: 3,
+      currentRevision: 3,
+      writeRun: () => calls.push("run"),
+      writeManifest: () => {
+        calls.push("manifest");
+        throw new Error("simulated manifest write failure");
+      },
+    }),
+    /simulated manifest write failure/,
+  );
+  assert.deepEqual(calls, ["run", "manifest"]);
+  assert.throws(
+    () => commitCoordinatorMutation({
+      expectedRevision: 2,
+      currentRevision: 3,
+      writeRun: () => calls.push("stale-run"),
+      writeManifest: () => calls.push("stale-manifest"),
+    }),
+    /state revision changed/i,
+  );
+  assert.deepEqual(calls, ["run", "manifest"]);
 });
 
 test("reroutes an unavailable auditor with durable evidence and keeps cross-family enforcement", () => {

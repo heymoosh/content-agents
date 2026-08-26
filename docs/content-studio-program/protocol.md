@@ -16,6 +16,11 @@ Every durable manifest write compares and advances `state_revision`; a stale coo
 reload instead of overwriting newer state. Read-only `status` and `validate` remain available from
 any checkout.
 
+When one transition updates both a run record and the manifest, the coordinator persists the
+prospective run evidence first and commits the revision-checked manifest transition last. If the
+second write is interrupted, the evidence can be replayed; the manifest never claims evidence that
+was not durably recorded.
+
 ## Standing authorization and continuation loop
 
 Muxin has authorized the coordinator to continue the entire approved Content Studio program without
