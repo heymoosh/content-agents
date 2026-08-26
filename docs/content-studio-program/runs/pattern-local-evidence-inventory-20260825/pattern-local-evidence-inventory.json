@@ -5,8 +5,7 @@
     "type": "builder",
     "task_id": "pattern-local-evidence-inventory",
     "family": "codex",
-    "model": "gpt-5.6-terra",
-    "reasoning_effort": "high",
+    "commit_sha": "76641280ffae77764a292fea75a093b1813b6bc9",
     "changed_paths": [
       "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.json",
       "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md"
@@ -41,19 +40,5 @@
     "unresolved_items": [
       "Claude cross-family audit is pending because the local Claude CLI reports that it is not logged in."
     ]
-  },
-  "audit": {
-    "type": "audit",
-    "task_id": "pattern-local-evidence-inventory",
-    "family": "claude",
-    "verdict": "pending",
-    "model": "claude-cli",
-    "reasoning_effort": "unknown",
-    "findings": [
-      "Attempted `claude -p` on 2026-08-25; the CLI returned `Not logged in · Please run /login` before reviewing any repository content."
-    ]
-  },
-  "diff_verified": true,
-  "verified_commit": null,
-  "integration": null
+  }
 }
