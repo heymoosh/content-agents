@@ -37,6 +37,18 @@
       "Pinterest and comparison-universe gaps remain explicit."
     ]
   },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-corrected-candidate-account-slate",
+    "family": "grok",
+    "verdict": "passed",
+    "findings": [
+      "No blocking findings: full base-to-final diff contains exactly the two leased packet files.",
+      "Deterministic checks confirmed 65 unique accounts, 13 represented platforms, Pinterest missing, W=207, R=132/123, and dispositions 30/8/27/0 across JSON and Markdown.",
+      "The packet is body-free, non-ranking, noncanonical, keeps all six evidence dimensions separate, preserves unknowns and caveats, and presents a minimal human decision gate.",
+      "Residual: upstream inventory arithmetic was not re-derived from data/** because corpus data was outside the authorized audit lease."
+    ]
+  },
   "audit_history": [
     {
       "type": "audit",
@@ -61,16 +73,10 @@
       "recorded_at": "2026-08-26T02:52:51.489Z"
     }
   ],
-  "audit": {
-    "type": "audit",
+  "integration": {
+    "type": "integration",
     "task_id": "pattern-corrected-candidate-account-slate",
     "family": "grok",
-    "verdict": "passed",
-    "findings": [
-      "No blocking findings: full base-to-final diff contains exactly the two leased packet files.",
-      "Deterministic checks confirmed 65 unique accounts, 13 represented platforms, Pinterest missing, W=207, R=132/123, and dispositions 30/8/27/0 across JSON and Markdown.",
-      "The packet is body-free, non-ranking, noncanonical, keeps all six evidence dimensions separate, preserves unknowns and caveats, and presents a minimal human decision gate.",
-      "Residual: upstream inventory arithmetic was not re-derived from data/** because corpus data was outside the authorized audit lease."
-    ]
+    "verdict": "passed"
   }
 }

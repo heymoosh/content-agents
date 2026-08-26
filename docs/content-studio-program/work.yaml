@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-reconcile
-state_revision: 4
+state_revision: 5
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -597,7 +597,7 @@ tasks:
   - id: pattern-corrected-candidate-account-slate
     batch_id: pattern-corrected-candidate-slate-20260825
     outcome: Replace the obsolete public-access-based all-hold gate with one body-free, local-evidence-backed candidate-account decision packet that keeps source-listing, measured relative-performance, account-baseline, body-completeness, repeat-engagement, metadata, and comparison-universe facts distinct.
-    status: accepted
+    status: integrated
     depends_on:
       - pattern-local-evidence-inventory-clean-commit
     base_sha: 61225475a2a539f6f30dec6710b8588c68fee09c
