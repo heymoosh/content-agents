@@ -47,8 +47,9 @@ an all-hold conclusion about the 13 represented platforms.
 
 The account table uses six independent dimensions:
 
-1. **W** = source-listing winner records in the local corpus. This is listing provenance, not a
-   claim of account or platform leadership.
+1. **W** = source-listing winner records in the local corpus, excluding baseline-only records.
+   This is listing provenance, not a claim of account or platform leadership. The 207-record
+   total is therefore lower than the 232 Reddit records because 25 records are baseline-only.
 2. **R** = admitted analyses / analyses with a recorded comparator. Comparator context is the
    local analysis context (for example, an account timeline window or a platform/community
    sample); no cross-platform multiple is calculated here.
@@ -78,13 +79,13 @@ dispositions, not canonical selections. No account is excluded on local evidence
 | `bluesky|danidonovan.com` | 6 | recommend | 0 | 2/2 | 0 | 6/0/0 | 2+ | L/U/G |
 | `bluesky|simonwillison.net` | 6 | research_further | 0 | 1/1 | 0 | 4/2/0 | 2+ | L/U/G |
 | `devto|sylwia-lask` | 4 | recommend | 0 | 4/4 | 0 | 4/0/0 | 2+ | L/U/G |
-| `hackernews|hackernews` | 9 | recommend | 0 | 9/9 | 0 | 4/5/0 | 2+ | L/U/G |
+| `hackernews|hackernews` | 9 | recommend | 0 | 4/4 | 0 | 4/5/0 | 2+ | L/U/G |
 | `instagram|adriennemareebrown` | 4 | research_further | 0 | 0/0 | 0 | 0/2/2 | 2+ | L/U/G |
-| `instagram|dralexgeorge` | 1 | research_further | 0 | 1/0 | 0 | 0/1/0 | 1 | L/U/G |
+| `instagram|dralexgeorge` | 1 | research_further | 0 | 0/0 | 0 | 0/1/0 | 1 | L/U/G |
 | `instagram|sharonsaysso` | 5 | research_further | 0 | 0/0 | 0 | 0/5/0 | 2+ | L/U/G |
 | `instagram|the.holistic.psychologist` | 3 | research_further | 0 | 0/0 | 0 | 0/3/0 | 0 | L/U/G |
 | `linkedin|aagupta` | 6 | recommend | 0 | 3/3 | 0 | 4/2/0 | 2+ | L/U/G |
-| `linkedin|codiesanchez` | 5 | recommend | 0 | 5/5 | 0 | 4/1/0 | 2+ | L/U/G |
+| `linkedin|codiesanchez` | 5 | recommend | 0 | 4/4 | 0 | 4/1/0 | 2+ | L/U/G |
 | `linkedin|justinwelsh` | 5 | recommend | 0 | 5/5 | 0 | 5/0/0 | 2+ | L/U/G |
 | `linkedin|thedankoe` | 5 | recommend | 0 | 3/3 | 0 | 3/2/0 | 2+ | L/U/G |
 | `mastodon|bagder@mastodon.social` | 6 | hold | 0 | 2/2 | 0 | 0/0/6 | 2+ | L/U/G |
@@ -96,15 +97,15 @@ dispositions, not canonical selections. No account is excluded on local evidence
 | `mastodon|mer__edith@mastodon.world` | 6 | hold | 0 | 5/5 | 0 | 0/0/6 | 2+ | L/U/G |
 | `mastodon|mmasnick@mastodon.social` | 6 | hold | 0 | 2/2 | 0 | 0/0/6 | 2+ | L/U/G |
 | `mastodon|molly0xfff@hachyderm.io` | 6 | recommend | 0 | 2/2 | 0 | 2/4/0 | 2+ | L/U/G |
-| `reddit|r/adhd` | 25 | recommend | 25 | 5/5 | 2 | 25/0/0 | 2+ | L/U/G |
-| `reddit|r/civictech` | 25 | research_further | 25 | 0/0 | 2 | 15/10/0 | 2+ | L/U/G |
-| `reddit|r/claudeai` | 26 | recommend | 26 | 3/3 | 2 | 3/23/0 | 2+ | L/U/G |
+| `reddit|r/adhd` | 25 | recommend | 20 | 5/5 | 2 | 25/0/0 | 2+ | L/U/G |
+| `reddit|r/civictech` | 25 | research_further | 22 | 0/0 | 2 | 15/10/0 | 2+ | L/U/G |
+| `reddit|r/claudeai` | 26 | recommend | 22 | 3/3 | 2 | 3/23/0 | 2+ | L/U/G |
 | `reddit|r/entrepreneur` | 25 | research_further | 25 | 0/0 | 0 | 25/0/0 | 2+ | L/U/G |
-| `reddit|r/lifeprotips` | 25 | recommend | 25 | 5/5 | 2 | 23/2/0 | 2+ | L/U/G |
+| `reddit|r/lifeprotips` | 25 | recommend | 20 | 5/5 | 2 | 23/2/0 | 2+ | L/U/G |
 | `reddit|r/localllama` | 25 | research_further | 25 | 0/0 | 0 | 1/24/0 | 2+ | L/U/G |
 | `reddit|r/microsaas` | 25 | research_further | 25 | 0/0 | 0 | 4/21/0 | 2+ | L/U/G |
-| `reddit|r/productmanagement` | 4 | recommend | 4 | 3/3 | 2 | 3/1/0 | 2+ | L/U/G |
-| `reddit|r/sideproject` | 27 | recommend | 27 | 2/2 | 2 | 2/25/0 | 2+ | L/U/G |
+| `reddit|r/productmanagement` | 4 | recommend | 0 | 3/3 | 2 | 3/1/0 | 2+ | L/U/G |
+| `reddit|r/sideproject` | 27 | recommend | 23 | 2/2 | 2 | 2/25/0 | 2+ | L/U/G |
 | `reddit|r/youshouldknow` | 25 | research_further | 25 | 0/0 | 0 | 25/0/0 | 2+ | L/U/G |
 | `substack-notes|robertreich` | 6 | recommend | 0 | 6/6 | 0 | 6/0/0 | 2+ | L/U/G |
 | `substack-notes|tedgioia` | 6 | recommend | 0 | 2/2 | 0 | 2/4/0 | 2+ | L/U/G |
@@ -131,12 +132,12 @@ dispositions, not canonical selections. No account is excluded on local evidence
 | `x|sahilbloom` | 3 | hold | 0 | 3/0 | 0 | 3/0/0 | 2+ | L/U/G |
 | `youtube|aakashgupta` | 2 | research_further | 0 | 0/0 | 0 | 2/0/0 | 2+ | L/U/G |
 | `youtube|aliabdaal` | 7 | recommend | 0 | 2/2 | 0 | 7/0/0 | 2+ | L/U/G |
-| `youtube|benerez` | 1 | research_further | 0 | 1/0 | 0 | 1/0/0 | 1 | L/U/G |
+| `youtube|benerez` | 1 | research_further | 0 | 0/0 | 0 | 1/0/0 | 1 | L/U/G |
 | `youtube|dankoetalks` | 1 | research_further | 0 | 1/0 | 0 | 1/0/0 | 1 | L/U/G |
-| `youtube|melrobbins` | 8 | hold | 0 | 8/0 | 0 | 8/0/0 | 2+ | L/U/G |
-| `youtube|neelsikdar` | 1 | research_further | 0 | 1/0 | 0 | 1/0/0 | 1 | L/U/G |
-| `youtube|productmanagementwithsachinsharma` | 1 | research_further | 0 | 1/0 | 0 | 1/0/0 | 1 | L/U/G |
-| `youtube|theholisticpsychologist` | 1 | research_further | 0 | 1/0 | 0 | 1/0/0 | 1 | L/U/G |
+| `youtube|melrobbins` | 8 | hold | 0 | 2/0 | 0 | 8/0/0 | 2+ | L/U/G |
+| `youtube|neelsikdar` | 1 | research_further | 0 | 0/0 | 0 | 1/0/0 | 1 | L/U/G |
+| `youtube|productmanagementwithsachinsharma` | 1 | research_further | 0 | 0/0 | 0 | 1/0/0 | 1 | L/U/G |
+| `youtube|theholisticpsychologist` | 1 | research_further | 0 | 0/0 | 0 | 1/0/0 | 1 | L/U/G |
 | `youtube|underthedesknews` | 2 | research_further | 0 | 0/0 | 0 | 2/0/0 | 2+ | L/U/G |
 
 Counts: 30 `recommend`, 8 `hold`, 27 `research_further`, and 0 `exclude`. The absence of an
