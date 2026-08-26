@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 42
+state_revision: 43
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -1156,7 +1156,7 @@ tasks:
       - pattern-stage-evidence-text-community-claude
       - pattern-stage-evidence-professional-publishing-claude
       - pattern-stage-evidence-visual-video-claude
-    base_sha: 2afa8ac02c5cb02b6245af9549c01b86e7b55b0a
+    base_sha: 67379d39f4223ca885c5523e30ad51cb26dd84df
     context_paths:
       - docs/content-studio-program/tasks/pattern-stage-evidence-consolidated-review-claude.md
       - docs/content-studio-program/tasks/pattern-reviewed-metadata-input.md
