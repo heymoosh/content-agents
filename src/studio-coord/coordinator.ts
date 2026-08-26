@@ -81,12 +81,24 @@ export const workManifestSchema = z.object({
   version: z.literal(1),
   program: z.literal("content-studio"),
   coordinator: z.string().min(1),
+  coordinator_branch: z.string().min(1).default("agent/content-studio-program"),
+  state_revision: z.number().int().nonnegative().default(0),
   authoritative_documents: z.array(pathSchema).min(1),
   tasks: z.array(taskSchema),
 }).strict();
 
 export type StudioTask = z.infer<typeof taskSchema>;
 export type WorkManifest = z.infer<typeof workManifestSchema>;
+
+export function advanceStateRevision(manifest: WorkManifest, expectedRevision: number): WorkManifest {
+  const normalized = validateWorkManifest(manifest);
+  if (normalized.state_revision !== expectedRevision) {
+    throw new Error(
+      `coordinator state revision changed: expected ${expectedRevision}, found ${normalized.state_revision}`,
+    );
+  }
+  return validateWorkManifest({ ...normalized, state_revision: expectedRevision + 1 });
+}
 
 function normalizeTask(task: StudioTask): StudioTask {
   return {
@@ -303,7 +315,16 @@ export interface RunRecord {
   integration?: IntegrationReport;
   diff_verified?: boolean;
   verified_commit?: string;
+  audit_routing?: AuditRoutingEvent[];
 }
+
+const auditRoutingEventSchema = z.object({
+  from_family: modelFamilySchema,
+  to_family: modelFamilySchema,
+  reason: z.string().min(1),
+  recorded_at: z.string().datetime(),
+}).strict();
+export type AuditRoutingEvent = z.infer<typeof auditRoutingEventSchema>;
 
 function normalizeReport(report: TaskReport): TaskReport {
   return { ...report, family: normalizeModelFamily(report.family) } as TaskReport;
@@ -315,6 +336,11 @@ function normalizeRunRecord(run: RunRecord): RunRecord {
     builder: run.builder ? normalizeReport(run.builder) as BuilderReport : undefined,
     audit: run.audit ? normalizeReport(run.audit) as AuditReport : undefined,
     integration: run.integration ? normalizeReport(run.integration) as IntegrationReport : undefined,
+    audit_routing: run.audit_routing?.map((event) => ({
+      ...event,
+      from_family: normalizeModelFamily(event.from_family),
+      to_family: normalizeModelFamily(event.to_family),
+    })),
   };
 }
 
@@ -326,6 +352,7 @@ export const runRecordSchema = z.object({
   integration: integrationReportSchema.optional(),
   diff_verified: z.boolean().optional(),
   verified_commit: shaSchema.optional(),
+  audit_routing: z.array(auditRoutingEventSchema).optional(),
 }).strict();
 
 export function parseRunRecord(input: unknown): RunRecord {
@@ -347,6 +374,51 @@ function passingAcceptance(task: StudioTask, builder: BuilderReport | undefined)
     if (!result) throw new Error(`acceptance command was not reported: ${command}`);
     if (!result.passed) throw new Error(`acceptance command failed: ${command}`);
   }
+}
+
+export function rerouteAuditor(
+  manifest: WorkManifest,
+  taskId: string,
+  nextFamilyLabel: string,
+  reason: string,
+  recordedAt: string,
+  existing: RunRecord | null,
+): { manifest: WorkManifest; run: RunRecord } {
+  const normalizedManifest = validateWorkManifest(manifest);
+  const task = normalizedManifest.tasks.find((candidate) => candidate.id === taskId);
+  if (!task) throw new Error(`unknown task: ${taskId}`);
+  if (["accepted", "integrated"].includes(task.status)) {
+    throw new Error(`task ${task.id} cannot reroute its auditor from status ${task.status}`);
+  }
+  const nextFamily = normalizeModelFamily(nextFamilyLabel);
+  if (nextFamily === task.builder_family) {
+    throw new Error(`task ${task.id} auditor must use a different model family than its builder`);
+  }
+  if (nextFamily === task.auditor_family) {
+    throw new Error(`task ${task.id} auditor is already assigned to ${nextFamily}`);
+  }
+  if (!reason.trim()) throw new Error("auditor reroute requires a reason");
+  const event = auditRoutingEventSchema.parse({
+    from_family: task.auditor_family,
+    to_family: nextFamily,
+    reason: reason.trim(),
+    recorded_at: recordedAt,
+  });
+  const run: RunRecord = normalizeRunRecord({
+    task_id: task.id,
+    batch_id: task.batch_id,
+    ...(existing ?? {}),
+    audit_routing: [...(existing?.audit_routing ?? []), event],
+  });
+  return {
+    manifest: validateWorkManifest({
+      ...normalizedManifest,
+      tasks: normalizedManifest.tasks.map((candidate) => candidate.id === task.id
+        ? { ...candidate, auditor_family: nextFamily }
+        : candidate),
+    }),
+    run,
+  };
 }
 
 export function applyTaskReport(

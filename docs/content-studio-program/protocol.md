@@ -10,6 +10,12 @@ Only the attended coordinator edits `work.yaml` and the files under `runs/`. Wor
 their leased worktrees, return a commit and JSON report, and never edit coordination records. Do
 not use the repository backlog, conductor, shared worker state, or a worker-authored `STATE.md`.
 
+All coordinator mutations run from the single linked worktree on the `coordinator_branch` recorded
+in `work.yaml`. The CLI rejects coordinator writes from the primary checkout or another branch.
+Every durable manifest write compares and advances `state_revision`; a stale coordinator must
+reload instead of overwriting newer state. Read-only `status` and `validate` remain available from
+any checkout.
+
 ## Standing authorization and continuation loop
 
 Muxin has authorized the coordinator to continue the entire approved Content Studio program without
@@ -106,6 +112,10 @@ files, for example `studio:conversation-routing` or `publish:approval-gate`.
 7. The named auditor family must differ from the builder family. It receives the packet, commit
    diff, and test output, not the builder conversation, and does not edit code. A failed audit
    moves the task to `needs-fix`; `claim` returns it to the original builder.
+   If the assigned auditor is unavailable before completing an audit, the coordinator may use
+   `reroute-auditor` to select another available cross-family auditor. The run record retains the
+   original family, replacement family, timestamp, and concrete availability reason. Unavailability
+   is not an audit failure, and the coordinator must not block while an authorized fallback exists.
 8. The coordinator runs `verify-diff` on the final full commit SHA. The task becomes `accepted`
    only after the final diff is in lease, all named acceptance commands passed, and the
    cross-family audit passed. Audit and diff verification may arrive in either order.
@@ -127,11 +137,13 @@ npm run studio:coord -- validate
 npm run studio:coord -- claim <task-id>
 npm run studio:coord -- verify-diff <task-id> <full-commit-sha>
 npm run studio:coord -- report <task-id> <report-file>
+npm run studio:coord -- reroute-auditor <task-id> <family> <reason-file>
 ```
 
 `status` is read-only and shows unresolved dependencies. `validate` checks schema, dependencies,
 cycles, active file/semantic conflicts, family separation, canonical pattern ownership, and durable
-evidence for accepted/integrated work. `claim`, `verify-diff`, and `report` are coordinator writes.
+evidence for accepted/integrated work. `claim`, `verify-diff`, `report`, and `reroute-auditor` are
+coordinator writes and therefore enforce the named linked-worktree and state-revision boundary.
 
 ## Report shapes
 

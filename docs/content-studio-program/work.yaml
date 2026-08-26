@@ -1,6 +1,8 @@
 version: 1
 program: content-studio
 coordinator: codex
+coordinator_branch: agent/content-studio-coordinator-reconcile
+state_revision: 0
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md

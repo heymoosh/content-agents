@@ -7,10 +7,12 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import {
   applyTaskReport,
+  advanceStateRevision,
   claimTask,
   describeProgram,
   parseRunRecord,
   recordVerifiedDiff,
+  rerouteAuditor,
   taskReportSchema,
   validateTaskEvidence,
   validateWorkManifest,
@@ -18,7 +20,7 @@ import {
   type StudioTask,
   type WorkManifest,
 } from "./coordinator.js";
-import { inspectCleanBaseline, inspectCleanWorktree, verifyTaskCommit } from "./git.js";
+import { inspectCleanBaseline, inspectCleanWorktree, inspectCoordinatorMutationContext, verifyTaskCommit } from "./git.js";
 
 const root = process.cwd();
 const programDir = join(root, "docs", "content-studio-program");
@@ -62,8 +64,16 @@ function atomicWrite(path: string, content: string): void {
   renameSync(tempPath, path);
 }
 
-function saveManifest(manifest: WorkManifest): void {
-  atomicWrite(workPath, stringifyYaml(manifest, { lineWidth: 0 }));
+function saveManifest(manifest: WorkManifest, expectedRevision: number): WorkManifest {
+  const current = loadManifest();
+  if (current.state_revision !== expectedRevision) {
+    throw new Error(
+      `coordinator state revision changed before write: expected ${expectedRevision}, found ${current.state_revision}`,
+    );
+  }
+  const advanced = advanceStateRevision(manifest, expectedRevision);
+  atomicWrite(workPath, stringifyYaml(advanced, { lineWidth: 0 }));
+  return advanced;
 }
 
 function saveRun(task: StudioTask, run: RunRecord): void {
@@ -104,42 +114,56 @@ function validate(): void {
 
 function claim(id: string): void {
   const manifest = loadManifest();
+  inspectCoordinatorMutationContext(root, manifest.coordinator_branch);
   const task = taskById(manifest, id);
   if (task.status === "ready" || task.status === "leased") inspectCleanBaseline(task);
   else if (task.status === "needs-fix") inspectCleanWorktree(task);
   const updated = claimTask(manifest, id);
-  saveManifest(updated);
+  saveManifest(updated, manifest.state_revision);
   console.log(`${id}: ${task.status} -> ${taskById(updated, id).status}`);
 }
 
 function verifyDiff(id: string, commit: string): void {
   if (!/^[0-9a-f]{40}$/i.test(commit)) throw new Error("commit must be a full 40-character SHA");
   const manifest = loadManifest();
+  inspectCoordinatorMutationContext(root, manifest.coordinator_branch);
   const task = taskById(manifest, id);
   const run = loadRun(task, true)!;
   const changed = verifyTaskCommit(task, commit);
   const updated = recordVerifiedDiff(manifest, id, commit, run);
+  saveManifest(updated.manifest, manifest.state_revision);
   saveRun(task, updated.run);
-  saveManifest(updated.manifest);
   console.log(`${id}: verified ${changed.length} changed path(s) at ${commit}`);
 }
 
 function report(id: string, reportFile: string): void {
   const manifest = loadManifest();
+  inspectCoordinatorMutationContext(root, manifest.coordinator_branch);
   const task = taskById(manifest, id);
   const parsed = taskReportSchema.safeParse(readJson(resolve(reportFile)));
   if (!parsed.success) throw new Error(parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "));
   const input = parsed.data;
   if (input.task_id !== id) throw new Error(`report task_id ${input.task_id} does not match ${id}`);
   const updated = applyTaskReport(manifest, input, loadRun(task));
+  saveManifest(updated.manifest, manifest.state_revision);
   saveRun(task, updated.run);
-  saveManifest(updated.manifest);
   console.log(`${id}: recorded ${input.type} report; status=${taskById(updated.manifest, id).status}`);
+}
+
+function reroute(id: string, family: string, reasonFile: string): void {
+  const manifest = loadManifest();
+  inspectCoordinatorMutationContext(root, manifest.coordinator_branch);
+  const task = taskById(manifest, id);
+  const reason = readFileSync(resolve(reasonFile), "utf8").trim();
+  const updated = rerouteAuditor(manifest, id, family, reason, new Date().toISOString(), loadRun(task));
+  saveManifest(updated.manifest, manifest.state_revision);
+  saveRun(task, updated.run);
+  console.log(`${id}: auditor ${task.auditor_family} -> ${taskById(updated.manifest, id).auditor_family}`);
 }
 
 function usage(): never {
   throw new Error(
-    "usage: npm run studio:coord -- <status|validate|claim TASK|verify-diff TASK COMMIT|report TASK REPORT_FILE>",
+    "usage: npm run studio:coord -- <status|validate|claim TASK|verify-diff TASK COMMIT|report TASK REPORT_FILE|reroute-auditor TASK FAMILY REASON_FILE>",
   );
 }
 
@@ -150,6 +174,7 @@ function main(args: string[]): void {
   if (command === "claim" && rest.length === 1) return claim(rest[0]!);
   if (command === "verify-diff" && rest.length === 2) return verifyDiff(rest[0]!, rest[1]!);
   if (command === "report" && rest.length === 2) return report(rest[0]!, rest[1]!);
+  if (command === "reroute-auditor" && rest.length === 3) return reroute(rest[0]!, rest[1]!, rest[2]!);
   usage();
 }
 

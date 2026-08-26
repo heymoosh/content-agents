@@ -7,6 +7,8 @@ import {
   claimTask,
   describeProgram,
   recordVerifiedDiff,
+  rerouteAuditor,
+  advanceStateRevision,
   verifyChangedPaths,
   validateWorkManifest,
   type AuditReport,
@@ -47,6 +49,8 @@ function manifest(tasks: unknown[]): WorkManifest {
     version: 1,
     program: "content-studio",
     coordinator: "codex",
+    coordinator_branch: "agent/content-studio-program",
+    state_revision: 0,
     authoritative_documents: ["docs/content-system-blueprint.md"],
     tasks: tasks as WorkManifest["tasks"],
   };
@@ -110,6 +114,68 @@ test("normalizes task family aliases and stores different canonical providers", 
 
   assert.equal(work.tasks[0]?.builder_family, "codex");
   assert.equal(work.tasks[0]?.auditor_family, "grok");
+});
+
+test("advances coordinator state only from the expected manifest revision", () => {
+  const work = validateWorkManifest(manifest([task("a")]));
+  assert.equal(work.state_revision, 0);
+  assert.equal(advanceStateRevision(work, 0).state_revision, 1);
+  assert.throws(() => advanceStateRevision(work, 1), /state revision.*changed/i);
+});
+
+test("reroutes an unavailable auditor with durable evidence and keeps cross-family enforcement", () => {
+  const work = validateWorkManifest(manifest([task("a", {
+    status: "auditing",
+    auditor_family: "claude",
+    commit_sha: "b".repeat(40),
+  })]));
+  const existing = {
+    task_id: "a",
+    batch_id: "batch-001",
+    builder: {
+      type: "builder" as const,
+      task_id: "a",
+      family: "codex",
+      commit_sha: "b".repeat(40),
+      changed_paths: ["src/a/index.ts"],
+      acceptance_commands: [{ command: "npm run check", passed: true, summary: "check passed" }],
+      behavior_impact: "none",
+      logic_impact: "none",
+      risks: [],
+      unresolved_items: [],
+    },
+  };
+
+  const rerouted = rerouteAuditor(
+    work,
+    "a",
+    "grok",
+    "Claude CLI was unavailable before the audit could start.",
+    "2026-08-25T20:00:00.000Z",
+    existing,
+  );
+  assert.equal(rerouted.manifest.tasks[0]?.auditor_family, "grok");
+  assert.deepEqual(rerouted.run.audit_routing, [{
+    from_family: "claude",
+    to_family: "grok",
+    reason: "Claude CLI was unavailable before the audit could start.",
+    recorded_at: "2026-08-25T20:00:00.000Z",
+  }]);
+  assert.throws(
+    () => rerouteAuditor(work, "a", "codex", "Fallback", "2026-08-25T20:00:00.000Z", existing),
+    /different model family/i,
+  );
+  assert.throws(
+    () => rerouteAuditor(
+      validateWorkManifest(manifest([task("a", { status: "integrated", commit_sha: "b".repeat(40), audit_verdict: "passed" })])),
+      "a",
+      "grok",
+      "Too late",
+      "2026-08-25T20:00:00.000Z",
+      existing,
+    ),
+    /cannot reroute.*integrated/i,
+  );
 });
 
 test("rejects unknown task and report families", () => {
