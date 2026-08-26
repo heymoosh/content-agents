@@ -554,7 +554,7 @@ tasks:
   - id: pattern-local-evidence-inventory-clean-commit
     batch_id: pattern-local-evidence-inventory-recovery-20260825
     outcome: Re-materialize the already verified body-free local-evidence inventory as a staging-only commit, with exact source-output equivalence and fresh acceptance evidence; do not change corpus, canonical data, task coordination, or inventory conclusions.
-    status: ready
+    status: auditing
     depends_on:
       - pattern-research-text-community
       - pattern-research-professional-publishing
@@ -590,7 +590,7 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-candidate-account-slate
-    commit_sha: null
+    commit_sha: 4b7644f4b0f4ca71014be4fcd0fe579fcf119fab
     audit_verdict: pending
   - id: pattern-research-text-community
     batch_id: pattern-broad-research-20260825
