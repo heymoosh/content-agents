@@ -5,5 +5,21 @@
   "audit_model": "claude-cli",
   "audit_reasoning_effort": "unreported",
   "audit_status": "pending",
-  "audit_blocker": "Attempted claude -p on 2026-08-25; the CLI returned Not logged in before reviewing repository content."
+  "audit_blocker": "Claude CLI authentication is unavailable in the isolated task worktree.",
+  "audit_attempts": [
+    {
+      "worktree": "/private/tmp/content-agents-pattern-local-evidence-inventory",
+      "command": "claude -p <body-free audit prompt>",
+      "result": "Not logged in; no repository content was audited."
+    },
+    {
+      "worktree": "/private/tmp/content-agents-pattern-local-evidence-inventory",
+      "command": "claude auth status && claude -p <body-free audit prompt>",
+      "result": "auth status returned loggedIn false and authMethod none; no repository content was audited."
+    }
+  ],
+  "resume": {
+    "next_action": "Run claude auth status in this worktree. Only after it reports loggedIn true, rerun the body-free Claude audit, record a passed audit report, and then create the corrected local-evidence-backed candidate slate.",
+    "integration_state": "Do not integrate this task or modify canonical data/patterns until the Claude audit passes and Muxin resolves the corrected consolidated slate gate."
+  }
 }
