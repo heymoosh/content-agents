@@ -1,0 +1,47 @@
+{
+  "task_id": "pattern-stage-evidence-consolidated-review-claude",
+  "batch_id": "pattern-consolidated-review-claude-20260826",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-stage-evidence-consolidated-review-claude",
+    "family": "claude",
+    "commit_sha": "337304b7176f14ecfde18469255d7b09b0cf6880",
+    "changed_paths": [
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/summary.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/morning-review.md",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verified-facts-vs-unknowns.md",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/decision-sheet.md",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Typecheck passed with no diagnostics."
+      },
+      {
+        "command": "node docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs",
+        "passed": true,
+        "summary": "Reconciled 65 unique accounts, 499 evidence rows, 12 baselines, 30 recommend, 8 hold, and 27 research-further proposals with zero duplicates or cross-lane overlap."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Whitespace check passed for the five-file leased diff."
+      }
+    ],
+    "behavior_impact": "None; review documentation and a read-only verifier only.",
+    "logic_impact": "None; no generation, review, publishing, or canonical ledger logic changed.",
+    "risks": [
+      "The verifier intentionally fails closed if future lane prose no longer contains one of the three literal proposal labels.",
+      "All 576 staged account, evidence, and baseline rows remain blocked pending Muxin's decisions."
+    ],
+    "unresolved_items": [
+      "Stable account IDs, text-community account references, and baseline numerator, denominator, and settled dates remain unresolved.",
+      "All pool decisions and authority for a later exclusive canonical-data steward remain at the human gate."
+    ]
+  },
+  "audit_history": [],
+  "diff_verified": true,
+  "verified_commit": "337304b7176f14ecfde18469255d7b09b0cf6880"
+}
