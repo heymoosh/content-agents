@@ -58,5 +58,17 @@
     }
   ],
   "diff_verified": true,
-  "verified_commit": "6c2b648eaad82c62f65dead7ad8d70f733a47488"
+  "verified_commit": "6c2b648eaad82c62f65dead7ad8d70f733a47488",
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-consolidated-review-claude",
+    "family": "codex",
+    "verdict": "failed",
+    "findings": [
+      "High: verified-facts-vs-unknowns.md claims disposition pending on all 499 evidence rows, but evidence rows have no disposition field; text and visual status/reviewStatus are null, while professional status is blocked and reviewStatus pending.",
+      "High: verified-facts-vs-unknowns.md flattens professional audience and scope fields to null. Professional accounts and evidence use explicit unknown and local-corpus scope values recorded by that lane.",
+      "Medium: morning-review.md calls local source/evidence counts already-published counts, while the lane packets describe them as local source records.",
+      "Passing checks: fully fail-closed verifier and both negative mutations, 65/499/12 totals, 576 blocked with zero ready/unmapped, 30/8/27 proposals, five-file lease, actual professional 14-unknown and 11-partial/3-blocked semantics, body-free authority denials, no outside catalog figure, no em dashes, npm run check, exact verifier, and git diff --check."
+    ]
+  }
 }
