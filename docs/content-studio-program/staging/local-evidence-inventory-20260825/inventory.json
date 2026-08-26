@@ -1,0 +1,47 @@
+{
+  "kind": "body_free_local_evidence_inventory",
+  "version": "local-evidence-inventory-v1",
+  "observedAt": "2026-08-25",
+  "scope": {
+    "corpusRecords": 499,
+    "accounts": 65,
+    "platformsCovered": 13,
+    "configuredPlatformsMissingCorpusEvidence": ["pinterest"]
+  },
+  "overallEvidence": {
+    "recordsWithAtLeastOneMetric": 499,
+    "recordsWithEngagementMetric": 496,
+    "accountsWithAtLeastTwoEngagementMetricRecords": 58,
+    "sourceWinnerRecords": 207,
+    "sourceWinnerAccounts": 9,
+    "admittedAnalyses": 132,
+    "admittedAnalysesWithMeasuredComparator": 123,
+    "admittedAnalysesAtLeastTwoTimesRecordedComparator": 61,
+    "storedBaselineRows": 12,
+    "storedBaselineAccounts": 6,
+    "bodyCompleteRecords": 286,
+    "bodyIncompleteRecords": 169,
+    "bodyCompletenessUnknownRecords": 44
+  },
+  "platforms": [
+    {"platform":"bluesky","records":22,"accounts":4,"winnerRecords":0,"bodyCompleteRecords":16,"admittedAnalyses":7,"measuredComparatorAnalyses":7,"atLeastTwoTimesComparator":4,"storedBaselineRows":0},
+    {"platform":"devto","records":4,"accounts":1,"winnerRecords":0,"bodyCompleteRecords":4,"admittedAnalyses":4,"measuredComparatorAnalyses":4,"atLeastTwoTimesComparator":2,"storedBaselineRows":0},
+    {"platform":"hackernews","records":9,"accounts":1,"winnerRecords":0,"bodyCompleteRecords":4,"admittedAnalyses":4,"measuredComparatorAnalyses":4,"atLeastTwoTimesComparator":4,"storedBaselineRows":0},
+    {"platform":"instagram","records":13,"accounts":4,"winnerRecords":0,"bodyCompleteRecords":0,"admittedAnalyses":0,"measuredComparatorAnalyses":0,"atLeastTwoTimesComparator":0,"storedBaselineRows":0},
+    {"platform":"linkedin","records":21,"accounts":4,"winnerRecords":0,"bodyCompleteRecords":16,"admittedAnalyses":15,"measuredComparatorAnalyses":15,"atLeastTwoTimesComparator":2,"storedBaselineRows":0},
+    {"platform":"mastodon","records":54,"accounts":9,"winnerRecords":0,"bodyCompleteRecords":4,"admittedAnalyses":18,"measuredComparatorAnalyses":18,"atLeastTwoTimesComparator":11,"storedBaselineRows":0},
+    {"platform":"reddit","records":232,"accounts":10,"winnerRecords":207,"bodyCompleteRecords":126,"admittedAnalyses":18,"measuredComparatorAnalyses":18,"atLeastTwoTimesComparator":18,"storedBaselineRows":12},
+    {"platform":"substack","records":22,"accounts":5,"winnerRecords":0,"bodyCompleteRecords":20,"admittedAnalyses":15,"measuredComparatorAnalyses":15,"atLeastTwoTimesComparator":4,"storedBaselineRows":0},
+    {"platform":"substack-notes","records":12,"accounts":2,"winnerRecords":0,"bodyCompleteRecords":8,"admittedAnalyses":8,"measuredComparatorAnalyses":8,"atLeastTwoTimesComparator":7,"storedBaselineRows":0},
+    {"platform":"threads","records":15,"accounts":3,"winnerRecords":0,"bodyCompleteRecords":9,"admittedAnalyses":5,"measuredComparatorAnalyses":5,"atLeastTwoTimesComparator":1,"storedBaselineRows":0},
+    {"platform":"tiktok","records":38,"accounts":7,"winnerRecords":0,"bodyCompleteRecords":37,"admittedAnalyses":24,"measuredComparatorAnalyses":21,"atLeastTwoTimesComparator":6,"storedBaselineRows":0},
+    {"platform":"x","records":33,"accounts":6,"winnerRecords":0,"bodyCompleteRecords":18,"admittedAnalyses":9,"measuredComparatorAnalyses":6,"atLeastTwoTimesComparator":2,"storedBaselineRows":0},
+    {"platform":"youtube","records":24,"accounts":9,"winnerRecords":0,"bodyCompleteRecords":24,"admittedAnalyses":5,"measuredComparatorAnalyses":2,"atLeastTwoTimesComparator":0,"storedBaselineRows":0}
+  ],
+  "boundaries": {
+    "bodyIncluded": false,
+    "canonicalWrites": false,
+    "ranking": false,
+    "universalViralScore": false
+  }
+}

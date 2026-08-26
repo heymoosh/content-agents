@@ -143,15 +143,28 @@ test("serve.ts refuses every non-GET above every route while fixtures are on", (
 
 test("no fixture scenario fakes a route that writes — every override is a GET read", () => {
   const src = readFileSync(join(HERE, "serve.ts"), "utf8");
+  const routeSources = [src];
+  for (const [handler, file] of [
+    ["handleFictionRoute", "serve-fiction.ts"],
+    ["handleCharlesRoute", "serve-charles.ts"],
+    ["handleSignalsRoute", "serve-signals.ts"],
+  ] as const) {
+    if (src.includes(`await ${handler}(`)) {
+      routeSources.push(readFileSync(join(HERE, file), "utf8"));
+    }
+  }
   for (const s of FIXTURE_SCENARIOS) {
     for (const path of Object.keys(s.overrides)) {
       // Venture reads are owned by handleVentureRead rather than by a literal pathname compare, and
       // that dispatcher is GET-only by construction (asserted just below), so a /api/venture/ path
       // it answers is as provably read-only as a literal GET route here.
       const isVentureRead = path.startsWith("/api/venture/") && src.includes("handleVentureRead");
+      const isLiteralGetRead = routeSources.some((routeSrc) =>
+        routeSrc.includes(`req.method === "GET" && url.pathname === "${path}"`),
+      );
       assert.ok(
-        isVentureRead || src.includes(`req.method === "GET" && url.pathname === "${path}"`),
-        `${s.id} overrides ${path}, which is not a GET route in serve.ts`,
+        isVentureRead || isLiteralGetRead,
+        `${s.id} overrides ${path}, which is not a GET route in the server dispatcher`,
       );
     }
   }

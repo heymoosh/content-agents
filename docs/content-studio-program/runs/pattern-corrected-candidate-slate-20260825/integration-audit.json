@@ -1,0 +1,25 @@
+{
+  "task_id": "pattern-corrected-candidate-account-slate",
+  "family": "grok",
+  "model": "grok-4.5",
+  "verdict": "passed",
+  "audited_task_commit": "d220c40b276d879e41983a4165ff4b7f6f2b219b",
+  "integrated_coordinator_commit": "5e2784561d31f946d1b2158ffae9c524cf2916b2",
+  "integration_chain": [
+    { "task_commit": "94128b4ae8f4857577c2b16409002eed76c0db7a", "coordinator_commit": "dac7f4091458a622ee468d8422701d7e8028a793" },
+    { "task_commit": "3acb35ba48611f5654974672860fa011aff7cdb2", "coordinator_commit": "fad8fdc566694d1dfe68c2b6efc88f7ee9821513" },
+    { "task_commit": "288d2880a201eae8b0a4084bcd2a5a04746ec42a", "coordinator_commit": "b4580c52714e24650d2a5a11cf861083f36cd141" },
+    { "task_commit": "d220c40b276d879e41983a4165ff4b7f6f2b219b", "coordinator_commit": "a7e546208da0cd827da66153b8aa3bdff42205f2" }
+  ],
+  "packet_blobs": {
+    "decision-packet.md": "9e28a1fce15b415355b6e969fd28ead6825c018e",
+    "decision-packet.json": "9435b66c29ea43ff7b4d49f787184bb618ae2e0a"
+  },
+  "evidence": [
+    "Task and integrated packet blobs are byte-identical.",
+    "Each task/coordinator commit pair has the same stable patch-id.",
+    "All four coordinator commits are ancestors of the audited integration tip.",
+    "No merge or later commit rewrote either packet path."
+  ],
+  "blockers": []
+}

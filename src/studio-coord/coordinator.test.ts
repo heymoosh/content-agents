@@ -7,6 +7,9 @@ import {
   claimTask,
   describeProgram,
   recordVerifiedDiff,
+  rerouteAuditor,
+  advanceStateRevision,
+  commitCoordinatorMutation,
   verifyChangedPaths,
   validateWorkManifest,
   type AuditReport,
@@ -47,6 +50,8 @@ function manifest(tasks: unknown[]): WorkManifest {
     version: 1,
     program: "content-studio",
     coordinator: "codex",
+    coordinator_branch: "agent/content-studio-program",
+    state_revision: 0,
     authoritative_documents: ["docs/content-system-blueprint.md"],
     tasks: tasks as WorkManifest["tasks"],
   };
@@ -110,6 +115,189 @@ test("normalizes task family aliases and stores different canonical providers", 
 
   assert.equal(work.tasks[0]?.builder_family, "codex");
   assert.equal(work.tasks[0]?.auditor_family, "grok");
+});
+
+test("parses manifests and run records written before coordinator revision fields existed", () => {
+  const current = manifest([task("a")]);
+  const { coordinator_branch: _branch, state_revision: _revision, ...legacy } = current;
+  const parsed = validateWorkManifest(legacy);
+  assert.equal(parsed.coordinator_branch, "agent/content-studio-program");
+  assert.equal(parsed.state_revision, 0);
+});
+
+test("advances coordinator state only from the expected manifest revision", () => {
+  const work = validateWorkManifest(manifest([task("a")]));
+  assert.equal(work.state_revision, 0);
+  assert.equal(advanceStateRevision(work, 0).state_revision, 1);
+  assert.throws(() => advanceStateRevision(work, 1), /state revision.*changed/i);
+});
+
+test("persists run evidence before committing the manifest revision", () => {
+  const calls: string[] = [];
+  assert.throws(
+    () => commitCoordinatorMutation({
+      expectedRevision: 3,
+      currentRevision: 3,
+      writeRun: () => calls.push("run"),
+      writeManifest: () => {
+        calls.push("manifest");
+        throw new Error("simulated manifest write failure");
+      },
+    }),
+    /simulated manifest write failure/,
+  );
+  assert.deepEqual(calls, ["run", "manifest"]);
+  assert.throws(
+    () => commitCoordinatorMutation({
+      expectedRevision: 2,
+      currentRevision: 3,
+      writeRun: () => calls.push("stale-run"),
+      writeManifest: () => calls.push("stale-manifest"),
+    }),
+    /state revision changed/i,
+  );
+  assert.deepEqual(calls, ["run", "manifest"]);
+});
+
+test("reroutes an unavailable auditor with durable evidence and keeps cross-family enforcement", () => {
+  const work = validateWorkManifest(manifest([task("a", {
+    status: "auditing",
+    auditor_family: "claude",
+    commit_sha: "b".repeat(40),
+  })]));
+  const existing = {
+    task_id: "a",
+    batch_id: "batch-001",
+    builder: {
+      type: "builder" as const,
+      task_id: "a",
+      family: "codex",
+      commit_sha: "b".repeat(40),
+      changed_paths: ["src/a/index.ts"],
+      acceptance_commands: [{ command: "npm run check", passed: true, summary: "check passed" }],
+      behavior_impact: "none",
+      logic_impact: "none",
+      risks: [],
+      unresolved_items: [],
+    },
+  };
+
+  const rerouted = rerouteAuditor(
+    work,
+    "a",
+    "grok",
+    "Claude CLI was unavailable before the audit could start.",
+    "2026-08-25T20:00:00.000Z",
+    existing,
+  );
+  assert.equal(rerouted.manifest.tasks[0]?.auditor_family, "grok");
+  assert.deepEqual(rerouted.run.audit_routing, [{
+    from_family: "claude",
+    to_family: "grok",
+    reason: "Claude CLI was unavailable before the audit could start.",
+    recorded_at: "2026-08-25T20:00:00.000Z",
+  }]);
+  assert.throws(
+    () => rerouteAuditor(work, "a", "codex", "Fallback", "2026-08-25T20:00:00.000Z", existing),
+    /different model family/i,
+  );
+  assert.throws(
+    () => rerouteAuditor(
+      validateWorkManifest(manifest([task("a", { status: "integrated", commit_sha: "b".repeat(40), audit_verdict: "passed" })])),
+      "a",
+      "grok",
+      "Too late",
+      "2026-08-25T20:00:00.000Z",
+      existing,
+    ),
+    /cannot reroute.*integrated/i,
+  );
+  assert.throws(
+    () => rerouteAuditor(
+      validateWorkManifest(manifest([task("a", { status: "accepted", commit_sha: "b".repeat(40), audit_verdict: "passed" })])),
+      "a",
+      "grok",
+      "Too late",
+      "2026-08-25T20:00:00.000Z",
+      existing,
+    ),
+    /cannot reroute.*accepted/i,
+  );
+
+  const replayed = rerouteAuditor(
+    work,
+    "a",
+    "grok",
+    "Claude CLI was unavailable before the audit could start.",
+    "2026-08-25T20:01:00.000Z",
+    rerouted.run,
+  );
+  assert.equal(replayed.manifest.tasks[0]?.auditor_family, "grok");
+  assert.equal(replayed.run.audit_routing?.length, 1, "interrupted reroute replay must be idempotent");
+
+  const completedAudit = {
+    ...existing,
+    audit: {
+      type: "audit" as const,
+      task_id: "a",
+      family: "claude",
+      verdict: "failed" as const,
+      findings: ["Correction required"],
+    },
+  };
+  assert.throws(
+    () => rerouteAuditor(work, "a", "grok", "Audit shopping", "2026-08-25T20:00:00.000Z", completedAudit),
+    /completed audit/i,
+  );
+});
+
+test("archives the completed audit and audited commit when a correction replaces the builder report", () => {
+  const priorCommit = "b".repeat(40);
+  const nextCommit = "c".repeat(40);
+  const priorBuilder: BuilderReport = {
+    type: "builder",
+    task_id: "a",
+    family: "codex",
+    commit_sha: priorCommit,
+    changed_paths: ["src/a/index.ts"],
+    acceptance_commands: [{ command: "npm run check", passed: true, summary: "passed" }],
+    behavior_impact: "none",
+    logic_impact: "none",
+    risks: [],
+    unresolved_items: [],
+  };
+  const failedAudit: AuditReport = {
+    type: "audit",
+    task_id: "a",
+    family: "grok",
+    verdict: "failed",
+    findings: ["Correction required"],
+  };
+  const correctedBuilder = { ...priorBuilder, commit_sha: nextCommit };
+  const work = validateWorkManifest(manifest([task("a", {
+    status: "needs-fix",
+    commit_sha: priorCommit,
+    audit_verdict: "failed",
+  })]));
+
+  const updated = applyTaskReport(work, correctedBuilder, {
+    task_id: "a",
+    batch_id: "batch-001",
+    builder: priorBuilder,
+    audit: failedAudit,
+  });
+
+  assert.deepEqual(updated.run.audit_history, [{ ...failedAudit, commit_sha: priorCommit }]);
+  assert.equal(updated.run.audit, undefined);
+
+  assert.throws(
+    () => applyTaskReport(work, correctedBuilder, {
+      task_id: "a",
+      batch_id: "batch-001",
+      audit: failedAudit,
+    }),
+    /audit.*builder/i,
+  );
 });
 
 test("rejects unknown task and report families", () => {

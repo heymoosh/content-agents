@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
 
 import { verifyChangedPaths, type StudioTask } from "./coordinator.js";
 
@@ -16,6 +17,18 @@ function requiredLeaseFields(task: StudioTask): { base: string; worktree: string
   if (!task.worktree) throw new Error(`task ${task.id} has no worktree`);
   if (!task.branch) throw new Error(`task ${task.id} has no branch`);
   return { base: task.base_sha, worktree: task.worktree, branch: task.branch };
+}
+
+export function inspectCoordinatorMutationContext(cwd: string, expectedBranch: string): void {
+  const branch = git(cwd, ["branch", "--show-current"]);
+  if (branch !== expectedBranch) {
+    throw new Error(`coordinator branch mismatch: expected ${expectedBranch}, found ${branch || "detached HEAD"}`);
+  }
+  const gitDir = resolve(cwd, git(cwd, ["rev-parse", "--git-dir"]));
+  const commonDir = resolve(cwd, git(cwd, ["rev-parse", "--git-common-dir"]));
+  if (gitDir === commonDir) {
+    throw new Error("coordinator mutations are forbidden in the primary checkout; use a linked worktree");
+  }
 }
 
 export function inspectCleanBaseline(task: StudioTask): void {

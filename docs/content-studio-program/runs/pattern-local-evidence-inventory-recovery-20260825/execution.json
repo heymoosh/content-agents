@@ -1,0 +1,16 @@
+{
+  "coordinator_model": "gpt-5.6-terra",
+  "coordinator_reasoning_effort": "high",
+  "builder_model": "gpt-5.6-luna",
+  "builder_reasoning_effort": "high",
+  "builder_commit": "4b7644f4b0f4ca71014be4fcd0fe579fcf119fab",
+  "auditor_family": "claude",
+  "auditor_cli": "Claude Code 2.1.246",
+  "auditor_reasoning_effort": "high",
+  "auditor_model": "default model not reported by the CLI",
+  "audit_verdict": "passed",
+  "integration_commit": "e702cb8da94327c0b2190a379e66eb4dd2da111e",
+  "integration_verdict": "passed",
+  "audit_evidence": "Claude independently recomputed the body-free inventory counts, verified the two-file lease, source blob identity, acceptance commands, and integration parents.",
+  "integration_evidence": "Claude verified both merge-parent diffs and exact source blobs; no conflict markers or out-of-lease product change were found."
+}

@@ -1,0 +1,47 @@
+{
+  "task_id": "pattern-local-evidence-inventory",
+  "batch_id": "pattern-local-evidence-inventory-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-local-evidence-inventory",
+    "family": "codex",
+    "commit_sha": "76641280ffae77764a292fea75a093b1813b6bc9",
+    "changed_paths": [
+      "docs/content-studio-program/runs/pattern-local-evidence-inventory-20260825/pattern-local-evidence-inventory.json",
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.json",
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md",
+      "docs/content-studio-program/tasks/pattern-local-evidence-inventory.md",
+      "docs/content-studio-program/work.yaml"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "TypeScript check passed."
+      },
+      {
+        "command": "npm run patterns:data-status -- --data-dir data/patterns --format json",
+        "passed": true,
+        "summary": "Read-only artifact status completed; its temporary tsx IPC socket required the host-approved sandbox exception."
+      },
+      {
+        "command": "inventory consistency assertion",
+        "passed": true,
+        "summary": "Corpus total, platform total, account total, and body-free boundary all matched."
+      },
+      {
+        "command": "git diff --check",
+        "passed": false,
+        "summary": "Recovery verification found a new blank line at EOF in docs/content-studio-program/tasks/pattern-local-evidence-inventory.md."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "The corpus is a targeted evidence sample, not a top-creator census or universal viral ranking."
+    ],
+    "unresolved_items": [
+      "The full source commit violated its staging-only lease and failed git diff --check; it is superseded by pattern-local-evidence-inventory-clean-commit."
+    ]
+  }
+}

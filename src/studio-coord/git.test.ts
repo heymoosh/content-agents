@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, test } from "node:test";
 
-import { inspectCleanBaseline, verifyTaskCommit } from "./git.js";
+import { inspectCleanBaseline, inspectCoordinatorMutationContext, verifyTaskCommit } from "./git.js";
 import type { StudioTask } from "./coordinator.js";
 
 const fixtures: string[] = [];
@@ -86,4 +86,22 @@ test("treats deletion of an out-of-lease path as a boundary violation", () => {
   git(root, "commit", "-m", "delete outside lease");
   const commit = git(root, "rev-parse", "HEAD");
   assert.throws(() => verifyTaskCommit(task, commit), /outside.*lease/i);
+});
+
+test("coordinator mutations require the named branch in a linked worktree", () => {
+  const { root } = fixture();
+  assert.throws(
+    () => inspectCoordinatorMutationContext(root, "feat/test"),
+    /primary checkout/i,
+  );
+
+  const linked = `${root}-linked`;
+  fixtures.push(linked);
+  git(root, "branch", "coord/test");
+  git(root, "worktree", "add", linked, "coord/test");
+  assert.doesNotThrow(() => inspectCoordinatorMutationContext(linked, "coord/test"));
+  assert.throws(
+    () => inspectCoordinatorMutationContext(linked, "coord/other"),
+    /coordinator branch mismatch/i,
+  );
 });
