@@ -5,7 +5,7 @@
     "type": "builder",
     "task_id": "pattern-stage-evidence-consolidated-review-claude",
     "family": "claude",
-    "commit_sha": "337304b7176f14ecfde18469255d7b09b0cf6880",
+    "commit_sha": "6c2b648eaad82c62f65dead7ad8d70f733a47488",
     "changed_paths": [
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/summary.json",
       "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/morning-review.md",
@@ -17,44 +17,46 @@
       {
         "command": "npm run check",
         "passed": true,
-        "summary": "Typecheck passed with no diagnostics."
+        "summary": "Typecheck passed after correction."
       },
       {
         "command": "node docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs",
         "passed": true,
-        "summary": "Reconciled 65 unique accounts, 499 evidence rows, 12 baselines, 30 recommend, 8 hold, and 27 research-further proposals with zero duplicates or cross-lane overlap."
+        "summary": "Reconciled 65 unique accounts, 499 evidence rows, 12 baselines, 30/8/27 proposals, and 576 blocked with zero ready or unmapped."
       },
       {
         "command": "git diff --check",
         "passed": true,
-        "summary": "Whitespace check passed for the five-file leased diff."
+        "summary": "Whitespace check passed for the corrected five-file leased diff."
       }
     ],
     "behavior_impact": "None; review documentation and a read-only verifier only.",
     "logic_impact": "None; no generation, review, publishing, or canonical ledger logic changed.",
     "risks": [
-      "The verifier intentionally fails closed if future lane prose no longer contains one of the three literal proposal labels.",
-      "All 576 staged account, evidence, and baseline rows remain blocked pending Muxin's decisions."
+      "The verifier intentionally fails closed if future lane proposal wording or readiness/status contracts change.",
+      "Professional metadata uses unknown on all 14 accounts in the actual lane report; the packet preserves that instead of the failed audit's mistaken 62/3 shorthand."
     ],
     "unresolved_items": [
-      "Stable account IDs, text-community account references, and baseline numerator, denominator, and settled dates remain unresolved.",
-      "All pool decisions and authority for a later exclusive canonical-data steward remain at the human gate."
+      "All 576 staged rows remain blocked pending Muxin's decisions.",
+      "Stable IDs, account references, baseline gaps, pool choices, and canonical-data authority remain at the human gate."
     ]
   },
-  "audit_history": [],
+  "audit_history": [
+    {
+      "type": "audit",
+      "task_id": "pattern-stage-evidence-consolidated-review-claude",
+      "family": "codex",
+      "verdict": "failed",
+      "findings": [
+        "High: verify.mjs does not assert lane or summary blocked, ready, and unmapped counts or all explicit row status fields; an empty invalid-status branch permits invalid evidence statuses, so the verifier is not fully fail-closed.",
+        "Medium: verified-facts-vs-unknowns.md says topics, focus, and nicheLabel are null for all 65 accounts, but all three Threads accounts use unknown for those fields and format. Null semantics are flattened.",
+        "Medium: verified-facts-vs-unknowns.md says all 14 professional profile lookups were blocked, while the lane packet records 11 partial results and 3 blocked Threads lookups.",
+        "Low: verified-facts-vs-unknowns.md includes a 345-of-371 catalog figure outside the task's allowed three-lane sources, contradicting its traceability claim.",
+        "Passing checks: five-file lease, 65 unique disjoint account keys, 499 sources, 12 baselines, 576 blocked rows, 30/8/27 proposals, body-free output, bounded usable decision sheet, no em dashes, npm run check, current verifier, and git diff --check."
+      ],
+      "commit_sha": "337304b7176f14ecfde18469255d7b09b0cf6880"
+    }
+  ],
   "diff_verified": true,
-  "verified_commit": "337304b7176f14ecfde18469255d7b09b0cf6880",
-  "audit": {
-    "type": "audit",
-    "task_id": "pattern-stage-evidence-consolidated-review-claude",
-    "family": "codex",
-    "verdict": "failed",
-    "findings": [
-      "High: verify.mjs does not assert lane or summary blocked, ready, and unmapped counts or all explicit row status fields; an empty invalid-status branch permits invalid evidence statuses, so the verifier is not fully fail-closed.",
-      "Medium: verified-facts-vs-unknowns.md says topics, focus, and nicheLabel are null for all 65 accounts, but all three Threads accounts use unknown for those fields and format. Null semantics are flattened.",
-      "Medium: verified-facts-vs-unknowns.md says all 14 professional profile lookups were blocked, while the lane packet records 11 partial results and 3 blocked Threads lookups.",
-      "Low: verified-facts-vs-unknowns.md includes a 345-of-371 catalog figure outside the task's allowed three-lane sources, contradicting its traceability claim.",
-      "Passing checks: five-file lease, 65 unique disjoint account keys, 499 sources, 12 baselines, 576 blocked rows, 30/8/27 proposals, body-free output, bounded usable decision sheet, no em dashes, npm run check, current verifier, and git diff --check."
-    ]
-  }
+  "verified_commit": "6c2b648eaad82c62f65dead7ad8d70f733a47488"
 }

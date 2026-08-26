@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 49
+state_revision: 51
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -1151,7 +1151,7 @@ tasks:
   - id: pattern-stage-evidence-consolidated-review-claude
     batch_id: pattern-consolidated-review-claude-20260826
     outcome: Reconcile the three accepted Claude staging lanes into one compact body-free 65-account morning review package without creating reviewed, canonical, best, winner, viral, or content-generation claims.
-    status: building
+    status: auditing
     depends_on:
       - pattern-stage-evidence-text-community-claude
       - pattern-stage-evidence-professional-publishing-claude
@@ -1201,5 +1201,5 @@ tasks:
     user_visible_behavior: false
     content_logic_change: false
     human_gate: consolidated-reviewed-metadata-decision
-    commit_sha: 337304b7176f14ecfde18469255d7b09b0cf6880
-    audit_verdict: failed
+    commit_sha: 6c2b648eaad82c62f65dead7ad8d70f733a47488
+    audit_verdict: pending
