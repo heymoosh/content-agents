@@ -123,6 +123,9 @@ files, for example `studio:conversation-routing` or `publish:approval-gate`.
    `reroute-auditor` to select another available cross-family auditor. The run record retains the
    original family, replacement family, timestamp, and concrete availability reason. Unavailability
    is not an audit failure, and the coordinator must not block while an authorized fallback exists.
+   For a Grok assignment that is unavailable or quota-limited, Claude is the default fallback when
+   Claude differs from the builder family. If Claude built the task, use Codex instead so the audit
+   remains cross-family. Usage limits are an availability reason, not a reason to pause the program.
    Rerouting is forbidden after an audit report exists; a corrected builder report first archives
    that report and its audited commit in `audit_history`, then clears the current audit for re-audit.
    Replaying an interrupted reroute recognizes the already-durable final routing event and commits
