@@ -47,5 +47,18 @@
   },
   "audit_history": [],
   "diff_verified": true,
-  "verified_commit": "cac80e73d43f323b101fa7d7603305b278de476a"
+  "verified_commit": "cac80e73d43f323b101fa7d7603305b278de476a",
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-text-community-claude",
+    "family": "codex",
+    "verdict": "failed",
+    "findings": [
+      "High: account-level baselineSource is populated for six mixed groups even though their projection groups contain both null and non-null values and the packet requires null.",
+      "High: all 12 baseline IDs are synthesized ordinals and their staged source label is absent from the safe baseline projection, whose schema has no id or source field.",
+      "Medium: the decision packet says 182 evidence rows have bodyComplete null; actual input counts are 42 null, 140 false, and 172 true. The 182 figure is a blocker count, not a null count.",
+      "Medium: all 397 intake input rows omit explicit bodyIncluded false even though the task packet requires every row to carry it.",
+      "Passing checks: lease scope, all 354 actual source IDs and copied fields, 31/354/12 totals, 14/6/11 dispositions, no raw bodies/rankings/canonical writes, regenerated reports, npm run check, exact intake and bridge commands, and git diff --check."
+    ]
+  }
 }

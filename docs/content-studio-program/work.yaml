@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 35
+state_revision: 37
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -975,7 +975,7 @@ tasks:
   - id: pattern-stage-evidence-text-community-claude
     batch_id: pattern-reviewed-evidence-staging-claude-20260826
     outcome: Rebuild the exact 31-account, 354-source, 12-baseline text/community body-free staging proposal with Claude as builder and Codex as auditor, preserving 14 recommend, 6 hold, and 11 research-further dispositions without reviewed or canonical claims.
-    status: auditing
+    status: building
     depends_on:
       - pattern-corrected-candidate-account-slate
     base_sha: 93c0c89e03d719bd4074e0bca6642f6da2d7ae5c
@@ -1029,7 +1029,7 @@ tasks:
     content_logic_change: false
     human_gate: reviewed-metadata-provenance-and-canonical-write
     commit_sha: cac80e73d43f323b101fa7d7603305b278de476a
-    audit_verdict: pending
+    audit_verdict: failed
   - id: pattern-stage-evidence-professional-publishing-claude
     batch_id: pattern-reviewed-evidence-staging-claude-20260826
     outcome: Rebuild the exact 14-account, 70-source professional/publishing body-free staging proposal with Claude as builder and Codex as auditor, preserving 11 recommend, 3 research-further, and corrected Threads unknowns.
