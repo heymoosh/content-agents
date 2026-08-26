@@ -40,6 +40,8 @@ Write only under
    audience, scope, provenance, completeness, and baseline gaps that remain unreviewed.
 4. `decision-sheet.md`: a human-editable approve, narrow, or hold choice for each lane; the open
    pool and metadata questions carried from the lane packets; and blank answer fields.
+5. `verify.mjs`: a deterministic, body-free reconciliation of `summary.json` against the three
+   lane reports. It performs no writes.
 
 State this null rule once in the decision sheet: leave a field blank or `null` when not answering
 it now. Blank never means false, excluded, or reviewed.
@@ -57,7 +59,7 @@ it now. Blank never means false, excluded, or reviewed.
 ## Acceptance
 
 1. `npm run check`
-2. Run a deterministic Node reconciliation that reads all three `intake-report.json` files and
+2. `node docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs`
    asserts 65 accounts, 499 evidence rows, 12 baselines, 30 recommend, 8 hold, 27
    research-further, exactly 65 unique account keys, and zero duplicates in `summary.json`.
 3. `git diff --check`

@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 41
+state_revision: 42
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -488,12 +488,14 @@ tasks:
       - pattern-research-visual-video
       - pattern-professional-evidence-boundary-correction
       - pattern-corrected-candidate-account-slate
+      - pattern-stage-evidence-consolidated-review-claude
     base_sha: null
     context_paths:
       - docs/content-studio-program/candidate-account-slate-20260825.md
       - docs/content-studio-program/runs/pattern-review-staging-20260825/review-staging-result.json
       - docs/pattern-mining-plan.md
       - docs/content-system-blueprint.md
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/**
     forbidden_paths:
       - data/**
       - content/**
@@ -1146,3 +1148,58 @@ tasks:
     human_gate: reviewed-metadata-provenance-and-canonical-write
     commit_sha: e7a7c23e88ab093a1711d0fbfdc429e94d6f6f63
     audit_verdict: passed
+  - id: pattern-stage-evidence-consolidated-review-claude
+    batch_id: pattern-consolidated-review-claude-20260826
+    outcome: Reconcile the three accepted Claude staging lanes into one compact body-free 65-account morning review package without creating reviewed, canonical, best, winner, viral, or content-generation claims.
+    status: ready
+    depends_on:
+      - pattern-stage-evidence-text-community-claude
+      - pattern-stage-evidence-professional-publishing-claude
+      - pattern-stage-evidence-visual-video-claude
+    base_sha: 2afa8ac02c5cb02b6245af9549c01b86e7b55b0a
+    context_paths:
+      - docs/content-studio-program/tasks/pattern-stage-evidence-consolidated-review-claude.md
+      - docs/content-studio-program/tasks/pattern-reviewed-metadata-input.md
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/protocol.md
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/decision-packet.md
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/intake-report.json
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/ledger-bridge-report.json
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/decision-packet.md
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/intake-report.json
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/ledger-bridge-report.json
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/decision-packet.md
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/intake-report.json
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/ledger-bridge-report.json
+      - package.json
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/tasks/**
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - data/**
+      - content/**
+      - config/**
+      - src/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/text-community/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/professional-publishing/**
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/**
+    write_paths:
+      - docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/**
+    semantic_locks:
+      - pattern:consolidated-review-claude
+      - pattern:body-free-local-evidence-claude:consolidated
+    builder_family: claude
+    auditor_family: codex
+    branch: agent/pattern-stage-evidence-consolidated-review-claude
+    worktree: /private/tmp/content-agents-pattern-stage-evidence-consolidated-review-claude
+    acceptance_commands:
+      - npm run check
+      - node docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs
+      - git diff --check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: consolidated-reviewed-metadata-decision
+    commit_sha: null
+    audit_verdict: pending
