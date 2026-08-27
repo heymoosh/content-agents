@@ -70,8 +70,11 @@ Recommended sequence, in this order:
    - an annotated tag on the current tip of `main`, for example
      `git tag -a creator-corpus-20260827 -m "raw creator-content corpus before relocation"`
      followed by `git push origin creator-corpus-20260827`; and
-   - a `git bundle create creator-content-20260827.bundle 497d4ff27ab5f71bcd2788929d67d216a76d5677`
-     stored wherever Muxin keeps offline backups.
+   - a bundle of that tag,
+     `git bundle create creator-content-20260827.bundle creator-corpus-20260827`,
+     stored wherever Muxin keeps offline backups. Bundle the tag, not the bare SHA: `git bundle`
+     refuses a revision that names no ref ("Refusing to create empty bundle"), so the tag has to
+     exist first. The bundle runs about 11 MB.
    The corpus already exists in `origin/main` history at `497d4ff`, so recovery is possible even
    without these. The tag and bundle make it possible without knowing that SHA.
 2. **Relocate to a local, gitignored path**, mirroring the convention `data/patterns/**` already

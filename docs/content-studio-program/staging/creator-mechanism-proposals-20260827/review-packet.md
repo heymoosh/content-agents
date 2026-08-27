@@ -340,9 +340,12 @@ The validator proves a bounded thing and not more. Say what it proves, then what
 
 **What passed.** No proposal's free text shares an eight-word run with the verbatim spans or the
 analysis prose of any entry it cites. No proposal carries a link, a blockquote, a quoted run, or
-an em dash. No proposal names a creator or an account handle. No proposal record has a key that
-could hold creator copy, and the reader rejects unknown keys rather than dropping them. No
-proposal uses a claim word.
+an em dash. No proposal record has a key that could hold creator copy, and the reader rejects
+unknown keys rather than dropping them. No proposal uses a claim word. No proposal contains a
+creator's full name or an account handle: that check matches the name as a phrase and the handle
+as one unbroken run, deliberately not single words, because creator slugs and handle fields carry
+ordinary English ("love", "green", "levels", "product", "information") that would otherwise fire
+on prose naming nobody. A publication title or a bare surname would not be caught.
 
 **What that does not settle.**
 
