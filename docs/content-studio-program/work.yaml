@@ -2,7 +2,7 @@ version: 1
 program: content-studio
 coordinator: codex
 coordinator_branch: agent/content-studio-coordinator-local-merge
-state_revision: 61
+state_revision: 66
 authoritative_documents:
   - docs/content-system-blueprint.md
   - docs/content-studio-vision.md
@@ -1203,3 +1203,132 @@ tasks:
     human_gate: consolidated-reviewed-metadata-decision
     commit_sha: 98790ce4cf952679c42b7fef70a78c63ed88c055
     audit_verdict: passed
+  - id: cs6-parallel-safe-ui-completion
+    batch_id: parallel-ui-corpus-20260827
+    outcome: Complete the remaining parallel-safe Content Studio frontend and product experience, including a fixture-backed recommendation seam and honest research-dependent states, without changing backend engines or content-generation behavior.
+    status: building
+    depends_on:
+      - cs5-content-workbench-continuity
+    base_sha: 82aed934a9e68d4986e620c91c32cf7bab141f0e
+    context_paths:
+      - docs/content-studio-program/tasks/cs6-parallel-safe-ui-completion.md
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/corpus-ui-reconciliation-20260827.md
+      - docs/content-studio-vision.md
+      - docs/content-studio-reset-handoff.md
+      - docs/content-studio-gemini-review-brief.md
+      - stories/AGENTS.md
+      - venture/AGENTS.md
+      - charles/AGENTS.md
+      - src/review/page.ts
+      - src/review/page.test.ts
+      - src/review/fixtures.ts
+      - src/review/studio.ts
+      - src/review/studio.test.ts
+      - src/review/studio-job-ui.ts
+      - src/review/page-capture.ts
+      - src/review/page-fiction.ts
+      - src/review/page-outreach.ts
+      - src/review/page-signals.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/runs/**
+      - docs/content-studio-program/creator-content/**
+      - docs/content-studio-program/creator-content-index.md
+      - docs/content-studio-program/creator-study-guide-20260826.md
+      - docs/content-studio-program/broad-pattern-research-policy-20260825.md
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - data/**
+      - config/**
+      - content/**
+      - briefs/**
+      - src/patterns/**
+      - src/grow/**
+      - src/atomize/**
+      - src/publish/**
+      - src/venture/**
+      - src/fiction/**
+      - src/outreach/**
+      - src/charles/**
+    write_paths:
+      - src/review/**
+      - e2e/**
+    semantic_locks:
+      - studio:parallel-safe-ui-completion
+      - studio:conversation-surface
+      - studio:fixture-backed-pattern-seam
+      - studio:no-generation-change
+    builder_family: claude
+    auditor_family: codex
+    branch: agent/cs6-parallel-safe-ui-completion
+    worktree: /private/tmp/content-agents-cs6-parallel-safe-ui-completion
+    acceptance_commands:
+      - npm run check
+      - node --import tsx --test src/review/*.test.ts
+      - npm run test:e2e
+    user_visible_behavior: true
+    content_logic_change: false
+    human_gate: final-visual-product-review
+    commit_sha: null
+    audit_verdict: pending
+  - id: pattern-creator-corpus-to-mechanism-proposals
+    batch_id: parallel-ui-corpus-20260827
+    outcome: Turn the merged creator-content library into deterministic body-free mechanism proposals, exact coverage accounting, evidence caveats, and a storage-boundary recommendation without changing canonical pattern data or making templates available to generation.
+    status: building
+    depends_on: []
+    base_sha: 82aed934a9e68d4986e620c91c32cf7bab141f0e
+    context_paths:
+      - docs/content-studio-program/tasks/pattern-creator-corpus-to-mechanism-proposals.md
+      - docs/content-studio-program/charter.md
+      - docs/content-studio-program/corpus-ui-reconciliation-20260827.md
+      - docs/content-system-blueprint.md
+      - docs/content-studio-program/creator-content-index.md
+      - docs/content-studio-program/creator-content/**
+      - config/patterns/hook-template-ledger.jsonl
+      - src/patterns/hook-template-ledger.ts
+      - src/patterns/platform-treatment-blueprint.ts
+      - src/patterns/types.ts
+    forbidden_paths:
+      - docs/content-studio-program/work.yaml
+      - docs/content-studio-program/runs/**
+      - docs/content-agents-backlog.md
+      - STATE.md
+      - data/**
+      - content/**
+      - briefs/**
+      - src/review/**
+      - src/grow/**
+      - src/atomize/**
+      - src/publish/**
+      - src/venture/**
+      - src/fiction/**
+      - src/outreach/**
+      - src/charles/**
+    write_paths:
+      - src/patterns/creator-content-normalization.ts
+      - src/patterns/creator-content-normalization.test.ts
+      - src/patterns/creator-mechanism-proposals.ts
+      - src/patterns/creator-mechanism-proposals.test.ts
+      - src/patterns/creator-mechanism-proposals-cli.ts
+      - package.json
+      - docs/content-studio-program/staging/creator-mechanism-proposals-20260827/**
+    semantic_locks:
+      - pattern:creator-corpus-normalization
+      - pattern:body-free-mechanism-proposals
+      - pattern:raw-corpus-storage-reconciliation
+      - pattern:no-template-availability
+    builder_family: claude
+    auditor_family: codex
+    branch: agent/pattern-creator-corpus-to-mechanism-proposals
+    worktree: /private/tmp/content-agents-pattern-creator-corpus-to-mechanism-proposals
+    acceptance_commands:
+      - npm run check
+      - node --import tsx --test src/patterns/creator-content-normalization.test.ts src/patterns/creator-mechanism-proposals.test.ts
+      - npm run patterns:creator-mechanisms -- --validate
+      - git diff --check
+    user_visible_behavior: false
+    content_logic_change: false
+    human_gate: mechanism-proposal-review-before-template-availability
+    commit_sha: null
+    audit_verdict: pending
