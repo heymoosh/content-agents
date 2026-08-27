@@ -1027,12 +1027,17 @@ function captureWindowFor(entries: readonly ParsedEntry[]): CaptureWindow {
   };
 }
 
+/**
+ * Completeness compares the entries that actually parse against the target the capture aimed at,
+ * never against the file's own summary sentence. Later `n/m` pairs in that sentence are not always
+ * a second stream: some report a sub-count of the same items (how many of 30 videos yielded a
+ * transcript), so summing every pair would call a complete capture partial. Transcript retrieval
+ * is reported separately, as its own coverage number.
+ */
 function completenessFor(file: ParsedCreatorFile): CreatorInventory["capture_completeness"] {
   if (file.entries.length === 0) return "blocked";
   if (file.claimedTarget === null) return "unknown";
-  const claimedSum = file.claimedPairs.reduce((total, pair) => total + pair[0], 0);
-  const targetSum = file.claimedPairs.reduce((total, pair) => total + pair[1], 0);
-  return claimedSum >= targetSum ? "complete" : "partial-window";
+  return file.entries.length >= file.claimedTarget ? "complete" : "partial-window";
 }
 
 export function buildCorpusInventory(

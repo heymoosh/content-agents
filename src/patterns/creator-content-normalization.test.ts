@@ -295,6 +295,28 @@ test("reports a claimed-count mismatch and accepts a multi-stream claim", () => 
   ]);
 });
 
+test("reads completeness from the entries that parse, not the file's summary sentence", () => {
+  const body = (count: number): string => Array.from({ length: count }, (_unused, index) => [
+    `### ${index + 1}. A sample title (2026-01-0${(index % 9) + 1}) [link](https://example.test/${index})`,
+    "**Metrics:** 10 likes",
+    "**Framing:** invented framing note",
+    "",
+  ].join("\n")).join("\n");
+
+  // A trailing pair can report a sub-count of the same items rather than a second stream: how
+  // many of the 30 captured videos yielded a transcript. Summing every pair would call this
+  // complete capture partial.
+  const subCount = parseCreatorFile("sample-subcount.md", [
+    header({ "Posts captured": "3/3 (transcripts: 2/3 retrieved; 1 confirmed unavailable)" }),
+    "## Posts", "", body(3),
+  ].join("\n"));
+  const bounded = parseCreatorFile("sample-bounded.md", [header({ "Posts captured": "3/30" }), "## Posts", "", body(3)].join("\n"));
+  const inventory = buildCorpusInventory([bounded, subCount], "# index\n");
+  const byFile = new Map(inventory.creators.map((creator) => [creator.file, creator] as const));
+  assert.equal(byFile.get("sample-subcount.md")!.capture_completeness, "complete");
+  assert.equal(byFile.get("sample-bounded.md")!.capture_completeness, "partial-window");
+});
+
 test("records a blocked capture as zero entries instead of failing", () => {
   const file = parseCreatorFile("sample-blocked.md", [
     header({ "Posts captured": "0/30" }),
