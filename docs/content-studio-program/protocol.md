@@ -46,9 +46,9 @@ decision packet that names the blocked work and the work that will resume after 
 
 Muxin authorized the coordinator to treat the current 65 evidence-bearing accounts as a broad
 research seed shortlist, not as viral, approved, best, complete, ranked, or exclusive candidates.
-Researchers may identify additional candidates from the 371-account catalog or bounded public
-research. All new research belongs in isolated, noncanonical staging packages until Muxin reviews
-one consolidated candidate-account slate; never write canonical JSONL datasets before that gate.
+Researchers may identify additional creators through SocialDB, browser search, and native platform
+research. The research ledger is the durable, human-readable source record. It is not canonical
+pattern data and it must not silently become a template or published content.
 
 Do not use a universal definition or score for "viral." Keep niche relevance, broad-platform
 performance, format-specific performance, relative outperformance against a valid baseline,
@@ -58,12 +58,58 @@ available performance and baseline/gap, pool rationale, caveats, confidence, and
 to include, exclude, hold, or research further. Absolute reach or engagement must name a
 denominator and measurement context. Unknown remains unknown.
 
-Per-platform decision packets are body-free. They may summarize mechanisms and name useful
-examples but never reproduce creator content. Finish disjoint eligible work before presenting the
-single consolidated candidate-slate gate, including recommended niche/broad/format pools, held or
-rejected candidates, missing platforms/formats, evidence/baseline gaps, and the exact decisions
-Muxin must make. After that answer, continue immediately with exclusive canonical-data stewardship
-and the remaining approved program.
+For supported platforms, start broad creator discovery with SocialDB's public leaderboard
+(`https://socialdb.xyz/leaderboard`), recording the platform, category, sort, comparison context,
+and access date. Treat it only as discovery and audience-comparison evidence. If it lacks coverage,
+its category is too broad, its result is empty, or recent/trending discovery is required, use
+browser search phrases tailored to the platform, niche, and date range, then verify natively.
+
+Do not elevate accounts whose results are plausibly driven chiefly by pre-existing celebrity,
+political office, executive or institutional power, platform ownership, or mega-franchise
+distribution into the active study set. Do not exclude a creator merely because the creator later
+became famous through the same kind of content being studied; document that content-origin
+trajectory and still require verified native performance evidence (see the Aug. 26 audience-size-first
+fill criterion below). Preserve any excluded,
+already-captured source record as archived audit evidence, with the explicit exclusion reason, but
+do not use it for recommendations, future content analysis, or templates.
+
+For each selected leader, inspect the native profile in Chrome and store the strongest verifiable
+post or video with its direct links, date, format, public metrics, audience size, comparison set,
+repeatability evidence, caveats, and confidence. State whether the selection came from a visible
+top/popular sort, pinned item, playlist, topic result, or bounded recent-feed comparison. A
+SocialDB listing is never post-level virality proof.
+
+Run native research with one Chrome operator at a time and use the existing signed-in session when
+available (Muxin may explicitly authorize multiple concurrent operators for a specific sweep; that
+is a one-time exception, not a standing change). Per the Aug. 26 audience-size-first direction, a
+creator fills a six-per-platform slot once verified as a real, active, content-origin account with
+a large following in the topic and/or platform, backed by at least one direct linkable piece of
+content; two strong native posts in a named visible window (or an equivalent multi-item
+`Popular`/channel comparison) remain valuable supporting evidence but are no longer required to
+fill a slot. An account with no verified direct link, or with only a small/unverifiable following,
+remains a directly linked study lead, not a completed slot. Update the human-readable creator tracker with
+handle, platforms, visible audience, exact subjects, direct post, comparison evidence, and
+`study now`/`study lead only`/`hold`/`archived` status after every verification. The full rerun
+sequence, including exact discovery query forms and the provenance decision, is maintained in
+`broad-pattern-research-policy-20260825.md`.
+
+The source ledger is append-only. Preserve the creator's original direct link and source text when
+a short excerpt is stored. Never delete, paraphrase, or overwrite source content. Put any later
+analysis of openings, hooks, storytelling, or reusable format in a distinct analysis artifact;
+do not create templates or canonical pattern data until Muxin explicitly requests that stage.
+
+Per-platform research records may summarize mechanism and retain only short, exact, attributed
+source excerpts when needed to preserve an opening or hook for later analysis. They must never
+replace the source with a paraphrase. Keep source capture separate from any hook, storytelling, or
+template analysis.
+
+Once Muxin explicitly requests it, a distinct later stage, the per-creator content library, stores
+full verbatim content (full essay text, full video transcripts, full captions, on-screen text and
+image text, per the media type) for each already-confirmed fill, not short excerpts; that stage's
+rules and rerun sequence live in `broad-pattern-research-policy-20260825.md` under "Aug. 26
+direction: per-creator content library" and "Rerun playbook: per-creator content library". It never
+runs on a lead, reject, or archived record, and it is separate from, and does not loosen, the
+short-excerpt-only rule above for the discovery/fill phase itself.
 
 ## Durable layout
 
