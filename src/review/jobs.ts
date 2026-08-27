@@ -1047,8 +1047,11 @@ async function runContinueJob(job: Job): Promise<void> {
   const before = folderAbs ? continueArtifactCounts(folderAbs, parsed?.lens) : null;
   const result = await runAtomizeJob(job);
   const failure = decodeSpawnFailure(result, job.id, {
-    timeoutVerb: "atomize", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
-    exitVerb: "atomize", includeTailOnTimeout: true,
+    // The rendered name for this step is "Format for platforms" (the vision bans the word
+    // "atomize" from anything a person reads). These two verbs compose straight into job.error,
+    // which the job row renders, so they carry the product name, not the skill's name.
+    timeoutVerb: "Formatting for platforms", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
+    exitVerb: "Formatting for platforms", includeTailOnTimeout: true,
   });
   // An unparseable arg (not built by this module) degrades to exit-code-only verification rather
   // than failing a run we can't inspect.
@@ -1232,8 +1235,11 @@ async function drain(): Promise<void> {
   const result = await runAtomizeJob(job);
   job.slugs = listSlugs().filter((s) => !before.has(s)); // artifact check — real folders, not exit code
   const failure = decodeSpawnFailure(result, job.id, {
-    timeoutVerb: "atomize", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
-    exitVerb: "atomize", includeTailOnTimeout: true,
+    // The rendered name for this step is "Format for platforms" (the vision bans the word
+    // "atomize" from anything a person reads). These two verbs compose straight into job.error,
+    // which the job row renders, so they carry the product name, not the skill's name.
+    timeoutVerb: "Formatting for platforms", timeoutLabel: `${ATOMIZE_TIMEOUT_MS / 60000} min`,
+    exitVerb: "Formatting for platforms", includeTailOnTimeout: true,
   });
   job.status = atomizeArtifactVerdict(failure, job.slugs.length);
   if (job.status === "done") {
