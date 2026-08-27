@@ -2363,8 +2363,16 @@ function fmtDay(iso){
   const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return MO[(Number(p[1])||1)-1]+" "+Number(p[2]);
 }
+// source_lines rides in from a piece's frontmatter, so it is whatever was written there: usually
+// an array of numbers, sometimes a bare scalar, occasionally something malformed. This runs inside
+// rowEl, which builds every row of the review queue, so a .map on a non-array would take the whole
+// queue down over one bad file. Anything that is not an array of refs degrades to nothing shown.
 function lineRefsText(refs){
-  const parts = (refs||[]).map(String);
+  let list;
+  if(Array.isArray(refs)) list = refs;
+  else if(typeof refs === "number" || (typeof refs === "string" && refs.trim() !== "")) list = [refs];
+  else list = [];
+  const parts = list.map(String).filter(function(s){ return s.trim() !== ""; });
   if(!parts.length) return "";
   return (parts.length===1 ? "line " : "lines ")+parts.join(", ");
 }
@@ -2437,7 +2445,7 @@ function wbMarginHtml(s){
     ? '<div class="dev-working">Your director is working on a round. Studio has the log.</div>'
     : '<div class="wb-reply">'+engineSelectHtml()+'<input class="wb-reply-input" placeholder="Push back, or ask for another angle…" data-slug="'+esc(s.slug)+'" />'+
       '<button class="wb-reply-send" data-slug="'+esc(s.slug)+'">'+(s.rounds.length?"Send to your director":"Ask for a read")+'</button>'+
-      '<span class="mono-note">a round takes 30s to a few min. real time.</span></div>';
+      '<span class="mono-note">Studio carries the clock and the log while a round runs.</span></div>';
   return '<div class="session-margin">'+
     '<div><div class="wb-margin-cap">WHAT YOUR DIRECTOR CHECKED</div>'+
     (s.rounds.length ? '<div class="wb-margin-sub">Ran the lenses against your words. Kept only what earned its place.</div>' : "")+

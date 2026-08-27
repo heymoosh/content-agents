@@ -2794,6 +2794,33 @@ test("Slice 5: review-queue row provenance uses lineRefsText, not JSON.stringify
   assert.ok(html.includes("lineRefsText(row.sourceLines)"), "row provenance must call lineRefsText");
 });
 
+// A malformed source_lines used to be harmless because the old code only JSON.stringify'd it.
+// lineRefsText maps over it, so a bare scalar or a stray object would throw inside rowEl and take
+// the whole review queue down over one bad frontmatter block. This runs the real emitted function.
+test("Slice 5: lineRefsText survives whatever frontmatter put in source_lines", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function lineRefsText(");
+  assert.ok(start >= 0, "lineRefsText must reach the browser");
+  const end = script.indexOf("function wbCheckHtml(", start);
+  assert.ok(end > start, "lineRefsText must be followed by wbCheckHtml");
+  const lineRefsText = new Function(
+    script.slice(start, end) + "\nreturn lineRefsText;",
+  )() as (refs: unknown) => string;
+
+  assert.equal(lineRefsText([12]), "line 12");
+  assert.equal(lineRefsText([12, 13]), "lines 12, 13");
+  assert.equal(lineRefsText(undefined), "");
+  assert.equal(lineRefsText(null), "");
+  assert.equal(lineRefsText([]), "");
+  // The shapes that used to throw.
+  assert.equal(lineRefsText(12), "line 12");
+  assert.equal(lineRefsText("12"), "line 12");
+  assert.equal(lineRefsText(""), "");
+  assert.equal(lineRefsText("   "), "");
+  assert.equal(lineRefsText({ from: 4, to: 9 }), "");
+  assert.equal(lineRefsText(true), "");
+});
+
 test("Slice 5: .wb-cut-body carries the blue authorship rule", () => {
   const html = renderPage({ repoRoot, isDevWorktree: false });
   const start = html.indexOf(".wb-cut-body {");
