@@ -56,7 +56,7 @@ entry at all. `missing` is not a defect on its own: a wordless video has no tran
 | Field kind | Present | Partial | Absent | Missing |
 |---|---|---|---|---|
 | hook | 1621 | 7 | 19 | 59 |
-| body | 816 | 118 | 46 | 726 |
+| body | 862 | 118 | 0 | 726 |
 | transcript | 346 | 33 | 246 | 1081 |
 | caption | 295 | 0 | 3 | 1408 |
 | on-screen-text | 190 | 2 | 47 | 1467 |

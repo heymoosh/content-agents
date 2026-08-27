@@ -163,6 +163,30 @@ test("parses a long-video entry and marks an unavailable transcript absent", () 
   assert.equal(withoutTranscript!.fields.find((field) => field.kind === "structure")?.presence, "absent");
 });
 
+test("reads a verbatim body that was written as plain Markdown instead of a blockquote", () => {
+  const file = parseCreatorFile("sample-unquoted.md", [
+    header({ "Primary platform": "Dev.to", "Primary media type": "long-form text", "Posts captured": "1/30" }),
+    "## Posts",
+    "",
+    "### 1. A sample article (Apr 20, 2026) [link](https://example.test/a)",
+    "**Metrics:** 100 reactions",
+    "**Full text (verbatim):**",
+    "",
+    "### A heading the creator wrote inside the article",
+    "invented body paragraph written as plain markdown, not quoted",
+    "",
+    "**Structure:** invented structural note",
+    "**Framing:** invented framing note",
+    "",
+  ].join("\n"));
+
+  const body = file.entries[0]!.fields.find((field) => field.kind === "body");
+  assert.equal(body!.presence, "present", "an unquoted body is still a body");
+  assert.equal(body!.quotedLineCount, 0);
+  assert.ok(body!.unquotedLineCount >= 2);
+  assert.equal(buildCorpusInventory([file], "# index\n").field_coverage.body.present, 1);
+});
+
 test("marks a paywalled long-form entry as a partial capture", () => {
   const file = parseCreatorFile("sample-longform.md", [
     header({ "Primary platform": "Substack", "Primary media type": "long-form text", "Posts captured": "1/30" }),

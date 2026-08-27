@@ -228,8 +228,10 @@ export interface ParsedField {
   readonly lineNumber: number;
   /** Size of the field's value, so coverage can distinguish a stub from real evidence. */
   readonly characterCount: number;
-  /** How many blockquote lines followed the label. Verbatim evidence lives in those. */
+  /** How many blockquote lines followed the label. Most verbatim evidence lives in those. */
   readonly quotedLineCount: number;
+  /** How many plain lines followed it, up to the next field label. Two files write bodies unquoted. */
+  readonly unquotedLineCount: number;
 }
 
 export interface ParsedMetricValue {
@@ -547,13 +549,13 @@ function presenceFor(
   qualifiers: readonly CreatorFieldQualifier[],
   value: string,
   firstValueLine: string,
-  quotedLineCount: number,
+  valueLineCount: number,
 ): CreatorFieldPresence {
   const inline = value.trim();
   const lead = (inline || firstValueLine).trim();
-  if (!lead && quotedLineCount === 0) return "absent";
+  if (!lead && valueLineCount === 0) return "absent";
   if (ABSENT_VALUE.test(lead)) return "absent";
-  if (quotedLineCount === 0 && lead.length <= 2) return "absent";
+  if (valueLineCount === 0 && lead.length <= 2) return "absent";
   if (qualifiers.includes("paywalled") || qualifiers.includes("partial") || qualifiers.includes("excerpt")) return "partial";
   if (PARTIAL_VALUE.test(lead)) return "partial";
   return "present";
@@ -672,17 +674,20 @@ export function parseCreatorFile(file: string, text: string): ParsedCreatorFile 
       const rawLabel = match[1]!.trim();
       const value = match[2]!;
       const { kind, qualifiers } = classifyFieldLabel(rawLabel);
+      // A field's value runs until the next field label, or the end of the entry. Most of the
+      // corpus blockquotes its verbatim evidence, but two files present a full post as plain
+      // Markdown, sometimes opening with the creator's own heading. Stopping at the first
+      // unquoted line, or at any heading, would read a present body as an absent one.
       let quotedLineCount = 0;
+      let unquotedLineCount = 0;
       let firstValueLine = "";
       for (let scan = index + 1; scan < end; scan += 1) {
         const next = lines[scan]!;
-        if (BLOCKQUOTE.test(next)) {
-          quotedLineCount += 1;
-          if (!firstValueLine) firstValueLine = next.replace(/^>\s?/, "").trim();
-          continue;
-        }
+        if (HEADER_FIELD.test(next)) break;
         if (!next.trim()) continue;
-        break;
+        if (BLOCKQUOTE.test(next)) quotedLineCount += 1;
+        else unquotedLineCount += 1;
+        if (!firstValueLine) firstValueLine = next.replace(/^>\s?/, "").trim();
       }
       if (kind === "unrecognized") {
         // A bold label the taxonomy does not know is almost always the creator's own body copy
@@ -707,10 +712,11 @@ export function parseCreatorFile(file: string, text: string): ParsedCreatorFile 
         rawLabel: kind === "unrecognized" ? "(redacted: outside field taxonomy)" : rawLabel,
         kind,
         qualifiers,
-        presence: presenceFor(qualifiers, value, firstValueLine, quotedLineCount),
+        presence: presenceFor(qualifiers, value, firstValueLine, quotedLineCount + unquotedLineCount),
         lineNumber: index + 1,
         characterCount: value.trim().length,
         quotedLineCount,
+        unquotedLineCount,
       });
     }
     const kinds = new Set(fields.map((field) => field.kind));
