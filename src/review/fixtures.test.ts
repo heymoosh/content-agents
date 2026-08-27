@@ -303,7 +303,7 @@ test("a done job's finishedAt is stamped in the browser, not baked in at render"
 });
 
 test("job-by-room fixtures use real kinds, so each one lands in the room it claims", () => {
-  const rooms: JobRoom[] = ["Content", "Outreach", "Fiction", "Signals", "Charles"];
+  const rooms: JobRoom[] = ["Content", "Outreach", "Fiction", "Signals", "Charles", "Venture"];
   for (const room of rooms) {
     const s = scenario(`job-room-${room.toLowerCase()}`);
     assert.ok(!s.disabled, `${room} should be forceable`);
@@ -316,13 +316,15 @@ test("job-by-room fixtures use real kinds, so each one lands in the room it clai
   }
 });
 
-test("the Venture job button is honestly dead until a Venture job kind exists", () => {
+test("the Venture job-by-room fixture is forceable with a real Venture kind", () => {
   const s = scenario("job-room-venture");
-  assert.equal(s.disabled, true);
-  assert.match(s.note ?? "", /no job kind maps to Venture yet/);
-  assert.deepEqual(s.overrides, {});
-  // The panel renders it disabled rather than pretending — no room is jumped to, nothing forced.
-  assert.match(fixturePanelHtml(), /data-fx="job-room-venture" disabled/);
+  assert.ok(!s.disabled, "Venture should no longer be disabled");
+  assert.equal(s.note, undefined);
+  assert.equal(s.room, "venture");
+  const j = jobsOf("job-room-venture")[0];
+  assert.equal(j.kind, "venture-analysis");
+  assert.equal(jobRoom(j.kind), "Venture");
+  assert.ok(!/data-fx="job-room-venture" disabled/.test(fixturePanelHtml()), "panel button must be enabled");
 });
 
 test("the three Fiction states cover every scene shape, and each overrides all three fiction reads", () => {
@@ -538,11 +540,12 @@ test("cold start empties every room at once, and reset hands the desk back to re
   assert.equal((await fx.post("/api/status")).status, 403);
 });
 
-test("the disabled Venture button forces nothing when clicked", async () => {
+test("the Venture job-by-room button forces a Venture job and jumps to the Venture room", async () => {
   const fx = await bootInterceptor();
   fx.click("job-room-venture");
-  assert.equal(await fx.get("/api/jobs"), "REAL", "a dead button must not fake a read");
-  assert.deepEqual(fx.roomJumps, [], "and must not jump to a room that does not exist");
+  const body = (await (await fx.get("/api/jobs") as unknown as Response).json()) as { jobs: JobView[] };
+  assert.equal(body.jobs[0].kind, "venture-analysis");
+  assert.deepEqual(fx.roomJumps, ["venture"]);
 });
 
 test("the room buttons are built from whatever rooms the header actually has", async () => {
@@ -551,4 +554,145 @@ test("the room buttons are built from whatever rooms the header actually has", a
   assert.match(fx.els.fxRooms.innerHTML, /data-fxroom="fiction"/);
   // The stub nav has no Venture tab today; the panel offers exactly what exists, no more.
   assert.ok(!fx.els.fxRooms.innerHTML.includes("venture"));
+});
+
+// ── Slice 2: approval, scheduling, interruption, history ─────────────────────────────────────────
+
+const SLICE2_IDS = [
+  "approval-waiting",
+  "approval-given-not-live",
+  "scheduling-slot-claimed",
+  "scheduling-no-slot",
+  "interruption-jobs-unreadable",
+  "interruption-studio-unreadable",
+  "history-quiet",
+] as const;
+
+test("every FIXTURE_SCENARIOS id is unique", () => {
+  const ids = FIXTURE_SCENARIOS.map((s) => s.id);
+  assert.equal(ids.length, new Set(ids).size);
+});
+
+test("slice-2 scenario ids are present", () => {
+  for (const id of SLICE2_IDS) {
+    assert.ok(FIXTURE_SCENARIOS.some((s) => s.id === id), `missing scenario ${id}`);
+  }
+});
+
+test("history-quiet has only settled jobs: no queued, no running", () => {
+  const jobs = jobsOf("history-quiet");
+  assert.ok(jobs.length >= 3);
+  assert.ok(jobs.every((j) => j.status !== "queued" && j.status !== "running"));
+  assert.ok(jobs.some((j) => j.status === "done"));
+  assert.ok(jobs.some((j) => j.status === "stopped"));
+  assert.ok(jobs.some((j) => j.status === "blocked" && j.answer));
+  for (const j of jobs) {
+    assert.equal(typeof j.elapsedMs, "number");
+    assert.ok(j.finishedAt != null, `${j.id} needs finishedAt so the clock reads as history`);
+  }
+});
+
+test("approval-given-not-live rows are all approve and none published", () => {
+  const queue = scenario("approval-given-not-live").overrides["/api/queue"] as {
+    pieces: { rows: { status: string }[] }[];
+  };
+  const rows = queue.pieces.flatMap((p) => p.rows);
+  assert.ok(rows.length > 0);
+  assert.ok(rows.every((r) => r.status === "approve"));
+  assert.ok(rows.every((r) => r.status !== "published"));
+});
+
+test("every new slice-2 fixture body string carries the FIXTURE: marker", () => {
+  // Only the payload each scenario uniquely forces — not the shared FX_CONTENT_BASE wizard
+  // scaffolding underneath approval/scheduling.
+  const uniquePayload: Record<(typeof SLICE2_IDS)[number], string> = {
+    "approval-waiting": "/api/queue",
+    "approval-given-not-live": "/api/queue",
+    "scheduling-slot-claimed": "/api/queue",
+    "scheduling-no-slot": "/api/queue",
+    "interruption-jobs-unreadable": "/api/jobs",
+    "interruption-studio-unreadable": "/api/studio",
+    "history-quiet": "/api/jobs",
+  };
+  function walk(v: unknown, path: string): void {
+    if (typeof v === "string") {
+      if (v.length === 0) return;
+      if (/^(approve|revise|discard|published|blocked|locked|text|image|quote-card|x|linkedin|bluesky|url)$/.test(v)) return;
+      if (/^fx-/.test(v) || /^fixture-/.test(v)) return;
+      if (/^\d{4}-\d{2}-\d{2}/.test(v)) return;
+      if (v === "FIXTURE_NOW") return;
+      assert.match(v, /FIXTURE/, `${path} is missing the FIXTURE marker: ${JSON.stringify(v)}`);
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    if (v && typeof v === "object") {
+      for (const [k, child] of Object.entries(v as Record<string, unknown>)) {
+        if (k === "status" || k === "id" || k === "platform" || k === "format" || k === "kind"
+            || k === "time" || k === "pending" || k === "liveStateAsOf" || k === "textPlatforms"
+            || k === "slug" || k === "editable" || k === "revisable" || k === "duplicatable"
+            || k === "sourceLines" || k === "step" || k === "stepTotal" || k === "failedAtStep"
+            || k === "retryable" || k === "elapsedMs" || k === "finishedAt") continue;
+        walk(child, `${path}.${k}`);
+      }
+    }
+  }
+  for (const id of SLICE2_IDS) {
+    const key = uniquePayload[id];
+    const payload = scenario(id).overrides[key];
+    assert.ok(payload != null, `${id} must override ${key}`);
+    walk(payload, `${id}${key}`);
+  }
+});
+
+test("approval-waiting rows all need a decision and pending is non-zero", () => {
+  const queue = scenario("approval-waiting").overrides["/api/queue"] as {
+    pending: number; pieces: { rows: { status: string }[] }[];
+  };
+  assert.ok(queue.pending > 0);
+  assert.ok(queue.pieces[0].rows.every((r) => r.status === ""));
+});
+
+test("scheduling-slot-claimed rows carry a slot; scheduling-no-slot rows do not", () => {
+  const claimed = scenario("scheduling-slot-claimed").overrides["/api/queue"] as {
+    pieces: { rows: { slot?: { time: string; label: string }; status: string }[] }[];
+  };
+  const bare = scenario("scheduling-no-slot").overrides["/api/queue"] as {
+    pieces: { rows: { slot?: unknown; status: string }[] }[];
+  };
+  for (const row of claimed.pieces[0].rows) {
+    assert.ok(row.slot, "claimed scenario needs a slot");
+    assert.match(row.slot.label, /^FIXTURE:/);
+    assert.equal(row.status, "approve");
+    assert.notEqual(row.status, "published");
+  }
+  for (const row of bare.pieces[0].rows) {
+    assert.equal(row.slot, undefined);
+    assert.equal(row.status, "approve");
+  }
+});
+
+test("interruption fixtures force an error body on the failing read", () => {
+  const jobs = scenario("interruption-jobs-unreadable").overrides["/api/jobs"] as { error: string };
+  const studio = scenario("interruption-studio-unreadable").overrides["/api/studio"] as { error: string };
+  assert.match(jobs.error, /^FIXTURE:/);
+  assert.match(studio.error, /^FIXTURE:/);
+});
+
+test("interruption overrides answer as a non-ok text body so the recoverable path fires", async () => {
+  // loadStudio checks !r.ok; loadJobs only catches. A 500 text body trips both.
+  const fx = await bootInterceptor();
+  fx.click("interruption-jobs-unreadable");
+  const jobsRes = await fx.get("/api/jobs") as unknown as Response;
+  assert.equal(jobsRes.ok, false);
+  assert.equal(jobsRes.status, 500);
+  await assert.rejects(() => jobsRes.json());
+
+  fx.click("interruption-studio-unreadable");
+  const studioRes = await fx.get("/api/studio") as unknown as Response;
+  assert.equal(studioRes.ok, false);
+  assert.equal(studioRes.status, 500);
+  assert.match(await studioRes.text(), /^FIXTURE:/);
 });

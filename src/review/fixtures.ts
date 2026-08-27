@@ -21,8 +21,8 @@
 // This module is deliberately I/O-free — it imports no filesystem or subprocess module, nothing at
 // all that could write. fixtures.test.ts asserts that too, by reading this file's own source.
 //
-// Adding a Venture fixture set later is a DATA change: append scenarios to FIXTURE_SCENARIOS and,
-// once a Venture job kind exists, fill in its `kind` in JOB_ROOM_KINDS. No rewrite.
+// Adding fixture scenarios is a DATA change: append to FIXTURE_SCENARIOS. One real kind per room
+// lives in JOB_ROOM_KINDS (including Venture via venture-analysis). No rewrite.
 
 import type { JobView, JobRoom } from "./page.js";
 
@@ -187,9 +187,7 @@ const JOB_ROOM_KINDS: { room: JobRoom; kind: string | null; roomTab?: string; no
   { room: "Signals", kind: "strategy", roomTab: "signals" },
   // stripJobFor returns null for Charles by design — this one shows in Studio's panel and rail only.
   { room: "Charles", kind: "charles-draft", roomTab: "charles" },
-  // jobRoom() maps no kind to Venture yet, so there is nothing honest to force. Fill in `kind`
-  // when the Venture room ships its job kind and this button lights up on its own.
-  { room: "Venture", kind: null, note: "no job kind maps to Venture yet" },
+  { room: "Venture", kind: "venture-analysis", roomTab: "venture" },
 ];
 
 // ── Fiction ──────────────────────────────────────────────────────────────────────────────────────
@@ -564,6 +562,202 @@ const CONTENT_SCENARIOS: FixtureScenario[] = [
   },
 ];
 
+// ── Approval: drafts waiting vs approved-but-not-live ────────────────────────────────────────────
+//
+// Approved and live are different states. These two force the queue into each half so the Content
+// room can be reviewed without inventing a publish.
+
+const APPROVAL_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "approval-waiting",
+    group: "Approval",
+    label: "drafts waiting on your yes",
+    room: "content",
+    overrides: {
+      ...FX_CONTENT_BASE,
+      "/api/queue": {
+        pieces: [{
+          slug: FX_SLUG,
+          title: "FIXTURE: a piece nobody wrote",
+          rows: [
+            fxRow({ id: "fx-x-1", platform: "x", status: "", body: "FIXTURE: a draft waiting on your yes." }),
+            fxRow({ id: "fx-li-1", platform: "linkedin", status: "", body: "FIXTURE: another draft waiting on your yes." }),
+            fxRow({ id: "fx-card-1", platform: "quote-card", kind: "image", format: "quote-card", status: "", body: "" }),
+          ],
+        }],
+        pending: 3,
+        liveStateAsOf: null,
+        textPlatforms: ["x", "linkedin", "bluesky"],
+      },
+    },
+  },
+  {
+    id: "approval-given-not-live",
+    group: "Approval",
+    label: "approved, and not live yet",
+    room: "content",
+    overrides: {
+      ...FX_CONTENT_BASE,
+      "/api/queue": {
+        pieces: [{
+          slug: FX_SLUG,
+          title: "FIXTURE: a piece nobody wrote",
+          rows: [
+            fxRow({
+              id: "fx-x-1", platform: "x", status: "approve",
+              body: "FIXTURE: approved on the desk, not published, not live.",
+              notes: "FIXTURE: approved is not live. Nothing has gone out.",
+            }),
+            fxRow({
+              id: "fx-li-1", platform: "linkedin", status: "approve",
+              body: "FIXTURE: approved on LinkedIn, still not live.",
+              notes: "FIXTURE: approved is not live. Nothing has gone out.",
+            }),
+            fxRow({
+              id: "fx-card-1", platform: "quote-card", kind: "image", format: "quote-card", status: "approve",
+              body: "",
+              notes: "FIXTURE: approved is not live. Nothing has gone out.",
+            }),
+          ],
+        }],
+        pending: 0,
+        liveStateAsOf: null,
+        textPlatforms: ["x", "linkedin", "bluesky"],
+      },
+    },
+  },
+];
+
+// ── Scheduling: a claimed slot vs approved with no slot ──────────────────────────────────────────
+//
+// Uses the same slot shape as treatment channels ({ time, label }). A claimed slot must not read
+// as a post that went out; an approved row with no slot must not invent a time.
+
+const SCHEDULING_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "scheduling-slot-claimed",
+    group: "Scheduling",
+    label: "a slot claimed, nothing posted",
+    room: "content",
+    overrides: {
+      ...FX_CONTENT_BASE,
+      "/api/queue": {
+        pieces: [{
+          slug: FX_SLUG,
+          title: "FIXTURE: a piece nobody wrote",
+          rows: [
+            fxRow({
+              id: "fx-x-1", platform: "x", status: "approve",
+              body: "FIXTURE: a draft with a claimed slot. Nothing posted.",
+              notes: "FIXTURE: slot claimed, nothing posted.",
+              slot: { time: FXS_NOW, label: "FIXTURE: Tue 09:00 PT" },
+            }),
+            fxRow({
+              id: "fx-li-1", platform: "linkedin", status: "approve",
+              body: "FIXTURE: LinkedIn draft with a claimed slot. Nothing posted.",
+              notes: "FIXTURE: slot claimed, nothing posted.",
+              slot: { time: FXS_NOW, label: "FIXTURE: Tue 09:00 PT" },
+            }),
+          ],
+        }],
+        pending: 0,
+        liveStateAsOf: null,
+        textPlatforms: ["x", "linkedin", "bluesky"],
+      },
+    },
+  },
+  {
+    id: "scheduling-no-slot",
+    group: "Scheduling",
+    label: "approved with no slot yet",
+    room: "content",
+    overrides: {
+      ...FX_CONTENT_BASE,
+      "/api/queue": {
+        pieces: [{
+          slug: FX_SLUG,
+          title: "FIXTURE: a piece nobody wrote",
+          rows: [
+            fxRow({
+              id: "fx-x-1", platform: "x", status: "approve",
+              body: "FIXTURE: approved, and no slot has been claimed yet.",
+              notes: "FIXTURE: approved with no slot yet. No time invented.",
+            }),
+            fxRow({
+              id: "fx-li-1", platform: "linkedin", status: "approve",
+              body: "FIXTURE: approved on LinkedIn, and no slot has been claimed yet.",
+              notes: "FIXTURE: approved with no slot yet. No time invented.",
+            }),
+          ],
+        }],
+        pending: 0,
+        liveStateAsOf: null,
+        textPlatforms: ["x", "linkedin", "bluesky"],
+      },
+    },
+  },
+];
+
+// ── Interruption: a failed jobs or studio read ───────────────────────────────────────────────────
+//
+// Same body shape as content-treatment-error ({ error: "FIXTURE: ..." }). loadStudio checks r.ok;
+// loadJobs only catches. The interceptor turns these two overrides into a non-ok text response so
+// both recoverable paths fire (see fixtureScriptHtml).
+
+const INTERRUPTION_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "interruption-jobs-unreadable",
+    group: "Interruption",
+    label: "the queue read fails",
+    room: "studio",
+    overrides: { "/api/jobs": { error: "FIXTURE: the job queue could not be read" } },
+  },
+  {
+    id: "interruption-studio-unreadable",
+    group: "Interruption",
+    label: "the Studio overview read fails",
+    room: "studio",
+    overrides: { "/api/studio": { error: "FIXTURE: the Studio overview could not be read" } },
+  },
+];
+
+// ── History: only settled work ───────────────────────────────────────────────────────────────────
+
+const HISTORY_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "history-quiet",
+    group: "History",
+    label: "only settled work, nothing running",
+    room: "studio",
+    overrides: {
+      "/api/jobs": {
+        jobs: [
+          job({
+            id: "fixture-job-history-done", kind: "url", status: "done",
+            label: "FIXTURE: settled done work, nothing running",
+            steps: FIXTURE_STEPS, stepTotal: 4, step: 4, elapsedMs: FAKE_ELAPSED,
+            finishedAt: NOW as unknown as number,
+          }),
+          job({
+            id: "fixture-job-history-stopped", kind: "url", status: "stopped",
+            label: "FIXTURE: settled stopped work, nothing running",
+            steps: FIXTURE_STEPS, stepTotal: 4, step: 2, elapsedMs: FAKE_ELAPSED,
+            finishedAt: NOW as unknown as number,
+          }),
+          job({
+            id: "fixture-job-history-answered", kind: "url", status: "blocked",
+            label: "FIXTURE: settled answered work, nothing running",
+            steps: FIXTURE_STEPS, stepTotal: 4, step: 2, elapsedMs: FAKE_ELAPSED,
+            ask: { question: "FIXTURE: a question no skill asked. Either answer is fake.", options: ["FIXTURE option A", "FIXTURE option B"] },
+            answer: "FIXTURE option A",
+            finishedAt: NOW as unknown as number,
+          }),
+        ],
+      },
+    },
+  },
+];
+
 const SIGNALS_SCENARIOS: FixtureScenario[] = [
   {
     id: "signals-outcomes",
@@ -935,6 +1129,10 @@ export const FIXTURE_SCENARIOS: FixtureScenario[] = [
   ...VENTURE_SCENARIOS,
   ...VENTURE_WRITE_SCENARIOS,
   ...CONTENT_SCENARIOS,
+  ...APPROVAL_SCENARIOS,
+  ...SCHEDULING_SCENARIOS,
+  ...INTERRUPTION_SCENARIOS,
+  ...HISTORY_SCENARIOS,
   ...SIGNALS_SCENARIOS,
   ...Object.entries(EMPTY_BY_ROOM).map(([tab, overrides]) => ({
     id: `empty-${tab}`, group: "Empty", label: tab, room: tab, overrides,
@@ -1056,7 +1254,20 @@ export function fixtureScriptHtml(): string {
     try { path = new URL(raw, location.href).pathname; } catch(e){}
     if (method !== "GET") return Promise.resolve(reply(403, { ok: false, error: FX.refusal }));
     if (Object.prototype.hasOwnProperty.call(overrides, path)) {
-      return Promise.resolve(reply(200, hydrate(overrides[path])));
+      var body = hydrate(overrides[path]);
+      // /api/jobs and /api/studio never return an error body from serve.ts; a real failure is a
+      // non-ok response. loadStudio checks r.ok; loadJobs only catches on throw. A non-ok plain
+      // text body trips both: !r.ok for Studio, r.json() throw for Jobs. Other error fixtures
+      // (content-treatment-error) stay JSON at 200 so their body.error path keeps working.
+      if (body && typeof body === "object" && typeof body.error === "string"
+          && Object.keys(body).length === 1
+          && (path === "/api/jobs" || path === "/api/studio")) {
+        return Promise.resolve(new Response(String(body.error), {
+          status: 500,
+          headers: { "content-type": "text/plain; charset=utf-8" }
+        }));
+      }
+      return Promise.resolve(reply(200, body));
     }
     return realFetch(input, init);
   };
