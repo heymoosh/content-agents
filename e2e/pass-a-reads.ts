@@ -124,6 +124,142 @@ async function main(): Promise<void> {
       detail: followText.trim().slice(0, 120).replace(/\s+/g, " "),
     });
 
+    // Production label: Format for platforms is what a person sees; "Hand it to the team" and any
+    // visible "atomize" are banned interface copy.
+    await openRoom(s.page, "content");
+    await waitLoaded(s.page, "#workbench").catch(() => "");
+    const contentBody = ((await s.page.locator("body").innerText()) ?? "").replace(/\s+/g, " ").trim();
+    const hasFormat = contentBody.includes("Format for platforms");
+    const hasHandoff = contentBody.includes("Hand it to the team");
+    const hasAtomize = /atomize/i.test(contentBody);
+    const formatBtns = await s.page.locator("#workbench .dev-format-btn").count();
+    if (!hasFormat && formatBtns === 0) {
+      record({
+        feature: "Production label is Format for platforms, not atomize",
+        status: "blocked",
+        detail: `no Format for platforms on screen (workbench format buttons=0); Hand it to the team=${hasHandoff}; atomize=${hasAtomize}`,
+      });
+    } else {
+      record({
+        feature: "Production label is Format for platforms, not atomize",
+        status: hasFormat && !hasHandoff && !hasAtomize ? "pass" : "fail",
+        detail: `Format for platforms=${hasFormat}; Hand it to the team=${hasHandoff}; atomize=${hasAtomize}; format buttons=${formatBtns}`,
+      });
+    }
+
+    // Recommendation seam honesty: the margin names PATTERN READS and never claims the corpus is
+    // approved, live, proven, viral, or a winner.
+    await openRoom(s.page, "content");
+    await waitLoaded(s.page, "#workbench").catch(() => "");
+    const marginText = ((await textOf(s.page, "#workbench .session-margin")) || "").replace(/\s+/g, " ").trim();
+    if (!marginText) {
+      record({
+        feature: "Recommendation margin never claims proven or live status",
+        status: "blocked",
+        detail: "workbench margin empty (no Content sessions to render PATTERN READS against)",
+      });
+    } else {
+      const hasCaption = /PATTERN READS/.test(marginText);
+      const claimHits = ["approved", "live", "proven", "viral", "winner"].filter((w) =>
+        new RegExp(`\\b${w}\\b`, "i").test(marginText)
+      );
+      record({
+        feature: "Recommendation margin never claims proven or live status",
+        status: hasCaption && claimHits.length === 0 ? "pass" : "fail",
+        detail: hasCaption
+          ? `caption present; forbidden whole-words=[${claimHits.join(",") || "none"}]; margin≈"${marginText.slice(0, 140)}"`
+          : `PATTERN READS missing; margin≈"${marginText.slice(0, 140)}"`,
+      });
+    }
+
+    // The seam's production answer is a blocked read: reviewed-interface, no examples.
+    const recsRead = await s.page.evaluate(async () => {
+      const r = await fetch("/api/recommendations");
+      return { status: r.status, body: await r.json() };
+    });
+    const recsBody = recsRead.body as { availability?: string; source?: string; examples?: unknown[] };
+    const recsOk =
+      recsRead.status === 200 &&
+      recsBody.availability === "blocked" &&
+      recsBody.source === "reviewed-interface" &&
+      Array.isArray(recsBody.examples) &&
+      recsBody.examples.length === 0;
+    record({
+      feature: "Recommendation seam serves a blocked read",
+      status: recsOk ? "pass" : "fail",
+      detail: `HTTP ${recsRead.status}; availability=${recsBody.availability}; source=${recsBody.source}; examples=${Array.isArray(recsBody.examples) ? recsBody.examples.length : "missing"}`,
+    });
+
+    // Studio needs-you actions and clickable stat tiles must be real <button>s (keyboard-reachable).
+    await openRoom(s.page, "studio");
+    await waitLoaded(s.page, "#studioMain").catch(() => "");
+    const btnNy = await s.page.locator("#studioMain button.ny-go").count();
+    const btnStat = await s.page.locator("#studioMain button.stat-tile[data-goto]").count();
+    const spanNy = await s.page.locator("#studioMain span.ny-go").count();
+    const divStat = await s.page.locator("#studioMain div.stat-tile[data-goto]").count();
+    if (btnNy === 0) {
+      record({
+        feature: "Studio needs-you and stat tiles are real buttons",
+        status: spanNy > 0 || divStat > 0 ? "fail" : "blocked",
+        detail:
+          spanNy > 0 || divStat > 0
+            ? `needs-you empty, but found non-buttons: span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}; button.stat-tile[data-goto]=${btnStat}`
+            : `Studio needs-you list empty (0 button.ny-go); cannot verify action controls are buttons. button.stat-tile[data-goto]=${btnStat}, span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}`,
+      });
+    } else {
+      record({
+        feature: "Studio needs-you and stat tiles are real buttons",
+        status: spanNy === 0 && divStat === 0 && btnStat > 0 ? "pass" : "fail",
+        detail: `button.ny-go=${btnNy}, button.stat-tile[data-goto]=${btnStat}, span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}`,
+      });
+    }
+
+    // Room nav is keyboard-operable: Enter on a room button changes room and sets aria-current.
+    await openRoom(s.page, "studio");
+    const beforeRoom = await s.page.locator("button.room.on").getAttribute("data-room");
+    const firstRoomBtn = s.page.locator('nav.rooms button.room').first();
+    await firstRoomBtn.focus();
+    await s.page.keyboard.press("Enter");
+    await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 }).catch(() => {});
+    const afterRoom = await s.page.locator("button.room.on").getAttribute("data-room");
+    const currentAttr = await s.page.locator("button.room.on").getAttribute("aria-current");
+    const roomChanged = afterRoom != null && afterRoom !== beforeRoom;
+    record({
+      feature: "Room nav responds to Enter and announces current page",
+      status: roomChanged && currentAttr === "page" ? "pass" : "fail",
+      detail: `before=${beforeRoom}; after=${afterRoom}; aria-current=${currentAttr}`,
+    });
+
+    // Narrow window: Content, Outreach, and Studio must not scroll horizontally at 700×900.
+    const originalViewport = s.page.viewportSize() ?? { width: 1280, height: 720 };
+    await s.page.setViewportSize({ width: 700, height: 900 });
+    const narrowRooms: { room: string; pane: string }[] = [
+      { room: "content", pane: "#reviewMain" },
+      { room: "outreach", pane: "#outreachList" },
+      { room: "studio", pane: "#studioMain" },
+    ];
+    const narrowDetails: string[] = [];
+    let narrowFail = false;
+    let narrowBlocked = false;
+    for (const nr of narrowRooms) {
+      await openRoom(s.page, nr.room);
+      await waitLoaded(s.page, nr.pane).catch(() => "");
+      const widths = await s.page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      const ok = widths.scrollWidth <= widths.clientWidth + 1;
+      narrowDetails.push(`${nr.room}: scrollWidth=${widths.scrollWidth} clientWidth=${widths.clientWidth}`);
+      if (!ok) narrowFail = true;
+      if (widths.clientWidth === 0) narrowBlocked = true;
+    }
+    await s.page.setViewportSize(originalViewport);
+    record({
+      feature: "Narrow viewport has no horizontal scroll (Content, Outreach, Studio)",
+      status: narrowBlocked ? "blocked" : narrowFail ? "fail" : "pass",
+      detail: narrowDetails.join("; "),
+    });
+
     // Fixture mode's central safety promise: it cannot write. Prove it from the browser.
     const writeAttempt = await s.page.evaluate(async () => {
       const r = await fetch("/api/status", {
