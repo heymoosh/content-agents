@@ -242,6 +242,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .capture-title { font:400 40px/1.2 Georgia,"Times New Roman",serif; letter-spacing:-.01em; margin-bottom:16px; }
   .capture textarea { width:100%; min-height:110px; font:17px/1.6 Georgia,"Times New Roman",serif;
     padding:4px 0; border:none; outline:none; background:transparent; resize:vertical; color:var(--ink); }
+  .capture textarea:focus-visible { outline:2px solid var(--blue); outline-offset:3px; border-radius:4px; }
   .capture textarea::placeholder { color:#a89a80; }
   /* The capture box (v7 Studio): its rail, the verdict it states back, and the bare-link ask.
      While the ask is open the textarea dims and goes read-only, and the rail turns amber — that is
@@ -285,10 +286,12 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .wb-sep span.rule { height:1px; flex:1; background:#efe7d6; }
   .wb-sep span.txt { font:italic 400 14px/1 Georgia,serif; color:#a89a80; }
   .wb-cut { margin-top:26px; }
-  .wb-cut-head { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .wb-cut-head { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; flex-wrap:wrap;
+    padding-left:18px; border-left:2px solid transparent; }
   .wb-cut-head .lens { font:600 13px/1 Georgia,serif; color:#5b46b8; }
   .wb-cut-head .sub { font-size:12px; color:#8a7f6d; font-style:italic; }
-  .wb-cut-body { font:400 22px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); white-space:pre-wrap; }
+  .wb-cut-body { font:400 22px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); white-space:pre-wrap;
+    padding-left:18px; border-left:2px solid var(--blue); }
   .wb-cut textarea { width:100%; min-height:140px; font:400 18px/1.55 Georgia,serif; padding:10px 12px;
     border:1px solid var(--muted); border-radius:8px; background:#fff; }
   .wb-handoff { margin-top:40px; padding-top:22px; border-top:1px solid #efe7d6;
@@ -370,6 +373,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .dir-open .line { font:400 17px/1.6 Georgia,"Times New Roman",serif; color:var(--ink); }
   .dir-box textarea { width:100%; box-sizing:border-box; border:none; outline:none; background:transparent;
     padding:0; resize:vertical; font:400 16px/1.55 Georgia,"Times New Roman",serif; color:var(--ink); }
+  .dir-box textarea:focus-visible { outline:2px solid var(--blue); outline-offset:3px; border-radius:4px; }
   .dir-go { display:flex; align-items:center; gap:12px; margin-top:12px; padding-top:12px; border-top:1px solid #efe7d6; }
   .dir-go button { background:var(--ink); color:#fbf9f4; border:none; border-radius:7px; padding:7px 15px;
     font-size:13.5px; font-weight:600; white-space:nowrap; }
@@ -885,6 +889,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .cw-sep { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#cdc0a4; padding:0 8px; }
   .cw-rail { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.05em; white-space:nowrap; }
   .cw-src { display:grid; grid-template-columns:96px minmax(0,1fr) auto; gap:16px; align-items:baseline;
+    font:inherit; text-align:left; width:100%; background:none; color:inherit; border:none; border-radius:0;
     padding:13px 12px; margin:0 -12px; border-top:1px solid #f2ece0; cursor:pointer; }
   .cw-src:hover { background:#faf6ec; }
   .cw-src.on { background:#f4efe3; }
@@ -1291,7 +1296,7 @@ function rowEl(piece, row){
   el.dataset.id = row.id;
 
   const spin = row.spin ? '<span class="spin">spin · '+esc(row.angle||"")+'</span>' : "";
-  const src = row.sourceLines ? '<span class="src">lines '+esc(JSON.stringify(row.sourceLines))+'</span>' : "";
+  const src = row.sourceLines ? '<span class="src">'+esc(lineRefsText(row.sourceLines))+'</span>' : "";
   const thread = row.threadCheck === "missing"
     ? '<span class="thread-missing">thread: missing'+(row.threadSpinApplied?" · spin-drafted":"")+'</span>'
     : row.threadCheck === "pass"
@@ -2714,12 +2719,14 @@ function cwStep1Html(){
     const tag = s.tag || "UNTAGGED";
     const cls = CW_TAGCLASS[s.tag] || "untagged";
     const on = s.slug===CW.slug;
-    return '<div class="cw-src'+(on?" on":"")+'" data-slug="'+esc(s.slug)+'">'+
+    return (on
+      ? '<button type="button" class="cw-src on" data-slug="'+esc(s.slug)+'">'
+      : '<button type="button" class="cw-src" data-slug="'+esc(s.slug)+'">')+
       '<span class="cw-tag '+cls+'">'+esc(tag)+'</span>'+
       '<span style="min-width:0"><span class="ttl">'+esc(s.title)+'</span>'+
       '<span class="meta">'+esc(cwSourceMeta(s))+'</span></span>'+
       '<span class="src" style="justify-self:end;white-space:nowrap">'+(on?"PICKED":"Make versions")+'</span>'+
-      '</div>';
+      '</button>';
   }).join("");
   return '<div style="margin-top:22px">'+
     '<div class="fam-ask">WHAT YOU CAN MAKE VERSIONS OF</div>'+
@@ -4280,7 +4287,7 @@ function renderFiction(){
   const composer = beats ? '' :
     '<div style="font:400 27px/1.35 Georgia,serif;margin:6px 0 18px;max-width:520px">What happens next?</div>'+
     '<div style="background:#fffdf8;border:1px solid #d8cfbb;border-radius:8px;padding:20px 22px;max-width:600px">'+
-      '<textarea id="ficBeats" rows="3" placeholder="Say the beats. Who is in it, what turns, what you want it to feel like." style="width:100%;box-sizing:border-box;border:none;outline:none;background:transparent;padding:0;resize:vertical;font:400 18px/1.6 Georgia,serif;color:var(--ink)"></textarea>'+
+      '<textarea id="ficBeats" rows="3" placeholder="Say the beats. Who is in it, what turns, what you want it to feel like." style="width:100%;box-sizing:border-box;border:none;background:transparent;padding:0;resize:vertical;font:400 18px/1.6 Georgia,serif;color:var(--ink)"></textarea>'+
       '<div style="display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid #efe7d6">'+
         engineSelectHtml()+
         '<button class="primary" id="ficDraftBtn" style="flex:none;white-space:nowrap">Draft it</button>'+
@@ -4323,7 +4330,7 @@ function renderFiction(){
     '<div style="margin-top:26px;max-width:600px">'+
       '<div class="wb-margin-cap">SECOND PASS · SAY WHAT TO CHANGE</div>'+
       '<div style="display:flex;gap:10px;align-items:center;border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:9px 13px;margin-top:8px">'+
-        '<input id="ficPass" value="'+esc(ficPassNote)+'" placeholder="More tension, less explaining" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:400 16px/1.5 Georgia,serif;color:var(--ink)" />'+
+        '<input id="ficPass" value="'+esc(ficPassNote)+'" placeholder="More tension, less explaining" style="flex:1;min-width:0;border:none;background:transparent;font:400 16px/1.5 Georgia,serif;color:var(--ink)" />'+
         engineSelectHtml()+
         '<button class="primary" id="ficPassBtn"'+(passJob?' disabled':'')+' style="white-space:nowrap">Run it again</button>'+
       '</div>'+

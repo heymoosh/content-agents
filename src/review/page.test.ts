@@ -311,7 +311,10 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
 // now: the Content room's three-step wizard reads the first, the Signals room's outcome families
 // read the other two. Add an entry only for a route whose UI genuinely has not landed yet, and
 // delete it the moment it has.
-const PENDING_UI_ROUTES = new Set<string>([]);
+const PENDING_UI_ROUTES = new Set<string>([
+  // Slice 3a landed the read-only seam; the Content-workbench caller is a later page.ts slice.
+  "/api/recommendations",
+]);
 
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
   const script = emittedScripts().join("\n");
@@ -2751,4 +2754,31 @@ test("Slice 1: needs-you links are real buttons, not spans", () => {
   const html = renderPage({ repoRoot, isDevWorktree: false });
   assert.ok(!html.includes('<span class="wb-link ny-go"'));
   assert.ok(html.includes('<button type="button" class="wb-link ny-go"'));
+});
+
+// ── Slice 5: provenance footnotes, authorship marker, focus, keyboard source picker ────────────
+
+test("Slice 5: review-queue row provenance uses lineRefsText, not JSON.stringify", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(!html.includes('lines "+esc(JSON.stringify('), "must not print raw JSON line numbers");
+  assert.ok(html.includes("lineRefsText(row.sourceLines)"), "row provenance must call lineRefsText");
+});
+
+test("Slice 5: .wb-cut-body carries the blue authorship rule", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const start = html.indexOf(".wb-cut-body {");
+  assert.ok(start >= 0, ".wb-cut-body rule must exist");
+  const css = html.slice(start, html.indexOf("}", start) + 1);
+  assert.ok(css.includes("border-left:2px solid var(--blue)"), ".wb-cut-body must carry the blue left rule");
+});
+
+test("Slice 5: .capture textarea:focus-visible has a visible outline", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes(".capture textarea:focus-visible { outline:2px solid var(--blue); outline-offset:3px; border-radius:4px; }"));
+});
+
+test("Slice 5: Content wizard source picker is a keyboard-operable button", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes('<button type="button" class="cw-src"'));
+  assert.ok(!html.includes('<div class="cw-src"'));
 });
