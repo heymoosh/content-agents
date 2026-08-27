@@ -93,6 +93,7 @@ import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute } from "./serve-signals.js";
+import { blockedRecommendationRead } from "./recommendations.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich), jobs.ts (classifySource,
@@ -996,6 +997,12 @@ const server = createServer(async (req, res) => {
     // advisor rounds, each cut as a readable message with provenance, pending review count.
     if (req.method === "GET" && url.pathname === "/api/content") {
       json(res, 200, { sessions: listContentSessions() });
+      return;
+    }
+    // Read-only recommendation seam: production always answers blocked. Touches no file, spawns
+    // no job, and takes no parameters that change the answer.
+    if (req.method === "GET" && url.pathname === "/api/recommendations") {
+      json(res, 200, blockedRecommendationRead());
       return;
     }
     // Read-only: everything the Content room's "decide the treatment" step renders for one piece —
