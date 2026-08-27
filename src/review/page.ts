@@ -2023,7 +2023,7 @@ function directionHtml(l){
     ? '<div class="dir-said"><div class="cap">YOU SAID</div><div class="said">'+esc(said)+'</div></div>'
     : "";
   if(phase === "drafting"){
-    return saidBlock + '<div class="thinking" style="margin-top:14px;">Drafting the pitch… (your subscription, ~30-60s. The Studio room has the progress and the log.)</div>';
+    return saidBlock + '<div class="thinking" style="margin-top:14px;">Drafting the pitch… (your subscription. The Studio room has the progress and the log.)</div>';
   }
   if(phase === "drafted") return saidBlock;
   const typed = outDirection.get(l.dir) || "";
@@ -2508,7 +2508,7 @@ $("#workbench").addEventListener("click", async (e)=>{
     const engine = localEngine ? localEngine.value : "claude";
     t.disabled = true;
     const r = await post("/api/develop/format", {slug, lenses, engine});
-    if(r.ok){ flash("Handed to the team with "+engineLabel(engine)+"; "+r.jobs.length+" job(s) queued"); loadJobs(); }
+    if(r.ok){ flash("Format for platforms queued with "+engineLabel(engine)+": "+r.jobs.length+" job(s)"); loadJobs(); }
     else { t.disabled = false; flash(r.error || "Could not queue formatting"); }
   } else if (t.classList.contains("wb-cut-edit")){
     const cutEl = t.closest(".wb-cut");

@@ -11,6 +11,7 @@ import {
   buildStudioHome,
   type NeedsYouItem,
 } from "./studio.js";
+import { jobs } from "./jobs.js";
 
 // Rooms renderStudio's .ny-go click handler opens: special-cased content/outreach/followups,
 // otherwise setRoom(room) for the nav buttons (fiction, charles, venture, signals, studio).
@@ -267,4 +268,62 @@ test("no needsYou text contains an em dash or emoji", async () => {
 test("Fiction is deliberately absent from needsYou (no durable waiting-on-her state in fiction.ts)", async () => {
   const home = await buildStudioHome();
   assert.equal(home.needsYou.filter((n) => (n.room as string) === "fiction").length, 0);
+});
+
+test("a running job with null elapsedMs does not invent 0m 00s; a measured one still shows the clock", async () => {
+  jobs.length = 0;
+  try {
+    jobs.push({
+      id: "studio-elapsed-null",
+      kind: "text",
+      label: "FIXTURE: unmeasured run",
+      arg: "x",
+      status: "running",
+      slugs: [],
+      error: null,
+      createdAt: Date.now(),
+      startedAt: null,
+      finishedAt: null,
+      lastStdoutLine: null,
+      steps: [],
+      stepTotal: null,
+      step: 0,
+      failedAtStep: null,
+      retryable: false,
+      ask: null,
+      answer: null,
+    });
+    const unmeasured = await buildStudioHome();
+    const unmeasuredLine = unmeasured.team.find((t) => t.state === "working")?.line ?? "";
+    assert.match(unmeasuredLine, /FIXTURE: unmeasured run/);
+    assert.ok(!unmeasuredLine.includes("0m 00s"), "null elapsed must not render as a zero clock");
+    assert.match(unmeasuredLine, /started, time not measured yet/);
+
+    jobs.length = 0;
+    jobs.push({
+      id: "studio-elapsed-real",
+      kind: "text",
+      label: "FIXTURE: measured run",
+      arg: "x",
+      status: "running",
+      slugs: [],
+      error: null,
+      createdAt: Date.now(),
+      startedAt: Date.now() - 185_000,
+      finishedAt: null,
+      lastStdoutLine: null,
+      steps: [],
+      stepTotal: null,
+      step: 0,
+      failedAtStep: null,
+      retryable: false,
+      ask: null,
+      answer: null,
+    });
+    const measured = await buildStudioHome();
+    const measuredLine = measured.team.find((t) => t.state === "working")?.line ?? "";
+    assert.match(measuredLine, /FIXTURE: measured run · 3m 05s/);
+  } finally {
+    jobs.length = 0;
+  }
 });

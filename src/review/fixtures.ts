@@ -726,14 +726,15 @@ const APPROVAL_SCENARIOS: FixtureScenario[] = [
 
 // ── Scheduling: a claimed slot vs approved with no slot ──────────────────────────────────────────
 //
-// Uses the same slot shape as treatment channels ({ time, label }). A claimed slot must not read
-// as a post that went out; an approved row with no slot must not invent a time.
+// rowEl renders scheduledWhen (the client's remembered ask), not slot. Leave reconciled unset on
+// purpose: scheduledWhen alone is "approved and scheduled, not confirmed live." An approved row
+// with no scheduledWhen must not invent a time.
 
 const SCHEDULING_SCENARIOS: FixtureScenario[] = [
   {
     id: "scheduling-slot-claimed",
     group: "Scheduling",
-    label: "a slot claimed, nothing posted",
+    label: "scheduled on the row, not confirmed live",
     room: "content",
     overrides: {
       ...FX_CONTENT_BASE,
@@ -746,13 +747,15 @@ const SCHEDULING_SCENARIOS: FixtureScenario[] = [
               id: "fx-x-1", platform: "x", status: "approve",
               body: "FIXTURE: a draft with a claimed slot. Nothing posted.",
               notes: "FIXTURE: slot claimed, nothing posted.",
-              slot: { time: FXS_NOW, label: "FIXTURE: Tue 09:00 PT" },
+              // Client-remembered ask only. No reconciled: that is the live check, and this
+              // scenario is exactly scheduled-but-not-confirmed-live.
+              scheduledWhen: "FIXTURE: Tue 09:00 PT",
             }),
             fxRow({
               id: "fx-li-1", platform: "linkedin", status: "approve",
               body: "FIXTURE: LinkedIn draft with a claimed slot. Nothing posted.",
               notes: "FIXTURE: slot claimed, nothing posted.",
-              slot: { time: FXS_NOW, label: "FIXTURE: Tue 09:00 PT" },
+              scheduledWhen: "FIXTURE: Tue 09:00 PT",
             }),
           ],
         }],

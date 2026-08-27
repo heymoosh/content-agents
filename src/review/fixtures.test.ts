@@ -655,20 +655,22 @@ test("approval-waiting rows all need a decision and pending is non-zero", () => 
   assert.ok(queue.pieces[0].rows.every((r) => r.status === ""));
 });
 
-test("scheduling-slot-claimed rows carry a slot; scheduling-no-slot rows do not", () => {
+test("scheduling-slot-claimed rows carry scheduledWhen and not reconciled; scheduling-no-slot rows do not", () => {
   const claimed = scenario("scheduling-slot-claimed").overrides["/api/queue"] as {
-    pieces: { rows: { slot?: { time: string; label: string }; status: string }[] }[];
+    pieces: { rows: { scheduledWhen?: string; reconciled?: unknown; slot?: unknown; status: string }[] }[];
   };
   const bare = scenario("scheduling-no-slot").overrides["/api/queue"] as {
-    pieces: { rows: { slot?: unknown; status: string }[] }[];
+    pieces: { rows: { scheduledWhen?: string; reconciled?: unknown; slot?: unknown; status: string }[] }[];
   };
   for (const row of claimed.pieces[0].rows) {
-    assert.ok(row.slot, "claimed scenario needs a slot");
-    assert.match(row.slot.label, /^FIXTURE:/);
+    assert.equal(row.scheduledWhen, "FIXTURE: Tue 09:00 PT");
+    assert.equal(row.reconciled, undefined, "reconciled unset is the point of this scenario");
+    assert.equal(row.slot, undefined, "rowEl renders scheduledWhen, not slot");
     assert.equal(row.status, "approve");
     assert.notEqual(row.status, "published");
   }
   for (const row of bare.pieces[0].rows) {
+    assert.equal(row.scheduledWhen, undefined);
     assert.equal(row.slot, undefined);
     assert.equal(row.status, "approve");
   }

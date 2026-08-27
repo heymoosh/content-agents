@@ -277,7 +277,7 @@ export async function reviseDerivative(slug: string, id: string, instruction: st
 
     const after = splitFrontmatter(readFileSync(p, "utf8")).body;
     if (after === original.body) {
-      throw new Error(`${engineName(job)} ran but didn't change anything — try a more specific instruction`);
+      throw new Error(`${engineName(job)} ran but didn't change anything. Try a more specific instruction`);
     }
     stampFileEngine(p, engine);
     return after;
@@ -289,7 +289,7 @@ export async function reviseDerivative(slug: string, id: string, instruction: st
 // Analytics block), imported back here since this is the one place that spawns the subprocess.
 export async function reviseBrief(instruction: string, engine: Engine = "claude"): Promise<{ path: string; content: string }> {
   const abs = latestBriefPath();
-  if (!abs) throw new Error("no strategy brief exists yet — run /strategy first");
+  if (!abs) throw new Error("no strategy brief exists yet. Run /strategy first");
   if (!instruction.trim()) throw new Error("tell Claude what to change first");
   const relPath = abs.slice(repoRoot.length + 1);
   const before = readFileSync(abs, "utf8");
@@ -302,7 +302,7 @@ export async function reviseBrief(instruction: string, engine: Engine = "claude"
     });
     if (failure) throw new Error(failure);
     const after = readFileSync(abs, "utf8");
-    if (after === before) throw new Error(`${engineName(job)} ran but didn't change anything — try a more specific instruction`);
+    if (after === before) throw new Error(`${engineName(job)} ran but didn't change anything. Try a more specific instruction`);
     return { path: relPath, content: after };
   }, engine);
 }
@@ -743,7 +743,7 @@ export function decodeSpawnFailure(
     // `command` names the actual spawned CLI (runCommandSpawn call sites, e.g. "npm") — the
     // default stays "claude" so every pre-existing call site's message is unchanged.
     const cli = opts.command ?? "claude";
-    return `the \`${cli}\` CLI isn't on this server's PATH — start the GUI from a terminal where \`${cli}\` runs`;
+    return `the \`${cli}\` CLI isn't on this server's PATH. Start the GUI from a terminal where \`${cli}\` runs`;
   }
   if (result.timedOut) {
     const tail = opts.includeTailOnTimeout ? logTailSuffix(jobId) : "";
@@ -1000,7 +1000,7 @@ async function runVideoJob(job: Job): Promise<void> {
     job.slugs = [basename(job.arg)]; // enables the jobs pill's "→ review" jump link
     return;
   }
-  job.error = failure ?? `/video ran but produced no video/storyboard.md — check the view-log link${logTailSuffix(job.id)}`;
+  job.error = failure ?? `/video ran but produced no video/storyboard.md. Check the view-log link${logTailSuffix(job.id)}`;
 }
 
 // Spawn `/develop <arg>` headlessly and verify by artifact: a NEW, parseable round must have
@@ -1033,7 +1033,7 @@ async function runDevelopJob(job: Job): Promise<void> {
     job.slugs = [slug!];
     return;
   }
-  job.error = failure ?? `the advisor ran but wrote no new round to develop/advice.json — check the view-log link${logTailSuffix(job.id)}`;
+  job.error = failure ?? `the advisor ran but wrote no new round to develop/advice.json. Check the view-log link${logTailSuffix(job.id)}`;
 }
 
 // A `--continue` job runs on an ALREADY-scaffolded folder, so drain()'s new-folder diff can never
@@ -1065,7 +1065,7 @@ async function runContinueJob(job: Job): Promise<void> {
   }
   job.error =
     failure ??
-    `formatting ran but added no new rows or derivatives in ${parsed?.folder ?? job.arg} — check the view-log link${logTailSuffix(job.id)}`;
+    `formatting ran but added no new rows or derivatives in ${parsed?.folder ?? job.arg}. Check the view-log link${logTailSuffix(job.id)}`;
 }
 
 
@@ -1255,7 +1255,10 @@ async function drain(): Promise<void> {
       }
     }
   } else {
-    job.error = failure ?? `atomize finished but created no new content folder — check the view-log link${logTailSuffix(job.id)}`;
+    // The rendered name for this step is "Format for platforms" (the vision bans the word
+    // "atomize" from anything a person reads). This fallback lands on job.error, which the job
+    // row renders, so it carries the product name, not the skill's name.
+    job.error = failure ?? `Format for platforms finished but created no new content folder. Check the view-log link${logTailSuffix(job.id)}`;
   }
   settleJob(job);
 }
@@ -1489,7 +1492,7 @@ export async function duplicateToPlatform(
     });
     if (failure) throw new Error(failure);
     if (!existsSync(targetPath)) {
-      throw new Error(`${engineName(job)} ran but didn't write ${targetId}.md — check the view-log link${logTailSuffix(job.id)}`);
+      throw new Error(`${engineName(job)} ran but didn't write ${targetId}.md. Check the view-log link${logTailSuffix(job.id)}`);
     }
 
     const newBody = splitFrontmatter(readFileSync(targetPath, "utf8")).body;

@@ -2737,6 +2737,37 @@ test("Slice 1: no rendered copy carries an em dash", () => {
   assert.ok(!html.includes("✨ your director is working"));
 });
 
+test("correction pass 1: rendered page has no invented 30-60s ETA and no Handed to the team", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(!html.includes("30-60s"), "invented duration must not reach the page");
+  assert.ok(!html.includes("Handed to the team"), "superseded Format for platforms flash wording");
+});
+
+test("correction pass 1: jobs.ts failure strings that reach job.error never say atomize", () => {
+  // Comments are excluded on purpose: they may name the /atomize skill for maintainers, and a
+  // comment is not interface copy. Only string literals on job.error assignments and on
+  // timeoutVerb/exitVerb (which decodeSpawnFailure composes into job.error) are checked.
+  const src = readFileSync(join(HERE, "jobs.ts"), "utf8");
+  const lines = src.split("\n");
+  const literals: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) continue;
+    if (!(/job\.error\s*=/.test(line) || /timeoutVerb\s*:/.test(line) || /exitVerb\s*:/.test(line))) continue;
+    let block = line;
+    for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+      block += "\n" + lines[j];
+      if (/;/.test(lines[j]) || /\},?\s*$/.test(lines[j].trim())) break;
+    }
+    for (const m of block.matchAll(/[`"']([^`"']*)[`"']/g)) literals.push(m[1]);
+  }
+  assert.ok(literals.length > 0, "expected to find string literals on job.error / timeoutVerb / exitVerb sites");
+  for (const lit of literals) {
+    assert.ok(!/\batomize\b/i.test(lit), 'atomize in rendered failure string: "' + lit + '"');
+  }
+});
+
 test("Slice 1: rooms nav announces the current room", () => {
   const html = renderPage({ repoRoot, isDevWorktree: false });
   assert.ok(html.includes('aria-label="Rooms"'));

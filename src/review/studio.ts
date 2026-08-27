@@ -209,9 +209,14 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
   const running = jobs.find((j) => j.status === "running");
   if (running) {
     const pub = publicJob(running);
-    const mins = pub.elapsedMs != null ? Math.floor(pub.elapsedMs / 60000) : 0;
-    const secs = pub.elapsedMs != null ? Math.floor((pub.elapsedMs % 60000) / 1000) : 0;
-    team.push({ name: teamNameFor(pub.kind), state: "working", line: `${pub.label} · ${mins}m ${String(secs).padStart(2, "0")}s` });
+    // Null elapsedMs means no measurement yet. Printing 0m 00s would invent a clock reading.
+    // formatElapsed / jobElapsedText in studio-job-ui.ts exist, but formatElapsed drops the
+    // always-Xm-YYs pad this rail uses, and jobElapsedText's null text is "not started", which
+    // is wrong for a job that is already running.
+    const line = pub.elapsedMs != null
+      ? `${pub.label} · ${Math.floor(pub.elapsedMs / 60000)}m ${String(Math.floor((pub.elapsedMs % 60000) / 1000)).padStart(2, "0")}s`
+      : `${pub.label} · started, time not measured yet`;
+    team.push({ name: teamNameFor(pub.kind), state: "working", line });
   }
   const queued = jobs.filter((j) => j.status === "queued").length;
   if (queued) team.push({ name: "Queue", state: "recent", line: `${queued} job${queued === 1 ? "" : "s"} waiting their turn` });
