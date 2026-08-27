@@ -10,9 +10,13 @@ import { listPieces } from "./rows.js";
 import { listLeads } from "../outreach/status.js";
 import { buildFollowups, summarizeFollowups } from "../outreach/tracker.js";
 import { jobs, publicJob } from "./jobs.js";
+import { listCharlesPosts } from "./charles.js";
+import { listVentures } from "../venture/paths.js";
+import { readDecisions } from "../venture/decisions.js";
+import { readArtifacts } from "../venture/artifacts.js";
 
 export interface NeedsYouItem {
-  room: "content" | "outreach" | "followups" | "signals";
+  room: "content" | "outreach" | "followups" | "signals" | "charles" | "venture";
   label: string; // 82px-mono room label in the design ("Outreach", "Content", ...)
   text: string; // the sentence, written to Muxin
   detail: string; // gray tail
@@ -84,6 +88,80 @@ function teamNameFor(kind: string): string {
   return "Formatter"; // url/file/text/notes/continue/revise/duplicate — the production crew
 }
 
+/** Charles drafts whose queue status is exactly `pending` (missing/empty status is not pending). */
+export function charlesNeedsYou(root?: string): NeedsYouItem[] {
+  try {
+    const pending = listCharlesPosts(root).filter((p) => p.status === "pending");
+    if (!pending.length) return [];
+    const n = pending.length;
+    return [{
+      room: "charles",
+      label: "Charles",
+      urgent: false,
+      text: n === 1
+        ? "A Charles draft is waiting on your yes."
+        : `${n} Charles drafts are waiting on your yes.`,
+      detail: n === 1
+        ? `${pending[0].type} · ${pending[0].id}`
+        : "Pending in his review queue.",
+      action: "Review",
+    }];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Venture decisions awaiting a selection, and artifacts still in editorial draft.
+ * Read-only: never writes a gate, checkpoint, or decision. Failure-tolerant per venture.
+ */
+export function ventureNeedsYou(): NeedsYouItem[] {
+  try {
+    let decisions = 0;
+    let drafts = 0;
+    for (const slug of listVentures()) {
+      try {
+        decisions += readDecisions(slug).filter((d) => d.status === "awaiting_user").length;
+      } catch {
+        /* skip unreadable decisions for this slug */
+      }
+      try {
+        drafts += readArtifacts(slug).filter((a) => a.editorial_status === "draft").length;
+      } catch {
+        /* skip unreadable artifacts for this slug */
+      }
+    }
+    if (!decisions && !drafts) return [];
+
+    let text: string;
+    let detail: string;
+    if (decisions && drafts) {
+      text = "Venture work is waiting on your decision.";
+      detail = `${decisions} decision${decisions === 1 ? "" : "s"} · ${drafts} draft${drafts === 1 ? "" : "s"}.`;
+    } else if (decisions) {
+      text = decisions === 1
+        ? "A Venture decision is waiting on your pick."
+        : `${decisions} Venture decisions are waiting on your pick.`;
+      detail = "Awaiting your selection.";
+    } else {
+      text = drafts === 1
+        ? "A Venture draft is waiting on your yes."
+        : `${drafts} Venture drafts are waiting on your yes.`;
+      detail = "Editorial approval still open.";
+    }
+    return [{
+      room: "venture",
+      label: "Venture",
+      urgent: false,
+      text,
+      detail,
+      action: "Open",
+    }];
+  } catch {
+    return [];
+  }
+}
+
 export async function buildStudioHome(nowIso: string = new Date().toISOString()): Promise<StudioHome> {
   const pieces = await listPieces();
   const pending = pieces.reduce((n, p) => n + p.pending, 0);
@@ -122,6 +200,8 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
       action: "Read", dir: lead.dir,
     });
   }
+  needsYou.push(...charlesNeedsYou());
+  needsYou.push(...ventureNeedsYou());
   // Urgent first, then content, then dossiers — the design's "ranked by my day".
   needsYou.sort((a, b) => Number(b.urgent) - Number(a.urgent));
 
