@@ -32,6 +32,10 @@ import {
   type JobView,
   type JobRoom,
 } from "./page.js";
+import {
+  describeRecommendation,
+  type RecommendationRead,
+} from "./recommendations.js";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 
@@ -180,10 +184,14 @@ function valueImports(src: string): string[] {
 
 test("the fixtures module is I/O-free by construction — it cannot write anything", () => {
   const src = readFileSync(join(HERE, "fixtures.ts"), "utf8");
-  // Two value imports, and the second is why this test grew a second half: fixtures.ts builds its
-  // Venture scenarios by running the REAL buildVentureThread over fixture data, so a scenario can
-  // never drift from what the room renders. That is only safe while the builder is itself I/O-free.
-  assert.deepEqual(valueImports(src), ["./venture-thread.js"], "fixtures.ts value-imports only the thread builder");
+  // Two value imports, both safe only while their modules are themselves I/O-free:
+  //   - venture-thread.js builds Venture scenarios from the real thread builder
+  //   - recommendations.js supplies describeRecommendation so recommendation copy cannot drift
+  assert.deepEqual(
+    valueImports(src),
+    ["./recommendations.js", "./venture-thread.js"],
+    "fixtures.ts value-imports only the recommendation seam and the thread builder",
+  );
   for (const banned of ["node:fs", "node:child_process", "node:http", "writeFileSync", "appendFileSync", "mkdirSync", "execSync", "spawn("]) {
     assert.ok(!src.includes(banned), `fixtures.ts must not reference ${banned}`);
   }
@@ -194,6 +202,14 @@ test("venture-thread.ts is I/O-free too, which is what makes importing it into f
   assert.deepEqual(valueImports(src), [], "venture-thread.ts must import types only — a value import could drag node:fs in");
   for (const banned of ["node:fs", "node:child_process", "node:http", "writeFileSync", "appendFileSync", "mkdirSync"]) {
     assert.ok(!src.includes(banned), `venture-thread.ts must not reference ${banned}`);
+  }
+});
+
+test("recommendations.ts is I/O-free too, which is what makes importing it into fixtures safe", () => {
+  const src = readFileSync(join(HERE, "recommendations.ts"), "utf8");
+  assert.deepEqual(valueImports(src), [], "recommendations.ts must import nothing — a value import could drag I/O in");
+  for (const banned of ["node:fs", "node:child_process", "node:http", "writeFileSync", "appendFileSync", "mkdirSync"]) {
+    assert.ok(!src.includes(banned), `recommendations.ts must not reference ${banned}`);
   }
 });
 
@@ -799,5 +815,79 @@ test("slice-6 fixture strings carry no @ handle and only https://fixture.invalid
   }
   for (const id of SLICE6_IDS) {
     walk(scenario(id).overrides, id);
+  }
+});
+
+// ── Slice 3b: Recommendations margin seam ───────────────────────────────────────────────────────
+
+const SLICE3B_REC_IDS = [
+  "recs-blocked",
+  "recs-insufficient",
+  "recs-awaiting-review",
+  "recs-unavailable",
+  "recs-empty",
+  "recs-fixture-examples",
+] as const;
+
+const SLICE3B_REC_STATES = {
+  "recs-blocked": "blocked",
+  "recs-insufficient": "insufficient-evidence",
+  "recs-awaiting-review": "awaiting-review",
+  "recs-unavailable": "unavailable",
+  "recs-empty": "empty",
+} as const;
+
+test("slice-3b recommendation scenario ids are present and every FIXTURE_SCENARIOS id stays unique", () => {
+  const ids = FIXTURE_SCENARIOS.map((s) => s.id);
+  assert.equal(ids.length, new Set(ids).size);
+  for (const id of SLICE3B_REC_IDS) {
+    assert.ok(FIXTURE_SCENARIOS.some((s) => s.id === id), `missing scenario ${id}`);
+  }
+});
+
+test("slice-3b only recs-fixture-examples carries a non-empty examples array", () => {
+  for (const id of SLICE3B_REC_IDS) {
+    const body = scenario(id).overrides["/api/recommendations"] as RecommendationRead;
+    assert.ok(body, `${id} must override /api/recommendations`);
+    if (id === "recs-fixture-examples") {
+      assert.ok(Array.isArray(body.examples) && body.examples.length > 0, `${id} needs examples`);
+      assert.equal(body.source, "fixture-example");
+    } else {
+      assert.deepEqual(body.examples, [], `${id} must carry examples: []`);
+      assert.equal(body.source, "reviewed-interface");
+    }
+  }
+});
+
+test("slice-3b recommendation scenario strings carry no @ and no http", () => {
+  function walk(v: unknown, path: string): void {
+    if (typeof v === "string") {
+      assert.ok(!v.includes("@"), `${path} must not contain @: ${JSON.stringify(v)}`);
+      assert.ok(!v.includes("http"), `${path} must not contain http: ${JSON.stringify(v)}`);
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    if (v && typeof v === "object") {
+      for (const [k, child] of Object.entries(v as Record<string, unknown>)) {
+        walk(child, `${path}.${k}`);
+      }
+    }
+  }
+  for (const id of SLICE3B_REC_IDS) {
+    // Only the recommendation payload: FX_CONTENT_BASE underneath still carries shared URLs.
+    walk(scenario(id).overrides["/api/recommendations"], id);
+  }
+});
+
+test("slice-3b non-example recommendation headlines and details match describeRecommendation", () => {
+  for (const [id, state] of Object.entries(SLICE3B_REC_STATES)) {
+    const body = scenario(id).overrides["/api/recommendations"] as RecommendationRead;
+    const copy = describeRecommendation(state);
+    assert.equal(body.availability, state);
+    assert.equal(body.headline, copy.headline, `${id} headline drifted`);
+    assert.equal(body.detail, copy.detail, `${id} detail drifted`);
   }
 });

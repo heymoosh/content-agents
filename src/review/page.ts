@@ -309,6 +309,13 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .wb-check .d { font-size:12.5px; line-height:1.5; color:#5a5346; }
   .wb-margin-cap { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; letter-spacing:.06em; }
   .wb-margin-sub { font:italic 400 13px/1.5 Georgia,serif; color:#8a7f6d; }
+  .wb-rec-ex { margin-top:10px; padding-top:10px; border-top:1px solid var(--line);
+    display:flex; flex-direction:column; gap:4px; }
+  .wb-rec-plat { font-size:12.5px; font-weight:600; color:var(--ink); }
+  .wb-rec-mech { font-size:12.5px; color:var(--ink); }
+  .wb-rec-why { font-size:12.5px; line-height:1.5; color:#5a5346; }
+  .wb-rec-ev { font-size:12px; line-height:1.45; color:var(--muted); margin-top:4px; }
+  .wb-rec-conf { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--muted); }
   .wb-reply { margin-top:auto; padding-top:16px; border-top:1px solid #efe7d6; display:flex; flex-direction:column; gap:8px; }
   .wb-reply input { font:italic 13px/1.4 Georgia,serif; border:1px solid #e6dcc4; background:#fbf9f4;
     border-radius:8px; padding:8px 12px; color:var(--ink); width:100%; }
@@ -2341,6 +2348,7 @@ async function loadOutreach(){
 // the reply box runs another advisor round as a queued job; "Format for platforms" runs the
 // formatting pipeline. Nothing publishes — every draft lands below in "Drafts for your yes".
 let WB_SESSIONS = [];
+let RECS = null;
 const devReplyPending = new Set(); // slugs with a just-clicked reply, before the job shows in JOBS
 const wbExpanded = new Set();      // slugs whose full source text is expanded
 
@@ -2362,6 +2370,52 @@ function lineRefsText(refs){
 }
 function wbCheckHtml(cls, verdict, label, textHtml){
   return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(verdict)+'</span> · '+esc(label)+'</span><span class="d">'+textHtml+'</span></div>';
+}
+// Hand-mirror of describeRecommendation("unavailable") in recommendations.ts — keep in sync by hand.
+const RECS_UNAVAILABLE = {
+  availability:"unavailable",
+  source:"reviewed-interface",
+  headline:"The recommendation source could not be read.",
+  detail:"This is a failed read, not an empty answer. Repair the source, then you review whatever comes back before it is usable.",
+  examples:[]
+};
+async function loadRecommendations(){
+  try {
+    const r = await fetch("/api/recommendations");
+    if(!r.ok){ RECS = RECS_UNAVAILABLE; return; }
+    const d = await r.json();
+    RECS = d;
+  } catch(e) {
+    RECS = RECS_UNAVAILABLE;
+  }
+}
+function recsBlockHtml(){
+  if(!RECS) return "";
+  let examplesHtml = "";
+  // Hand-mirror of recommendationExamplesShown() in recommendations.ts: only fixture-example
+  // responses may expose recommendation bodies. Explicit positive check, never a negative on
+  // reviewed-interface.
+  if(RECS.source === "fixture-example" && RECS.examples && RECS.examples.length){
+    // Hand-mirror of RECOMMENDATION_EXAMPLE_NOTICE in recommendations.ts — keep in sync by hand.
+    const notice = "This example only illustrates the shape the seam will carry; it is not something you have reviewed or signed off on.";
+    for(const ex of RECS.examples){
+      let evidenceHtml = "";
+      for(const ev of (ex.evidence || [])){
+        evidenceHtml += '<div class="wb-rec-ev">'+esc(ev.label)+' · '+esc(ev.reference)+
+          '<div class="src">'+esc(ev.caveat)+'</div></div>';
+      }
+      examplesHtml += '<div class="wb-rec-ex"><div class="src">'+esc(notice)+'</div>'+
+        '<div class="wb-rec-plat">'+esc(ex.platform)+'</div>'+
+        '<div class="wb-rec-mech">'+esc(ex.mechanism)+'</div>'+
+        '<div class="wb-rec-why">'+esc(ex.whyItCouldFit)+'</div>'+
+        evidenceHtml+
+        '<div class="wb-rec-conf">'+esc(ex.confidence)+'</div></div>';
+    }
+  }
+  return '<div><div class="wb-margin-cap">PATTERN READS</div>'+
+    '<div class="wb-margin-sub">'+esc(RECS.headline)+'</div>'+
+    '<div class="src">'+esc(RECS.detail)+'</div>'+
+    examplesHtml+'</div>';
 }
 function wbMarginHtml(s){
   const kindLabel = {cta:"CTA check", spin:"Platform spin", routing:"Routing", note:"Note"};
@@ -2387,7 +2441,7 @@ function wbMarginHtml(s){
   return '<div class="session-margin">'+
     '<div><div class="wb-margin-cap">WHAT YOUR DIRECTOR CHECKED</div>'+
     (s.rounds.length ? '<div class="wb-margin-sub">Ran the lenses against your words. Kept only what earned its place.</div>' : "")+
-    '</div>'+body+reply+'</div>';
+    '</div>'+body+recsBlockHtml()+reply+'</div>';
 }
 function wbAngleHtml(slug, card){
   const refs = lineRefsText(card.sourceLines);
@@ -2444,6 +2498,7 @@ async function loadContent(){
     if(!r.ok) throw new Error("content "+r.status);
     const d = await r.json();
     WB_SESSIONS = d.sessions || [];
+    await loadRecommendations();
     renderWorkbench();
     renderContentWizard();
     hideRoomLoading("workbench");

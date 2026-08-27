@@ -193,6 +193,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderPage } from "./page.js";
+import { FORBIDDEN_RECOMMENDATION_CLAIMS, claimsLiveness } from "./recommendations.js";
 import * as pageModule from "./page.js";
 import { repoRoot } from "../db/db.js";
 import { VENTURE_READ_PATHS } from "./venture-reads.js";
@@ -309,11 +310,9 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
 // Empty, and meant to stay that way. The three routes that used to sit here
 // (/api/content/treatment, /api/signals/outcomes, /api/research/report) are all called by the page
 // now: the Content room's three-step wizard reads the first, the Signals room's outcome families
-// read the other two. Add an entry only for a route whose UI genuinely has not landed yet, and
-// delete it the moment it has.
+// read the other two. /api/recommendations gained its Content-workbench caller in Slice 3b.
+// Add an entry only for a route whose UI genuinely has not landed yet, and delete it the moment it has.
 const PENDING_UI_ROUTES = new Set<string>([
-  // Slice 3a landed the read-only seam; the Content-workbench caller is a later page.ts slice.
-  "/api/recommendations",
 ]);
 
 test("wiring guard: every client /api path has a serve.ts route, and every route has a caller", () => {
@@ -2812,4 +2811,37 @@ test("Slice 5: Content wizard source picker is a keyboard-operable button", () =
   const html = renderPage({ repoRoot, isDevWorktree: false });
   assert.ok(html.includes('<button type="button" class="cw-src"'));
   assert.ok(!html.includes('<div class="cw-src"'));
+});
+
+// ── Slice 3b: recommendation seam in the Content workbench margin ───────────────────────────────
+
+test("Slice 3b: PATTERN READS caption reaches the page", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes("PATTERN READS"), "the margin caption must ship in the rendered page");
+});
+
+test("Slice 3b: recommendation path checks fixture-example explicitly", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(
+    script.includes('RECS.source === "fixture-example"'),
+    "recsBlockHtml must positive-check fixture-example (hand-mirror of recommendationExamplesShown)",
+  );
+});
+
+test("Slice 3b: recommendation block copy claims no liveness", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("async function loadRecommendations");
+  const end = script.indexOf("function wbMarginHtml");
+  assert.ok(start > -1, "loadRecommendations must ship in the browser script");
+  assert.ok(end > start, "recsBlockHtml must sit before wbMarginHtml");
+  const block = script.slice(start, end);
+  assert.equal(claimsLiveness(block), false, "recommendation block copy must not claim liveness");
+  for (const claim of FORBIDDEN_RECOMMENDATION_CLAIMS) {
+    const escaped = claim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.equal(
+      new RegExp(`\\b${escaped}\\b`, "i").test(block),
+      false,
+      `recommendation block must not contain forbidden claim "${claim}"`,
+    );
+  }
 });
