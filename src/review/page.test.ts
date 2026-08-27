@@ -64,8 +64,8 @@ test("replyContextHtml: renders nothing when reply_to_text is present but origin
 
 test("imageMissingHtml: an image row with no assetUrl renders the missing-image placeholder", () => {
   const html = imageMissingHtml({ kind: "image" });
-  assert.ok(html.includes("image not rendered yet"));
-  assert.ok(html.includes("src"), "should reuse the existing .src placeholder styling");
+  assert.equal(html, '<div class="src missing-img">No image rendered yet.</div>');
+  assert.ok(!html.includes("—"), "missing-image copy must not use an em dash");
 });
 
 test("imageMissingHtml: an image row WITH an assetUrl renders nothing (the real <img> tag covers it)", () => {
@@ -2642,7 +2642,7 @@ test("intakeSaveLine: 'saved' is only ever said about a write the server confirm
   for (const v of vectors) assert.equal(m(v), intakeSaveLine(v), `mirror disagrees on ${JSON.stringify(v)}`);
   assert.equal(intakeSaveLine({ state: "" }), "", "an untouched box claims nothing");
   assert.equal(intakeSaveLine({ state: "saved" }), "saved", "no savedAt means no clock time is invented");
-  assert.match(intakeSaveLine({ state: "failed", error: "disk full" }), /^NOT SAVED — disk full/);
+  assert.match(intakeSaveLine({ state: "failed", error: "disk full" }), /^NOT SAVED\. disk full/);
   // Rule 2's banned pattern: a bare timer that says "saved" without a response.
   const script = emittedScripts().join("\n");
   const start = script.indexOf("async function ivSaveNow(");
@@ -2684,4 +2684,71 @@ test("the interview types her answers in her own register, and never in the AI o
   const start = script.indexOf("const IV_QUESTIONS");
   const body = script.slice(start, script.indexOf("async function loadFiction(", start));
   assert.doesNotMatch(body, /5b46b8|vdrafted|vpen/, "nothing in the interview may render in the AI-written register");
+});
+
+// ── Slice 1: production label, keyboard access, responsive layout, copy cleanup ───────────────
+
+test("Slice 1: production step reads Format for platforms, never Hand it to the team", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes("Format for platforms"));
+  assert.ok(!html.includes("Hand it to the team"));
+});
+
+test("Slice 1: rendered page has no atomize outside /api/atomize routes", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const stripped = html.replaceAll("/api/atomize", "");
+  assert.ok(!/atomize/i.test(stripped), "atomize must not appear in rendered UI copy");
+});
+
+test("Slice 1: no rendered copy carries an em dash", () => {
+  // The whole emitted page, minus its own comments. Comments keep their em dashes: a comment is
+  // not interface copy. Everything a person actually reads must have none.
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  const withoutComments = html
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .split("\n")
+    .map((line) => line.replace(/(^|[^:])\/\/.*$/, "$1"))
+    .join("\n");
+  // Guard against a vacuous pass: the stripper must not have eaten the page.
+  assert.ok(withoutComments.includes("Format for platforms"), "comment stripper ate the markup");
+  assert.ok(withoutComments.length > html.length / 2, "comment stripper removed too much");
+  assert.ok(!withoutComments.includes("\u2014"), "em dash found in rendered copy");
+  const fixed = [
+    "No asset generated yet.",
+    "No image rendered yet.",
+    "Format for platforms",
+    "Use Format for platforms in the workbench below and they land here.",
+    "Your director is working on a round. Studio has the log.",
+    "Nothing needs you right now.",
+    "not recorded",
+  ];
+  for (const s of fixed) {
+    assert.ok(html.includes(s), "missing fixed copy: " + s);
+    assert.ok(!s.includes("—"), "em dash in fixed copy: " + s);
+  }
+  assert.equal(imageMissingHtml({ kind: "image" }), '<div class="src missing-img">No image rendered yet.</div>');
+  assert.ok(!html.includes("— image not rendered yet —"));
+  assert.ok(!html.includes("— no asset generated yet —"));
+  assert.ok(!html.includes("Nothing needs you right now. 🎉"));
+  assert.ok(!html.includes("✨ your director is working"));
+});
+
+test("Slice 1: rooms nav announces the current room", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes('aria-label="Rooms"'));
+  assert.ok(html.includes('setAttribute("aria-current","page")'));
+  assert.ok(html.includes('removeAttribute("aria-current")'));
+});
+
+test("Slice 1: narrow viewport collapses session-grid to one column", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(html.includes("@media (max-width:900px)"));
+  assert.ok(html.includes(".session-grid { grid-template-columns:minmax(0,1fr); }"));
+});
+
+test("Slice 1: needs-you links are real buttons, not spans", () => {
+  const html = renderPage({ repoRoot, isDevWorktree: false });
+  assert.ok(!html.includes('<span class="wb-link ny-go"'));
+  assert.ok(html.includes('<button type="button" class="wb-link ny-go"'));
 });

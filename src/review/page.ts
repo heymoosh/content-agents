@@ -105,7 +105,7 @@ export function replyContextHtml(row: { origin?: string; replyToText?: string; r
 // same cross-runtime duplication, kept in sync by hand, exists purely so this is Node-testable.
 export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): string {
   if (row.kind !== "image" || row.assetUrl) return "";
-  return '<div class="src missing-img">— image not rendered yet —</div>';
+  return '<div class="src missing-img">No image rendered yet.</div>';
 }
 
 // Pure, DOM-free mirror of the inline logic the client <script> below uses to clear its
@@ -203,6 +203,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     --red:#9a2f2f; --red-bg:#f6e6e3; --blue:#2f5d9a; --blue-bg:#e6ecf5; --accent:#1c1a17;
   }
   * { box-sizing:border-box; }
+  :focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
   /* The studio desk (Content Studio Riff design): the page is a walnut desk, each work surface a
      sheet of paper laid on it. Warm-paper tokens keep styling everything ON the sheets. */
   body { margin:0; color:var(--ink);
@@ -279,7 +280,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     padding-left:18px; border-left:2px solid var(--blue); white-space:pre-wrap; }
   .wb-source.clamped { max-height:180px; overflow:hidden;
     -webkit-mask-image:linear-gradient(180deg,#000 60%,transparent); mask-image:linear-gradient(180deg,#000 60%,transparent); }
-  .wb-expand { font-size:12.5px; color:#7a7266; border-bottom:1px solid #d8cfbb; cursor:pointer; width:fit-content; margin-top:6px; }
+  .wb-expand { font-size:12.5px; color:#7a7266; border:none; border-bottom:1px solid #d8cfbb; background:none; padding:0; font:inherit; cursor:pointer; width:fit-content; margin-top:6px; }
   .wb-sep { margin:36px 0 0; display:flex; align-items:center; gap:12px; }
   .wb-sep span.rule { height:1px; flex:1; background:#efe7d6; }
   .wb-sep span.txt { font:italic 400 14px/1 Georgia,serif; color:#a89a80; }
@@ -313,6 +314,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .stat-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:20px; }
   .stat-tile { border:1px solid #efe7d6; border-radius:10px; padding:14px 16px; background:#faf7f0;
     display:flex; flex-direction:column; gap:3px; }
+  button.stat-tile { font:inherit; text-align:left; cursor:pointer; }
   .stat-tile .n { font:400 30px/1 Georgia,serif; }
   .stat-tile .l { font-size:12px; color:#5a5346; line-height:1.3; }
   .ny-row { display:grid; grid-template-columns:82px 1fr auto; gap:16px; align-items:baseline;
@@ -647,6 +649,17 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
     .vrail { border-left:none; border-top:1px solid var(--line); border-radius:0 0 5px 5px; }
     .vrail-in { position:static; max-height:none; overflow-y:visible; }
   }
+  @media (max-width:900px) {
+    .sheet { margin:16px 10px; padding:28px 20px 26px; }
+    .session-grid { grid-template-columns:minmax(0,1fr); }
+    .session-main { padding:28px 20px 24px; }
+    .session-margin { border-left:none; border-top:1px solid #efe7d6; padding:24px 20px 28px; }
+    .dossier-grid { grid-template-columns:minmax(0,1fr); gap:0; }
+    .stat-tiles { grid-template-columns:repeat(2,1fr); }
+    .mm-row { grid-template-columns:minmax(0,1fr); gap:2px; }
+    .ny-row { grid-template-columns:minmax(0,1fr); gap:4px; }
+    header { padding:11px 16px; }
+  }
   .vmono { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
     letter-spacing:.06em; color:#a89a80; }
   .vsaid { font-size:15.5px; line-height:1.62; color:var(--ink); max-width:600px; white-space:pre-wrap; }
@@ -910,10 +923,10 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
 </head>
 <body>
 ${opts.fixtures ? fixtureBannerHtml() : ""}
-${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (${opts.repoRoot}) — data/content here is isolated and gitignored, not synced with your main repo. Numbers may look empty/stale even when your real pipeline is fine.</div>` : ""}
+${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (${opts.repoRoot}): data/content here is isolated and gitignored, not synced with your main repo. Numbers may look empty/stale even when your real pipeline is fine.</div>` : ""}
 <header>
   <h1>Content studio</h1>
-  <nav class="rooms">
+  <nav class="rooms" aria-label="Rooms">
     <button class="room${BOOT_ROOM === "content" ? " on" : ""}" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
     <button class="room${BOOT_ROOM === "studio" ? " on" : ""}" data-room="studio">Studio</button>
     <button class="room" data-room="outreach">Outreach</button>
@@ -1026,14 +1039,14 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <option value="reply">Reply to a link</option>
         </select>
         <label class="engine-choice"><span>Run with</span><select class="engine-select" id="charlesEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        <input id="charlesInput" style="flex:1;min-width:220px" placeholder="Topic/angle, or a URL to react to (reply) — optional otherwise" />
+        <input id="charlesInput" style="flex:1;min-width:220px" placeholder="Topic/angle, or a URL to react to (reply), optional otherwise" />
         <button class="primary" id="charlesDraftBtn">Draft</button>
       </div>
       <div class="hint">Runs the real /charles skill with the engine you choose. Lands in the queue below as "pending". Nothing posts on its own.</div>
     </div>
     <div class="sheet">
       <div class="sheet-head"><h2>Persona brief</h2><span class="grow"></span><button id="charlesBriefCopyBtn">Copy</button></div>
-      <div class="sheet-sub">Muxin's original brief, verbatim — for pasting into whatever else she's using for meme research (e.g. Grok).</div>
+      <div class="sheet-sub">Muxin's original brief, verbatim, for pasting into whatever else she's using for meme research (e.g. Grok).</div>
       <textarea id="charlesBriefText" readonly style="width:100%;min-height:140px;margin-top:10px;font:400 13px/1.6 ui-monospace,monospace;padding:12px 14px;border:1px dashed #e0d6c0;border-radius:8px;background:#fcfbf7;resize:vertical;"></textarea>
     </div>
     <div class="sheet session">
@@ -1131,7 +1144,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <button id="rawRefreshBtn">Reload list</button>
       </div>
       <div id="rawList"><div class="empty">Loading…</div></div>
-      <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest). "Reload list" only re-reads what's already on disk — it does NOT fetch anything new. "Pull fresh now" is the real pull: it launches real Chrome with your saved logins for LinkedIn/X/Substack and can take a few minutes; it otherwise only runs Sundays at 07:00 via cron. Open a file yourself if you want the raw numbers rather than a computed report.</span>
+      <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest). "Reload list" only re-reads what's already on disk. It does NOT fetch anything new. "Pull fresh now" is the real pull: it launches real Chrome with your saved logins for LinkedIn/X/Substack and can take a few minutes; it otherwise only runs Sundays at 07:00 via cron. Open a file yourself if you want the raw numbers rather than a computed report.</span>
     </div>
     </div>
   </section>
@@ -1300,12 +1313,12 @@ function rowEl(piece, row){
   else if (row.assetUrl && row.kind === "video") preview = '<video class="preview" src="'+row.assetUrl+'" controls muted></video>';
   // Quote-card row whose PNG hasn't been rendered yet — flag it explicitly instead of falling
   // through to plain-text rendering, which looked identical to a normal card (card 4c3dd6fc).
-  else if (row.kind === "image") preview = '<div class="src missing-img">— image not rendered yet —</div>';
+  else if (row.kind === "image") preview = '<div class="src missing-img">No image rendered yet.</div>';
   if (row.body !== undefined && row.body !== "") {
     const cls = row.kind === "storyboard" ? "body story" : "body";
     preview += '<div class="'+cls+'" data-body>'+esc(row.body)+'</div>';
   }
-  if (!preview) preview = '<div class="src">— no asset generated yet —</div>';
+  if (!preview) preview = '<div class="src">No asset generated yet.</div>';
 
   const notes = row.notes && row.notes.trim() ? '<div class="notes">note: '+esc(row.notes)+'</div>' : "";
   const sched = row.scheduledWhen ? '<div class="scheduled">✓ scheduled · '+esc(row.scheduledWhen)+'</div>' : "";
@@ -1321,27 +1334,27 @@ function rowEl(piece, row){
     reconHtml = '<div class="recon-ok">✓ live at '+esc(recon.provider)+(recon.when ? ' · '+esc(recon.when) : '')+'</div>';
     cancelBtn = '<button class="cancel" data-act="cancel">✕ Cancel scheduled post</button>';
   } else if (recon && recon.state === "mismatch") {
-    reconHtml = '<div class="recon-mismatch">⚠ not found at '+esc(recon.provider)+' — '+esc(recon.reason||"mismatch")+'</div>';
+    reconHtml = '<div class="recon-mismatch">⚠ not found at '+esc(recon.provider)+': '+esc(recon.reason||"mismatch")+'</div>';
   } else if (recon && recon.state === "unavailable" && recon.provider === "upload-post") {
     // The retired Upload-Post provider (PR #130 deleted its adapter) has no live check and can't be
     // canceled from here — point straight at the dashboard instead of a dead-end "unavailable".
-    reconHtml = '<div class="recon-unknown">⚠ scheduled via the retired Upload-Post provider — check/cancel by hand at '+
+    reconHtml = '<div class="recon-unknown">⚠ scheduled via the retired Upload-Post provider: check/cancel by hand at '+
       '<a href="https://upload-post.com" target="_blank" rel="noopener">upload-post.com</a></div>';
   } else if (recon && recon.state === "unavailable") {
-    reconHtml = '<div class="recon-unknown">provider check unavailable ('+esc(recon.provider)+') — '+esc(recon.reason||"")+'</div>';
+    reconHtml = '<div class="recon-unknown">provider check unavailable ('+esc(recon.provider)+'): '+esc(recon.reason||"")+'</div>';
   }
   const cancelErr = row.cancelError ? '<div class="recon-mismatch">⚠ cancel failed: '+esc(row.cancelError)+'</div>' : "";
   const manual = row.manualComment ? '<div class="notes">↳ add as first comment in Typefully: '+esc(row.manualComment)+'</div>' : "";
   const editBtn = row.editable ? '<button data-act="edit">Edit</button>' : "";
-  const aiBtn = row.revisable ? '<button class="ai" data-act="ai">✨ Revise with an engine</button>' : "";
+  const aiBtn = row.revisable ? '<button class="ai" data-act="ai">Revise with an engine</button>' : "";
   // "Generate storyboard" (card 9e20a616): the video-path dead end — a video-script row you can't
   // approve because storyboard.md doesn't exist yet, and no way to run /video without a terminal.
   // storyboardSlugs (module-level, keyed by piece.slug — card fbfea28b) tracks the in-flight state
   // instead of a row flag, so it survives the background poll's load() rebuilding this row's DOM.
   const storyboardBtn = row.canGenerateStoryboard
     ? (storyboardSlugs.has(piece.slug)
-        ? '<span class="hint">✨ generating storyboard… (the Studio room has progress)</span>'
-        : '<span class="storyboard-control">'+engineSelectHtml()+'<button class="storyboard" data-act="gen-storyboard">🎬 Generate storyboard</button></span>')
+        ? '<span class="hint">generating storyboard… (the Studio room has progress)</span>'
+        : '<span class="storyboard-control">'+engineSelectHtml()+'<button class="storyboard" data-act="gen-storyboard">Generate storyboard</button></span>')
     : "";
   // "Duplicate to platform" (card 9304e4a5's missing "create a post for another platform"):
   // options come from DATA.textPlatforms (server's TEXT_PLATFORMS), excluding this row's own
@@ -1380,14 +1393,14 @@ function rowEl(piece, row){
     // explanation instead of a silent no-op.
     '<div class="aibox'+((row.aiError||aiPending.has(row.id))?" show":"")+'">'+
       (aiPending.has(row.id)
-        ? '<div class="thinking">✨ '+esc(engineLabel(aiEngine.get(row.id)))+' is revising. The room strip carries the live clock.</div>'
+        ? '<div class="thinking">'+esc(engineLabel(aiEngine.get(row.id)))+' is revising. The room strip carries the live clock.</div>'
         : engineSelectHtml()+'<input placeholder="tell the selected engine what to change…" /><button class="send" data-act="ai-send">Run revision</button>'+
           (row.aiError ? '<div class="aierr">⚠ '+esc(row.aiError)+'</div>' : ""))+
     '</div>'+
     (row.duplicatable
       ? '<div class="dupbox'+((row.dupError||dupPending.has(row.id))?" show":"")+'">'+
         (dupPending.has(row.id)
-          ? '<div class="thinking">✨ '+esc(engineLabel(dupEngine.get(row.id)))+' is drafting the '+esc(dupPending.get(row.id))+' version. The room strip carries the live clock.</div>'
+          ? '<div class="thinking">'+esc(engineLabel(dupEngine.get(row.id)))+' is drafting the '+esc(dupPending.get(row.id))+' version. The room strip carries the live clock.</div>'
           : engineSelectHtml()+'<select class="dup-platform">'+dupOptions+'</select><button class="send" data-act="dup-send">Duplicate</button>'+
             (row.dupError ? '<div class="duperr">⚠ '+esc(row.dupError)+'</div>' : ""))+
       '</div>'
@@ -1415,9 +1428,9 @@ async function onAction(e, piece, row, el){
         // A YouTube Short with no "youtube" cadence configured uploads PRIVATE instead of on a real
         // publish schedule (see publishShorts) — flag that distinctly instead of a generic "Scheduled"
         // that reads the same as an actually-scheduled post.
-        flash(r.scheduled.autoPublishes === false ? "Uploaded (still PRIVATE — flip it manually in YouTube Studio) · "+r.scheduled.when : "Scheduled · "+r.scheduled.when);
+        flash(r.scheduled.autoPublishes === false ? "Uploaded (still PRIVATE: flip it manually in YouTube Studio) · "+r.scheduled.when : "Scheduled · "+r.scheduled.when);
       }
-      else if (r.scheduleError){ row.status="approve"; flash("Approved — schedule failed: "+r.scheduleError); }
+      else if (r.scheduleError){ row.status="approve"; flash("Approved, schedule failed: "+r.scheduleError); }
       else { row.status="approve"; flash("Approved"); }
     } else { row.status="discard"; flash("Discarded"); }
     rerender();
@@ -1512,7 +1525,7 @@ function render(){
   }
   $("#count").textContent = String(pending);
   $("#count").hidden = pending === 0;
-  if (!shown) main.innerHTML = '<div class="empty">Nothing '+(showDecided?"here yet":"awaiting review")+'. 🎉</div>';
+  if (!shown) main.innerHTML = '<div class="empty">Nothing '+(showDecided?"here yet":"awaiting review")+'.</div>';
   refreshEngineControls();
   // Step 3 of the wizard renders the SAME rows out of the same DATA, so a status change anywhere
   // has to repaint it too. renderContentWizard never calls back into render().
@@ -1528,7 +1541,12 @@ let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
 function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
   currentTab = t;
-  document.querySelectorAll(".room").forEach(b=>b.classList.toggle("on", b.dataset.room===t));
+  document.querySelectorAll(".room").forEach(b=>{
+    const on = b.dataset.room===t;
+    b.classList.toggle("on", on);
+    if(on) b.setAttribute("aria-current","page");
+    else b.removeAttribute("aria-current");
+  });
   $("#roomContent").hidden = t!=="content";
   $("#roomStudio").hidden = t!=="studio";
   $("#roomOutreach").hidden = t!=="outreach";
@@ -1656,7 +1674,7 @@ async function askBrief(){
   $("#briefAskBtn").disabled = true;
   const prevHtml = $("#briefBody").innerHTML;
   const engine = $("#signalsEngine").value;
-  $("#briefBody").textContent = "✨ "+engineLabel(engine)+" is revising the brief. The room strip carries the live clock.";
+  $("#briefBody").textContent = engineLabel(engine)+" is revising the brief. The room strip carries the live clock.";
   const r = await post("/api/strategy/ask", {instruction, engine});
   $("#briefAskBtn").disabled = false;
   if(r.ok){ $("#briefBody").innerHTML = mdToHtml(r.content); $("#briefPath").textContent = r.path; inp.value = ""; flash("Brief revised with "+engineLabel(engine)); }
@@ -1676,12 +1694,12 @@ async function refreshBriefRun(){
   // this job, and it counts from when the job was queued. A second timer started at the click
   // disagreed with it on the same screen, which is the exact defect this design was corrected for.
   const engine = $("#signalsEngine").value;
-  body.innerHTML = '<p class="thinking">✨ Running /strategy with '+esc(engineLabel(engine))+'. It grades your bets and writes a new dated brief. The room strip carries the live clock.</p>';
+  body.innerHTML = '<p class="thinking">Running /strategy with '+esc(engineLabel(engine))+'. It grades your bets and writes a new dated brief. The room strip carries the live clock.</p>';
   loadJobs(); // make the strategy job visible in the Studio room right away
   try {
     const r = await post("/api/strategy/refresh-brief", {engine});
     if(r.ok){ flash("Brief refreshed: "+(r.path||"")); await loadBrief(); }
-    else { body.innerHTML = prevHtml; flash(r.error || "Refresh failed — see the job log"); }
+    else { body.innerHTML = prevHtml; flash(r.error || "Refresh failed: see the job log"); }
   } catch (e) {
     body.innerHTML = prevHtml;
     flash(e instanceof Error ? e.message : String(e));
@@ -1752,7 +1770,7 @@ async function askInsights(){
   // right at the time; the room strip now carries the one measured elapsed count for this job, so
   // a second timer on the same screen would just disagree with it.
   const engine = $("#signalsEngine").value;
-  thinking.innerHTML = '✨ '+esc(engineLabel(engine))+' is looking into it. It may re-run a report first. The room strip carries the live clock.';
+  thinking.innerHTML = esc(engineLabel(engine))+' is looking into it. It may re-run a report first. The room strip carries the live clock.';
   $("#insightsThread").appendChild(thinking);
   const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine});
   $("#insightsAskBtn").disabled = false;
@@ -1796,7 +1814,7 @@ async function pullFresh(){
   btn.disabled = true; $("#rawRefreshBtn").disabled = true;
   const box = $("#rawList");
   const prevHtml = box.innerHTML;
-  box.innerHTML = '<div class="empty">✨ Pulling fresh analytics through real Chrome. It can take a few minutes. The strip at the top of this room carries the clock.</div>';
+  box.innerHTML = '<div class="empty">Pulling fresh analytics through real Chrome. It can take a few minutes. The strip at the top of this room carries the clock.</div>';
   const r = await post("/api/strategy/pull", {});
   btn.disabled = false; $("#rawRefreshBtn").disabled = false;
   if(r.ok){ flash("Pull complete"); await loadRaw(); }
@@ -2000,7 +2018,7 @@ function directionHtml(l){
     ? '<div class="dir-said"><div class="cap">YOU SAID</div><div class="said">'+esc(said)+'</div></div>'
     : "";
   if(phase === "drafting"){
-    return saidBlock + '<div class="thinking" style="margin-top:14px;">✨ Drafting the pitch… (your subscription, ~30-60s. The Studio room has the progress and the log.)</div>';
+    return saidBlock + '<div class="thinking" style="margin-top:14px;">Drafting the pitch… (your subscription, ~30-60s. The Studio room has the progress and the log.)</div>';
   }
   if(phase === "drafted") return saidBlock;
   const typed = outDirection.get(l.dir) || "";
@@ -2037,7 +2055,7 @@ function outreachMessageBox(l){
     '<div class="actions"><button class="msg-save" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Save edits</button></div>'+
     '<div class="aibox show">'+
       (revPending
-        ? '<div class="thinking">✨ Rewriting the same draft, not adding a new one…</div>'
+        ? '<div class="thinking">Rewriting the same draft, not adding a new one…</div>'
         : '<input class="msg-revise-input" placeholder="Make it shorter, drop the second line, warmer close…" /><button class="send msg-revise" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'">Update it</button>'+
           (revErr ? '<div class="aierr">⚠ '+esc(revErr)+'</div>' : ""))+
     '</div></div>';
@@ -2258,13 +2276,13 @@ async function scoutRun(){
   const banner = document.createElement("div");
   banner.className = "hint";
   banner.style.padding = "10px 4px";
-  banner.textContent = "✨ Scouting for new leads with "+engineLabel(engine)+" and bounded searches on your subscription. It takes minutes. The strip at the top of this room carries the clock, and the Studio room has the log.";
+  banner.textContent = "Scouting for new leads with "+engineLabel(engine)+" and bounded searches on your subscription. It takes minutes. The strip at the top of this room carries the clock, and the Studio room has the log.";
   box.prepend(banner);
   loadJobs(); // make the scout job visible in the Studio room right away
   try {
     const r = await post("/api/outreach/scout", {engine});
-    if(r.ok){ flash("Scout finished with "+engineLabel(engine)+" — leads reloaded"); }
-    else flash(r.error || "Scout failed — see the job log");
+    if(r.ok){ flash("Scout finished with "+engineLabel(engine)+": leads reloaded"); }
+    else flash(r.error || "Scout failed: see the job log");
   } catch (e) {
     flash(e instanceof Error ? e.message : String(e));
   } finally {
@@ -2315,7 +2333,7 @@ async function loadOutreach(){
 // One sheet per active piece: Muxin's source verbatim in serif behind the blue pencil, each cut
 // rendered as the message it is, the director's checks in the margin, one clear handoff. Accept
 // still builds cuts server-side from verbatim lines only (what you see IS what gets accepted);
-// the reply box runs another advisor round as a queued job; "Hand it to the team" runs the
+// the reply box runs another advisor round as a queued job; "Format for platforms" runs the
 // formatting pipeline. Nothing publishes — every draft lands below in "Drafts for your yes".
 let WB_SESSIONS = [];
 const devReplyPending = new Set(); // slugs with a just-clicked reply, before the job shows in JOBS
@@ -2357,7 +2375,7 @@ function wbMarginHtml(s){
   const body = checks.length ? checks.join("")
     : '<div class="wb-margin-sub">No director notes on this piece yet.</div>';
   const reply = devWorking(s.slug)
-    ? '<div class="dev-working">✨ your director is working on a round… (Studio has the log)</div>'
+    ? '<div class="dev-working">Your director is working on a round. Studio has the log.</div>'
     : '<div class="wb-reply">'+engineSelectHtml()+'<input class="wb-reply-input" placeholder="Push back, or ask for another angle…" data-slug="'+esc(s.slug)+'" />'+
       '<button class="wb-reply-send" data-slug="'+esc(s.slug)+'">'+(s.rounds.length?"Send to your director":"Ask for a read")+'</button>'+
       '<span class="mono-note">a round takes 30s to a few min. real time.</span></div>';
@@ -2390,7 +2408,7 @@ function wbSessionEl(s){
   let main = '<div class="wb-title">'+esc(s.title)+'</div>'+
     '<div class="wb-label">You wrote'+(s.date?", "+fmtDay(s.date):"")+'</div>'+
     '<div class="wb-source'+((longSource&&!expanded)?" clamped":"")+'">'+esc(s.sourceBody)+'</div>'+
-    (longSource?'<div class="wb-expand" data-slug="'+esc(s.slug)+'">'+(expanded?"show less":"read the whole page")+'</div>':"");
+    (longSource?'<button type="button" class="wb-expand" data-slug="'+esc(s.slug)+'">'+(expanded?"show less":"read the whole page")+'</button>':"");
   if(s.cuts.length){
     main += '<div class="wb-sep"><span class="rule"></span><span class="txt">your director shaped '+(s.cuts.length>1?"cuts":"a cut")+'</span><span class="rule"></span></div>';
     for(const c of s.cuts){
@@ -2402,9 +2420,9 @@ function wbSessionEl(s){
   for(const card of openAngles) main += wbAngleHtml(s.slug, card);
   const lensChecks = ["extract"].concat(s.cuts.map(c=>c.lens)).map(l =>
     '<label class="toggle"><input type="checkbox" class="dev-fmt-lens" value="'+esc(l)+'" checked /> '+esc(l)+'</label>').join("");
-  main += '<div class="wb-handoff">'+engineSelectHtml()+'<button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Hand it to the team →</button>'+
+  main += '<div class="wb-handoff">'+engineSelectHtml()+'<button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Format for platforms</button>'+
     '<span class="note">They shape it for each platform, make the visuals, hold it for posting. Every draft comes back below for your yes.</span>'+lensChecks+'</div>';
-  if(s.pending) main += '<div class="wb-links"><span class="wb-link wb-goto-review">'+s.pending+' draft'+(s.pending===1?"":"s")+' below, waiting for your yes ↓</span></div>';
+  if(s.pending) main += '<div class="wb-links"><button type="button" class="wb-link wb-goto-review">'+s.pending+' draft'+(s.pending===1?"":"s")+' below, waiting for your yes ↓</button></div>';
   sheet.innerHTML = '<div class="session-grid"><div class="session-main">'+main+'</div>'+wbMarginHtml(s)+'</div>';
   return sheet;
 }
@@ -2454,7 +2472,7 @@ $("#workbench").addEventListener("click", async (e)=>{
     const body = {slug:t.dataset.slug, cardId:t.dataset.card};
     if (lensInput && lensInput.value.trim()) body.lens = lensInput.value.trim();
     const r = await post("/api/develop/accept", body);
-    if(r.ok){ flash("Cut made: "+r.lens+" — your words, on the page"); await loadContent(); }
+    if(r.ok){ flash("Cut made: "+r.lens+": your words, on the page"); await loadContent(); }
     else { t.disabled = false; flash(r.error || "Could not accept"); }
   } else if (t.classList.contains("dev-dismiss")){
     t.disabled = true;
@@ -2756,7 +2774,7 @@ function cwStep2Html(){
   const forward = total
     ? '<button class="primary cw-fwd" data-step="3">See the '+total+' draft'+(total===1?"":"s")+'</button>'+
       '<span class="src" style="max-width:360px">Every one of them still waits for your yes, one channel at a time.</span>'
-    : '<span class="fam-note t-amber" style="margin:0">No drafts exist for this piece yet. Hand it to the team in the workbench below and they land here.</span>';
+    : '<span class="fam-note t-amber" style="margin:0">No drafts exist for this piece yet. Use Format for platforms in the workbench below and they land here.</span>';
   return cwPickedHtml(s)+
     '<div class="cw-reads">'+cells+'</div>'+
     '<div class="fam-ask" style="margin-top:28px">CHANNELS · READ, NOT CHOSEN HERE</div>'+
@@ -3045,7 +3063,7 @@ async function loadVentureList(){
     $("#ventureAnalysisPanel").hidden = true;
     $("#ventureDay").textContent = "";
     $("#ventureIntakeSections").innerHTML = '<div class="sheet-head"><h3>Intake guardrails</h3></div><div class="empty" style="padding:18px 0">Start or choose a venture to edit its durable voice and scorecard fields.</div>';
-    $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. "Start a venture" above runs the whole intake interview here — 25 questions, one at a time.</div>';
+    $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. "Start a venture" above runs the whole intake interview here: 25 questions, one at a time.</div>';
     $("#ventureRail").innerHTML = "";
     return;
   }
@@ -3087,7 +3105,7 @@ async function analyzeVenture(){
   $("#ventureAnalyzeBtn").disabled = true;
   $("#ventureAnalysisPanel").hidden = false;
   $("#ventureAnalysisEngine").textContent = engineLabel(engine);
-  $("#ventureAnalysisOut").innerHTML = '<p class="thinking">✨ '+esc(engineLabel(engine))+' is reading the current venture state. The room strip carries the live clock.</p>';
+  $("#ventureAnalysisOut").innerHTML = '<p class="thinking">'+esc(engineLabel(engine))+' is reading the current venture state. The room strip carries the live clock.</p>';
   try {
     const r = await post("/api/venture/"+encodeURIComponent(ventureSlug)+"/analyze", {engine});
     if(r.ok){
@@ -3188,8 +3206,8 @@ function vCardAction(artifactId, action){
   if(action.id === "confirm-live") return vOpen(key, "confirm:"+action.proof, "");
   if(action.id === "failed") return vOpen(key, "failed", "");
   if(action.id === "retract") return vOpen(key, "retract", "");
-  if(action.destructive && !confirm(action.label + " — " + artifactId + "?")) return;
-  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id, {}, (action.label+" — done"), key);
+  if(action.destructive && !confirm(action.label + ": " + artifactId + "?")) return;
+  ventureWrite("/artifacts/"+encodeURIComponent(artifactId)+"/"+action.id, {}, (action.label+": done"), key);
 }
 
 // The reason field the override discipline raises. Rendered from the server's own
@@ -3591,7 +3609,7 @@ function vCheckpoint(m){
       + '<div class="vmono">AND THESE DECISIONS</div>'
       + m.decisions.map(d=>'<div class="l" style="display:flex;align-items:center;gap:9px;margin-top:7px;font-size:13px">'
         + '<i style="width:7px;height:7px;border-radius:50%;display:block;background:'+vDot(d.selected?"green":"amber")+'"></i>'
-        + '<span>'+esc(d.kind.replace(/-/g," "))+(d.selected?"":" — not chosen yet")+'</span></div>').join("")
+        + '<span>'+esc(d.kind.replace(/-/g," "))+(d.selected?"":" (not chosen yet)")+'</span></div>').join("")
       + '</div>'
     : "";
   return '<div class="vcp"><div class="vcp-head"><span class="vmono" style="color:#8a7f6d">'+esc(m.rail)+'</span>'
@@ -3797,7 +3815,7 @@ function ivUnanswered(drafts, total){
 }
 function ivSaveLine(s){
   if(s.state === "saving") return "saving…";
-  if(s.state === "failed") return "NOT SAVED — "+(s.error || "the server did not answer");
+  if(s.state === "failed") return "NOT SAVED. "+(s.error || "the server did not answer");
   if(s.state === "saved"){
     const d = s.savedAt ? new Date(s.savedAt) : null;
     if(!d || isNaN(d.getTime())) return "saved";
@@ -4001,7 +4019,7 @@ async function ivCommit(){
   try { await fetch(ivApi("/intake/drafts/clear"), { method:"POST", headers:{"content-type":"application/json"}, body:"{}" }); } catch(e){}
   ivRemember(null);
   ivExit();
-  flash(out.alreadyKickedOff ? (newSlug + " was already kicked off") : ("intake.md written — " + newSlug + " is on the desk"));
+  flash(out.alreadyKickedOff ? (newSlug + " was already kicked off") : ("intake.md written: " + newSlug + " is on the desk"));
   ventureSlug = newSlug;
   await loadVentureList();
 }
@@ -4121,7 +4139,7 @@ function renderIntake(){
   if(!box) return;
   if(!ivSlug){ box.innerHTML = ivStartHtml(); const s = $("#ivSlugIn"); if(s) s.focus(); return; }
   const body = ivStep <= IV_TOTAL ? ivQuestionHtml() : ivStep === IV_VOICE_STEP ? ivVoiceHtml() : ivScoreHtml();
-  box.innerHTML = '<div class="iv"><div class="vmono">INTAKE — '+esc(ivSlug)+'</div>'+body+'</div>';
+  box.innerHTML = '<div class="iv"><div class="vmono">INTAKE: '+esc(ivSlug)+'</div>'+body+'</div>';
 }
 
 // One delegated listener each, like the Venture thread above: renderIntake() replaces the whole
@@ -4155,7 +4173,7 @@ document.addEventListener("click", e=>{
     const el = $("#ivSlugIn");
     const slug = (el ? el.value : "").trim();
     const bad = ivSlugError(slug);
-    if(bad){ ivRefusal = bad + " — lowercase letters, numbers and dashes, starting with a letter or a number"; return renderIntake(); }
+    if(bad){ ivRefusal = bad + ": lowercase letters, numbers and dashes, starting with a letter or a number"; return renderIntake(); }
     if((VENTURE_SLUGS||[]).includes(slug)){ ivRefusal = slug + " already exists. Pick another name, or open it from the picker above."; return renderIntake(); }
     return ivEnter(slug);
   }
@@ -4349,7 +4367,7 @@ function renderFiction(){
     '<div class="wb-margin-cap">YOUR CANON · CLICK TO OPEN</div>'+
     series.docs.map(x=>'<div class="lead-chip'+(x.path===ficDocPath?" on":"")+'" style="display:flex" data-path="'+esc(x.path)+'">'+esc(x.label)+'</div>').join("")+
     '<div class="wb-reply"><div class="wb-margin-cap">PROMOTE THE SERIES</div>'+
-    '<span class="wb-link" id="ficPromoNote">Start a launch note in Content</span>'+
+    '<button type="button" class="wb-link" id="ficPromoNote">Start a launch note in Content</button>'+
     '<span class="mono-note">Promo is the only bridge to the rest of the studio: teasers quote LOCKED chapters verbatim. Character art is not wired into this room yet.</span></div>';
 
   refreshEngineControls($("#fictionMain"));
@@ -4489,7 +4507,7 @@ function renderCharles(){
       '<button id="charlesEditBtn" data-act="edit">Edit in place</button>'+
     '</div>'+
     '<div class="revisebox" id="charlesRevisebox"><input placeholder="what needs changing?" value="'+esc(post.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
-    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything — Charles has no live-posting credentials on purpose (charles/CLAUDE.md). Once approved, paste it to Substack yourself.</div>';
+    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything. Charles has no live-posting credentials on purpose (charles/CLAUDE.md). Once approved, paste it to Substack yourself.</div>';
   $("#charlesSide").innerHTML =
     '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
     CHARLES_POSTS.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
@@ -4503,7 +4521,7 @@ async function onCharlesAction(act, item){
   if (act === "approve" || act === "discard"){
     const r = await post("/api/charles/status", {id:item.id, status:act});
     if (r.ok===false){ flash(r.error||"Failed"); return; }
-    flash(act==="approve" ? "Approved — paste it to Substack when ready" : "Discarded");
+    flash(act==="approve" ? "Approved: paste it to Substack when ready" : "Discarded");
     loadCharles();
   } else if (act === "revise"){
     $("#charlesRevisebox").classList.toggle("show");
@@ -4572,7 +4590,7 @@ function renderSignals(){
         '<button class="'+(adopted?'':'primary ')+'sig-adopt" data-i="'+i+'"'+(adopted?' disabled':'')+'>'+(adopted?'Adopted for this session':'Adopt')+'</button>'+
         '<button class="sig-decline" data-i="'+i+'">Decline</button>'+
         (sent
-          ? '<span class="scheduled">✓ filed to the backlog — the pipeline grooms it from here</span>'
+          ? '<span class="scheduled">✓ filed to the backlog: the pipeline grooms it from here</span>'
           : '<button class="primary sig-send" data-i="'+i+'">Send to backlog</button><span class="src">Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships.</span>')+
         (adopted ? '<span class="src">Adopted for this session. Nothing changed.</span>' : '')+
       '</div></div>';
@@ -4779,12 +4797,14 @@ function renderStudio(){
     [c.dossiersToRead, "dossiers to read", "#2f5d9a", "outreach"],
     [c.followupsDue, "follow-ups due", "#9a6b12", "followups"],
     [c.postsHolding, "posts holding for slots", "#2f7d46", null],
-  ].map(t=>'<div class="stat-tile"'+(t[3]?' style="cursor:pointer" data-goto="'+t[3]+'"':'')+'><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></div>').join("");
+  ].map(t=>t[3]
+    ? '<button type="button" class="stat-tile" data-goto="'+t[3]+'"><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></button>'
+    : '<div class="stat-tile"><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></div>').join("");
   const captures = readCaptureHandoffs().map(captureHandoffSummary).filter(Boolean).map(c=>({...c, urgent:true}));
   const rows = [...captures, ...(STUDIO.needsYou||[])].map(n=>
     '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
     '<span class="ny-text">'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
-    '<span class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+'>'+esc(n.action)+'</span></div>'
+    '<button type="button" class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+'>'+esc(n.action)+'</button></div>'
   ).join("");
   $("#studioMain").innerHTML =
     '<div class="wb-label" style="margin-bottom:2px">'+studioDateLine()+'</div>'+
@@ -4792,7 +4812,7 @@ function renderStudio(){
     '<div class="sheet-sub" style="max-width:560px">This screen never starts work, that is what Content is for. It shows what needs you and what the team is doing, so you never go hunting room by room.</div>'+
     '<div class="stat-tiles">'+tiles+'</div>'+
     '<div style="margin-top:30px;"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Needs you today</div>'+
-    (rows || '<div class="empty" style="padding:20px">Nothing needs you right now. 🎉</div>')+'</div>';
+    (rows || '<div class="empty" style="padding:20px">Nothing needs you right now.</div>')+'</div>';
   renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
     const room = a.dataset.room;
@@ -4856,11 +4876,11 @@ function followupRowHtml(row){
   const err = row.dir ? fuError.get(row.dir) : null;
   const open = fuOpen.has(row.key);
   const nameParts = row.person ? [row.person, row.who.replace(row.person+" · ","")] : [row.who, ""];
-  const sentLine = (row.channel?esc(row.channel):"—")+(row.lastTouch?' · last touch '+esc(row.lastTouch.slice(0,10)):' · never');
+  const sentLine = (row.channel?esc(row.channel):"not recorded")+(row.lastTouch?' · last touch '+esc(row.lastTouch.slice(0,10)):' · never');
   const origin = open ? '<div class="fu-origin">'+
       '<div><div class="cap">Why you reached out</div><div class="cell">'+esc(row.why)+'</div></div>'+
       '<div><div class="cap">What you said</div>'+(row.saidExcerpt?'<div class="cell" style="font:italic 400 13px/1.55 Georgia,serif;">"…'+esc(row.saidExcerpt)+'…"</div>':'<div class="cell">no locked message on file</div>')+'</div>'+
-      '<div><div class="cap">The dossier</div><div class="cell">'+(row.fit?esc(row.fit)+' fit':'—')+(row.dir?' · <span class="wb-link fu-reopen" data-dir="'+esc(row.dir)+'">reopen ↗</span>':"")+'</div></div>'+
+      '<div><div class="cap">The dossier</div><div class="cell">'+(row.fit?esc(row.fit)+' fit':'not recorded')+(row.dir?' · <button type="button" class="wb-link fu-reopen" data-dir="'+esc(row.dir)+'">reopen ↗</button>':"")+'</div></div>'+
     '</div>' : "";
   const status = pending
     ? '<div class="hint" style="margin-left:26px;">drafting… (the Studio room has progress + log)</div>'
@@ -4871,7 +4891,7 @@ function followupRowHtml(row){
     '<div class="fu-head"><span class="fu-dot" style="background:'+fuDotColor(row.status)+'"></span>'+
       '<div><span class="fu-name">'+esc(nameParts[0])+'</span>'+(row.person?' <span class="fu-org">· '+esc(nameParts[1])+'</span>':"")+
       ' <span class="seg-chip '+(row.bucket==="platform"?"platform":row.bucket==="client"?"org-role":"content-example")+'">'+esc(row.bucket==="client"?"org":row.bucket)+'</span>'+
-      '<div class="fu-meta">'+sentLine+' · <span class="wb-link fu-toggle" data-key="'+esc(row.key)+'">'+(open?"hide why":"show why")+'</span></div></div>'+
+      '<div class="fu-meta">'+sentLine+' · <button type="button" class="wb-link fu-toggle" data-key="'+esc(row.key)+'">'+(open?"hide why":"show why")+'</button></div></div>'+
       '<span class="fu-next" style="color:'+fuNextColor(row.status)+'">'+esc(row.nextAction)+'</span></div>'+
     origin + status +
     '<div class="fu-actions">'+noteInput+
@@ -4921,7 +4941,7 @@ async function loadFollowups(){
 }
 async function followupAction(action, body){
   const r = await post("/api/followups/"+action, body);
-  if(r.ok){ flash(action==="mark-responded" ? "Marked replied" : action==="mark-contacted" ? "Nudge logged — clock restarted" : "Moved on"); loadFollowups(); }
+  if(r.ok){ flash(action==="mark-responded" ? "Marked replied" : action==="mark-contacted" ? "Nudge logged: clock restarted" : "Moved on"); loadFollowups(); }
   else flash(r.error || "Failed");
 }
 function followupDraftRequest(dir, person, engine){
@@ -4933,7 +4953,7 @@ async function followupDraft(dir, person, engine){
   fuPending.add(dir); renderFollowupsBox();
   try {
     const r = await post("/api/followups/draft-follow-up", followupDraftRequest(dir, person, engine));
-    if(r.ok){ flash("Follow-up drafted — shape it on the Leads pane"); await loadFollowups(); }
+    if(r.ok){ flash("Follow-up drafted: shape it on the Leads pane"); await loadFollowups(); }
     else { fuError.set(dir, r.error || "Failed to draft"); }
   } catch (e) {
     fuError.set(dir, e instanceof Error ? e.message : String(e));
