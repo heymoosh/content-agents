@@ -223,6 +223,33 @@ const FIC_DOC = {
 
 const FIC_BASE = { "/api/fiction": FIC_SERIES, "/api/fiction/doc": FIC_DOC };
 
+const FIC_CHAPTER_BODY =
+  "FIXTURE. No chapter was drafted to produce this paragraph, and none of it is anybody's prose.\n\n" +
+  "FIXTURE. She raised her left hand toward the door.";
+
+const FIC_CHAPTER = {
+  number: 1,
+  title: "FIXTURE: Chapter one",
+  status: "draft",
+  body: FIC_CHAPTER_BODY,
+  path: "chapters/chapter-01.md",
+};
+
+function fxContinuityItem(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    kind: "conflict",
+    rule: "FIXTURE: a canon rule",
+    span: "",
+    canonSays: "FIXTURE: what the canon establishes instead",
+    replacement: "",
+    note: "FIXTURE: a continuity note nobody wrote.",
+    occurrences: 0,
+    fixable: false,
+    unfixableReason: "",
+    ...over,
+  };
+}
+
 const FIC_STATES: { id: string; label: string; scene: unknown }[] = [
   {
     id: "fiction-no-beats",
@@ -250,6 +277,75 @@ const FIC_STATES: { id: string; label: string; scene: unknown }[] = [
         path: "chapters/chapter-01.md",
       },
       continuity: null,
+    },
+  },
+  {
+    id: "fiction-continuity-conflicts",
+    label: "a scene with conflicts and holds",
+    scene: {
+      ok: true,
+      beats: FIC_BEATS,
+      chapter: FIC_CHAPTER,
+      continuity: {
+        series: FIC_SLUG,
+        chapter: 1,
+        checkedAt: "2026-08-21T09:00:00.000Z",
+        rulesRead: 3,
+        conflicts: [
+          fxContinuityItem({
+            kind: "conflict",
+            rule: "FIXTURE: which hand",
+            span: "She raised her left hand toward the door.",
+            canonSays: "FIXTURE: the character's left hand was lost earlier.",
+            replacement: "She raised her right hand toward the door.",
+            note: "FIXTURE: the draft uses the wrong hand.",
+            occurrences: 1,
+            fixable: true,
+            unfixableReason: "",
+          }),
+          fxContinuityItem({
+            kind: "conflict",
+            rule: "FIXTURE: a name that never settled",
+            span: "FIXTURE span that is not in the chapter",
+            canonSays: "FIXTURE: the canon never named this.",
+            replacement: "",
+            note: "FIXTURE: this conflict cannot be patched from here.",
+            occurrences: 0,
+            fixable: false,
+            unfixableReason: "span-missing",
+          }),
+        ],
+        holds: [
+          fxContinuityItem({
+            kind: "hold",
+            rule: "FIXTURE: an open question",
+            span: "",
+            canonSays: "FIXTURE: the canon never settled this detail.",
+            replacement: "",
+            note: "FIXTURE: holding until the next chapter answers it.",
+            occurrences: 0,
+            fixable: false,
+            unfixableReason: "",
+          }),
+        ],
+      },
+    },
+  },
+  {
+    id: "fiction-continuity-clear",
+    label: "a scene the canon check cleared",
+    scene: {
+      ok: true,
+      beats: FIC_BEATS,
+      chapter: FIC_CHAPTER,
+      continuity: {
+        series: FIC_SLUG,
+        chapter: 1,
+        checkedAt: "2026-08-21T09:00:00.000Z",
+        rulesRead: 4,
+        conflicts: [],
+        holds: [],
+      },
     },
   },
 ];
@@ -782,6 +878,318 @@ const SIGNALS_SCENARIOS: FixtureScenario[] = [
   },
 ];
 
+// ── Outreach: triage, thread, legacy angle, follow-ups ───────────────────────────────────────────
+//
+// GET /api/outreach/leads and GET /api/followups. Every string carries FIXTURE. Names and links are
+// obviously fake (https://fixture.invalid/...) so a screenshot cannot be mistaken for a real lead.
+
+function fxLead(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    dir: "outreach/leads/client-fixture-org",
+    kind: "client",
+    name: "FIXTURE Org",
+    source: "manual",
+    status: "pursue",
+    classificationOrFit: "FIXTURE: mission fit",
+    pitchAngle: "",
+    pitch: "",
+    profile: "FIXTURE: a profile nobody researched.",
+    profileRest: "FIXTURE: a profile nobody researched.",
+    classificationNote: "FIXTURE: why-fit reasoning nobody wrote.",
+    jsaStats: [],
+    muxinNotes: "",
+    latestMessage: null,
+    whyThem: "",
+    whyMe: "",
+    whyMutual: "",
+    segment: "",
+    whySource: "",
+    contacts: [],
+    suggestedContacts: [],
+    evidence: [],
+    ...over,
+  };
+}
+
+function fxEvidence(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: "E1",
+    signal: "worldview-match",
+    person: "",
+    source: "(none)",
+    quote: "FIXTURE: a quote nobody said",
+    description: "FIXTURE: an evidence note",
+    captured_at: null,
+    ...over,
+  };
+}
+
+const FX_OUTREACH_TRIAGE_LEADS = [
+  fxLead({
+    dir: "outreach/leads/platform-fixture-stage",
+    kind: "platform",
+    name: "FIXTURE Stage",
+    segment: "platform",
+    classificationOrFit: "FIXTURE: strong fit",
+    whyThem: "FIXTURE: they host the audience you already write for.",
+    whyMe: "FIXTURE: you bring a receipts-first read they do not have.",
+    whyMutual: "FIXTURE: one stage, two halves of the same question.",
+    contacts: [{ name: "Pat Fixture", role: "FIXTURE editor" }],
+  }),
+  fxLead({
+    dir: "outreach/leads/client-fixture-mission",
+    kind: "client",
+    name: "FIXTURE Mission Co",
+    source: "manual",
+    segment: "org-mission",
+    whyThem: "FIXTURE: they do the work your essays already track.",
+    whyMe: "FIXTURE: you have the public case studies they need.",
+    whyMutual: "FIXTURE: shared ground without a product pitch.",
+    contacts: [{ name: "Sam Fixture", role: "FIXTURE lead" }],
+  }),
+  fxLead({
+    dir: "outreach/leads/client-fixture-role",
+    kind: "client",
+    name: "FIXTURE Role Co",
+    source: "jsa",
+    segment: "org-role",
+    classificationOrFit: "FIXTURE: open role",
+    whyThem: "FIXTURE: they are hiring for what you already built.",
+    whyMe: "FIXTURE: you can show the exact receipt.",
+    whyMutual: "FIXTURE: the role and the work already match.",
+    contacts: [{ name: "Lee Fixture", role: "FIXTURE hiring" }],
+  }),
+  fxLead({
+    dir: "outreach/leads/content-example-fixture-angle",
+    kind: "content-example",
+    name: "FIXTURE Example Piece",
+    segment: "content-example",
+    whyThem: "FIXTURE: this piece is raw material for an angle.",
+    whyMe: "FIXTURE: you already wrote the counterpart.",
+    whyMutual: "FIXTURE: two takes on one public argument.",
+  }),
+];
+
+const FX_OUTREACH_THREAD_LEAD = fxLead({
+  dir: "outreach/leads/client-fixture-thread",
+  kind: "client",
+  name: "FIXTURE Thread Co",
+  segment: "org-mission",
+  whyThem: "FIXTURE: they reversed a shipped call in public.",
+  whyMe: "FIXTURE: you write the receipts that call needs.",
+  whyMutual: "FIXTURE: one audience, two halves of the same lesson.",
+  contacts: [
+    { name: "Pat Fixture", role: "FIXTURE editor" },
+    { name: "Sam Fixture", role: "FIXTURE producer" },
+  ],
+  evidence: [
+    fxEvidence({
+      id: "E1",
+      signal: "worldview-match",
+      person: "Pat Fixture",
+      source: "https://fixture.invalid/thread/source",
+      quote: "FIXTURE: a quote from a real link source",
+      description: "FIXTURE: evidence with a clickable source and a capture date",
+      captured_at: "2026-08-18",
+    }),
+    fxEvidence({
+      id: "E2",
+      signal: "person-fit",
+      person: "Sam Fixture",
+      source: "vault:FIXTURE/People/Sam Fixture.md",
+      quote: "FIXTURE: a quote from a text-only vault source",
+      description: "FIXTURE: evidence with a vault path and no capture date",
+      captured_at: null,
+    }),
+    fxEvidence({
+      id: "E3",
+      signal: "recency",
+      person: "",
+      source: "(none)",
+      quote: "(none)",
+      description: "FIXTURE: evidence with no source recorded",
+      captured_at: null,
+    }),
+  ],
+  latestMessage: {
+    file: "messages/message-01.md",
+    channel: "email",
+    status: "draft",
+    recipient: "Pat Fixture",
+    body: "FIXTURE: a draft message nobody sent.",
+  },
+});
+
+const FX_OUTREACH_LEGACY_LEAD = fxLead({
+  dir: "outreach/leads/client-fixture-legacy",
+  kind: "client",
+  name: "FIXTURE Legacy Co",
+  segment: "org-mission",
+  pitchAngle: "FIXTURE: the old strategy memo standing in for a matchmaker read",
+  whyThem: "",
+  whyMe: "",
+  whyMutual: "",
+  contacts: [{ name: "Pat Fixture", role: "FIXTURE editor" }],
+});
+
+const FX_FOLLOWUPS_TWO_CLOCKS = {
+  ok: true,
+  buckets: {
+    client: [
+      {
+        key: "client:fixture-org:Pat Fixture",
+        bucket: "client",
+        lead: "fixture-org",
+        person: "Pat Fixture",
+        who: "Pat Fixture · FIXTURE Org",
+        why: "FIXTURE: why this org is on the desk",
+        dir: "outreach/leads/client-fixture-org",
+        channel: "email",
+        lastTouch: "2026-08-10T12:00:00.000Z",
+        lastEvent: "contacted",
+        status: "due",
+        nextAction: "FIXTURE: follow up (due 2026-08-20)",
+        dueDate: "2026-08-20",
+        abandonDate: null,
+        saidExcerpt: "FIXTURE: a locked message excerpt to Pat",
+        fit: "FIXTURE: mission fit",
+      },
+      {
+        key: "client:fixture-org:Sam Fixture",
+        bucket: "client",
+        lead: "fixture-org",
+        person: "Sam Fixture",
+        who: "Sam Fixture · FIXTURE Org",
+        why: "FIXTURE: why this org is on the desk",
+        dir: "outreach/leads/client-fixture-org",
+        channel: "email",
+        lastTouch: "2026-08-18T15:30:00.000Z",
+        lastEvent: "contacted",
+        status: "waiting",
+        nextAction: "FIXTURE: waiting (check back 2026-08-25)",
+        dueDate: "2026-08-25",
+        abandonDate: null,
+        saidExcerpt: "FIXTURE: a locked message excerpt to Sam",
+        fit: "FIXTURE: mission fit",
+      },
+    ],
+    platform: [],
+    inbound: [],
+    jobsearch: [],
+  },
+  jobsearchNote: null,
+};
+
+const OUTREACH_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "outreach-triage",
+    group: "Outreach",
+    label: "a queue grouped by why",
+    room: "outreach",
+    overrides: {
+      "/api/outreach/leads": { ok: true, leads: FX_OUTREACH_TRIAGE_LEADS },
+      "/api/followups": { ok: true, buckets: { client: [], platform: [], inbound: [], jobsearch: [] }, jobsearchNote: null },
+    },
+  },
+  {
+    id: "outreach-thread",
+    group: "Outreach",
+    label: "one lead, read end to end",
+    room: "outreach",
+    overrides: {
+      "/api/outreach/leads": { ok: true, leads: [FX_OUTREACH_THREAD_LEAD] },
+      "/api/followups": { ok: true, buckets: { client: [], platform: [], inbound: [], jobsearch: [] }, jobsearchNote: null },
+    },
+  },
+  {
+    id: "outreach-legacy-angle",
+    group: "Outreach",
+    label: "the old strategy memo, not a matchmaker read",
+    room: "outreach",
+    overrides: {
+      "/api/outreach/leads": { ok: true, leads: [FX_OUTREACH_LEGACY_LEAD] },
+      "/api/followups": { ok: true, buckets: { client: [], platform: [], inbound: [], jobsearch: [] }, jobsearchNote: null },
+    },
+  },
+  {
+    id: "outreach-followups",
+    group: "Outreach",
+    label: "two people at one org, two clocks",
+    room: "outreach",
+    overrides: {
+      "/api/outreach/leads": {
+        ok: true,
+        leads: [fxLead({
+          dir: "outreach/leads/client-fixture-org",
+          kind: "client",
+          name: "FIXTURE Org",
+          segment: "org-mission",
+          whyThem: "FIXTURE: they do the work your essays already track.",
+          whyMe: "FIXTURE: you bring the public case.",
+          whyMutual: "FIXTURE: shared ground, two people, two clocks.",
+          contacts: [
+            { name: "Pat Fixture", role: "FIXTURE editor" },
+            { name: "Sam Fixture", role: "FIXTURE producer" },
+          ],
+        })],
+      },
+      "/api/followups": FX_FOLLOWUPS_TWO_CLOCKS,
+    },
+  },
+];
+
+// ── Charles: drafts in every review status ───────────────────────────────────────────────────────
+//
+// GET /api/charles. Charles is a satirical persona, not Muxin's voice. Bodies stay short, flat, and
+// prefixed FIXTURE so nothing here could be mistaken for a real draft.
+
+const CHARLES_SCENARIOS: FixtureScenario[] = [
+  {
+    id: "charles-drafts",
+    group: "Charles",
+    label: "drafts in every status",
+    room: "charles",
+    overrides: {
+      "/api/charles": {
+        posts: [
+          {
+            id: "fx-charles-pending",
+            type: "one-liner",
+            file: "posts/one-liner/fx-pending.md",
+            status: "pending",
+            notes: "",
+            body: "FIXTURE: a pending one-liner nobody drafted.",
+          },
+          {
+            id: "fx-charles-approve",
+            type: "essay",
+            file: "posts/essay/fx-approve.md",
+            status: "approve",
+            notes: "",
+            body: "FIXTURE: an approved essay nobody posted.",
+          },
+          {
+            id: "fx-charles-revise",
+            type: "reply",
+            file: "posts/reply/fx-revise.md",
+            status: "revise",
+            notes: "FIXTURE: shorter, and drop the last sentence.",
+            body: "FIXTURE: a reply marked revise.",
+          },
+          {
+            id: "fx-charles-discard",
+            type: "one-liner",
+            file: "posts/one-liner/fx-discard.md",
+            status: "discard",
+            notes: "",
+            body: "FIXTURE: a discarded one-liner.",
+          },
+        ],
+      },
+    },
+  },
+];
+
 const EMPTY_BY_ROOM: Record<string, Record<string, unknown>> = {
   content: {
     "/api/queue": { pieces: [], pending: 0, liveStateAsOf: null, textPlatforms: ["x", "linkedin", "bluesky"] },
@@ -1134,6 +1542,8 @@ export const FIXTURE_SCENARIOS: FixtureScenario[] = [
   ...INTERRUPTION_SCENARIOS,
   ...HISTORY_SCENARIOS,
   ...SIGNALS_SCENARIOS,
+  ...OUTREACH_SCENARIOS,
+  ...CHARLES_SCENARIOS,
   ...Object.entries(EMPTY_BY_ROOM).map(([tab, overrides]) => ({
     id: `empty-${tab}`, group: "Empty", label: tab, room: tab, overrides,
   })),

@@ -696,3 +696,106 @@ test("interruption overrides answer as a non-ok text body so the recoverable pat
   assert.equal(studioRes.status, 500);
   assert.match(await studioRes.text(), /^FIXTURE:/);
 });
+
+// ── Slice 6: Outreach, Fiction continuity, Charles ───────────────────────────────────────────────
+
+const SLICE6_IDS = [
+  "outreach-triage",
+  "outreach-thread",
+  "outreach-legacy-angle",
+  "outreach-followups",
+  "fiction-continuity-conflicts",
+  "fiction-continuity-clear",
+  "charles-drafts",
+] as const;
+
+test("slice-6 scenario ids are present and every FIXTURE_SCENARIOS id stays unique", () => {
+  const ids = FIXTURE_SCENARIOS.map((s) => s.id);
+  assert.equal(ids.length, new Set(ids).size);
+  for (const id of SLICE6_IDS) {
+    assert.ok(FIXTURE_SCENARIOS.some((s) => s.id === id), `missing scenario ${id}`);
+  }
+});
+
+test("outreach-thread evidence covers link, text, and none sources, plus dated and undated capture", () => {
+  const leads = (scenario("outreach-thread").overrides["/api/outreach/leads"] as {
+    leads: { evidence: { source?: string; captured_at?: string | null }[] }[];
+  }).leads;
+  assert.equal(leads.length, 1);
+  const evidence = leads[0].evidence;
+  const kinds = new Set(
+    evidence.map((e) => {
+      const src = (e.source ?? "").trim();
+      if (/^https?:\/\//i.test(src)) return "link";
+      if (/^vault:/i.test(src)) return "text";
+      return "none";
+    }),
+  );
+  assert.ok(kinds.has("link"), "needs a real link source");
+  assert.ok(kinds.has("text"), "needs a text-only (vault) source");
+  assert.ok(kinds.has("none"), "needs a no-source-recorded item");
+  assert.ok(evidence.some((e) => /^\d{4}-\d{2}-\d{2}$/.test((e.captured_at ?? "").trim())), "needs a dated capture");
+  assert.ok(evidence.some((e) => !/^\d{4}-\d{2}-\d{2}$/.test((e.captured_at ?? "").trim())), "needs an undated capture");
+});
+
+test("outreach-followups has two rows for the same lead and different people", () => {
+  const fu = scenario("outreach-followups").overrides["/api/followups"] as {
+    buckets: { client: { lead: string; person?: string; nextAction: string; lastTouch: string | null }[] };
+  };
+  const rows = fu.buckets.client;
+  assert.ok(rows.length >= 2);
+  assert.equal(rows[0].lead, rows[1].lead);
+  assert.notEqual(rows[0].person, rows[1].person);
+  assert.ok(rows[0].person && rows[1].person);
+  assert.notEqual(rows[0].lastTouch, rows[1].lastTouch);
+  assert.notEqual(rows[0].nextAction, rows[1].nextAction);
+});
+
+test("fiction-continuity-conflicts has a fixable conflict, an unfixable conflict, and a hold", () => {
+  const scene = scenario("fiction-continuity-conflicts").overrides["/api/fiction/scene"] as {
+    continuity: {
+      conflicts: { kind: string; fixable?: boolean; span: string; replacement: string; unfixableReason?: string }[];
+      holds: { kind: string }[];
+    };
+  };
+  const { conflicts, holds } = scene.continuity;
+  assert.ok(conflicts.some((c) => c.kind === "conflict" && c.fixable && c.span && c.replacement));
+  assert.ok(conflicts.some((c) => c.kind === "conflict" && !c.fixable && c.unfixableReason));
+  assert.ok(holds.some((h) => h.kind === "hold"));
+});
+
+test("charles-drafts covers all four Charles statuses", () => {
+  const posts = (scenario("charles-drafts").overrides["/api/charles"] as {
+    posts: { status: string; notes: string }[];
+  }).posts;
+  const statuses = new Set(posts.map((p) => p.status));
+  for (const want of ["pending", "approve", "revise", "discard"]) {
+    assert.ok(statuses.has(want), `missing Charles status ${want}`);
+  }
+  const revise = posts.find((p) => p.status === "revise");
+  assert.ok(revise && /FIXTURE:/.test(revise.notes), "revise post needs real revision notes");
+});
+
+test("slice-6 fixture strings carry no @ handle and only https://fixture.invalid URLs", () => {
+  function walk(v: unknown, path: string): void {
+    if (typeof v === "string") {
+      assert.ok(!v.includes("@"), `${path} must not contain an @ handle: ${JSON.stringify(v)}`);
+      for (const m of v.matchAll(/https?:\/\/[^\s"'\\]+/gi)) {
+        assert.match(m[0], /^https:\/\/fixture\.invalid(?:\/|$)/, `${path} has a non-fixture URL: ${m[0]}`);
+      }
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    if (v && typeof v === "object") {
+      for (const [k, child] of Object.entries(v as Record<string, unknown>)) {
+        walk(child, `${path}.${k}`);
+      }
+    }
+  }
+  for (const id of SLICE6_IDS) {
+    walk(scenario(id).overrides, id);
+  }
+});
