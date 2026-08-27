@@ -145,7 +145,8 @@
     "check": "npm run typecheck",
     "test:e2e": "tsx e2e/run-all.ts",
     "patterns:reddit-rss": "tsx src/patterns/reddit-rss.ts",
-    "patterns:reddit-backfill": "tsx src/patterns/reddit-backfill.ts"
+    "patterns:reddit-backfill": "tsx src/patterns/reddit-backfill.ts",
+    "patterns:creator-corpus": "tsx src/patterns/creator-mechanism-proposals-cli.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.20.38",
