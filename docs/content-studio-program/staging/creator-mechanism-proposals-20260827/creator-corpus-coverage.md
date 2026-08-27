@@ -106,15 +106,15 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | Opening hook | hook |  | 30 | 1 |
 | Opening hook (visual description, since mostly wordless) | hook | no-spoken-audio, visual-only | 30 | 1 |
 | Points/comments | metrics |  | 30 | 1 |
-| Spoken transcript (verbatim, or "None (wordless...)" note) | transcript | no-spoken-audio, verbatim | 30 | 1 |
+| Spoken transcript (verbatim, or "None (wordless...)" note) | transcript | conditional-absence, no-spoken-audio, verbatim | 30 | 1 |
 | Spoken transcript (verbatim, or "Not captured" note) | transcript | conditional-absence, unavailable, verbatim | 30 | 1 |
 | Teaser | teaser |  | 30 | 1 |
 | Transcript | transcript |  | 30 | 1 |
-| Opening hook (verbatim caption or visual description) | hook | verbatim, visual-only | 29 | 1 |
-| Spoken/audio transcript (verbatim, or "None (music/dance...)" note) | transcript | no-spoken-audio, verbatim | 29 | 1 |
+| Opening hook (verbatim caption or visual description) | hook | from-transcript, verbatim, visual-only | 29 | 1 |
+| Spoken/audio transcript (verbatim, or "None (music/dance...)" note) | transcript | conditional-absence, no-spoken-audio, verbatim | 29 | 1 |
 | Byline | byline |  | 28 | 2 |
-| Opening hook (verbatim, transcript) | hook | verbatim | 28 | 1 |
-| Full transcript (verbatim, auto-caption) | transcript | auto-captions, verbatim | 26 | 1 |
+| Opening hook (verbatim, transcript) | hook | from-transcript, verbatim | 28 | 1 |
+| Full transcript (verbatim, auto-caption) | transcript | auto-captions, from-transcript, verbatim | 26 | 1 |
 | Host channel/event | entry-metadata |  | 26 | 1 |
 | Description | description |  | 23 | 1 |
 | Full text (verbatim, paywalled: this is everything publicly visible) | body | partial, paywalled, verbatim | 22 | 1 |
@@ -124,8 +124,8 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | Note | capture-note |  | 16 | 5 |
 | Original clip being reacted to | entry-metadata |  | 14 | 1 |
 | Full text (verbatim, PAYWALLED: free preview only) | body | partial, paywalled, verbatim | 11 | 1 |
-| Full transcript (verbatim, from YouTube's creator-provided English captions) | transcript | creator-captions, verbatim | 10 | 1 |
-| Full transcript (verbatim, from YouTube's auto-generated captions -- no native punctuation/capitalization; see capture note) | transcript | auto-captions, creator-captions, from-transcript, verbatim | 9 | 1 |
+| Full transcript (verbatim, from YouTube's creator-provided English captions) | transcript | creator-captions, from-transcript, verbatim | 10 | 1 |
+| Full transcript (verbatim, from YouTube's auto-generated captions -- no native punctuation/capitalization; see capture note) | transcript | auto-captions, from-transcript, verbatim | 9 | 1 |
 | Full text (verbatim, on-post teaser copy) | body | partial, verbatim | 7 | 1 |
 | Promotional teaser | teaser |  | 6 | 1 |
 | Opening hook (verbatim excerpt) | hook | excerpt, partial, verbatim | 5 | 1 |
@@ -143,7 +143,7 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | Framing (Asher Brooks's post, not Lara's) | framing | third-party-authored | 1 | 1 |
 | Framing (Gabe Einhorn's post, not Lara's) | framing | third-party-authored | 1 | 1 |
 | Framing (Jake Ward's post, not Lara's) | framing | third-party-authored | 1 | 1 |
-| Full text (everything visible before the paywall, an interview transcript that cuts off partway through) | body | partial, paywalled | 1 | 1 |
+| Full text (everything visible before the paywall, an interview transcript that cuts off partway through) | body | from-transcript, partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in after only 2 of the promised "Top 10 takeaways") | body | partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in mid-way through Step 4 of 5) | body | partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in mid-way through the numbered takeaways list) | body | partial, paywalled | 1 | 1 |
@@ -185,7 +185,7 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | Live link | linked-url |  | 1 | 1 |
 | Note on Notes access | capture-note |  | 1 | 1 |
 | Note on scan coverage | capture-note |  | 1 | 1 |
-| Opening hook (transcript unavailable - this video is age-restricted on YouTube ("This video may be inappropriate for some users") and its transcript panel never populated despite repeated waits after clicking through the age gate. Falling back to the video's own description as the best available description of the opening premise, per instructions) | hook | restricted, unavailable | 1 | 1 |
+| Opening hook (transcript unavailable - this video is age-restricted on YouTube ("This video may be inappropriate for some users") and its transcript panel never populated despite repeated waits after clicking through the age gate. Falling back to the video's own description as the best available description of the opening premise, per instructions) | hook | from-transcript, restricted, unavailable | 1 | 1 |
 | Opening hook (verbatim, Cameron Trew's words) | hook | third-party-authored, verbatim | 1 | 1 |
 | Opening hook (verbatim, Daniele Ronca's words) | hook | third-party-authored, verbatim | 1 | 1 |
 | Opening hook (verbatim, David Jordan Soro's words) | hook | third-party-authored, verbatim | 1 | 1 |
@@ -195,7 +195,7 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | Opening hook (verbatim, OC Product's words) | hook | third-party-authored, verbatim | 1 | 1 |
 | Opening hook (verbatim, Peter's editorial intro before handing off to the guest author) | hook | verbatim | 1 | 1 |
 | Opening hook (verbatim, auto-captions, lowercase in source) | hook | auto-captions, from-transcript, verbatim | 1 | 1 |
-| Opening hook (verbatim, on-screen caption) | hook | verbatim, visual-only | 1 | 1 |
+| Opening hook (verbatim, on-screen caption) | hook | from-transcript, verbatim, visual-only | 1 | 1 |
 | Opening hook (verbatim, text card) | hook | verbatim, visual-only | 1 | 1 |
 | Promotional teaser (verbatim, stylized monospace in the original) | teaser | stylized, verbatim | 1 | 1 |
 | Structure (Asher Brooks's post, not Lara's) | structure | third-party-authored | 1 | 1 |

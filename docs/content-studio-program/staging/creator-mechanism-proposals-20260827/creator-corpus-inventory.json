@@ -361,6 +361,7 @@
       "raw_label": "Spoken transcript (verbatim, or \"None (wordless...)\" note)",
       "kind": "transcript",
       "qualifiers": [
+        "conditional-absence",
         "no-spoken-audio",
         "verbatim"
       ],
@@ -396,6 +397,7 @@
       "raw_label": "Opening hook (verbatim caption or visual description)",
       "kind": "hook",
       "qualifiers": [
+        "from-transcript",
         "verbatim",
         "visual-only"
       ],
@@ -406,6 +408,7 @@
       "raw_label": "Spoken/audio transcript (verbatim, or \"None (music/dance...)\" note)",
       "kind": "transcript",
       "qualifiers": [
+        "conditional-absence",
         "no-spoken-audio",
         "verbatim"
       ],
@@ -423,6 +426,7 @@
       "raw_label": "Opening hook (verbatim, transcript)",
       "kind": "hook",
       "qualifiers": [
+        "from-transcript",
         "verbatim"
       ],
       "occurrences": 28,
@@ -433,6 +437,7 @@
       "kind": "transcript",
       "qualifiers": [
         "auto-captions",
+        "from-transcript",
         "verbatim"
       ],
       "occurrences": 26,
@@ -519,6 +524,7 @@
       "kind": "transcript",
       "qualifiers": [
         "creator-captions",
+        "from-transcript",
         "verbatim"
       ],
       "occurrences": 10,
@@ -529,7 +535,6 @@
       "kind": "transcript",
       "qualifiers": [
         "auto-captions",
-        "creator-captions",
         "from-transcript",
         "verbatim"
       ],
@@ -692,6 +697,7 @@
       "raw_label": "Full text (everything visible before the paywall, an interview transcript that cuts off partway through)",
       "kind": "body",
       "qualifiers": [
+        "from-transcript",
         "partial",
         "paywalled"
       ],
@@ -1110,6 +1116,7 @@
       "raw_label": "Opening hook (transcript unavailable - this video is age-restricted on YouTube (\"This video may be inappropriate for some users\") and its transcript panel never populated despite repeated waits after clicking through the age gate. Falling back to the video's own description as the best available description of the opening premise, per instructions)",
       "kind": "hook",
       "qualifiers": [
+        "from-transcript",
         "restricted",
         "unavailable"
       ],
@@ -1210,6 +1217,7 @@
       "raw_label": "Opening hook (verbatim, on-screen caption)",
       "kind": "hook",
       "qualifiers": [
+        "from-transcript",
         "verbatim",
         "visual-only"
       ],

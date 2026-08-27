@@ -146,17 +146,25 @@ const KIND_BY_BASE_LABEL: ReadonlyArray<readonly [string, CreatorFieldKind]> = [
 interface QualifierRule {
   readonly pattern: RegExp;
   readonly qualifiers: readonly CreatorFieldQualifier[];
+  /** Match the parenthetical only, when the base label would otherwise trigger the rule itself. */
+  readonly scope?: "qualifier";
 }
 
 const QUALIFIER_RULES: readonly QualifierRule[] = [
   { pattern: /\bverbatim\b/, qualifiers: ["verbatim"] },
-  { pattern: /\bfrom transcript\b|\btranscript\b(?=[,)])|\bauto-captions\b|\bauto-generated captions\b/, qualifiers: ["from-transcript"] },
+  // Scoped to the parenthetical: a hook labelled "(verbatim, transcript)" was read off a
+  // transcript, but the base label "Full transcript" says nothing about where the hook came from.
+  { pattern: /\btranscripts?\b|\bcaptions?\b/, qualifiers: ["from-transcript"], scope: "qualifier" },
   { pattern: /auto-generated captions|auto-caption|auto caption/, qualifiers: ["auto-captions"] },
-  { pattern: /creator-provided|native punctuation|english captions/, qualifiers: ["creator-captions"] },
+  // "no native punctuation" and "no English captions" are the opposite claim, so the negative
+  // lookbehind matters: only an unqualified mention means the creator supplied the captions.
+  { pattern: /\bcreator-provided\b|(?<!no )\benglish captions\b/, qualifiers: ["creator-captions"] },
   { pattern: /paywall|paid-subscriber|gated|upgrade|subscription-offer/, qualifiers: ["paywalled", "partial"] },
   { pattern: /free preview|public portion|everything visible before|ends where|ends at|cuts in|cuts off|of the visible portion|on-post teaser copy/, qualifiers: ["partial"] },
   { pattern: /\bexcerpt\b/, qualifiers: ["excerpt", "partial"] },
-  { pattern: /\bor\b[^)]*\bnote\b|if any|if applicable|if image post|if genuinely unavailable/, qualifiers: ["conditional-absence"] },
+  // The "or ... note" form often contains its own parentheses ("None (music/dance...)"), so the
+  // gap between "or" and "note" must be allowed to cross them, bounded to stay cheap.
+  { pattern: /\bor\b[\s\S]{0,120}?\bnote\b|if any|if applicable|if image post|if genuinely unavailable/, qualifiers: ["conditional-absence"] },
   { pattern: /visual description|mostly wordless|text card|on-screen caption/, qualifiers: ["visual-only"] },
   { pattern: /wordless|music\/dance|none \(/, qualifiers: ["no-spoken-audio"] },
   { pattern: /'s words|’s words|not lara's|not lara’s|authored by|reposted by/, qualifiers: ["third-party-authored"] },
@@ -200,7 +208,9 @@ export function classifyFieldLabel(rawLabel: string): {
   }
   const qualifiers = new Set<CreatorFieldQualifier>();
   for (const rule of QUALIFIER_RULES) {
-    if (rule.pattern.test(whole)) for (const flag of rule.qualifiers) qualifiers.add(flag);
+    if (rule.pattern.test(rule.scope === "qualifier" ? qualifier : whole)) {
+      for (const flag of rule.qualifiers) qualifiers.add(flag);
+    }
   }
   return { kind, qualifiers: [...qualifiers].sort(compareText) };
 }

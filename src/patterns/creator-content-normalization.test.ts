@@ -356,6 +356,21 @@ test("classifies field labels and their qualifiers", () => {
   assert.ok(classifyFieldLabel("Full text (everything visible before the paywall)").qualifiers.includes("paywalled"));
   assert.ok(classifyFieldLabel("Opening hook (visual description, since mostly wordless)").qualifiers.includes("visual-only"));
   assert.equal(classifyFieldLabel("Some label nobody defined").kind, "unrecognized");
+
+  // The qualifier decides where a hook came from; the base label does not. A hook labelled
+  // "(verbatim, transcript)" was read off a transcript even though the word "from" is absent.
+  assert.ok(classifyFieldLabel("Opening hook (verbatim, transcript)").qualifiers.includes("from-transcript"));
+  assert.ok(classifyFieldLabel("Full text (verbatim)").qualifiers.includes("from-transcript") === false);
+
+  // "no native punctuation" and "no English captions" are the opposite claim to creator-supplied
+  // captions, so an auto-caption label must not also read as creator-provided.
+  const autoLabel = classifyFieldLabel("Full transcript (verbatim, from YouTube's auto-generated captions -- no native punctuation/capitalization)");
+  assert.ok(autoLabel.qualifiers.includes("auto-captions"));
+  assert.equal(autoLabel.qualifiers.includes("creator-captions"), false);
+  assert.ok(classifyFieldLabel("Full transcript (verbatim, from YouTube's creator-provided English captions)").qualifiers.includes("creator-captions"));
+
+  // The conditional-absence form carries its own parentheses, so the gap must cross them.
+  assert.ok(classifyFieldLabel('Spoken/audio transcript (verbatim, or "None (music/dance...)" note)').qualifiers.includes("conditional-absence"));
 });
 
 test("reads every metrics shape the corpus uses and refuses to guess the rest", () => {
