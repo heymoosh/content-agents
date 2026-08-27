@@ -43,7 +43,7 @@ export async function reviseOutreachMessage(dir: string, file: string, instructi
   if (!existsSync(abs)) throw new Error("no such message to revise");
   const before = splitFrontmatter(readFileSync(abs, "utf8"));
   if (String(before.fm.status ?? "").trim() === "locked") {
-    throw new Error("this message is locked — use Draft follow-up for a new touch instead");
+    throw new Error("this message is locked. Use Draft follow-up for a new touch instead");
   }
   const channel = typeof before.fm.channel === "string" ? before.fm.channel : "";
   const prompt = outreachMessageRevisePrompt(`${dir}/${file}`, channel, instruction.trim());
@@ -60,7 +60,7 @@ export async function reviseOutreachMessage(dir: string, file: string, instructi
     if (failure) throw new Error(failure);
     const after = splitFrontmatter(readFileSync(abs, "utf8")).body;
     if (after === before.body) {
-      throw new Error(`${engineName(job)} ran but didn't change anything — try a more specific instruction`);
+      throw new Error(`${engineName(job)} ran but didn't change anything. Try a more specific instruction`);
     }
     return { body: after.trim() };
   }, engine);

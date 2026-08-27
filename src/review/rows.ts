@@ -102,17 +102,17 @@ export function approveBlockReason(
   exists: (p: string) => boolean = existsSync,
 ): string | null {
   if (row.format === "storyboard") {
-    return exists(join(folder, "video", "storyboard.md")) ? null : "storyboard not rendered yet — run /video";
+    return exists(join(folder, "video", "storyboard.md")) ? null : "storyboard not rendered yet. Run /video";
   }
   if (row.format === "video" || row.format === "short") {
     const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
     if (!asset) return null; // no known gate file to check
-    return exists(join(folder, asset)) ? null : "video not rendered yet — run /video";
+    return exists(join(folder, asset)) ? null : "video not rendered yet. Run /video";
   }
   if (row.format === "image") {
     const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
     if (!asset) return null; // no known gate file to check
-    return exists(join(folder, asset)) ? null : "image not rendered yet — run npm run render -- --still <folder>";
+    return exists(join(folder, asset)) ? null : "image not rendered yet. Run npm run render -- --still <folder>";
   }
   return null;
 }
@@ -539,7 +539,7 @@ export async function cancelScheduled(
   if (logged.provider === "upload-post") {
     return {
       ok: false,
-      error: "scheduled via the retired Upload-Post provider (no live adapter since PR #130) — cancel it by hand at upload-post.com",
+      error: "scheduled via the retired Upload-Post provider (no live adapter since PR #130). Cancel it by hand at upload-post.com",
     };
   }
   try {

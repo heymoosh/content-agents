@@ -338,9 +338,9 @@ async function generateInsights(engine: Engine = "claude"): Promise<InsightsResu
       `**No analytics data in this checkout (0 posts in data/analytics.db).**\n\n` +
       (IS_DEV_WORKTREE
         ? `This GUI is running from a Claude Code dev worktree, which has its own empty, gitignored ` +
-          `data/analytics.db — it's never synced with your real checkout. Run \`npm run review\` from ` +
+          `data/analytics.db. It's never synced with your real checkout. Run \`npm run review\` from ` +
           `your main repo checkout instead to see live numbers.\n`
-        : `\`data/analytics.db\` is gitignored (per-checkout, never synced by git) — either this checkout ` +
+        : `\`data/analytics.db\` is gitignored (per-checkout, never synced by git). Either this checkout ` +
           `has never been ingested, or something pulled into a different copy. Run \`npm run ingest\` / ` +
           `\`npm run pull\` here, or check you're in the checkout you expect.\n`);
     return { summary, engine, freshness: null, brief: null, untagged: 0 };
@@ -534,7 +534,7 @@ async function refreshBrief(engine: Engine = "claude"): Promise<{ path: string }
     const after = latestBriefPath();
     const changed = after && (after !== before || statSync(after).mtimeMs > beforeMtime);
     if (!after || !changed) {
-      throw new Error("/strategy ran but no new or updated brief landed in briefs/ — check the job log");
+      throw new Error("/strategy ran but no new or updated brief landed in briefs/. Check the job log");
     }
     return { path: after.slice(repoRoot.length + 1) };
   }, engine);
@@ -900,7 +900,7 @@ const server = createServer(async (req, res) => {
         // rows/folders keep scheduling concurrently.
         const inFlightKey = `${slug}/${id}`;
         if (schedulingInFlight.has(inFlightKey)) {
-          json(res, 200, { ok: true, scheduled: null, scheduleError: "already scheduling this row — try again in a moment" });
+          json(res, 200, { ok: true, scheduled: null, scheduleError: "already scheduling this row. Try again in a moment" });
           return;
         }
         schedulingInFlight.add(inFlightKey);
@@ -949,7 +949,7 @@ const server = createServer(async (req, res) => {
       }
       const inFlightKey = `${slug}/${id}`;
       if (schedulingInFlight.has(inFlightKey)) {
-        json(res, 200, { ok: false, error: "already scheduling/canceling this row — try again in a moment" });
+        json(res, 200, { ok: false, error: "already scheduling/canceling this row. Try again in a moment" });
         return;
       }
       schedulingInFlight.add(inFlightKey);
@@ -1057,7 +1057,7 @@ const server = createServer(async (req, res) => {
       }
       try {
         if (developJobInFlight(slug)) {
-          json(res, 409, { ok: false, error: "the advisor is already working on this piece — wait for that round to land" });
+          json(res, 409, { ok: false, error: "the advisor is already working on this piece. Wait for that round to land" });
           return;
         }
         // Persist the reply BEFORE enqueueing: the spawn argv stays a fixed `/develop
@@ -1274,7 +1274,7 @@ const server = createServer(async (req, res) => {
       try {
         text = readFileSync(jobLogPath(jobId), "utf8");
       } catch {
-        text = "(no log yet — the job hasn't produced output)";
+        text = "(no log yet: the job hasn't produced output)";
       }
       res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
       res.end(text);
@@ -1313,7 +1313,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/strategy/brief") {
       const abs = latestBriefPath();
       if (!abs) {
-        json(res, 200, { ok: false, error: "no strategy brief exists yet — run /strategy first" });
+        json(res, 200, { ok: false, error: "no strategy brief exists yet. Run /strategy first" });
         return;
       }
       json(res, 200, { ok: true, path: abs.slice(repoRoot.length + 1), content: readFileSync(abs, "utf8") });
@@ -1335,7 +1335,7 @@ const server = createServer(async (req, res) => {
     // pull-style jobs); progress is visible via /api/jobs + the job log meanwhile.
     if (req.method === "POST" && url.pathname === "/api/strategy/refresh-brief") {
       if (jobInFlight("strategy")) {
-        json(res, 409, { ok: false, error: "a /strategy run is already in progress — see the Add / Queue tab" });
+        json(res, 409, { ok: false, error: "a /strategy run is already in progress. See the Add / Queue tab" });
         return;
       }
       try {
@@ -1430,7 +1430,7 @@ const server = createServer(async (req, res) => {
     // send path); found leads land researched/intake awaiting Pursue/Pass.
     if (req.method === "POST" && url.pathname === "/api/outreach/scout") {
       if (jobInFlight("scout")) {
-        json(res, 409, { ok: false, error: "a scout run is already in progress — see the Add / Queue tab" });
+        json(res, 409, { ok: false, error: "a scout run is already in progress. See the Add / Queue tab" });
         return;
       }
       const b = await readBody(req);
@@ -1527,7 +1527,7 @@ const server = createServer(async (req, res) => {
         const abs = join(repoRoot, dir, file);
         const { header, fm } = splitFrontmatter(readFileSync(abs, "utf8"));
         if (String(fm.status ?? "").trim() === "locked") {
-          json(res, 200, { ok: false, error: "this message is locked — use Draft follow-up for a new touch instead" });
+          json(res, 200, { ok: false, error: "this message is locked. Use Draft follow-up for a new touch instead" });
           return;
         }
         // `header` keeps its own trailing newline (splitFrontmatter's byte-exact block).

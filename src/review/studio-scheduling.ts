@@ -110,7 +110,7 @@ export async function scheduleApproved(
       }
       return {
         scheduled: null,
-        scheduleError: "not scheduled — blocked by the reuse guard (check the server log for the reason)",
+        scheduleError: "not scheduled: blocked by the reuse guard (check the server log for the reason)",
       };
     }
     return { scheduled: done[0], scheduleError: null };
