@@ -22,7 +22,8 @@ and this lane adds no wiring that would make them readable.
 | Entries gated by a paywall | 105 |
 | Entries authored by someone other than the account owner | 13 |
 | Entries whose opening is visual rather than worded | 61 |
-| Video entries | 625 |
+| Video entries | 653 |
+| Video entries carrying a transcript field | 625 |
 | Video entries whose transcript field held text | 379 |
 | Recognized field-label spellings | 124 |
 | Tracked size | 16,733,798 bytes |
@@ -30,7 +31,7 @@ and this lane adds no wiring that would make them readable.
 Entries by platform: youtube 386, substack 325, linkedin 199, bluesky 180, instagram 163,
 x 134, mastodon 90, tiktok 89, pinterest 58, devto 30, hackernews 30, threads 22.
 
-Entries by evidence kind: text 802, long-video 386, short-video 239, image 165,
+Entries by evidence kind: text 802, long-video 386, short-video 267, image 137,
 long-form-text 114.
 
 Capture completeness: 49 files complete against their own stated target, 12 partial-window,
@@ -71,6 +72,7 @@ stopped early).
 |---|---|---|
 | `body-embedded-heading` | 9 | A `### N.` line inside a creator's own long-form body, rejected as an entry. All 9 are in `ashley-childress.md`, whose Dev.to posts carry their own numbered subheads. Counting them would have inflated that file from 30 entries to 39. |
 | `unrecognized-field-label` | 23 | A bold label outside the field taxonomy. These are the creator's own bolded lines inside a verbatim body, so the label text is counted and located but never recorded. |
+| `unparsable-metrics` | 39 | An entry whose metric list is partly unreadable, because the platform showed prose where a number belongs ("views not shown", "comments in the hundreds"), or because a paywall note was appended to the metric line. The readable counts are kept; the entry is flagged as incomplete rather than treated as fully measured. |
 | `claimed-count-mismatch` | 1 | `jesse-anderson.md`, above. |
 | `no-entries` | 1 | `bella-poarch.md`, a documented account-specific capture block. |
 
@@ -87,7 +89,8 @@ proposal resting on those entries can claim.
   `rich-mironov.md` (20/30), `ruben-hassid.md` (24/30), `teresa-torres.md` (26/30),
   `alex-hormozi.md` (28/30), `digital-empires.md` (28/30), `charli-damelio.md` (29/30).
   Threads capped three of them at 4, 4 and 14; LinkedIn's feed capped three more.
-- **Transcripts exist for 379 of 625 video entries.** The gap is not evenly spread: every
+- **Transcripts exist for 379 of 653 video entries**, and 28 video entries carry no
+  transcript field at all. The gap is not evenly spread: every
   Instagram Reels account and the TikTok accounts returned 0 usable transcripts (playback would
   not advance in an automated session, or the clip is wordless and set to music), while the
   YouTube accounts returned nearly all of theirs. Any short-video mechanism therefore rests on
@@ -240,6 +243,7 @@ Consolidation note: 21 input candidates reduced to 8 merged proposals. Three mer
 | `mech:visual-treatment:wordless-visual-pairing-contrast` | Wordless Visual Pairing Carries The Contrast | 5 | 3 | instagram, tiktok | metric-backed | medium |
 
 Consolidation note: 17 input candidates reduced to 7 merged proposals. Two large merges consolidated near-duplicate observations that recurred independently across three shards each: screenshot/image-as-evidentiary-proof (long-form text, a general short-text shard, and an accountability-journalism-leaning shard) and physical-prop-as-concrete-proof (a still-image shard, a long-video shard, a short-video shard); both are now the family's best-supported candidates. One input candidate (upfront structure-preview device) was rejected as filed under the wrong family rather than moved, since it describes a structural device, not a visual-layer treatment. The remaining 5 rejected candidates were thin, at or near the 4-ref support floor with 2-3 files, or showed a concentration issue where one file supplied most refs.
+
 ## 6. Rejected and unsupported clusters
 
 Two tiers were dropped. Both are listed so that a "no" is visible rather than silent.
@@ -338,9 +342,9 @@ concentrated in a single creator file.
 
 The validator proves a bounded thing and not more. Say what it proves, then what it does not.
 
-**What passed.** No proposal's free text shares an eight-word run with the verbatim spans or the
-analysis prose of any entry it cites. No proposal carries a link, a blockquote, a quoted run, or
-an em dash. No proposal record has a key that could hold creator copy, and the reader rejects
+**What passed.** No proposal's free text, including its own identifier, shares an eight-word run
+with any line of any entry it cites. No proposal carries a link, a blockquote, a quoted run, or
+an em dash, and none asserts what an arrangement does to a reader. No proposal record has a key that could hold creator copy, and the reader rejects
 unknown keys rather than dropping them. No proposal uses a claim word. No proposal contains a
 creator's full name or an account handle: that check matches the name as a phrase and the handle
 as one unbroken run, deliberately not single words, because creator slugs and handle fields carry
@@ -370,9 +374,13 @@ evidence audit named in the charter has not run, and this lane did not run it.
 
 ## 8. What the eight-word copy check cannot see
 
-For completeness, the check compares proposal free text against the entries a proposal cites. It
-does not compare against entries it does not cite, and it does not detect close paraphrase below
-eight consecutive words. It is a floor, not a proof of independence.
+The check compares a proposal's free text and its identifier against every line of every entry it
+cites. It does not compare against entries it does not cite, and it does not detect close
+paraphrase below eight consecutive words. It is a floor, not a proof of independence.
+
+Three proposals were reworded during this lane's own audit because they asserted an effect rather
+than describing an arrangement: two said a device created urgency or supplied the audience's
+trust, one warned against manufacturing urgency. The validator now refuses that wording outright.
 
 ## 9. Decisions required before any template integration
 

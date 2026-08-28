@@ -178,6 +178,19 @@ const QUALIFIER_RULES: readonly QualifierRule[] = [
 const ABSENT_VALUE = /^(none|n\/a|not captured|not available|not verified|not determined|not assessed|not visible|not shown|not displayed|not applicable|not retrievable|not accessible|unavailable|transcript unavailable|no transcript|no captions|no english captions|could not)\b/i;
 const PARTIAL_VALUE = /paywall|free preview|cuts off|truncat|partial|only the visible/i;
 
+/** The persisted ceiling on a field label. Long enough for every real spelling in the corpus. */
+export const MAX_PERSISTED_LABEL_LENGTH = 160;
+
+/**
+ * Field labels are the research pass's own metadata, not creator copy, so they are kept verbatim.
+ * They are still bounded: a label is a place a long qualifier could sit, and nothing about a label
+ * needs 300 characters to be recognizable.
+ */
+function boundLabel(rawLabel: string): string {
+  if (rawLabel.length <= MAX_PERSISTED_LABEL_LENGTH) return rawLabel;
+  return `${rawLabel.slice(0, MAX_PERSISTED_LABEL_LENGTH)} (truncated)`;
+}
+
 function normalizeLabel(label: string): string {
   return label.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -406,6 +419,16 @@ function monthNumber(name: string): number | undefined {
   return MONTHS[name.slice(0, 3).toLowerCase()];
 }
 
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** A date the source published is still only a date if it exists. 2024-13-40 is a typo, not a day. */
+function calendarDay(year: number, month: number, day: number): string | null {
+  if (!Number.isInteger(year) || year < 1900 || year > 2200) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > DAYS_IN_MONTH[month - 1]!) return null;
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
 /**
  * Read the heading's date parentheticals and keep nothing else. The corpus dates items in every
  * form the source platform showed: ISO, US slashes, spelled months with or without a year,
@@ -420,21 +443,27 @@ export function parseHeadingDate(heading: string): ParsedHeadingDate {
     const text = inner.replace(/\s+/g, " ").trim();
     const approximate = /~|approx|approximate|\blate\b|\bmid-|\bearly\b/i.test(text);
     const iso = new RegExp("(\\d{4})-(\\d{1,2})-(\\d{1,2})").exec(text);
-    if (iso) return { date: `${iso[1]}-${pad(Number(iso[2]))}-${pad(Number(iso[3]))}`, precision: "day", approximate };
+    if (iso) {
+      const date = calendarDay(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+      if (date) return { date, precision: "day", approximate };
+    }
     const slash = new RegExp("\\b(\\d{1,2})/(\\d{1,2})/(\\d{2}|\\d{4})\\b").exec(text);
     if (slash) {
       const year = slash[3]!.length === 2 ? 2000 + Number(slash[3]) : Number(slash[3]);
-      return { date: `${year}-${pad(Number(slash[1]))}-${pad(Number(slash[2]))}`, precision: "day", approximate };
+      const date = calendarDay(year, Number(slash[1]), Number(slash[2]));
+      if (date) return { date, precision: "day", approximate };
     }
     const named = new RegExp(`\\b(${MONTH_NAMES})[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s*(\\d{4})\\b`, "i").exec(text);
     if (named) {
       const month = monthNumber(named[1]!);
-      if (month !== undefined) return { date: `${named[3]}-${pad(month)}-${pad(Number(named[2]))}`, precision: "day", approximate };
+      const date = month === undefined ? null : calendarDay(Number(named[3]), month, Number(named[2]));
+      if (date) return { date, precision: "day", approximate };
     }
     const shortYear = new RegExp(`\\b(${MONTH_NAMES})[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*'(\\d{2})\\b`, "i").exec(text);
     if (shortYear) {
       const month = monthNumber(shortYear[1]!);
-      if (month !== undefined) return { date: `${2000 + Number(shortYear[3])}-${pad(month)}-${pad(Number(shortYear[2]))}`, precision: "day", approximate };
+      const date = month === undefined ? null : calendarDay(2000 + Number(shortYear[3]), month, Number(shortYear[2]));
+      if (date) return { date, precision: "day", approximate };
     }
     const monthYear = new RegExp(`\\b(${MONTH_NAMES})[a-z]*\\.?\\s+(\\d{4})\\b`, "i").exec(text);
     if (monthYear) {
@@ -442,7 +471,9 @@ export function parseHeadingDate(heading: string): ParsedHeadingDate {
       if (month !== undefined) return { date: `${monthYear[2]}-${pad(month)}`, precision: "month", approximate };
     }
     const isoMonth = new RegExp("(\\d{4})-(\\d{1,2})(?![\\d-])").exec(text);
-    if (isoMonth) return { date: `${isoMonth[1]}-${pad(Number(isoMonth[2]))}`, precision: "month", approximate };
+    if (isoMonth && Number(isoMonth[2]) >= 1 && Number(isoMonth[2]) <= 12) {
+      return { date: `${isoMonth[1]}-${pad(Number(isoMonth[2]))}`, precision: "month", approximate };
+    }
     const dayNoYear = new RegExp(`\\b(${MONTH_NAMES})[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "i").exec(text);
     if (dayNoYear) {
       const month = monthNumber(dayNoYear[1]!);
@@ -471,6 +502,16 @@ export function parseHeadingDate(heading: string): ParsedHeadingDate {
 
 const SCALE: Readonly<Record<string, number>> = { k: 1_000, m: 1_000_000, b: 1_000_000_000 };
 
+// Metric lists separate their entries with a comma, a semicolon or a middle dot, and their NUMBERS
+// separate thousands with a comma too. Splitting on every comma turns "949,260,655 views" into
+// "655 views", so a comma only separates entries when it is not sitting between two digits.
+function splitMetricTokens(value: string): string[] {
+  return value
+    .split(/[;·]|(?<!\d),|,(?!\d)/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
 /**
  * Read a metrics value into named counts. Shapes in the corpus: `1.6K likes, 193 replies`,
  * `949,260,655 views; 20,111,082 likes`, `12 reactions \u00b7 3 comments`, Hacker News's
@@ -487,7 +528,7 @@ export function parseMetricsValue(value: string, labelNames: readonly string[] =
     return { available: false, values: [], positionalOnly: false, segmented, unparsedTokens: 0 };
   }
   // A bare number list: either the label named the metrics ("Points/comments"), or nothing did.
-  const bare = withoutParens.split(/[,;/·]/).map((token) => token.trim()).filter(Boolean);
+  const bare = splitMetricTokens(withoutParens).flatMap((token) => token.split("/")).map((token) => token.trim()).filter(Boolean);
   if (bare.length > 1 && bare.every((token) => /^[\d][\d,]*$/.test(token))) {
     const named = labelNames.length === bare.length;
     return {
@@ -505,9 +546,7 @@ export function parseMetricsValue(value: string, labelNames: readonly string[] =
   }
   const values: ParsedMetricValue[] = [];
   let unparsedTokens = 0;
-  for (const token of withoutParens.split(/[,;·]/)) {
-    const cleaned = token.trim();
-    if (!cleaned) continue;
+  for (const cleaned of splitMetricTokens(withoutParens)) {
     const match = /^([\d][\d,]*(?:\.\d+)?)\s*([KMB])?\s+(.+)$/i.exec(cleaned);
     if (!match) {
       unparsedTokens += 1;
@@ -569,14 +608,21 @@ function evidenceKindFor(
   const media = (mediaTypeLabel ?? "").toLowerCase();
   const hasTranscript = kinds.has("transcript");
   const hasViews = metrics.values.some((value) => value.metric.includes("view"));
+  const mentionsVideo = /video|reel/.test(media);
+  const mentionsImage = /image|pin\b|pins|carousel|comic|photo/.test(media);
+  // A video the account calls a video stays a video even when the only evidence captured is a
+  // visual description: some platforms return no transcript at all. Only an account that publishes
+  // BOTH images and video is ambiguous enough to be decided by the fields alone.
+  const videoKind = (): EntryEvidenceKind => (/long/.test(media) || kinds.has("duration") || hasViews ? "long-video" : "short-video");
   if (hasTranscript || kinds.has("thumbnail-description")) {
     if (/short|reel|tiktok/.test(media)) return "short-video";
     if (/long/.test(media)) return "long-video";
     return kinds.has("duration") || hasViews ? "long-video" : "short-video";
   }
+  if (mentionsVideo && !mentionsImage) return videoKind();
   if (kinds.has("image-text") || kinds.has("visual-description")) return "image";
   if (kinds.has("body")) return /long-form|long form/.test(media) ? "long-form-text" : "text";
-  if (kinds.has("caption") || kinds.has("on-screen-text")) return /video|reel/.test(media) ? "short-video" : "image";
+  if (kinds.has("caption") || kinds.has("on-screen-text")) return mentionsVideo ? "short-video" : "image";
   return "unknown";
 }
 
@@ -704,12 +750,19 @@ export function parseCreatorFile(file: string, text: string): ParsedCreatorFile 
       if (kind === "metrics") {
         sawMetricsField = true;
         metrics = parseMetricsValue(value, splitFieldLabel(rawLabel).base.split("/").map((part) => part.trim()).filter(Boolean));
-        if (!metrics.available && metrics.unparsedTokens > 0) {
-          anomalies.push({ file, lineNumber: index + 1, kind: "unparsable-metrics", detail: `${metrics.unparsedTokens} unreadable metric token(s)` });
+        if (metrics.unparsedTokens > 0) {
+          // Even one unreadable token matters: the entry's metric set is incomplete, and an
+          // incomplete set must not quietly support a "metric-backed" claim downstream.
+          anomalies.push({
+            file,
+            lineNumber: index + 1,
+            kind: "unparsable-metrics",
+            detail: `${metrics.unparsedTokens} unreadable metric token(s); the recorded counts are incomplete`,
+          });
         }
       }
       fields.push({
-        rawLabel: kind === "unrecognized" ? "(redacted: outside field taxonomy)" : rawLabel,
+        rawLabel: kind === "unrecognized" ? "(redacted: outside field taxonomy)" : boundLabel(rawLabel),
         kind,
         qualifiers,
         presence: presenceFor(qualifiers, value, firstValueLine, quotedLineCount + unquotedLineCount),

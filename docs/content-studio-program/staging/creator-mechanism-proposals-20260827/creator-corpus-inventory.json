@@ -14,7 +14,7 @@
     "entries_third_party_authored": 13,
     "entries_segmented_thread": 3,
     "entries_visual_only_hook": 61,
-    "transcript_expected": 625,
+    "transcript_expected": 653,
     "transcript_field_present": 625,
     "transcript_available": 379,
     "tracked_bytes": 16733798
@@ -34,10 +34,10 @@
     "youtube": 386
   },
   "entries_by_evidence_kind": {
-    "image": 165,
+    "image": 137,
     "long-form-text": 114,
     "long-video": 386,
-    "short-video": 239,
+    "short-video": 267,
     "text": 802
   },
   "field_coverage": {
@@ -815,7 +815,7 @@
       "files": 1
     },
     {
-      "raw_label": "Full text (everything visible before the paywall, which cuts in right as the \"5 steps to get the most out of Deep Research\" section begins; this post's free portion is unusually long and complete)",
+      "raw_label": "Full text (everything visible before the paywall, which cuts in right as the \"5 steps to get the most out of Deep Research\" section begins; this post's free por (truncated)",
       "kind": "body",
       "qualifiers": [
         "partial",
@@ -1113,7 +1113,7 @@
       "files": 1
     },
     {
-      "raw_label": "Opening hook (transcript unavailable - this video is age-restricted on YouTube (\"This video may be inappropriate for some users\") and its transcript panel never populated despite repeated waits after clicking through the age gate. Falling back to the video's own description as the best available description of the opening premise, per instructions)",
+      "raw_label": "Opening hook (transcript unavailable - this video is age-restricted on YouTube (\"This video may be inappropriate for some users\") and its transcript panel never (truncated)",
       "kind": "hook",
       "qualifiers": [
         "from-transcript",
@@ -1817,7 +1817,9 @@
         "reels-top-30-by-view-count-of-41-scanned",
         "image-carousel-posts-all-13-non-video-posts-foun"
       ],
-      "anomaly_counts": {},
+      "anomaly_counts": {
+        "unparsable-metrics": 1
+      },
       "line_count": 703,
       "byte_length": 42851
     },
@@ -2214,7 +2216,9 @@
         "posts",
         "pinned-profile-post-checked-not-counted-toward-t"
       ],
-      "anomaly_counts": {},
+      "anomaly_counts": {
+        "unparsable-metrics": 12
+      },
       "line_count": 397,
       "byte_length": 19673
     },
@@ -3810,7 +3814,9 @@
       "section_slugs": [
         "posts"
       ],
-      "anomaly_counts": {},
+      "anomaly_counts": {
+        "unparsable-metrics": 1
+      },
       "line_count": 190,
       "byte_length": 11234
     },
@@ -4097,7 +4103,7 @@
       "actual_entries": 28,
       "capture_completeness": "partial-window",
       "entries_by_evidence_kind": {
-        "image": 28
+        "short-video": 28
       },
       "field_coverage": {
         "hook": {
@@ -4206,7 +4212,8 @@
         "reactions-board-profile"
       ],
       "flag_counts": {
-        "partialCapture": 1
+        "partialCapture": 1,
+        "transcriptExpected": 28
       },
       "capture_note_labels": [
         "Caveat (important)"
@@ -4214,7 +4221,9 @@
       "section_slugs": [
         "pins"
       ],
-      "anomaly_counts": {},
+      "anomaly_counts": {
+        "unparsable-metrics": 1
+      },
       "line_count": 351,
       "byte_length": 28829
     },
@@ -6743,8 +6752,7 @@
       "metric_names": [
         "positional-1",
         "positional-2",
-        "positional-3",
-        "positional-4"
+        "positional-3"
       ],
       "flag_counts": {
         "partialCapture": 28
@@ -7033,7 +7041,9 @@
       "section_slugs": [
         "posts"
       ],
-      "anomaly_counts": {},
+      "anomaly_counts": {
+        "unparsable-metrics": 22
+      },
       "line_count": 2180,
       "byte_length": 226737
     },
@@ -8376,7 +8386,9 @@
       "section_slugs": [
         "posts"
       ],
-      "anomaly_counts": {},
+      "anomaly_counts": {
+        "unparsable-metrics": 1
+      },
       "line_count": 311,
       "byte_length": 132858
     },
@@ -8914,6 +8926,7 @@
         "posts"
       ],
       "anomaly_counts": {
+        "unparsable-metrics": 1,
         "unrecognized-field-label": 1
       },
       "line_count": 8724,
@@ -9877,6 +9890,84 @@
   },
   "anomalies": [
     {
+      "file": "alex-partridge.md",
+      "line": 512,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 24,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 34,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 44,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 111,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 162,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 190,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 200,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 226,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 250,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 266,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 304,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "arvid-kahl.md",
+      "line": 337,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
       "file": "ashley-childress.md",
       "line": 563,
       "kind": "unrecognized-field-label",
@@ -10069,10 +10160,166 @@
       "detail": "file records zero captured entries"
     },
     {
+      "file": "danny-postma.md",
+      "line": 144,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "digital-empires.md",
+      "line": 15,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
       "file": "jesse-anderson.md",
       "line": 1,
       "kind": "claimed-count-mismatch",
       "detail": "file claims 30/30 but 31 entries parse"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 445,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 551,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 729,
+      "kind": "unparsable-metrics",
+      "detail": "3 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 772,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 943,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1015,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1113,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1211,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1263,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1399,
+      "kind": "unparsable-metrics",
+      "detail": "4 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1499,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1579,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1629,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1697,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1729,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1773,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1865,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1923,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 1981,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 2017,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 2079,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "marily-nika.md",
+      "line": 2143,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "pewdiepie.md",
+      "line": 253,
+      "kind": "unparsable-metrics",
+      "detail": "1 unreadable metric token(s); the recorded counts are incomplete"
+    },
+    {
+      "file": "ruben-hassid.md",
+      "line": 8665,
+      "kind": "unparsable-metrics",
+      "detail": "2 unreadable metric token(s); the recorded counts are incomplete"
     },
     {
       "file": "ruben-hassid.md",
@@ -10085,6 +10332,7 @@
     "body-embedded-heading": 9,
     "claimed-count-mismatch": 1,
     "no-entries": 1,
+    "unparsable-metrics": 39,
     "unrecognized-field-label": 23
   },
   "body_included": false,

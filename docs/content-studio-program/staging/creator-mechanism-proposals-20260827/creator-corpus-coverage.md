@@ -16,7 +16,7 @@ a winner, proven, or available to Content generation.
 - Entries authored by someone other than the account owner: 13
 - Entries captured as a segmented thread: 3
 - Entries whose opening is visual rather than worded: 61
-- Video entries: 625; carrying a transcript field: 625; whose transcript field held text: 379
+- Video entries: 653; carrying a transcript field: 625; whose transcript field held text: 379
 - Tracked corpus size: 16733798 bytes
 
 ## Entries by platform
@@ -40,10 +40,10 @@ a winner, proven, or available to Content generation.
 
 | Evidence kind | Entries |
 |---|---|
-| image | 165 |
+| image | 137 |
 | long-form-text | 114 |
 | long-video | 386 |
-| short-video | 239 |
+| short-video | 267 |
 | text | 802 |
 
 ## Field coverage
@@ -155,7 +155,7 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | Full text (everything visible before the paywall, which cuts in right as step 5 of the tutorial begins) | body | partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in right as step 6 begins) | body | partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in right as technique 4 of 7 begins) | body | partial, paywalled | 1 | 1 |
-| Full text (everything visible before the paywall, which cuts in right as the "5 steps to get the most out of Deep Research" section begins; this post's free portion is unusually long and complete) | body | partial, paywalled | 1 | 1 |
+| Full text (everything visible before the paywall, which cuts in right as the "5 steps to get the most out of Deep Research" section begins; this post's free por (truncated) | body | partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in right as the "How to build AI workflows" section begins) | body | partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in right as the "improving our extension" section begins) | body | partial, paywalled | 1 | 1 |
 | Full text (everything visible before the paywall, which cuts in right as the Google Workspace setup section begins) | body | partial, paywalled | 1 | 1 |
@@ -185,7 +185,7 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | Live link | linked-url |  | 1 | 1 |
 | Note on Notes access | capture-note |  | 1 | 1 |
 | Note on scan coverage | capture-note |  | 1 | 1 |
-| Opening hook (transcript unavailable - this video is age-restricted on YouTube ("This video may be inappropriate for some users") and its transcript panel never populated despite repeated waits after clicking through the age gate. Falling back to the video's own description as the best available description of the opening premise, per instructions) | hook | from-transcript, restricted, unavailable | 1 | 1 |
+| Opening hook (transcript unavailable - this video is age-restricted on YouTube ("This video may be inappropriate for some users") and its transcript panel never (truncated) | hook | from-transcript, restricted, unavailable | 1 | 1 |
 | Opening hook (verbatim, Cameron Trew's words) | hook | third-party-authored, verbatim | 1 | 1 |
 | Opening hook (verbatim, Daniele Ronca's words) | hook | third-party-authored, verbatim | 1 | 1 |
 | Opening hook (verbatim, David Jordan Soro's words) | hook | third-party-authored, verbatim | 1 | 1 |
@@ -290,10 +290,24 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | body-embedded-heading | 9 |
 | claimed-count-mismatch | 1 |
 | no-entries | 1 |
+| unparsable-metrics | 39 |
 | unrecognized-field-label | 23 |
 
 | File | Line | Kind | Detail |
 |---|---|---|---|
+| alex-partridge.md | 512 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 24 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 34 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 44 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 111 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 162 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 190 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 200 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 226 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 250 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 266 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 304 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| arvid-kahl.md | 337 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
 | ashley-childress.md | 563 | unrecognized-field-label | bold label outside the field taxonomy (11 characters, redacted) |
 | ashley-childress.md | 609 | unrecognized-field-label | bold label outside the field taxonomy (18 characters, redacted) |
 | ashley-childress.md | 623 | unrecognized-field-label | bold label outside the field taxonomy (4 characters, redacted) |
@@ -326,5 +340,31 @@ treated as the creator's own body copy, counted, and redacted rather than record
 | ashley-childress.md | 4257 | body-embedded-heading | "### 5." is not an entry (recognized field follows: false; sequential: false) |
 | ashley-childress.md | 4268 | body-embedded-heading | "### 6." is not an entry (recognized field follows: false; sequential: false) |
 | bella-poarch.md | 1 | no-entries | file records zero captured entries |
+| danny-postma.md | 144 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| digital-empires.md | 15 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
 | jesse-anderson.md | 1 | claimed-count-mismatch | file claims 30/30 but 31 entries parse |
+| marily-nika.md | 445 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 551 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 729 | unparsable-metrics | 3 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 772 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 943 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1015 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1113 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1211 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1263 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1399 | unparsable-metrics | 4 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1499 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1579 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1629 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1697 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1729 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1773 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1865 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1923 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 1981 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 2017 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 2079 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| marily-nika.md | 2143 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| pewdiepie.md | 253 | unparsable-metrics | 1 unreadable metric token(s); the recorded counts are incomplete |
+| ruben-hassid.md | 8665 | unparsable-metrics | 2 unreadable metric token(s); the recorded counts are incomplete |
 | ruben-hassid.md | 8723 | unrecognized-field-label | bold label outside the field taxonomy (17 characters, redacted) |

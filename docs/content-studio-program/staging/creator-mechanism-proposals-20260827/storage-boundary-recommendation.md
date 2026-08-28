@@ -57,7 +57,9 @@ projection of the same corpus:
 
 What the projection does not preserve is the creator text itself. If the raw files leave git, an
 `#entry-1-14` reference resolves against the relocated local copy or against the creator's live
-post, not against anything in the repository. That is the trade being decided.
+post, not against anything in the repository. Anyone without that local copy, and any future
+cross-family auditor, would be reading the projection without being able to check it against the
+source. That is the trade being decided.
 
 ## 4. Recommendation
 
@@ -77,16 +79,32 @@ Recommended sequence, in this order:
      exist first. The bundle runs about 11 MB.
    The corpus already exists in `origin/main` history at `497d4ff`, so recovery is possible even
    without these. The tag and bundle make it possible without knowing that SHA.
-2. **Relocate to a local, gitignored path**, mirroring the convention `data/patterns/**` already
-   uses: copy the 62 files to a local directory, add the directory to `.gitignore`, and keep the
-   index in git. The index is 13 KB of structured metadata with no creator body in it, so it can
-   stay tracked and keep pointing at the local copy.
-3. **Remove the tracked files in their own PR.** `git rm` the 62 files, keep the index, keep this
-   staging package, and cite the tag and bundle from step 1 in the PR body. Reversible with a
-   single `git revert`.
+2. **Copy to a local path OUTSIDE the repository working tree, and verify the copy.** This is the
+   step that must not be got wrong: copying into a path inside the repository and then running
+   `git rm` deletes the copy along with the tracked files, and `git clean` would remove it even
+   from an ignored path. Copy the 62 files somewhere outside the checkout, for example
+   `~/.content-agents/creator-content/`, then verify before removing anything:
+
+   ```bash
+   mkdir -p ~/.content-agents/creator-content
+   cp docs/content-studio-program/creator-content/*.md ~/.content-agents/creator-content/
+   ls ~/.content-agents/creator-content/*.md | wc -l          # expect 62
+   diff -r docs/content-studio-program/creator-content ~/.content-agents/creator-content
+   ```
+
+   The `diff` must print nothing. This mirrors what `data/patterns/**` already does, except that
+   the destination is outside the repository rather than an ignored path inside it, because an
+   ignored path inside a checkout is still one `git clean -xdf` away from gone.
+3. **Remove the tracked files in their own PR, only after step 2 verified.** `git rm` the 62
+   files, keep the index, keep this staging package, add
+   `docs/content-studio-program/creator-content/` to `.gitignore` so a future copy is not
+   re-committed by accident, and cite the tag, the bundle and the verified local path in the PR
+   body. Reversible with a single `git revert`.
 4. **Update the pointers.** `creator-content-index.md` and
-   `corpus-ui-reconciliation-20260827.md` both describe the files as tracked. Both need a line
-   saying where the raw copy now lives and that it is deliberately not in git.
+   `corpus-ui-reconciliation-20260827.md` both describe the files as tracked, and the index's
+   62 relative links would resolve to nothing. Both need a line saying where the raw copy now
+   lives and that it is deliberately not in git. The index's per-row links should either be
+   dropped or rewritten to name the file rather than link to it.
 
 **Do not rewrite history by default.** Purging the blobs from `origin/main` with a filter rewrite
 is a separate and much heavier decision: it invalidates every existing clone, worktree and open

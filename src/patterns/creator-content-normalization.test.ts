@@ -417,6 +417,69 @@ test("reads every metrics shape the corpus uses and refuses to guess the rest", 
   const missing = parseMetricsValue("Not visible without login");
   assert.equal(missing.available, false);
   assert.deepEqual(missing.values, []);
+
+  // A comma separates metrics AND thousands. Splitting on every comma turned nearly a billion
+  // views into 655, so the comma only separates entries when it is not sitting between digits.
+  assert.deepEqual(parseMetricsValue("949,260,655 views; 20,111,082 likes").values, [
+    { metric: "likes", count: 20_111_082 },
+    { metric: "views", count: 949_260_655 },
+  ]);
+  assert.deepEqual(parseMetricsValue("1,279 likes, 165 reposts").values, [
+    { metric: "likes", count: 1279 },
+    { metric: "reposts", count: 165 },
+  ]);
+
+  // A partly unreadable list is reported as unreadable, not quietly trimmed to the parts that fit.
+  const partial = parseMetricsValue("1,279 likes, 165 reposts, views not shown");
+  assert.equal(partial.unparsedTokens, 1);
+  assert.equal(partial.values.length, 2);
+});
+
+test("an entry whose metric list is partly unreadable raises an anomaly", () => {
+  const file = parseCreatorFile("sample-metrics.md", [
+    header({ "Posts captured": "1/30" }),
+    "## Posts",
+    "",
+    "### 1. A sample title (2026-02-14) [link](https://example.test/1)",
+    "**Metrics:** 1,279 likes, views not shown",
+    "**Framing:** invented framing note",
+    "",
+  ].join("\n"));
+  const anomaly = file.anomalies.find((row) => row.kind === "unparsable-metrics");
+  assert.ok(anomaly, "an incomplete metric set must be visible, not silently trimmed");
+  assert.match(anomaly!.detail, /incomplete/);
+  assert.equal(file.entries[0]!.metrics.available, true);
+  assert.equal(file.entries[0]!.metrics.unparsedTokens, 1);
+});
+
+test("classifies a video the account calls a video even with no transcript captured", () => {
+  const file = parseCreatorFile("sample-videopin.md", [
+    header({ "Primary platform": "Pinterest", "Primary media type": "video (short-form)", "Posts captured": "1/30" }),
+    "## Pins",
+    "",
+    "### 1. A sample video pin (not shown) [link](https://example.test/pin)",
+    "**Metrics:** 40 saves",
+    "**Visual description:** invented description of the clip",
+    "**Structure:** invented structural note",
+    "**Framing:** invented framing note",
+    "",
+  ].join("\n"));
+  assert.equal(file.entries[0]!.evidenceKind, "short-video");
+  assert.equal(file.entries[0]!.flags.transcriptExpected, true);
+  assert.equal(file.entries[0]!.flags.transcriptFieldPresent, false);
+
+  // An account that publishes both images and video stays ambiguous, and the fields decide.
+  const mixed = parseCreatorFile("sample-mixed.md", [
+    header({ "Primary platform": "Bluesky", "Primary media type": "image/video with caption", "Posts captured": "1/30" }),
+    "## Posts",
+    "",
+    "### 1. A sample post (2026-02-14) [link](https://example.test/1)",
+    "**Metrics:** 40 likes",
+    "**Visual description:** invented description",
+    "**Framing:** invented framing note",
+    "",
+  ].join("\n"));
+  assert.equal(mixed.entries[0]!.evidenceKind, "image");
 });
 
 test("reads every date shape without upgrading an approximation into a date", () => {
@@ -433,6 +496,10 @@ test("reads every date shape without upgrading an approximation into a date", ()
   assert.deepEqual(parseHeadingDate("A title (6-28)"), { date: null, precision: "month", approximate: false });
   assert.deepEqual(parseHeadingDate("A title (not shown)"), { date: null, precision: "source-undated", approximate: false });
   assert.deepEqual(parseHeadingDate("A title with nothing datelike"), { date: null, precision: "none", approximate: false });
+  // A date that does not exist is not a date. 2024-13-40 is a typo, and reporting it as a day
+  // would put an impossible value into the capture window.
+  assert.deepEqual(parseHeadingDate("A title (2024-13-40)"), { date: null, precision: "none", approximate: false });
+  assert.deepEqual(parseHeadingDate("A title (2026-02-30)"), { date: null, precision: "none", approximate: false });
   assert.deepEqual(
     parseHeadingDate("A title (2020-09-20) [link](http://example.test/blog/2019-01-02-post.html)"),
     { date: "2020-09-20", precision: "day", approximate: false },

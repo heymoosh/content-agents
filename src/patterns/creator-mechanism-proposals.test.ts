@@ -173,6 +173,29 @@ test("rejects claim words anywhere in the free text", () => {
   );
 });
 
+test("rejects a claim about what an arrangement does to a reader", () => {
+  for (const value of [
+    "Flags a session as filling up, creating urgency distinct from an evergreen link.",
+    "Uses an admitted failure as the basis for the audience's trust in what follows.",
+    "Opens with a number that makes the reader stop scrolling.",
+    "Front-loads the payoff so that the audience keeps watching.",
+  ]) {
+    assert.throws(() => readMechanismProposals(jsonl(proposal({ mechanism: value }))), MechanismProposalValidationError, value);
+  }
+  // Describing the arrangement itself is fine; only the asserted effect is refused.
+  assert.doesNotThrow(() => readMechanismProposals(jsonl(proposal({
+    mechanism: "Flags a session as filling up, which is a bounded ask rather than an evergreen link.",
+  }))));
+});
+
+test("lints the proposal id, because an id is a string a human reads too", () => {
+  assert.throws(() => readMechanismProposals(jsonl(proposal({ proposal_id: "mech:hook:best" }))), MechanismProposalValidationError);
+  assert.throws(() => readMechanismProposals(jsonl(proposal({ proposal_id: "mech:hook:proven-viral-opener" }))), MechanismProposalValidationError);
+  assert.throws(() => readMechanismProposals(jsonl(proposal({
+    proposal_id: `mech:hook:${"a".repeat(61)}`,
+  }))), MechanismProposalValidationError);
+});
+
 test("rejects a quoted run, a link, or an em dash smuggled into free text", () => {
   assert.throws(() => readMechanismProposals(jsonl(proposal({ mechanism: 'Opens by saying "here is the one thing nobody tells you about this" and continues.' }))), MechanismProposalValidationError);
   assert.throws(() => readMechanismProposals(jsonl(proposal({ mechanism: "Points readers at example.com for the rest of the argument." }))), MechanismProposalValidationError);
@@ -293,6 +316,19 @@ test("rejects a platform no cited entry supports", () => {
   assert.ok(validateProposalsAgainstCorpus(set, index).findings.some((finding) => finding.kind === "platform-mismatch"));
 });
 
+test("refuses to build a corpus index that cannot run the copy check", () => {
+  const { files } = corpus();
+  assert.throws(() => buildCorpusIndex(files, new Map()), MechanismProposalValidationError);
+});
+
+test("catches a copied run smuggled through the proposal id", () => {
+  const { files, raw } = corpus();
+  const index = buildCorpusIndex(files, raw);
+  const copied = plainEntry(1).quoted.split(" ").slice(0, 8).join("-");
+  const set = readMechanismProposals(jsonl(proposal({ proposal_id: `mech:hook:${copied}` })));
+  assert.ok(validateProposalsAgainstCorpus(set, index).findings.some((finding) => finding.kind === "verbatim-overlap"));
+});
+
 test("catches an exact-text payload hidden in a description field", () => {
   const { files, raw } = corpus();
   const index = buildCorpusIndex(files, raw);
@@ -309,6 +345,64 @@ test("catches a proposal that attributes itself to a named creator", () => {
     mechanism: "Names a constraint the reader lives with, the way fixture alpha does, then supplies the smallest change that removes it.",
   })));
   assert.ok(validateProposalsAgainstCorpus(set, index).findings.some((finding) => finding.kind === "creator-named"));
+});
+
+test("will not call third-party-only support replication of any kind", () => {
+  const { files, raw } = fixtureCorpus(fixtureSource("fixture-alpha.md", "X", [
+    { ...plainEntry(1), thirdParty: true },
+    { ...plainEntry(2), thirdParty: true },
+    { ...plainEntry(3), thirdParty: true },
+    { ...plainEntry(4), thirdParty: true },
+  ]));
+  const index = buildCorpusIndex(files, raw);
+  const set = readMechanismProposals(jsonl(proposal({
+    third_party_refs: [
+      "fixture-alpha.md#entry-1-1", "fixture-alpha.md#entry-1-2",
+      "fixture-alpha.md#entry-1-3", "fixture-alpha.md#entry-1-4",
+    ],
+    support: {
+      ...(proposal().support as Record<string, number>),
+      distinct_creator_files: 0,
+      distinct_platforms: 0,
+      third_party_entries: 4,
+    },
+  })));
+  assert.ok(validateProposalsAgainstCorpus(set, index).findings.some(
+    (finding) => finding.kind === "replication-mismatch" && finding.detail.includes("insufficient"),
+  ));
+});
+
+test("rejects a first-party entry declared as somebody else's post", () => {
+  const { files, raw } = corpus();
+  const index = buildCorpusIndex(files, raw);
+  const set = readMechanismProposals(jsonl(proposal({
+    third_party_refs: ["fixture-alpha.md#entry-1-1"],
+    support: { ...(proposal().support as Record<string, number>), third_party_entries: 1 },
+  })));
+  assert.ok(validateProposalsAgainstCorpus(set, index).findings.some(
+    (finding) => finding.kind === "third-party-ref-mismatch" && finding.detail.includes("account owner's own post"),
+  ));
+});
+
+test("catches a short creator name and a typographic hyphen", () => {
+  const { files, raw } = fixtureCorpus(
+    fixtureSource("dril.md", "Bluesky", [plainEntry(1), plainEntry(2), plainEntry(3), plainEntry(4)]),
+  );
+  const index = buildCorpusIndex(files, raw);
+  const refs = [1, 2, 3, 4].map((entry) => `dril.md#entry-1-${entry}`);
+  const short = readMechanismProposals(jsonl(proposal({
+    platforms: ["bluesky"],
+    source_refs: refs,
+    mechanism: "Opens on a flat absurd assertion in the register dril uses, then declines to explain it.",
+  })));
+  assert.ok(validateProposalsAgainstCorpus(short, index).findings.some((finding) => finding.kind === "creator-named"));
+
+  const { files: nameFiles, raw: nameRaw } = corpus();
+  const nameIndex = buildCorpusIndex(nameFiles, nameRaw);
+  const hyphenated = readMechanismProposals(jsonl(proposal({
+    mechanism: "Names a constraint the way fixture\u2010alpha does, then supplies the smallest change that removes it.",
+  })));
+  assert.ok(validateProposalsAgainstCorpus(hyphenated, nameIndex).findings.some((finding) => finding.kind === "creator-named"));
 });
 
 test("holds a thin cluster below the support floor", () => {

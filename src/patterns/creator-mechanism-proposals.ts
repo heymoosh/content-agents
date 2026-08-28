@@ -151,12 +151,24 @@ const BANNED_CLAIM_PATTERNS: readonly RegExp[] = [
   /\boptimal\b/i,
 ];
 
+// Effect claims. A proposal describes an arrangement; it does not get to assert what that
+// arrangement does to a reader. There is no baseline anywhere in this corpus that could support
+// such a claim, so the wording is refused rather than footnoted.
+const EFFECT_CLAIM_PATTERNS: readonly RegExp[] = [
+  /\b(?:creat|generat|manufactur|build|earn|driv|boost|increas|maximi[sz])\w*\s+(?:the\s+|a\s+|an\s+)?(?:urgency|trust|credibility|desire|demand|engagement|reach|conversions?|retention|attention)\b/i,
+  /\bbasis for (?:the )?(?:audience|reader|viewer)(?:'s|s')?\s+\w+/i,
+  /\bmakes? (?:the )?(?:audience|reader|viewer|people)\b/i,
+  /\bso that (?:the )?(?:audience|reader|viewer|people)\b/i,
+  /\b(?:audience|reader|viewer)s?\s+(?:are|is|will be)\s+(?:more likely|persuaded|convinced|hooked)\b/i,
+];
+
 const URL_PATTERN = /https?:\/\/|www\.|\.com\b|\.org\b|\.net\b|\.io\b/i;
 const BLOCKQUOTE_PATTERN = /(^|\n)\s*>/;
 
 const REF_PATTERN = /^([a-z0-9-]+\.md)#entry-(\d+)-(\d+)$/;
 const ID_PATTERN = /^mech:(?:hook|structure|framing|retention|cta|storytelling-sequence|native-format|visual-treatment):[a-z0-9-]+$/;
 
+const MAX_SLUG_LENGTH = 60;
 const MAX_NAME_LENGTH = 60;
 const MAX_MECHANISM_LENGTH = 320;
 const MAX_NOTE_LENGTH = 320;
@@ -189,6 +201,11 @@ export function assertNoBannedClaims(text: string, field: string): void {
   for (const pattern of BANNED_CLAIM_PATTERNS) {
     if (pattern.test(text)) {
       fail(`${field} uses a forbidden claim word (${pattern.source}); proposals are unreviewed research evidence and may not be labelled approved, reviewed, best, winner, proven viral, or generation-ready`);
+    }
+  }
+  for (const pattern of EFFECT_CLAIM_PATTERNS) {
+    if (pattern.test(text)) {
+      fail(`${field} asserts an effect on the audience (${pattern.source}); this corpus has no baseline, denominator or comparison window, so a proposal may describe an arrangement but never what it does to a reader`);
     }
   }
 }
@@ -291,6 +308,10 @@ function proposalRecord(value: unknown, field: string): MechanismProposal {
   exactKeys(row, PROPOSAL_KEYS, field);
   const proposalId = String(row.proposal_id ?? "").trim();
   if (!ID_PATTERN.test(proposalId)) fail(`${field}.proposal_id must look like "mech:<family>:<slug>"`);
+  const slug = proposalId.slice(proposalId.lastIndexOf(":") + 1);
+  if (slug.length > MAX_SLUG_LENGTH) fail(`${field}.proposal_id slug must be at most ${MAX_SLUG_LENGTH} characters; an id is a handle, not a place to put text`);
+  // The id is read by humans and stored like any other string, so it is linted like any other.
+  assertNoBannedClaims(slug.replace(/-/g, " "), `${field}.proposal_id`);
   const family = enumValue(row.family, `${field}.family`, MECHANISM_FAMILIES);
   if (!proposalId.startsWith(`mech:${family}:`)) fail(`${field}.proposal_id must carry its own family`);
   if (row.generates_copy !== false) fail(`${field}.generates_copy must be false`);
@@ -430,7 +451,7 @@ export function buildCorpusIndex(
     // are what an actual attribution looks like.
     const slugTokens = file.creatorSlug.split("-");
     if (slugTokens.length > 1) creatorTokens.add(slugTokens.join(" "));
-    else if (slugTokens[0]!.length >= 6) creatorTokens.add(slugTokens[0]!);
+    else if (slugTokens[0]!.length >= 4) creatorTokens.add(slugTokens[0]!);
     // The handle field is sometimes a display name plus an annotation ("Product Talk
     // (productTalk.org)"). Only take the leading run when it is actually a handle: either
     // @-prefixed, or the only word before the first parenthesis or comma.
@@ -443,14 +464,17 @@ export function buildCorpusIndex(
     // than a category word: "dieworkwear" yes, the "product" in "@product-thinking" no.
     const firstSegment = handle?.split(/[._-]/)[0];
     if (firstSegment && firstSegment.length >= 8 && !GENERIC_HANDLE_TOKENS.has(firstSegment)) creatorTokens.add(firstSegment);
-    const lines = (rawTextByFile.get(file.file) ?? "").split(/\r?\n/);
+    // Fail closed: a file with no source text would silently disable the copy check for every
+    // entry it holds, which is exactly the case where the check matters.
+    const rawText = rawTextByFile.get(file.file);
+    if (rawText === undefined) fail(`buildCorpusIndex is missing the source text for ${file.file}; the copy check cannot run without it`);
+    const lines = rawText.split(/\r?\n/);
     const starts = file.entries.map((entry) => entry.lineNumber - 1);
     for (const [position, entry] of file.entries.entries()) {
       const end = position + 1 < starts.length ? starts[position + 1]! : lines.length;
-      const span = lines
-        .slice(starts[position]!, end)
-        .filter((line) => line.startsWith(">") || /^\*\*(Structure|Framing)/.test(line))
-        .join(" ");
+      // Every line of the entry, not just its blockquotes: an inline field value carries captured
+      // text too, and a check that skipped them would leave the easiest route open.
+      const span = lines.slice(starts[position]!, end).join(" ");
       entriesByRef.set(entry.ref, entry);
       verbatimShinglesByRef.set(entry.ref, shingles(span));
     }
@@ -500,6 +524,9 @@ function recomputeSupport(entries: readonly ParsedEntry[], index: CorpusIndex): 
 
 function expectedReplication(support: MechanismSupport): ReplicationStatus {
   if (support.entries < MINIMUM_SUPPORT_ENTRIES) return "insufficient";
+  // Zero first-party files means every cited entry is somebody else's post carried on an account
+  // being studied. That is not one creator repeating themselves and it is not replication either.
+  if (support.distinct_creator_files === 0) return "insufficient";
   return support.distinct_creator_files > 1 ? "cross-creator" : "single-creator";
 }
 
@@ -549,6 +576,10 @@ export function validateProposalsAgainstCorpus(
     for (const ref of proposal.third_party_refs) {
       if (!proposal.source_refs.includes(ref)) {
         findings.push({ proposal_id: proposal.proposal_id, kind: "third-party-ref-mismatch", detail: `${ref} is listed as third-party but is not a source ref` });
+        continue;
+      }
+      if (index.entriesByRef.get(ref)?.flags.thirdPartyAuthored === false) {
+        findings.push({ proposal_id: proposal.proposal_id, kind: "third-party-ref-mismatch", detail: `${ref} is listed as third-party but the corpus records it as the account owner's own post` });
       }
     }
 
@@ -568,7 +599,13 @@ export function validateProposalsAgainstCorpus(
       }
     }
 
-    const freeText = [proposal.name, proposal.mechanism, proposal.adaptation_note, ...proposal.evidence_limitations].join(" ");
+    const freeText = [
+      proposal.proposal_id.slice(proposal.proposal_id.lastIndexOf(":") + 1).replace(/-/g, " "),
+      proposal.name,
+      proposal.mechanism,
+      proposal.adaptation_note,
+      ...proposal.evidence_limitations,
+    ].join(" ");
     const proposalShingles = shingles(freeText);
     for (const ref of proposal.source_refs) {
       const source = index.verbatimShinglesByRef.get(ref);
@@ -581,9 +618,15 @@ export function validateProposalsAgainstCorpus(
       }
     }
 
-    const lowered = freeText.toLowerCase();
+    // Normalize the dash family before matching so a typographic hyphen cannot split a name.
+    const lowered = freeText.toLowerCase().replace(/[\u2010-\u2015\u2212]/g, "-");
     for (const token of index.creatorTokens) {
-      if (lowered.includes(token)) {
+      // A one-word name is matched on word boundaries; a multi-word name or a handle is a phrase
+      // distinctive enough that a substring match is safe.
+      const hit = token.includes(" ") || token.length >= 8
+        ? lowered.includes(token)
+        : new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(lowered);
+      if (hit) {
         findings.push({ proposal_id: proposal.proposal_id, kind: "creator-named", detail: `free text names a corpus creator or handle token ("${token}")` });
       }
     }
