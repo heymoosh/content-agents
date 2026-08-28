@@ -2892,3 +2892,24 @@ test("Slice 3b: recommendation block copy claims no liveness", () => {
     );
   }
 });
+
+// Muxin's voice rules ban decorative emoji in anything a human reads. The only sweep that
+// existed checked the Studio needs-you strings, so a seedling in the empty queue and a speech
+// bubble in the Notes engagement line both shipped. This reads the whole emitted page.
+//
+// A few marks are allowed because they carry meaning rather than decoration: the warning triangle
+// on the dev-worktree and fixture banners, and the design's own evidence badges, which
+// Venture Build v7 handoff §1 specifies as LINK ↗ / SYSTEM ▪ / YOUR WORD ✓.
+test("no decorative emoji anywhere in the rendered page", () => {
+  const MEANINGFUL = new Set(["⚠", "↗", "▪", "✓"]);
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: true, fixtures: true });
+  const found = new Set<string>();
+  for (const ch of html) {
+    if (/\p{Extended_Pictographic}/u.test(ch) && !MEANINGFUL.has(ch)) found.add(ch);
+  }
+  assert.deepEqual(
+    [...found],
+    [],
+    `decorative emoji in rendered copy: ${[...found].map((c) => `${c} U+${c.codePointAt(0)!.toString(16).toUpperCase()}`).join(", ")}`,
+  );
+});

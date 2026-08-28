@@ -78,6 +78,15 @@ export function lastScoutRun(path?: string): string | null {
 const UNDECIDED_LEAD_STATUSES = new Set(["intake", "researched", "qualified"]);
 
 // Friendly team-member name per job kind — the design's cast (Formatter, Scout, Publisher, ...).
+/**
+ * Wrap a title in quotes exactly once. A Substack note's own title usually arrives already
+ * quoted, and wrapping it again rendered `From """Why do we fear AI…"""` on the Studio queue.
+ */
+export function quoteOnce(title: string): string {
+  const bare = title.trim().replace(/^["“”']+/, "").replace(/["“”']+$/, "");
+  return `"${bare}"`;
+}
+
 function teamNameFor(kind: string): string {
   if (kind === "develop" || kind === "develop-reply") return "Director";
   if (kind === "scout") return "Scout";
@@ -188,7 +197,7 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
     needsYou.push({
       room: "content", label: "Content", urgent: false,
       text: `${piece.pending} draft${piece.pending === 1 ? "" : "s"} ready for your yes or no.`,
-      detail: `From "${piece.title}".`,
+      detail: `From ${quoteOnce(piece.title)}.`,
       action: "Review",
     });
   }

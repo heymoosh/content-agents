@@ -5280,7 +5280,7 @@ function askBoxHtml(j){
 }
 function renderJobs(){
   const box = $("#jobs"); box.innerHTML = "";
-  if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above. 🌱</div>'; return; }
+  if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above.</div>'; return; }
   // Matches jobIsSweepable in jobs.ts, which takes a stopped job too: it is finished work.
   const clearable = JOBS.some(j=>j.status==="done"||j.status==="failed"||j.status==="stopped");
   let html = '<div class="jobs-head"><h3>Queue</h3>'+(clearable?'<button id="clearJobsBtn">Clear queue</button>':'')+'</div>';
@@ -5684,7 +5684,7 @@ function noteMeta(n){
   // draftedTag ("in review now" / "published Nd ago" / "drafted before, discarded") comes from the
   // server's note-reuse rule — never recomputed client-side.
   const tag = n.drafted ? ' <span class="drafted-tag">'+esc(n.draftedTag||"already drafted")+'</span>' : "";
-  return d+' · eng '+n.eng+' (♥'+n.likes+' ↻'+n.reposts+' 💬'+n.replies+')'+tag;
+  return d+' · eng '+n.eng+' ('+n.likes+' likes · '+n.reposts+' reposts · '+n.replies+' replies)'+tag;
 }
 function renderNotes(){
   const box = $("#notesList");
