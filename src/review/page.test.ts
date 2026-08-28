@@ -906,6 +906,32 @@ test("Signals: opens on the reads; brief and raw exports sit behind pane control
   assert.ok(html.includes('SIG.pane !== "raw"'), "the raw sheet must follow SIG.pane");
 });
 
+// Intake guardrails are durable notes, not the room's subject. They stay fully working behind one
+// VEN.pane switch, same shape as Signals' SIG.pane. The room opens on the thread.
+test("Venture: opens on the thread; intake guardrails sit behind a pane control", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('id="ventureMainSheet"'), "the thread sheet must be present");
+  assert.ok(html.includes('id="ventureRead"'), "the thread itself must still be present");
+  assert.match(html, /id="ventureIntakeSheet"[^>]*\bhidden\b/, "the intake sheet starts hidden");
+  assert.ok(html.includes('id="ventureIntakeSections"'), "the intake fields must still exist");
+  assert.ok(html.includes('data-set-ven-pane="intake"'), "a control must open the intake sheet");
+  assert.ok(html.includes('data-set-ven-pane="thread"'), "the demoted sheet needs a way back to the thread");
+  assert.ok(html.includes("Edit the intake guardrails"), "the intake control must be labeled");
+  assert.ok(html.includes("Back to the venture"), "the intake sheet must offer a way back");
+  assert.ok(html.includes('id="ventureAnalyzeBtn"'), "Analyze this step must still be reachable");
+  assert.ok(html.includes('id="ventureRunStepBtn"'), "Run the next draft step must still be reachable");
+  assert.ok(html.includes('id="ventureStartBtn"'), "Start a venture must still be reachable");
+  assert.ok(html.includes('id="ventureEngine"'), "the engine picker must still be reachable");
+  assert.ok(html.includes('let VEN = { pane: "thread" }'), "VEN.pane must default to the thread");
+  assert.ok(html.includes("function renderVentureSheets()"), "one function must toggle the two sheets");
+  assert.ok(html.includes('VEN.pane !== "thread"'), "the thread sheet must follow VEN.pane");
+  assert.ok(html.includes('VEN.pane !== "intake"'), "the intake sheet must follow VEN.pane");
+  assert.ok(
+    !html.includes("Nothing on this screen is stored as a conversation"),
+    "the long header paragraph must be trimmed so the thread is the subject",
+  );
+});
+
 // The three job surfaces must actually reach the browser, not just exist as testable mirrors.
 test("client <script> output: the job working panel, room strips and team rail all emit", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });

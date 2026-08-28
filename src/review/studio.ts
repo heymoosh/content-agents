@@ -87,6 +87,22 @@ export function quoteOnce(title: string): string {
   return `"${bare}"`;
 }
 
+/**
+ * Cut on a word boundary with a single ellipsis. Keeps approx `max` characters of the source.
+ *
+ * It also repairs " -- " on the way through. Scout and matchmaker prose arrives with an em dash
+ * already flattened to a double hyphen, and Muxin's voice rules strip an em dash to real
+ * punctuation, never to that. This is system-written description, not her own words, so a colon is
+ * safe here. Anything she wrote goes to the screen untouched.
+ */
+export function clipOnWord(text: string, max: number): string {
+  const t = (text || "").replace(/ +-- +/g, ": ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max).replace(/[\s,;:]+\S*$/, "").replace(/\s+$/, "");
+  return (cut || t.slice(0, max).trimEnd()) + "…";
+}
+
 function teamNameFor(kind: string): string {
   if (kind === "develop" || kind === "develop-reply") return "Director";
   if (kind === "scout") return "Scout";
@@ -187,7 +203,7 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
       needsYou.push({
         room: "followups", label: "Outreach", urgent: true,
         text: `Follow up with ${row.who}.`,
-        detail: `${row.status === "overdue" ? "Worth a call on moving on. " : "Due now. "}${row.why.slice(0, 90)}`,
+        detail: `${row.status === "overdue" ? "Worth a call on moving on. " : "Due now. "}${clipOnWord(row.why, 90)}`,
         action: "Open", dir: row.dir,
       });
     }
@@ -205,7 +221,7 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
     needsYou.push({
       room: "outreach", label: "Outreach", urgent: false,
       text: `${lead.name} dossier, worth a minute.`,
-      detail: lead.pitchAngle ? lead.pitchAngle.slice(0, 110) : "Researched and waiting on your pursue-or-pass.",
+      detail: lead.pitchAngle ? clipOnWord(lead.pitchAngle, 110) : "Researched and waiting on your pursue-or-pass.",
       action: "Read", dir: lead.dir,
     });
   }

@@ -45,6 +45,13 @@ export interface VentureReadResult {
   body: unknown;
 }
 
+// formatStatusReadOnly still emits " -- " where an em dash used to sit. Muxin's voice rules strip
+// an em dash to a period, comma, colon, or parentheses, never to a double hyphen. The status module
+// is outside this change's edit wall, so the screen path rewrites here before the thread ships.
+export function screenStatusText(text: string): string {
+  return text.replace(/ -- /g, ": ");
+}
+
 // The same allowlist src/review/fiction.ts:113 uses for a fiction series, deliberately rather than
 // paths.ts's safeSlug blocklist. A blocklist that names "/", "\" and ".." has to be right about
 // every other way a path can escape; an allowlist of [a-z0-9][\w-]* has nothing left to be wrong
@@ -158,7 +165,7 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
     return { thread: buildVentureThread({
       slug,
       state: computeState(slug),
-      statusText: formatStatusReadOnly(slug),
+      statusText: screenStatusText(formatStatusReadOnly(slug)),
       artifacts: readArtifacts(slug),
       decisions: readDecisions(slug),
       canon: readCanonEvents(slug),

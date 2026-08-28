@@ -17,7 +17,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSyn
 import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { handleVentureRead, VENTURE_READ_PATHS } from "./venture-reads.js";
+import { handleVentureRead, VENTURE_READ_PATHS, screenStatusText } from "./venture-reads.js";
 import { listVentures, ventureRoot } from "../venture/paths.js";
 import { INTAKE_QUESTIONS, readIntakeAnswers, kickoffVenture, type IntakeAnswers } from "../venture/intake.js";
 import { loadRules } from "../venture/rules.js";
@@ -261,7 +261,13 @@ test("the thread carries what the eight deleted routes used to return", () => {
     // ...state + status
     assert.equal(t.slug, "full");
     assert.equal(t.phase, 1);
-    assert.match(t.statusText, /^full -- Phase 1/);
+    assert.match(t.statusText, /^full: Phase 1/);
+    assert.ok(!t.statusText.includes(" -- "), "status text must not keep a double hyphen where an em dash was stripped");
+    assert.equal(screenStatusText("zz-test-phase2 -- Phase 2"), "zz-test-phase2: Phase 2");
+    assert.equal(
+      screenStatusText("recorded -- ready to clear Checkpoint 1."),
+      "recorded: ready to clear Checkpoint 1.",
+    );
     // ...canon
     assert.equal(t.messages.filter((m) => m.kind === "receipt").length, 1);
     // ...artifacts and decisions: nothing drafted yet, so no cards and no choice panels

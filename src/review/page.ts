@@ -1103,32 +1103,44 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomVenture" hidden>
-    <div class="sheet" style="padding:18px 40px">
+    <!-- One default sheet: compact chrome + the thread. Intake guardrails sit behind VEN.pane. -->
+    <div class="sheet" id="ventureMainSheet" style="padding:22px 40px 28px">
       <div class="sheet-head"><h2>Venture</h2><span class="grow"></span>
         <select id="ventureSlug"></select>
         <label class="engine-choice"><span>Analyze with</span><select class="engine-select" id="ventureEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        <button id="ventureAnalyzeBtn">Analyze this step</button>
-        <button class="primary" id="ventureRunStepBtn">Run the next draft step</button>
+        <button type="button" id="ventureAnalyzeBtn">Analyze this step</button>
+        <button type="button" class="primary" id="ventureRunStepBtn">Run the next draft step</button>
         <span class="src" id="ventureDay"></span>
-        <button id="ventureStartBtn">Start a venture</button>
+        <button type="button" id="ventureStartBtn">Start a venture</button>
       </div>
-      <div class="sheet-sub">The 14-day build, read straight out of canon. Nothing on this screen is stored as a conversation: every line below is derived from the ledger, the decisions, the artifacts and your own intake answers. The selected engine runs one validated draft step, then stops at the next human gate. It never selects, approves, or publishes.</div>
+      <div class="sheet-sub" style="max-width:640px">Every line below comes from the ledger, the decisions, the artifacts, and your intake. The selected engine drafts one step and stops at your next gate.</div>
+      <div id="ventureAnalysisPanel" hidden style="margin-top:16px;padding-top:14px;border-top:1px solid #efe7d6">
+        <div class="sheet-head"><h3>Selected engine's read</h3><span class="grow"></span><span class="src" id="ventureAnalysisEngine"></span></div>
+        <div class="sheet-sub">Read-only advice about what is ready, what you need to decide, and what must wait. It does not write canon or advance a phase.</div>
+        <div class="md" id="ventureAnalysisOut" style="margin-top:12px"></div>
+      </div>
+      <div class="vroom" id="ventureRead" style="margin:18px -40px 0;border-top:1px solid #efe7d6">
+        <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
+        <div class="vrail"><div class="vrail-in" id="ventureRail"></div></div>
+      </div>
+      <div class="sheet-foot" id="ventureMainFoot" style="justify-content:flex-start;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:18px">
+        <button type="button" class="cw-back" data-set-ven-pane="intake">Edit the intake guardrails</button>
+        <span class="src">Voice and Day 14 scorecard notes live there. This room opens on the thread.</span>
+      </div>
     </div>
-    <div class="sheet" id="ventureIntakeSections" style="padding:22px 40px">
-      <div class="sheet-head"><h3>Intake guardrails</h3><span class="grow"></span><span class="src">Voice and scorecard fields save as you type</span></div>
+    <div class="sheet" id="ventureIntakeSheet" hidden style="padding:22px 40px">
+      <div class="sheet-head">
+        <button type="button" class="cw-back" data-set-ven-pane="thread">Back to the venture</button>
+        <h2>Intake guardrails</h2>
+        <span class="grow"></span>
+        <span class="src">Voice and scorecard fields save as you type</span>
+      </div>
       <div class="sheet-sub">These fields are separate from the 25-question interview. They survive a reload, never advance a phase, and remain durable notes for this venture until you choose to use them.</div>
-      <div class="empty" style="padding:18px 0">Choose a venture to load its intake guardrails.</div>
+      <div id="ventureIntakeSections">
+        <div class="empty" style="padding:18px 0">Choose a venture to load its intake guardrails.</div>
+      </div>
     </div>
     <div class="sheet" id="ventureCaptureHandoff" hidden></div>
-    <div class="sheet" id="ventureAnalysisPanel" hidden style="padding:22px 40px">
-      <div class="sheet-head"><h3>Selected engine's read</h3><span class="grow"></span><span class="src" id="ventureAnalysisEngine"></span></div>
-      <div class="sheet-sub">Read-only advice about what is ready, what you need to decide, and what must wait. It does not write canon or advance a phase.</div>
-      <div class="md" id="ventureAnalysisOut" style="margin-top:12px"></div>
-    </div>
-    <div class="sheet vroom" id="ventureRead">
-      <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
-      <div class="vrail"><div class="vrail-in" id="ventureRail"></div></div>
-    </div>
     <div class="sheet" id="ventureIntake" hidden style="padding:26px 40px 34px">
       <div id="intakeBox"></div>
     </div>
@@ -3166,6 +3178,15 @@ let ficFixed = {};        // spans fixed in this session, so the rail says "fixe
 //
 // Almost nothing is computed here. src/review/venture-thread.ts already derived the whole view
 // model server-side; this walks it and writes markup. The two exceptions are the mirrors below.
+//
+// VEN.pane picks which of the room's two durable sheets is on screen: "thread" (default: chrome +
+// the venture thread) or "intake" (the voice/scorecard guardrails). Exactly one shows at a time.
+// The Start-a-venture interview is a separate overlay on the thread pane, same as before.
+let VEN = { pane: "thread" };
+function renderVentureSheets(){
+  $("#ventureMainSheet").hidden = VEN.pane !== "thread";
+  $("#ventureIntakeSheet").hidden = VEN.pane !== "intake";
+}
 let VENTURE_SLUGS = [];
 let ventureSlug = null;
 let VENTURE_THREAD = null;
@@ -3190,6 +3211,7 @@ function intakeValue(section, field){
 function renderVentureIntake(){
   const box = $("#ventureIntakeSections");
   if(!box) return;
+  // Sheet chrome (title, back control, save hint) lives on #ventureIntakeSheet. This only fills fields.
   const body = Object.entries(INTAKE_FIELDS).map(([section, fields])=>
     '<div style="margin-top:18px"><div class="wb-label">'+esc(section==="voice"?"Voice":"Scorecard")+'</div>'+
     '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px">'+fields.map(field=>{
@@ -3198,8 +3220,7 @@ function renderVentureIntake(){
         '<textarea data-intake-section="'+esc(section)+'" data-intake-field="'+esc(field)+'" rows="3" placeholder="Add a durable guardrail for this section" style="width:100%;box-sizing:border-box;resize:vertical;border:1px solid #e0d6c0;border-radius:7px;padding:9px 10px;background:#fffdf8;font:14px/1.5 Georgia,serif">'+esc(intakeValue(section, field))+'</textarea></label>';
     }).join('')+'</div></div>'
   ).join('');
-  box.innerHTML = '<div class="sheet-head"><h3>Intake guardrails</h3><span class="grow"></span><span class="src">Voice and scorecard fields save as you type</span></div>'+
-    '<div class="sheet-sub">These fields are separate from the 25-question interview. They survive a reload, never advance a phase, and remain durable notes for this venture until you choose to use them.</div>'+body;
+  box.innerHTML = body;
   box.querySelectorAll("textarea[data-intake-section]").forEach(ta=>ta.addEventListener("input",()=>{
     const section=ta.dataset.intakeSection, field=ta.dataset.intakeField, key=intakeKey(section,field);
     VENTURE_INTAKE[section][field] = ta.value;
@@ -3263,7 +3284,7 @@ async function loadVentureList(){
     $("#ventureRunStepBtn").disabled = true;
     $("#ventureAnalysisPanel").hidden = true;
     $("#ventureDay").textContent = "";
-    $("#ventureIntakeSections").innerHTML = '<div class="sheet-head"><h3>Intake guardrails</h3></div><div class="empty" style="padding:18px 0">Start or choose a venture to edit its durable voice and scorecard fields.</div>';
+    $("#ventureIntakeSections").innerHTML = '<div class="empty" style="padding:18px 0">Start or choose a venture to edit its durable voice and scorecard fields.</div>';
     $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. "Start a venture" above runs the whole intake interview here: 25 questions, one at a time.</div>';
     $("#ventureRail").innerHTML = "";
     return;
@@ -3901,6 +3922,14 @@ document.addEventListener("change", e=>{
     loadVenture();
   }
 });
+// Pane switch for the demoted intake sheet (mirrors Signals' SIG.pane). Lives on the room, not
+// inside the rebuilt thread, so a plain listener on #roomVenture is enough.
+$("#roomVenture").addEventListener("click", (e)=>{
+  const t = e.target.closest ? e.target.closest("[data-set-ven-pane]") : null;
+  if(!t) return;
+  VEN.pane = t.dataset.setVenPane;
+  renderVentureSheets();
+});
 // One delegated listener: renderVenture() replaces the whole subtree on every refetch, so per-node
 // handlers would be re-bound constantly and a stale one could fire against a rebuilt thread.
 document.addEventListener("click", e=>{
@@ -4060,7 +4089,10 @@ function ivResumable(){
 }
 
 function ivShow(on){
+  // Interview sits on the thread pane. Leaving intake guardrails open would stack two sheets.
+  if(on){ VEN.pane = "thread"; renderVentureSheets(); }
   $("#ventureRead").hidden = on;
+  const foot = $("#ventureMainFoot"); if(foot) foot.hidden = on;
   $("#ventureIntake").hidden = !on;
   $("#ventureStartBtn").textContent = on ? "Back to the venture" : "Start a venture";
 }

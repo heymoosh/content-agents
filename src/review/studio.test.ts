@@ -9,6 +9,7 @@ import {
   charlesNeedsYou,
   ventureNeedsYou,
   buildStudioHome,
+  clipOnWord,
   type NeedsYouItem,
   quoteOnce,
 } from "./studio.js";
@@ -271,6 +272,18 @@ test("Fiction is deliberately absent from needsYou (no durable waiting-on-her st
   assert.equal(home.needsYou.filter((n) => (n.room as string) === "fiction").length, 0);
 });
 
+test("clipOnWord: cuts on a word boundary with a single ellipsis, not mid-word", () => {
+  assert.equal(clipOnWord("short", 90), "short");
+  assert.equal(clipOnWord("", 90), "");
+  const long = "a strong general information architecture across all 68 contested contests in the region";
+  const clipped = clipOnWord(long, 40);
+  assert.equal(clipped, "a strong general information…");
+  assert.ok(!clipped.includes("..."), "must use a single ellipsis character, not three periods");
+  const mid = clipOnWord("across all 68 contested contests tomorrow", 28);
+  assert.equal(mid, "across all 68 contested…");
+  assert.ok(!mid.includes("con…") && !mid.includes("contested con"), mid);
+});
+
 test("a running job with null elapsedMs does not invent 0m 00s; a measured one still shows the clock", async () => {
   jobs.length = 0;
   try {
@@ -338,4 +351,14 @@ test("quoteOnce wraps a title in exactly one pair of quotes", () => {
   assert.equal(quoteOnce('  "Padded"  '), '"Padded"');
   assert.equal(quoteOnce('""Doubled""'), '"Doubled"');
   assert.equal(quoteOnce('He said "no" out loud'), '"He said "no" out loud"');
+});
+
+test("clipOnWord repairs a flattened em dash and never cuts mid-word", () => {
+  assert.equal(clipOnWord("Upworthy, ex-MoveOn.org -- the strongest connection", 200),
+    "Upworthy, ex-MoveOn.org: the strongest connection");
+  assert.equal(clipOnWord("a hyphenated-word stays whole", 200), "a hyphenated-word stays whole");
+  const clipped = clipOnWord("Building FundingPath.ai for non-dilutive capital and grants", 30);
+  assert.ok(clipped.endsWith("…"), `expected an ellipsis, got ${clipped}`);
+  assert.ok(!/\w…$/.test(clipped.replace(/\s\S*…$/, "")), "must not cut mid-word");
+  assert.ok(clipped.length <= 32, `too long: ${clipped}`);
 });
