@@ -1717,8 +1717,8 @@ export function fixtureBannerHtml(): string {
 <div ${FIXTURE_BANNER_MARKER} role="alert" style="position:fixed;top:0;left:0;right:0;z-index:9000;
   background:${BANNER_BG};color:#fff;padding:7px 16px;display:flex;gap:14px;align-items:baseline;
   font:700 11.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;
-  box-shadow:0 2px 10px rgba(0,0,0,.45)">
-  <span>&#9888; FIXTURE MODE &mdash; ${FIXTURE_ENV_VAR}=1 &mdash; NOTHING ON THIS PAGE IS REAL</span>
+  box-shadow:0 2px 10px rgba(0,0,0,.45);pointer-events:none">
+  <span>&#9888; FIXTURE MODE &middot; ${FIXTURE_ENV_VAR}=1 &middot; NOTHING ON THIS PAGE IS REAL</span>
   <span id="fxBannerState" style="font-weight:400;letter-spacing:0;opacity:.92">real data &middot; nothing forced &middot; every write refused</span>
 </div>`;
 }

@@ -149,7 +149,10 @@ async function main(): Promise<void> {
 
     // Recommendation seam honesty: the margin names PATTERN READS and never claims the corpus is
     // approved, live, proven, viral, or a winner.
-    await openRoom(s.page, "content");
+    // Apply recs-blocked first: that scenario forces Content sessions plus a recommendations payload,
+    // so the PATTERN READS block must render; absence after apply is a fail, not a blocked excuse.
+    await s.page.click('button.fxb[data-fx="recs-blocked"]');
+    await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#workbench").catch(() => "");
     // Scope to the seam's own block, not the whole margin: a director's angle summary may fairly
     // use a word this seam must never use, about Muxin's own routing rather than a corpus claim.
@@ -160,8 +163,8 @@ async function main(): Promise<void> {
     if (!marginText) {
       record({
         feature: "Recommendation margin never claims proven or live status",
-        status: "blocked",
-        detail: "workbench margin empty (no Content sessions to render PATTERN READS against)",
+        status: "fail",
+        detail: "recs-blocked scenario applied; PATTERN READS block still did not render",
       });
     } else {
       const hasCaption = /PATTERN READS/.test(marginText);
@@ -196,7 +199,10 @@ async function main(): Promise<void> {
     });
 
     // Studio needs-you actions and clickable stat tiles must be real <button>s (keyboard-reachable).
-    await openRoom(s.page, "studio");
+    // Apply a Studio scenario first so a missing needs-you list names what was tried; no fixture
+    // overrides /api/studio with a non-empty needsYou, so empty after apply stays blocked (not pass).
+    await s.page.click('button.fxb[data-fx="job-queued"]');
+    await s.page.waitForSelector("#roomStudio:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#studioMain").catch(() => "");
     const btnNy = await s.page.locator("#studioMain button.ny-go").count();
     const btnStat = await s.page.locator("#studioMain button.stat-tile[data-goto]").count();
@@ -208,8 +214,8 @@ async function main(): Promise<void> {
         status: spanNy > 0 || divStat > 0 ? "fail" : "blocked",
         detail:
           spanNy > 0 || divStat > 0
-            ? `needs-you empty, but found non-buttons: span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}; button.stat-tile[data-goto]=${btnStat}`
-            : `Studio needs-you list empty (0 button.ny-go); cannot verify action controls are buttons. button.stat-tile[data-goto]=${btnStat}, span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}`,
+            ? `job-queued scenario applied; needs-you empty, but found non-buttons: span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}; button.stat-tile[data-goto]=${btnStat}`
+            : `job-queued scenario applied; Studio needs-you list still empty (0 button.ny-go); cannot verify action controls are buttons. button.stat-tile[data-goto]=${btnStat}, span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}`,
       });
     } else {
       record({

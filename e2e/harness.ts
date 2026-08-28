@@ -124,11 +124,24 @@ export async function bootServer(env: Record<string, string>, port: number): Pro
   let exited: string | null = null;
   proc.on("exit", (code, signal) => (exited = `exit code ${code}, signal ${signal}`));
 
+  // Negative pid is the process group: the launcher and the node server it forked.
+  // Timeout and early-exit must use the same path as stop(), or the orphaned server holds the port.
+  const killTree = (): void => {
+    try {
+      if (proc.pid) process.kill(-proc.pid, "SIGKILL");
+    } catch {
+      proc.kill("SIGKILL");
+    }
+  };
+
   const deadline = Date.now() + 60_000;
   for (;;) {
-    if (exited) throw new Error(`server on ${port} died before answering (${exited}). Output:\n${log}`);
+    if (exited) {
+      killTree();
+      throw new Error(`server on ${port} died before answering (${exited}). Output:\n${log}`);
+    }
     if (Date.now() > deadline) {
-      proc.kill("SIGKILL");
+      killTree();
       throw new Error(`server did not start on ${port} within 60s. Output:\n${log}`);
     }
     try {
@@ -142,12 +155,7 @@ export async function bootServer(env: Record<string, string>, port: number): Pro
   return {
     port,
     stop: () => {
-      // Negative pid is the process group: the launcher and the node server it forked.
-      try {
-        if (proc.pid) process.kill(-proc.pid, "SIGKILL");
-      } catch {
-        proc.kill("SIGKILL");
-      }
+      killTree();
     },
   };
 }
