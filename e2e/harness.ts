@@ -111,6 +111,9 @@ export async function bootServer(env: Record<string, string>, port: number): Pro
       cwd: ROOT,
       env: { ...process.env, ...env, REVIEW_PORT: String(port) },
       stdio: ["ignore", "pipe", "pipe"],
+      // The tsx launcher forks the real node server, so killing only the launcher orphans the
+      // server and leaves its port held. Its own group means stop() can take the whole tree.
+      detached: true,
     }
   );
   let log = "";
@@ -139,7 +142,12 @@ export async function bootServer(env: Record<string, string>, port: number): Pro
   return {
     port,
     stop: () => {
-      proc.kill("SIGKILL");
+      // Negative pid is the process group: the launcher and the node server it forked.
+      try {
+        if (proc.pid) process.kill(-proc.pid, "SIGKILL");
+      } catch {
+        proc.kill("SIGKILL");
+      }
     },
   };
 }
