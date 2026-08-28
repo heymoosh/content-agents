@@ -500,6 +500,8 @@ test("reads every date shape without upgrading an approximation into a date", ()
   // would put an impossible value into the capture window.
   assert.deepEqual(parseHeadingDate("A title (2024-13-40)"), { date: null, precision: "none", approximate: false });
   assert.deepEqual(parseHeadingDate("A title (2026-02-30)"), { date: null, precision: "none", approximate: false });
+  assert.deepEqual(parseHeadingDate("A title (Feb 29, 2024)"), { date: "2024-02-29", precision: "day", approximate: false });
+  assert.equal(parseHeadingDate("A title (Feb 29, 2025)").date, null, "2025 is not a leap year");
   assert.deepEqual(
     parseHeadingDate("A title (2020-09-20) [link](http://example.test/blog/2019-01-02-post.html)"),
     { date: "2020-09-20", precision: "day", approximate: false },

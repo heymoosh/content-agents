@@ -419,13 +419,18 @@ function monthNumber(name: string): number | undefined {
   return MONTHS[name.slice(0, 3).toLowerCase()];
 }
 
-const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
 
 /** A date the source published is still only a date if it exists. 2024-13-40 is a typo, not a day. */
 function calendarDay(year: number, month: number, day: number): string | null {
   if (!Number.isInteger(year) || year < 1900 || year > 2200) return null;
   if (month < 1 || month > 12) return null;
-  if (day < 1 || day > DAYS_IN_MONTH[month - 1]!) return null;
+  const limit = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1]!;
+  if (day < 1 || day > limit) return null;
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
