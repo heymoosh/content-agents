@@ -91,7 +91,12 @@ const DETECTORS: Readonly<Record<Exclude<SlotSignal, "generic">, RegExp>> = {
   duration: /\b(?:for|over|in)\s+(?:the\s+)?(?:past\s+)?((?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:year|month|week|day|decade|hour)s?)\b|\b((?:a|one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(?:year|month|week|day|decade)s?)\s+(?:ago|now)\b/i,
   // Stops before a duration cue. A frame that slots the state and the timespan separately would
   // otherwise take "writing on LinkedIn since 2024" for the state and repeat the date.
-  "ongoing-state": /\bI(?:'ve|’ve|\s+have)\s+been\s+([a-z]+ing\b(?:(?!\s+(?:since|for|over)\b)[^.!?;]){0,60})/i,
+  // Stops before a duration cue, and before a finite verb, which marks the point where the sentence
+  // has moved past the state into a new clause ("What I've been looking forward to IS ...").
+  // Must begin a clause. "One of the things I've been looking forward to with AI is ..." is a noun
+  // phrase about what the writer wants, not a statement that they have been doing something, and
+  // listing every relative-clause head that could precede it is a losing game.
+  "ongoing-state": /(?:^|[.!?]\s+|\n\s*|\b(?:but|and|so|because)\s+)I(?:'ve|’ve|\s+have)\s+been\s+([a-z]+ing\b(?:(?!\s+(?:since|for|over|is|are|was|were|has|have)\b)[^.!?;,]){0,60})/i,
   "belief-old": /\bI\s+(?:used\s+to\s+(?:think|believe|assume)|once\s+thought|thought|believed|assumed)\s+(?:that\s+)?([^.!?;]{3,90})/i,
   // Sentence-initial "Now", so a mid-sentence "now" does not get read as the turn. Everything after
   // it is kept, verb included: stripping "I see" out of "Now I see it as ..." leaves "Now it as ...".
@@ -114,6 +119,35 @@ function tidy(value: string): string {
   return value.replace(/\s+/g, " ").replace(/^[\s,;:.-]+|[\s,;:.-]+$/g, "").trim();
 }
 
+/**
+ * Character-capped captures cut mid-word, which produced spans ending in "distri" and "marke".
+ * Drop a trailing partial word when the cap was hit, and cap the span in words as well, since a
+ * span longer than an opening clause is not an opening.
+ */
+function trimToWords(span: string, hitCap: boolean, maxWords: number): string {
+  let words = span.split(/\s+/).filter((word) => word.length > 0);
+  if (hitCap && words.length > 1) words = words.slice(0, -1);
+  if (words.length > maxWords) words = words.slice(0, maxWords);
+  return tidy(words.join(" "));
+}
+
+/** Per-signal word cap. An opening slot holds a phrase, not a paragraph. */
+const SPAN_WORD_CAP: Readonly<Record<SlotSignal, number>> = {
+  duration: 4,
+  "ongoing-state": 8,
+  "belief-old": 14,
+  "belief-new": 14,
+  role: 4,
+  "proper-name": 4,
+  number: 3,
+  question: 24,
+  purchase: 10,
+  "action-taken": 12,
+  frustration: 12,
+  "shared-experience": 14,
+  generic: 12,
+};
+
 /** First verbatim span in the draft supplying this signal, or null. */
 export function findSpan(draft: string, signal: SlotSignal): string | null {
   if (signal === "generic") return null;
@@ -121,7 +155,11 @@ export function findSpan(draft: string, signal: SlotSignal): string | null {
   if (match === null) return null;
   // Prefer the first capture group, which holds the material rather than the cue that found it.
   const captured = match.slice(1).find((group) => typeof group === "string" && group.trim().length > 0);
-  const span = tidy(captured ?? match[0]!);
+  const raw = captured ?? match[0]!;
+  // Whether the regex stopped because it ran out of allowance rather than at a real boundary. Only
+  // then is the last word suspect.
+  const hitCap = /[a-z0-9]$/i.test(raw) && raw.length >= 60;
+  const span = trimToWords(tidy(raw), hitCap, SPAN_WORD_CAP[signal]);
   return span.length === 0 ? null : span;
 }
 
@@ -158,9 +196,14 @@ export interface FitInput {
 
 /** Score one frame against one draft. Pure material matching, never a quality judgment. */
 export function fitFrame(draft: string, frame: FitInput): FrameFit {
+  // A reversal needs both halves. Plenty of drafts open a sentence with "Now" without having stated
+  // an earlier belief, and reading that as the second half of a turn invents a reversal the writer
+  // never made. So the new belief only counts when an old one is actually present.
+  const hasOldBelief = findSpan(draft, "belief-old") !== null;
   const slots = frame.slots.map((slot) => {
     const signal = slotSignal(slot);
-    return { slot, signal, span: findSpan(draft, signal) };
+    const span = signal === "belief-new" && !hasOldBelief ? null : findSpan(draft, signal);
+    return { slot, signal, span };
   });
   const demanding = slots.filter((slot) => slot.signal !== "generic");
   const satisfied = demanding.filter((slot) => slot.span !== null).length;
