@@ -10,6 +10,7 @@ import {
   ventureNeedsYou,
   buildStudioHome,
   type NeedsYouItem,
+  quoteOnce,
 } from "./studio.js";
 import { jobs } from "./jobs.js";
 
@@ -326,4 +327,15 @@ test("a running job with null elapsedMs does not invent 0m 00s; a measured one s
   } finally {
     jobs.length = 0;
   }
+});
+
+// A Substack note's title usually arrives already wrapped in quotes, and the Content needs-you row
+// wrapped it again: From """Why do we seem to fear AI more than we fear power?""".
+test("quoteOnce wraps a title in exactly one pair of quotes", () => {
+  assert.equal(quoteOnce("A plain title"), '"A plain title"');
+  assert.equal(quoteOnce('"Already quoted"'), '"Already quoted"');
+  assert.equal(quoteOnce("“Curly quoted”"), '"Curly quoted"');
+  assert.equal(quoteOnce('  "Padded"  '), '"Padded"');
+  assert.equal(quoteOnce('""Doubled""'), '"Doubled"');
+  assert.equal(quoteOnce('He said "no" out loud'), '"He said "no" out loud"');
 });
