@@ -48,14 +48,41 @@ export interface CorpusRanking {
   readonly filesWithDistribution: number;
 }
 
-function primaryCount(entry: ParsedEntry): { count: number; metric: string } | null {
+// Substring matching on metric names is a trap: "interviews" contains "views", "displays" contains
+// "plays", and "dislikes" contains "likes", which would rank an entry on a rejection count. Match
+// whole words instead.
+function metricMatches(metric: string, wanted: string): boolean {
+  return metric
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((word) => word.length > 0)
+    .includes(wanted);
+}
+
+function metricFor(entry: ParsedEntry, wanted: string): { count: number; metric: string } | null {
   if (!entry.metrics.available) return null;
-  for (const wanted of PRIMARY_METRICS) {
-    for (const value of entry.metrics.values) {
-      if (value.metric.toLowerCase().includes(wanted)) return { count: value.count, metric: value.metric };
-    }
+  for (const value of entry.metrics.values) {
+    if (metricMatches(value.metric, wanted)) return { count: value.count, metric: value.metric };
   }
   return null;
+}
+
+/**
+ * The single metric a whole file is ranked on: the most preferred metric that most of its entries
+ * carry. Choosing per entry instead would put a five million view post and a forty like post on one
+ * scale, and the quartile would then measure which metric a post happened to report.
+ */
+export function fileMetric(entries: readonly ParsedEntry[]): string | null {
+  let chosen: string | null = null;
+  let chosenCoverage = 0;
+  for (const wanted of PRIMARY_METRICS) {
+    const coverage = entries.filter((entry) => metricFor(entry, wanted) !== null).length;
+    if (coverage > chosenCoverage) {
+      chosen = wanted;
+      chosenCoverage = coverage;
+    }
+  }
+  return chosen;
 }
 
 /**
@@ -69,8 +96,10 @@ export function buildCorpusRanking(files: readonly ParsedCreatorFile[]): CorpusR
   const counted = new Map<string, { entry: ParsedEntry; file: ParsedCreatorFile; count: number; metric: string }>();
   const perFile = new Map<string, number[]>();
   for (const file of files) {
+    const wanted = fileMetric(file.entries);
+    if (wanted === null) continue;
     for (const entry of file.entries) {
-      const primary = primaryCount(entry);
+      const primary = metricFor(entry, wanted);
       if (primary === null) continue;
       counted.set(entry.ref, { entry, file, count: primary.count, metric: primary.metric });
       const bucket = perFile.get(file.file) ?? [];
@@ -83,8 +112,9 @@ export function buildCorpusRanking(files: readonly ParsedCreatorFile[]): CorpusR
   for (const [file, counts] of perFile) {
     if (counts.length < MINIMUM_ENTRIES_FOR_RANKING) continue;
     const sorted = [...counts].sort((left, right) => left - right);
-    // Nearest-rank 75th percentile. Deterministic, and it does not interpolate a count that no
-    // entry actually had.
+    // The count at the 75% index, so the top quartile is the entries at or above it. Deterministic,
+    // and it never interpolates a count no entry actually had. Note this is not the nearest-rank
+    // percentile, which would put the cut one position lower and admit slightly more than a quarter.
     thresholds.set(file, sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.75))]!);
   }
 
@@ -175,6 +205,81 @@ export function compareSupport(claimed: HookFrameSupport, recomputed: HookFrameS
     .map((field) => ({ field, claimed: claimed[field], recomputed: recomputed[field] }));
 }
 
+/** Fixed runs shorter than this are too generic to be worth grounding. */
+export const MINIMUM_GROUNDED_RUN_WORDS = 3;
+
+/** A frame's fixed wording must appear in at least this many of its cited creators' files. */
+export const MINIMUM_GROUNDING_CREATORS = 2;
+
+export interface GroundingResult {
+  /** Fixed runs of at least MINIMUM_GROUNDED_RUN_WORDS words that no cited creator actually wrote. */
+  readonly ungroundedRuns: readonly string[];
+  /** Runs only one cited creator wrote, which makes them that creator's wording, not common language. */
+  readonly singleCreatorRuns: readonly string[];
+}
+
+/**
+ * Check that a frame's own fixed wording is language its cited creators actually used.
+ *
+ * This is the mirror of the verbatim-run scan, and the two are not in tension. A long fixed run
+ * found anywhere in the corpus is one creator's distinctive sentence and is refused. A SHORT fixed
+ * run found in nobody's text was invented by whatever proposed the frame, and a short run found in
+ * exactly one creator's text is that creator's phrasing. Only a run at least two cited creators
+ * independently wrote is the common connective language a frame is allowed to carry.
+ *
+ * `runs` comes from `fixedRuns` on the template. `citedTexts` maps creator file to that file's raw
+ * text, restricted to the files the frame cites.
+ */
+// Frames spell contractions out because config/voice.yaml prefers it; creators type them short.
+// Without this, "hi i am" would read as ungrounded against a hook that plainly says "hi i'm".
+const CONTRACTIONS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bi'm\b/g, "i am"], [/\bi've\b/g, "i have"], [/\bi'll\b/g, "i will"], [/\bi'd\b/g, "i would"],
+  [/\byou're\b/g, "you are"], [/\byou've\b/g, "you have"], [/\byou'll\b/g, "you will"],
+  [/\bwe're\b/g, "we are"], [/\bwe've\b/g, "we have"], [/\bwe'll\b/g, "we will"],
+  [/\bthey're\b/g, "they are"], [/\bthey've\b/g, "they have"],
+  [/\bit's\b/g, "it is"], [/\bthat's\b/g, "that is"], [/\bhere's\b/g, "here is"],
+  [/\bthere's\b/g, "there is"], [/\bwhat's\b/g, "what is"], [/\bwho's\b/g, "who is"],
+  [/\blet's\b/g, "let us"], [/\bdon't\b/g, "do not"], [/\bdoesn't\b/g, "does not"],
+  [/\bdidn't\b/g, "did not"], [/\bisn't\b/g, "is not"], [/\baren't\b/g, "are not"],
+  [/\bwasn't\b/g, "was not"], [/\bhaven't\b/g, "have not"], [/\bhasn't\b/g, "has not"],
+  [/\bcan't\b/g, "can not"], [/\bcannot\b/g, "can not"], [/\bwon't\b/g, "will not"],
+];
+
+function groundingText(value: string): string {
+  let text = value.toLowerCase().replace(/[‘’ʼ]/g, "'");
+  for (const [pattern, replacement] of CONTRACTIONS) text = text.replace(pattern, replacement);
+  return text
+    .split(/\s+/)
+    .map((word) => word.replace(/[^a-z0-9']/g, ""))
+    .filter((word) => word.length > 0)
+    .join(" ");
+}
+
+export function checkGrounding(
+  runs: readonly (readonly string[])[],
+  citedTexts: ReadonlyMap<string, string>,
+): GroundingResult {
+  const normalized = new Map<string, string>();
+  for (const [file, raw] of citedTexts) normalized.set(file, groundingText(raw));
+  const ungroundedRuns: string[] = [];
+  const singleCreatorRuns: string[] = [];
+  for (const run of runs) {
+    if (run.length < MINIMUM_GROUNDED_RUN_WORDS) continue;
+    const needle = groundingText(run.join(" "));
+    if (needle.length === 0) continue;
+    let found = 0;
+    for (const haystack of normalized.values()) {
+      // Word-boundary safe: both sides are single-spaced word sequences.
+      if (haystack === needle || haystack.startsWith(`${needle} `) || haystack.endsWith(` ${needle}`) || haystack.includes(` ${needle} `)) {
+        found += 1;
+      }
+    }
+    if (found === 0) ungroundedRuns.push(needle);
+    else if (found < MINIMUM_GROUNDING_CREATORS) singleCreatorRuns.push(needle);
+  }
+  return { ungroundedRuns, singleCreatorRuns };
+}
+
 /**
  * Every distinct word run of `length` words across a creator file's raw text, as a set of strings.
  *
@@ -186,6 +291,9 @@ export function corpusRunIndex(rawTexts: readonly string[], length: number): Set
   for (const raw of rawTexts) {
     const words = raw
       .toLowerCase()
+      // Curly apostrophes first, or a corpus "don't" indexes as "dont" and never matches a
+      // template's ASCII "don't", leaving the verbatim guard blind to a real copy.
+      .replace(/[‘’ʼ]/g, "'")
       .split(/\s+/)
       .map((word) => word.replace(/[^a-z0-9']/g, ""))
       .filter((word) => word.length > 0);

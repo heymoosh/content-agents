@@ -11,10 +11,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CREATOR_CONTENT_DIR, parseCreatorFile } from "./creator-content-normalization.js";
-import { buildCorpusRanking, compareSupport, corpusRunIndex, recomputeSupport } from "./hook-frame-corpus.js";
+import { buildCorpusRanking, checkGrounding, compareSupport, corpusRunIndex, recomputeSupport } from "./hook-frame-corpus.js";
 import {
   VERBATIM_RUN_WORDS,
   fillFrame,
+  fixedRuns,
   parseHookFrame,
   readHookFrameLibrary,
   selectFrames,
@@ -105,17 +106,23 @@ export function parseHookFrameArgs(argv: readonly string[]): HookFrameCliOptions
   return { command, root, includePending, material, ...(platform === undefined ? {} : { platform }), ...(topic === undefined ? {} : { topic }), ...(limit === undefined ? {} : { limit }), ...(frameId === undefined ? {} : { frameId }) };
 }
 
-function loadCorpus(root: string, io: HookFrameCliIo): { files: ReturnType<typeof parseCreatorFile>[]; rawTexts: string[] } {
+function loadCorpus(root: string, io: HookFrameCliIo): {
+  files: ReturnType<typeof parseCreatorFile>[];
+  rawTexts: string[];
+  rawByFile: Map<string, string>;
+} {
   const directory = join(root, CREATOR_CONTENT_DIR);
   const names = [...io.listDir(directory)].filter((name) => name.endsWith(".md")).sort();
   const files: ReturnType<typeof parseCreatorFile>[] = [];
   const rawTexts: string[] = [];
+  const rawByFile = new Map<string, string>();
   for (const name of names) {
     const raw = io.readFile(join(directory, name));
     rawTexts.push(raw);
+    rawByFile.set(name, raw);
     files.push(parseCreatorFile(name, raw));
   }
-  return { files, rawTexts };
+  return { files, rawTexts, rawByFile };
 }
 
 function loadBank(root: string, io: HookFrameCliIo, rawTexts: readonly string[], names: readonly string[], handles: readonly string[]) {
@@ -139,7 +146,7 @@ function percent(part: number, whole: number): string {
 }
 
 export function runHookFrameCli(options: HookFrameCliOptions, io: HookFrameCliIo): number {
-  const { files, rawTexts } = loadCorpus(options.root, io);
+  const { files, rawTexts, rawByFile } = loadCorpus(options.root, io);
   const { names, handles } = creatorIdentity(files);
   const ranking = buildCorpusRanking(files);
 
@@ -165,6 +172,21 @@ export function runHookFrameCli(options: HookFrameCliOptions, io: HookFrameCliIo
       const unlisted = recomputed.platforms.filter((platform) => !(frame.platforms as readonly string[]).includes(platform));
       for (const platform of unlisted) {
         io.write(`FINDING ${frame.id}: platform-mismatch: refs include ${platform}, which the frame does not list\n`);
+        problems += 1;
+      }
+      const citedTexts = new Map<string, string>();
+      for (const ref of frame.sourceRefs) {
+        const file = ranking.byRef.get(ref)?.file;
+        const raw = file === undefined ? undefined : rawByFile.get(file);
+        if (file !== undefined && raw !== undefined) citedTexts.set(file, raw);
+      }
+      const grounding = checkGrounding(fixedRuns(frame.template), citedTexts);
+      for (const run of grounding.ungroundedRuns) {
+        io.write(`FINDING ${frame.id}: ungrounded-wording: "${run}" appears in none of the cited creators' text\n`);
+        problems += 1;
+      }
+      for (const run of grounding.singleCreatorRuns) {
+        io.write(`FINDING ${frame.id}: single-creator-wording: "${run}" appears in only one cited creator's text\n`);
         problems += 1;
       }
     }
@@ -193,7 +215,9 @@ export function runHookFrameCli(options: HookFrameCliOptions, io: HookFrameCliIo
     }
     io.write(`base rate for comparison: ${percent(ranking.topQuartileEntries, ranking.rankedEntries)} of ranked corpus entries are top-quartile within their own creator\n\n`);
     for (const selection of selections) {
-      const support = selection.frame.support;
+      // Recomputed from the corpus, not read off the bank. What a human sees has to be the measured
+      // number, or the "never trust the written support" rule holds only where nobody is looking.
+      const support = recomputeSupport(selection.frame.sourceRefs, ranking).support;
       io.write(
         `${selection.frame.id}  (${selection.frame.review})\n` +
           `  ${selection.frame.name}\n` +

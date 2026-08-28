@@ -6,6 +6,7 @@ import {
   buildCorpusRanking,
   compareSupport,
   corpusRunIndex,
+  fileMetric,
   recomputeSupport,
 } from "./hook-frame-corpus.js";
 import type { HookFrameSupport } from "./hook-frame-library.js";
@@ -17,6 +18,8 @@ type MetricsSpec =
   | { readonly kind: "views"; readonly count: number }
   | { readonly kind: "likes"; readonly count: number }
   | { readonly kind: "both"; readonly likes: number; readonly views: number }
+  | { readonly kind: "interviews"; readonly count: number }
+  | { readonly kind: "dislikes"; readonly count: number }
   | { readonly kind: "none" };
 
 function metricsLine(spec: MetricsSpec): string {
@@ -27,6 +30,12 @@ function metricsLine(spec: MetricsSpec): string {
       return `**Metrics:** ${spec.count} likes`;
     case "both":
       return `**Metrics:** ${spec.likes} likes, ${spec.views} views`;
+    // Neither of these is a metric this module looks for; they exist to prove the substring trap
+    // ("interviews" contains "views", "dislikes" contains "likes") no longer bites.
+    case "interviews":
+      return `**Metrics:** ${spec.count} interviews`;
+    case "dislikes":
+      return `**Metrics:** ${spec.count} dislikes`;
     case "none":
       return "**Metrics:** Not captured";
   }
@@ -110,28 +119,72 @@ test("nearest-rank 75th percentile marks exactly the top quarter for counts 1..1
   assert.equal(ranking.topQuartileEntries, 3);
 });
 
-test("primaryCount prefers views over likes, uses only one metric per entry, and leaves unavailable metrics unranked", () => {
+test("a whole file is ranked on ONE metric (the widest-coverage one), not per entry", () => {
+  // "views" covers 2 entries (the "both" entry and the views-only entry), "likes" also covers 2
+  // (the "both" entry and the likes-only entry) -- a tie, which the preference order breaks toward
+  // "views". The file commits to that one metric; the likes-only entry is excluded rather than
+  // opportunistically ranked on the metric it happens to carry.
   const file = parsedFile("preference-creator.md", "YouTube", [
     { kind: "both", likes: 50, views: 200 },
+    { kind: "views", count: 120 },
     { kind: "likes", count: 75 },
     { kind: "none" },
   ]);
-  const [entryBoth, entryLikesOnly, entryNone] = file.entries;
-  assert.ok(entryBoth && entryLikesOnly && entryNone);
+  const [entryBoth, entryViewsOnly, entryLikesOnly, entryNone] = file.entries;
+  assert.ok(entryBoth && entryViewsOnly && entryLikesOnly && entryNone);
+  assert.equal(fileMetric(file.entries), "views");
+
   const ranking = buildCorpusRanking([file]);
 
   const rankedBoth = ranking.byRef.get(entryBoth.ref);
   assert.equal(rankedBoth?.primaryMetric, "views");
   assert.equal(rankedBoth?.primaryCount, 200);
 
+  const rankedViewsOnly = ranking.byRef.get(entryViewsOnly.ref);
+  assert.equal(rankedViewsOnly?.primaryMetric, "views");
+  assert.equal(rankedViewsOnly?.primaryCount, 120);
+
+  // Carries "likes", but the file settled on "views", so this entry is unranked -- not ranked on
+  // its own metric.
   const rankedLikesOnly = ranking.byRef.get(entryLikesOnly.ref);
-  assert.equal(rankedLikesOnly?.primaryMetric, "likes");
-  assert.equal(rankedLikesOnly?.primaryCount, 75);
+  assert.equal(rankedLikesOnly?.primaryMetric, null);
+  assert.equal(rankedLikesOnly?.primaryCount, null);
+  assert.equal(rankedLikesOnly?.topQuartile, null);
 
   const rankedNone = ranking.byRef.get(entryNone.ref);
   assert.equal(rankedNone?.primaryMetric, null);
   assert.equal(rankedNone?.primaryCount, null);
   assert.equal(rankedNone?.topQuartile, null);
+});
+
+test("fileMetric picks the metric with the widest coverage even when it is less preferred", () => {
+  // "views" is more preferred than "likes" in PRIMARY_METRICS, but only 2 entries carry it against
+  // 6 that carry "likes" -- the widest-coverage metric wins over the more-preferred one.
+  const specs: MetricsSpec[] = [
+    ...Array.from({ length: 2 }, (_, i) => ({ kind: "views", count: (i + 1) * 100 }) as MetricsSpec),
+    ...Array.from({ length: 6 }, (_, i) => ({ kind: "likes", count: (i + 1) * 10 }) as MetricsSpec),
+  ];
+  const file = parsedFile("widecoverage-creator.md", "YouTube", specs);
+  assert.equal(fileMetric(file.entries), "likes");
+});
+
+test("fileMetric and buildCorpusRanking match metric names on whole words, so 'interviews' never matches 'views' and 'dislikes' never matches 'likes'", () => {
+  const interviewSpecs: MetricsSpec[] = Array.from({ length: 8 }, (_, i) => ({ kind: "interviews", count: (i + 1) * 10 }) as MetricsSpec);
+  const interviewFile = parsedFile("interviews-creator.md", "YouTube", interviewSpecs);
+  assert.equal(fileMetric(interviewFile.entries), null);
+  const interviewRanking = buildCorpusRanking([interviewFile]);
+  assert.equal(interviewRanking.filesWithDistribution, 0);
+  for (const entry of interviewFile.entries) {
+    const ranked = interviewRanking.byRef.get(entry.ref);
+    assert.equal(ranked?.primaryMetric, null);
+    assert.equal(ranked?.topQuartile, null);
+  }
+
+  const dislikeSpecs: MetricsSpec[] = Array.from({ length: 8 }, (_, i) => ({ kind: "dislikes", count: (i + 1) * 5 }) as MetricsSpec);
+  const dislikeFile = parsedFile("dislikes-creator.md", "YouTube", dislikeSpecs);
+  assert.equal(fileMetric(dislikeFile.entries), null);
+  const dislikeRanking = buildCorpusRanking([dislikeFile]);
+  assert.equal(dislikeRanking.filesWithDistribution, 0);
 });
 
 test("baseRate is the topQuartile share of ranked entries, and 0 when nothing is rankable", () => {

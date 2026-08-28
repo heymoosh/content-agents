@@ -75,6 +75,9 @@ function fail(message: string): never {
 const BANNED_CLAIM_WORDS = [
   "viral", "proven", "guaranteed", "best", "winner", "winning", "optimal", "top-performing",
   "high-performing", "generation-ready", "approved-for-generation", "always works", "never fails",
+  // Bare "approved" too. The `review` field is where an editorial decision belongs; prose that
+  // calls a frame approved is claiming a decision Muxin has not made.
+  "approved", "reviewed", "validated",
 ];
 
 const SLOT_PATTERN = /\{([a-z][a-z0-9_]*)\}/g;
@@ -166,19 +169,45 @@ export interface FrameFinding {
     | "insufficient-creators"
     | "support-arithmetic"
     | "duplicate-id"
+    | "verbatim-scan-not-run"
     | "unusable-template";
   readonly detail: string;
 }
 
 function normalizeForMatch(value: string): string {
-  // Unicode hyphens and quotes collapse so a name cannot slip through on typography alone.
+  // Unicode hyphens and quotes collapse so a name cannot slip through on typography alone, and
+  // hyphens become spaces so a slug-derived needle ("jean luc picard") matches the hyphenated
+  // spelling a frame would actually contain.
   return value
     .toLowerCase()
     .replace(/[‐-―−]/g, "-")
     .replace(/[‘’ʼ]/g, "'")
     .replace(/[^a-z0-9'@-]+/g, " ")
+    .replace(/-+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// Single-token creator slugs like "mrbeast" are real names, but so are generic tokens the earlier
+// pass tripped over ("product", "behind"). A lone token counts as a name only when it is long and
+// not an ordinary English word.
+const COMMON_SINGLE_TOKENS = new Set([
+  "product", "behind", "information", "partridge", "understanding", "career", "journey", "digital",
+  "empires", "comics", "love", "coach", "everyday", "content", "creator", "design", "science",
+]);
+
+function isDistinctiveSingleToken(token: string): boolean {
+  return token.length >= 6 && !COMMON_SINGLE_TOKENS.has(token);
+}
+
+/** Distinct creator files implied by the refs themselves, which no bank field can overstate. */
+export function creatorFilesFromRefs(refs: readonly string[]): string[] {
+  const files = new Set<string>();
+  for (const ref of refs) {
+    const file = ref.split("#")[0]?.trim();
+    if (file !== undefined && file.length > 0) files.add(file);
+  }
+  return [...files].sort();
 }
 
 export function checkFrame(frame: HookFrame, context: FrameValidationContext = {}): FrameFinding[] {
@@ -205,7 +234,9 @@ export function checkFrame(frame: HookFrame, context: FrameValidationContext = {
     add("too-few-fixed-words", `${fixed.length} fixed words, needs at least ${MINIMUM_FIXED_WORDS}`);
   }
 
-  const prose = `${frame.name} ${frame.template} ${frame.whenToUse} ${frame.adaptationNote}`;
+  // Every field a reader or the selection logic can see, not just the sentences. An id or a topic
+  // reading "best-viral-openers" is the same claim wherever it sits.
+  const prose = `${frame.id} ${frame.name} ${frame.template} ${frame.whenToUse} ${frame.adaptationNote} ${frame.topics.join(" ")}`;
   const haystack = normalizeForMatch(prose);
   for (const word of BANNED_CLAIM_WORDS) {
     if (haystack.includes(normalizeForMatch(word))) add("claim-word", `"${word}" is a performance claim the corpus cannot support`);
@@ -215,17 +246,29 @@ export function checkFrame(frame: HookFrame, context: FrameValidationContext = {
 
   for (const name of context.creatorNames ?? []) {
     const needle = normalizeForMatch(name);
-    if (needle.split(" ").length >= 2 && haystack.includes(needle)) add("creator-name", `mentions creator "${name}"`);
+    const tokens = needle.split(" ").filter((token) => token.length > 0);
+    if (tokens.length === 0) continue;
+    const matchable = tokens.length >= 2 || isDistinctiveSingleToken(tokens[0]!);
+    if (matchable && haystack.includes(needle)) add("creator-name", `mentions creator "${name}"`);
   }
   for (const handle of context.handles ?? []) {
     const needle = normalizeForMatch(handle).replace(/^@/, "");
     if (needle.length >= 4 && haystack.includes(needle)) add("handle", `mentions handle "${handle}"`);
   }
 
-  if (frame.support.distinctCreatorFiles < MINIMUM_DISTINCT_CREATORS) {
+  // Read the creator count off the refs, never off the number the bank wrote next to them. This is
+  // the load-bearing originality guard, so it must not be a field a bad row can simply assert.
+  const refFiles = creatorFilesFromRefs(frame.sourceRefs);
+  if (refFiles.length < MINIMUM_DISTINCT_CREATORS) {
     add(
       "insufficient-creators",
-      `${frame.support.distinctCreatorFiles} creator file(s); a frame only counts as widely shared at ${MINIMUM_DISTINCT_CREATORS} or more`,
+      `refs span ${refFiles.length} creator file(s); a frame only counts as widely shared at ${MINIMUM_DISTINCT_CREATORS} or more`,
+    );
+  }
+  if (frame.support.distinctCreatorFiles !== refFiles.length) {
+    add(
+      "support-arithmetic",
+      `distinctCreatorFiles claims ${frame.support.distinctCreatorFiles}, the refs span ${refFiles.length}`,
     );
   }
   if (frame.support.instances < frame.support.distinctCreatorFiles) {
@@ -244,12 +287,23 @@ export function checkFrame(frame: HookFrame, context: FrameValidationContext = {
   // The backstop. Most frames pass this trivially because their fixed runs are two or three generic
   // words; it bites exactly on the long frame that is really a creator's sentence in disguise.
   const contains = context.corpusContainsRun;
-  if (contains) {
-    for (const run of fixedRuns(frame.template)) {
-      for (let start = 0; start + VERBATIM_RUN_WORDS <= run.length; start += 1) {
-        const window = run.slice(start, start + VERBATIM_RUN_WORDS);
+  if (contains === undefined) {
+    // Fail closed. Skipping the scan silently would let a creator's sentence ship as a frame.
+    add("verbatim-scan-not-run", "no corpus run index was supplied, so the verbatim backstop could not run");
+  } else {
+    // Per-run, and then over the fixed words with the slots closed up. Sprinkling slots through a
+    // distinctive sentence leaves every run under eight words while the sentence stays intact, so
+    // the collapsed sequence has to be checked too.
+    const sequences = [...fixedRuns(frame.template), fixedWords(frame.template).map((word) => word.toLowerCase())];
+    const reported = new Set<string>();
+    for (const sequence of sequences) {
+      for (let start = 0; start + VERBATIM_RUN_WORDS <= sequence.length; start += 1) {
+        const window = sequence.slice(start, start + VERBATIM_RUN_WORDS);
+        const key = window.join(" ");
+        if (reported.has(key)) continue;
         if (contains(window)) {
-          add("unusable-template", `a ${VERBATIM_RUN_WORDS}-word fixed run appears verbatim in the corpus: "${window.join(" ")}"`);
+          reported.add(key);
+          add("unusable-template", `a ${VERBATIM_RUN_WORDS}-word fixed run appears verbatim in the corpus: "${key}"`);
         }
       }
     }
@@ -389,6 +443,9 @@ export function selectFrames(library: HookFrameLibrary, request: FrameSelectionR
   const topic = request.topic?.trim().toLowerCase();
   const rows = library.frames
     .filter((frame) => frame.platforms.includes(request.platform))
+    // A rejected frame or one that failed originality is out regardless of includePending, which
+    // only ever means "show me what is still pending", never "show me what was already refused".
+    .filter((frame) => frame.review !== "rejected" && frame.originality !== "failed")
     .filter((frame) => request.includePending === true || frame.review === "approved")
     .map((frame) => ({
       frame,

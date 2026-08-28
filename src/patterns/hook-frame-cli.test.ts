@@ -101,7 +101,9 @@ function creatorAMarkdown(): string {
     "**Metrics:** 40 likes",
     "",
     "**Opening hook (verbatim):**",
-    "> Synthetic opening line about careers for entry one.",
+    // Grounds consistentFrame's two fixed runs ("nobody warns you that" / "changes the moment
+    // you") in this file, so the CLI's grounding check (checkGrounding) does not flag them.
+    "> Nobody warns you that pricing changes the moment you raise it, entry one about careers.",
     "",
     "### 2. Post Two (2025-01-02) [link](https://example.test/a/2)",
     "**Metrics:** 55 likes",
@@ -134,7 +136,9 @@ function creatorBMarkdown(): string {
     "**Metrics:** 30 likes",
     "",
     "**Opening hook (verbatim):**",
-    "> Synthetic opening line about building for entry one.",
+    // Same grounding phrases as creator-a.md: checkGrounding needs a run found in at least
+    // MINIMUM_GROUNDING_CREATORS (2) cited files, not just one.
+    "> Nobody warns you that scope changes the moment you commit, entry one about building.",
     "",
     "### 2. Note Two (2025-02-02) [link](https://example.test/b/2)",
     "**Metrics:** 45 likes",
@@ -273,7 +277,7 @@ test("verify prints a platform-mismatch FINDING when refs cover a platform the f
 // list
 // ---------------------------------------------------------------------------
 
-const approvedListFrame: FrameRow = { ...consistentFrame, id: "hook:list-approved" };
+const approvedListFrame: FrameRow = { ...consistentFrame, id: "hook:list-live" };
 const pendingListFrame: FrameRow = {
   ...consistentFrame,
   id: "hook:list-pending",
@@ -288,14 +292,14 @@ test("list returns 0 and prints the frames for a platform; a pending frame needs
   const code1 = runHookFrameCli(parseHookFrameArgs(["list", "--platform", "linkedin"]), withoutPending.io);
   const text1 = withoutPending.output.join("");
   assert.equal(code1, 0);
-  assert.match(text1, /hook:list-approved/);
+  assert.match(text1, /hook:list-live/);
   assert.doesNotMatch(text1, /hook:list-pending/);
 
   const withPending = makeIo(bank);
   const code2 = runHookFrameCli(parseHookFrameArgs(["list", "--platform", "linkedin", "--include-pending"]), withPending.io);
   const text2 = withPending.output.join("");
   assert.equal(code2, 0);
-  assert.match(text2, /hook:list-approved/);
+  assert.match(text2, /hook:list-live/);
   assert.match(text2, /hook:list-pending/);
 });
 
