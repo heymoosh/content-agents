@@ -226,6 +226,9 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .room.on { color:#f4e8ca; font-weight:600; border-bottom-color:#cbaf87; }
   .room .count { background:#f4e8ca; color:#3a2a12; margin-left:6px; }
   .desk-date { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89876; }
+  /* The design's own header line, kept because it is the one promise the whole app makes. */
+  .desk-tagline { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89876; }
+  .desk-tagline::before { content:"· "; }
   header .hint { color:#a89876; }
   header > button#refresh { border:1px solid rgba(230,213,175,.4); background:transparent; color:#e6d5af; }
   header > button#refresh:hover { border-color:#e6d5af; }
@@ -955,16 +958,17 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
 <header>
   <h1>Content studio</h1>
   <nav class="rooms" aria-label="Rooms">
-    <button class="room${BOOT_ROOM === "content" ? " on" : ""}" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
     <button class="room${BOOT_ROOM === "studio" ? " on" : ""}" data-room="studio">Studio</button>
+    <button class="room" data-room="venture">Venture</button>
+    <button class="room${BOOT_ROOM === "content" ? " on" : ""}" data-room="content">Content <span class="count" id="count" hidden>0</span></button>
     <button class="room" data-room="outreach">Outreach</button>
     <button class="room" data-room="fiction">Fiction</button>
     <button class="room" data-room="charles">Charles</button>
-    <button class="room" data-room="venture">Venture</button>
     <button class="room" data-room="signals">Signals</button>
   </nav>
   <span class="grow"></span>
   <span class="desk-date" id="deskDate"></span>
+  <span class="desk-tagline">nothing sends itself</span>
   <span class="hint" id="lastRefreshed" style="min-width:0"></span>
   <button id="refresh" title="Refreshes only the room you're looking at">Refresh</button>
 </header>
@@ -1247,7 +1251,10 @@ function connectionRecovered(){
   const box=$("#connectionState");
   if(box) box.hidden=true;
 }
-function esc(s){ return (s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+// String() rather than a bare ?? "": a caller passing a number used to throw "replace is not a
+// function" deep inside a map, and the room's catch reported that render bug as a server problem.
+// esc runs on every value this page prints, so it coerces rather than trusting its callers.
+function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 const ENGINE_LABELS = {claude:"Claude", grok:"Grok", codex:"GPT (Codex)"};
 const ENGINE_ROLES = {claude:"Writing", grok:"Ideation", codex:"Analysis"};
 const ENGINE_OPTIONS = '<option value="claude">Claude · Writing</option><option value="grok">Grok · Ideation</option><option value="codex">GPT (Codex) · Analysis</option>';

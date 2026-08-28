@@ -2938,3 +2938,25 @@ test("no decorative emoji anywhere in the rendered page", () => {
     `decorative emoji in rendered copy: ${[...found].map((c) => `${c} U+${c.codePointAt(0)!.toString(16).toUpperCase()}`).join(", ")}`,
   );
 });
+
+// The Venture room used to render "Could not load Venture. Check the server" whenever a venture had
+// history, because esc() was handed a phase number and threw "replace is not a function" deep inside
+// a map. esc runs on every value this page prints, so it coerces rather than trusting its callers.
+test("the browser esc() coerces a non-string instead of throwing", () => {
+  const script = emittedScripts().join("\n");
+  const m = /function esc\(s\)\{[^\n]*\}/.exec(script);
+  assert.ok(m, "esc must ship in the browser script");
+  const esc = new Function("return " + m[0].replace(/^function esc/, "function"))();
+  assert.equal(esc(2), "2");
+  assert.equal(esc(null), "");
+  assert.equal(esc(undefined), "");
+  assert.equal(esc("<b>"), "&lt;b&gt;");
+});
+
+// The rooms run in the order Muxin's design puts them in. Charles has no room in the prototype and
+// sits with the other composing room rather than ahead of the ones that do.
+test("room nav runs in the design's order", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const order = [...html.matchAll(/<button class="room[^"]*" data-room="([a-z]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(order, ["studio", "venture", "content", "outreach", "fiction", "charles", "signals"]);
+});
