@@ -1129,7 +1129,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   <section class="view" id="roomSignals" hidden>
     <div class="sheet" id="signalsCaptureHandoff" hidden></div>
     <div class="sheet" id="stripSignals" hidden style="padding:24px 56px 10px"></div>
-    <div class="sheet">
+    <div class="sheet" id="signalsReads">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
     <div style="margin-top:26px">
@@ -1156,35 +1156,46 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         </div>
       </div>
     </div>
-    <div class="notes-panel" id="stratBriefPanel">
-      <div class="notes-head">
-        <h3>Latest strategy brief</h3>
-        <span class="grow"></span>
-        <span class="src" id="briefPath"></span>
-        <button id="briefToggleBtn">Show brief</button>
-        <button class="primary" id="briefRefreshBtn" title="Runs the full /strategy skill: grades last cycle's bets, writes a new dated brief, records new bets. Takes minutes.">Refresh brief (runs /strategy)</button>
-      </div>
-      <div id="briefBodyWrap" hidden>
-        <div class="md" id="briefBody">Loading…</div>
-        <div class="aibox show">
-          <input placeholder="tell Claude what to change in the brief…" id="briefAskInput" />
-          <button class="send" id="briefAskBtn">Send to engine</button>
-        </div>
-        <span class="hint">Edits land in the brief file itself. Formatting and strategy runs read the latest brief every time, so a change here feeds forward with no extra step.</span>
-      </div>
-      <span class="hint">Refresh brief runs the REAL /strategy with the selected engine: grades bets against fresh data and writes a new dated brief.</span>
+    <div class="sheet-foot" style="justify-content:flex-start;align-items:baseline;gap:14px;flex-wrap:wrap">
+      <button type="button" class="cw-back" data-set-sig-pane="brief">Show the latest strategy brief</button>
+      <button type="button" class="cw-back" data-set-sig-pane="raw">Show the raw downloaded exports</button>
+      <span class="src">The brief file and the on-disk CSV/JSON/XLSX pulls live there. This room opens on the reads.</span>
     </div>
-    <div class="notes-panel">
-      <div class="notes-head">
-        <h3>Raw downloaded exports</h3>
-        <span class="src" id="rawLastPull"></span>
+    </div>
+    <div class="sheet" id="signalsBriefSheet" hidden>
+      <div class="sheet-head">
+        <button type="button" class="cw-back" data-set-sig-pane="reads">Back to the reads</button>
+        <h2>Latest strategy brief</h2>
+      </div>
+      <div class="notes-panel" id="stratBriefPanel" style="margin-top:14px">
+        <div class="notes-head">
+          <span class="grow"></span>
+          <span class="src" id="briefPath"></span>
+          <button id="briefToggleBtn">Show brief</button>
+          <button class="primary" id="briefRefreshBtn" title="Runs the full /strategy skill: grades last cycle's bets, writes a new dated brief, records new bets. Takes minutes.">Refresh brief (runs /strategy)</button>
+        </div>
+        <div id="briefBodyWrap" hidden>
+          <div class="md" id="briefBody">Loading…</div>
+          <div class="aibox show">
+            <input placeholder="tell Claude what to change in the brief…" id="briefAskInput" />
+            <button class="send" id="briefAskBtn">Send to engine</button>
+          </div>
+          <span class="hint">Edits land in the brief file itself. Formatting and strategy runs read the latest brief every time, so a change here feeds forward with no extra step.</span>
+        </div>
+        <span class="hint">Refresh brief runs the REAL /strategy with the selected engine: grades bets against fresh data and writes a new dated brief.</span>
+      </div>
+    </div>
+    <div class="sheet" id="signalsRawSheet" hidden>
+      <div class="sheet-head">
+        <button type="button" class="cw-back" data-set-sig-pane="reads">Back to the reads</button>
+        <h2>Raw downloaded exports</h2>
         <span class="grow"></span>
+        <span class="src" id="rawLastPull"></span>
         <button class="primary" id="rawPullBtn">Pull fresh now</button>
         <button id="rawRefreshBtn">Reload list</button>
       </div>
-      <div id="rawList"><div class="empty">Loading…</div></div>
+      <div id="rawList" style="margin-top:14px"><div class="empty">Loading…</div></div>
       <span class="hint">The actual CSV/JSON/XLSX files pulled from each platform (data/inbox = not yet ingested, data/processed = archived after npm run ingest). "Reload list" only re-reads what's already on disk. It does NOT fetch anything new. "Pull fresh now" is the real pull: it launches real Chrome with your saved logins for LinkedIn/X/Substack and can take a few minutes; it otherwise only runs Sundays at 07:00 via cron. Open a file yourself if you want the raw numbers rather than a computed report.</span>
-    </div>
     </div>
   </section>
   <section class="view" id="roomOutreach" hidden>
@@ -1685,6 +1696,19 @@ function mdToHtml(md){
 }
 
 let briefLoaded = false;
+// SIG.pane picks which of the Signals room's three sheets is on screen: "reads" (default),
+// "brief", or "raw". Exactly one shows at a time — see renderSignalsSheets.
+let SIG = { pane: "reads" };
+function renderSignalsSheets(){
+  $("#signalsReads").hidden = SIG.pane !== "reads";
+  $("#signalsBriefSheet").hidden = SIG.pane !== "brief";
+  $("#signalsRawSheet").hidden = SIG.pane !== "raw";
+}
+function openSignalsBrief(){
+  SIG.pane = "brief";
+  renderSignalsSheets();
+  setBriefExpanded(true);
+}
 async function loadBrief(){
   briefLoaded = true;
   const r = await fetch("/api/strategy/brief"); const d = await r.json();
@@ -1695,7 +1719,8 @@ async function loadBrief(){
 // Collapsed by default — the brief used to render in full the moment the Strategy tab opened,
 // which is the "populates the whole page" behavior Muxin flagged. Now it opens on request: the
 // toggle button, or the dated "Brief: <date>" link Generate Insights renders (delegated listener
-// below, since that link lives inside dynamically-injected insights/brief-revise HTML).
+// below, since that link lives inside dynamically-injected insights/brief-revise HTML). Opening
+// that link also switches SIG.pane to the demoted brief sheet.
 function setBriefExpanded(open){
   $("#briefBodyWrap").hidden = !open;
   $("#briefToggleBtn").textContent = open ? "Hide brief" : "Show brief";
@@ -1703,7 +1728,14 @@ function setBriefExpanded(open){
 $("#briefToggleBtn").addEventListener("click", ()=> setBriefExpanded($("#briefBodyWrap").hidden));
 document.addEventListener("click", (e)=>{
   const a = e.target.closest && e.target.closest('a[href="#stratBriefPanel"]');
-  if(a) setBriefExpanded(true);
+  if(a){ openSignalsBrief(); }
+});
+$("#roomSignals").addEventListener("click", (e)=>{
+  const t = e.target.closest ? e.target.closest("[data-set-sig-pane]") : null;
+  if(!t) return;
+  SIG.pane = t.dataset.setSigPane;
+  renderSignalsSheets();
+  if(SIG.pane === "brief") setBriefExpanded(true);
 });
 async function askBrief(){
   const inp = $("#briefAskInput"); const instruction = inp.value.trim();
@@ -4711,6 +4743,10 @@ async function onCharlesAction(act, item){
 // Deterministic read of the latest brief: per-channel confidence cards and the brief's own
 // [DO MORE]/[TEST]/[DO LESS] recommendations as "worth changing, your call" cards. Send to
 // backlog files a card for the Claude Code pipeline; nothing changes by itself.
+//
+// The room's pane state (SIG) and renderSignalsSheets live with the brief/raw loaders above so the
+// foot controls and the insights "Brief:" link share one switch. The last two sheets are
+// pre-prototype developer surfaces relocated behind those controls so the room opens on the reads.
 let SIGNALS = null;
 const sigSent = new Set();
 // Signals decisions are acknowledgements for this browser page only. Keep the key stable across
@@ -4727,7 +4763,7 @@ function renderSignals(){
   $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
   const box = $("#signalsTop");
   if(!SIGNALS.briefPath){
-    box.innerHTML = '<div class="empty">No strategy brief yet. Use Refresh brief below to create the first one. It may take a few minutes, and progress appears in Studio.</div>';
+    box.innerHTML = '<div class="empty">No strategy brief yet. Open the latest strategy brief below and use Refresh brief to create the first one. It may take a few minutes, and progress appears in Studio.</div>';
     return;
   }
   const fitCards = (SIGNALS.confidence||[]).map(c=>{

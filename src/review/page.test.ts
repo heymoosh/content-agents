@@ -881,6 +881,31 @@ test("Signals: recommendations expose session-only adopt and decline decisions",
   assert.ok(html.includes('sigDeclined.add(signalKey(r))'), "Decline must only update in-memory state");
 });
 
+// The strategy brief and raw-exports sheets are pre-prototype developer surfaces. They stay fully
+// working, but the room opens on the reads (families / research / top / insights) and reaches them
+// through one SIG.pane switch, same shape as Content's CW.pane.
+test("Signals: opens on the reads; brief and raw exports sit behind pane controls", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('id="signalsReads"'), "the reads sheet must be present");
+  assert.match(html, /id="signalsBriefSheet"[^>]*\bhidden\b/, "the brief sheet starts hidden");
+  assert.match(html, /id="signalsRawSheet"[^>]*\bhidden\b/, "the raw sheet starts hidden");
+  assert.ok(html.includes('data-set-sig-pane="brief"'), "a control must open the brief sheet");
+  assert.ok(html.includes('data-set-sig-pane="raw"'), "a control must open the raw sheet");
+  assert.ok(html.includes('data-set-sig-pane="reads"'), "each demoted sheet needs a way back to the reads");
+  assert.ok(html.includes("Show the latest strategy brief"), "the brief control must be labeled");
+  assert.ok(html.includes("Show the raw downloaded exports"), "the raw control must be labeled");
+  assert.ok(html.includes("Back to the reads"), "demoted sheets must offer a way back");
+  assert.ok(html.includes('id="stratBriefPanel"'), "the brief surface itself must still exist");
+  assert.ok(html.includes('id="rawList"'), "the raw file list must still exist");
+  assert.ok(html.includes('id="briefRefreshBtn"'), "Refresh brief must still be reachable");
+  assert.ok(html.includes('id="rawPullBtn"'), "Pull fresh now must still be reachable");
+  assert.ok(html.includes('let SIG = { pane: "reads" }'), "SIG.pane must default to the reads");
+  assert.ok(html.includes("function renderSignalsSheets()"), "one function must toggle the three sheets");
+  assert.ok(html.includes('SIG.pane !== "reads"'), "the reads sheet must follow SIG.pane");
+  assert.ok(html.includes('SIG.pane !== "brief"'), "the brief sheet must follow SIG.pane");
+  assert.ok(html.includes('SIG.pane !== "raw"'), "the raw sheet must follow SIG.pane");
+});
+
 // The three job surfaces must actually reach the browser, not just exist as testable mirrors.
 test("client <script> output: the job working panel, room strips and team rail all emit", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
