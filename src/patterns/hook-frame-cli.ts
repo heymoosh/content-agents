@@ -1,17 +1,20 @@
 // CLI over the hook frame library.
 //
 //   npm run patterns:hook-frames -- list [--platform x] [--topic ...] [--include-pending]
+//   npm run patterns:hook-frames -- fit  --draft <path> [--platform x] [--show-unfit] [--limit N]
 //   npm run patterns:hook-frames -- verify
 //   npm run patterns:hook-frames -- fill --frame <id> --slot name=value [--slot ...]
 //
-// `verify` is the one that matters: it recomputes every frame's support from the read-only corpus
-// and refuses to agree with the bank on faith.
+// `fit` is the one Muxin reaches for: it reads a draft and offers only the frames that draft can
+// actually fill. `verify` is the one that keeps the bank honest: it recomputes every frame's support
+// from the read-only corpus and refuses to agree with the bank on faith.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CREATOR_CONTENT_DIR, parseCreatorFile } from "./creator-content-normalization.js";
 import { buildCorpusRanking, checkGrounding, compareSupport, corpusRunIndex, recomputeSupport } from "./hook-frame-corpus.js";
+import { fitFrame, proposeOpening, rankFits } from "./hook-frame-fit.js";
 import {
   VERBATIM_RUN_WORDS,
   fillFrame,
@@ -19,6 +22,7 @@ import {
   parseHookFrame,
   readHookFrameLibrary,
   selectFrames,
+  templateSlots,
   type HookFrame,
 } from "./hook-frame-library.js";
 import { PLATFORMS, type Platform } from "./types.js";
@@ -26,7 +30,7 @@ import { PLATFORMS, type Platform } from "./types.js";
 export const HOOK_FRAME_CLI_VERSION = "hook-frame-cli-v1" as const;
 export const HOOK_FRAME_BANK = "config/hook-frames.jsonl" as const;
 
-export type HookFrameCommand = "list" | "verify" | "fill";
+export type HookFrameCommand = "list" | "verify" | "fill" | "fit";
 
 export interface HookFrameCliOptions {
   readonly command: HookFrameCommand;
@@ -37,6 +41,10 @@ export interface HookFrameCliOptions {
   readonly limit?: number;
   readonly frameId?: string;
   readonly material: Readonly<Record<string, string>>;
+  /** Path to the draft `fit` reads. */
+  readonly draft?: string;
+  /** Show frames the draft cannot fill, which `fit` hides by default. */
+  readonly showUnfit: boolean;
 }
 
 export interface HookFrameCliIo {
@@ -58,8 +66,8 @@ function optionValue(argv: readonly string[], index: number, option: string): st
 
 export function parseHookFrameArgs(argv: readonly string[]): HookFrameCliOptions {
   const [command, ...rest] = argv;
-  if (command !== "list" && command !== "verify" && command !== "fill") {
-    fail("usage: hook-frame-cli <list|verify|fill> [options]");
+  if (command !== "list" && command !== "verify" && command !== "fill" && command !== "fit") {
+    fail("usage: hook-frame-cli <list|verify|fill|fit> [options]");
   }
   let root = ".";
   let platform: Platform | undefined;
@@ -67,6 +75,8 @@ export function parseHookFrameArgs(argv: readonly string[]): HookFrameCliOptions
   let includePending = false;
   let limit: number | undefined;
   let frameId: string | undefined;
+  let draft: string | undefined;
+  let showUnfit = false;
   const material: Record<string, string> = {};
   for (let index = 0; index < rest.length; index += 1) {
     const argument = rest[index]!;
@@ -91,6 +101,11 @@ export function parseHookFrameArgs(argv: readonly string[]): HookFrameCliOptions
     } else if (argument === "--frame") {
       frameId = optionValue(rest, index, argument);
       index += 1;
+    } else if (argument === "--draft") {
+      draft = optionValue(rest, index, argument);
+      index += 1;
+    } else if (argument === "--show-unfit") {
+      showUnfit = true;
     } else if (argument === "--slot") {
       const value = optionValue(rest, index, argument);
       const split = value.indexOf("=");
@@ -103,7 +118,15 @@ export function parseHookFrameArgs(argv: readonly string[]): HookFrameCliOptions
   }
   if (command === "fill" && frameId === undefined) fail("fill requires --frame <id>");
   if (command === "list" && platform === undefined) fail("list requires --platform <platform>");
-  return { command, root, includePending, material, ...(platform === undefined ? {} : { platform }), ...(topic === undefined ? {} : { topic }), ...(limit === undefined ? {} : { limit }), ...(frameId === undefined ? {} : { frameId }) };
+  if (command === "fit" && draft === undefined) fail("fit requires --draft <path>");
+  return {
+    command, root, includePending, material, showUnfit,
+    ...(platform === undefined ? {} : { platform }),
+    ...(topic === undefined ? {} : { topic }),
+    ...(limit === undefined ? {} : { limit }),
+    ...(frameId === undefined ? {} : { frameId }),
+    ...(draft === undefined ? {} : { draft }),
+  };
 }
 
 function loadCorpus(root: string, io: HookFrameCliIo): {
@@ -227,6 +250,66 @@ export function runHookFrameCli(options: HookFrameCliOptions, io: HookFrameCliIo
           `${support.topQuartileInstances}/${support.rankedInstances} ranked instances top-quartile (${percent(support.topQuartileInstances, support.rankedInstances)})\n` +
           `  supply: ${selection.frame.slots.join(", ")}\n\n`,
       );
+    }
+    return 0;
+  }
+
+  if (options.command === "fit") {
+    const draft = io.readFile(options.draft!);
+    // Derivatives already declare their platform in frontmatter, so `fit --draft <path>` is the
+    // whole command in practice. An explicit --platform still wins.
+    const declared = /^platform:\s*([a-z-]+)\s*$/m.exec(draft)?.[1];
+    const platform = options.platform ?? (declared !== undefined && (PLATFORMS as readonly string[]).includes(declared) ? (declared as Platform) : undefined);
+    if (platform === undefined) {
+      io.error?.("fit needs a platform: pass --platform, or give a draft whose frontmatter declares one\n");
+      return 1;
+    }
+    const candidates = selectFrames(library, {
+      platform,
+      includePending: options.includePending,
+      ...(options.topic === undefined ? {} : { topic: options.topic }),
+    });
+    if (candidates.length === 0) {
+      io.write("no frames for this platform. Frames stay unavailable until Muxin marks them approved; pass --include-pending to consider the whole bank.\n");
+      return 0;
+    }
+    const fits = rankFits(
+      candidates.map((selection) =>
+        fitFrame(draft, {
+          frameId: selection.frame.id,
+          slots: templateSlots(selection.frame.template),
+          fixedRuns: fixedRuns(selection.frame.template),
+        }),
+      ),
+    );
+    const byId = new Map(candidates.map((selection) => [selection.frame.id, selection.frame]));
+    // A frame the draft cannot fill is the thing this command exists to stop offering, so it is
+    // hidden rather than ranked last.
+    const shown = options.showUnfit ? fits : fits.filter((fit) => fit.verdict !== "no-fit");
+    const limited = options.limit === undefined ? shown : shown.slice(0, options.limit);
+    io.write(
+      `draft: ${options.draft}\n` +
+        `${candidates.length} frame(s) for ${platform}, ${fits.filter((fit) => fit.verdict === "fits").length} the draft can fill completely\n` +
+        `fit is material matching only. It reports what your draft can supply, never whether an opening is better than the one you wrote.\n\n`,
+    );
+    if (limited.length === 0) {
+      io.write("nothing this draft can fill. Pass --show-unfit to see what was ruled out and why.\n");
+      return 0;
+    }
+    for (const fit of limited) {
+      const frame = byId.get(fit.frameId)!;
+      const proposed = proposeOpening(frame.template, fit);
+      io.write(`${fit.frameId}  [${fit.verdict}${fit.alreadyUsed ? ", draft already opens this way" : ""}]\n`);
+      io.write(`  ${frame.template}\n`);
+      for (const slot of fit.slots) {
+        const found = slot.span === null
+          ? slot.signal === "generic" ? "you supply this; nothing in the draft identifies it" : `NOT FOUND (needs a ${slot.signal})`
+          : `"${slot.span}"`;
+        io.write(`    {${slot.slot}} <- ${found}\n`);
+      }
+      io.write(`  proposed: ${proposed.text}\n`);
+      if (proposed.unfilled.length > 0) io.write(`  still yours to fill: ${proposed.unfilled.join(", ")}\n`);
+      io.write("\n");
     }
     return 0;
   }

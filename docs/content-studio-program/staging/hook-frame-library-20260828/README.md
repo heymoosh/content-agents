@@ -100,10 +100,42 @@ It does not write posts, pick your topic, or publish anything. `fill` returns te
 **To approve a frame, change its `review` field from `pending` to `approved` in
 `config/hook-frames.jsonl`.** Until then `list` shows nothing without `--include-pending`.
 
+## Matching a draft to a frame
+
+`list` ranks by evidence and has never seen your draft, which means it will hand back a frame that
+fights the piece: a reversed-belief opener is useless against a post that states no belief. `fit`
+is the step that reads the draft.
+
+```
+npm run patterns:hook-frames -- fit --platform linkedin --draft path/to/draft.md [--show-unfit]
+```
+
+Each slot is read for what it demands (a duration, a role, a purchase, a question), the draft is
+scanned for that material, and a frame is only offered when the draft can actually supply it.
+Frames the draft cannot fill are hidden rather than ranked last. Spans are lifted from the draft
+**verbatim**, so a proposed opening is assembled from your own wording; a slot with nothing to draw
+on stays `{slot}` for you to fill, because writing it would mean composing a claim your draft does
+not make.
+
+```
+ive-been-for-timespan  [partial, draft already opens this way]
+  I have been {state} for {timespan} now.
+    {state} <- "writing on LinkedIn"
+    {timespan} <- NOT FOUND (needs a duration)
+  proposed: I have been writing on LinkedIn for {timespan} now.
+```
+
+Note what it refuses to do there. The draft says "since 2024", which is a start date, not a
+duration. Turning one into the other would put a number in your mouth, so the slot stays empty.
+
+`fit` reports what a draft can supply and nothing else. It does not score writing, and it never
+claims a proposed opening beats the one you wrote, because the corpus cannot support that judgment.
+
 ## Commands
 
 ```
 npm run patterns:hook-frames -- list --platform linkedin [--topic ...] [--include-pending]
+npm run patterns:hook-frames -- fit  --platform linkedin --draft <path> [--show-unfit] [--limit N]
 npm run patterns:hook-frames -- fill --frame <id> --slot name=value [--slot ...]
 npm run patterns:hook-frames -- verify
 ```

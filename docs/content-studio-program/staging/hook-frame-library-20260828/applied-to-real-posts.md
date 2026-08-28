@@ -121,10 +121,39 @@ hold, which this post does not contain. Inventing one would compose a claim in h
 4. **The corpus cannot referee an A/B.** Nobody wrote the same post twice with two openings. Every
    "better" claim about a specific rewrite is a human judgment and should be presented as one.
 
-## The gap this exposes
+## The gap this exposed, now closed
 
-What was asked for is a system that reads a draft and proposes the frame that fits it. What exists is
-a bank of ten evidence-backed shapes with no fit step. Closing that gap means matching a draft's
-content (does it contain a reversed belief? a credential? a timespan? a purchase?) against each
-frame's slots, and returning only frames whose slots the draft can actually fill from its own
-material. That is buildable and deterministic, and it is not built yet.
+Both frames above were chosen by a human reading the post. `fit` is the step that does it instead.
+Run against the same two posts:
+
+**Post 2, "Building an innovation nation":**
+
+```
+3 frame(s) for linkedin, 0 the draft can fill completely
+
+nothing this draft can fill. Pass --show-unfit to see what was ruled out and why.
+```
+
+That is the right answer, and it is the answer no earlier version of this tool could give. The post
+states no reversed belief, no ongoing activity with a duration, and no second-person shared
+experience, so none of the three LinkedIn frames have anything to work with. The earlier hand-picked
+`if-youve-ever-read-this` suggestion is now correctly ruled out rather than offered.
+
+**Post 1, "Human Inference":**
+
+```
+ive-been-for-timespan  [partial, draft already opens this way]
+  I have been {state} for {timespan} now.
+    {state} <- "writing on LinkedIn"
+    {timespan} <- NOT FOUND (needs a duration)
+  proposed: I have been writing on LinkedIn for {timespan} now.
+  still yours to fill: timespan
+```
+
+Three things it gets right that the hand-pick did not. It flags that the draft already opens this
+way, so applying the frame changes little. It fills `{state}` from her own words rather than
+inventing. And it refuses to read "since 2024" as a duration, because a start date is not a length
+of time and converting one to the other would state a number she did not write.
+
+What `fit` still does not do, deliberately: tell her which opening is better. That judgment is hers,
+and the measurements above are the reason it cannot be delegated.

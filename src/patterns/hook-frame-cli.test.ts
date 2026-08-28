@@ -75,7 +75,7 @@ test("parseHookFrameArgs requires --frame for fill", () => {
 });
 
 test("parseHookFrameArgs rejects an unknown command", () => {
-  assert.throws(() => parseHookFrameArgs(["bogus"]), /usage: hook-frame-cli <list\|verify\|fill>/);
+  assert.throws(() => parseHookFrameArgs(["bogus"]), /usage: hook-frame-cli <list\|verify\|fill\|fit>/);
 });
 
 // ---------------------------------------------------------------------------
