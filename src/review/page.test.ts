@@ -2002,10 +2002,17 @@ test("Studio capture: the box moved out of the Content room and into Studio", ()
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const studio = html.slice(html.indexOf('id="roomStudio"'), html.indexOf('id="roomFiction"'));
   const content = html.slice(html.indexOf('id="roomContent"'), html.indexOf('id="roomStudio"'));
-  for (const id of ['id="src"', 'id="captureTitle"', 'id="devStartBtn"', 'id="addBtn"', 'id="notesBtn"', 'id="notesPanel"', 'id="routeBtn"']) {
+  for (const id of ['id="src"', 'id="devStartBtn"', 'id="addBtn"', 'id="notesBtn"', 'id="notesPanel"', 'id="routeBtn"', 'id="captureQuiet"']) {
     assert.ok(studio.includes(id), id + " must live in the Studio room now");
     assert.ok(!content.includes(id), id + " must no longer be in the Content room");
   }
+  // Prototype rail + placeholder; the pre-prototype title and stacked hint paragraphs are gone.
+  assert.ok(studio.includes("a thought, a link, a name, a scene"));
+  assert.ok(studio.includes('placeholder="Say it however it came out."'));
+  assert.ok(!studio.includes("What's on your mind today?"));
+  assert.ok(!studio.includes('id="captureHint"'));
+  assert.ok(!studio.includes('id="engineStatus"'));
+  assert.ok(studio.includes("It starts nothing, and nothing goes out."));
   // The notes browser came with it, so its copy must not still point "below" at a sheet that is
   // now in a different room.
   assert.ok(studio.includes("waits for your yes in the Content room"));
@@ -2013,6 +2020,19 @@ test("Studio capture: the box moved out of the Content room and into Studio", ()
   // The promo bridge fills #src, so it has to land in the room #src is in.
   const script = emittedScripts().join("\n");
   assert.ok(script.includes('setRoom("studio"); // the capture box lives in Studio now'));
+});
+
+test("Studio home: Needs you today without the pre-prototype stat tiles", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function renderStudio(){");
+  const end = script.indexOf("async function loadStudio(){");
+  assert.ok(start > -1 && end > start, "renderStudio must be identifiable");
+  const section = script.slice(start, end);
+  assert.ok(section.includes("Needs you today"));
+  assert.ok(!section.includes("Everything happening, at a glance"));
+  assert.ok(!section.includes("stat-tile"), "stat tiles must not render in Studio");
+  assert.ok(!section.includes("drafts to review"));
+  assert.ok(section.includes("ranked by what actually blocks something"));
 });
 
 test("the bare-link ask: three controls, the honest explainer, and the honest Signals copy", () => {

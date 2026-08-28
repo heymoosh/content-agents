@@ -253,9 +253,16 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   /* The capture box (v7 Studio): its rail, the verdict it states back, and the bare-link ask.
      While the ask is open the textarea dims and goes read-only, and the rail turns amber — that is
      honest state (the app is holding her link, waiting), not decoration. */
+  .capture-rail-row { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:12px; }
   .capture-rail { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
-    letter-spacing:.06em; color:#8a7f6d; margin-bottom:10px; }
+    letter-spacing:.06em; color:#8a7f6d; }
   .capture-rail.asking { color:#9a6b12; }
+  .capture-rail-hint { font:italic 400 12.5px/1.4 Georgia,serif; color:#a89a80; margin-left:auto; }
+  /* One primary action, then demoted real actions + the engine picker so they stop competing. */
+  .capture-primary { display:flex; align-items:center; gap:14px; margin-top:14px; padding-top:14px;
+    border-top:1px solid #efe7d6; flex-wrap:wrap; }
+  .capture-explain { font-size:12.5px; line-height:1.5; color:#8a7f6d; max-width:470px; }
+  .capture-more { display:flex; gap:18px; flex-wrap:wrap; align-items:center; margin-top:14px; }
   .capture textarea.dimmed { opacity:.6; }
   .capture-verdict { margin:12px 0 0; padding:11px 14px; border:1px solid #e3d9c3; background:#fffdf8;
     border-radius:8px; font-size:13.5px; line-height:1.55; color:var(--ink); max-width:640px; }
@@ -984,25 +991,35 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   </section>
   <section class="view" id="roomStudio" hidden>
     <div class="sheet capture">
-      <div class="capture-rail" id="captureRail">One place to say it</div>
-      <div class="capture-title" id="captureTitle">What's on your mind today?</div>
-      <textarea id="src" placeholder="Start typing. Paste a link, a file path, or half a sentence. Nothing is a form. (⌘/Ctrl+Enter hands it over)"></textarea>
-      <div class="capture-verdict" id="captureVerdict" hidden></div>
-      <div class="ingest-actions" id="captureActions">
-        <label class="engine-choice"><span>Run with</span><select class="engine-select" id="studioEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        <button class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Put it where it goes</button>
-        <button id="devStartBtn">Hand it to your director</button>
-        <button id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
-        <button id="notesBtn">Browse Substack Notes</button>
+      <div class="capture-rail-row">
+        <span class="capture-rail" id="captureRail">One place to say it</span>
+        <span class="capture-rail-hint">a thought, a link, a name, a scene</span>
       </div>
-      <div class="hint" id="captureHint">Put it where it goes reads what you wrote, picks the room, and tells you which one it picked. A bare link it asks about first, because that could be two things. It starts nothing, and nothing goes out.</div>
-      <div class="hint" id="engineStatus">Engines are checked when the run starts.</div>
+      <textarea id="src" placeholder="Say it however it came out."></textarea>
+      <div class="capture-verdict" id="captureVerdict" hidden></div>
+      <!-- Quiet state: one primary action. Director / Format / Notes and the engine picker are real
+           and stay reachable, demoted below so they stop competing with Start-on-it. Link-ask and
+           the Notes panel open in place of this block (rules.md carve-out 1), not stacked on it. -->
+      <div id="captureQuiet">
+        <div class="capture-primary" id="captureActions">
+          <button type="button" class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Put it where it goes</button>
+          <span class="capture-explain">I pick the room for most things. A bare link I ask about first, because it could be two things. It starts nothing, and nothing goes out.</span>
+        </div>
+        <div class="capture-more">
+          <button type="button" class="wb-link" id="devStartBtn">Hand it to your director</button>
+          <button type="button" class="wb-link" id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
+          <button type="button" class="wb-link" id="notesBtn">Browse Substack Notes</button>
+        </div>
+        <div class="sheet-foot" style="justify-content:flex-start">
+          <label class="engine-choice"><span>Run with</span><select class="engine-select" id="studioEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
+        </div>
+      </div>
       <div class="link-ask" id="linkAsk" hidden>
         <div class="link-ask-head">Where should this go?</div>
         <div class="link-ask-btns">
-          <button id="linkFileBtn">Source for Signals</button>
-          <button class="primary" id="linkReadBtn">Versions for Content</button>
-          <button class="link-ask-cancel" id="linkCancelBtn">Never mind, clear it</button>
+          <button type="button" id="linkFileBtn">Source for Signals</button>
+          <button type="button" class="primary" id="linkReadBtn">Versions for Content</button>
+          <button type="button" class="link-ask-cancel" id="linkCancelBtn">Never mind, clear it</button>
         </div>
         <div class="hint">${LINK_ASK_SIGNALS_NOTE}</div>
         <div class="link-ask-why">Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.</div>
@@ -1019,11 +1036,11 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <h3>Substack Notes</h3>
           <label class="toggle"><input type="checkbox" id="notesShowDrafted" /> show already drafted</label>
           <span class="grow"></span>
-          <button id="notesCloseBtn">Close</button>
+          <button type="button" id="notesCloseBtn">Close</button>
         </div>
         <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
         <div class="notes-actions">
-          <button class="primary" id="notesDraftBtn">Draft selected</button>
+          <button type="button" class="primary" id="notesDraftBtn">Draft selected</button>
           <span class="hint">Pick the notes worth cross-posting. Each one gets a folder and goes through the production pipeline; every draft still waits for your yes in the Content room. A note published in the last 30 days stays blocked.</span>
         </div>
       </div>
@@ -1261,10 +1278,9 @@ async function loadEngines(){
       });
     }
     refreshEngineControls();
-    const unavailable = (d.engines||[]).filter(e=>!e.installed).map(e=>e.label);
-    const note = $("#engineStatus");
-    const guidance = (d.engines||[]).map(e=>e.label+" for "+String(e.roleHint||"its task").toLowerCase()).join(" · ");
-  if(note) note.textContent = (unavailable.length ? unavailable.join(", ")+" unavailable here. " : "")+guidance+". Your last choice is remembered, and every run can override it. Sign-in is checked when a run starts.";
+    // Engine availability used to fill a second hint under the capture card. That line was
+    // collapsed into the single sentence beside Put it where it goes; the select still disables
+    // unavailable engines via refreshEngineControls, and sign-in is still checked when a run starts.
   }catch(e){ connectionState("Engine availability could not be checked. The server will validate your choice when you run it."); }
 }
 
@@ -4934,28 +4950,26 @@ function studioDateLine(){
 }
 function renderStudio(){
   if(!STUDIO) return;
-  const c = STUDIO.counts;
-  const tiles = [
-    [c.draftsToReview, "drafts to review", "#9a6b12", "content"],
-    [c.dossiersToRead, "dossiers to read", "#2f5d9a", "outreach"],
-    [c.followupsDue, "follow-ups due", "#9a6b12", "followups"],
-    [c.postsHolding, "posts holding for slots", "#2f7d46", null],
-  ].map(t=>t[3]
-    ? '<button type="button" class="stat-tile" data-goto="'+t[3]+'"><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></button>'
-    : '<div class="stat-tile"><span class="n" style="color:'+t[2]+'">'+t[0]+'</span><span class="l">'+t[1]+'</span></div>').join("");
+  // The four stat tiles (drafts / dossiers / follow-ups / posts holding) were the pre-prototype
+  // summary. "Needs you today" already names the same work in sentences, and each tile's click
+  // path already has a needs-you row or the room nav, so the tiles go rather than relocate.
   const captures = readCaptureHandoffs().map(captureHandoffSummary).filter(Boolean).map(c=>({...c, urgent:true}));
-  const rows = [...captures, ...(STUDIO.needsYou||[])].map(n=>
+  const items = [...captures, ...(STUDIO.needsYou||[])];
+  const rows = items.map(n=>
     '<div class="ny-row'+(n.urgent?" urgent":"")+'"><span class="ny-room">'+esc(n.label)+'</span>'+
     '<span class="ny-text">'+esc(n.text)+' <span class="ny-detail">'+esc(n.detail)+'</span></span>'+
     '<button type="button" class="wb-link ny-go" data-room="'+esc(n.room)+'"'+(n.dir?' data-dir="'+esc(n.dir)+'"':'')+'>'+esc(n.action)+'</button></div>'
   ).join("");
+  // Closing line uses the measured row count. The prototype's hardcoded "Four things" would lie
+  // whenever the list is not exactly four.
+  const closing = items.length
+    ? '<div style="margin-top:22px;font-size:12.5px;line-height:1.55;color:#8a7f6d">'+items.length+' thing'+(items.length===1?"":"s")+', ranked by what actually blocks something. Everything else the team is handling.</div>'
+    : "";
   $("#studioMain").innerHTML =
-    '<div class="wb-label" style="margin-bottom:2px">'+studioDateLine()+'</div>'+
-    '<div style="font:400 30px/1.25 Georgia,serif;margin:2px 0 4px;">Everything happening, at a glance</div>'+
-    '<div class="sheet-sub" style="max-width:560px">This screen never starts work, that is what Content is for. It shows what needs you and what the team is doing, so you never go hunting room by room.</div>'+
-    '<div class="stat-tiles">'+tiles+'</div>'+
-    '<div style="margin-top:30px;"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Needs you today</div>'+
-    (rows || '<div class="empty" style="padding:20px">Nothing needs you right now.</div>')+'</div>';
+    '<div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80;margin-bottom:6px">'+studioDateLine()+'</div>'+
+    '<div style="font:400 30px/1.25 Georgia,serif;margin:0 0 22px;">Needs you today</div>'+
+    (rows || '<div class="empty" style="padding:20px 0">Nothing needs you right now.</div>')+
+    closing;
   renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
     const room = a.dataset.room;
@@ -4963,12 +4977,6 @@ function renderStudio(){
     else if(room==="outreach"){ if(a.dataset.dir) activeLeadDir=a.dataset.dir; setRoom("outreach"); setOutreachSub("leads"); }
     else if(room==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
     else setRoom(room);
-  }));
-  document.querySelectorAll("#studioMain .stat-tile[data-goto]").forEach(t=>t.addEventListener("click",()=>{
-    const g = t.dataset.goto;
-    if(g==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
-    else if(g==="outreach"){ setRoom("outreach"); setOutreachSub("leads"); }
-    else { setRoom("content"); if(g==="content") openReviewSheet(); }
   }));
 }
 async function loadStudio(){
@@ -5552,12 +5560,16 @@ function setCaptureRail(asking){
   rail.textContent = asking ? ${JSON.stringify(CAPTURE_RAIL_ASKING)} : ${JSON.stringify(CAPTURE_RAIL_IDLE)};
   rail.classList.toggle("asking", !!asking);
 }
+function setCaptureQuiet(show){
+  const quiet = $("#captureQuiet");
+  if(quiet) quiet.hidden = !show;
+}
 function openLinkAsk(url){
   linkAskUrl = url;
   hideCaptureVerdict();
+  $("#notesPanel").hidden = true;
   $("#linkAsk").hidden = false;
-  $("#captureActions").hidden = true;
-  $("#captureHint").hidden = true;
+  setCaptureQuiet(false);
   const ta = $("#src");
   ta.readOnly = true; ta.classList.add("dimmed");
   setCaptureRail(true);
@@ -5565,8 +5577,7 @@ function openLinkAsk(url){
 function closeLinkAsk(clearText){
   linkAskUrl = null;
   $("#linkAsk").hidden = true;
-  $("#captureActions").hidden = false;
-  $("#captureHint").hidden = false;
+  if($("#notesPanel").hidden) setCaptureQuiet(true);
   const ta = $("#src");
   ta.readOnly = false; ta.classList.remove("dimmed");
   if(clearText) ta.value = "";
@@ -5692,7 +5703,11 @@ function renderNotes(){
   }
 }
 async function openNotes(){
+  // Opens in place of the quiet capture controls (same carve-out as the bare-link ask), not stacked
+  // under them. Closing restores the quiet state.
+  if(linkAskUrl) closeLinkAsk(false);
   $("#notesPanel").hidden = false;
+  setCaptureQuiet(false);
   $("#notesList").innerHTML = '<div class="empty">Loading…</div>';
   const r = await fetch("/api/notes");
   const data = await r.json();
@@ -5700,6 +5715,10 @@ async function openNotes(){
   NOTES = data.notes;
   selectedNoteIdxs.clear(); // fresh fetch = fresh cache indices; stale selections must not map onto new notes
   renderNotes();
+}
+function closeNotes(){
+  $("#notesPanel").hidden = true;
+  if($("#linkAsk").hidden) setCaptureQuiet(true);
 }
 async function draftSelectedNotes(){
   const indices = [...selectedNoteIdxs].sort((a,b)=>a-b);
@@ -5710,7 +5729,7 @@ async function draftSelectedNotes(){
   if(r.ok){
     flash(r.jobs.length+" note(s) queued");
     selectedNoteIdxs.clear();
-    $("#notesPanel").hidden = true;
+    closeNotes();
     loadJobs();
   } else flash(r.error || "Failed");
 }
@@ -5724,7 +5743,7 @@ $("#notesList").addEventListener("change",(e)=>{
 $("#jobs").addEventListener("click",(e)=>{ if(e.target.id==="clearJobsBtn") clearJobs(); });
 $("#addBtn").addEventListener("click", addSource);
 $("#notesBtn").addEventListener("click", openNotes);
-$("#notesCloseBtn").addEventListener("click", ()=>{ $("#notesPanel").hidden = true; });
+$("#notesCloseBtn").addEventListener("click", closeNotes);
 $("#notesShowDrafted").addEventListener("change",(e)=>{ notesShowDrafted = e.target.checked; renderNotes(); });
 $("#notesDraftBtn").addEventListener("click", draftSelectedNotes);
 $("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") devStart(); });

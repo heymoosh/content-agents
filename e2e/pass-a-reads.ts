@@ -216,30 +216,29 @@ async function main(): Promise<void> {
       detail: `HTTP ${recsRead.status}; availability=${recsBody.availability}; source=${recsBody.source}; examples=${Array.isArray(recsBody.examples) ? recsBody.examples.length : "missing"}`,
     });
 
-    // Studio needs-you actions and clickable stat tiles must be real <button>s (keyboard-reachable).
+    // Studio needs-you actions must be real <button>s (keyboard-reachable). The pre-prototype
+    // stat tiles were removed in the Studio subtraction pass; this check covers only what remains.
     // Apply a Studio scenario first so a missing needs-you list names what was tried; no fixture
     // overrides /api/studio with a non-empty needsYou, so empty after apply stays blocked (not pass).
     await s.page.click('button.fxb[data-fx="job-queued"]');
     await s.page.waitForSelector("#roomStudio:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#studioMain").catch(() => "");
     const btnNy = await s.page.locator("#studioMain button.ny-go").count();
-    const btnStat = await s.page.locator("#studioMain button.stat-tile[data-goto]").count();
     const spanNy = await s.page.locator("#studioMain span.ny-go").count();
-    const divStat = await s.page.locator("#studioMain div.stat-tile[data-goto]").count();
     if (btnNy === 0) {
       record({
-        feature: "Studio needs-you and stat tiles are real buttons",
-        status: spanNy > 0 || divStat > 0 ? "fail" : "blocked",
+        feature: "Studio needs-you actions are real buttons",
+        status: spanNy > 0 ? "fail" : "blocked",
         detail:
-          spanNy > 0 || divStat > 0
-            ? `job-queued scenario applied; needs-you empty, but found non-buttons: span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}; button.stat-tile[data-goto]=${btnStat}`
-            : `job-queued scenario applied; Studio needs-you list still empty (0 button.ny-go); cannot verify action controls are buttons. button.stat-tile[data-goto]=${btnStat}, span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}`,
+          spanNy > 0
+            ? `job-queued scenario applied; needs-you empty, but found non-buttons: span.ny-go=${spanNy}`
+            : `job-queued scenario applied; Studio needs-you list still empty (0 button.ny-go); cannot verify action controls are buttons. span.ny-go=${spanNy}`,
       });
     } else {
       record({
-        feature: "Studio needs-you and stat tiles are real buttons",
-        status: spanNy === 0 && divStat === 0 && btnStat > 0 ? "pass" : "fail",
-        detail: `button.ny-go=${btnNy}, button.stat-tile[data-goto]=${btnStat}, span.ny-go=${spanNy}, div.stat-tile[data-goto]=${divStat}`,
+        feature: "Studio needs-you actions are real buttons",
+        status: spanNy === 0 ? "pass" : "fail",
+        detail: `button.ny-go=${btnNy}, span.ny-go=${spanNy}`,
       });
     }
 
