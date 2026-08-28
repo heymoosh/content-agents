@@ -970,9 +970,10 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="cw-steps" id="cwSteps"></div>
       <div id="cwBody"><div class="empty">Loading…</div></div>
     </div>
-    <div id="workbench"></div>
-    <div class="sheet" id="reviewSheet">
+    <div id="workbench" hidden></div>
+    <div class="sheet" id="reviewSheet" hidden>
       <div class="sheet-head">
+        <button type="button" class="cw-back" data-set-pane="wizard">Back to the wizard</button>
         <h2>Drafts for your yes</h2>
         <span class="grow"></span>
         <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
@@ -2348,11 +2349,11 @@ async function loadOutreach(){
 
 
 // ── Content room: the workbench (Content Studio Riff 3a/3b) ──
-// One sheet per active piece: Muxin's source verbatim in serif behind the blue pencil, each cut
-// rendered as the message it is, the director's checks in the margin, one clear handoff. Accept
-// still builds cuts server-side from verbatim lines only (what you see IS what gets accepted);
-// the reply box runs another advisor round as a queued job; "Format for platforms" runs the
-// formatting pipeline. Nothing publishes — every draft lands below in "Drafts for your yes".
+// One sheet for the piece picked in the wizard: Muxin's source verbatim in serif behind the blue
+// pencil, each cut rendered as the message it is, the director's checks in the margin, one clear
+// handoff. Accept still builds cuts server-side from verbatim lines only (what you see IS what
+// gets accepted); the reply box runs another advisor round as a queued job; "Format for platforms"
+// runs the formatting pipeline. Nothing publishes: every draft lands in "Drafts for your yes".
 let WB_SESSIONS = [];
 let RECS = null;
 const devReplyPending = new Set(); // slugs with a just-clicked reply, before the job shows in JOBS
@@ -2497,15 +2498,30 @@ function wbSessionEl(s){
   const lensChecks = ["extract"].concat(s.cuts.map(c=>c.lens)).map(l =>
     '<label class="toggle"><input type="checkbox" class="dev-fmt-lens" value="'+esc(l)+'" checked /> '+esc(l)+'</label>').join("");
   main += '<div class="wb-handoff">'+engineSelectHtml()+'<button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Format for platforms</button>'+
-    '<span class="note">They shape it for each platform, make the visuals, hold it for posting. Every draft comes back below for your yes.</span>'+lensChecks+'</div>';
-  if(s.pending) main += '<div class="wb-links"><button type="button" class="wb-link wb-goto-review">'+s.pending+' draft'+(s.pending===1?"":"s")+' below, waiting for your yes ↓</button></div>';
+    '<span class="note">They shape it for each platform, make the visuals, hold it for posting. Every draft lands in Drafts for your yes.</span>'+lensChecks+'</div>';
+  if(s.pending) main += '<div class="wb-links"><button type="button" class="wb-link wb-goto-review">See '+s.pending+' draft'+(s.pending===1?"":"s")+' waiting for your yes</button></div>';
   sheet.innerHTML = '<div class="session-grid"><div class="session-main">'+main+'</div>'+wbMarginHtml(s)+'</div>';
   return sheet;
 }
+// The workbench used to render every active piece's session at once, stacked below the wizard
+// regardless of which step was showing. The prototype gives this surface no home of its own, so
+// per rules.md carve-out 1 it moves rather than disappears: it now opens for exactly the piece
+// picked in the wizard (CW.slug), reached from a control on step 2, and shows nothing otherwise.
 function renderWorkbench(){
   const box = $("#workbench");
   box.innerHTML = "";
-  for(const s of WB_SESSIONS) box.appendChild(wbSessionEl(s));
+  if(CW.pane !== "workbench") return;
+  const s = WB_SESSIONS.find(x=>x.slug===CW.slug);
+  const back = '<button type="button" class="cw-back" data-set-pane="wizard">Back to the treatment</button>';
+  if(!s){
+    box.innerHTML = '<div class="sheet">'+back+'<div class="empty" style="margin-top:16px">That source is no longer on the desk.</div></div>';
+  } else {
+    const el = wbSessionEl(s);
+    const backWrap = document.createElement("div");
+    backWrap.innerHTML = back;
+    el.querySelector(".session-main").prepend(backWrap.firstChild);
+    box.appendChild(el);
+  }
   refreshEngineControls(box);
 }
 async function loadContent(){
@@ -2543,6 +2559,7 @@ $("#devStartBtn").addEventListener("click", devStart);
 $("#workbench").addEventListener("click", async (e)=>{
   const t = e.target;
   if (!t || !t.classList) return;
+  if (t.dataset.setPane){ CW.pane = t.dataset.setPane; renderContentWizard(); renderWorkbench(); return; }
   if (t.classList.contains("dev-accept")){
     const lensInput = t.closest(".actions").querySelector(".dev-lens");
     t.disabled = true;
@@ -2601,13 +2618,13 @@ $("#workbench").addEventListener("click", async (e)=>{
     if(wbExpanded.has(slug)) wbExpanded.delete(slug); else wbExpanded.add(slug);
     renderWorkbench();
   } else if (t.classList.contains("wb-goto-review")){
-    $("#reviewSheet").scrollIntoView({behavior:"smooth", block:"start"});
+    openReviewSheet();
   }
 });
 
 // ── Content: the three-step wizard (pick a source, decide the treatment, approve the drafts) ──
 //
-// Step 1 reads GET /api/content (the same sessions the workbench below renders), step 2 reads
+// Step 1 reads GET /api/content (the same sessions the workbench pane renders), step 2 reads
 // GET /api/content/treatment?slug=…, step 3 reads the piece's own rows out of GET /api/queue and
 // approves them through the SAME POST /api/status every review card uses. No new write path.
 //
@@ -2618,7 +2635,11 @@ $("#workbench").addEventListener("click", async (e)=>{
 //   * the per-draft treatment block (a CTA toggle and persona spins sized by an audience cluster).
 //     Nothing in src/ clusters Muxin's own audience, so none of it has a source.
 //   * the VENTURE source tag. Nothing hands a Venture artifact to content/. See develop.ts.
-let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, loading:false, yesErrors:[] };
+// CW.pane picks which of the room's three sheets is on screen: "wizard" (the default, the step
+// rail + step body), "workbench" (the director's notes on the picked piece, opened from step 2),
+// or "review" (every piece's drafts at once, opened from step 3 or from Studio). Exactly one
+// shows at a time — see renderContentWizard, which is the single place that toggles all three.
+let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, loading:false, yesErrors:[], pane:"wizard" };
 
 // ── begin the treatment mirror ──
 // Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
@@ -2773,12 +2794,16 @@ function cwStepsHtml(step){
       '<span class="cw-sep">'+(i<2?"→":"")+'</span></span>';
   }).join("")+'<span style="flex:1"></span><span class="cw-rail t-'+rail.tone+'">'+esc(rail.text)+'</span>';
 }
+// Step 1's line is a pick-aid, not a developer readout: date and the drafts-waiting count are real
+// reads Muxin needs to choose between sources. tagBasis (why the tag is what it is, e.g. "source.md
+// records source_kind: …") stays out of this line on purpose — it is provenance for a developer,
+// not something she needs to pick a source. Never invent a word count or an open count here: the
+// prototype shows both, but no read in this repo measures them.
 function cwSourceMeta(s){
   const bits = [];
   if(s.date) bits.push("on the desk since "+fmtDay(s.date));
   // published_at is a full ISO timestamp for a Note and a plain date for an essay. Show the day.
   if(s.publishedAt) bits.push("published "+fmtDay(String(s.publishedAt).slice(0,10)));
-  bits.push(s.tagBasis);
   if(s.pending) bits.push(s.pending+" draft"+(s.pending===1?"":"s")+" waiting for your yes");
   return bits.join(" · ");
 }
@@ -2837,13 +2862,26 @@ function cwChannelHtml(c){
     '<div class="slot">NEXT FREE SLOT · '+esc(c.slot ? c.slot.label : "")+'</div>'+
     '</div>';
 }
+// The director/develop surface (the proposed cut, the reply box, Format for platforms) has no
+// home in the prototype's three-step design, so per rules.md carve-out 1 it moves here instead of
+// disappearing: one demoted, mono control at the foot of the sheet, same treatment Outreach gave
+// its engine picker, opening the workbench for exactly this piece rather than stacking it. It is
+// independent of the treatment read, so every step 2 state offers it, including a failed read.
+function cwWbFootHtml(s){
+  const wbNote = s.pending
+    ? s.pending+' draft'+(s.pending===1?"":"s")+' already made from this.'
+    : 'Nothing made from this yet.';
+  return '<div class="sheet-foot" style="justify-content:flex-start;align-items:baseline;gap:10px">'+
+    '<button type="button" class="cw-back" data-set-pane="workbench">Talk to your director about this piece</button>'+
+    '<span class="src">'+esc(wbNote)+' The proposed cut, the reply box, and Format for platforms live there.</span></div>';
+}
 function cwStep2Html(){
   const s = cwSession();
   if(!s) return '<div class="empty">That source is no longer on the desk. Pick another one.</div>';
   if(CW.treatErr){
-    return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read the treatment for this piece: '+esc(CW.treatErr)+'</div>';
+    return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read the treatment for this piece: '+esc(CW.treatErr)+'</div>'+cwWbFootHtml(s);
   }
-  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading the treatment…</div>';
+  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading the treatment…</div>'+cwWbFootHtml(s);
   const cells = readsFromCells(CW.treat, s.cuts||[]).map(c=>
     '<span class="cw-cell"><span class="k">'+esc(c.k)+'</span><span class="v t-'+c.tone+'">'+esc(c.v)+'</span></span>'
   ).join("");
@@ -2853,13 +2891,14 @@ function cwStep2Html(){
   const forward = total
     ? '<button class="primary cw-fwd" data-step="3">See the '+total+' draft'+(total===1?"":"s")+'</button>'+
       '<span class="src" style="max-width:360px">Every one of them still waits for your yes, one channel at a time.</span>'
-    : '<span class="fam-note t-amber" style="margin:0">No drafts exist for this piece yet. Use Format for platforms in the workbench below and they land here.</span>';
+    : '<span class="fam-note t-amber" style="margin:0">No drafts exist for this piece yet. Talk to your director about it below and they land here.</span>';
   return cwPickedHtml(s)+
     '<div class="cw-reads">'+cells+'</div>'+
     '<div class="fam-ask" style="margin-top:28px">CHANNELS · READ, NOT CHOSEN HERE</div>'+
     '<div class="src" style="margin-top:6px;max-width:560px">The defaults list in config/routing.yaml is the only thing that includes or skips a channel, so this grid reports what routing decided rather than offering to change it. Each row carries the reuse window that belongs to that channel and its own next free slot.</div>'+
     '<div class="cw-chans">'+chans+'</div>'+
-    '<div class="cw-yesall">'+forward+'</div>';
+    '<div class="cw-yesall">'+forward+'</div>'+
+    cwWbFootHtml(s);
 }
 function cwStep3Html(){
   const s = cwSession();
@@ -2912,9 +2951,21 @@ function cwStep3Html(){
     '<div class="cw-tabhead">'+head+'</div>'+
     '<div id="cwRows" style="margin-top:14px"></div>'+
     '<div class="cw-yesall">'+yesAll+'</div>'+errs+
-    '<div class="src" style="margin-top:8px;max-width:560px">A yes marks a draft ready and holds it. Nothing posts from this room.</div>';
+    '<div class="src" style="margin-top:8px;max-width:560px">A yes marks a draft ready and holds it. Nothing posts from this room.</div>'+
+    // Retired from the default stack (rules.md #5.2 keeps the strip, but the cross-piece "Drafts
+    // for your yes" sheet is not part of the prototype's three-step design) and reachable only from
+    // here: this step is per-piece, the sheet below sweeps every piece at once.
+    '<div class="sheet-foot" style="justify-content:flex-start"><button type="button" class="cw-back" data-set-pane="review">Show drafts for every piece</button></div>';
 }
+// The room opens on exactly one sheet. renderContentWizard is the single place that decides which
+// of the three (the wizard itself, the director's workbench, or every piece's drafts at once) is
+// on screen, driven by CW.pane. The wizard body only needs building while it is the visible pane;
+// the other two build their own content in renderWorkbench() / render()'s #reviewMain pass.
 function renderContentWizard(){
+  $("#contentWizard").hidden = CW.pane !== "wizard";
+  $("#workbench").hidden = CW.pane !== "workbench";
+  $("#reviewSheet").hidden = CW.pane !== "review";
+  if(CW.pane !== "wizard") return;
   const step = cwStep();
   $("#cwSteps").innerHTML = cwStepsHtml(step);
   const body = $("#cwBody");
@@ -2925,6 +2976,13 @@ function renderContentWizard(){
     const active = cwActiveGroup();
     if(holder && piece && active) for(const row of active.rows) holder.appendChild(rowEl(piece, row));
   }
+}
+// Opened from step 3's "Show every piece's drafts" or from a Studio jump — the cross-piece sweep
+// the wizard's own step 3 (per-piece) cannot do.
+function openReviewSheet(){
+  CW.pane = "review";
+  renderContentWizard();
+  $("#reviewSheet").scrollIntoView({behavior:"smooth", block:"start"});
 }
 async function cwLoadTreatment(){
   const slug = CW.slug;
@@ -2964,18 +3022,24 @@ async function cwYesAll(btn){
 }
 // Delegated: the wizard is rebuilt wholesale on every render, same pattern as the workbench.
 $("#contentWizard").addEventListener("click", (e)=>{
-  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-tab],.cw-yes-all") : null;
+  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-tab],[data-set-pane],.cw-yes-all") : null;
   if(!t) return;
   if(t.classList.contains("cw-yes-all")){ cwYesAll(t); return; }
+  if(t.dataset.setPane !== undefined){
+    CW.pane = t.dataset.setPane;
+    renderContentWizard();
+    if(CW.pane === "workbench") renderWorkbench();
+    return;
+  }
   if(t.dataset.tab !== undefined){ CW.tab = t.dataset.tab; CW.yesErrors = []; renderContentWizard(); return; }
   if(t.dataset.slug !== undefined){
-    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = [];
+    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = []; CW.pane = "wizard";
     renderContentWizard(); cwLoadTreatment(); return;
   }
   if(t.dataset.step !== undefined){
     const n = Number(t.dataset.step);
     if(n > 1 && !CW.slug) return;
-    CW.step = n; CW.yesErrors = [];
+    CW.step = n; CW.yesErrors = []; CW.pane = "wizard";
     renderContentWizard();
     if(n === 2 && CW.slug && CW.treatFor !== CW.slug) cwLoadTreatment();
   }
@@ -4895,7 +4959,7 @@ function renderStudio(){
   renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
     const room = a.dataset.room;
-    if(room==="content"){ setRoom("content"); $("#reviewSheet").scrollIntoView(); }
+    if(room==="content"){ setRoom("content"); openReviewSheet(); }
     else if(room==="outreach"){ if(a.dataset.dir) activeLeadDir=a.dataset.dir; setRoom("outreach"); setOutreachSub("leads"); }
     else if(room==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
     else setRoom(room);
@@ -4904,7 +4968,7 @@ function renderStudio(){
     const g = t.dataset.goto;
     if(g==="followups"){ setRoom("outreach"); setOutreachSub("followups"); }
     else if(g==="outreach"){ setRoom("outreach"); setOutreachSub("leads"); }
-    else { setRoom("content"); if(g==="content") $("#reviewSheet").scrollIntoView(); }
+    else { setRoom("content"); if(g==="content") openReviewSheet(); }
   }));
 }
 async function loadStudio(){
@@ -5170,6 +5234,18 @@ function openWorkbenchJob(j){
   Promise.resolve(setRoom("content")).then(()=>{
     const slug = workbenchJobTarget(j);
     if(!slug) return;
+    // The workbench now opens for one piece at a time (see rules.md #1's carve-out), so jumping to
+    // a job's session means picking that slug and switching into the workbench pane, not scrolling
+    // to a sheet that used to render every session stacked at once. Reset step/treatment state the
+    // same way the wizard's own source-picker click does: without this, "Back to the treatment"
+    // for a piece nobody picked through step 1 renders "Reading the treatment…" forever, because
+    // nothing here would otherwise trigger cwLoadTreatment() for it.
+    if(CW.slug !== slug){
+      CW.slug = slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = [];
+      cwLoadTreatment();
+    }
+    CW.pane = "workbench";
+    renderContentWizard(); renderWorkbench();
     const target = [...document.querySelectorAll(".session[data-wb-slug]")].find(el=>el.dataset.wbSlug===slug);
     if(target) target.scrollIntoView({behavior:"smooth", block:"start"});
   });
@@ -5655,6 +5731,10 @@ $("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="
 setInterval(()=>{ if(jobsPollDue(JOBS, Date.now(), jobsPollArmedUntil)) loadJobs(); }, JOBS_POLL_MS);
 
 $("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
+$("#reviewSheet").addEventListener("click", (e)=>{
+  const t = e.target.closest ? e.target.closest("[data-set-pane]") : null;
+  if(t){ CW.pane = t.dataset.setPane; renderContentWizard(); }
+});
 setRoom(${JSON.stringify(BOOT_ROOM)});
 // The desk header's live date ("Thursday · Jul 17").
 {

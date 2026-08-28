@@ -2720,7 +2720,7 @@ test("Slice 1: no rendered copy carries an em dash", () => {
     "No asset generated yet.",
     "No image rendered yet.",
     "Format for platforms",
-    "Use Format for platforms in the workbench below and they land here.",
+    "No drafts exist for this piece yet. Talk to your director about it below and they land here.",
     "Your director is working on a round. Studio has the log.",
     "Nothing needs you right now.",
     "not recorded",

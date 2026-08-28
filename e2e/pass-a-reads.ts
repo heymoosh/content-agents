@@ -124,10 +124,30 @@ async function main(): Promise<void> {
       detail: followText.trim().slice(0, 120).replace(/\s+/g, " "),
     });
 
+    // The workbench (the director's notes: proposed cut, reply box, Format for platforms, and the
+    // PATTERN READS seam) no longer renders open by default — it moved behind a control on wizard
+    // step 2 for the picked piece (rules.md carve-out 1). Reach it the way a person does: pick a
+    // source, then open the director's notes on it. Apply recs-blocked FIRST, before picking a
+    // source: it forces three real Content sessions (a dev worktree's own /api/content can be
+    // empty, per the banner at the top of this page), so the pick is guaranteed a row to click
+    // rather than depending on whatever this checkout happens to have on disk.
+    await openRoom(s.page, "content");
+    // The fixture panel now starts collapsed (its open/closed state is a remembered per-viewer
+    // preference), so every button.fxb click in this suite needs the panel open first. Already
+    // open is not an error.
+    await s.page.click("#fxOpen").catch(() => null);
+    await s.page.click('button.fxb[data-fx="recs-blocked"]');
+    await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
+    await waitLoaded(s.page, "#cwBody").catch(() => "");
+    await s.page.waitForSelector("#cwBody .cw-src", { timeout: 15_000 }).catch(() => null);
+    await s.page.click("#cwBody .cw-src");
+    await s.page.waitForSelector('#cwBody [data-set-pane="workbench"]', { timeout: 15_000 }).catch(() => null);
+    await s.page.click('#cwBody [data-set-pane="workbench"]');
+    await s.page.waitForSelector("#workbench:not([hidden])", { timeout: 15_000 }).catch(() => null);
+    await waitLoaded(s.page, "#workbench").catch(() => "");
+
     // Production label: Format for platforms is what a person sees; "Hand it to the team" and any
     // visible "atomize" are banned interface copy.
-    await openRoom(s.page, "content");
-    await waitLoaded(s.page, "#workbench").catch(() => "");
     const contentBody = ((await s.page.locator("body").innerText()) ?? "").replace(/\s+/g, " ").trim();
     const hasFormat = contentBody.includes("Format for platforms");
     const hasHandoff = contentBody.includes("Hand it to the team");
@@ -148,12 +168,10 @@ async function main(): Promise<void> {
     }
 
     // Recommendation seam honesty: the margin names PATTERN READS and never claims the corpus is
-    // approved, live, proven, viral, or a winner.
-    // Apply recs-blocked first: that scenario forces Content sessions plus a recommendations payload,
-    // so the PATTERN READS block must render; absence after apply is a fail, not a blocked excuse.
-    await s.page.click('button.fxb[data-fx="recs-blocked"]');
-    await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
-    await waitLoaded(s.page, "#workbench").catch(() => "");
+    // approved, live, proven, viral, or a winner. recs-blocked (applied above, before the pick) also
+    // forces /api/recommendations, and the workbench pane opened above stays open across it (a
+    // fixture apply re-fetches in place, it does not navigate) — so the block's own selector is
+    // unchanged: #workbench .wb-recs.
     // Scope to the seam's own block, not the whole margin: a director's angle summary may fairly
     // use a word this seam must never use, about Muxin's own routing rather than a corpus claim.
     // waitLoaded returns as soon as the container stops saying Loading, which on a second visit to
