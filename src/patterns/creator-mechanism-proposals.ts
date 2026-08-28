@@ -57,6 +57,7 @@ export interface MechanismSupport {
   readonly distinct_creator_files: number;
   readonly distinct_platforms: number;
   readonly metric_backed_entries: number;
+  readonly incomplete_metric_entries: number;
   readonly partial_capture_entries: number;
   readonly paywalled_entries: number;
   readonly third_party_entries: number;
@@ -160,14 +161,17 @@ const BANNED_CLAIM_PATTERNS: readonly RegExp[] = [
 // still what decides whether a proposal says more than the evidence supports.
 const EFFECT_CLAIM_PATTERNS: readonly RegExp[] = [
   /\b(?:creat|generat|manufactur|build|earn|driv|boost|increas|maximi[sz])\w*\s+(?:the\s+|a\s+|an\s+)?(?:urgency|trust|credibility|desire|demand|engagement|reach|conversions?|retention|attention)\b/i,
-  /\bbasis for (?:the )?(?:audience|reader|viewer)(?:'s|s')?\s+\w+/i,
+  /\bbasis for (?:the )?(?:audience|readers?|viewers?)(?:'s|s')?\s+\w+/i,
   // "what makes the reader respond is unknown" is a limitation, not a claim, so the subject
   // matters: only an arrangement asserted to act on a reader is refused.
-  /(?<!\bwhat )\bmakes? (?:the )?(?:audience|reader|viewer|people)\b/i,
-  /\b(?:hooks?|grabs?|holds?|keeps?|captures?|compels?|persuades?|convinces?)\s+(?:the\s+)?(?:audience|reader|viewer|people)\b/i,
+  /(?<!\bwhat )\bmakes? (?:the )?(?:audience|readers?|viewers?|people)\b/i,
+  /\b(?:hooks?|grabs?|holds?|keeps?|captures?|compels?|persuades?|convinces?)\s+(?:the\s+)?(?:audience|readers?|viewers?|people)\b/i,
   /\bso that (?:the )?(?:audience|reader|viewer|people)\b/i,
   /\b(?:audience|reader|viewer)s?\s+(?:are|is|will be)\s+(?:more likely|persuaded|convinced|hooked)\b/i,
+  /\b(?:persuades?|convinces?|compels?)\s+(?:the\s+)?(?:audience|readers?|viewers?|people)\s+to\b/i,
 ];
+
+const NEGATION_BEFORE = /\b(?:not|never|no|nor|unknown|unclear|whether)\b[^.]*$/i;
 
 const URL_PATTERN = /https?:\/\/|www\.|\.com\b|\.org\b|\.net\b|\.io\b/i;
 const BLOCKQUOTE_PATTERN = /(^|\n)\s*>/;
@@ -211,9 +215,12 @@ export function assertNoBannedClaims(text: string, field: string): void {
     }
   }
   for (const pattern of EFFECT_CLAIM_PATTERNS) {
-    if (pattern.test(text)) {
-      fail(`${field} asserts an effect on the audience (${pattern.source}); this corpus has no baseline, denominator or comparison window, so a proposal may describe an arrangement but never what it does to a reader`);
-    }
+    const match = pattern.exec(text);
+    if (!match) continue;
+    // Saying an arrangement is NOT a basis for something, or that its effect is unknown, is the
+    // honest sentence this lane wants, so a negation immediately before the phrase clears it.
+    if (NEGATION_BEFORE.test(text.slice(Math.max(0, match.index - 28), match.index))) continue;
+    fail(`${field} asserts an effect on the audience (${pattern.source}); this corpus has no baseline, denominator or comparison window, so a proposal may describe an arrangement but never what it does to a reader`);
   }
 }
 
@@ -224,6 +231,39 @@ function assertNoEmbeddedSource(text: string, field: string): void {
   const straightQuoted = /"[^"]{16,}"/.exec(text);
   if (straightQuoted) fail(`${field} must not carry a quoted run of source text`);
   if (text.includes("—")) fail(`${field} must not use em dashes`);
+}
+
+/**
+ * A 53-bit hash of a normalized word run, built from two FNV-1a passes with different seeds.
+ *
+ * One 32-bit pass is not enough here. The corpus holds roughly two and a half million word runs,
+ * and at 32 bits that produced false alarms on real proposals whose text appears nowhere in the
+ * corpus. Widening to 53 bits, the largest exact integer a Number holds, makes a collision
+ * vanishingly unlikely while keeping the set cheap. A collision can still only over-report.
+ */
+export function shingleHash(words: readonly string[]): number {
+  let low = 0x811c9dc5;
+  let high = 0x01000193;
+  for (const word of words) {
+    for (let index = 0; index < word.length; index += 1) {
+      const code = word.charCodeAt(index);
+      low = Math.imul(low ^ code, 0x01000193);
+      high = Math.imul(high ^ code, 0x85ebca6b);
+    }
+    low = Math.imul(low ^ 32, 0x01000193);
+    high = Math.imul(high ^ 32, 0x85ebca6b);
+  }
+  return (low >>> 0) * 2 ** 21 + (high >>> 11);
+}
+
+/** Hashed word runs of `text`, for comparison against the whole corpus rather than one entry. */
+export function shingleHashes(text: string, size = VERBATIM_SHINGLE_WORDS): Set<number> {
+  const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const result = new Set<number>();
+  for (let index = 0; index + size <= words.length; index += 1) {
+    result.add(shingleHash(words.slice(index, index + size)));
+  }
+  return result;
 }
 
 /** Lowercased word shingles, used to detect a copied run rather than shared vocabulary. */
@@ -289,7 +329,7 @@ function compareText(left: string, right: string): number {
 
 const SUPPORT_KEYS = [
   "entries", "distinct_creator_files", "distinct_platforms", "metric_backed_entries",
-  "partial_capture_entries", "paywalled_entries", "third_party_entries",
+  "incomplete_metric_entries", "partial_capture_entries", "paywalled_entries", "third_party_entries",
 ] as const;
 
 const PROPOSAL_KEYS = [
@@ -343,6 +383,7 @@ function proposalRecord(value: unknown, field: string): MechanismProposal {
       distinct_creator_files: integer(support.distinct_creator_files, `${field}.support.distinct_creator_files`),
       distinct_platforms: integer(support.distinct_platforms, `${field}.support.distinct_platforms`),
       metric_backed_entries: integer(support.metric_backed_entries, `${field}.support.metric_backed_entries`),
+      incomplete_metric_entries: integer(support.incomplete_metric_entries, `${field}.support.incomplete_metric_entries`),
       partial_capture_entries: integer(support.partial_capture_entries, `${field}.support.partial_capture_entries`),
       paywalled_entries: integer(support.paywalled_entries, `${field}.support.paywalled_entries`),
       third_party_entries: integer(support.third_party_entries, `${field}.support.third_party_entries`),
@@ -429,8 +470,18 @@ export interface CorpusIndex {
   readonly platformByFile: ReadonlyMap<string, string | null>;
   /** Verbatim spans and analysis prose per entry ref, used only for the copy check. */
   readonly verbatimShinglesByRef: ReadonlyMap<string, ReadonlySet<string>>;
-  /** Creator names and handles, so a proposal cannot quietly attribute itself to one. */
+  /**
+   * Hashed word runs from EVERY line of the whole corpus, cited or not. Held as 32-bit hashes
+   * rather than strings because the corpus is roughly 16 MB of text. A hash collision can only
+   * produce a false alarm on a proposal, never a silent pass.
+   */
+  readonly corpusShingleHashes: ReadonlySet<number>;
+  /** Creator names, matched over the fields that describe a mechanism. */
   readonly creatorTokens: ReadonlySet<string>;
+  /** Account handles, matched everywhere including evidence limitations. */
+  readonly creatorHandleTokens: ReadonlySet<string>;
+  /** Corpus file names, which a limitation is allowed to cite the way source_refs do. */
+  readonly corpusFileNames: ReadonlySet<string>;
 }
 
 /**
@@ -445,9 +496,13 @@ export function buildCorpusIndex(
   const platformByFile = new Map<string, string | null>();
   const verbatimShinglesByRef = new Map<string, ReadonlySet<string>>();
   const creatorTokens = new Set<string>();
+  const creatorHandleTokens = new Set<string>();
+  const corpusFileNames = new Set<string>();
+  const corpusShingleHashes = new Set<number>();
 
   for (const file of files) {
     platformByFile.set(file.file, file.header.platform);
+    corpusFileNames.add(file.file);
     // Two things are matched, and deliberately only two: the creator's name as a phrase
     // ("alex hormozi") and the account handle itself as one unbroken run ("juddlegum").
     //
@@ -466,16 +521,23 @@ export function buildCorpusIndex(
     const namePart = handleField.split(/[(,]/)[0]!.trim();
     const isHandle = handleField.startsWith("@") || !/\s/.test(namePart);
     const handle = isHandle ? /^@?([a-z0-9][a-z0-9_.-]*)/.exec(handleField)?.[1] : undefined;
-    if (handle && handle.length >= 6 && !GENERIC_HANDLE_TOKENS.has(handle)) creatorTokens.add(handle);
+    if (handle && handle.length >= 6 && !GENERIC_HANDLE_TOKENS.has(handle)) {
+      creatorTokens.add(handle);
+      creatorHandleTokens.add(handle);
+    }
     // A handle's first segment only counts on its own when it is long enough to be a name rather
     // than a category word: "dieworkwear" yes, the "product" in "@product-thinking" no.
     const firstSegment = handle?.split(/[._-]/)[0];
-    if (firstSegment && firstSegment.length >= 8 && !GENERIC_HANDLE_TOKENS.has(firstSegment)) creatorTokens.add(firstSegment);
+    if (firstSegment && firstSegment.length >= 8 && !GENERIC_HANDLE_TOKENS.has(firstSegment)) {
+      creatorTokens.add(firstSegment);
+      creatorHandleTokens.add(firstSegment);
+    }
     // Fail closed: a file with no source text would silently disable the copy check for every
     // entry it holds, which is exactly the case where the check matters.
     const rawText = rawTextByFile.get(file.file);
     if (rawText === undefined) fail(`buildCorpusIndex is missing the source text for ${file.file}; the copy check cannot run without it`);
     const lines = rawText.split(/\r?\n/);
+    for (const hash of shingleHashes(rawText)) corpusShingleHashes.add(hash);
     const starts = file.entries.map((entry) => entry.lineNumber - 1);
     for (const [position, entry] of file.entries.entries()) {
       const end = position + 1 < starts.length ? starts[position + 1]! : lines.length;
@@ -486,7 +548,7 @@ export function buildCorpusIndex(
       verbatimShinglesByRef.set(entry.ref, shingles(span));
     }
   }
-  return { entriesByRef, platformByFile, verbatimShinglesByRef, creatorTokens };
+  return { entriesByRef, platformByFile, verbatimShinglesByRef, creatorTokens, creatorHandleTokens, corpusFileNames, corpusShingleHashes };
 }
 
 export interface ProposalValidationFinding {
@@ -522,7 +584,10 @@ function recomputeSupport(entries: readonly ParsedEntry[], index: CorpusIndex): 
     entries: entries.length,
     distinct_creator_files: new Set(firstParty.map((entry) => entry.file)).size,
     distinct_platforms: new Set(firstParty.map((entry) => index.platformByFile.get(entry.file) ?? "unmapped")).size,
-    metric_backed_entries: entries.filter((entry) => entry.metrics.available).length,
+    // "metric-backed" means the platform's whole count set was readable. One unreadable token
+    // makes the set incomplete, and an incomplete set must not stand in for a complete one.
+    metric_backed_entries: entries.filter((entry) => entry.metrics.available && entry.metrics.unparsedTokens === 0).length,
+    incomplete_metric_entries: entries.filter((entry) => entry.metrics.unparsedTokens > 0).length,
     partial_capture_entries: entries.filter((entry) => entry.flags.partialCapture).length,
     paywalled_entries: entries.filter((entry) => entry.flags.paywalled).length,
     third_party_entries: entries.length - firstParty.length,
@@ -540,6 +605,7 @@ function expectedReplication(support: MechanismSupport): ReplicationStatus {
 function expectedEvidenceStatus(support: MechanismSupport): ProposalEvidenceStatus {
   if (support.entries < MINIMUM_SUPPORT_ENTRIES) return "insufficient";
   if (support.partial_capture_entries > 0 || support.paywalled_entries > 0) return "partial-capture";
+  if (support.incomplete_metric_entries > 0) return "structural-only";
   return support.metric_backed_entries === support.entries ? "metric-backed" : "structural-only";
 }
 
@@ -606,33 +672,61 @@ export function validateProposalsAgainstCorpus(
       }
     }
 
-    const freeText = [
-      proposal.proposal_id.slice(proposal.proposal_id.lastIndexOf(":") + 1).replace(/-/g, " "),
-      proposal.name,
-      proposal.mechanism,
-      proposal.adaptation_note,
-      ...proposal.evidence_limitations,
-    ].join(" ");
+    let citedOverlap = false;
+    const slugWords = proposal.proposal_id.slice(proposal.proposal_id.lastIndexOf(":") + 1).replace(/-/g, " ");
+    // Everything a downstream template would read. This is where an attribution must not appear.
+    const mechanismText = [slugWords, proposal.name, proposal.mechanism, proposal.adaptation_note].join(" ");
+    const freeText = [mechanismText, ...proposal.evidence_limitations].join(" ");
     const proposalShingles = shingles(freeText);
     for (const ref of proposal.source_refs) {
       const source = index.verbatimShinglesByRef.get(ref);
       if (!source) continue;
       for (const shingle of proposalShingles) {
         if (source.has(shingle)) {
+          citedOverlap = true;
           findings.push({ proposal_id: proposal.proposal_id, kind: "verbatim-overlap", detail: `shares a ${VERBATIM_SHINGLE_WORDS}-word run with the captured text of ${ref}` });
           break;
         }
       }
     }
+    // Citing entry A while copying from entry B would slip past a check scoped to cited entries,
+    // so the same runs are also compared against the whole corpus. This one cannot name the
+    // entry it matched, only that a run of this length exists somewhere in the source material.
+    if (!citedOverlap) {
+      for (const hash of shingleHashes(freeText)) {
+        if (index.corpusShingleHashes.has(hash)) {
+          findings.push({ proposal_id: proposal.proposal_id, kind: "verbatim-overlap", detail: `shares a ${VERBATIM_SHINGLE_WORDS}-word run with corpus text the proposal does not cite` });
+          break;
+        }
+      }
+    }
 
-    // Normalize the dash family before matching so a typographic hyphen cannot split a name.
-    const lowered = freeText.toLowerCase().replace(/[\u2010-\u2015\u2212]/g, "-");
+    // A creator name is stored as a phrase ("alex hormozi"), so a written "Alex-Hormozi" or
+    // "Alex\u2010Hormozi" has to be compared with the dash family read as a space as well as read
+    // as a hyphen. Both readings are checked; a handle keeps its own hyphens in the second.
+    // An evidence limitation is provenance: saying which source file the evidence concentrates in
+    // is the honest sentence, and it is the same information source_refs already carries. So the
+    // creator-name check runs over the mechanism-describing fields, not over the limitations.
+    const normalized = mechanismText.toLowerCase().replace(/[\u2010-\u2015\u2212]/g, "-");
+    const readings = [normalized, normalized.replace(/-/g, " ").replace(/\s+/g, " ")];
+    // A handle is never needed to state a limitation, so it stays forbidden there. Source-file
+    // names are removed first: citing the file the evidence concentrates in is the honest sentence,
+    // and some accounts' handles are the file name, so leaving them in would refuse provenance.
+    let limitationText = proposal.evidence_limitations.join(" ").toLowerCase();
+    for (const fileName of index.corpusFileNames) {
+      limitationText = limitationText.split(fileName).join(" ").split(fileName.replace(/\.md$/, "")).join(" ");
+    }
+    for (const handle of index.creatorHandleTokens) {
+      if (limitationText.includes(handle)) {
+        findings.push({ proposal_id: proposal.proposal_id, kind: "creator-named", detail: `an evidence limitation names an account handle ("${handle}")` });
+      }
+    }
     for (const token of index.creatorTokens) {
       // A one-word name is matched on word boundaries; a multi-word name or a handle is a phrase
       // distinctive enough that a substring match is safe.
-      const hit = token.includes(" ") || token.length >= 8
-        ? lowered.includes(token)
-        : new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(lowered);
+      const hit = readings.some((reading) => (token.includes(" ") || token.length >= 8
+        ? reading.includes(token)
+        : new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(reading)));
       if (hit) {
         findings.push({ proposal_id: proposal.proposal_id, kind: "creator-named", detail: `free text names a corpus creator or handle token ("${token}")` });
       }

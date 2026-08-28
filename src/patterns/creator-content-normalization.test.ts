@@ -228,6 +228,16 @@ test("flags an entry whose content was authored by someone else", () => {
   ].join("\n"));
 
   assert.equal(file.entries[0]!.flags.thirdPartyAuthored, true);
+
+  // The corpus marks a repost several ways; all of them mean the account owner did not write it.
+  for (const label of [
+    "Full text (verbatim, someone else's post)",
+    "Full text (verbatim, authored by Someone Else)",
+    "Full text (verbatim, reposted by the account owner)",
+    "Structure (Someone Else's post, not the owner's)",
+  ]) {
+    assert.ok(classifyFieldLabel(label).qualifiers.includes("third-party-authored"), label);
+  }
 });
 
 test("records a missing field rather than inventing one", () => {
@@ -409,6 +419,9 @@ test("reads every metrics shape the corpus uses and refuses to guess the rest", 
   const positional = parseMetricsValue("819 / 25 / 61 (reaction/comment/restack counts)");
   assert.equal(positional.positionalOnly, true);
   assert.deepEqual(positional.values.map((value) => value.count), [819, 25, 61]);
+  const compact = parseMetricsValue("1275,265", ["points", "comments"]);
+  assert.deepEqual(compact.values, [{ metric: "comments", count: 265 }, { metric: "points", count: 1275 }]);
+  assert.equal(parseMetricsValue("1,275", ["points", "comments"]).values.length, 0, "an ambiguous compact pair is not guessed");
   const named = parseMetricsValue("1275, 265", ["points", "comments"]);
   assert.equal(named.positionalOnly, false);
   assert.deepEqual(named.values, [{ metric: "comments", count: 265 }, { metric: "points", count: 1275 }]);
@@ -467,6 +480,19 @@ test("classifies a video the account calls a video even with no transcript captu
   assert.equal(file.entries[0]!.evidenceKind, "short-video");
   assert.equal(file.entries[0]!.flags.transcriptExpected, true);
   assert.equal(file.entries[0]!.flags.transcriptFieldPresent, false);
+
+  // A view count must not promote an explicitly short-form video to a long one.
+  const withViews = parseCreatorFile("sample-shortviews.md", [
+    header({ "Primary platform": "TikTok", "Primary media type": "short-form video", "Posts captured": "1/30" }),
+    "## Posts",
+    "",
+    "### 1. A sample clip (2026-01-02) [link](https://example.test/1)",
+    "**Metrics:** 1,000 views",
+    "**Visual description:** invented description",
+    "**Framing:** invented framing note",
+    "",
+  ].join("\n"));
+  assert.equal(withViews.entries[0]!.evidenceKind, "short-video");
 
   // An account that publishes both images and video stays ambiguous, and the fields decide.
   const mixed = parseCreatorFile("sample-mixed.md", [

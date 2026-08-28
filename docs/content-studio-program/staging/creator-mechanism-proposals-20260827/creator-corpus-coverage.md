@@ -12,6 +12,8 @@ a winner, proven, or available to Content generation.
 - Creator files: **62** (61 with entries, 1 with none)
 - Parsed entries: **1706**
 - Entries with readable platform counts: 1705 of 1706
+- Entries whose metric list is partly unreadable: 39
+- Entries carrying a direct source link: 1703 of 1706
 - Entries with a partial capture: 210 (of which paywall-gated: 105)
 - Entries authored by someone other than the account owner: 13
 - Entries captured as a segmented thread: 3
@@ -205,70 +207,70 @@ treated as the creator's own body copy, counted, and redacted rather than record
 
 ## Per-creator coverage
 
-| File | Platform | Claimed | Actual | Completeness | Metrics | Capture window | Partial | Paywalled | Third-party |
-|---|---|---|---|---|---|---|---|---|---|
-| adhd-love.md | instagram | 30/30 | 30 | complete | 30/30 | unknown | 0 | 0 | 0 |
-| alex-cattoni.md | linkedin | 30/30 | 30 | complete | 30/30 | relative only (30) | 7 | 0 | 0 |
-| alex-hormozi.md | linkedin | 28/30 | 28 | partial-window | 28/28 | 2025-09 to 2026-08-26 | 0 | 0 | 1 |
-| alex-partridge.md | instagram | 30/30 | 43 | complete | 43/43 | 2026-03-22 to 2026-08-25 | 1 | 0 | 0 |
-| ali-abdaal.md | youtube | 30/30 | 30 | complete | 30/30 | 2018-04-04 to 2026 | 1 | 0 | 0 |
-| amelia-sordell.md | linkedin | 30/30 | 30 | complete | 30/30 | relative only (30) | 0 | 0 | 0 |
-| arvid-kahl.md | x | 30/30 | 30 | complete | 30/30 | 2020-06-04 to 2026-08-18 | 0 | 0 | 0 |
-| ashley-childress.md | devto | 30/30 | 30 | complete | 30/30 | 2025-07-02 to 2025-12-17 | 0 | 0 | 0 |
-| bella-poarch.md | tiktok | 0/30 | 0 | blocked | 0/0 | unknown | 0 | 0 | 0 |
-| charli-damelio.md | tiktok | 29/30 | 29 | partial-window | 29/29 | 2020-01-17 to 2024-06-14 | 0 | 0 | 0 |
-| codie-sanchez.md | youtube | 30/30 | 30 | complete | 30/30 | 2022-07-21 to 2026-03-30 | 5 | 0 | 0 |
-| colin-percival.md | hackernews | 30/30 | 30 | complete | 30/30 | 2010-05-14 to 2026-04-11 | 0 | 0 | 0 |
-| cory-doctorow.md | mastodon | 30/30 | 30 | complete | 30/30 | 2026-07-27 to 2026-08-26 | 0 | 0 | 0 |
-| damon-chen.md | x | 30/30 | 30 | complete | 30/30 | 2024-10-18 to 2026-08-26 | 0 | 0 | 0 |
-| dan-koe.md | youtube | 30/30 | 30 | complete | 30/30 | 2022-10-02 to 2025-12-28 | 2 | 0 | 0 |
-| dani-donovan.md | bluesky | 30/30 | 30 | complete | 30/30 | 2024-11-25 to 2026-07-07 | 0 | 0 | 0 |
-| danny-postma.md | x | 13/30 | 13 | partial-window | 13/13 | 2022-12-01 to 2026-08-25 | 0 | 0 | 0 |
-| daria-career-journey.md | threads | 14/30 | 14 | partial-window | 14/14 | 2025-12-26 to 2026-06-03 | 0 | 0 | 0 |
-| derek-guy.md | bluesky | 30/30 | 30 | complete | 30/30 | 2025-10-25 to 2026-08-26 | 0 | 0 | 0 |
-| digital-empires.md | pinterest | 28/30 | 28 | partial-window | 28/28 | source published no date (28) | 1 | 0 | 0 |
-| dril.md | bluesky | 30/30 | 30 | complete | 30/30 | 2024-02-06 to 2026-04-27 | 0 | 0 | 0 |
-| hamel-husain.md | youtube | 30/30 | 30 | complete | 30/30 | 2022-02-02 to 2026-07-31 | 6 | 0 | 0 |
-| hank-green.md | bluesky | 30/30 | 30 | complete | 30/30 | 2026-05-15 to 2026-07-30 | 1 | 0 | 0 |
-| heather-cox-richardson.md | substack | 30/30 | 30 | complete | 30/30 | 2022-05-30 to 2026-05-24 | 0 | 0 | 0 |
-| jake-goodman.md | substack | 30/30 | 30 | complete | 30/30 | 2024-12-08 to 2026-08-16 | 17 | 17 | 0 |
-| jake-ward.md | linkedin | 19/30 | 19 | partial-window | 19/19 | 2026-07-26 to 2026-08-25 | 0 | 0 | 4 |
-| jesse-anderson.md | substack | 30/30 | 31 | complete | 30/31 | 2023-04-11 to 2026-08-26 | 27 | 22 | 0 |
-| jessica-mccabe.md | youtube | 30/30 | 30 | complete | 30/30 | 2016-02-09 to 2022-02-08 | 0 | 0 | 0 |
-| joanna-rahier.md | pinterest | 30/30 | 30 | complete | 30/30 | source published no date (30) | 0 | 0 | 0 |
-| john-cutler.md | substack | 30/30 | 30 | complete | 30/30 | 2021-07-01 to 2026-01-01 | 0 | 0 | 0 |
-| johnny-harris.md | youtube | 30/30 | 30 | complete | 30/30 | relative only (30) | 3 | 0 | 0 |
-| judd-legum.md | substack | 30/30 | 30 | complete | 30/30 | 2021-01-10 to 2026-08-26 | 0 | 0 | 0 |
-| julie-zhuo.md | substack | 30/30 | 30 | complete | 30/30 | 2020-08-07 to 2026-06-13 | 21 | 21 | 0 |
-| justin-welsh.md | linkedin | 30/30 | 30 | complete | 30/30 | 2026-07 to 2026-08-26 | 0 | 0 | 0 |
-| khabane-lame.md | tiktok | 30/30 | 30 | complete | 30/30 | 2021-04-08 to 2023-05-19 | 2 | 0 | 0 |
-| lara-acosta.md | linkedin | 12/30 | 12 | partial-window | 12/12 | 2026-08-20 to 2026-08-27 | 0 | 0 | 3 |
-| leeja-miller.md | youtube | 30/30 | 30 | complete | 30/30 | 2021-05-04 to 2025-07-28 | 2 | 0 | 0 |
-| legaleagle.md | youtube | 30/30 | 30 | complete | 30/30 | relative only (30) | 4 | 0 | 0 |
-| lenny-rachitsky.md | substack | 30/30 | 30 | complete | 30/30 | 2023-02-28 to 2025-12-23 | 28 | 0 | 0 |
-| marc-lou.md | x | 30/30 | 30 | complete | 30/30 | 2025-08-04 to 2026-08-26 | 0 | 0 | 0 |
-| marily-nika.md | substack | 30/30 | 30 | complete | 30/30 | 2024-05-30 to 2026-08-24 | 22 | 14 | 0 |
-| marty-cagan.md | linkedin | 30/30 | 30 | complete | 30/30 | 2026-01 to 2026-08 | 1 | 0 | 1 |
-| melissa-perri.md | youtube | 30/30 | 30 | complete | 30/30 | 2019-12-03 to 2025-10-15 | 4 | 0 | 0 |
-| mini-adhd-coach.md | threads | 4/30 | 4 | partial-window | 4/4 | 2026-08-09 to 2026-08-10 | 0 | 0 | 0 |
-| molly-white.md | mastodon | 30/30 | 30 | complete | 30/30 | 2026-06-30 to 2026-08-21 | 0 | 0 | 0 |
-| mr-beat.md | youtube | 30/30 | 30 | complete | 30/30 | 2017-01-06 to 2024-05-10 | 7 | 0 | 0 |
-| mrbeast.md | youtube | 30/30 | 30 | complete | 30/30 | 2020-05-30 to 2024-11-30 | 1 | 0 | 0 |
-| nik-hobrecker.md | instagram | 30/30 | 30 | complete | 30/30 | 2026-06-29 to 2026-08-25 | 2 | 0 | 0 |
-| pbf-comics.md | bluesky | 30/30 | 30 | complete | 30/30 | 2024-11-22 to 2026-08-04 | 0 | 0 | 0 |
-| peter-yang.md | substack | 30/30 | 30 | complete | 30/30 | 2023-07-12 to 2026-08-26 | 20 | 20 | 0 |
-| pewdiepie.md | youtube | 30/30 | 30 | complete | 30/30 | 2012-10-28 to 2019-10-23 | 0 | 0 | 0 |
-| pieter-levels.md | x | 31/30 | 31 | complete | 31/31 | 2025-06-22 to 2026-08-26 | 0 | 0 | 0 |
-| rich-mironov.md | linkedin | 20/30 | 20 | partial-window | 20/20 | 2026-06-26 to 2026-08-25 | 0 | 0 | 4 |
-| rowan-cheung.md | threads | 4/30 | 4 | partial-window | 4/4 | 2025-09-16 to 2026-08-26 | 0 | 0 | 0 |
-| ruben-hassid.md | substack | 24/30 | 24 | partial-window | 24/24 | 2025-12-24 to 2026-07-29 | 4 | 0 | 0 |
-| sabrina-ramonov.md | instagram | 30/30 | 30 | complete | 30/30 | 2026-05-24 to 2026-08-24 | 1 | 0 | 0 |
-| sasha-hamdani.md | instagram | 30/30 | 30 | complete | 30/30 | 2023-06-17 to 2026-08-26 | 0 | 0 | 0 |
-| school-of-hard-knocks.md | tiktok | 30/30 | 30 | complete | 30/30 | 2021-08-30 to 2025-10-16 | 0 | 0 | 0 |
-| simon-willison-mastodon.md | mastodon | 30/30 | 30 | complete | 30/30 | 2025-12-07 to 2026-08-16 | 0 | 0 | 0 |
-| teresa-torres.md | youtube | 26/30 | 26 | partial-window | 26/26 | 2015-06-03 to 2026-01-08 | 5 | 0 | 0 |
-| understanding-ai.md | substack | 30/30 | 30 | complete | 30/30 | 2023-07-27 to 2026-08-13 | 15 | 11 | 0 |
-| weratedogs.md | bluesky | 30/30 | 30 | complete | 30/30 | 2026-03-30 to 2026-08-06 | 0 | 0 | 0 |
+| File | Platform | Claimed | Actual | Completeness | Metrics | Linked | Capture window | Partial | Paywalled | Third-party |
+|---|---|---|---|---|---|---|---|---|---|---|
+| adhd-love.md | instagram | 30/30 | 30 | complete | 30/30 | 30/30 | unknown | 0 | 0 | 0 |
+| alex-cattoni.md | linkedin | 30/30 | 30 | complete | 30/30 | 30/30 | relative only (30) | 7 | 0 | 0 |
+| alex-hormozi.md | linkedin | 28/30 | 28 | partial-window | 28/28 | 28/28 | 2025-09 to 2026-08-26 | 0 | 0 | 1 |
+| alex-partridge.md | instagram | 30/30 | 43 | complete | 43/43 (1 partial) | 40/43 | 2026-03-22 to 2026-08-25 | 1 | 0 | 0 |
+| ali-abdaal.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2018-04-04 to 2026 | 1 | 0 | 0 |
+| amelia-sordell.md | linkedin | 30/30 | 30 | complete | 30/30 | 30/30 | relative only (30) | 0 | 0 | 0 |
+| arvid-kahl.md | x | 30/30 | 30 | complete | 30/30 (12 partial) | 30/30 | 2020-06-04 to 2026-08-18 | 0 | 0 | 0 |
+| ashley-childress.md | devto | 30/30 | 30 | complete | 30/30 | 30/30 | 2025-07-02 to 2025-12-17 | 0 | 0 | 0 |
+| bella-poarch.md | tiktok | 0/30 | 0 | blocked | 0/0 | 0/0 | unknown | 0 | 0 | 0 |
+| charli-damelio.md | tiktok | 29/30 | 29 | partial-window | 29/29 | 29/29 | 2020-01-17 to 2024-06-14 | 0 | 0 | 0 |
+| codie-sanchez.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2022-07-21 to 2026-03-30 | 5 | 0 | 0 |
+| colin-percival.md | hackernews | 30/30 | 30 | complete | 30/30 | 30/30 | 2010-05-14 to 2026-04-11 | 0 | 0 | 0 |
+| cory-doctorow.md | mastodon | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-07-27 to 2026-08-26 | 0 | 0 | 0 |
+| damon-chen.md | x | 30/30 | 30 | complete | 30/30 | 30/30 | 2024-10-18 to 2026-08-26 | 0 | 0 | 0 |
+| dan-koe.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2022-10-02 to 2025-12-28 | 2 | 0 | 0 |
+| dani-donovan.md | bluesky | 30/30 | 30 | complete | 30/30 | 30/30 | 2024-11-25 to 2026-07-07 | 0 | 0 | 0 |
+| danny-postma.md | x | 13/30 | 13 | partial-window | 13/13 (1 partial) | 13/13 | 2022-12-01 to 2026-08-25 | 0 | 0 | 0 |
+| daria-career-journey.md | threads | 14/30 | 14 | partial-window | 14/14 | 14/14 | 2025-12-26 to 2026-06-03 | 0 | 0 | 0 |
+| derek-guy.md | bluesky | 30/30 | 30 | complete | 30/30 | 30/30 | 2025-10-25 to 2026-08-26 | 0 | 0 | 0 |
+| digital-empires.md | pinterest | 28/30 | 28 | partial-window | 28/28 (1 partial) | 28/28 | source published no date (28) | 1 | 0 | 0 |
+| dril.md | bluesky | 30/30 | 30 | complete | 30/30 | 30/30 | 2024-02-06 to 2026-04-27 | 0 | 0 | 0 |
+| hamel-husain.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2022-02-02 to 2026-07-31 | 6 | 0 | 0 |
+| hank-green.md | bluesky | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-05-15 to 2026-07-30 | 1 | 0 | 0 |
+| heather-cox-richardson.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2022-05-30 to 2026-05-24 | 0 | 0 | 0 |
+| jake-goodman.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2024-12-08 to 2026-08-16 | 17 | 17 | 0 |
+| jake-ward.md | linkedin | 19/30 | 19 | partial-window | 19/19 | 19/19 | 2026-07-26 to 2026-08-25 | 0 | 0 | 4 |
+| jesse-anderson.md | substack | 30/30 | 31 | complete | 30/31 | 31/31 | 2023-04-11 to 2026-08-26 | 27 | 22 | 0 |
+| jessica-mccabe.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2016-02-09 to 2022-02-08 | 0 | 0 | 0 |
+| joanna-rahier.md | pinterest | 30/30 | 30 | complete | 30/30 | 30/30 | source published no date (30) | 0 | 0 | 0 |
+| john-cutler.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2021-07-01 to 2026-01-01 | 0 | 0 | 0 |
+| johnny-harris.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | relative only (30) | 3 | 0 | 0 |
+| judd-legum.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2021-01-10 to 2026-08-26 | 0 | 0 | 0 |
+| julie-zhuo.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2020-08-07 to 2026-06-13 | 21 | 21 | 0 |
+| justin-welsh.md | linkedin | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-07 to 2026-08-26 | 0 | 0 | 0 |
+| khabane-lame.md | tiktok | 30/30 | 30 | complete | 30/30 | 30/30 | 2021-04-08 to 2023-05-19 | 2 | 0 | 0 |
+| lara-acosta.md | linkedin | 12/30 | 12 | partial-window | 12/12 | 12/12 | 2026-08-20 to 2026-08-27 | 0 | 0 | 3 |
+| leeja-miller.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2021-05-04 to 2025-07-28 | 2 | 0 | 0 |
+| legaleagle.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | relative only (30) | 4 | 0 | 0 |
+| lenny-rachitsky.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2023-02-28 to 2025-12-23 | 28 | 0 | 0 |
+| marc-lou.md | x | 30/30 | 30 | complete | 30/30 | 30/30 | 2025-08-04 to 2026-08-26 | 0 | 0 | 0 |
+| marily-nika.md | substack | 30/30 | 30 | complete | 30/30 (22 partial) | 30/30 | 2024-05-30 to 2026-08-24 | 22 | 14 | 0 |
+| marty-cagan.md | linkedin | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-01 to 2026-08 | 1 | 0 | 1 |
+| melissa-perri.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2019-12-03 to 2025-10-15 | 4 | 0 | 0 |
+| mini-adhd-coach.md | threads | 4/30 | 4 | partial-window | 4/4 | 4/4 | 2026-08-09 to 2026-08-10 | 0 | 0 | 0 |
+| molly-white.md | mastodon | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-06-30 to 2026-08-21 | 0 | 0 | 0 |
+| mr-beat.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2017-01-06 to 2024-05-10 | 7 | 0 | 0 |
+| mrbeast.md | youtube | 30/30 | 30 | complete | 30/30 | 30/30 | 2020-05-30 to 2024-11-30 | 1 | 0 | 0 |
+| nik-hobrecker.md | instagram | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-06-29 to 2026-08-25 | 2 | 0 | 0 |
+| pbf-comics.md | bluesky | 30/30 | 30 | complete | 30/30 | 30/30 | 2024-11-22 to 2026-08-04 | 0 | 0 | 0 |
+| peter-yang.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2023-07-12 to 2026-08-26 | 20 | 20 | 0 |
+| pewdiepie.md | youtube | 30/30 | 30 | complete | 30/30 (1 partial) | 30/30 | 2012-10-28 to 2019-10-23 | 0 | 0 | 0 |
+| pieter-levels.md | x | 31/30 | 31 | complete | 31/31 | 31/31 | 2025-06-22 to 2026-08-26 | 0 | 0 | 0 |
+| rich-mironov.md | linkedin | 20/30 | 20 | partial-window | 20/20 | 20/20 | 2026-06-26 to 2026-08-25 | 0 | 0 | 4 |
+| rowan-cheung.md | threads | 4/30 | 4 | partial-window | 4/4 | 4/4 | 2025-09-16 to 2026-08-26 | 0 | 0 | 0 |
+| ruben-hassid.md | substack | 24/30 | 24 | partial-window | 24/24 (1 partial) | 24/24 | 2025-12-24 to 2026-07-29 | 4 | 0 | 0 |
+| sabrina-ramonov.md | instagram | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-05-24 to 2026-08-24 | 1 | 0 | 0 |
+| sasha-hamdani.md | instagram | 30/30 | 30 | complete | 30/30 | 30/30 | 2023-06-17 to 2026-08-26 | 0 | 0 | 0 |
+| school-of-hard-knocks.md | tiktok | 30/30 | 30 | complete | 30/30 | 30/30 | 2021-08-30 to 2025-10-16 | 0 | 0 | 0 |
+| simon-willison-mastodon.md | mastodon | 30/30 | 30 | complete | 30/30 | 30/30 | 2025-12-07 to 2026-08-16 | 0 | 0 | 0 |
+| teresa-torres.md | youtube | 26/30 | 26 | partial-window | 26/26 | 26/26 | 2015-06-03 to 2026-01-08 | 5 | 0 | 0 |
+| understanding-ai.md | substack | 30/30 | 30 | complete | 30/30 | 30/30 | 2023-07-27 to 2026-08-13 | 15 | 11 | 0 |
+| weratedogs.md | bluesky | 30/30 | 30 | complete | 30/30 | 30/30 | 2026-03-30 to 2026-08-06 | 0 | 0 | 0 |
 
 ## Index reconciliation
 

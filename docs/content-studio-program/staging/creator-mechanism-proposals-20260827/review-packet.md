@@ -18,6 +18,8 @@ and this lane adds no wiring that would make them readable.
 | Files with at least one parsed entry | 61 |
 | Parsed entries | 1,706 |
 | Entries with readable platform counts | 1,705 |
+| Entries whose metric list is partly unreadable | 39 |
+| Entries carrying a direct source link | 1,703 |
 | Entries with a partial capture | 210 |
 | Entries gated by a paywall | 105 |
 | Entries authored by someone other than the account owner | 13 |
@@ -101,6 +103,9 @@ proposal resting on those entries can claim.
   "19h"), Pinterest published none at all for two accounts, and some entries carry an
   approximation the capture agent marked. The inventory records the precision it found and never
   upgrades an approximation into a date.
+- **Three of 1,706 entries carry no direct source link**, so 1,703 can be re-checked at
+  the source and three cannot. All three are grid-only captures whose individual permalink the
+  platform did not expose.
 - **No baselines, denominators or comparison windows exist anywhere in this corpus.** Counts are
   absolute and unnormalized against follower count, channel size, era or platform. Nothing here
   supports a relative-outperformance claim.
@@ -114,8 +119,10 @@ from the cited entries by `validate`, not declared by hand.
 
 - Replication: 69 cross-creator, 0 single-creator. Cross-creator here means only that the cited
   entries come from more than one creator file. It is not a claim of measured replication.
-- Evidence status: 37 metric-backed, 32 partial-capture. `metric-backed` means only that every
-  cited entry carried readable counts, never that the arrangement caused them.
+- Evidence status: 34 metric-backed, 32 partial-capture, 3 structural-only.
+  `metric-backed` means only that every cited entry carried a complete, readable count set, never
+  that the arrangement caused those counts. `structural-only` means at least one cited entry's
+  metric list is partly unreadable.
 - Confidence: 55 medium, 14 low. No proposal is high.
 - 727 source references, 584 distinct entries, across all 12 platforms.
 
@@ -127,7 +134,7 @@ from the cited entries by `validate`, not declared by hand.
 | `mech:hook:concrete-scene-before-thesis` | Concrete scene before thesis | 6 | 4 | devto, substack | metric-backed | medium |
 | `mech:hook:dated-external-event-anchor` | Dated external-event anchor | 6 | 4 | hackernews, linkedin, mastodon, substack | metric-backed | medium |
 | `mech:hook:flash-forward-teaser-cut` | Flash-forward teaser cut | 11 | 3 | youtube | partial-capture | medium |
-| `mech:hook:paradox-contrast-flat-opener` | Flat paradox or contrast opener | 20 | 10 | bluesky, linkedin, mastodon, x | metric-backed | medium |
+| `mech:hook:paradox-contrast-flat-opener` | Flat paradox or contrast opener | 20 | 10 | bluesky, linkedin, mastodon, x | structural-only | medium |
 | `mech:hook:point-first-opener` | Point-first opener (verdict or topic before preamble) | 16 | 7 | instagram, youtube | partial-capture | medium |
 | `mech:hook:stat-first-opener` | Stat-first / concrete-number opener | 20 | 12 | instagram, linkedin, mastodon, substack, tiktok, x, youtube | partial-capture | medium |
 | `mech:hook:visual-resolved-curiosity-gap` | Visual-resolved curiosity gap | 8 | 4 | bluesky, linkedin, x | metric-backed | medium |
@@ -186,7 +193,7 @@ Consolidation note: 6 merged proposals, within the 5-8 target range. Several ind
 |---|---|---|---|---|---|---|
 | `mech:cta:appended-resource-or-next-step-offer` | Appended Resource or Next-Step Offer | 20 | 9 | linkedin, substack, youtube | partial-capture | medium |
 | `mech:cta:cta-as-designed-graphic-element` | CTA as Designed Graphic Element | 12 | 4 | instagram, pinterest, threads | partial-capture | low |
-| `mech:cta:direct-access-point-ask` | Direct Access-Point Ask | 6 | 4 | linkedin, x | metric-backed | low |
+| `mech:cta:direct-access-point-ask` | Direct Access-Point Ask | 6 | 4 | linkedin, x | structural-only | low |
 | `mech:cta:entry-mechanism-giveaway-ask` | Entry-Mechanism Giveaway Ask | 5 | 2 | youtube | metric-backed | low |
 | `mech:cta:free-sample-paid-upsell-funnel` | Free-Sample Paid-Upsell Funnel | 9 | 3 | youtube | partial-capture | medium |
 | `mech:cta:invite-reader-contribution` | Invite Reader Contribution | 4 | 2 | devto, substack | partial-capture | low |
@@ -234,7 +241,7 @@ Consolidation note: 21 input candidates reduced to 8 merged proposals. Three mer
 
 | Proposal | Name | Entries | Creator files | Platforms | Evidence | Confidence |
 |---|---|---|---|---|---|---|
-| `mech:visual-treatment:deadpan-image-mismatch` | Deadpan Image Mismatch | 5 | 3 | bluesky, x | metric-backed | low |
+| `mech:visual-treatment:deadpan-image-mismatch` | Deadpan Image Mismatch | 5 | 3 | bluesky, x | structural-only | low |
 | `mech:visual-treatment:fixed-position-text-banner-signature` | Fixed-Position Text Banner As Signature | 5 | 4 | instagram | metric-backed | medium |
 | `mech:visual-treatment:overlay-text-as-primary-hook` | Overlay Text As Primary Hook | 11 | 4 | instagram, pinterest, threads | metric-backed | medium |
 | `mech:visual-treatment:physical-prop-as-concrete-proof` | Physical Prop As Concrete Proof | 15 | 9 | bluesky, instagram, pinterest, youtube | metric-backed | low |
@@ -343,7 +350,7 @@ concentrated in a single creator file.
 The validator proves a bounded thing and not more. Say what it proves, then what it does not.
 
 **What passed.** No proposal's free text, including its own identifier, shares an eight-word run
-with any line of any entry it cites. No proposal carries a link, a blockquote, a quoted run, or
+with any line of any entry it cites, nor with any line anywhere else in the corpus. No proposal carries a link, a blockquote, a quoted run, or
 an em dash, and none asserts what an arrangement does to a reader. No proposal record has a key that could hold creator copy, and the reader rejects
 unknown keys rather than dropping them. No proposal uses a claim word. No proposal contains a
 creator's full name or an account handle: that check matches the name as a phrase and the handle
@@ -375,8 +382,15 @@ evidence audit named in the charter has not run, and this lane did not run it.
 ## 8. What the eight-word copy check cannot see
 
 The check compares a proposal's free text and its identifier against every line of every entry it
-cites. It does not compare against entries it does not cite, and it does not detect close
-paraphrase below eight consecutive words. It is a floor, not a proof of independence.
+cites, and separately against a hashed index of every word run in all 62 files, so copying from an
+entry a proposal does not cite is caught too. What it still cannot see is close paraphrase below
+eight consecutive words, or a rearrangement of the same substance. It is a floor, not a proof of
+independence.
+
+The creator-name check runs over the fields that describe a mechanism: the name, the mechanism, the
+adaptation note and the identifier. It does not run over `evidence_limitations`, because naming the
+source file the evidence concentrates in is exactly what a limitation is for, and some accounts'
+handles are their file name. Account handles remain forbidden in limitations.
 
 Three proposals were reworded during this lane's own audit because they asserted an effect rather
 than describing an arrangement: two said a device created urgency or supplied the audience's

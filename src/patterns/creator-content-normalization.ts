@@ -167,7 +167,9 @@ const QUALIFIER_RULES: readonly QualifierRule[] = [
   { pattern: /\bor\b[\s\S]{0,120}?\bnote\b|if any|if applicable|if image post|if genuinely unavailable/, qualifiers: ["conditional-absence"] },
   { pattern: /visual description|mostly wordless|text card|on-screen caption/, qualifiers: ["visual-only"] },
   { pattern: /wordless|music\/dance|none \(/, qualifiers: ["no-spoken-audio"] },
-  { pattern: /'s words|’s words|not lara's|not lara’s|authored by|reposted by/, qualifiers: ["third-party-authored"] },
+  // The corpus marks a repost several ways: "X's words", "X's post", "authored by X", "reposted
+  // by X", "not X's". All of them mean the account owner did not write it.
+  { pattern: /['’]s (?:words|post|writing|content|thread)\b|\bnot [a-z]+['’]s\b|\bauthored by\b|\breposted by\b|\bguest[- ]authored\b/, qualifiers: ["third-party-authored"] },
   { pattern: /\ball \d+ segments\b|\bsegment\b/, qualifiers: ["segmented"] },
   { pattern: /stylized/, qualifiers: ["stylized"] },
   { pattern: /age-restricted|requires sign-in/, qualifiers: ["restricted"] },
@@ -533,7 +535,19 @@ export function parseMetricsValue(value: string, labelNames: readonly string[] =
     return { available: false, values: [], positionalOnly: false, segmented, unparsedTokens: 0 };
   }
   // A bare number list: either the label named the metrics ("Points/comments"), or nothing did.
-  const bare = splitMetricTokens(withoutParens).flatMap((token) => token.split("/")).map((token) => token.trim()).filter(Boolean);
+  // A compact list ("1275,265") is indistinguishable from a thousands separator on shape alone, so
+  // it counts as a list only when the label names exactly that many metrics AND at least one group
+  // is not three digits, which a thousands group after the first always is.
+  const compact = /^[\d,]+$/.test(withoutParens) ? withoutParens.split(",").map((part) => part.trim()) : [];
+  // A thousands-separated number has a leading group of one to three digits and every later group
+  // of exactly three. A comma list that cannot be read that way is a list.
+  const readsAsOneNumber = compact.length > 0
+    && compact[0]!.length >= 1 && compact[0]!.length <= 3
+    && compact.slice(1).every((group) => group.length === 3);
+  const compactIsList = labelNames.length > 1 && compact.length === labelNames.length && !readsAsOneNumber;
+  const bare = compactIsList
+    ? compact
+    : splitMetricTokens(withoutParens).flatMap((token) => token.split("/")).map((token) => token.trim()).filter(Boolean);
   if (bare.length > 1 && bare.every((token) => /^[\d][\d,]*$/.test(token))) {
     const named = labelNames.length === bare.length;
     return {
@@ -618,7 +632,11 @@ function evidenceKindFor(
   // A video the account calls a video stays a video even when the only evidence captured is a
   // visual description: some platforms return no transcript at all. Only an account that publishes
   // BOTH images and video is ambiguous enough to be decided by the fields alone.
-  const videoKind = (): EntryEvidenceKind => (/long/.test(media) || kinds.has("duration") || hasViews ? "long-video" : "short-video");
+  const videoKind = (): EntryEvidenceKind => {
+    if (/short|reel|tiktok/.test(media)) return "short-video";
+    if (/long/.test(media) || kinds.has("duration") || hasViews) return "long-video";
+    return "short-video";
+  };
   if (hasTranscript || kinds.has("thumbnail-description")) {
     if (/short|reel|tiktok/.test(media)) return "short-video";
     if (/long/.test(media)) return "long-video";
@@ -999,7 +1017,9 @@ export interface CreatorInventory {
   readonly entries_by_evidence_kind: Readonly<Record<string, number>>;
   readonly field_coverage: Readonly<Record<CoverageFieldKind, FieldCoverage>>;
   readonly capture_window: CaptureWindow;
+  readonly entries_with_source_link: number;
   readonly metrics_available_entries: number;
+  readonly metrics_incomplete_entries: number;
   readonly metrics_positional_only_entries: number;
   readonly metric_names: readonly string[];
   readonly flag_counts: Readonly<Record<string, number>>;
@@ -1029,6 +1049,8 @@ export interface CorpusInventory {
     readonly creators_with_zero_entries: number;
     readonly entries: number;
     readonly entries_with_available_metrics: number;
+    readonly entries_with_incomplete_metrics: number;
+    readonly entries_with_a_source_link: number;
     readonly entries_paywalled: number;
     readonly entries_partial_capture: number;
     readonly entries_third_party_authored: number;
@@ -1136,6 +1158,7 @@ export function buildCorpusInventory(
     const metricNames = new Set<string>();
     let metricsAvailable = 0;
     let positionalOnly = 0;
+    let incompleteMetrics = 0;
 
     for (const entry of file.entries) {
       entriesTotal += 1;
@@ -1146,6 +1169,7 @@ export function buildCorpusInventory(
       tally(creatorEvidence, entry.evidenceKind);
       if (entry.metrics.available) metricsAvailable += 1;
       if (entry.metrics.positionalOnly) positionalOnly += 1;
+      if (entry.metrics.unparsedTokens > 0) incompleteMetrics += 1;
       for (const value of entry.metrics.values) metricNames.add(value.metric);
       for (const [flag, on] of Object.entries(entry.flags)) if (on) tally(flagCounts, flag);
       for (const field of entry.fields) {
@@ -1179,7 +1203,9 @@ export function buildCorpusInventory(
       entries_by_evidence_kind: sortedRecord(creatorEvidence),
       field_coverage: creatorCoverage,
       capture_window: captureWindowFor(file.entries),
+      entries_with_source_link: file.entries.filter((entry) => entry.hasLink).length,
       metrics_available_entries: metricsAvailable,
+      metrics_incomplete_entries: incompleteMetrics,
       metrics_positional_only_entries: positionalOnly,
       metric_names: [...metricNames].sort(compareText),
       flag_counts: sortedRecord(flagCounts),
@@ -1205,6 +1231,8 @@ export function buildCorpusInventory(
       creators_with_zero_entries: ordered.filter((file) => file.entries.length === 0).length,
       entries: entriesTotal,
       entries_with_available_metrics: allEntries.filter((entry) => entry.metrics.available).length,
+      entries_with_incomplete_metrics: allEntries.filter((entry) => entry.metrics.unparsedTokens > 0).length,
+      entries_with_a_source_link: allEntries.filter((entry) => entry.hasLink).length,
       entries_paywalled: allEntries.filter((entry) => entry.flags.paywalled).length,
       entries_partial_capture: allEntries.filter((entry) => entry.flags.partialCapture).length,
       entries_third_party_authored: allEntries.filter((entry) => entry.flags.thirdPartyAuthored).length,

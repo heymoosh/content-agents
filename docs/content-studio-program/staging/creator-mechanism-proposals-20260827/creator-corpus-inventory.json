@@ -9,6 +9,8 @@
     "creators_with_zero_entries": 1,
     "entries": 1706,
     "entries_with_available_metrics": 1705,
+    "entries_with_incomplete_metrics": 39,
+    "entries_with_a_source_link": 1703,
     "entries_paywalled": 105,
     "entries_partial_capture": 210,
     "entries_third_party_authored": 13,
@@ -1394,7 +1396,9 @@
         "source_undated": 0,
         "approximate": 1
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -1530,7 +1534,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -1663,7 +1669,9 @@
         "source_undated": 0,
         "approximate": 28
       },
+      "entries_with_source_link": 28,
       "metrics_available_entries": 28,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -1798,7 +1806,9 @@
         "source_undated": 3,
         "approximate": 3
       },
+      "entries_with_source_link": 40,
       "metrics_available_entries": 43,
+      "metrics_incomplete_entries": 1,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -1937,7 +1947,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -2071,7 +2083,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -2202,7 +2216,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 12,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -2336,7 +2352,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -2741,7 +2759,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 0,
       "metrics_available_entries": 0,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [],
       "flag_counts": {},
@@ -2870,7 +2890,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 29,
       "metrics_available_entries": 29,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -3008,7 +3030,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -3142,7 +3166,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -3271,7 +3297,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "boosts",
@@ -3403,7 +3431,9 @@
         "source_undated": 0,
         "approximate": 1
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "bookmark",
@@ -3537,7 +3567,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -3671,7 +3703,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -3801,7 +3835,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 13,
       "metrics_available_entries": 13,
+      "metrics_incomplete_entries": 1,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -3934,7 +3970,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 14,
       "metrics_available_entries": 14,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -4070,7 +4108,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -4201,7 +4241,9 @@
         "source_undated": 28,
         "approximate": 0
       },
+      "entries_with_source_link": 28,
       "metrics_available_entries": 28,
+      "metrics_incomplete_entries": 1,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -4341,7 +4383,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -4472,7 +4516,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -4606,7 +4652,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -4740,7 +4788,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -4870,7 +4920,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -5003,7 +5055,9 @@
         "source_undated": 0,
         "approximate": 19
       },
+      "entries_with_source_link": 19,
       "metrics_available_entries": 19,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -5137,7 +5191,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 31,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -5277,7 +5333,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -5410,7 +5468,9 @@
         "source_undated": 30,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -5541,7 +5601,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -5671,7 +5733,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -5807,7 +5871,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -5939,7 +6005,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -6073,7 +6141,9 @@
         "source_undated": 0,
         "approximate": 26
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -6205,7 +6275,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -6344,7 +6416,9 @@
         "source_undated": 0,
         "approximate": 8
       },
+      "entries_with_source_link": 12,
       "metrics_available_entries": 12,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -6476,7 +6550,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -6612,7 +6688,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "views"
@@ -6747,7 +6825,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 30,
       "metric_names": [
         "positional-1",
@@ -6880,7 +6960,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -7011,7 +7093,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 22,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -7161,7 +7245,9 @@
         "source_undated": 0,
         "approximate": 30
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -7297,7 +7383,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -7431,7 +7519,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 4,
       "metrics_available_entries": 4,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -7565,7 +7655,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "boosts",
@@ -7696,7 +7788,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -7832,7 +7926,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -7966,7 +8062,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -8103,7 +8201,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -8235,7 +8335,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -8371,7 +8473,9 @@
         "source_undated": 0,
         "approximate": 1
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 1,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -8506,7 +8610,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 31,
       "metrics_available_entries": 31,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "bookmarks",
@@ -8638,7 +8744,9 @@
         "source_undated": 0,
         "approximate": 20
       },
+      "entries_with_source_link": 20,
       "metrics_available_entries": 20,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -8773,7 +8881,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 4,
       "metrics_available_entries": 4,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -8909,7 +9019,9 @@
         "source_undated": 0,
         "approximate": 1
       },
+      "entries_with_source_link": 24,
       "metrics_available_entries": 24,
+      "metrics_incomplete_entries": 1,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comment",
@@ -9046,7 +9158,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -9184,7 +9298,9 @@
         "source_undated": 0,
         "approximate": 8
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -9318,7 +9434,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -9453,7 +9571,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "boosts",
@@ -9584,7 +9704,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 26,
       "metrics_available_entries": 26,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",
@@ -9719,7 +9841,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "comments",
@@ -9852,7 +9976,9 @@
         "source_undated": 0,
         "approximate": 0
       },
+      "entries_with_source_link": 30,
       "metrics_available_entries": 30,
+      "metrics_incomplete_entries": 0,
       "metrics_positional_only_entries": 0,
       "metric_names": [
         "likes",

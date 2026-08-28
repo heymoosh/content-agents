@@ -98,6 +98,7 @@ function proposal(overrides: Record<string, unknown> = {}): Record<string, unkno
       distinct_creator_files: 1,
       distinct_platforms: 1,
       metric_backed_entries: 4,
+      incomplete_metric_entries: 0,
       partial_capture_entries: 0,
       paywalled_entries: 0,
       third_party_entries: 0,
@@ -412,6 +413,51 @@ test("catches a short creator name and a typographic hyphen", () => {
     mechanism: "Names a constraint the way fixture\u2010alpha does, then supplies the smallest change that removes it.",
   })));
   assert.ok(validateProposalsAgainstCorpus(hyphenated, nameIndex).findings.some((finding) => finding.kind === "creator-named"));
+});
+
+test("catches a copied run taken from an entry the proposal does not cite", () => {
+  const { files, raw } = corpus();
+  const index = buildCorpusIndex(files, raw);
+  // The proposal cites only fixture-alpha but lifts its run from fixture-beta.
+  const set = readMechanismProposals(jsonl(proposal({
+    mechanism: `Opens by restating ${plainEntry(5).quoted} and then continues.`,
+  })));
+  const report = validateProposalsAgainstCorpus(set, index);
+  assert.ok(report.findings.some(
+    (finding) => finding.kind === "verbatim-overlap" && finding.detail.includes("does not cite"),
+  ));
+});
+
+test("lets an evidence limitation name its source file but never a handle", () => {
+  const { files, raw } = corpus();
+  const index = buildCorpusIndex(files, raw);
+  const named = readMechanismProposals(jsonl(proposal({
+    evidence_limitations: ["most refs come from fixture-alpha.md, so the spread is narrower than the count suggests"],
+  })));
+  assert.deepEqual(validateProposalsAgainstCorpus(named, index).findings, []);
+
+  const handled = readMechanismProposals(jsonl(proposal({
+    evidence_limitations: ["most refs come from the fixture account, whose handle is fixture"],
+  })));
+  assert.ok(validateProposalsAgainstCorpus(handled, index).findings.some(
+    (finding) => finding.kind === "creator-named" && finding.detail.includes("evidence limitation"),
+  ));
+});
+
+test("will not call an incomplete metric set metric-backed", () => {
+  const { files, raw } = fixtureCorpus(fixtureSource("fixture-alpha.md", "X", [
+    plainEntry(1), plainEntry(2), plainEntry(3),
+    { ...plainEntry(4), metrics: "100 likes, view count not shown" },
+  ]));
+  const index = buildCorpusIndex(files, raw);
+  const optimistic = readMechanismProposals(jsonl(proposal()));
+  assert.ok(validateProposalsAgainstCorpus(optimistic, index).findings.some((finding) => finding.kind === "evidence-status-mismatch"));
+
+  const honest = readMechanismProposals(jsonl(proposal({
+    evidence_status: "structural-only",
+    support: { ...(proposal().support as Record<string, number>), metric_backed_entries: 3, incomplete_metric_entries: 1 },
+  })));
+  assert.deepEqual(validateProposalsAgainstCorpus(honest, index).findings, []);
 });
 
 test("holds a thin cluster below the support floor", () => {
