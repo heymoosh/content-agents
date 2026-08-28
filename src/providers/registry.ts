@@ -106,6 +106,13 @@ export const getProse = () => load<ProseProvider>("prose");
 export const getAnalyst = () => load<AnalystProvider>("analyst");
 export const getProseNamed = (name: string) => importProvider<ProseProvider>("prose", name);
 
+// Restructuring a draft against corpus patterns. Deliberately NOT getAnalyst(): that one falls back
+// to Claude, and Claude is the wrong engine for this job. It stays too close to the sentences it was
+// given and loses the thread of the argument partway through, which is exactly the failure mode a
+// restructure has to avoid. Grok and GPT do it well, so the caller names one and gets it or an
+// error, never a silent Claude substitution.
+export const getAnalystNamed = (name: string) => importProvider<AnalystProvider>("analyst", name);
+
 // Animated scene engine. Like getImage(), returns the adapter plus its `video_broll_params`
 // (model/resolution/cost), passed straight to provider.interpolate().
 export async function getBroll(): Promise<{

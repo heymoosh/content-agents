@@ -147,7 +147,8 @@
     "patterns:reddit-rss": "tsx src/patterns/reddit-rss.ts",
     "patterns:reddit-backfill": "tsx src/patterns/reddit-backfill.ts",
     "patterns:creator-corpus": "tsx src/patterns/creator-mechanism-proposals-cli.ts",
-    "patterns:hook-frames": "tsx src/patterns/hook-frame-cli.ts"
+    "patterns:hook-frames": "tsx src/patterns/hook-frame-cli.ts",
+    "patterns:rewrite": "tsx src/patterns/rewrite-cli.ts"
   },
   "dependencies": {
     "@atproto/api": "^0.20.38",
