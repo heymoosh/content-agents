@@ -45,3 +45,6 @@ data/patterns/**
 e2e/*.log
 e2e/results.jsonl
 e2e/RESULTS.md
+
+# Rewrite proposals are working files, not content. Muxin takes what she wants by hand.
+*.rewrite.md
