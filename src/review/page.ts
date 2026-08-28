@@ -2420,7 +2420,10 @@ function recsBlockHtml(){
         '<div class="wb-rec-conf">'+esc(ex.confidence)+'</div></div>';
     }
   }
-  return '<div><div class="wb-margin-cap">PATTERN READS</div>'+
+  // The block gets its own class so a reader, a test, or the e2e pass can scope to the seam's own
+  // copy. The margin around it can fairly use words this seam must never use, because there they
+  // describe Muxin's own routing rather than a corpus mechanism.
+  return '<div class="wb-recs"><div class="wb-margin-cap">PATTERN READS</div>'+
     '<div class="wb-margin-sub">'+esc(RECS.headline)+'</div>'+
     '<div class="src">'+esc(RECS.detail)+'</div>'+
     examplesHtml+'</div>';

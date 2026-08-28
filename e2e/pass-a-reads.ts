@@ -151,7 +151,12 @@ async function main(): Promise<void> {
     // approved, live, proven, viral, or a winner.
     await openRoom(s.page, "content");
     await waitLoaded(s.page, "#workbench").catch(() => "");
-    const marginText = ((await textOf(s.page, "#workbench .session-margin")) || "").replace(/\s+/g, " ").trim();
+    // Scope to the seam's own block, not the whole margin: a director's angle summary may fairly
+    // use a word this seam must never use, about Muxin's own routing rather than a corpus claim.
+    // waitLoaded returns as soon as the container stops saying Loading, which on a second visit to
+    // this room can be the previous render still on screen, so wait for the block itself.
+    await s.page.waitForSelector("#workbench .wb-recs", { timeout: 15_000 }).catch(() => null);
+    const marginText = ((await textOf(s.page, "#workbench .wb-recs")) || "").replace(/\s+/g, " ").trim();
     if (!marginText) {
       record({
         feature: "Recommendation margin never claims proven or live status",

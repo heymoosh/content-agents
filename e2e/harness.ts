@@ -82,8 +82,28 @@ export function flushReport(): void {
 
 export type Server = { port: number; stop: () => void };
 
-/** Boot the real review server out of this worktree and wait for the port to answer. */
+/**
+ * Boot the real review server out of this worktree and wait for the port to answer.
+ *
+ * The wait loop below cannot tell our own child from someone else's server on the same port, and a
+ * killed run leaves its server listening. Adopting one of those is the worst possible failure: the
+ * whole suite passes or fails against code from another commit, and every row it writes is a lie
+ * about the working tree. So refuse to start if the port already answers, and say which port.
+ */
 export async function bootServer(env: Record<string, string>, port: number): Promise<Server> {
+  try {
+    const stale = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1500) });
+    if (stale.ok) {
+      throw new Error(
+        `port ${port} already answers, so this run would test whatever that server is running, ` +
+          `not this worktree. Stop it first: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
+      );
+    }
+  } catch (e) {
+    // Only the refusal above is fatal. A connection error here is the normal case: nothing is
+    // listening yet, which is exactly what we want.
+    if (e instanceof Error && e.message.startsWith(`port ${port} already answers`)) throw e;
+  }
   const proc: ChildProcess = spawn(
     join(ROOT, "node_modules", ".bin", "tsx"),
     [join(ROOT, "src", "review", "serve.ts")],
@@ -97,8 +117,13 @@ export async function bootServer(env: Record<string, string>, port: number): Pro
   proc.stdout?.on("data", (d) => (log += String(d)));
   proc.stderr?.on("data", (d) => (log += String(d)));
 
+  // A server that dies on startup would otherwise be waited on for the full 60 seconds.
+  let exited: string | null = null;
+  proc.on("exit", (code, signal) => (exited = `exit code ${code}, signal ${signal}`));
+
   const deadline = Date.now() + 60_000;
   for (;;) {
+    if (exited) throw new Error(`server on ${port} died before answering (${exited}). Output:\n${log}`);
     if (Date.now() > deadline) {
       proc.kill("SIGKILL");
       throw new Error(`server did not start on ${port} within 60s. Output:\n${log}`);
