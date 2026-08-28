@@ -337,24 +337,42 @@ export function readHookFrameLibrary(jsonl: string, context: FrameValidationCont
   return { kind: "hook_frame_library", version: HOOK_FRAME_LIBRARY_VERSION, frames, findings };
 }
 
+/**
+ * Pseudo-counts pulling a frame's share toward the corpus base rate when it is ranking frames.
+ *
+ * Without this, four instances that all happened to land top-quartile read as 100% and outrank a
+ * frame measured over fifty. Ten pseudo-counts means a frame needs real volume before its share
+ * moves it much, which is the honest reading of these sample sizes.
+ */
+export const SHARE_PRIOR_WEIGHT = 10;
+
 export interface FrameSelectionRequest {
   readonly platform: Platform;
   readonly topic?: string;
   /** Include frames still awaiting Muxin's review. Off by default. */
   readonly includePending?: boolean;
   readonly limit?: number;
+  /** Corpus top-quartile base rate, used as the prior. Defaults to a flat quartile. */
+  readonly baseRate?: number;
 }
 
 export interface FrameSelection {
   readonly frame: HookFrame;
   /** Top-quartile share among ranked instances, or null when nothing could be ranked. */
   readonly topQuartileShare: number | null;
+  /** The share after shrinking toward the base rate. Ordering only, never reported as a result. */
+  readonly adjustedShare: number;
   readonly topicMatch: boolean;
 }
 
 function topQuartileShare(frame: HookFrame): number | null {
   if (frame.support.rankedInstances === 0) return null;
   return frame.support.topQuartileInstances / frame.support.rankedInstances;
+}
+
+function adjustedShare(frame: HookFrame, baseRate: number): number {
+  const { topQuartileInstances, rankedInstances } = frame.support;
+  return (topQuartileInstances + SHARE_PRIOR_WEIGHT * baseRate) / (rankedInstances + SHARE_PRIOR_WEIGHT);
 }
 
 /**
@@ -364,6 +382,10 @@ function topQuartileShare(frame: HookFrame): number | null {
  */
 export function selectFrames(library: HookFrameLibrary, request: FrameSelectionRequest): FrameSelection[] {
   if (!(PLATFORMS as readonly string[]).includes(request.platform)) fail("request.platform is unsupported");
+  const baseRate = request.baseRate ?? 0.25;
+  if (typeof baseRate !== "number" || !Number.isFinite(baseRate) || baseRate < 0 || baseRate > 1) {
+    fail("request.baseRate must be between 0 and 1");
+  }
   const topic = request.topic?.trim().toLowerCase();
   const rows = library.frames
     .filter((frame) => frame.platforms.includes(request.platform))
@@ -371,13 +393,12 @@ export function selectFrames(library: HookFrameLibrary, request: FrameSelectionR
     .map((frame) => ({
       frame,
       topQuartileShare: topQuartileShare(frame),
+      adjustedShare: adjustedShare(frame, baseRate),
       topicMatch: topic === undefined ? false : frame.topics.some((value) => value.toLowerCase().includes(topic) || topic.includes(value.toLowerCase())),
     }));
   rows.sort((left, right) => {
     if (left.topicMatch !== right.topicMatch) return left.topicMatch ? -1 : 1;
-    const leftShare = left.topQuartileShare ?? -1;
-    const rightShare = right.topQuartileShare ?? -1;
-    if (leftShare !== rightShare) return rightShare - leftShare;
+    if (left.adjustedShare !== right.adjustedShare) return right.adjustedShare - left.adjustedShare;
     if (left.frame.support.distinctCreatorFiles !== right.frame.support.distinctCreatorFiles) {
       return right.frame.support.distinctCreatorFiles - left.frame.support.distinctCreatorFiles;
     }

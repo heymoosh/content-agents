@@ -183,6 +183,7 @@ export function runHookFrameCli(options: HookFrameCliOptions, io: HookFrameCliIo
     const selections = selectFrames(library, {
       platform: options.platform!,
       includePending: options.includePending,
+      baseRate: ranking.rankedEntries === 0 ? 0.25 : ranking.topQuartileEntries / ranking.rankedEntries,
       ...(options.topic === undefined ? {} : { topic: options.topic }),
       ...(options.limit === undefined ? {} : { limit: options.limit }),
     });
