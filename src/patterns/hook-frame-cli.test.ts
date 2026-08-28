@@ -303,13 +303,24 @@ test("list returns 0 and prints the frames for a platform; a pending frame needs
   assert.match(text2, /hook:list-pending/);
 });
 
-test("list prints the 'no frames match' message when nothing matches", () => {
+test("list prints support numbers recomputed from the corpus, not the bank's own claim", () => {
+  // Both synthetic files have fewer entries than MINIMUM_ENTRIES_FOR_RANKING (8), so the real
+  // corpus recomputation is 0 ranked / 0 top-quartile, no matter what the bank asserts.
+  const overclaimed: FrameRow = {
+    ...consistentFrame,
+    id: "hook:list-overclaimed",
+    support: { instances: 2, distinctCreatorFiles: 2, rankedInstances: 2, topQuartileInstances: 1 },
+  };
+  const { io, output } = makeIo(frameLine(overclaimed));
+  const code = runHookFrameCli(parseHookFrameArgs(["list", "--platform", "linkedin"]), io);
+  const text = output.join("");
+  assert.equal(code, 0);
+  assert.match(text, /0\/0 ranked instances top-quartile \(not ranked\)/);
+});
+
+test("list prints the 'no frames match' message when nothing matches, with an explicit limit", () => {
   const bank = frameLine(approvedListFrame);
   const { io, output } = makeIo(bank);
-  // --limit is supplied to route around a module bug: selectFrames in hook-frame-library.ts
-  // defaults an omitted `limit` to `rows.length`, and when zero frames match that default is 0,
-  // which its own `limit < 1` check then rejects as invalid instead of returning an empty
-  // selection. See the final report for this run for the full note.
   const code = runHookFrameCli(parseHookFrameArgs(["list", "--platform", "x", "--limit", "5"]), io);
   const text = output.join("");
   assert.equal(code, 0);
