@@ -2060,6 +2060,33 @@ test("Studio home: Needs you today without the pre-prototype stat tiles", () => 
   assert.ok(section.includes("ranked by what actually blocks something"));
 });
 
+test("Studio home: one sheet, capture card inside it, queue only when busy", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const studio = html.slice(
+    html.indexOf('<section class="view" id="roomStudio"'),
+    html.indexOf('<section class="view" id="roomFiction"'),
+  );
+  // Match only paper sheets (class token "sheet"), not .sheet-foot / .sheet-head / .sheet-sub.
+  const sheets = [...studio.matchAll(/<div class="sheet(?:\s[^"]*)?"/g)].map((m) => m[0]);
+  assert.equal(sheets.length, 1, "Studio must be one sheet, not three: " + sheets.join(" | "));
+  assert.ok(sheets[0].includes("session"), "the one sheet is the session surface");
+  assert.ok(studio.includes('class="capture studio-capture"'), "capture is a bordered card on that sheet");
+  assert.ok(!studio.includes('class="sheet capture"'), "capture must not be its own sheet of paper");
+  assert.ok(!studio.includes("<h2>The queue</h2>"), "no separate queue sheet heading");
+  assert.ok(!studio.includes("Nothing here needs babysitting."), "no empty-queue sheet copy");
+  // #jobs sits below #studioMain in the left column so Needs you today stays above it.
+  const mainIdx = studio.indexOf('id="studioMain"');
+  const jobsIdx = studio.indexOf('id="jobs"');
+  assert.ok(mainIdx > -1 && jobsIdx > mainIdx, "queue section is below Needs you today");
+  assert.ok(/id="jobs"[^>]*\bhidden\b/.test(studio), "empty queue starts hidden");
+  const script = emittedScripts().join("\n");
+  const renderJobs = script.slice(script.indexOf("function renderJobs(){"), script.indexOf("async function answerJob("));
+  assert.ok(renderJobs.includes("box.hidden = true"), "empty queue shows nothing");
+  assert.ok(renderJobs.includes("box.hidden = false"), "busy queue reveals the section");
+  assert.ok(!renderJobs.includes("Nothing queued yet"), "do not announce an empty queue");
+  assert.ok(html.includes(".studio-capture {"), "bordered capture card CSS ships");
+});
+
 test("the bare-link ask: three controls, the honest explainer, and the honest Signals copy", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes(LINK_ASK_HEADING), "the ask must be headed " + LINK_ASK_HEADING);

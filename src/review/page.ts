@@ -247,12 +247,15 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .sheet-foot .engine-choice { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; gap:6px; }
   .sheet-foot .engine-choice span { font-weight:600; }
   .sheet-foot .engine-select { font-size:11px; min-width:0; padding:2px 6px; }
-  /* Capture sheet (3a): the blank page */
+  /* Capture sheet (3a): the blank page. Charles still uses a full .sheet.capture; Studio nests
+     capture as a bordered card on its one home sheet (.studio-capture). */
   .capture-title { font:400 40px/1.2 Georgia,"Times New Roman",serif; letter-spacing:-.01em; margin-bottom:16px; }
   .capture textarea { width:100%; min-height:110px; font:17px/1.6 Georgia,"Times New Roman",serif;
     padding:4px 0; border:none; outline:none; background:transparent; resize:vertical; color:var(--ink); }
   .capture textarea:focus-visible { outline:2px solid var(--blue); outline-offset:3px; border-radius:4px; }
   .capture textarea::placeholder { color:#a89a80; }
+  .studio-capture { margin:36px 56px 8px; padding:28px 32px 24px; border:1px solid #e3d9c3;
+    border-radius:8px; background:var(--paper); }
   /* The capture box (v7 Studio): its rail, the verdict it states back, and the bare-link ask.
      While the ask is open the textarea dims and goes read-only, and the rail turns amber — that is
      honest state (the app is holding her link, waiting), not decoration. */
@@ -681,6 +684,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   }
   @media (max-width:900px) {
     .sheet { margin:16px 10px; padding:28px 20px 26px; }
+    .studio-capture { margin:24px 20px 8px; padding:22px 18px; }
     .session-grid { grid-template-columns:minmax(0,1fr); }
     .session-main { padding:28px 20px 24px; }
     .session-margin { border-left:none; border-top:1px solid #efe7d6; padding:24px 20px 28px; }
@@ -994,71 +998,70 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
   <section class="view" id="roomStudio" hidden>
-    <div class="sheet capture">
-      <div class="capture-rail-row">
-        <span class="capture-rail" id="captureRail">One place to say it</span>
-        <span class="capture-rail-hint">a thought, a link, a name, a scene</span>
-      </div>
-      <textarea id="src" placeholder="Say it however it came out."></textarea>
-      <div class="capture-verdict" id="captureVerdict" hidden></div>
-      <!-- Quiet state: one primary action. Director / Format / Notes and the engine picker are real
-           and stay reachable, demoted below so they stop competing with Start-on-it. Link-ask and
-           the Notes panel open in place of this block (rules.md carve-out 1), not stacked on it. -->
-      <div id="captureQuiet">
-        <div class="capture-primary" id="captureActions">
-          <button type="button" class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Put it where it goes</button>
-          <span class="capture-explain">I pick the room for most things. A bare link I ask about first, because it could be two things. It starts nothing, and nothing goes out.</span>
-        </div>
-        <div class="capture-more">
-          <button type="button" class="wb-link" id="devStartBtn">Hand it to your director</button>
-          <button type="button" class="wb-link" id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
-          <button type="button" class="wb-link" id="notesBtn">Browse Substack Notes</button>
-        </div>
-        <div class="sheet-foot" style="justify-content:flex-start">
-          <label class="engine-choice"><span>Run with</span><select class="engine-select" id="studioEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        </div>
-      </div>
-      <div class="link-ask" id="linkAsk" hidden>
-        <div class="link-ask-head">Where should this go?</div>
-        <div class="link-ask-btns">
-          <button type="button" id="linkFileBtn">Source for Signals</button>
-          <button type="button" class="primary" id="linkReadBtn">Versions for Content</button>
-          <button type="button" class="link-ask-cancel" id="linkCancelBtn">Never mind, clear it</button>
-        </div>
-        <div class="hint">${LINK_ASK_SIGNALS_NOTE}</div>
-        <div class="link-ask-why">Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.</div>
-      </div>
-      <div class="director-line">
-        <span class="d-avatar">d</span>
-        <div>
-          <div class="d-line-main">Your creative director is here when you want a read.</div>
-          <div class="d-line-sub">Won't touch a word without your say. Handles the platforms, the visuals, the posting. Asks you only for the calls that are yours. <span style="color:#5b46b8;">Your director.</span></div>
-        </div>
-      </div>
-      <div class="notes-panel" id="notesPanel" hidden>
-        <div class="notes-head">
-          <h3>Substack Notes</h3>
-          <label class="toggle"><input type="checkbox" id="notesShowDrafted" /> show already drafted</label>
-          <span class="grow"></span>
-          <button type="button" id="notesCloseBtn">Close</button>
-        </div>
-        <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
-        <div class="notes-actions">
-          <button type="button" class="primary" id="notesDraftBtn">Draft selected</button>
-          <span class="hint">Pick the notes worth cross-posting. Each one gets a folder and goes through the production pipeline; every draft still waits for your yes in the Content room. A note published in the last 30 days stays blocked.</span>
-        </div>
-      </div>
-    </div>
+    <!-- Studio is one sheet: capture card on top, needs-you + team rail, queue only when busy. -->
     <div class="sheet session">
+      <div class="capture studio-capture">
+        <div class="capture-rail-row">
+          <span class="capture-rail" id="captureRail">One place to say it</span>
+          <span class="capture-rail-hint">a thought, a link, a name, a scene</span>
+        </div>
+        <textarea id="src" placeholder="Say it however it came out."></textarea>
+        <div class="capture-verdict" id="captureVerdict" hidden></div>
+        <!-- Quiet state: one primary action. Director / Format / Notes and the engine picker are real
+             and stay reachable, demoted below so they stop competing with Start-on-it. Link-ask and
+             the Notes panel open in place of this block (rules.md carve-out 1), not stacked on it. -->
+        <div id="captureQuiet">
+          <div class="capture-primary" id="captureActions">
+            <button type="button" class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Put it where it goes</button>
+            <span class="capture-explain">I pick the room for most things. A bare link I ask about first, because it could be two things. It starts nothing, and nothing goes out.</span>
+          </div>
+          <div class="capture-more">
+            <button type="button" class="wb-link" id="devStartBtn">Hand it to your director</button>
+            <button type="button" class="wb-link" id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
+            <button type="button" class="wb-link" id="notesBtn">Browse Substack Notes</button>
+          </div>
+          <div class="sheet-foot" style="justify-content:flex-start">
+            <label class="engine-choice"><span>Run with</span><select class="engine-select" id="studioEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
+          </div>
+        </div>
+        <div class="link-ask" id="linkAsk" hidden>
+          <div class="link-ask-head">Where should this go?</div>
+          <div class="link-ask-btns">
+            <button type="button" id="linkFileBtn">Source for Signals</button>
+            <button type="button" class="primary" id="linkReadBtn">Versions for Content</button>
+            <button type="button" class="link-ask-cancel" id="linkCancelBtn">Never mind, clear it</button>
+          </div>
+          <div class="hint">${LINK_ASK_SIGNALS_NOTE}</div>
+          <div class="link-ask-why">Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.</div>
+        </div>
+        <div class="director-line">
+          <span class="d-avatar">d</span>
+          <div>
+            <div class="d-line-main">Your creative director is here when you want a read.</div>
+            <div class="d-line-sub">Won't touch a word without your say. Handles the platforms, the visuals, the posting. Asks you only for the calls that are yours. <span style="color:#5b46b8;">Your director.</span></div>
+          </div>
+        </div>
+        <div class="notes-panel" id="notesPanel" hidden>
+          <div class="notes-head">
+            <h3>Substack Notes</h3>
+            <label class="toggle"><input type="checkbox" id="notesShowDrafted" /> show already drafted</label>
+            <span class="grow"></span>
+            <button type="button" id="notesCloseBtn">Close</button>
+          </div>
+          <div class="notelist" id="notesList"><div class="empty">Loading…</div></div>
+          <div class="notes-actions">
+            <button type="button" class="primary" id="notesDraftBtn">Draft selected</button>
+            <span class="hint">Pick the notes worth cross-posting. Each one gets a folder and goes through the production pipeline; every draft still waits for your yes in the Content room. A note published in the last 30 days stays blocked.</span>
+          </div>
+        </div>
+      </div>
       <div class="session-grid">
-        <div class="session-main" id="studioMain"><div class="empty">Loading…</div></div>
+        <div class="session-main">
+          <div id="studioMain"><div class="empty">Loading…</div></div>
+          <div class="jobs" id="jobs" style="max-width:none;margin-top:22px" hidden></div>
+        </div>
         <div class="session-margin" id="studioTeam"></div>
       </div>
-    </div>
-    <div class="sheet">
-      <div class="sheet-head"><h2>The queue</h2></div>
-      <div class="sheet-sub">Every background job, honest elapsed time, a log link. Nothing here needs babysitting.</div>
-      <div class="jobs" id="jobs" style="max-width:none;margin-top:10px"></div>
     </div>
   </section>
   <section class="view" id="roomFiction" hidden>
@@ -5323,7 +5326,10 @@ function askBoxHtml(j){
 }
 function renderJobs(){
   const box = $("#jobs"); box.innerHTML = "";
-  if(!JOBS.length){ box.innerHTML = '<div class="empty" style="padding:34px">Nothing queued yet. Drop an idea above.</div>'; return; }
+  // Empty queue: show nothing. A separate empty sheet used to announce itself; jobs now fold into
+  // the one Studio sheet only when there is work.
+  if(!JOBS.length){ box.hidden = true; return; }
+  box.hidden = false;
   // Matches jobIsSweepable in jobs.ts, which takes a stopped job too: it is finished work.
   const clearable = JOBS.some(j=>j.status==="done"||j.status==="failed"||j.status==="stopped");
   let html = '<div class="jobs-head"><h3>Queue</h3>'+(clearable?'<button id="clearJobsBtn">Clear queue</button>':'')+'</div>';
