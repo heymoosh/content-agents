@@ -102,6 +102,16 @@ test("fixtures enabled: banner, panel and interceptor all render", () => {
   // Unmistakable, and not dismissable: the panel has a hide button, the banner has none.
   assert.match(html, /NOTHING ON THIS PAGE IS REAL/);
   assert.ok(!/id="fxBanner"[^>]*hidden/.test(html), "the banner is never rendered hidden");
+  // Opening state with nothing forced stays honest: real data, nothing forced, writes refused.
+  assert.match(html, /real data &middot; nothing forced &middot; every write refused/);
+});
+
+test("fixture panel markup starts collapsed: panel hidden, re-open button shown", () => {
+  const html = fixturePanelHtml();
+  assert.match(html, /id="fxPanel"\s+hidden\b/, "the panel must render with the hidden attribute");
+  assert.match(html, /id="fxPanel"[^>]*display:\s*none/, "the panel must start display:none");
+  assert.match(html, /id="fxOpen"/, "the re-open button must still render");
+  assert.ok(!/\bid="fxOpen"[^>]*\bhidden\b/.test(html), "the re-open button must not start hidden");
 });
 
 // The whole design hinges on this ordering: the interceptor has to be installed before the app's
@@ -425,7 +435,7 @@ function fakeEl(id: string): FakeEl {
   return el;
 }
 
-async function bootInterceptor() {
+async function bootInterceptor(opts: { storage?: Record<string, string>; throwOnStorage?: boolean } = {}) {
   const { runInNewContext } = await import("node:vm");
   const els: Record<string, FakeEl> = {
     fxBannerState: fakeEl("fxBannerState"),
@@ -433,11 +443,22 @@ async function bootInterceptor() {
     fxPanel: fakeEl("fxPanel"),
     fxOpen: fakeEl("fxOpen"),
   };
+  const store: Record<string, string> = { ...(opts.storage ?? {}) };
   const passthrough: string[] = [];
   const roomJumps: string[] = [];
+  const localStorage = opts.throwOnStorage
+    ? {
+        getItem() { throw new Error("blocked"); },
+        setItem() { throw new Error("blocked"); },
+      }
+    : {
+        getItem(k: string) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
+        setItem(k: string, v: string) { store[k] = String(v); },
+      };
   const ctx: Record<string, unknown> = {
     URL, Response, console,
     location: { href: "http://localhost:4600/" },
+    localStorage,
     document: {
       readyState: "complete",
       getElementById: (id: string) => els[id] ?? null,
@@ -462,7 +483,7 @@ async function bootInterceptor() {
   const get = (url: string) => (ctx.window as { fetch: (u: string) => Promise<unknown> }).fetch(url);
   const post = (url: string) =>
     (ctx.window as { fetch: (u: string, i: unknown) => Promise<Response> }).fetch(url, { method: "POST" });
-  return { ctx, els, click, get, post, passthrough, roomJumps };
+  return { ctx, els, click, get, post, passthrough, roomJumps, store };
 }
 
 test("the interceptor installs, and refuses every write without letting it reach the network", async () => {
@@ -479,17 +500,47 @@ test("the interceptor installs, and refuses every write without letting it reach
 
 test("fixture panel hide and reopen explicitly toggle display state", async () => {
   const fx = await bootInterceptor();
-  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  // No stored preference → starts collapsed.
   assert.equal(fx.els.fxPanel.hidden, true);
   assert.equal(fx.els.fxPanel.style.display, "none");
   assert.equal(fx.els.fxOpen.hidden, false);
   assert.equal(fx.els.fxOpen.style.display, "block");
+  assert.equal(fx.store["review-fixture-panel-open"], "0");
 
   fx.els.fxOpen.handler?.({ target: { closest: () => ({ id: "fxOpen", dataset: {} }) } });
   assert.equal(fx.els.fxPanel.hidden, false);
   assert.equal(fx.els.fxPanel.style.display, "flex");
   assert.equal(fx.els.fxOpen.hidden, true);
   assert.equal(fx.els.fxOpen.style.display, "none");
+  assert.equal(fx.store["review-fixture-panel-open"], "1");
+
+  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, true);
+  assert.equal(fx.els.fxPanel.style.display, "none");
+  assert.equal(fx.els.fxOpen.hidden, false);
+  assert.equal(fx.els.fxOpen.style.display, "block");
+  assert.equal(fx.store["review-fixture-panel-open"], "0");
+});
+
+test("fixture panel restores the last open choice from localStorage", async () => {
+  const fx = await bootInterceptor({ storage: { "review-fixture-panel-open": "1" } });
+  assert.equal(fx.els.fxPanel.hidden, false);
+  assert.equal(fx.els.fxPanel.style.display, "flex");
+  assert.equal(fx.els.fxOpen.hidden, true);
+  assert.equal(fx.els.fxOpen.style.display, "none");
+});
+
+test("fixture panel stays usable when localStorage throws", async () => {
+  const fx = await bootInterceptor({ throwOnStorage: true });
+  assert.equal(fx.els.fxPanel.hidden, true, "defaults collapsed when storage is blocked");
+  assert.equal(fx.els.fxOpen.hidden, false);
+  // Toggle still works even though persistence cannot.
+  fx.els.fxOpen.handler?.({ target: { closest: () => ({ id: "fxOpen", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, false);
+  assert.equal(fx.els.fxOpen.hidden, true);
+  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, true);
+  assert.equal(fx.els.fxOpen.hidden, false);
 });
 
 test("with nothing forced, every read passes straight through to the real server", async () => {

@@ -1746,10 +1746,12 @@ export function fixturePanelHtml(): string {
     groups.push(`<div style="display:flex;flex-direction:column;gap:7px">
       <span class="fxg">${esc(sc.group)}</span><div style="display:flex;flex-wrap:wrap;gap:5px">${items}</div></div>`);
   }
-  return `<div ${FIXTURE_PANEL_MARKER} style="position:fixed;right:16px;bottom:16px;z-index:9000;width:250px;
+  // Starts collapsed: the floating re-open control is visible; the panel itself is hidden.
+  // fixtureScriptHtml restores the last localStorage choice (default collapsed) on boot.
+  return `<div ${FIXTURE_PANEL_MARKER} hidden style="position:fixed;right:16px;bottom:16px;z-index:9000;width:250px;
   box-sizing:border-box;max-height:74vh;overflow:auto;background:rgba(20,14,7,.96);
   border:1px solid #4a3a22;border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,.5);
-  padding:13px 14px 14px;display:flex;flex-direction:column;gap:13px">
+  padding:13px 14px 14px;display:none;flex-direction:column;gap:13px">
   <div style="display:flex;align-items:center;gap:10px">
     <span class="fxg" style="color:#c8ae7c">Fixture panel</span><span style="flex:1"></span>
     <button id="fxHide" class="fxb" style="border:none;background:none;padding:0;color:#8a7355">hide</button>
@@ -1759,7 +1761,7 @@ export function fixturePanelHtml(): string {
     Dev tooling, not part of the app. Every button fakes a read; every write is refused.
   </div>
 </div>
-<button ${FIXTURE_OPEN_MARKER} class="fxb" hidden style="position:fixed;right:16px;bottom:16px;z-index:9000;
+<button ${FIXTURE_OPEN_MARKER} class="fxb" style="position:fixed;right:16px;bottom:16px;z-index:9000;
   border-radius:20px;padding:6px 13px;text-transform:uppercase;letter-spacing:.07em">fixtures</button>`;
 }
 
@@ -1850,24 +1852,41 @@ export function fixtureScriptHtml(): string {
     }
     box.innerHTML = html || '<span style="font:10px/1.4 ui-monospace,monospace;color:#6d5b3f">no rooms in the header</span>';
   }
+  // Panel open/closed preference. Default collapsed when unset. localStorage itself can throw
+  // in a private window or with blocked site data; every access is try/caught.
+  var PANEL_LS_KEY = "review-fixture-panel-open";
+  function readPanelOpen(){
+    try {
+      var v = localStorage.getItem(PANEL_LS_KEY);
+      if (v == null) return false;
+      return v === "1" || v === "true";
+    } catch (e) { return false; }
+  }
+  function writePanelOpen(wantOpen){
+    try { localStorage.setItem(PANEL_LS_KEY, wantOpen ? "1" : "0"); } catch (e) {}
+  }
+  function setPanelOpen(panel, open, wantOpen){
+    panel.hidden = !wantOpen; panel.style.display = wantOpen ? "flex" : "none";
+    open.hidden = wantOpen; open.style.display = wantOpen ? "none" : "block";
+    writePanelOpen(wantOpen);
+  }
   function start(){
     paintRooms();
     paint();
     var panel = document.getElementById("fxPanel"), open = document.getElementById("fxOpen");
     if (!panel || !open) return;
+    setPanelOpen(panel, open, readPanelOpen());
     panel.addEventListener("click", function(e){
       var b = e.target.closest ? e.target.closest("button") : null; if (!b) return;
       if (b.id === "fxHide") {
-        panel.hidden = true; panel.style.display = "none";
-        open.hidden = false; open.style.display = "block";
+        setPanelOpen(panel, open, false);
         return;
       }
       if (b.dataset.fxroom) { if (typeof window.setRoom === "function") window.setRoom(b.dataset.fxroom); return; }
       if (b.dataset.fx) apply(b.dataset.fx);
     });
     open.addEventListener("click", function(){
-      panel.hidden = false; panel.style.display = "flex";
-      open.hidden = true; open.style.display = "none";
+      setPanelOpen(panel, open, true);
     });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
