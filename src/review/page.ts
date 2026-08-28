@@ -238,6 +238,12 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .sheet-head h2 { font:400 26px/1.25 Georgia,"Times New Roman",serif; margin:0; }
   .sheet-sub { font-size:13.5px; color:#8a7f6d; margin-top:5px; }
   .mono-note { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b0a488; }
+  /* A relocated control demoted below its room's content, so it stops competing with the sheet's
+     subject. Small and mono, like the rest of this room's status labels, not a form field. */
+  .sheet-foot { margin-top:18px; padding-top:14px; border-top:1px solid #efe7d6; display:flex; justify-content:flex-end; }
+  .sheet-foot .engine-choice { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; gap:6px; }
+  .sheet-foot .engine-choice span { font-weight:600; }
+  .sheet-foot .engine-select { font-size:11px; min-width:0; padding:2px 6px; }
   /* Capture sheet (3a): the blank page */
   .capture-title { font:400 40px/1.2 Georgia,"Times New Roman",serif; letter-spacing:-.01em; margin-bottom:16px; }
   .capture textarea { width:100%; min-height:110px; font:17px/1.6 Georgia,"Times New Roman",serif;
@@ -435,11 +441,14 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .fu-origin .cap { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89a80; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
   .fu-origin .cell { font-size:13px; line-height:1.5; color:#3a352c; }
   .fu-actions { margin-left:26px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  /* Outreach room subnav (Leads | Follow-ups) */
-  .subnav { display:flex; gap:3px; align-items:center; background:rgba(0,0,0,.28); border-radius:20px;
-    padding:3px; width:fit-content; margin:22px auto 0; }
-  .subtab { font-size:12px; color:#e6d5af; border:none; background:none; border-radius:16px; padding:4px 13px; cursor:pointer; }
-  .subtab.on { font-weight:600; background:#f4e8ca; color:#3a2a12; }
+  /* Outreach room subnav (Leads | Follow-ups): styled as the sheet's own tab strip, not a
+     floating pill hovering above the desk. Aligned to the sheet's own max-width/padding so it
+     reads as attached to the paper below it, rather than a separate piece of chrome. */
+  .subnav { display:flex; gap:22px; max-width:1040px; margin:26px auto 0; padding:0 56px; }
+  .subtab { font:10.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+    letter-spacing:.06em; color:#a89a80; border:none; border-bottom:2px solid transparent;
+    background:none; border-radius:0; padding:0 0 8px; cursor:pointer; }
+  .subtab.on { font-weight:600; color:#3a2a12; border-bottom-color:#3a2a12; }
   .count { background:var(--accent); color:var(--paper); border-radius:20px; padding:2px 11px;
     font-size:13px; font-weight:600; }
   .grow { flex:1; }
@@ -1167,10 +1176,9 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
     <div class="sheet" id="stripOutreach" hidden style="padding:24px 56px 10px"></div>
     <div class="sheet" id="outreachPane">
-      <div class="sheet-head"><h2 id="outreachHead">Leads</h2><span class="grow"></span><label class="engine-choice"><span>Scout with</span><select class="engine-select" id="scoutEngine"><option value="claude">Claude</option><option value="grok">Grok</option></select></label></div>
-      <div class="sheet-sub">Everyone your scout found, grouped by the reason they are on the desk. Pick one to read the research and shape a message. Only you ever send it.</div>
       <div id="outreachCaptureHandoff" hidden></div>
-      <div id="outreachList" style="margin-top:14px"><div class="empty">Loading…</div></div>
+      <div id="outreachList"><div class="empty">Loading…</div></div>
+      <div class="sheet-foot" id="outreachFoot"><label class="engine-choice"><span>Scout with</span><select class="engine-select" id="scoutEngine"><option value="claude">Claude</option><option value="grok">Grok</option></select></label></div>
     </div>
     <div class="sheet" id="followupsPane" hidden>
       <div class="sheet-head"><h2>Follow-ups</h2></div>
@@ -1986,7 +1994,7 @@ function triageHtml(){
       }).join("")+
     '</div>').join("");
   const margin = '<div class="session-margin"><div class="wb-margin-cap">WHY THIS IS ON YOUR DESK</div>'+
-    '<div class="src">Pick someone from the queue. The research on them, and every source behind it, opens here.</div></div>';
+    '<div class="src">Pick someone from the queue. The research on them, and every source behind it, opens here. Only you ever send it.</div></div>';
   return '<div class="dossier-grid"><div style="min-width:0;">'+
     '<div class="tri-cap">WHO IS IN FRONT OF YOU, GROUPED BY WHY · PICK ONE TO DRAFT TO</div>'+body+
   '</div>'+margin+'</div>';
@@ -2148,13 +2156,11 @@ function renderOutreachBox(){
   const leads = OUTREACH_LEADS;
   if(!leads.length){
     activeLeadDir = null;
-    $("#outreachHead").textContent = "Leads";
     box.innerHTML = '<div class="empty">No leads yet. Scout new leads above runs the discovery agent. Nothing is contacted or sent automatically.</div>';
     return;
   }
   if(activeLeadDir && !leads.some(l=>l.dir===activeLeadDir)) activeLeadDir = null;
   const active = activeLeadDir ? leads.find(l=>l.dir===activeLeadDir) : null;
-  $("#outreachHead").textContent = active ? "The thread" : "Leads";
   box.innerHTML = active ? threadHtml(active) : triageHtml();
   refreshEngineControls(box);
   box.querySelectorAll("button.tri-row").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = b.dataset.dir; renderOutreachBox(); }));
