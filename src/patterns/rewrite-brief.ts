@@ -76,12 +76,27 @@ export interface StoredPrompt {
   readonly patterns: string;
 }
 
-/** Split the stored prompt into the part sent every time and the part sent only with patterns. */
+/**
+ * Split the stored prompt into the part sent every time and the part sent only with patterns.
+ *
+ * Only `## base` and `## patterns` are headings in that file. The output format the model must
+ * return is described inside base as inline text, on purpose: a heading there would end the base
+ * section early and quietly drop the rest of the instruction, which is exactly what an earlier
+ * regex version of this function did.
+ */
 export function parseStoredPrompt(markdown: string): StoredPrompt {
-  const section = (name: string): string => {
-    const match = new RegExp(`^##\\s+${name}\\s*$([\\s\\S]*?)(?=^##\\s|\\Z)`, "m").exec(markdown);
-    return (match?.[1] ?? "").trim();
-  };
+  const sections = new Map<string, string[]>();
+  let current: string | null = null;
+  for (const line of markdown.split(/\r?\n/)) {
+    const heading = /^##\s+(.+?)\s*$/.exec(line);
+    if (heading !== null) {
+      current = heading[1]!.toLowerCase();
+      if (!sections.has(current)) sections.set(current, []);
+      continue;
+    }
+    if (current !== null) sections.get(current)!.push(line);
+  }
+  const section = (name: string): string => (sections.get(name) ?? []).join("\n").trim();
   const base = section("base");
   if (!base) throw new RewriteBriefError(`${REWRITE_PROMPT} has no "## base" section`);
   return { base, patterns: section("patterns") };

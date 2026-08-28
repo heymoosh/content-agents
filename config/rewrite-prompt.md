@@ -2,8 +2,10 @@
 
 The stored instruction behind `npm run patterns:rewrite`. Edit it freely, it is read at run time.
 
-Two sections. `## base` is sent every time. `## patterns` is appended only when the run asks for
-corpus patterns, which is what iterations are for.
+Two headings, and only two. `## base` is sent every time. `## patterns` is appended only when the
+run asks for corpus patterns, which is what iterations are for. Anything the model should return is
+described inside a section as ordinary text, never as a new `##` heading, or it ends that section
+early and the rest of the instruction is dropped.
 
 ## base
 
@@ -23,21 +25,14 @@ bracketed blank like [my number here] and tell me what to fill in. Never guess i
 Do not tell me a change will make it perform better. You do not know that. Tell me what you changed
 and why you think it helps.
 
-Return exactly these three sections and nothing before them. No preamble, no narration of your
-process, no thinking out loud. If you change your mind partway, revise before you answer rather than
-showing me both versions.
+Return exactly these three sections, in this order, with these headings, and nothing before them:
 
-## Rewritten post
+1. `## Rewritten post`, the full post, ready to read.
+2. `## What changed`, a short list of the moves you made and why you think each helps.
+3. `## Blanks to fill`, every bracketed blank I need to fill, or "none".
 
-The full post, ready to read.
-
-## What changed
-
-A short list of the moves you made and why you think each helps.
-
-## Blanks to fill
-
-Every bracketed blank I need to fill, or "none".
+No preamble, no narration of your process, no thinking out loud. If you change your mind partway,
+revise before you answer rather than showing me both versions.
 
 ## patterns
 
