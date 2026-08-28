@@ -4,7 +4,9 @@
 // exactly what fixture mode was built for — prototype-port-rules Rule 4). Fixture mode is read-only
 // by construction, so this pass proves reads only; writes are Pass B.
 
-import { bootServer, openSession, openRoom, waitLoaded, textOf, record, results } from "./harness.js";
+import { bootServer, openSession, openRoom, waitLoaded, textOf, record, results,
+  applyScenario,
+} from "./harness.js";
 
 const PORT = 4791;
 
@@ -96,13 +98,20 @@ async function main(): Promise<void> {
     });
 
     // #349/#378: the job queue surface, and a job's step markers when it has them.
+    // The queue renders only when a job exists, so an idle studio shows nothing rather than a sheet
+    // announcing its own emptiness. Apply a running job first: with that scenario the queue MUST
+    // list it, so absence is a failure rather than an empty-fixture excuse.
     await openRoom(s.page, "studio");
+    await applyScenario(s.page, "job-running");
+    await s.page.waitForSelector("#jobs:not([hidden])", { timeout: 15_000 }).catch(() => null);
     const jobsText = await textOf(s.page, "#jobs");
     record({
       feature: "Studio job queue lists jobs",
       pr: "#349",
       status: jobsText.trim().length > 0 ? "pass" : "fail",
-      detail: jobsText.trim().length > 0 ? `${jobsText.trim().slice(0, 100).replace(/\s+/g, " ")}…` : "job queue empty in fixture mode",
+      detail: jobsText.trim().length > 0
+        ? `${jobsText.trim().slice(0, 100).replace(/\s+/g, " ")}…`
+        : "job-running scenario applied and the queue still listed nothing",
     });
 
     // #350: Outreach is a triage queue grouped by reason, then a thread.
@@ -132,11 +141,7 @@ async function main(): Promise<void> {
     // empty, per the banner at the top of this page), so the pick is guaranteed a row to click
     // rather than depending on whatever this checkout happens to have on disk.
     await openRoom(s.page, "content");
-    // The fixture panel now starts collapsed (its open/closed state is a remembered per-viewer
-    // preference), so every button.fxb click in this suite needs the panel open first. Already
-    // open is not an error.
-    await s.page.click("#fxOpen").catch(() => null);
-    await s.page.click('button.fxb[data-fx="recs-blocked"]');
+    await applyScenario(s.page, "recs-blocked");
     await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#cwBody").catch(() => "");
     await s.page.waitForSelector("#cwBody .cw-src", { timeout: 15_000 }).catch(() => null);
@@ -220,7 +225,7 @@ async function main(): Promise<void> {
     // stat tiles were removed in the Studio subtraction pass; this check covers only what remains.
     // Apply a Studio scenario first so a missing needs-you list names what was tried; no fixture
     // overrides /api/studio with a non-empty needsYou, so empty after apply stays blocked (not pass).
-    await s.page.click('button.fxb[data-fx="job-queued"]');
+    await applyScenario(s.page, "job-queued");
     await s.page.waitForSelector("#roomStudio:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#studioMain").catch(() => "");
     const btnNy = await s.page.locator("#studioMain button.ny-go").count();
@@ -245,10 +250,13 @@ async function main(): Promise<void> {
     // Room nav is keyboard-operable: Enter on a room button changes room and sets aria-current.
     await openRoom(s.page, "studio");
     const beforeRoom = await s.page.locator("button.room.on").getAttribute("data-room");
-    const firstRoomBtn = s.page.locator('nav.rooms button.room').first();
-    await firstRoomBtn.focus();
+    // Any room BUT the one already open, so this stays true whatever order the nav runs in.
+    const otherRoomBtn = s.page.locator("nav.rooms button.room:not(.on)").first();
+    const targetRoom = await otherRoomBtn.getAttribute("data-room");
+    await otherRoomBtn.focus();
     await s.page.keyboard.press("Enter");
-    await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 }).catch(() => {});
+    const targetId = "#room" + (targetRoom ?? "").charAt(0).toUpperCase() + (targetRoom ?? "").slice(1);
+    await s.page.waitForSelector(`${targetId}:not([hidden])`, { timeout: 15_000 }).catch(() => {});
     const afterRoom = await s.page.locator("button.room.on").getAttribute("data-room");
     const currentAttr = await s.page.locator("button.room.on").getAttribute("aria-current");
     const roomChanged = afterRoom != null && afterRoom !== beforeRoom;

@@ -239,6 +239,19 @@ export async function waitLoaded(page: Page, selector: string, timeoutMs = 20_00
   return (await page.textContent(selector)) ?? "";
 }
 
+/**
+ * Apply a fixture scenario by clicking its chip.
+ *
+ * The fixture panel starts collapsed, because it opened over the room behind it and Muxin said the
+ * screen was overwhelming. Its chips are therefore present but not visible until the panel opens,
+ * and a click on one times out rather than failing loudly. Every scenario click goes through here
+ * so a collapsed panel can never be mistaken for a broken surface. Already open is not an error.
+ */
+export async function applyScenario(page: Page, id: string): Promise<void> {
+  await page.click("#fxOpen").catch(() => null);
+  await page.click(`button.fxb[data-fx="${id}"]`);
+}
+
 export async function textOf(page: Page, selector: string): Promise<string> {
   return (await page.textContent(selector).catch(() => "")) ?? "";
 }
