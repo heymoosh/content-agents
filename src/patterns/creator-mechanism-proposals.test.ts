@@ -182,10 +182,19 @@ test("rejects a claim about what an arrangement does to a reader", () => {
   ]) {
     assert.throws(() => readMechanismProposals(jsonl(proposal({ mechanism: value }))), MechanismProposalValidationError, value);
   }
-  // Describing the arrangement itself is fine; only the asserted effect is refused.
-  assert.doesNotThrow(() => readMechanismProposals(jsonl(proposal({
-    mechanism: "Flags a session as filling up, which is a bounded ask rather than an evergreen link.",
-  }))));
+  assert.throws(() => readMechanismProposals(jsonl(proposal({
+    mechanism: "Opens on a number, which hooks the reader immediately.",
+  }))), MechanismProposalValidationError);
+
+  // Describing the arrangement, or naming what is NOT known, is fine; only an asserted effect is
+  // refused. The lint has to leave room for the honest sentence as well as refuse the claim.
+  for (const value of [
+    "Flags a session as filling up, which is a bounded ask rather than an evergreen link.",
+    "Places a running count on screen and updates it at each stage of the piece.",
+    "What makes the reader respond is unknown from this evidence.",
+  ]) {
+    assert.doesNotThrow(() => readMechanismProposals(jsonl(proposal({ mechanism: value }))), value);
+  }
 });
 
 test("lints the proposal id, because an id is a string a human reads too", () => {

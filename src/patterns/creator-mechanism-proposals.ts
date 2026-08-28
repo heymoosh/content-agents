@@ -154,10 +154,17 @@ const BANNED_CLAIM_PATTERNS: readonly RegExp[] = [
 // Effect claims. A proposal describes an arrangement; it does not get to assert what that
 // arrangement does to a reader. There is no baseline anywhere in this corpus that could support
 // such a claim, so the wording is refused rather than footnoted.
+//
+// This is a bounded lint over the phrasings the corpus work actually produced, not a semantic
+// judge: a sufficiently indirect effect claim will pass it. It raises the floor; Muxin's review is
+// still what decides whether a proposal says more than the evidence supports.
 const EFFECT_CLAIM_PATTERNS: readonly RegExp[] = [
   /\b(?:creat|generat|manufactur|build|earn|driv|boost|increas|maximi[sz])\w*\s+(?:the\s+|a\s+|an\s+)?(?:urgency|trust|credibility|desire|demand|engagement|reach|conversions?|retention|attention)\b/i,
   /\bbasis for (?:the )?(?:audience|reader|viewer)(?:'s|s')?\s+\w+/i,
-  /\bmakes? (?:the )?(?:audience|reader|viewer|people)\b/i,
+  // "what makes the reader respond is unknown" is a limitation, not a claim, so the subject
+  // matters: only an arrangement asserted to act on a reader is refused.
+  /(?<!\bwhat )\bmakes? (?:the )?(?:audience|reader|viewer|people)\b/i,
+  /\b(?:hooks?|grabs?|holds?|keeps?|captures?|compels?|persuades?|convinces?)\s+(?:the\s+)?(?:audience|reader|viewer|people)\b/i,
   /\bso that (?:the )?(?:audience|reader|viewer|people)\b/i,
   /\b(?:audience|reader|viewer)s?\s+(?:are|is|will be)\s+(?:more likely|persuaded|convinced|hooked)\b/i,
 ];

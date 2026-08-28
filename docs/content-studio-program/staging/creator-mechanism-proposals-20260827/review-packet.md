@@ -381,6 +381,9 @@ paraphrase below eight consecutive words. It is a floor, not a proof of independ
 Three proposals were reworded during this lane's own audit because they asserted an effect rather
 than describing an arrangement: two said a device created urgency or supplied the audience's
 trust, one warned against manufacturing urgency. The validator now refuses that wording outright.
+That refusal is a bounded lint over the phrasings this work actually produced, not a semantic
+judge. A sufficiently indirect effect claim will pass it, which is one of the things a human
+reviewer is reading for.
 
 ## 9. Decisions required before any template integration
 
