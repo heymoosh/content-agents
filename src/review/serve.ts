@@ -1769,8 +1769,13 @@ const server = createServer(async (req, res) => {
 });
 
 // Start the server only when run directly (npm run review), so tests can import revisePrompt et al.
-// without binding the port.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// without binding the port. The explicit function is also the narrow seam used by the hermetic
+// E2E harness: a loader/eval entrypoint cannot reliably satisfy this module-identity check, while
+// an intentional caller can still start the exact same server without changing production routes.
+let startRequested = false;
+export function startReviewServer(): void {
+  if (startRequested) return;
+  startRequested = true;
   // Loopback ONLY, deliberately. This server has no authentication and it both writes real state
   // (approve / revise / discard) and triggers real publishes, so binding every interface — Node's
   // default when no host is passed — put it on the local Wi-Fi for anyone to drive. It also made
@@ -1785,4 +1790,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log("  Approve / revise / discard / edit every pending derivative in one place.");
     console.log("  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.\n");
   });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startReviewServer();
 }

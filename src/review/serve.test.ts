@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -33,6 +33,15 @@ import {
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
+
+test("the E2E start seam owns the loopback listen and direct execution delegates to it", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const seam = source.indexOf("export function startReviewServer");
+  const guard = source.indexOf("startReviewServer();", seam + 1);
+  assert.ok(seam >= 0, "serve.ts must export the explicit start seam");
+  assert.ok(guard > seam, "the direct-run guard must delegate to the seam");
+  assert.match(source.slice(seam, guard), /server\.listen\(PORT, "127\.0\.0\.1"/);
+});
 
 test("ventureAnalysisPrompt is read-only and carries the server-derived state", () => {
   const prompt = ventureAnalysisPrompt("my-venture", { phase: 2, next: "review" });

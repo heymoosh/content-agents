@@ -227,8 +227,6 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .room .count { background:#f4e8ca; color:#3a2a12; margin-left:6px; }
   .desk-date { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89876; }
   /* The design's own header line, kept because it is the one promise the whole app makes. */
-  .desk-tagline { font:11px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#a89876; }
-  .desk-tagline::before { content:"· "; }
   header .hint { color:#a89876; }
   header > button#refresh { border:1px solid rgba(230,213,175,.4); background:transparent; color:#e6d5af; }
   header > button#refresh:hover { border-color:#e6d5af; }
@@ -281,19 +279,20 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .link-ask-btns button.link-ask-cancel { border:none; background:none; padding:0; margin-left:4px;
     font-size:12.5px; color:#7a7266; border-bottom:1px solid #d8cfbb; }
   .link-ask-why { font-size:12.5px; line-height:1.55; color:#8a7f6d; margin-top:12px; max-width:470px; }
-  .director-line { margin-top:34px; padding-top:20px; border-top:1px solid #efe7d6;
-    display:flex; align-items:flex-start; gap:14px; }
-  .d-avatar { width:30px; height:30px; border-radius:50%; background:#efeafd; border:1px solid #d8cff2;
-    display:flex; align-items:center; justify-content:center; font:italic 700 14px/1 Georgia,serif;
-    color:#5b46b8; flex:none; }
-  .d-line-main { font-size:13.5px; line-height:1.5; color:#4a453c; }
-  .d-line-sub { font-size:12.5px; color:#8a7f6d; font-style:italic; }
   /* Workbench session sheets (3b): main column + director margin */
   .session { padding:0; overflow:hidden; }
   .session-grid { display:grid; grid-template-columns:minmax(0,1fr) 300px; }
   .session-main { padding:44px 36px 40px 56px; min-width:0; }
   .session-margin { border-left:1px solid #efe7d6; padding:44px 26px 36px 24px; background:#faf7f0;
-    display:flex; flex-direction:column; gap:16px; }
+    display:flex; flex-direction:column; gap:16px; min-height:100%; }
+  .room-rail { position:sticky; top:78px; align-self:start; max-height:calc(100vh - 96px); overflow:auto; }
+  .scan-row { width:100%; display:grid; grid-template-columns:110px minmax(0,1fr) auto; gap:14px; text-align:left;
+    padding:13px 4px; border:0; border-top:1px solid var(--line); border-radius:0; background:none; }
+  .scan-row:hover { background:#faf7f0; }
+  .focus-backdrop { position:fixed; inset:0; z-index:80; background:rgba(28,26,23,.42); display:grid; place-items:center; padding:28px; }
+  .focus-backdrop[hidden] { display:none; }
+  .focus-dialog { width:min(880px,100%); max-height:calc(100vh - 56px); overflow:auto; background:var(--paper);
+    border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 60px rgba(0,0,0,.22); padding:22px; }
   .wb-title { font:600 20px/1.3 Georgia,"Times New Roman",serif; margin-bottom:16px; }
   .wb-label { font:italic 400 13px/1.5 Georgia,serif; color:#a89a80; margin-bottom:12px; }
   .wb-source { font:400 19px/1.55 Georgia,"Times New Roman",serif; color:var(--ink);
@@ -318,6 +317,11 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .wb-handoff .note { font-size:13px; color:#7a7266; line-height:1.5; max-width:340px; }
   .wb-links { margin-top:14px; display:flex; gap:20px; flex-wrap:wrap; }
   .wb-link { font-size:13px; color:#7a7266; border-bottom:1px solid #d8cfbb; padding-bottom:1px; cursor:pointer; background:none; border-top:none; border-left:none; border-right:none; border-radius:0; padding-top:0; padding-left:0; padding-right:0; }
+  .venture-switcher { min-width:220px; max-width:380px; }
+  .venture-stages { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; padding:16px 0 13px; border-bottom:1px solid #dfd4bb; }
+  .venture-stage { border:0; background:none; padding:0; color:#a89a80; cursor:pointer; }
+  .venture-stage.on { color:var(--ink); font-weight:600; }
+  .venture-example { padding:22px; border:1px solid var(--line); border-radius:10px; background:#faf7f0; }
   .wb-check { display:flex; flex-direction:column; gap:5px; padding-left:12px; border-left:2px solid #d8cff2; }
   .wb-check.sand { border-left-color:#e6dcc4; }
   .wb-check.green { border-left-color:#cbe0d1; }
@@ -972,7 +976,6 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
   </nav>
   <span class="grow"></span>
   <span class="desk-date" id="deskDate"></span>
-  <span class="desk-tagline">nothing sends itself</span>
   <span class="hint" id="lastRefreshed" style="min-width:0"></span>
   <button id="refresh" title="Refreshes only the room you're looking at">Refresh</button>
 </header>
@@ -1012,16 +1015,12 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
              the Notes panel open in place of this block (rules.md carve-out 1), not stacked on it. -->
         <div id="captureQuiet">
           <div class="capture-primary" id="captureActions">
-            <button type="button" class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Put it where it goes</button>
-            <span class="capture-explain">I pick the room for most things. A bare link I ask about first, because it could be two things. It starts nothing, and nothing goes out.</span>
-          </div>
-          <div class="capture-more">
-            <button type="button" class="wb-link" id="devStartBtn">Hand it to your director</button>
-            <button type="button" class="wb-link" id="addBtn" title="Skip the director's read and go straight to platform drafts">Format directly</button>
-            <button type="button" class="wb-link" id="notesBtn">Browse Substack Notes</button>
+            <button type="button" class="primary" id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Start on it</button>
+            <span class="capture-explain">I pick the room and begin the next safe step. A bare link still needs one quick question first. Nothing goes out without your review.</span>
           </div>
           <div class="sheet-foot" style="justify-content:flex-start">
             <label class="engine-choice"><span>Run with</span><select class="engine-select" id="studioEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
+            <button type="button" class="wb-link" id="notesBtn">Browse Substack Notes</button>
           </div>
         </div>
         <div class="link-ask" id="linkAsk" hidden>
@@ -1033,13 +1032,6 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           </div>
           <div class="hint">${LINK_ASK_SIGNALS_NOTE}</div>
           <div class="link-ask-why">Filing treats it as somewhere your readers came from. Reading treats it as source material for a post of yours. I will not guess between those two.</div>
-        </div>
-        <div class="director-line">
-          <span class="d-avatar">d</span>
-          <div>
-            <div class="d-line-main">Your creative director is here when you want a read.</div>
-            <div class="d-line-sub">Won't touch a word without your say. Handles the platforms, the visuals, the posting. Asks you only for the calls that are yours. <span style="color:#5b46b8;">Your director.</span></div>
-          </div>
         </div>
         <div class="notes-panel" id="notesPanel" hidden>
           <div class="notes-head">
@@ -1060,7 +1052,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           <div id="studioMain"><div class="empty">Loading…</div></div>
           <div class="jobs" id="jobs" style="max-width:none;margin-top:22px" hidden></div>
         </div>
-        <div class="session-margin" id="studioTeam"></div>
+        <div class="session-margin room-rail" id="studioTeam"></div>
       </div>
     </div>
   </section>
@@ -1070,50 +1062,61 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet session">
       <div class="session-grid">
         <div class="session-main" id="fictionMain"><div class="empty">Loading…</div></div>
-        <div class="session-margin" id="fictionSide"></div>
+        <div class="session-margin room-rail" id="fictionSide"></div>
       </div>
     </div>
   </section>
   <section class="view" id="roomCharles" hidden>
     <div class="sheet" id="charlesCaptureHandoff" hidden></div>
-    <div class="sheet capture">
-      <div class="capture-title">Draft a new Charles post</div>
-      <div class="ingest-actions" style="align-items:center">
-        <select id="charlesMode">
-          <option value="oneliner">One-liner</option>
-          <option value="essay">Essay</option>
-          <option value="reply">Reply to a link</option>
-        </select>
-        <label class="engine-choice"><span>Run with</span><select class="engine-select" id="charlesEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        <input id="charlesInput" style="flex:1;min-width:220px" placeholder="Topic/angle, or a URL to react to (reply), optional otherwise" />
-        <button class="primary" id="charlesDraftBtn">Draft</button>
-      </div>
-      <div class="hint">Runs the real /charles skill with the engine you choose. Lands in the queue below as "pending". Nothing posts on its own.</div>
-    </div>
-    <div class="sheet">
-      <div class="sheet-head"><h2>Persona brief</h2><span class="grow"></span><button id="charlesBriefCopyBtn">Copy</button></div>
-      <div class="sheet-sub">Muxin's original brief, verbatim, for pasting into whatever else she's using for meme research (e.g. Grok).</div>
-      <textarea id="charlesBriefText" readonly style="width:100%;min-height:140px;margin-top:10px;font:400 13px/1.6 ui-monospace,monospace;padding:12px 14px;border:1px dashed #e0d6c0;border-radius:8px;background:#fcfbf7;resize:vertical;"></textarea>
-    </div>
     <div class="sheet session">
       <div class="session-grid">
-        <div class="session-main" id="charlesMain"><div class="empty">Loading…</div></div>
-        <div class="session-margin" id="charlesSide"></div>
+      <div class="session-main">
+      <div class="capture" style="padding:0 0 22px;border-bottom:1px solid #efe7d6">
+      <div class="capture-title">Draft a Charles post</div>
+      <div class="ingest-actions" style="align-items:center">
+        <label class="engine-choice"><span>Run with</span><select class="engine-select" id="charlesEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
+        <textarea id="charlesInput" rows="5" style="flex:1;min-width:220px" placeholder="Topic, angle, or a URL for a reply"></textarea>
+        <button class="primary" id="charlesDraftBtn">Draft</button>
+      </div>
+      <fieldset style="border:0;padding:10px 0 0;margin:0"><legend class="wb-label">FORMATS · EACH QUEUES SEPARATELY</legend>
+        <label><input class="charles-format" type="checkbox" value="oneliner" checked> One-liner</label>
+        <label><input class="charles-format" type="checkbox" value="essay"> Essay</label>
+        <label><input class="charles-format" type="checkbox" value="reply"> Reply</label>
+      </fieldset>
+      <div class="hint">Runs the real /charles skill with the engine you choose. Lands in the queue below as "pending". Nothing posts on its own.</div>
+      </div>
+      <div id="charlesMain" style="margin-top:24px"><div class="empty">Loading…</div></div>
+      </div>
+      <div class="session-margin room-rail" id="charlesSide">
+        <details id="charlesPersonaPanel">
+          <summary class="wb-margin-cap">PERSONA CONTEXT</summary>
+          <div class="sheet-sub" style="margin-top:10px">Muxin's original brief, verbatim, for copying into her other persona tools.</div>
+          <button id="charlesBriefCopyBtn" style="margin-top:10px">Copy persona brief</button>
+          <textarea id="charlesBriefText" readonly style="width:100%;min-height:140px;margin-top:10px;font:400 11px/1.5 ui-monospace,monospace;padding:10px;border:1px dashed #e0d6c0;border-radius:8px;background:#fcfbf7;resize:vertical;"></textarea>
+        </details>
+        <div id="charlesDraftList" style="margin-top:20px"></div>
+      </div>
       </div>
     </div>
   </section>
   <section class="view" id="roomVenture" hidden>
     <!-- One default sheet: compact chrome + the thread. Intake guardrails sit behind VEN.pane. -->
     <div class="sheet" id="ventureMainSheet" style="padding:22px 40px 28px">
-      <div class="sheet-head"><h2>Venture</h2><span class="grow"></span>
-        <select id="ventureSlug"></select>
-        <label class="engine-choice"><span>Analyze with</span><select class="engine-select" id="ventureEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        <button type="button" id="ventureAnalyzeBtn">Analyze this step</button>
-        <button type="button" class="primary" id="ventureRunStepBtn">Run the next draft step</button>
+      <div class="sheet-head"><h2>Venture</h2><label><span class="sr-only">Choose a venture</span><select id="ventureSelect" class="venture-switcher" aria-label="Choose a venture"><option>Loading ventures…</option></select></label><button type="button" id="ventureStartBtn"><span aria-hidden="true">＋</span> Start a venture</button><span class="grow"></span>
         <span class="src" id="ventureDay"></span>
-        <button type="button" id="ventureStartBtn">Start a venture</button>
       </div>
+      <nav class="venture-stages" aria-label="Venture stages"><button class="venture-stage on" data-set-ven-pane="work">1 · Work</button><span class="cw-sep">→</span><button class="venture-stage" data-set-ven-pane="documents">2 · Documents</button><span class="cw-sep">→</span><button class="venture-stage" data-set-ven-pane="intake">3 · Guardrails</button><span class="cw-sep">→</span><button class="venture-stage" data-set-ven-pane="history">4 · History</button></nav>
+      <div id="ventureWorkPane">
       <div class="sheet-sub" style="max-width:640px">Every line below comes from the ledger, the decisions, the artifacts, and your intake. The selected engine drafts one step and stops at your next gate.</div>
+      <details class="venture-tools" style="margin-top:12px">
+        <summary class="cw-back">Analysis and next-step controls</summary>
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:10px;padding:10px 12px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px">
+          <label class="engine-choice"><span>Run with</span><select class="engine-select" id="ventureEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
+          <button type="button" id="ventureAnalyzeBtn">Analyze this step</button>
+          <button type="button" id="ventureRunStepBtn">Run the next draft step</button>
+          <span class="src">Both stop at the next human gate. Neither approves or publishes.</span>
+        </div>
+      </details>
       <div id="ventureAnalysisPanel" hidden style="margin-top:16px;padding-top:14px;border-top:1px solid #efe7d6">
         <div class="sheet-head"><h3>Selected engine's read</h3><span class="grow"></span><span class="src" id="ventureAnalysisEngine"></span></div>
         <div class="sheet-sub">Read-only advice about what is ready, what you need to decide, and what must wait. It does not write canon or advance a phase.</div>
@@ -1121,16 +1124,14 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       </div>
       <div class="vroom" id="ventureRead" style="margin:18px -40px 0;border-top:1px solid #efe7d6">
         <div class="vthread" id="ventureThread"><div class="empty">Loading…</div></div>
-        <div class="vrail"><div class="vrail-in" id="ventureRail"></div></div>
       </div>
-      <div class="sheet-foot" id="ventureMainFoot" style="justify-content:flex-start;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:18px">
-        <button type="button" class="cw-back" data-set-ven-pane="intake">Edit the intake guardrails</button>
-        <span class="src">Voice and Day 14 scorecard notes live there. This room opens on the thread.</span>
       </div>
+      <div id="ventureDocumentsPane" hidden><div id="ventureDocuments"></div><div id="ventureDocumentReader" hidden></div></div>
+      <div id="ventureHistoryPane" hidden><div id="ventureRail"></div></div>
     </div>
     <div class="sheet" id="ventureIntakeSheet" hidden style="padding:22px 40px">
       <div class="sheet-head">
-        <button type="button" class="cw-back" data-set-ven-pane="thread">Back to the venture</button>
+        <button type="button" class="cw-back" data-set-ven-pane="work">Back to the venture</button>
         <h2>Intake guardrails</h2>
         <span class="grow"></span>
         <span class="src">Voice and scorecard fields save as you type</span>
@@ -1151,13 +1152,12 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="signalsReads">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
-    <div style="margin-top:26px">
+    <details style="margin-top:26px"><summary class="wb-label">Measurement inventory</summary><div style="margin-top:18px">
       <div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80">This read</div>
       <div style="font:400 27px/1.35 Georgia,'Times New Roman',serif;color:#1c1a17;margin:8px 0 0;max-width:520px">Four things, kept apart</div>
       <div class="sheet-sub" style="max-width:560px">One number across all four would hide the thing you most need to see. Nothing on this page adds them up, and two of them are never allowed to argue for dropping a pillar or a platform.</div>
       <div id="signalsFamilies"><div class="empty">Loading…</div></div>
-    </div>
-    <div id="signalsResearch"></div>
+    </div><div id="signalsResearch"></div></details>
     <div id="signalsTop"><div class="empty">Loading…</div></div>
     <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
@@ -1236,6 +1236,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     </div>
   </section>
 </main>
+<div class="focus-backdrop" id="reviewFocus" hidden><section class="focus-dialog" role="dialog" aria-modal="true" aria-labelledby="reviewFocusTitle" tabindex="-1"><div class="sheet-head"><h2 id="reviewFocusTitle">Draft review</h2><span class="grow"></span><button type="button" id="reviewFocusClose" aria-label="Close draft review">Close</button></div><div id="reviewFocusBody"></div></section></div>
 <div class="flash" id="flash"></div>
 ${opts.fixtures ? fixturePanelHtml() + fixtureScriptHtml() : ""}
 <script>
@@ -1312,7 +1313,7 @@ async function loadEngines(){
     }
     refreshEngineControls();
     // Engine availability used to fill a second hint under the capture card. That line was
-    // collapsed into the single sentence beside Put it where it goes; the select still disables
+    // collapsed into the single sentence beside Start on it; the select still disables
     // unavailable engines via refreshEngineControls, and sign-in is still checked when a run starts.
   }catch(e){ connectionState("Engine availability could not be checked. The server will validate your choice when you run it."); }
 }
@@ -1479,6 +1480,30 @@ function rowEl(piece, row){
   el.addEventListener("click", (e)=>onAction(e, piece, row, el));
   return el;
 }
+let reviewFocusReturn = null;
+function reviewScanRowEl(piece,row){
+  const button=document.createElement("button");
+  button.type="button"; button.className="scan-row"; button.dataset.reviewId=row.id;
+  const lead=String(row.body||row.notes||"No generated asset yet").replace(/\\s+/g," ").slice(0,150);
+  button.innerHTML='<span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span></span><span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block;margin-top:3px">'+esc(lead)+'</span></span><span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>';
+  button.addEventListener("click",()=>openReviewFocus(piece,row,button));
+  return button;
+}
+function openReviewFocus(piece,row,returnTo){
+  reviewFocusReturn=returnTo;
+  const body=$("#reviewFocusBody"); body.innerHTML=""; body.appendChild(rowEl(piece,row));
+  $("#reviewFocusTitle").textContent=piece.title+" · "+row.platform;
+  $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
+  refreshEngineControls(body);
+}
+function closeReviewFocus(){
+  $("#reviewFocus").hidden=true; $("#reviewFocusBody").innerHTML="";
+  if(reviewFocusReturn&&reviewFocusReturn.isConnected) reviewFocusReturn.focus();
+  reviewFocusReturn=null;
+}
+$("#reviewFocusClose").addEventListener("click",closeReviewFocus);
+$("#reviewFocus").addEventListener("click",e=>{ if(e.target===$("#reviewFocus")) closeReviewFocus(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("#reviewFocus").hidden) closeReviewFocus(); });
 
 async function onAction(e, piece, row, el){
   const act = e.target.dataset.act; if(!act) return;
@@ -1578,7 +1603,25 @@ async function onAction(e, piece, row, el){
 }
 
 let rerenderScheduled=false;
-function rerender(){ if(rerenderScheduled) return; rerenderScheduled=true; requestAnimationFrame(()=>{rerenderScheduled=false; render();}); }
+function rerender(){
+  // The focus dialog contains a detached copy of a row. Close it before rebuilding the source list,
+  // then return focus to the corresponding compact trigger (or the review surface if the action
+  // removed that row from the current filter). This prevents an approve/revise response from
+  // leaving stale controls visible in the modal.
+  const reviewFocusId = !$("#reviewFocus").hidden ? $("#reviewFocusBody .row")?.dataset.id || null : null;
+  if(reviewFocusId) closeReviewFocus();
+  if(rerenderScheduled) return;
+  rerenderScheduled=true;
+  requestAnimationFrame(()=>{
+    rerenderScheduled=false;
+    render();
+    if(reviewFocusId){
+      const trigger=[...document.querySelectorAll("[data-review-id]")].find(el=>el.dataset.reviewId===reviewFocusId);
+      if(trigger) trigger.focus();
+      else { const surface=$("#reviewMain"); surface?.setAttribute("tabindex","-1"); surface?.focus(); }
+    }
+  });
+}
 
 function render(){
   const main = $("#reviewMain"); main.innerHTML = "";
@@ -1590,7 +1633,7 @@ function render(){
     shown += rows.length;
     const sec = document.createElement("section"); sec.className = "piece";
     sec.innerHTML = '<h2>'+esc(piece.title)+'</h2><div class="slug">'+esc(piece.slug)+'</div>';
-    for (const row of rows) sec.appendChild(rowEl(piece, row));
+    for (const row of rows) sec.appendChild(reviewScanRowEl(piece, row));
     main.appendChild(sec);
   }
   $("#count").textContent = String(pending);
@@ -1607,6 +1650,7 @@ function render(){
 // Refresh stays room-aware: it only re-reads whatever the CURRENT room shows, labeled per room,
 // with a "last refreshed HH:MM" stamp so its effect is visible.
 let currentTab = ${JSON.stringify(BOOT_ROOM)};
+const SHOW_TEST_VENTURES = ${JSON.stringify(Boolean(process.env.CONTENT_AGENTS_TEST_VENTURE_ROOT))};
 let outreachSub = "leads"; // the Outreach room's Leads | Follow-ups toggle
 function refreshLabelFor(t){ return t==="content" ? "Refresh the desk" : t==="studio" ? "Refresh queue" : t==="signals" ? "Reload brief + file list" : t==="fiction" ? "Reload canon" : t==="charles" ? "Reload drafts" : t==="venture" ? "Reread canon" : t==="outreach" ? (outreachSub==="followups" ? "Refresh follow-ups" : "Scout new leads") : "Refresh"; }
 function setRoom(t){
@@ -2565,10 +2609,8 @@ function wbSessionEl(s){
     }
   }
   for(const card of openAngles) main += wbAngleHtml(s.slug, card);
-  const lensChecks = ["extract"].concat(s.cuts.map(c=>c.lens)).map(l =>
-    '<label class="toggle"><input type="checkbox" class="dev-fmt-lens" value="'+esc(l)+'" checked /> '+esc(l)+'</label>').join("");
-  main += '<div class="wb-handoff">'+engineSelectHtml()+'<button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Format for platforms</button>'+
-    '<span class="note">They shape it for each platform, make the visuals, hold it for posting. Every draft lands in Drafts for your yes.</span>'+lensChecks+'</div>';
+  main += '<div class="wb-handoff"><button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Format for platforms</button>'+
+    '<span class="note">Pick the cuts, treatments, and model in the Content treatment step. The explicit selection is saved before any formatting job starts.</span></div>';
   if(s.pending) main += '<div class="wb-links"><button type="button" class="wb-link wb-goto-review">See '+s.pending+' draft'+(s.pending===1?"":"s")+' waiting for your yes</button></div>';
   sheet.innerHTML = '<div class="session-grid"><div class="session-main">'+main+'</div>'+wbMarginHtml(s)+'</div>';
   return sheet;
@@ -2624,7 +2666,6 @@ async function devStart(){
     else flash(r.error || "Could not hand it over");
   } finally { setCaptureSubmitting(false); }
 }
-$("#devStartBtn").addEventListener("click", devStart);
 // Delegated — the workbench is rebuilt wholesale on every load, same pattern as the notes list.
 $("#workbench").addEventListener("click", async (e)=>{
   const t = e.target;
@@ -2661,14 +2702,9 @@ $("#workbench").addEventListener("click", async (e)=>{
     } finally { devReplyPending.delete(slug); renderWorkbench(); }
   } else if (t.classList.contains("dev-format-btn")){
     const slug = t.dataset.slug;
-    const lenses = [...t.closest(".session-main").querySelectorAll(".dev-fmt-lens")].filter(c=>c.checked).map(c=>c.value);
-    if(!lenses.length){ flash("Pick at least one cut"); return; }
-    const localEngine = t.closest(".wb-handoff")?.querySelector(".engine-select");
-    const engine = localEngine ? localEngine.value : "claude";
-    t.disabled = true;
-    const r = await post("/api/develop/format", {slug, lenses, engine});
-    if(r.ok){ flash("Format for platforms queued with "+engineLabel(engine)+": "+r.jobs.length+" job(s)"); loadJobs(); }
-    else { t.disabled = false; flash(r.error || "Could not queue formatting"); }
+    CW.slug = slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null;
+    CW.selection = null; CW.selectionFor = null; CW.selectionErr = null; CW.yesErrors = []; CW.pane = "wizard";
+    renderWorkbench(); renderContentWizard(); cwLoadTreatment();
   } else if (t.classList.contains("wb-cut-edit")){
     const cutEl = t.closest(".wb-cut");
     if(t.dataset.mode === "save"){
@@ -2709,7 +2745,7 @@ $("#workbench").addEventListener("click", async (e)=>{
 // rail + step body), "workbench" (the director's notes on the picked piece, opened from step 2),
 // or "review" (every piece's drafts at once, opened from step 3 or from Studio). Exactly one
 // shows at a time — see renderContentWizard, which is the single place that toggles all three.
-let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, loading:false, yesErrors:[], pane:"wizard" };
+let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, launching:false, loading:false, yesErrors:[], pane:"wizard" };
 
 // ── begin the treatment mirror ──
 // Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
@@ -2962,8 +2998,16 @@ function cwStep2Html(){
     ? '<button class="primary cw-fwd" data-step="3">See the '+total+' draft'+(total===1?"":"s")+'</button>'+
       '<span class="src" style="max-width:360px">Every one of them still waits for your yes, one channel at a time.</span>'
     : '<span class="fam-note t-amber" style="margin:0">No drafts exist for this piece yet. Talk to your director about it below and they land here.</span>';
+  const lenses = (s.cuts||[]).map(c=>'<label style="display:flex;gap:7px"><input type="checkbox" data-cw-lens value="'+esc(c.lens)+'" checked> '+esc(c.lens)+'</label>').join("");
+  const run = lenses
+    ? engineSelectHtml("contentTreatmentEngine")+'<button class="primary" data-cw-launch'+(CW.launching?" disabled":"")+'>'+(CW.launching?"Formatting…":"Format selected cuts")+'</button>'
+    : '<span class="fam-note t-amber" style="margin:0">No cuts are ready to format yet. Open the director controls below to make one.</span>';
   return cwPickedHtml(s)+
     '<div class="cw-reads">'+cells+'</div>'+
+    '<div class="fam-ask" style="margin-top:28px">CHOOSE CUTS TO FORMAT</div>'+
+    '<div class="src" style="margin-top:6px;max-width:620px">The treatment above is a read of routing and reuse. Choose the cuts you want to format, then review every resulting draft below before approving anything.</div>'+
+    '<div style="margin-top:14px"><div style="display:flex;flex-direction:column;gap:8px">'+(lenses||'<span class="src">No cuts yet.</span>')+'</div></div>'+
+    '<div class="cw-yesall">'+run+'<span class="src">Formatting uses the existing cut route. It creates drafts only; nothing is approved or published here.</span></div>'+
     '<div class="fam-ask" style="margin-top:28px">CHANNELS · READ, NOT CHOSEN HERE</div>'+
     '<div class="src" style="margin-top:6px;max-width:560px">The defaults list in config/routing.yaml is the only thing that includes or skips a channel, so this grid reports what routing decided rather than offering to change it. Each row carries the reuse window that belongs to that channel and its own next free slot.</div>'+
     '<div class="cw-chans">'+chans+'</div>'+
@@ -3040,11 +3084,12 @@ function renderContentWizard(){
   $("#cwSteps").innerHTML = cwStepsHtml(step);
   const body = $("#cwBody");
   body.innerHTML = step === 1 ? cwStep1Html() : step === 2 ? cwStep2Html() : cwStep3Html();
+  refreshEngineControls(body);
   if(step === 3){
     const holder = $("#cwRows");
     const piece = cwPiece();
     const active = cwActiveGroup();
-    if(holder && piece && active) for(const row of active.rows) holder.appendChild(rowEl(piece, row));
+    if(holder && piece && active) for(const row of active.rows) holder.appendChild(reviewScanRowEl(piece, row));
   }
 }
 // Opened from step 3's "Show every piece's drafts" or from a Studio jump — the cross-piece sweep
@@ -3070,6 +3115,24 @@ async function cwLoadTreatment(){
     if(CW.slug === slug) renderContentWizard();
   }
 }
+async function cwLaunch(btn){
+  const s = cwSession();
+  if(!s || !CW.treat || CW.launching) return;
+  const slug = CW.slug;
+  const root = btn.closest("#cwBody");
+  const lenses = [...root.querySelectorAll("[data-cw-lens]:checked")].map(x=>x.value);
+  if(!lenses.length){ flash("Pick at least one cut"); return; }
+  const engine = $("#contentTreatmentEngine").value;
+  CW.launching = true; renderContentWizard();
+  try {
+    const launched = await post("/api/develop/format", {slug, lenses, engine});
+    if(!launched.ok){ flash(launched.error || "Could not start formatting"); return; }
+    flash("Formatting queued with "+engineLabel(engine)+" for "+launched.jobs.length+" cut(s)");
+    loadJobs(); await loadContent();
+  } catch(e) {
+    flash(e instanceof Error ? e.message : String(e));
+  } finally { CW.launching = false; renderContentWizard(); }
+}
 async function cwYesAll(btn){
   const g = cwActiveGroup();
   if(!g || !CW.slug) return;
@@ -3092,9 +3155,10 @@ async function cwYesAll(btn){
 }
 // Delegated: the wizard is rebuilt wholesale on every render, same pattern as the workbench.
 $("#contentWizard").addEventListener("click", (e)=>{
-  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-tab],[data-set-pane],.cw-yes-all") : null;
+  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-tab],[data-set-pane],[data-cw-launch],.cw-yes-all") : null;
   if(!t) return;
   if(t.classList.contains("cw-yes-all")){ cwYesAll(t); return; }
+  if(t.dataset.cwLaunch !== undefined){ cwLaunch(t); return; }
   if(t.dataset.setPane !== undefined){
     CW.pane = t.dataset.setPane;
     renderContentWizard();
@@ -3179,17 +3243,24 @@ let ficFixed = {};        // spans fixed in this session, so the rail says "fixe
 // Almost nothing is computed here. src/review/venture-thread.ts already derived the whole view
 // model server-side; this walks it and writes markup. The two exceptions are the mirrors below.
 //
-// VEN.pane picks which of the room's two durable sheets is on screen: "thread" (default: chrome +
+// VEN.pane picks one focused stage instead of stacking the whole venture on one page.
 // the venture thread) or "intake" (the voice/scorecard guardrails). Exactly one shows at a time.
 // The Start-a-venture interview is a separate overlay on the thread pane, same as before.
-let VEN = { pane: "thread" };
+let VEN = { pane: "work" };
 function renderVentureSheets(){
-  $("#ventureMainSheet").hidden = VEN.pane !== "thread";
+  $("#ventureMainSheet").hidden = VEN.pane === "intake";
   $("#ventureIntakeSheet").hidden = VEN.pane !== "intake";
+  $("#ventureWorkPane").hidden = VEN.pane !== "work";
+  $("#ventureDocumentsPane").hidden = VEN.pane !== "documents";
+  $("#ventureHistoryPane").hidden = VEN.pane !== "history";
+  document.querySelectorAll(".venture-stage").forEach(b=>b.classList.toggle("on", b.dataset.setVenPane===VEN.pane));
 }
 let VENTURE_SLUGS = [];
 let ventureSlug = null;
 let VENTURE_THREAD = null;
+let VENTURE_SUMMARIES = {};
+let VENTURE_DOCUMENTS = [];
+let ventureDocument = null;
 let ventureAnalysisPending = false;
 let ventureRunStepPending = false;
 const INTAKE_FIELDS = {
@@ -3227,31 +3298,39 @@ function renderVentureIntake(){
     const state=box.querySelector('[data-intake-state="'+key+'"]');
     if(state) state.textContent = "saving…";
     clearTimeout(intakeTimers.get(key));
-    intakeTimers.set(key, setTimeout(()=>saveVentureIntakeField(section, field, ta.value), 500));
+    const slug = ventureSlug;
+    intakeTimers.set(key, setTimeout(()=>{
+      intakeTimers.delete(key);
+      if(ventureSlug === slug) saveVentureIntakeField(slug, section, field, ta.value);
+    }, 500));
   }));
 }
-async function loadVentureIntakeSections(){
+async function loadVentureIntakeSections(slug = ventureSlug){
   const box=$("#ventureIntakeSections");
-  if(!box || !ventureSlug) return;
+  if(!box || !slug) return;
   try {
-    const r=await fetch("/api/venture/"+encodeURIComponent(ventureSlug)+"/intake/sections");
+    const r=await fetch("/api/venture/"+encodeURIComponent(slug)+"/intake/sections");
     const j=await r.json();
     if(!r.ok || !j.ok) throw new Error(j.error||"could not load intake guardrails");
+    if(slug !== ventureSlug) return;
     VENTURE_INTAKE={voice:{...(j.sections&&j.sections.voice||{})},scorecard:{...(j.sections&&j.sections.scorecard||{})}};
     renderVentureIntake();
   } catch(e) {
+    if(slug !== ventureSlug) return;
     box.innerHTML='<div class="load-error" role="alert"><strong>Could not load intake guardrails.</strong><div>Check your connection, then try again. Your saved answers are unchanged.</div><button type="button" id="ventureIntakeRetry">Try again</button></div>';
-    $("#ventureIntakeRetry")?.addEventListener("click", loadVentureIntakeSections);
+    $("#ventureIntakeRetry")?.addEventListener("click", ()=>loadVentureIntakeSections(slug));
   }
 }
-async function saveVentureIntakeField(section, field, text){
+async function saveVentureIntakeField(slug, section, field, text){
   const key=intakeKey(section,field);
   const state=$("#ventureIntakeSections [data-intake-state=\\""+key+"\\"]");
   try {
-    const r=await post("/api/venture/"+encodeURIComponent(ventureSlug)+"/intake/section",{section,field,text});
+    const r=await post("/api/venture/"+encodeURIComponent(slug)+"/intake/section",{section,field,text});
+    if(slug !== ventureSlug) return;
     if(r.ok){ if(state) state.textContent="saved"; }
     else { if(state) state.textContent="not saved"; flash(r.error||"This intake field was not saved. Try again"); }
   } catch(e) {
+    if(slug !== ventureSlug) return;
     if(state) state.textContent="not saved";
     flash("This intake field was not saved. Check your connection and try again");
   }
@@ -3273,12 +3352,9 @@ function vDayLine(elapsedDays){
 async function loadVentureList(){
   const r = await fetch("/api/venture/list");
   const j = await r.json();
-  VENTURE_SLUGS = j.ventures || [];
-  const sel = $("#ventureSlug");
-  sel.innerHTML = VENTURE_SLUGS.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join("");
+  VENTURE_SLUGS = (j.ventures || []).filter(slug=>SHOW_TEST_VENTURES || !/^(?:e2e-|zz-test-)/.test(slug));
   if(!VENTURE_SLUGS.length){
     ventureSlug = null;
-    sel.hidden = true;
     $("#ventureEngine").disabled = true;
     $("#ventureAnalyzeBtn").disabled = true;
     $("#ventureRunStepBtn").disabled = true;
@@ -3287,15 +3363,55 @@ async function loadVentureList(){
     $("#ventureIntakeSections").innerHTML = '<div class="empty" style="padding:18px 0">Start or choose a venture to edit its durable voice and scorecard fields.</div>';
     $("#ventureThread").innerHTML = '<div class="empty">No venture on the desk yet. "Start a venture" above runs the whole intake interview here: 25 questions, one at a time.</div>';
     $("#ventureRail").innerHTML = "";
+    renderVentureSwitcher(); renderVentureDocuments();
     return;
   }
-  sel.hidden = false;
   $("#ventureEngine").disabled = false;
   $("#ventureAnalyzeBtn").disabled = false;
   $("#ventureRunStepBtn").disabled = false;
   if(!ventureSlug || !VENTURE_SLUGS.includes(ventureSlug)) ventureSlug = VENTURE_SLUGS[0];
-  sel.value = ventureSlug;
+  renderVentureSwitcher();
+  Promise.all(VENTURE_SLUGS.map(async slug=>{
+    try { const r=await fetch("/api/venture/"+encodeURIComponent(slug)+"/thread"); const j=await r.json(); if(r.ok&&j.ok) VENTURE_SUMMARIES[slug]=j.thread; } catch(e){}
+  })).then(renderVentureSwitcher);
   await loadVenture();
+}
+function renderVentureSwitcher(){
+  const box=$("#ventureSelect");
+  if(!box) return;
+  box.innerHTML=(VENTURE_SLUGS.length ? VENTURE_SLUGS.map(slug=>{
+    const summary=VENTURE_SUMMARIES[slug];
+    const phase=summary && summary.phase ? "Phase "+summary.phase : "";
+    return '<option value="'+esc(slug)+'"'+(slug===ventureSlug?' selected':'')+'>'+esc(slug)+(phase?' · '+esc(phase):'')+'</option>';
+  }).join('') : '<option value="" disabled selected>No ventures yet</option>')+
+    '<option value="__example__"'+(ventureSlug==='__example__'?' selected':'')+'>Example venture · guided walkthrough</option>';
+}
+function renderVentureDocuments(){
+  const box=$("#ventureDocuments"); if(!box) return;
+  box.innerHTML='<div class="vmono" style="margin-top:22px">CANONICAL DOCUMENTS</div><div class="vnote" style="font-size:11px;margin-top:4px">Opened from the venture files on disk.</div>'+
+    (VENTURE_DOCUMENTS.length ? '<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">'+VENTURE_DOCUMENTS.map(d=>
+      '<button type="button" data-venture-document="'+esc(d.id)+'" class="lead-chip"'+(d.state==="missing"||d.state==="unavailable"?' disabled':'')+' style="text-align:left;display:flex;flex-direction:column"><span>'+esc(d.title)+'</span><span class="from">Phase '+esc(d.phase)+' · '+esc(d.state)+' · '+esc(d.path)+(d.state==="unavailable"&&d.error?' · unavailable: '+esc(d.error):'')+'</span></button>'
+    ).join('')+'</div>' : '<div class="vnote" style="margin-top:9px">No document index is available for this venture yet.</div>');
+  const reader=$("#ventureDocumentReader");
+  if(!ventureDocument){ reader.hidden=true; reader.innerHTML=""; return; }
+  reader.hidden=false;
+  reader.innerHTML='<div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--line)"><div class="vtitle" style="font-size:15px">'+esc(ventureDocument.title)+'</div><div class="from">Phase '+esc(ventureDocument.phase)+' · '+esc(ventureDocument.path)+' · '+esc(ventureDocument.state)+'</div><div class="md" style="margin-top:10px;max-height:360px;overflow:auto">'+(ventureDocument.content===null?'<p>This document is missing on disk.</p>':ventureDocument.content.trim()?mdToHtml(ventureDocument.content):'<p>This document exists but is empty.</p>')+'</div></div>';
+}
+async function loadVentureDocuments(){
+  const slug=ventureSlug;
+  VENTURE_DOCUMENTS=[]; ventureDocument=null; renderVentureDocuments();
+  if(!slug) return;
+  try { const r=await fetch("/api/venture/"+encodeURIComponent(slug)+"/documents"); const j=await r.json(); if(!r.ok) throw new Error(j.error||"could not read documents"); if(slug!==ventureSlug) return; VENTURE_DOCUMENTS=j.documents||[]; }
+  catch(e){ VENTURE_DOCUMENTS=[]; }
+  renderVentureDocuments();
+}
+async function openVentureDocument(id){
+  const slug=ventureSlug;
+  const r=await fetch("/api/venture/"+encodeURIComponent(slug)+"/documents/"+encodeURIComponent(id));
+  const j=await r.json();
+  if(!r.ok||!j.ok){ flash(j.error||"Could not open that document"); return; }
+  if(slug!==ventureSlug) return;
+  ventureDocument=j.document; renderVentureDocuments();
 }
 async function loadVenture(){
   if(!ventureSlug) return loadVentureList();
@@ -3308,10 +3424,12 @@ async function loadVenture(){
     if(requestedSlug !== ventureSlug){ hideRoomLoading("ventureThread"); return; }
     if(!j.ok) throw new Error(j.error || "could not read this venture");
     VENTURE_THREAD = j.thread;
+    VENTURE_SUMMARIES[requestedSlug] = j.thread;
     $("#ventureRunStepBtn").disabled = false;
     renderVenture();
+    renderVentureSwitcher();
     hideRoomLoading("ventureThread");
-    await loadVentureIntakeSections();
+    await Promise.all([loadVentureIntakeSections(requestedSlug), loadVentureDocuments()]);
     connectionRecovered();
   } catch(e) {
     hideRoomLoading("ventureThread");
@@ -3913,15 +4031,37 @@ function renderVenture(){
       + '<div class="from" style="font:10px/1.5 ui-monospace,monospace;color:#b8ad94">'+esc(r.stamp)+'</div></div>').join("")
     + '</div>';
 }
-document.addEventListener("change", e=>{
-  if(e.target && e.target.id === "ventureSlug"){
-    ventureSlug = e.target.value;
-    VENTURE_THREAD = null;
-    $("#ventureRunStepBtn").disabled = true;
-    $("#ventureAnalysisPanel").hidden = true;
-    loadVenture();
-  }
+function renderVentureExample(){
+  $("#ventureDay").textContent = "read-only example";
+  $("#ventureEngine").disabled = true; $("#ventureAnalyzeBtn").disabled = true; $("#ventureRunStepBtn").disabled = true;
+  $("#ventureThread").innerHTML = '<div class="venture-example"><div class="vmono">EXAMPLE · PHASE 1, ATTENTION</div><h3 style="margin-top:10px">A small consulting offer for mission-driven operators</h3><p class="vnote">First, answer the intake one question at a time. The system turns those answers into a research plan, then stops for your review.</p><div class="vreceipt"><i style="background:#2f7d46"></i><span>Intake complete · voice and truth constraints recorded</span></div><div class="vblock"><div class="vmono">YOUR NEXT DECISION</div><div class="vtitle" style="margin-top:8px">Approve the research plan?</div><div class="vnote">After your yes, Venture proposes ten evidence-seeking post ideas. You choose three. It drafts only those three and stops again before anything goes out.</div></div><div class="vreceipt"><i style="background:#9a6b12"></i><span>Nothing advances until you make the highlighted decision</span></div></div>';
+  $("#ventureDocuments").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE DOCUMENTS</div><p class="vnote">As work advances, this stage holds the research plan, selected ideas, draft posts, lead magnet, offer outline, operating plan, and Day 14 review. Each remains visibly draft, approved, or live.</p></div>';
+  $("#ventureRail").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE HISTORY</div><p class="vnote">Every selection, approval, delivery confirmation, and checkpoint appears here as an audit trail. Earlier phases stay available without crowding the current work screen.</p></div>';
+  $("#ventureIntakeSections").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE GUARDRAILS</div><p class="vnote"><strong>Voice:</strong> plainspoken, specific, and skeptical of inflated claims.</p><p class="vnote"><strong>Truth boundary:</strong> treat demand as a hypothesis until real replies or purchases support it.</p><p class="vnote"><strong>Day 14:</strong> three live probes, a sustainable posting pace, and at least five substantive replies from the intended audience.</p><p class="from">Read-only. Start your own venture to record real guardrails.</p></div>';
+}
+document.addEventListener("click", e=>{
+  const target=e.target && e.target.closest ? e.target.closest("[data-venture-slug]") : null;
+  if(target){ switchVenture(target.dataset.ventureSlug); return; }
+  const doc=e.target && e.target.closest ? e.target.closest("[data-venture-document]") : null;
+  if(doc) openVentureDocument(doc.dataset.ventureDocument);
 });
+$("#ventureSelect").addEventListener("change", e=>switchVenture(e.target.value));
+function switchVenture(slug){
+  if(!slug || (!VENTURE_SLUGS.includes(slug) && slug!=="__example__") || slug===ventureSlug) return;
+  for(const timer of intakeTimers.values()) clearTimeout(timer);
+  intakeTimers.clear();
+  ventureSlug=slug;
+  VENTURE_THREAD=null;
+  VENTURE_DOCUMENTS=[];
+  ventureDocument=null;
+  ventureAnalysisPending=false;
+  $("#ventureAnalysisPanel").hidden=true;
+  $("#ventureRunStepBtn").disabled=true;
+  renderVentureSwitcher();
+  renderVentureDocuments();
+  if(slug==="__example__"){ renderVentureExample(); return; }
+  loadVenture();
+}
 // Pane switch for the demoted intake sheet (mirrors Signals' SIG.pane). Lives on the room, not
 // inside the rebuilt thread, so a plain listener on #roomVenture is enough.
 $("#roomVenture").addEventListener("click", (e)=>{
@@ -4090,9 +4230,8 @@ function ivResumable(){
 
 function ivShow(on){
   // Interview sits on the thread pane. Leaving intake guardrails open would stack two sheets.
-  if(on){ VEN.pane = "thread"; renderVentureSheets(); }
+  if(on){ VEN.pane = "work"; renderVentureSheets(); }
   $("#ventureRead").hidden = on;
-  const foot = $("#ventureMainFoot"); if(foot) foot.hidden = on;
   $("#ventureIntake").hidden = !on;
   $("#ventureStartBtn").textContent = on ? "Back to the venture" : "Start a venture";
 }
@@ -4675,19 +4814,23 @@ function renderFiction(){
 }
 
 async function draftCharles(){
-  const mode = $("#charlesMode").value;
   const input = $("#charlesInput").value.trim();
-  if(mode==="reply" && !input){ flash("Paste a URL to reply to first"); return; }
+  const modes=[...document.querySelectorAll(".charles-format:checked")].map(x=>x.value);
+  if(!modes.length){ flash("Choose at least one format"); return; }
+  if(modes.includes("reply") && !input){ flash("Paste a URL before queueing a reply"); return; }
   const btn = $("#charlesDraftBtn");
-  btn.disabled = true; btn.textContent = "Drafting… (check Studio for progress)";
-  const r = await post("/api/charles/draft", {mode, input, engine:$("#charlesEngine").value});
+  btn.disabled = true; btn.textContent = "Queueing checked formats…";
+  const engine=$("#charlesEngine").value;
+  const results=[];
+  for(const mode of modes) results.push({mode,result:await post("/api/charles/draft", {mode, input, engine})});
   btn.disabled = false; btn.textContent = "Draft";
-  if(r.ok){
+  const ok=results.filter(x=>x.result.ok), failed=results.filter(x=>!x.result.ok);
+  if(ok.length){
     $("#charlesInput").value = "";
-    charlesId = r.id;
-    flash("Drafted with "+engineLabel($("#charlesEngine").value)+"; waiting in the queue below");
+    charlesId = ok[ok.length-1].result.id;
+    flash("Queued "+ok.map(x=>typeLabel(x.mode)).join(", ")+" with "+engineLabel(engine)+(failed.length?"; failed: "+failed.map(x=>typeLabel(x.mode)).join(", "):""));
     if(currentTab==="charles") loadCharles();
-  } else flash(r.error || "Could not draft");
+  } else flash(failed.map(x=>typeLabel(x.mode)+": "+(x.result.error||"failed")).join("; "));
 }
 $("#charlesDraftBtn").addEventListener("click", draftCharles);
 
@@ -4717,7 +4860,7 @@ async function loadCharles(){
   CHARLES_POSTS = (await r.json()).posts || [];
   if(!CHARLES_POSTS.length){
     $("#charlesMain").innerHTML = '<div class="empty">Nothing drafted yet. Pick a mode above and hit Draft.</div>';
-    $("#charlesSide").innerHTML = "";
+    $("#charlesDraftList").innerHTML = "";
     return;
   }
   if(!charlesId || !CHARLES_POSTS.some(p=>p.id===charlesId)) charlesId = CHARLES_POSTS[0].id;
@@ -4741,13 +4884,13 @@ function renderCharles(){
     '</div>'+
     '<div class="revisebox" id="charlesRevisebox"><input placeholder="what needs changing?" value="'+esc(post.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
     '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything. Charles has no live-posting credentials on purpose (charles/CLAUDE.md). Once approved, paste it to Substack yourself.</div>';
-  $("#charlesSide").innerHTML =
+  $("#charlesDraftList").innerHTML =
     '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
     CHARLES_POSTS.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
       '<span>'+esc(typeLabel(p.type))+' · '+esc(p.id)+'</span>'+
       '<span class="pill '+pillClass(p.status)+'" style="font-size:10px">'+esc(statusLabel(p.status))+'</span>'+
     '</div>').join("");
-  document.querySelectorAll("#charlesSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); }));
+  document.querySelectorAll("#charlesDraftList .lead-chip").forEach(c=>c.addEventListener("click",()=>{ charlesId=c.dataset.id; renderCharles(); }));
   $("#charlesMain").querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click", (e)=>onCharlesAction(e.target.dataset.act, post)));
 }
 async function onCharlesAction(act, item){
@@ -5822,7 +5965,6 @@ $("#notesList").addEventListener("change",(e)=>{
   if(cb.checked) selectedNoteIdxs.add(idx); else selectedNoteIdxs.delete(idx);
 });
 $("#jobs").addEventListener("click",(e)=>{ if(e.target.id==="clearJobsBtn") clearJobs(); });
-$("#addBtn").addEventListener("click", addSource);
 $("#notesBtn").addEventListener("click", openNotes);
 $("#notesCloseBtn").addEventListener("click", closeNotes);
 $("#notesShowDrafted").addEventListener("change",(e)=>{ notesShowDrafted = e.target.checked; renderNotes(); });

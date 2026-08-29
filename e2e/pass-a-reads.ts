@@ -24,8 +24,9 @@ const ROOMS: { room: string; label: string; panes: string[]; pr?: string }[] = [
 async function main(): Promise<void> {
   console.log("\n=== Pass A: reads, fixture mode ===\n");
   const server = await bootServer({ REVIEW_FIXTURES: "1" }, PORT);
-  const s = await openSession(PORT);
+  let s: Awaited<ReturnType<typeof openSession>> | null = null;
   try {
+    s = await openSession(PORT);
     // The fixture banner is a safety claim (fixtures.ts §3: "a screenshot cannot hide it"). If it is
     // missing while the flag is on, fixture data is reaching a screen unlabelled.
     const bannerVisible = await s.page.locator("#fxBanner").isVisible().catch(() => false);
@@ -316,8 +317,8 @@ async function main(): Promise<void> {
       console.log(`\n  (suite aborted ${s.blockedCalls.length} model-spawning call(s): ${[...new Set(s.blockedCalls)].join(", ")})`);
     }
   } finally {
-    await s.close();
-    server.stop();
+    if (s) await s.close();
+    await server.stop();
   }
 
   const failed = results.filter((r) => r.status === "fail").length;

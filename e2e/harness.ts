@@ -18,11 +18,83 @@
 
 import { chromium, type Browser, type Page, type Request } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { appendFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { homedir } from "node:os";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const SOURCE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+// The combined runner sets E2E_REPO_ROOT to a disposable copy of the checkout. Keeping this
+// override in the shared harness makes every pass use the same boundary: server source, fixture
+// data, assertions, and the result ledger all resolve below one temporary root. A direct pass run
+// still defaults to its checkout, which is useful for debugging but is intentionally not what
+// `npm run test:e2e` uses.
+export const ROOT = resolve(process.env.E2E_REPO_ROOT ?? SOURCE_ROOT);
+export const DRAFT_HOME = process.env.E2E_DRAFT_HOME ? resolve(process.env.E2E_DRAFT_HOME) : null;
+
+export const E2E_PHASE3_SLUG = "e2e-phase3";
+export const E2E_WRITE_SLUG = "e2e-probe-venture";
+
+/** Resolve Playwright's browser cache before the E2E runner swaps HOME for its draft sandbox. */
+export function playwrightBrowsersPath(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.PLAYWRIGHT_BROWSERS_PATH ?? join(home, "Library", "Caches", "ms-playwright");
+}
+
+/** Remove only artifacts owned by this suite from a disposable copy before a run starts. */
+export function resetDisposableSuiteState(root: string, draftHome: string): void {
+  for (const path of [
+    join(root, "e2e", "results.jsonl"),
+    join(root, "e2e", "RESULTS.md"),
+    join(root, "venture", E2E_PHASE3_SLUG),
+    join(root, "venture", E2E_WRITE_SLUG),
+    join(draftHome, ".content-agents", "venture-intake-drafts", `${E2E_WRITE_SLUG}.json`),
+    join(draftHome, ".content-agents", "venture-intake-drafts", `${E2E_WRITE_SLUG}.sections.json`),
+  ]) {
+    rmSync(path, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Hash the checkout's bytes and entry types, omitting only git metadata and dependencies. The
+ * combined runner uses this around every browser pass. It deliberately includes ignored runtime
+ * data (analytics, queues, and scratch files), because those are exactly the files a write route
+ * must not accidentally reach in the caller's checkout.
+ */
+export function snapshotWorktree(root: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const skip = new Set([".git", "node_modules"]);
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (skip.has(entry.name) && dir === root) continue;
+      const path = join(dir, entry.name);
+      const rel = path.slice(root.length + 1);
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) {
+        out.set(`${rel}/`, `dir:${stat.mode}`);
+        walk(path);
+      } else if (stat.isSymbolicLink()) {
+        out.set(rel, `symlink:${readlinkSync(path)}`);
+      } else if (stat.isFile()) {
+        const hash = createHash("sha256");
+        hash.update(readFileSync(path));
+        out.set(rel, `file:${stat.mode}:${hash.digest("hex")}`);
+      } else {
+        out.set(rel, `other:${stat.mode}`);
+      }
+    }
+  };
+  walk(root);
+  return out;
+}
+
+export function changedWorktreePaths(before: Map<string, string>, after: Map<string, string>): string[] {
+  const changed = new Set<string>();
+  for (const [path, value] of after) if (before.get(path) !== value) changed.add(path);
+  for (const path of before.keys()) if (!after.has(path)) changed.add(path);
+  return [...changed].sort();
+}
 
 // Routes that spawn a `claude -p` process, hit a paid API, or drive a real browser session. The
 // suite must never trigger one: they cost real money or subscription time, take minutes, and would
@@ -80,7 +152,7 @@ export function flushReport(): void {
   appendFileSync(LEDGER, JSON.stringify({ pass: PASS_NAME, ...results[results.length - 1] }) + "\n");
 }
 
-export type Server = { port: number; stop: () => void };
+export type Server = { port: number; stop: () => Promise<void> };
 
 /**
  * Boot the real review server out of this worktree and wait for the port to answer.
@@ -104,12 +176,32 @@ export async function bootServer(env: Record<string, string>, port: number): Pro
     // listening yet, which is exactly what we want.
     if (e instanceof Error && e.message.startsWith(`port ${port} already answers`)) throw e;
   }
+  const serverEntry = join(ROOT, "src", "review", "serve.ts");
+  // serve.ts intentionally binds only when run directly. A loader/eval entrypoint cannot
+  // reliably satisfy that module-identity comparison, so bootstrap it through the explicit
+  // startReviewServer() seam after importing the copied entry. This is harness-only and leaves
+  // the production direct-run guard untouched.
+  const bootstrap = [
+    "import { pathToFileURL } from 'node:url';",
+    "const entry = process.env.E2E_SERVER_ENTRY;",
+    "if (!entry) throw new Error('E2E_SERVER_ENTRY is required');",
+    "const mod = await import(pathToFileURL(entry).href);",
+    "if (typeof mod.startReviewServer !== 'function') throw new Error('serve.ts has no startReviewServer seam');",
+    "mod.startReviewServer();",
+  ].join(" ");
   const proc: ChildProcess = spawn(
-    join(ROOT, "node_modules", ".bin", "tsx"),
-    [join(ROOT, "src", "review", "serve.ts")],
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "--eval", bootstrap],
     {
       cwd: ROOT,
-      env: { ...process.env, ...env, REVIEW_PORT: String(port) },
+      env: {
+        ...process.env,
+        ...env,
+        E2E_SERVER_ENTRY: serverEntry,
+        ...(DRAFT_HOME ? { HOME: DRAFT_HOME } : {}),
+        ...(process.env.E2E_REPO_ROOT ? { CONTENT_AGENTS_TEST_VENTURE_ROOT: join(ROOT, "venture") } : {}),
+        REVIEW_PORT: String(port),
+      },
       stdio: ["ignore", "pipe", "pipe"],
       // The tsx launcher forks the real node server, so killing only the launcher orphans the
       // server and leaves its port held. Its own group means stop() can take the whole tree.
@@ -152,10 +244,28 @@ export async function bootServer(env: Record<string, string>, port: number): Pro
     }
     await new Promise((r) => setTimeout(r, 300));
   }
+  let stopped: Promise<void> | null = null;
+  const waitForExit = (): Promise<void> => {
+    if (stopped) return stopped;
+    stopped = new Promise((resolve) => {
+      if (exited) {
+        resolve();
+        return;
+      }
+      const timer = setTimeout(resolve, 2_000);
+      proc.once("exit", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    return stopped;
+  };
+
   return {
     port,
-    stop: () => {
+    stop: async () => {
       killTree();
+      await waitForExit();
     },
   };
 }
@@ -174,24 +284,25 @@ export type Session = {
 
 export async function openSession(port: number): Promise<Session> {
   const browser = await chromium.launch();
-  const page = await browser.newPage();
-  const errors: string[] = [];
-  const badResponses: string[] = [];
-  const blockedCalls: string[] = [];
+  try {
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    const badResponses: string[] = [];
+    const blockedCalls: string[] = [];
 
-  page.on("console", (m) => {
+    page.on("console", (m) => {
     if (m.type() === "error") errors.push(`console.error: ${m.text()}`);
   });
-  page.on("pageerror", (e) => errors.push(`uncaught: ${e.message}`));
-  page.on("response", (r) => {
+    page.on("pageerror", (e) => errors.push(`uncaught: ${e.message}`));
+    page.on("response", (r) => {
     const u = new URL(r.url());
     if (u.port === String(port) && !r.ok() && r.status() !== 304) {
       badResponses.push(`${r.status()} ${u.pathname}${u.search}`);
     }
-  });
+    });
   // Scoped to /api/** on purpose: intercepting every request (documents, assets) puts the whole
   // page load through the handler for no benefit, and only API routes can spawn a model job.
-  await page.route("**/api/**", async (route, req: Request) => {
+    await page.route("**/api/**", async (route, req: Request) => {
     const path = new URL(req.url()).pathname;
     if (EXPENSIVE_ROUTES.some((e) => path === e || path.startsWith(e + "/"))) {
       blockedCalls.push(`${req.method()} ${path}`);
@@ -199,19 +310,23 @@ export async function openSession(port: number): Promise<Session> {
       return;
     }
     await route.continue();
-  });
+    });
 
-  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
-  return {
-    browser,
-    page,
-    errors,
-    badResponses,
-    blockedCalls,
-    close: async () => {
-      await browser.close();
-    },
-  };
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
+    return {
+      browser,
+      page,
+      errors,
+      badResponses,
+      blockedCalls,
+      close: async () => {
+        await browser.close();
+      },
+    };
+  } catch (error) {
+    await browser.close().catch(() => {});
+    throw error;
+  }
 }
 
 /** Click a room's nav button and wait for its section to actually become visible. */

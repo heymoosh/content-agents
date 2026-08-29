@@ -7,8 +7,7 @@
 //
 // EXPENSIVE_ROUTES are aborted at the browser (see harness.ts). Nothing here starts a model job.
 
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { bootServer, openSession, openRoom, waitLoaded, record, results, ROOT } from "./harness.js";
 
@@ -22,16 +21,12 @@ function answerFor(n: number): string {
 
 async function main(): Promise<void> {
   console.log("\n=== Pass B: writes, real server (worktree-isolated) ===\n");
-  // The intake DRAFT store is the one thing a worktree does not isolate: it lives in
-  // ~/.content-agents/venture-intake-drafts, keyed by slug, shared by every checkout. Clear only
-  // this suite's own slug — never anything else in that directory, which is Muxin's real scratch.
-  rmSync(join(homedir(), ".content-agents", "venture-intake-drafts", `${SLUG}.json`), { force: true });
-
   const server = await bootServer({}, PORT);
-  const s = await openSession(PORT);
-  const { page } = s;
+  let s: Awaited<ReturnType<typeof openSession>> | null = null;
 
   try {
+    s = await openSession(PORT);
+    const { page } = s;
     // ── #381: the whole 25-question intake interview, on the desk, ending in a real intake.md ──
     await openRoom(page, "venture");
     await waitLoaded(page, "#ventureThread").catch(() => {});
@@ -163,7 +158,7 @@ async function main(): Promise<void> {
     // intake box instead of the room.
     await page.click("#ivLeave").catch(() => {});
     for (const slug of ["zz-test-phase3", "zz-test-phase2"]) {
-      await page.selectOption("#ventureSlug", slug).catch(() => {});
+      await page.selectOption("#ventureSelect", slug).catch(() => {});
       await page.waitForTimeout(1200);
       const controls = await page.evaluate(() =>
         Array.from(document.querySelectorAll("#roomVenture [data-v], #roomVenture button"))
@@ -180,6 +175,8 @@ async function main(): Promise<void> {
     // ── Outreach: mark-sent is the pre-send/post-send boundary (tracker.ts owns post-send). ──
     await openRoom(page, "outreach");
     await waitLoaded(page, "#outreachList");
+    const trackerPath = join(ROOT, "data", "outreach", "tracker.jsonl");
+    const trackerBefore = existsSync(trackerPath) ? readFileSync(trackerPath, "utf8") : "";
     const markSent = await page.evaluate(async () => {
       const r = await fetch("/api/outreach/leads");
       const j = (await r.json()) as { ok: boolean; leads: { dir: string; status: string }[] };
@@ -190,10 +187,26 @@ async function main(): Promise<void> {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ dir: lead.dir, channel: "email" }),
       });
-      return { ok: res.ok, status: res.status, body: (await res.text()).slice(0, 200), dir: lead.dir };
+      const body = await res.text();
+      let event: { lead?: string; event?: string; channel?: string } | undefined;
+      try {
+        event = (JSON.parse(body) as { event?: typeof event }).event;
+      } catch {
+        // The truncated response body below carries the useful failure detail.
+      }
+      return { ok: res.ok, status: res.status, body: body.slice(0, 200), dir: lead.dir, event };
     });
-    const trackerPath = join(ROOT, "data", "outreach", "tracker.jsonl");
-    const trackerHas = existsSync(trackerPath) && /"sent"|"contacted"/.test(readFileSync(trackerPath, "utf8"));
+    const trackerAfter = existsSync(trackerPath) ? readFileSync(trackerPath, "utf8") : "";
+    const expected = markSent.event;
+    const trackerHas = trackerAfter.length > trackerBefore.length &&
+      trackerAfter.slice(trackerBefore.length).split("\n").some((line) => {
+        try {
+          const event = JSON.parse(line) as { lead?: string; event?: string; channel?: string };
+          return !!expected && event.lead === expected.lead && event.event === expected.event && event.channel === expected.channel;
+        } catch {
+          return false;
+        }
+      });
     record({
       feature: "Outreach mark-sent appends a real tracker event",
       pr: "#350",
@@ -255,8 +268,8 @@ async function main(): Promise<void> {
       console.log(`  (non-OK responses seen: ${[...new Set(s.badResponses)].slice(0, 12).join(", ")})`);
     }
   } finally {
-    await s.close();
-    server.stop();
+    if (s) await s.close();
+    await server.stop();
   }
 
   const failed = results.filter((r) => r.status === "fail").length;

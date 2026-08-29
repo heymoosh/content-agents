@@ -13,7 +13,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, symlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
@@ -287,13 +287,15 @@ test("the eight granular reads are still gone, and the rest 404 like any unknown
     for (const gone of ["state", "artifacts", "decisions", "canon", "gate", "clusters", "rules", "intake/answers"]) {
       assert.equal(handleVentureRead("GET", `/api/venture/full/${gone}`), null, `${gone} should no longer be a route`);
     }
-    // Three now, not two. The third takes a parameter and is the deliberate exception: the body
+    // Five now: the canonical document index/read pair joins the thread and artifact-body read.
     // editor needs ONE artifact's text, and the thread does not inline body files. Everything the
     // deleted eight returned is still inside the thread, which is what this list is guarding.
     assert.deepEqual(VENTURE_READ_PATHS, [
       "/api/venture/list",
+      "/api/venture/:slug/documents",
       "/api/venture/:slug/thread",
       "/api/venture/:slug/artifacts/:id/body",
+      "/api/venture/:slug/documents/:id",
     ]);
   });
 });
@@ -307,6 +309,123 @@ test("a venture with nothing recorded yet answers 200 with an honest empty threa
     // No receipts, no cards, no transcript, no clusters -- just where the venture is.
     assert.deepEqual(t.messages.map((m) => m.kind), ["rail", "said", "rail", "checkpoint"]);
     assert.deepEqual(t.rail, []);
+  });
+});
+
+test("the canonical document index exposes expected phase documents with honest missing, empty, and ready states", () => {
+  withRoot((root) => {
+    const dir = seedVenture(root, "library");
+    createArtifact("library", loadRules(), {
+      artifact_id: "p1-research-plan", phase: 1, artifact_kind: "phase_1_research_plan",
+      title: "Phase 1 research plan", fields: { confirmed_knowns: [{ claim: "A durable finding" }] },
+      venture_id: "library", venture_phase: 1, message_id: "p1-research-plan", at: "2026-08-20T00:00:00.000Z",
+    });
+    createArtifact("library", loadRules(), {
+      artifact_id: "p4-operating-plan", phase: 4, artifact_kind: "daily-operating-plan",
+      title: "Daily operating plan", body_path: "phase-4-operations/p4-operating-plan.md",
+      venture_id: "library", venture_phase: 4, message_id: "p4-operating-plan", at: "2026-08-20T00:00:00.000Z",
+    });
+    mkdirSync(join(dir, "phase-4-operations"), { recursive: true });
+    writeFileSync(join(dir, "phase-4-operations", "p4-operating-plan.md"), "");
+    writeFileSync(join(dir, "cluster-analysis.json"), JSON.stringify({ analyzed_at: "2026-08-20", clusters: [] }));
+
+    const r = get("/api/venture/library/documents");
+    assert.equal(r.status, 200);
+    const docs = (r.body as { documents: Array<{ id: string; phase: number; title: string; path: string; state: string }> }).documents;
+    assert.deepEqual(docs.map((d) => d.id), [
+      "research-plan", "research-read", "cluster-analysis", "transformation", "product-outline",
+      "price-decision", "operating-plan", "day-14-review",
+    ]);
+    assert.deepEqual(docs.find((d) => d.id === "research-plan"), {
+      id: "research-plan", phase: 1, title: "Research plan and confirmed knowns", path: "artifacts.jsonl", state: "ready",
+    });
+    assert.equal(docs.find((d) => d.id === "research-read")?.state, "missing");
+    assert.equal(docs.find((d) => d.id === "cluster-analysis")?.state, "ready");
+    assert.equal(docs.find((d) => d.id === "operating-plan")?.state, "empty");
+  });
+});
+
+test("a canonical document read returns content from its durable backing file", () => {
+  withRoot((root) => {
+    const dir = seedVenture(root, "readable");
+    createArtifact("readable", loadRules(), {
+      artifact_id: "p3-product-outline", phase: 3, artifact_kind: "product-outline", title: "Product outline",
+      body_path: "phase-3-offer/p3-product-outline.md", venture_id: "readable", venture_phase: 3,
+      message_id: "p3-product-outline", at: "2026-08-20T00:00:00.000Z",
+    });
+    mkdirSync(join(dir, "phase-3-offer"), { recursive: true });
+    writeFileSync(join(dir, "phase-3-offer", "p3-product-outline.md"), "# The actual outline\n\nDurable words.\n");
+
+    const r = get("/api/venture/readable/documents/product-outline");
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body, {
+      ok: true,
+      document: {
+        id: "product-outline", phase: 3, title: "Product outline",
+        path: "phase-3-offer/p3-product-outline.md", state: "ready",
+        content: "# The actual outline\n\nDurable words.\n",
+      },
+    });
+  });
+});
+
+test("canonical document reads refuse unknown ids and body paths that escape the venture", () => {
+  withRoot((root) => {
+    seedVenture(root, "safe");
+    createArtifact("safe", loadRules(), {
+      artifact_id: "p3-product-outline", phase: 3, artifact_kind: "product-outline", title: "Product outline",
+      body_path: "../outside.md", venture_id: "safe", venture_phase: 3, message_id: "p3-product-outline",
+      at: "2026-08-20T00:00:00.000Z",
+    });
+    writeFileSync(join(root, "outside.md"), "must not escape");
+    assert.equal(get("/api/venture/safe/documents/not-a-document").status, 404);
+    const escaped = get("/api/venture/safe/documents/product-outline");
+    assert.equal(escaped.status, 400);
+    assert.match((escaped.body as { error: string }).error, /outside venture directory/);
+  });
+});
+
+test("canonical document reads refuse an in-venture symlink whose target escapes the venture", () => {
+  withRoot((root) => {
+    const dir = seedVenture(root, "symlinked");
+    const outside = join(root, "outside-secret.md");
+    writeFileSync(outside, "must not escape through a symlink");
+    mkdirSync(join(dir, "phase-3-offer"), { recursive: true });
+    symlinkSync(outside, join(dir, "phase-3-offer", "p3-product-outline.md"));
+    createArtifact("symlinked", loadRules(), {
+      artifact_id: "p3-product-outline", phase: 3, artifact_kind: "product-outline", title: "Product outline",
+      body_path: "phase-3-offer/p3-product-outline.md", venture_id: "symlinked", venture_phase: 3,
+      message_id: "p3-product-outline", at: "2026-08-20T00:00:00.000Z",
+    });
+
+    const escaped = get("/api/venture/symlinked/documents/product-outline");
+    assert.equal(escaped.status, 400);
+    assert.match((escaped.body as { error: string }).error, /outside venture directory/);
+    assert.ok(!JSON.stringify(escaped.body).includes("must not escape through a symlink"));
+  });
+});
+
+test("one escaping document stays row-local in the index and does not hide healthy catalog rows", () => {
+  withRoot((root) => {
+    const dir = seedVenture(root, "partly-corrupt");
+    const outside = join(root, "outside-secret.md");
+    writeFileSync(outside, "must not leak into the document index");
+    mkdirSync(join(dir, "phase-3-offer"), { recursive: true });
+    symlinkSync(outside, join(dir, "phase-3-offer", "p3-product-outline.md"));
+    createArtifact("partly-corrupt", loadRules(), {
+      artifact_id: "p3-product-outline", phase: 3, artifact_kind: "product-outline", title: "Product outline",
+      body_path: "phase-3-offer/p3-product-outline.md", venture_id: "partly-corrupt", venture_phase: 3,
+      message_id: "p3-product-outline", at: "2026-08-20T00:00:00.000Z",
+    });
+
+    const index = get("/api/venture/partly-corrupt/documents");
+    assert.equal(index.status, 200);
+    const docs = (index.body as { documents: Array<{ id: string; state: string; error?: string }> }).documents;
+    assert.equal(docs.length, 8);
+    assert.equal(docs.find((d) => d.id === "product-outline")?.state, "unavailable");
+    assert.equal(docs.find((d) => d.id === "research-plan")?.state, "missing");
+    assert.match(docs.find((d) => d.id === "product-outline")?.error ?? "", /outside venture directory/);
+    assert.ok(!JSON.stringify(index.body).includes("must not leak into the document index"));
   });
 });
 
@@ -325,7 +444,7 @@ test("an unknown slug 404s, distinct from a known slug with no data", () => {
     writeFileSync(join(dir, "phase-1-attention", "a-1.md"), "the drafted words\n");
 
     for (const path of VENTURE_READ_PATHS.filter((p) => p.includes(":slug"))) {
-      const tail = path.replace("/api/venture/:slug/", "").replace(":id", "a-1");
+      const tail = path.replace("/api/venture/:slug/", "").replace(":id", path.includes("documents") ? "product-outline" : "a-1");
       const unknown = get(`/api/venture/never-made/${tail}`);
       assert.equal(unknown.status, 404, `${tail} should 404 for an unknown slug`);
       assert.equal((unknown.body as { ok: boolean }).ok, false);

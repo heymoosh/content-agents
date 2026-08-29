@@ -907,29 +907,55 @@ test("Signals: opens on the reads; brief and raw exports sit behind pane control
 });
 
 // Intake guardrails are durable notes, not the room's subject. They stay fully working behind one
-// VEN.pane switch, same shape as Signals' SIG.pane. The room opens on the thread.
-test("Venture: opens on the thread; intake guardrails sit behind a pane control", () => {
+// VEN.pane switch, same shape as Signals' SIG.pane. The room opens on focused work.
+test("Venture: opens on work; intake guardrails sit behind a pane control", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes('id="ventureMainSheet"'), "the thread sheet must be present");
   assert.ok(html.includes('id="ventureRead"'), "the thread itself must still be present");
   assert.match(html, /id="ventureIntakeSheet"[^>]*\bhidden\b/, "the intake sheet starts hidden");
   assert.ok(html.includes('id="ventureIntakeSections"'), "the intake fields must still exist");
   assert.ok(html.includes('data-set-ven-pane="intake"'), "a control must open the intake sheet");
-  assert.ok(html.includes('data-set-ven-pane="thread"'), "the demoted sheet needs a way back to the thread");
-  assert.ok(html.includes("Edit the intake guardrails"), "the intake control must be labeled");
+  assert.ok(html.includes('data-set-ven-pane="work"'), "the demoted sheet needs a way back to the work");
+  assert.ok(html.includes("3 · Guardrails"), "the intake control must be labeled");
   assert.ok(html.includes("Back to the venture"), "the intake sheet must offer a way back");
   assert.ok(html.includes('id="ventureAnalyzeBtn"'), "Analyze this step must still be reachable");
   assert.ok(html.includes('id="ventureRunStepBtn"'), "Run the next draft step must still be reachable");
   assert.ok(html.includes('id="ventureStartBtn"'), "Start a venture must still be reachable");
   assert.ok(html.includes('id="ventureEngine"'), "the engine picker must still be reachable");
-  assert.ok(html.includes('let VEN = { pane: "thread" }'), "VEN.pane must default to the thread");
-  assert.ok(html.includes("function renderVentureSheets()"), "one function must toggle the two sheets");
-  assert.ok(html.includes('VEN.pane !== "thread"'), "the thread sheet must follow VEN.pane");
+  assert.ok(html.includes('let VEN = { pane: "work" }'), "VEN.pane must default to work");
+  assert.ok(html.includes("function renderVentureSheets()"), "one function must toggle the staged sheets");
+  assert.ok(html.includes('VEN.pane !== "work"'), "the work stage must follow VEN.pane");
   assert.ok(html.includes('VEN.pane !== "intake"'), "the intake sheet must follow VEN.pane");
   assert.ok(
     !html.includes("Nothing on this screen is stored as a conversation"),
     "the long header paragraph must be trimmed so the thread is the subject",
   );
+});
+
+test("Studio and Venture chrome use the simplified product language", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('id="routeBtn" title="Reads what you wrote, picks the room, and tells you which one it picked">Start on it</button>'));
+  assert.ok(!html.includes("Put it where it goes"));
+  assert.ok(!html.includes("Hand it to your director"));
+  assert.ok(!html.includes("Format directly"));
+  assert.ok(!html.includes("nothing sends itself"));
+  assert.match(html, /id="studioEngine"[\s\S]*id="notesBtn"/,
+    "Browse Substack Notes belongs beside the model selector below the divider");
+});
+
+test("Venture uses one workspace select, one labeled creation action, and four staged views", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('id="ventureSelect"'));
+  assert.ok(html.includes('id="ventureStartBtn"'));
+  assert.match(html, /id="ventureStartBtn"[^>]*>[\s\S]*Start a venture/);
+  assert.ok(!html.includes('id="ventureAddBtn"'));
+  for (const pane of ["work", "documents", "intake", "history"]) {
+    assert.ok(html.includes('data-set-ven-pane="' + pane + '"'), pane + " stage must be reachable");
+  }
+  assert.ok(html.includes("Example venture"), "a safe guided example must be available");
+  assert.ok(html.includes("Read-only. Start your own venture to record real guardrails."));
+  const script = html.slice(html.indexOf("function renderVentureExample()"), html.indexOf("document.addEventListener", html.indexOf("function renderVentureExample()")));
+  assert.ok(!script.includes("post("), "the guided example must not write product state");
 });
 
 // The three job surfaces must actually reach the browser, not just exist as testable mirrors.
@@ -2068,9 +2094,6 @@ test("Studio capture: the box moved out of the Content room and into Studio", ()
   // now in a different room.
   assert.ok(studio.includes("waits for your yes in the Content room"));
   assert.ok(!html.includes("every draft still waits for your yes below"));
-  // The promo bridge fills #src, so it has to land in the room #src is in.
-  const script = emittedScripts().join("\n");
-  assert.ok(script.includes('setRoom("studio"); // the capture box lives in Studio now'));
 });
 
 test("Studio home: Needs you today without the pre-prototype stat tiles", () => {
@@ -2231,14 +2254,16 @@ test("Notes picker sends the selected engine", () => {
   assert.ok(script.includes('post("/api/notes/pick", notesPickRequest(indices, $("#studioEngine").value))'));
 });
 
-test("Content workbench actions expose local engine selectors and use them", () => {
+test("Content workbench replies use a local engine; formatting moves to explicit treatment", () => {
   const html = renderPage({ repoRoot, isDevWorktree: false });
   const script = emittedScripts().join("\n");
   assert.ok(html.includes('class="wb-reply"'), "each workbench reply action needs its own control group");
   assert.ok(html.includes('class="wb-handoff"'), "each workbench handoff needs its own control group");
   assert.ok(script.includes('refreshEngineControls(box);'), "rebuilt workbench selectors must receive engine availability state");
   assert.ok(script.includes('t.closest(".wb-reply")?.querySelector(".engine-select")'));
-  assert.ok(script.includes('t.closest(".wb-handoff")?.querySelector(".engine-select")'));
+  assert.ok(!script.includes('t.closest(".wb-handoff")?.querySelector(".engine-select")'));
+  assert.ok(script.includes('>Format for platforms</button>'), "the production action has the exact user-facing label");
+  assert.ok(!script.includes("Choose treatment and format"), "the old ambiguous production label is gone");
   assert.ok(!script.includes('post("/api/develop/reply", {slug, reply, engine:$("#studioEngine").value})'));
   assert.ok(!script.includes('post("/api/develop/format", {slug, lenses, engine:$("#studioEngine").value})'));
 });
@@ -3012,4 +3037,139 @@ test("room nav runs in the design's order", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const order = [...html.matchAll(/<button class="room[^"]*" data-room="([a-z]+)"/g)].map((m) => m[1]);
   assert.deepEqual(order, ["studio", "venture", "content", "outreach", "fiction", "charles", "signals"]);
+});
+
+test("port audit: Venture uses one select and reads canonical documents from their routes", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes('id="ventureSelect"'), "Venture needs one visible keyboard-accessible switcher");
+  assert.ok(!html.includes('id="ventureSlug"'), "the old top select no longer owns venture switching");
+  assert.ok(html.includes('id="ventureDocumentReader"'));
+  assert.ok(script.includes('"/documents"'));
+  assert.ok(script.includes('"/documents/"+encodeURIComponent'));
+  assert.ok(script.includes("function renderVentureSwitcher()"));
+  assert.ok(script.includes('<option value="\'+esc(slug)') && script.includes("esc(slug)"), "each switcher option carries its venture slug");
+  assert.ok(html.includes('aria-label="Choose a venture"'), "the active venture is announced to assistive technology");
+  assert.ok(script.includes("slug===ventureSlug?' selected'"), "the active venture is visibly selected");
+  assert.ok(script.includes("function renderVentureDocuments()"));
+});
+
+test("Venture switcher refreshes every read-only surface without changing rooms", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function switchVenture(");
+  const end = script.indexOf('\n// Pane switch', start);
+  assert.ok(start >= 0, "switching is centralized in one selection handler");
+  const handler = script.slice(start, end);
+  assert.match(handler, /VENTURE_THREAD\s*=\s*null/);
+  assert.ok(handler.includes("loadVenture()"), "thread and history are reread");
+  assert.ok(!handler.includes("setRoom("), "selection never changes the active room");
+  assert.ok(!handler.includes("post("), "selection never writes");
+  const loadStart = script.indexOf("async function loadVenture()");
+  const loadEnd = script.indexOf("\nasync function analyzeVenture", loadStart);
+  const loader = script.slice(loadStart, loadEnd);
+  assert.match(loader, /loadVentureIntakeSections\(requestedSlug\)/, "intake guardrails are reread for the selected venture");
+  assert.ok(loader.includes("loadVentureDocuments()"), "canonical document rail is reread");
+});
+
+test("Venture intake autosave is bound to its venture and cancelled on a switch", () => {
+  const script = emittedScripts().join("\n");
+  const saveStart = script.indexOf("async function saveVentureIntakeField(");
+  const saveEnd = script.indexOf("\n\n// Rule 5 mirrors", saveStart);
+  const save = script.slice(saveStart, saveEnd);
+  assert.match(save, /saveVentureIntakeField\(slug, section, field, text\)/);
+  assert.match(save, /encodeURIComponent\(slug\)/);
+  assert.match(save, /slug !== ventureSlug/);
+  const switchStart = script.indexOf("function switchVenture(");
+  const switchEnd = script.indexOf("\n// Pane switch", switchStart);
+  assert.ok(script.slice(switchStart, switchEnd).includes("intakeTimers"), "switching must cancel pending intake saves");
+  assert.match(script, /setTimeout\(\(\)=>\{[^}]*saveVentureIntakeField\(slug, section, field, ta\.value\)/s);
+});
+
+test("Venture intake reads ignore stale responses after a workspace switch", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("async function loadVentureIntakeSections(");
+  const end = script.indexOf("\nasync function saveVentureIntakeField", start);
+  const loader = script.slice(start, end);
+  assert.match(loader, /loadVentureIntakeSections\(slug = ventureSlug\)/);
+  assert.match(loader, /if\(slug !== ventureSlug\) return/);
+  assert.ok(script.includes("loadVentureIntakeSections(requestedSlug)"), "thread load must pass its captured slug");
+});
+
+test("port audit: Charles is one Content-like active-post sheet with persona context in its margin", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const room = html.slice(html.indexOf('<section class="view" id="roomCharles"'), html.indexOf('<section class="view" id="roomVenture"'));
+  assert.equal([...room.matchAll(/class="sheet session"/g)].length, 1, "capture, active post, and persona context share one primary surface");
+  assert.ok(!room.includes('class="sheet capture"'), "capture is no longer a separate stacked sheet");
+  assert.ok(room.includes('id="charlesPersonaPanel"'));
+  assert.ok(room.includes('id="charlesBriefText"'));
+});
+
+test("Venture document rail treats unavailable as an honest disabled refusal", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function renderVentureDocuments()");
+  const end = script.indexOf("\nasync function ", start);
+  const renderer = script.slice(start, end);
+  assert.ok(renderer.includes('d.state==="unavailable"'));
+  assert.ok(renderer.includes("d.error"), "the server's safe refusal reason is visible");
+  assert.ok(renderer.includes("disabled"), "unavailable documents cannot be opened as if ready");
+});
+
+test("Grok audit: Venture analyze and run controls are secondary contextual controls", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const room = html.slice(html.indexOf('id="roomVenture"'), html.indexOf('id="roomSignals"'));
+  const head = room.slice(room.indexOf('<div class="sheet-head">'), room.indexOf('<div class="sheet-sub"'));
+  assert.ok(!head.includes("ventureAnalyzeBtn"));
+  assert.ok(!head.includes("ventureRunStepBtn"));
+  assert.ok(room.includes('class="venture-tools"'));
+  assert.ok(room.includes('id="ventureAnalyzeBtn"') && room.includes('id="ventureRunStepBtn"'));
+  assert.ok(!room.includes('class="primary" id="ventureRunStepBtn"'));
+});
+
+test("dead Charles and standing director scaffolding are removed", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  for (const id of ["charlesMode"]) {
+    assert.ok(!html.includes(`id="${id}"`), `${id} must be removed`);
+  }
+  assert.ok(!html.includes('class="director-line"'));
+});
+
+test("approval is a scan list with one accessible focus overlay", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes('id="reviewFocus"'));
+  assert.ok(html.includes('role="dialog"') && html.includes('aria-modal="true"'));
+  assert.ok(script.includes("reviewScanRowEl"));
+  assert.ok(script.includes("openReviewFocus"));
+  assert.ok(script.includes('e.key==="Escape"'));
+  assert.ok(script.includes("reviewFocusReturn"));
+});
+
+test("review actions close the focus dialog before rebuilding its source list", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function rerender()");
+  const end = script.indexOf("\nfunction render()", start);
+  const rerender = script.slice(start, end);
+  assert.ok(rerender.includes("closeReviewFocus()"), "a stale dialog cannot survive an action rerender");
+  assert.ok(rerender.includes("reviewFocusId"), "the active review trigger id is retained for focus return");
+  assert.ok(rerender.includes("focus()"), "focus returns to the rebuilt scan row or review surface");
+});
+
+test("Content step 3 renders compact scan rows and opens full controls only in the focus dialog", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function renderContentWizard()");
+  const end = script.indexOf("\nfunction openReviewSheet", start);
+  const renderer = script.slice(start, end);
+  assert.ok(renderer.includes("holder.appendChild(reviewScanRowEl(piece, row))"), "#cwRows must use compact scan rows");
+  assert.ok(!renderer.includes("holder.appendChild(rowEl(piece, row))"), "expanded cards cannot remain in the primary list");
+  assert.ok(script.includes("button.addEventListener(\"click\",()=>openReviewFocus(piece,row,button))"));
+  assert.ok(script.includes("body.appendChild(rowEl(piece,row))"), "the dialog alone receives the full row controls");
+});
+
+test("rooms use quieter rails and honest capability boundaries", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("room-rail"), "shared full-height rail primitive is present");
+  assert.ok(html.includes('id="ventureSwitcher"') && html.includes('id="ventureAddBtn"'));
+  assert.ok(html.includes('id="ventureHistory"') && html.includes("History and ledger"));
+  assert.ok(html.includes("Canon documents"));
+  assert.ok(html.includes('id="charlesInput"') && html.includes("charles-format"));
 });
