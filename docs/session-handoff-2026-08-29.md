@@ -2,7 +2,7 @@
 
 Date: 2026-08-29
 
-Worktree: `/private/tmp/content-agents-cs6-parallel-safe-ui-completion`
+Worktree: `/Users/Muxin/Documents/GitHub/content-agents/.claude/worktrees/content-studio-ui-recovery`
 
 Branch: `agent/prototype-subtraction`
 
@@ -16,7 +16,7 @@ branch. Those changes were not replayed after the temporary worktree was lost.
 The commit containing this file is the durable recovery point. Start a resumed session with:
 
 ```bash
-cd /private/tmp/content-agents-cs6-parallel-safe-ui-completion
+cd /Users/Muxin/Documents/GitHub/content-agents/.claude/worktrees/content-studio-ui-recovery
 git status --short
 git log -1 --oneline
 ```
@@ -78,7 +78,7 @@ the repository's authorized board mechanism, never by editing the Markdown file 
 For human UI review, restart the review server from this exact worktree and hard-refresh the page:
 
 ```bash
-cd /private/tmp/content-agents-cs6-parallel-safe-ui-completion
+cd /Users/Muxin/Documents/GitHub/content-agents/.claude/worktrees/content-studio-ui-recovery
 npm run review
 ```
 
