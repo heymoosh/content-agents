@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildContentRequest } from "./content-request.js";
-import { assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredContentPrompt, parseConfiguredVariantBodies, parseVentureConfiguredBodies, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
+import { assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredContentPrompt, configuredDerivativeText, configuredSourceSegments, parseConfiguredVariantBodies, parseVentureConfiguredBodies, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
 
 const request = buildContentRequest({
   id: "request-1", origin: "studio", descriptor: "A useful idea", originalInput: "The exact source.",
@@ -14,11 +14,37 @@ const request = buildContentRequest({
 const treated = request.variants.filter((variant) => variant.identity.kind === "treated");
 
 test("configured drafting prompt carries every selected treated identity and preserves source/control separation", () => {
-  const prompt = configuredContentPrompt(request, treated);
+  const prompt = configuredContentPrompt(request, treated, [{ source_line: 2, text: "The exact source." }]);
   for (const variant of treated) assert.match(prompt, new RegExp(variant.identity.id));
   assert.match(prompt, /approved_source_lines/);
-  assert.doesNotMatch(prompt, /The exact source\./);
+  assert.match(prompt, /The exact source\./);
+  assert.match(prompt, /word for word/i);
+  assert.match(prompt, /No em dashes/i);
+  assert.match(prompt, /AI tells/i);
   assert.doesNotMatch(prompt, new RegExp(request.variants.find((variant) => variant.identity.kind === "control")!.identity.id));
+});
+
+test("configured source segments preserve exact source text and treated output fails closed on AI tells", () => {
+  const folder = mkdtempSync(join(tmpdir(), "configured-voice-"));
+  writeFileSync(join(folder, "source.md"), "Control stays exact.\nHere’s the thing. Bad treated line.\nBad dash — line.\n");
+  assert.deepEqual(configuredSourceSegments(folder, [1, 2]), [
+    { source_line: 1, text: "Control stays exact." },
+    { source_line: 2, text: "Here’s the thing. Bad treated line." },
+  ]);
+  assert.throws(
+    () => parseConfiguredVariantBodies(JSON.stringify(treated.map((v) => ({ id: v.identity.id, source_lines: [2] }))), treated, folder, [1, 2, 3]),
+    /AI tell/i,
+  );
+  assert.throws(
+    () => parseConfiguredVariantBodies(JSON.stringify(treated.map((v) => ({ id: v.identity.id, source_lines: [3] }))), treated, folder, [1, 2, 3]),
+    /em dash/i,
+  );
+});
+
+test("untreated control serialization preserves the complete author body byte for byte", () => {
+  const original = "# Heading\n\n  Deliberate spacing stays.  \nLast line without newline";
+  const serialized = configuredDerivativeText("---\nvariant_kind: control\n---\n\n", original, true);
+  assert.equal(serialized.slice(serialized.indexOf("\n\n") + 2), original);
 });
 
 test("configured drafting reconstructs bodies from approved refs and rejects forged/out-of-bound provenance", () => {
@@ -83,6 +109,10 @@ test("Venture treated variants use a dedicated engine-body contract with claim a
   const parsed = parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody }))), ventureTreated);
   assert.equal(parsed.get(ventureTreated[0]!.identity.id)?.body, engineBody);
   assert.notEqual(parsed.get(ventureTreated[0]!.identity.id)?.body, venture.originalInput);
+  assert.throws(
+    () => parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: "Here’s the thing — this unlocks a new paradigm." }))), ventureTreated),
+    /voice check/i,
+  );
   assert.throws(() => parseVentureConfiguredBodies(JSON.stringify(ventureTreated.map((v) => ({ id: v.identity.id, body: engineBody, source_lines: [1] }))), ventureTreated), /malformed/);
 });
 

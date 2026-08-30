@@ -9,8 +9,10 @@ coverage, and one authenticated Codex generation canary passed; authenticated pr
 safe next actions, advisor-cut enforcement, seven staged media pipelines, normalized delivery and
 reconciliation, one locked operational data root, the gated Postiz-first/Typefully-fallback canary
 matrix, and reviewed Signals apply/rollback; authenticated provider lifecycle canaries remain unrun.
-**Generation review:** open `docs/reviews/content-studio-phase1-generation-review.html` for Codex-run
-ordinary Content, Venture, cross-room refusal, and all-seven-media examples from a synthetic fixture.
+**Generation review:** open `docs/reviews/content-studio-phase1-generation-review.html` for eight
+Codex and eight Grok treatments of Muxin's own essay, plus cross-room refusal and all-seven-media
+plans. The hidden untreated control is byte-for-byte verified by hash; treated posts can only select,
+omit, or reorder exact source segments and fail closed on em dashes or configured AI tells.
 **Provider-cost update:** Studio edits already route Claude, Grok, and GPT/Codex through local
 subscription CLIs. Grok prose now uses the subscription CLI, transcription uses local whisper.cpp,
 and unattended image generation is disabled; reviewed Codex-generated image files are the preferred

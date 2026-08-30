@@ -1,10 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { buildContentRequest, type ContentRequest, type ContentVariant } from "../src/review/content-request.js";
 import { configuredMediaPlan, configuredMediaStage, CONFIGURED_MEDIA } from "../src/review/configured-media.js";
 import { buildEngineSpawn, type Engine } from "../src/review/engines.js";
+import { parseGrokJson } from "../src/providers/analyst/grok-cli.js";
 
 // Importing the production jobs module initializes its durable job paths. Keep this review harness
 // hermetic by selecting a disposable runtime root before that module is evaluated.
@@ -12,24 +14,26 @@ process.env.CONTENT_AGENTS_DATA_ROOT ??= mkdtempSync(join(tmpdir(), "phase1-gene
 const {
   assertConfiguredTreatmentPolicy,
   configuredContentPrompt,
+  configuredDerivativeText,
+  configuredSourceSegments,
   parseConfiguredVariantBodies,
-  parseVentureConfiguredBodies,
   resolveConfiguredProvenance,
-  ventureConfiguredContentPrompt,
 } = await import("../src/review/jobs.js");
 
 const outputPath = resolve(process.argv[2] ?? "docs/reviews/content-studio-phase1-generation-review.html");
+const sourcePath = resolve(process.argv[3] ?? process.env.PHASE1_REVIEW_SOURCE ?? "");
+if (!sourcePath) throw new Error("pass the source essay path as the second argument or PHASE1_REVIEW_SOURCE");
+const sourceText = readFileSync(sourcePath, "utf8");
 const generatedAt = new Date().toISOString();
-const engine: Engine = process.env.PHASE1_REVIEW_ENGINE === "ollama-gpt-oss" ? "ollama-gpt-oss" : "codex";
+const engines: readonly Engine[] = process.env.PHASE1_REVIEW_ENGINE
+  ? [process.env.PHASE1_REVIEW_ENGINE as Engine]
+  : process.env.PHASE1_REVIEW_GROK_OUTPUT ? ["codex", "grok"] : ["codex"];
 
-const approvedLines = [
-  "A product team can automate a task long before it understands whether the task is worth doing.",
-  "The hard part is usually not execution. It is deciding what good looks like and what evidence would change the decision.",
-  "That means an AI rollout should begin with a judgment map, not a list of tools.",
-  "Write down the decisions people make, the evidence they use, and the cost of being wrong.",
-  "Then automate the work around those decisions without pretending the judgment disappeared.",
-  "The goal is not more automation. The goal is better decisions with less mechanical work around them.",
-];
+const treatments = ["cta", "viral-rewrite", "platform-framing", "shorter-version", "thread", "counterpoint", "summary", "hook-variants"] as const;
+const treatmentPlatforms: Record<(typeof treatments)[number], string> = {
+  cta: "threads", "viral-rewrite": "x", "platform-framing": "linkedin", "shorter-version": "x",
+  thread: "x", counterpoint: "bluesky", summary: "linkedin", "hook-variants": "threads",
+};
 
 function escapeHtml(value: unknown): string {
   return String(value)
@@ -40,22 +44,23 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#039;");
 }
 
-function runEngine(prompt: string): { output: string; version: string } {
-  const timeoutMs = engine === "ollama-gpt-oss" ? 600_000 : 180_000;
-  const built = buildEngineSpawn(engine, prompt, { timeoutMs, sandbox: "read-only" });
+function runEngine(engine: Engine, prompt: string): { output: string; version: string } {
+  const timeoutMs = engine === "ollama-gpt-oss" ? 600_000 : engine === "grok" ? 300_000 : 180_000;
+  const built = buildEngineSpawn(engine, prompt, { timeoutMs, sandbox: "read-only", permissionMode: "dontAsk", tools: "" });
+  if (engine === "grok") built.args.push("--output-format", "json", "--disable-web-search", "--no-plan");
   const result = spawnSync(built.command, built.args, {
-    cwd: resolve("."),
+    cwd: engine === "grok" ? tmpdir() : resolve("."),
     input: built.input,
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 10 * 1024 * 1024,
   });
-  if (result.error) throw result.error;
+  if (result.error) throw new Error(`${engine} launch failed: ${result.error.code ?? result.error.message}`);
   if (result.status !== 0) throw new Error(`${engine} exited ${result.status}: ${result.stderr.trim()}`);
-  const version = engine === "codex"
-    ? spawnSync("codex", ["--version"], { encoding: "utf8" }).stdout.trim()
-    : `local ${spawnSync("ollama", ["--version"], { encoding: "utf8" }).stdout.trim()} · gpt-oss:20b`;
-  return { output: result.stdout.trim(), version };
+  const version = engine === "ollama-gpt-oss"
+    ? `local ${spawnSync("ollama", ["--version"], { encoding: "utf8" }).stdout.trim()} · gpt-oss:20b`
+    : spawnSync(engine, ["--version"], { encoding: "utf8" }).stdout.trim();
+  return { output: engine === "grok" ? parseGrokJson(result.stdout).text : result.stdout.trim(), version };
 }
 
 function variantLabel(variant: ContentVariant): string {
@@ -83,79 +88,81 @@ function policyError(request: ContentRequest): string {
 }
 
 const folder = mkdtempSync(join(tmpdir(), "phase1-generation-review-"));
-writeFileSync(join(folder, "source.md"), approvedLines.join("\n") + "\n");
-const lineRefs = approvedLines.map((_, index) => index + 1);
-const approvedBody = approvedLines.join("\n\n");
-mkdirSync(join(folder, "cuts", "human-judgment"), { recursive: true });
-writeFileSync(
-  join(folder, "cuts", "human-judgment", "cut.md"),
-  `---\nsource_lines: [${lineRefs.join(", ")}]\n---\n\n${approvedBody}\n`,
-);
+writeFileSync(join(folder, "source.md"), sourceText);
+const sourceLines = sourceText.split("\n");
+const lineRefs: (number | string)[] = [];
+for (let index = 0; index < sourceLines.length;) {
+  if (!sourceLines[index]!.trim()) { index += 1; continue; }
+  const start = index + 1;
+  while (index + 1 < sourceLines.length && sourceLines[index + 1]!.trim()) index += 1;
+  const end = index + 1;
+  lineRefs.push(start === end ? start : `${start}-${end}`);
+  index += 1;
+}
+const approvedBody = sourceText;
 
 const ordinary = buildContentRequest({
   id: "phase1-review-ordinary",
   origin: "studio",
-  descriptor: "Synthetic approved thesis cut for Phase 1 review",
+  descriptor: "Muxin's essay, The world's broken. What do we do? Create distinct short posts using only her exact sentences.",
   originalInput: approvedBody,
-  treatments: ["shorter", "lead with the counterintuitive claim"],
+  treatments,
   media: [],
-  platforms: ["linkedin", "x"],
+  platforms: [...new Set(Object.values(treatmentPlatforms))],
   includeUntreatedControl: true,
-  sourceProvenance: { kind: "approved-cut", lens: "human-judgment", sourceLines: lineRefs },
+  sourceProvenance: { kind: "source", sourceLines: lineRefs },
 });
-const ordinaryTreated = ordinary.variants.filter((variant) => variant.identity.kind === "treated");
+const ordinaryTreated = treatments.map((treatment) => ordinary.variants.find((variant) =>
+  variant.identity.kind === "treated" && variant.platform === treatmentPlatforms[treatment] && variant.treatments[0] === treatment,
+)!);
 resolveConfiguredProvenance(folder, ordinary);
-const ordinaryRun = runEngine(configuredContentPrompt(ordinary, ordinaryTreated));
-const ordinaryBodies = parseConfiguredVariantBodies(ordinaryRun.output, ordinaryTreated, folder, lineRefs);
-const ordinaryCards = ordinary.variants.map((variant) => {
-  const generated = variant.identity.kind === "control"
-    ? { body: approvedBody, sourceLines: lineRefs }
-    : ordinaryBodies.get(variant.identity.id)!;
-  return {
-    title: variantLabel(variant),
-    eyebrow: variant.identity.kind === "control" ? "Control" : `${engine}-selected extraction`,
-    body: generated.body,
-    meta: `source_lines: [${generated.sourceLines.join(", ")}] · pending review`,
-  };
+const referenceHeading = sourceLines.findIndex((line) => /^# References\s*$/.test(line));
+const eligibleSegments = configuredSourceSegments(folder, lineRefs).filter((segment) => {
+  const startLine = Number(String(segment.source_line).split("-")[0]);
+  const text = segment.text.trim();
+  return (referenceHeading < 0 || startLine < referenceHeading + 1)
+    && text.length <= 800
+    && !/^(?:#|!\[|\*.*\*$|---$|\[\^)/s.test(text);
 });
-
-const ventureBody = [
-  "Teams in this review fixture can automate scoped work, but they still struggle to decide what is worth building.",
-  "The proposed test is a short field guide that helps a product team separate execution work from judgment work before it automates anything.",
-  "The only promised outcome is a clearer map of the decisions the team still owns.",
-].join("\n\n");
-const venture = buildContentRequest({
-  id: "phase1-review-venture",
-  origin: "venture",
-  ventureId: "phase1-review-fixture",
-  descriptor: "Representative approved Venture probe",
-  originalInput: ventureBody,
-  treatments: ["shorter", "open with the practical tension"],
-  media: [],
-  platforms: ["linkedin", "substack"],
-  includeUntreatedControl: true,
-  ventureSource: {
-    artifactId: "review-probe-1",
-    phase: 1,
-    artifactKind: "text-post-note",
-    messageId: "review-message-1",
-    bodyPath: "phase-1/review-probe-1.md",
-    claimRefs: [
-      { claim: "Scoped work and judgment gap", ref: "synthetic-review-fixture:claim-1" },
-      { claim: "Field-guide test and promised outcome", ref: "synthetic-review-fixture:claim-2" },
-    ],
-    approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" },
-  },
+const basePrompt = configuredContentPrompt(ordinary, ordinaryTreated, eligibleSegments);
+if (process.env.PHASE1_REVIEW_PROMPT_PATH) {
+  writeFileSync(resolve(process.env.PHASE1_REVIEW_PROMPT_PATH), basePrompt, { mode: 0o600 });
+  console.log(resolve(process.env.PHASE1_REVIEW_PROMPT_PATH));
+  process.exit(0);
+}
+const engineReviews = engines.map((engine) => {
+  let prompt = basePrompt;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const externalOutputPath = engine === "grok" ? process.env.PHASE1_REVIEW_GROK_OUTPUT : undefined;
+    const run = externalOutputPath
+      ? { output: readFileSync(resolve(externalOutputPath), "utf8").trim(), version: "Grok 4.5 via managed subscription bridge" }
+      : runEngine(engine, prompt);
+    try {
+      const bodies = parseConfiguredVariantBodies(run.output, ordinaryTreated, folder, lineRefs);
+      return {
+        engine,
+        version: run.version,
+        cards: ordinaryTreated.map((variant) => {
+          const generated = bodies.get(variant.identity.id)!;
+          return {
+            title: variantLabel(variant), eyebrow: `${engine}-selected exact extraction`, body: generated.body,
+            meta: `${generated.body.length} characters · source_lines: [${generated.sourceLines.join(", ")}] · pending review`,
+          };
+        }),
+      };
+    } catch (error) {
+      lastError = error;
+      if (externalOutputPath) break;
+      prompt = `${basePrompt}\n\nYour previous selection was rejected by the deterministic server check: ${error instanceof Error ? error.message : String(error)}. Return a corrected complete JSON array. Do not reuse the rejected source_lines for that variant.`;
+    }
+  }
+  throw lastError;
 });
-const ventureTreated = venture.variants.filter((variant) => variant.identity.kind === "treated");
-const ventureRun = runEngine(ventureConfiguredContentPrompt(venture, ventureTreated));
-const ventureBodies = parseVentureConfiguredBodies(ventureRun.output, ventureTreated);
-const ventureCards = venture.variants.map((variant) => ({
-  title: variantLabel(variant),
-  eyebrow: variant.identity.kind === "control" ? "Control" : `${engine}-composed Venture treatment`,
-  body: variant.identity.kind === "control" ? ventureBody : ventureBodies.get(variant.identity.id)!.body,
-  meta: variant.identity.kind === "control" ? "approved source · pending review" : "claim_refs enforced · config/voice.yaml required · pending review",
-}));
+const controlEnvelope = configuredDerivativeText("---\nvariant_kind: control\n---\n\n", sourceText, true);
+const controlBody = controlEnvelope.slice(controlEnvelope.indexOf("\n\n") + 2);
+if (controlBody !== sourceText) throw new Error("untreated control did not preserve the source byte for byte");
+const controlHash = createHash("sha256").update(controlBody).digest("hex");
 
 const fiction = buildContentRequest({
   id: "phase1-review-fiction", origin: "fiction", descriptor: "Approved promotion", originalInput: "Unapproved request wording.",
@@ -186,7 +193,9 @@ const mediaRows = Object.keys(CONFIGURED_MEDIA).map((media) => {
       : {};
   const stage = configuredMediaStage(media, id, inputs);
   const plan = configuredMediaPlan(media, approvedBody);
-  return { media, stage: stage.stage, queue: stage.queue.format, plan: JSON.stringify(plan, null, 2), primitives: stage.primitives.join("; ") };
+  const reviewPlan = JSON.stringify(plan, (key, value) =>
+    key === "sourceText" || key === "sourceExcerpt" || key === "transcript" ? "[control omitted from review]" : value, 2);
+  return { media, stage: stage.stage, queue: stage.queue.format, plan: reviewPlan, primitives: stage.primitives.join("; ") };
 });
 
 const html = `<!doctype html>
@@ -233,39 +242,33 @@ const html = `<!doctype html>
   <header>
     <div class="eyebrow">Human Inference · review artifact</div>
     <h1>What Phase 1 actually generates</h1>
-    <p class="dek">Outputs below were produced from a synthetic, non-private fixture by the committed Phase 1 prompt, parser, provenance, policy, and media-plan functions. Nothing was approved, scheduled, rendered by a paid provider, or published.</p>
+    <p class="dek">Every short post below was produced from Muxin's own essay by the committed Phase 1 prompt, parser, provenance, and voice checks. The model could select, omit, and reorder complete source segments. It could not write or paraphrase a sentence.</p>
     <div class="facts">
       <div class="fact"><b>Generated</b>${escapeHtml(generatedAt)}</div>
-      <div class="fact"><b>Engine</b>${escapeHtml(ordinaryRun.version)}</div>
-      <div class="fact"><b>Ordinary Content</b>Extraction only</div>
-      <div class="fact"><b>Venture</b>Scoped composition</div>
+      <div class="fact"><b>Engines</b>${escapeHtml(engineReviews.map((review) => review.version).join(" · "))}</div>
+      <div class="fact"><b>Control</b>Byte-for-byte verified</div>
+      <div class="fact"><b>Voice gate</b>No em dashes or configured AI tells</div>
     </div>
   </header>
 
-  <h2>1. Ordinary Content</h2>
-  <p>The selected model does not write the post here. It returns only line references. The server reconstructs every body from the approved cut, refuses any out-of-bound reference, and queues each result as pending.</p>
-  <div class="source">${escapeHtml(approvedBody)}</div>
-  <div class="grid">${cards(ordinaryCards)}</div>
+  <h2>1. Eight treatments of Muxin's essay</h2>
+  <p>The untreated control is intentionally not repeated here. The system verified it against the source byte for byte. SHA-256: <code>${controlHash}</code>. Each treatment below is assembled only from exact source segments and passed the hard voice gate before appearing.</p>
+  ${engineReviews.map((review) => `<h3 style="margin-top:30px">${escapeHtml(review.engine.toUpperCase())}</h3><div class="grid">${cards(review.cards)}</div>`).join("")}
 
-  <h2>2. Venture composition exception</h2>
-  <p>This path may compose a treatment because Venture has no source essay. The prompt carries the approved body, claim references, the no-invented-proof rule, and <code>config/voice.yaml</code>. These are representative review fixtures, not approved campaign content.</p>
-  <div class="source">${escapeHtml(ventureBody)}</div>
-  <div class="grid">${cards(ventureCards)}</div>
-
-  <h2>3. Cross-room safety boundaries</h2>
+  <h2>2. Cross-room safety boundaries</h2>
   <p>Fiction and Charles may enter Content with approved prose, but Phase 1 deliberately refuses AI treatments because no enforceable restricted transformation exists yet.</p>
   <div class="boundary"><strong>Fiction treatment refused:</strong><br>${escapeHtml(policyError(fiction))}</div>
   <div class="boundary"><strong>Charles treatment refused:</strong><br>${escapeHtml(policyError(charles))}</div>
 
-  <h2>4. Seven staged media paths</h2>
+  <h2>3. Seven staged media paths</h2>
   <p>These are the inspectable artifacts created before rendering. Each waits for explicit approval; a declared path is never presented as a finished asset.</p>
   <table><thead><tr><th>Media</th><th>Gate</th><th>Plan created by Phase 1</th><th>Existing primitives</th></tr></thead><tbody>
     ${mediaRows.map((row) => `<tr><td><b>${escapeHtml(row.media)}</b><br><span class="note">queue: ${escapeHtml(row.queue)}</span></td><td>${escapeHtml(row.stage)}</td><td><pre>${escapeHtml(row.plan)}</pre></td><td>${escapeHtml(row.primitives)}</td></tr>`).join("")}
   </tbody></table>
 
   <h2>How to evaluate this</h2>
-  <p>For ordinary Content, judge whether the selected source lines make a useful platform post without changing Muxin's words. For Venture, judge voice, concision, and whether every factual statement stays inside the two claim references. For media, judge whether the pre-render plan is concrete enough to approve before cost or side effects occur.</p>
-  <p class="note">Reproduce with Codex: <code>npx tsx scripts/phase1-generation-review.ts docs/reviews/content-studio-phase1-generation-review.html</code>. To keep generation fully local, set <code>PHASE1_REVIEW_ENGINE=ollama-gpt-oss</code>.</p>
+  <p>Judge whether each exact-source treatment is useful, distinct, short enough for its platform, and recognizably Muxin. Any em dash or configured AI tell causes generation to fail rather than queue the draft.</p>
+  <p class="note">Reproduce the Codex set with <code>npx tsx scripts/phase1-generation-review.ts docs/reviews/content-studio-phase1-generation-review.html /absolute/path/to/source.md</code>. The Grok comparison shown here came from the managed subscription bridge and was fed back through the same deterministic parser with <code>PHASE1_REVIEW_GROK_OUTPUT</code>.</p>
 </main></body></html>`;
 
 mkdirSync(dirname(outputPath), { recursive: true });
