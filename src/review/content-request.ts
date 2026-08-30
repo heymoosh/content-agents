@@ -13,6 +13,16 @@ export interface RecommendationEvidence {
   readonly recommended?: boolean;
 }
 
+export interface VentureContentSource {
+  readonly artifactId: string;
+  readonly phase: number;
+  readonly artifactKind: "substack-post" | "text-post-note";
+  readonly messageId: string;
+  readonly bodyPath: string;
+  readonly claimRefs: readonly { readonly claim: string; readonly ref: string }[];
+  readonly approval: { readonly editorialStatus: "approved"; readonly provenance: "muxin-editorial-approval" };
+}
+
 export interface ContentRequestInput {
   readonly id: string;
   readonly origin: ContentOrigin;
@@ -25,6 +35,7 @@ export interface ContentRequestInput {
   readonly recommendationEvidence?: readonly RecommendationEvidence[];
   readonly includeUntreatedControl?: boolean;
   readonly ventureId?: string | null;
+  readonly ventureSource?: VentureContentSource | null;
 }
 
 export interface ContentSelections {
@@ -59,6 +70,7 @@ export interface ContentRequest {
   readonly descriptor: string;
   readonly originalInput: string;
   readonly ventureId: string | null;
+  readonly ventureSource: VentureContentSource | null;
   readonly selections: ContentSelections;
   readonly recommendations: {
     readonly treatments: Recommendation[];
@@ -114,9 +126,28 @@ function variantId(kind: VariantKind, ...parts: string[]): string {
   return [kind, ...parts.map((part) => Buffer.from(part, "utf8").toString("base64url"))].join("-");
 }
 
+function ventureSource(value: VentureContentSource | null | undefined): VentureContentSource | null {
+  if (value == null) return null;
+  if (!Number.isInteger(value.phase) || value.phase < 1 || value.phase > 4) throw new Error("venture source phase is invalid");
+  if (!["substack-post", "text-post-note"].includes(value.artifactKind)) throw new Error("venture source artifact kind is invalid");
+  if (value.approval?.editorialStatus !== "approved" || value.approval?.provenance !== "muxin-editorial-approval") throw new Error("venture source approval provenance is invalid");
+  return {
+    artifactId: required(value.artifactId, "venture source artifactId"), phase: value.phase,
+    artifactKind: value.artifactKind, messageId: required(value.messageId, "venture source messageId"),
+    bodyPath: required(value.bodyPath, "venture source bodyPath"),
+    claimRefs: (value.claimRefs ?? []).map((item, index) => ({
+      claim: required(item.claim, `venture source claimRefs[${index}].claim`),
+      ref: required(item.ref, `venture source claimRefs[${index}].ref`),
+    })),
+    approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" },
+  };
+}
+
 export function buildContentRequest(input: ContentRequestInput): ContentRequest {
   const id = required(input.id, "id");
   if (!ORIGINS.has(input.origin)) throw new Error("origin is unknown");
+  if (input.ventureSource != null && input.origin !== "venture") throw new Error("Venture source provenance requires a Venture origin");
+  if (input.ventureSource != null && (typeof input.ventureId !== "string" || input.ventureId.trim() === "")) throw new Error("Venture source provenance requires a ventureId");
   const descriptor = required(input.descriptor, "descriptor");
   // Do not trim this field: verbatim preservation is part of the domain contract.
   if (typeof input.originalInput !== "string" || input.originalInput.length === 0) throw new Error("originalInput is required");
@@ -145,8 +176,25 @@ export function buildContentRequest(input: ContentRequestInput): ContentRequest 
   }
   return {
     kind: "content_request", version: CONTENT_REQUEST_VERSION, id, origin: input.origin, descriptor, originalInput: input.originalInput,
-    ventureId: input.ventureId ?? null, selections: selected, recommendations: recs,
+    ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), selections: selected, recommendations: recs,
     control: { enabled: controlEnabled }, variants,
+  };
+}
+
+/** A configuration save may edit choices only; source identity/provenance stays server-owned. */
+export function mergeContentConfiguration(existing: ContentRequest, incoming: ContentRequestInput): ContentRequestInput {
+  return {
+    id: existing.id,
+    origin: existing.origin,
+    descriptor: existing.descriptor,
+    originalInput: existing.originalInput,
+    ventureId: existing.ventureId,
+    ventureSource: existing.ventureSource,
+    treatments: incoming.treatments,
+    media: incoming.media,
+    platforms: incoming.platforms,
+    recommendationEvidence: incoming.recommendationEvidence,
+    includeUntreatedControl: incoming.includeUntreatedControl,
   };
 }
 

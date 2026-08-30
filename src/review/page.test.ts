@@ -857,24 +857,22 @@ test("Signals: the emitted page never claims a filed recommendation already took
   assert.ok(!html.includes("Applies to next post"), 'the page must never say "Applies to next post"');
 });
 
-test("Signals: recommendations stay session-local and expose no orchestration write control", () => {
+test("Signals: recommendations persist intent and expose no orchestration write control", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(!html.includes("Send to backlog"));
   assert.ok(!html.includes("filed to the backlog"));
-  assert.ok(html.includes("Adopted for this session. Nothing changed."));
+  assert.ok(html.includes("Decision saved. No configuration changed."));
 });
 
-test("Signals: recommendations expose session-only adopt and decline decisions", () => {
+test("Signals: recommendations expose durable adopt and decline decisions", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes('sig-adopt'), "recommendations must offer Adopt");
   assert.ok(html.includes('class="sig-decline"'), "recommendations must offer Decline");
-  assert.ok(html.includes("Adopted for this session. Nothing changed."), "adopt must be visibly session-only");
-  assert.ok(html.includes("Declined this session"), "declined recommendations need a session section");
-  assert.ok(html.includes("const sigAdopted = new Set()"), "adopt state must live in JavaScript memory");
-  assert.ok(html.includes("const sigDeclined = new Set()"), "decline state must live in JavaScript memory");
-  assert.ok(html.includes("JSON.stringify([r.type, r.title])"), "session decisions must be keyed by type and title");
-  assert.ok(html.includes('sigAdopted.add(signalKey(r))'), "Adopt must only update in-memory state");
-  assert.ok(html.includes('sigDeclined.add(signalKey(r))'), "Decline must only update in-memory state");
+  assert.ok(html.includes("Decision saved. No configuration changed."), "adopt must describe the durable non-config decision");
+  assert.ok(html.includes('post("/api/signals/decision"'), "both choices must use the durable decision endpoint");
+  assert.ok(!html.includes("const sigAdopted = new Set()"));
+  assert.ok(!html.includes("const sigDeclined = new Set()"));
+  assert.ok(html.includes('function signalKey(r){ return r.type+":"+r.title; }'));
 });
 
 // The strategy brief and raw-exports sheets are pre-prototype developer surfaces. They stay fully
@@ -948,6 +946,11 @@ test("Content separates request-grouped draft approval from publishing status", 
   assert.ok(html.includes("Select all"));
   assert.ok(html.includes("Approve selected for publishing"));
   assert.ok(html.includes("Open Focus Mode"));
+  assert.ok(html.includes("Typefully"));
+  assert.ok(html.includes("PostPeer"));
+  assert.ok(html.includes('post("/api/publishing/resolve"'));
+  assert.ok(html.includes("Provider has nothing · allow retry"));
+  assert.ok(!html.includes("Postiz is not connected"));
   assert.ok(!html.includes("Show drafts for every piece"));
   assert.ok(!html.includes("show published / discarded"));
 });
@@ -962,6 +965,14 @@ test("Fiction launch action creates a validated Content handoff and opens config
   assert.ok(html.includes("Send approved final to Content"));
 });
 
+test("approved Venture primary artifacts can enter ordinary Content configuration", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('post("/api/venture/handoff"'));
+  assert.ok(html.includes("Send approved artifact to Content"));
+  assert.ok(html.includes('setRoom("content")'));
+  assert.ok(html.includes("CW.step=2"));
+});
+
 test("Fiction Draft is a durable promotional focus flow, not the old story-scene composer", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   for (const text of ["PROMOTIONAL DRAFT", "Save direct edit", "TARGETED AI REVISION", "Revision history", "PLATFORM / MEDIA PREVIEWS", "/api/fiction/promotion/draft", "/api/fiction/promotion/revise", "/api/fiction/promotion/status"]) assert.ok(html.includes(text));
@@ -969,16 +980,16 @@ test("Fiction Draft is a durable promotional focus flow, not the old story-scene
   assert.ok(!html.includes('ficStage==="draft"?head+composer+anchor+failCard+scene'));
 });
 
-test("Outreach hides poor fits and treats Gmail as an explicit setup dependency", () => {
+test("Outreach hides poor fits and keeps sending manual", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes("function outreachGoodFit"));
   const script = emittedScripts().join("\n");
   const start = script.indexOf("function outreachGoodFit");
   const policy = script.slice(start, script.indexOf("\n}", start) + 2);
   assert.ok(!policy.includes("l.status"), "workflow status cannot override an explicit or missing fit classification");
-  assert.ok(html.includes("muxin.li.pro@gmail.com"));
-  assert.ok(html.includes("Connect Gmail to send"));
-  assert.ok(!html.includes("Paste it into your mail client and send it there."));
+  assert.ok(html.includes("Copy message"));
+  assert.ok(html.includes("I sent this by hand"));
+  assert.ok(!html.includes("Connect Gmail to send"));
   assert.ok(html.includes('<select class="engine-select" id="scoutEngine"><option value="codex">ChatGPT</option><option value="grok">Grok</option></select>'));
   assert.ok(!html.includes('id="scoutEngine"><option value="claude"'));
 });
@@ -998,6 +1009,25 @@ test("Signals leads with actionable topic/platform/media defaults and labels sam
   assert.ok(html.includes("Sample data · illustrative, not measured"));
   assert.ok(script.includes("SIGNALS.performance"), "Signals must render the recommendation-domain response");
   assert.ok(script.includes("signals.contentDefaults"), "Content must receive separate cold-start defaults rather than reusing illustrative results");
+});
+
+test("Signals decisions persist through the API instead of browser-session Sets", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('post("/api/signals/decision"'));
+  assert.ok(html.includes("Decision saved"));
+  assert.ok(!html.includes("const sigAdopted = new Set()"));
+  assert.ok(!html.includes("Adopted for this session"));
+  assert.ok(!html.includes("Declined this session"));
+});
+
+test("GPT-OSS is selectable for read-only Signals analysis but not file-writing strategy runs", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const analysis = html.slice(html.indexOf('id="signalsAnalysisEngine"') - 120, html.indexOf('id="signalsAnalysisEngine"') + 500);
+  const strategy = html.slice(html.indexOf('id="strategyEngine"') - 120, html.indexOf('id="strategyEngine"') + 500);
+  assert.ok(analysis.includes('value="ollama-gpt-oss"'));
+  assert.ok(!strategy.includes('value="ollama-gpt-oss"'));
+  assert.ok(html.includes('$("#signalsAnalysisEngine").value'));
+  assert.ok(html.includes('$("#strategyEngine").value'));
 });
 
 test("Venture example demonstrates ventures, content, lead magnets, and statuses", () => {
@@ -1316,7 +1346,7 @@ test("outreachSendState: locked never reads as sent, because nothing records whi
 
 test("outreachSendNote: locking and sending carry the two authored notes, verbatim", () => {
   assert.equal(outreachSendNote("draft"), "Locking readies it. You send it by hand, and nothing here can send it for you.");
-  assert.equal(outreachSendNote("locked"), "Gmail setup is required before this locked draft can be sent.");
+  assert.equal(outreachSendNote("locked"), "Copy the locked message, send it in the channel you choose, then record that you sent it.");
   assert.equal(outreachSendNote("none"), "");
 });
 
@@ -1351,7 +1381,7 @@ test("outreach copy: no em dashes and no 'atomize' in the strings this PR adds",
   }
 });
 
-test("outreach room markup: the triage rail, thread, and Gmail setup boundary are on the page", () => {
+test("outreach room markup: the triage rail, thread, and manual-send boundary are on the page", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   for (const copy of [
     "WHO IS IN FRONT OF YOU, GROUPED BY WHY · PICK ONE TO DRAFT TO",
@@ -1361,8 +1391,8 @@ test("outreach room markup: the triage rail, thread, and Gmail setup boundary ar
     "← Back to queue",
     "Lock this message",
     "Locking readies it. You send it by hand, and nothing here can send it for you.",
-    "Gmail setup required for muxin.li.pro@gmail.com",
-    "Connect Gmail to send",
+    "Copy message",
+    "I sent this by hand",
     "no source recorded",
     "never pitched",
   ]) {
@@ -3272,7 +3302,7 @@ test("Approve Drafts puts a searchable request filter before the other filters",
 
 test("fixture review mode shows clearly marked sample drafts without adding real requests", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: true, fixtures: true });
-  assert.ok(html.includes("FIXTURE_REVIEW_PIECE"));
+  assert.ok(html.includes("SAMPLE_REVIEW_PIECE"));
   assert.ok(html.includes("SAMPLE DATA · LAYOUT ONLY"));
   assert.ok(html.includes("Nothing in this sample is added to your request list"));
 });

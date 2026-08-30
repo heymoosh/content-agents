@@ -757,6 +757,7 @@ export async function runAgentSpawn(
     const result = await runCommandSpawn(job, built.command, built.args, {
       timeoutMs: opts.timeoutMs,
       env: { ...opts.env, CONTENT_AGENT_ENGINE: engine },
+      input: built.input,
     });
     logCost({ step: `agent:${engine}`, detail: job.label, engine });
     if (!outputFile) return result;

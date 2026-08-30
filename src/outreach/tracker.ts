@@ -446,6 +446,12 @@ export function markSent(
   opts: { person?: string; channel?: string; message?: string; note?: string },
   path: string = TRACKER_PATH,
 ): TrackerEvent {
+  if (opts.message) {
+    const existing = readTrackerEvents(path).find((event) =>
+      event.event === "contacted" && event.bucket === bucket && event.lead === lead
+      && event.message === opts.message && (event.person ?? "") === (opts.person ?? ""));
+    if (existing) return existing;
+  }
   const event: TrackerEvent = {
     ts: new Date().toISOString(), lead, bucket, event: "contacted",
     ...(opts.person ? { person: opts.person } : {}),

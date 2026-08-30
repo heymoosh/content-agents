@@ -19,6 +19,7 @@ import {
   type ReconciledStatus,
   type PublishLogRead,
 } from "./reconcile.js";
+import { publishingKey, readPublishingStatuses, type PublishingStatus } from "./publishing-status.js";
 
 export const CONTENT = join(repoRoot, "content");
 // Outreach Phase 2 (docs/outreach-engine-plan.md §6): a lead's review-queue.md row surfaces in
@@ -53,6 +54,7 @@ interface EnrichedRow extends QueueRow {
   hasAsset: boolean;
   approveBlocked: string | null; // reason Approve is disabled, if any
   reconciled?: ReconciledStatus; // live Typefully/PostPeer reconciliation — omitted when not applicable
+  publishingStatus?: PublishingStatus;
   // "Generate storyboard" button (card 9e20a616): true for a video-script row whose storyboard
   // hasn't been generated yet — the one case Approve is blocked with no way in the GUI to fix it.
   canGenerateStoryboard: boolean;
@@ -171,7 +173,7 @@ async function fetchLiveProviderState(): Promise<LiveProviderState> {
 
 // Exported so the reconciliation wiring (row.reconciled) is testable against the REAL code path
 // /api/queue uses — a temp folder + a crafted publish-log.md + injected live state, no server/network.
-export function enrich(folder: string, slug: string, row: QueueRow, publishLog: PublishLogRead, live: LiveProviderState): EnrichedRow {
+export function enrich(folder: string, slug: string, row: QueueRow, publishLog: PublishLogRead, live: LiveProviderState, publishingStatus?: PublishingStatus): EnrichedRow {
   const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
   let kind: Kind = "unknown";
   if (row.format === "text") kind = "text";
@@ -188,6 +190,7 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
   const isReply = row.origin === "reply to mention";
   const out: EnrichedRow = {
     ...row,
+    ...(publishingStatus ? { publishingStatus } : {}),
     kind,
     editable: false,
     revisable: !isReply && existsSync(join(folder, "derivatives", `${row.id}.md`)),
@@ -333,9 +336,10 @@ export async function listPieces(): Promise<Piece[]> {
   if (anyNeedsReconcile) ensureLiveStatePolling();
   const live: LiveProviderState = anyNeedsReconcile ? liveState : { typefullyDrafts: [], postpeerPosts: [] };
 
+  const publishingStatuses = readPublishingStatuses();
   const pieces = folderRows.map(({ slug, folder, rows }) => {
     const publishLog: PublishLogRead = rows.some(needsReconciliation) ? readPublishLogSafe(folder) : { text: "" };
-    const enriched = rows.map((r) => enrich(folder, slug, r, publishLog, live));
+    const enriched = rows.map((r) => enrich(folder, slug, r, publishLog, live, publishingStatuses[publishingKey(slug, r.id)]));
     return {
       slug,
       title: firstHeading(folder),

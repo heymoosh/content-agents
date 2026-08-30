@@ -28,12 +28,12 @@ import { readQueue, type QueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
 import { scaffoldContentFolder } from "../atomize/new-content.js";
-import { listLeadDetails } from "../outreach/status.js";
+import { listLeadDetails, readLeadDetail, type LeadDetail } from "../outreach/status.js";
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
 import { handleVentureWrite } from "./venture-writes.js";
-import { buildFollowups, markResponded, markContacted, moveOn, isBucket } from "../outreach/tracker.js";
+import { buildFollowups, markResponded, markContacted, markSent, moveOn, isBucket, type TrackerEvent } from "../outreach/tracker.js";
 import {
   enrich,
   listPieces,
@@ -80,17 +80,20 @@ import { listContentSessions } from "./develop.js";
 import { renderPage } from "./page.js";
 import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
-import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, type Engine } from "./engines.js";
+import { ENGINES, ENGINE_COMMANDS, ENGINE_LABELS, ENGINE_METADATA, isEngine, enginePrompt, ollamaAvailability, type Engine } from "./engines.js";
 import { readTreatment } from "./treatment.js";
 import { saveIntakeDraft, readIntakeDraft, readIntakeDrafts, saveIntakeSectionDraft, readIntakeSections, clearIntakeDrafts } from "./intake-draft.js";
 import { enqueueVentureStep } from "./venture-runner.js";
 import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
+import { providerForKind, publishingRetryBlock, resolvePublishingAttempt, scheduleApprovedOnce, type PublishingResolution } from "./publishing-status.js";
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute } from "./serve-signals.js";
+import { createApprovedVentureHandoff, findExistingVentureContentFolder } from "./venture-content-handoff-store.js";
+import { toContentRequestInput as ventureToContentRequestInput } from "./venture-content-handoff.js";
 import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
 import { readContentRequest, writeContentRequest } from "./content-request-store.js";
-import type { ContentRequestInput } from "./content-request.js";
+import { mergeContentConfiguration, type ContentRequestInput } from "./content-request.js";
 import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
 import { toContentRequestInput } from "./fiction-content-handoff.js";
 import { seriesDirFor } from "./fiction.js";
@@ -108,15 +111,45 @@ export type { ScheduleKind, SchedulerDeps } from "./studio-scheduling.js";
 
 const PORT = Number(process.env.REVIEW_PORT ?? 4600);
 
-function requestEngine(value: unknown): Engine {
+/** File-writing and tool-using routes deliberately exclude the plain local Ollama runner. */
+export function requestEngine(value: unknown): Engine {
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is read-only and cannot run an agentic or file-writing route");
   return isEngine(value) ? value : "claude";
 }
 
-function availableEngines() {
+/** Read-only, self-contained analysis can use every installed engine, including local GPT-OSS. */
+export function requestAnalysisEngine(value: unknown): Engine {
+  return isEngine(value) ? value : "claude";
+}
+
+export function requestInteractiveAnalysisEngine(value: unknown): Engine {
+  if (value === "ollama-gpt-oss") throw new Error("GPT-OSS is limited to the self-contained initial analysis; choose another engine for report-reading follow-up questions");
+  return requestEngine(value);
+}
+
+type SyncEngineProbe = (file: string, args: readonly string[], options: { encoding?: BufferEncoding; stdio?: "ignore" | "pipe"; timeout: number }) => string | Buffer;
+
+export function availableEngines(probe: SyncEngineProbe = execFileSync as SyncEngineProbe) {
   return ENGINES.map((engine) => {
+    if (engine === "ollama-gpt-oss") {
+      try {
+        const availability = ollamaAvailability({ listOutput: String(probe("ollama", ["list"], { encoding: "utf8", stdio: "pipe", timeout: 2_000 })) });
+        return {
+          id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
+          roleHint: ENGINE_METADATA[engine].roleHint, installed: availability.state === "ready",
+          note: availability.state === "ready" ? `${availability.model} is available locally.` : `${availability.model} is not installed in Ollama.`,
+        };
+      } catch {
+        return {
+          id: engine, label: ENGINE_LABELS[engine], description: ENGINE_METADATA[engine].description,
+          roleHint: ENGINE_METADATA[engine].roleHint, installed: false,
+          note: "Ollama is not reachable on this server.",
+        };
+      }
+    }
     let installed = false;
     try {
-      execFileSync("which", [ENGINE_COMMANDS[engine]], { stdio: "ignore", timeout: 2_000 });
+      probe("which", [ENGINE_COMMANDS[engine]], { stdio: "ignore", timeout: 2_000 });
       installed = true;
     } catch {
       installed = false;
@@ -149,6 +182,7 @@ const FIXTURES_ON = fixturesEnabled();
 // Rows (keyed `${slug}/${id}`) currently mid-schedule — see the in-flight guard in the /api/status
 // handler below, which prevents a double-click/retry from firing a duplicate real provider call.
 const schedulingInFlight = new Set<string>();
+const ventureHandoffsInFlight = new Set<string>();
 
 // A separate execFileP instance from jobs.ts's own (that one backs reviseDerivative/reviseBrief) —
 // this one just backs the read-only report/insights calls below. Stateless (promisify(execFile) is
@@ -636,6 +670,24 @@ export function isValidMessageFile(file: string): boolean {
   return /^messages\/message-\d+\.md$/.test(file);
 }
 
+/** Record the first manual send from server-owned lead/message facts; this never transmits data. */
+export function recordOutreachInitialSend(
+  dir: string,
+  detail: Pick<LeadDetail, "kind" | "latestMessage" | "contacts">,
+  record: (bucket: "client" | "platform", lead: string, opts: { person?: string; channel?: string; message?: string; note?: string }) => TrackerEvent = markSent,
+): TrackerEvent {
+  if (!isValidLeadDir(dir)) throw new Error("not a valid outreach lead folder");
+  if (detail.kind !== "client" && detail.kind !== "platform") throw new Error("this item is not an outreach lead");
+  const message = detail.latestMessage;
+  if (!message || message.status !== "locked") throw new Error("lock the outreach message before recording its initial send");
+  return record(detail.kind, basename(dir), {
+    person: message.recipient || detail.contacts[0]?.name || undefined,
+    channel: message.channel || undefined,
+    message: message.file || undefined,
+    note: "Sent by hand from the Outreach composer",
+  });
+}
+
 // A typed direction is a sentence or two about what she wants said, not a pasted document. The cap
 // keeps one runaway paste from dominating the draft prompt the evidence is supposed to anchor.
 export const MAX_DIRECTION_CHARS = 2000;
@@ -886,24 +938,44 @@ const server = createServer(async (req, res) => {
           json(res, 200, { ok: false, error: blocked });
           return;
         }
+        if (scheduleKind(approveRow)) {
+          const retryBlocked = publishingRetryBlock(slug, approveRow);
+          if (retryBlocked) {
+            json(res, 200, { ok: false, error: retryBlocked });
+            return;
+          }
+        }
       }
       const ok = updateRow(slug, id, status, notes);
       if (!ok) {
         json(res, 404, { ok: false });
         return;
       }
-      // Approval and publishing are separate states. The required self-hosted Postiz adapter is
-      // not configured in this repository, so an approval enters the publishing queue as Pending
-      // and stops. It must never fall through to the legacy Typefully/PostPeer schedulers.
-      const publishing = approveFolder && approveRow
-        ? {
-            provider: "postiz",
-            status: "Pending",
-            configured: false,
-            setupRequired: "Connect the self-hosted Postiz instance before scheduling or publishing.",
+      // Approval is the explicit human gate. Once it is recorded, dispatch the one approved row
+      // through the publisher that already owns its platform. Every publisher creates a scheduled
+      // draft/upload, never an instant unreviewed post. A failure leaves the row approved and is
+      // returned for the Publishing view instead of being mistaken for success.
+      let scheduled: unknown = null;
+      let scheduleError: string | null = null;
+      let publishing: unknown = null;
+      if (approveFolder && approveRow) {
+        const inFlightKey = `${slug}/${id}`;
+        if (schedulingInFlight.has(inFlightKey)) {
+          json(res, 200, { ok: true, scheduled: null, scheduleError: "already scheduling this row. Try again in a moment" });
+          return;
+        }
+        schedulingInFlight.add(inFlightKey);
+        try {
+          if (scheduleKind(approveRow)) {
+            ({ scheduled, scheduleError, publishing } = await scheduleApprovedOnce(approveFolder, slug, approveRow));
+          } else {
+            ({ scheduled, scheduleError } = await scheduleApproved(approveFolder, approveRow));
           }
-        : null;
-      json(res, 200, { ok: true, scheduled: null, scheduleError: null, publishing });
+        } finally {
+          schedulingInFlight.delete(inFlightKey);
+        }
+      }
+      json(res, 200, { ok: true, scheduled, scheduleError, publishing });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/cancel") {
@@ -940,6 +1012,29 @@ const server = createServer(async (req, res) => {
         schedulingInFlight.delete(inFlightKey);
       }
       json(res, 200, result);
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/publishing/resolve") {
+      const b = await readBody(req);
+      const slug = String(b.slug ?? "");
+      const id = String(b.id ?? "");
+      const resolution = String(b.resolution ?? "") as PublishingResolution;
+      try {
+        if (resolution !== "exists" && resolution !== "not-created") throw new Error("choose whether the provider item exists");
+        const folder = safeFolder(slug);
+        const row = readQueue(folder).rows.find((item) => item.id === id);
+        if (!row) throw new Error("no such publishing row");
+        const kind = scheduleKind(row);
+        if (!kind) throw new Error("no publishing provider owns this row");
+        const publishing = resolvePublishingAttempt(slug, id, resolution, {
+          provider: providerForKind(kind),
+          ref: b.ref === undefined ? undefined : String(b.ref),
+          plannedFor: b.plannedFor === undefined ? undefined : String(b.plannedFor),
+        });
+        json(res, 200, { ok: true, publishing });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/derivative") {
@@ -1010,6 +1105,46 @@ const server = createServer(async (req, res) => {
     }
     if (await handleCharlesRoute({ req, res, url, readBody, json, requestEngine })) return;
     if (await handleSignalsRoute({ req, res, url, readBody, json })) return;
+    // Approved Venture primary copy enters the ordinary Content configuration cycle. This keeps
+    // its Venture provenance and does not generate or deliver anything. A retry recovers the
+    // same Content folder; entering configuration is not falsely recorded as Venture delivery.
+    if (req.method === "POST" && url.pathname === "/api/venture/handoff") {
+      const b = await readBody(req);
+      try {
+        const slug = String(b.slug ?? "").trim();
+        const artifactId = String(b.artifactId ?? "").trim();
+        const inFlightKey = `${slug}/${artifactId}`;
+        if (ventureHandoffsInFlight.has(inFlightKey)) throw new Error("this Venture artifact is already being handed off");
+        ventureHandoffsInFlight.add(inFlightKey);
+        try {
+          const handoff = await createApprovedVentureHandoff({ slug, artifactId });
+          const existingFolder = findExistingVentureContentFolder(handoff.ventureId, handoff.artifactId);
+          let folder: string;
+          let request;
+          if (existingFolder && existsSync(join(existingFolder, "content-request.json"))) {
+            const existingRequest = await readContentRequest(existingFolder);
+            if (existingRequest.origin !== "venture" || existingRequest.ventureId !== handoff.ventureId
+              || existingRequest.ventureSource?.artifactId !== handoff.artifactId) {
+              throw new Error("existing Content request does not match this Venture artifact provenance");
+            }
+            folder = existingFolder;
+            request = existingRequest;
+          } else {
+            folder = existingFolder ?? scaffoldContentFolder({
+                title: handoff.descriptor, origin: `venture:${handoff.ventureId}:${handoff.artifactId}`,
+                publishedAt: null, sourceKind: "venture", text: handoff.body,
+              });
+            request = await writeContentRequest(folder, ventureToContentRequestInput({ ...handoff, id: basename(folder) }));
+          }
+          json(res, 200, { ok: true, handoff, request });
+        } finally {
+          ventureHandoffsInFlight.delete(inFlightKey);
+        }
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
     // Studio home (design 3c): counts, the ranked needs-you list, and the team's honest status.
     if (req.method === "GET" && url.pathname === "/api/studio") {
       json(res, 200, await buildStudioHome());
@@ -1055,7 +1190,12 @@ const server = createServer(async (req, res) => {
         const input = b.request as ContentRequestInput;
         if (!input || typeof input !== "object") throw new Error("content request is required");
         if (input.id !== slug) throw new Error("content request id must match its source slug");
-        const request = await writeContentRequest(safeFolder(slug), input);
+        const folder = safeFolder(slug);
+        const storedPath = join(folder, "content-request.json");
+        const safeInput = existsSync(storedPath)
+          ? mergeContentConfiguration(await readContentRequest(folder), input)
+          : input;
+        const request = await writeContentRequest(folder, safeInput);
         json(res, 200, { ok: true, request });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1301,7 +1441,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/strategy/insights") {
       const b = await readBody(req);
       try {
-        const result = await generateInsights(requestEngine(b.engine));
+        const result = await generateInsights(requestAnalysisEngine(b.engine));
         json(res, 200, { ok: true, ...result });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1313,7 +1453,7 @@ const server = createServer(async (req, res) => {
       const question = String(b.question ?? "");
       const history = Array.isArray(b.history) ? b.history : [];
       try {
-        const answer = await askInsights(question, history, requestEngine(b.engine));
+        const answer = await askInsights(question, history, requestInteractiveAnalysisEngine(b.engine));
         json(res, 200, { ok: true, answer });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1477,6 +1617,21 @@ const server = createServer(async (req, res) => {
         json(res, 200, { ok: true, body });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/outreach/mark-sent") {
+      const b = await readBody(req);
+      const dir = String(b.dir ?? "");
+      if (!isValidLeadDir(dir)) {
+        json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
+        return;
+      }
+      try {
+        const event = recordOutreachInitialSend(dir, readLeadDetail(dir));
+        json(res, 200, { ok: true, event });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
       return;
     }

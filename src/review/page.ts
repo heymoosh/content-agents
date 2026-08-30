@@ -1025,7 +1025,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="publishedSheet" hidden>
       <div class="cw-steps" id="publishedSteps"></div>
       <div class="sheet-head"><h2>Publishing status</h2><span class="grow"></span></div>
-      <div class="sheet-sub">Scheduling and publication status by input request. Postiz is not connected in this repository, so provider actions remain a setup dependency and are never shown as complete.</div>
+      <div class="sheet-sub">Scheduling and publication status by input request. Text and cards go through Typefully, TikTok through PostPeer, Shorts through YouTube, and Notes through Substack. A provider is only shown as complete after its recorded result can be read back.</div>
       <div id="publishedMain" style="margin-top:14px"><div class="empty">Nothing has entered publishing yet.</div></div>
     </div>
   </section>
@@ -1199,7 +1199,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
-        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
+        <label class="engine-choice"><span>Run analysis with</span><select class="engine-select" id="signalsAnalysisEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option><option value="ollama-gpt-oss">GPT-OSS (local)</option></select></label>
         <button class="primary" id="insightsBtn">Generate insights</button>
         <span class="hint">Runs the analytics reports live, then asks your selected engine for a short skim. Nothing here writes data or publishes anything.</span>
       </div>
@@ -1227,6 +1227,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
         <div class="notes-head">
           <span class="grow"></span>
           <span class="src" id="briefPath"></span>
+          <label class="engine-choice"><span>Run with</span><select class="engine-select" id="strategyEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
           <button id="briefToggleBtn">Show brief</button>
           <button class="primary" id="briefRefreshBtn" title="Runs the full /strategy skill: grades last cycle's bets, writes a new dated brief, records new bets. Takes minutes.">Refresh brief (runs /strategy)</button>
         </div>
@@ -1279,7 +1280,7 @@ ${opts.fixtures ? fixturePanelHtml() + fixtureScriptHtml() : ""}
 <script>
 const $ = (s, r=document) => r.querySelector(s);
 let DATA = { pieces: [], pending: 0 };
-const FIXTURE_REVIEW_PIECE = ${opts.fixtures ? JSON.stringify({
+const SAMPLE_REVIEW_PIECE = ${opts.fixtures ? JSON.stringify({
   slug: "sample-ai-power-request", requestId: "sample-layout-only",
   descriptor: "Why do we seem to fear AI more than we fear power?",
   title: "Why do we seem to fear AI more than we fear power?",
@@ -1318,11 +1319,11 @@ function connectionRecovered(){
 // function" deep inside a map, and the room's catch reported that render bug as a server problem.
 // esc runs on every value this page prints, so it coerces rather than trusting its callers.
 function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-const ENGINE_LABELS = {claude:"Claude", grok:"Grok", codex:"GPT (Codex)"};
-const ENGINE_ROLES = {claude:"Writing", grok:"Ideation", codex:"Analysis"};
+const ENGINE_LABELS = {claude:"Claude", grok:"Grok", codex:"GPT (Codex)", "ollama-gpt-oss":"GPT-OSS (local)"};
+const ENGINE_ROLES = {claude:"Writing", grok:"Ideation", codex:"Analysis", "ollama-gpt-oss":"Analysis"};
 const ENGINE_OPTIONS = '<option value="claude">Claude · Writing</option><option value="grok">Grok · Ideation</option><option value="codex">GPT (Codex) · Analysis</option>';
 const OUTREACH_ENGINE_OPTIONS = '<option value="codex">ChatGPT</option><option value="grok">Grok</option>';
-let ENGINE_STATUS = {claude:true, grok:true, codex:true};
+let ENGINE_STATUS = {claude:true, grok:true, codex:true, "ollama-gpt-oss":false};
 function engineLabel(id){ return ENGINE_LABELS[id] || "Claude"; }
 const ENGINE_PREFERENCE_KEY = "content-agents-preferred-engine";
 function preferredEngine(){
@@ -1551,7 +1552,7 @@ function reviewStateLabel(status){
 function contentRequestPieces(pieces){ return (pieces||[]).filter(p=>p.originalInput||p.requestId); }
 function reviewVisiblePieces(){
   const real=contentRequestPieces(DATA.pieces);
-  return real.length||!FIXTURE_REVIEW_PIECE ? real : [FIXTURE_REVIEW_PIECE];
+  return real.length||!SAMPLE_REVIEW_PIECE ? real : [SAMPLE_REVIEW_PIECE];
 }
 function openReviewFocus(piece,row,returnTo){
   reviewFocusReturn=returnTo;
@@ -1565,7 +1566,7 @@ function openReviewFocus(piece,row,returnTo){
   $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
   const editor=$("#reviewFocusEditor"); if(row.editable) editor.focus();
   $("#reviewFocusSave").addEventListener("click",async ()=>{ const result=await post("/api/derivative",{slug:piece.slug,id:row.id,body:editor.value}); if(result.ok===false){flash(result.error||"Could not save");return;} row.body=editor.value.trim(); flash("Saved"); closeReviewFocus(); rerender(); });
-  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} row.status=act; flash(act==="approve"?"Approved": "Discarded"); closeReviewFocus(); rerender(); }));
+  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} if(act==="approve"&&result.scheduled){ row.status=row.kind==="outreach-message"?"locked":"published"; row.scheduledWhen=result.scheduled.when; flash(row.kind==="outreach-message"?"Locked":"Scheduled · "+(result.scheduled.when||"provider accepted")); } else if(act==="approve"&&result.scheduleError){ row.status="approve"; flash("Approved, scheduling needs attention: "+result.scheduleError); } else { row.status=act; flash(act==="approve"?"Approved": "Discarded"); } closeReviewFocus(); rerender(); }));
 }
 function closeReviewFocus(){
   $("#reviewFocus").hidden=true; $("#reviewFocusBody").innerHTML="";
@@ -1742,10 +1743,26 @@ function renderReviewFilters(){
   requestOptions.innerHTML=requestedPieces.map(p=>'<option value="'+esc(p.descriptor||p.title)+'">'+esc(p.slug)+'</option>').join("");
 }
 function publishingState(row){
-  if(row.scheduleError||row.reconciled&&row.reconciled.state==="mismatch") return "Failed";
+  if(row.publishingStatus&&row.publishingStatus.state==="uncertain") return "Needs reconciliation";
+  if(row.publishingStatus&&row.publishingStatus.state==="blocked") return "Blocked";
+  if(row.publishingStatus&&row.publishingStatus.state==="scheduling") return "Scheduling";
+  if(row.publishingStatus&&row.publishingStatus.state==="private") return "Uploaded private";
+  if(row.publishingStatus&&row.publishingStatus.state==="cleared") return "Ready to retry";
+  if(row.scheduleError||row.reconciled&&row.reconciled.state==="mismatch") return "Needs attention";
+  if(row.publishingStatus&&row.publishingStatus.state==="scheduled") return "Scheduled";
   if(row.reconciled&&row.reconciled.state==="scheduled"||row.scheduledWhen) return "Scheduled";
-  if(row.status==="published") return "Published";
+  if(row.status==="published") return "Scheduled / uploaded";
   return "Pending";
+}
+function publishingProvider(row){
+  if(row.reconciled&&row.reconciled.provider) return row.reconciled.provider;
+  if(row.publishingStatus&&row.publishingStatus.provider) return row.publishingStatus.provider;
+  const platform=String(row.platform||"").toLowerCase(), format=String(row.format||"").toLowerCase();
+  if(platform==="x"||platform==="linkedin"||platform==="bluesky"||platform.startsWith("quote-card")) return "Typefully";
+  if(platform==="tiktok") return "PostPeer";
+  if(platform==="youtube"||format==="short") return "YouTube";
+  if(platform==="substack") return "Substack";
+  return "No provider assigned";
 }
 function renderPublished(){
   const main=$("#publishedMain"); if(!main) return; main.innerHTML=""; let shown=0;
@@ -1756,20 +1773,36 @@ function renderPublished(){
     sec.innerHTML='<h3>'+esc(piece.descriptor||piece.title)+'</h3><div class="slug">Input request · '+esc(piece.slug)+'</div><div class="publish-row head"><span>Draft</span><span>Destination</span><span>Planned / sent</span><span>Provider status</span></div>';
     for(const row of rows){
       const state=publishingState(row), item=document.createElement("div"); item.className="publish-row";
-      const error=row.scheduleError||(row.reconciled&&row.reconciled.reason)||"";
-      const provider=row.reconciled&&row.reconciled.provider||"Postiz";
-      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(row.scheduledWhen||"No send time recorded")+'</span></span><span class="src"><strong>'+esc(provider)+'</strong><br>'+(error?esc(error)+' · Retry requires provider setup.':'Live provider status unavailable until connected.')+'</span>';
+      const error=(row.publishingStatus&&row.publishingStatus.error)||row.scheduleError||(row.reconciled&&row.reconciled.reason)||"";
+      const provider=publishingProvider(row);
+      const planned=(row.reconciled&&row.reconciled.when)||(row.publishingStatus&&row.publishingStatus.plannedFor)||row.scheduledWhen||"No planned time recorded";
+      const ref=row.publishingStatus&&row.publishingStatus.ref ? ' · '+esc(row.publishingStatus.ref) : '';
+      const reconcile=row.publishingStatus&&(row.publishingStatus.state==="uncertain"||row.publishingStatus.state==="scheduling") ? '<div class="actions"><button data-publish-resolve="exists" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">I found it at the provider</button><button data-publish-resolve="not-created" data-slug="'+esc(piece.slug)+'" data-id="'+esc(row.id)+'">Provider has nothing · allow retry</button></div>' : '';
+      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(planned)+'</span></span><span class="src"><strong>'+esc(provider)+'</strong>'+ref+'<br>'+(error?esc(error):state==="Pending"?'Waiting for the provider to accept it.':'Provider result recorded; live publication is not yet confirmed.')+reconcile+'</span>';
       sec.appendChild(item);
     }
     main.appendChild(sec);
   }
+  main.querySelectorAll("[data-publish-resolve]").forEach(button=>button.addEventListener("click",()=>resolvePublishing(button.dataset.slug,button.dataset.id,button.dataset.publishResolve,button)));
   if(!shown) main.innerHTML='<div class="empty">Nothing has entered publishing yet.</div>';
+}
+async function resolvePublishing(slug,id,resolution,button){
+  if(resolution==="not-created"&&!confirm("Only allow a retry after you checked the named provider and confirmed that no draft, upload, or post exists. Continue?")) return;
+  const ref=resolution==="exists" ? prompt("Provider reference or URL (optional)","") : undefined;
+  const plannedFor=resolution==="exists" ? prompt("Planned time or current provider status (optional)","") : undefined;
+  button.disabled=true;
+  const result=await post("/api/publishing/resolve",{slug,id,resolution,ref,plannedFor});
+  if(!result.ok){ button.disabled=false; flash(result.error||"Could not record the reconciliation"); return; }
+  flash(resolution==="exists"?"Provider item recorded. No retry will run.":"Provider check recorded. You may approve again to retry.");
+  await load();
 }
 async function approveReviewSelection(){
   const targets=[];
   for(const piece of DATA.pieces||[]) for(const row of piece.rows||[]) if(reviewSelected.has(reviewSelectionKey(piece.slug,row.id))&&!DECIDED.has(row.status)) targets.push({piece,row});
-  for(const {piece,row} of targets){ const result=await post("/api/status",{slug:piece.slug,id:row.id,status:"approve"}); if(result&&result.ok===false) flash(result.error||"Approve blocked"); }
+  const failures=[];
+  for(const {piece,row} of targets){ const result=await post("/api/status",{slug:piece.slug,id:row.id,status:"approve"}); if(result&&result.ok===false) failures.push(result.error||"Approve blocked"); else if(result&&result.scheduleError) failures.push(result.scheduleError); }
   reviewSelected.clear(); await load();
+  flash(failures.length?"Some approvals need attention: "+failures.join(" · "):"Approved and handed to publishing");
 }
 
 // ── rooms ──
@@ -1935,7 +1968,7 @@ async function askBrief(){
   if(!instruction){ flash("Type what you want changed first"); return; }
   $("#briefAskBtn").disabled = true;
   const prevHtml = $("#briefBody").innerHTML;
-  const engine = $("#signalsEngine").value;
+  const engine = $("#strategyEngine").value;
   $("#briefBody").textContent = engineLabel(engine)+" is revising the brief. The room strip carries the live clock.";
   const r = await post("/api/strategy/ask", {instruction, engine});
   $("#briefAskBtn").disabled = false;
@@ -1955,7 +1988,7 @@ async function refreshBriefRun(){
   // No clock here. The progress strip at the top of this room is the ONE measured duration for
   // this job, and it counts from when the job was queued. A second timer started at the click
   // disagreed with it on the same screen, which is the exact defect this design was corrected for.
-  const engine = $("#signalsEngine").value;
+  const engine = $("#strategyEngine").value;
   body.innerHTML = '<p class="thinking">Running /strategy with '+esc(engineLabel(engine))+'. It grades your bets and writes a new dated brief. The room strip carries the live clock.</p>';
   loadJobs(); // make the strategy job visible in the Studio room right away
   try {
@@ -1999,7 +2032,7 @@ async function generateInsights(){
   $("#insightsThread").innerHTML = "";
   // No estimate here. Nothing ever measured the guess that used to sit in this line, and the strip
   // at the top of this room already shows the real elapsed time for this job.
-  const engine = $("#signalsEngine").value;
+  const engine = $("#signalsAnalysisEngine").value;
   const intro = engine === "claude" ? "Running the reports, then asking Claude for a synthesis." : "Running the reports, then asking "+engineLabel(engine)+" for a synthesis.";
   $("#insightsOut").innerHTML = '<p class="hint">'+esc(intro)+' The room strip carries the live clock.</p>';
   const r = await post("/api/strategy/insights", {engine});
@@ -2031,7 +2064,7 @@ async function askInsights(){
   // No clock here either. Card a14693da replaced a fixed ETA with a click-local ticker, which was
   // right at the time; the room strip now carries the one measured elapsed count for this job, so
   // a second timer on the same screen would just disagree with it.
-  const engine = $("#signalsEngine").value;
+  const engine = $("#signalsAnalysisEngine").value;
   thinking.innerHTML = esc(engineLabel(engine))+' is looking into it. It may re-run a report first. The room strip carries the live clock.';
   $("#insightsThread").appendChild(thinking);
   const r = await post("/api/strategy/ask-insights", {question:q, history:insightsHistory, engine});
@@ -2185,7 +2218,7 @@ function outreachSendState(msg){
 }
 function outreachSendNote(state){
   if(state==="draft") return "Locking readies it. You send it by hand, and nothing here can send it for you.";
-  if(state==="locked") return "Gmail setup is required before this locked draft can be sent.";
+  if(state==="locked") return "Copy the locked message, send it in the channel you choose, then record that you sent it.";
   return "";
 }
 function outreachSendBadge(state, hasLoggedSend){
@@ -2342,7 +2375,7 @@ function sendStepsHtml(l){
   if(state === "draft"){
     return '<div class="send-steps"><button class="primary out-lock" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'"'+(pending?" disabled":"")+'>'+(pending?"Locking…":"Lock this message")+'</button>'+note+'</div>';
   }
-  return '<div class="send-steps"><button type="button" class="primary" disabled>Connect Gmail to send</button><span class="send-note">Gmail setup required for muxin.li.pro@gmail.com. Authenticate that account and grant send permission before this control can work.</span></div>';
+  return '<div class="send-steps"><button type="button" class="out-copy" data-dir="'+esc(l.dir)+'">Copy message</button><button type="button" class="primary out-mark-sent" data-dir="'+esc(l.dir)+'">I sent this by hand</button>'+note+'</div>';
 }
 
 function whoBoxHtml(l){
@@ -2424,6 +2457,8 @@ function renderOutreachBox(){
   box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
   box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
   box.querySelectorAll("button.out-lock").forEach(b=>b.addEventListener("click", ()=>outreachLock(b.dataset.dir, b.dataset.file)));
+  box.querySelectorAll("button.out-copy").forEach(b=>b.addEventListener("click", ()=>outreachCopy(b.dataset.dir)));
+  box.querySelectorAll("button.out-mark-sent").forEach(b=>b.addEventListener("click", ()=>outreachMarkSent(b.dataset.dir, b)));
   box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
   box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
   box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>{
@@ -2435,6 +2470,33 @@ function renderOutreachBox(){
     const wrap = b.closest(".who-box");
     outreachAddContact(b.dataset.dir, wrap.querySelector(".who-name").value.trim(), wrap.querySelector(".who-role").value.trim());
   }));
+}
+
+async function outreachCopy(dir){
+  const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
+  const body = lead && lead.latestMessage ? String(lead.latestMessage.body||"") : "";
+  if(!body.trim()){ flash("No message to copy yet"); return; }
+  try {
+    await navigator.clipboard.writeText(body);
+    flash("Message copied");
+  } catch (e) {
+    flash("Could not copy automatically. Select the message text and copy it.");
+  }
+}
+
+async function outreachMarkSent(dir, button){
+  const lead = (OUTREACH_LEADS||[]).find(l=>l.dir===dir);
+  if(!lead || !lead.latestMessage){ flash("No message to mark as sent"); return; }
+  button.disabled = true;
+  try {
+    const r = await post("/api/outreach/mark-sent", {dir:lead.dir});
+    if(!r.ok){ button.disabled=false; flash(r.error||"Could not record the send"); return; }
+    flash("Send recorded. Follow-ups will remind you when it is time to check back.");
+    await loadOutreach();
+  } catch (e) {
+    button.disabled=false;
+    flash(e instanceof Error ? e.message : String(e));
+  }
 }
 
 async function outreachAddContact(dir, name, role){
@@ -3601,6 +3663,9 @@ function vCard(m){
         + (i===0?' class="primary"':'')+'>'+esc(a.label)+'</button>').join("")
       + '</div>';
   }
+  if(m.contentHandoffEligible){
+    h += '<div class="vacts"><button class="primary v-content-handoff" data-vhandoff="'+esc(m.artifactId)+'">Send approved artifact to Content</button></div>';
+  }
   h += vSlot("card:"+m.artifactId, m);
   return h+'</div>';
 }
@@ -3910,6 +3975,8 @@ document.addEventListener("click", e=>{
   const val = ()=> { const el = $("#vFormVal"); return el ? el.value : ""; };
 
   if(t.id === "vFormCancel") return vClose();
+  const handoff = t.closest("[data-vhandoff]");
+  if(handoff) return ventureContentHandoff(handoff.dataset.vhandoff, handoff);
   if(t.id === "vFormOk"){
     const o = ventureOpen; if(!o) return;
     if(o.kind === "reason"){
@@ -3978,6 +4045,16 @@ document.addEventListener("click", e=>{
     });
   }
 });
+
+async function ventureContentHandoff(artifactId, button){
+  if(!ventureSlug || !artifactId) return;
+  button.disabled=true;
+  const result=await post("/api/venture/handoff",{slug:ventureSlug,artifactId});
+  if(!result.ok){ button.disabled=false; flash(result.error||"Could not create the Content handoff"); return; }
+  await setRoom("content");
+  CW.slug=result.request.id; CW.step=2; CW.pane="wizard"; CW.config=null; CW.treat=null; CW.treatFor=null; renderContentWizard(); cwLoadTreatment();
+  flash("Venture artifact opened in Content configuration");
+}
 
 // ── the intake interview ─────────────────────────────────────────────────────────────────────────
 //
@@ -4861,12 +4938,9 @@ async function onCharlesAction(act, item){
 // foot controls and the insights "Brief:" link share one switch. The last two sheets are
 // pre-prototype developer surfaces relocated behind those controls so the room opens on the reads.
 let SIGNALS = null;
-// Signals decisions are acknowledgements for this browser page only. Keep the key stable across
-// refreshes of the brief while leaving the API and the backlog handoff untouched; a full reload
-// creates fresh Sets and therefore restores every recommendation.
-const sigAdopted = new Set();
-const sigDeclined = new Set();
-function signalKey(r){ return JSON.stringify([r.type, r.title]); }
+// The server returns the latest append-only decision for each recommendation. A reload therefore
+// keeps the user's choice without changing routing, configuration, or the repository backlog.
+function signalKey(r){ return r.type+":"+r.title; }
 function signalStatusLabel(c){
   return c.status.startsWith("OK") ? c.weeks+" wks of data" : "insufficient · directional only";
 }
@@ -4903,23 +4977,24 @@ function renderSignals(){
       '<span class="l">'+c.posts+' posts on record</span></div>';
   }).join("");
   const weak = (SIGNALS.confidence||[]).filter(c=>!c.status.startsWith("OK"));
-  const declined = (SIGNALS.recommendations||[]).filter(r=>sigDeclined.has(signalKey(r)));
+  const declined = (SIGNALS.recommendations||[]).filter(r=>(r.decision || (SIGNALS.decisions&&SIGNALS.decisions[signalKey(r)]||{}).decision)==="decline");
   const recs = (SIGNALS.recommendations||[]).map((r,i)=>{
     const key = signalKey(r);
-    if(sigDeclined.has(key)) return "";
-    const adopted = sigAdopted.has(key);
+    const decision = r.decision || (SIGNALS.decisions&&SIGNALS.decisions[key]||{}).decision;
+    if(decision==="decline") return "";
+    const adopted = decision==="adopt";
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
       '<div class="dev-summary">'+esc(r.rationale)+'</div>'+
       '<div class="actions">'+
-        '<button class="'+(adopted?'':'primary ')+'sig-adopt" data-i="'+i+'"'+(adopted?' disabled':'')+'>'+(adopted?'Adopted for this session':'Adopt')+'</button>'+
+        '<button class="'+(adopted?'':'primary ')+'sig-adopt" data-i="'+i+'"'+(adopted?' disabled':'')+'>'+(adopted?'Adopted':'Adopt')+'</button>'+
         '<button class="sig-decline" data-i="'+i+'">Decline</button>'+
-        (adopted ? '<span class="src">Adopted for this session. Nothing changed.</span>' : '')+
+        (adopted ? '<span class="src">Decision saved. No configuration changed.</span>' : '')+
       '</div></div>';
   }).join("");
   const declinedHtml = declined.length
-    ? '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:6px;">Declined this session</div>'+declined.map(r=>
+    ? '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:6px;">Declined</div>'+declined.map(r=>
       '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
-      '<div class="dev-summary">'+esc(r.rationale)+'</div><div class="src">Declined this session. Nothing changed.</div></div>'
+      '<div class="dev-summary">'+esc(r.rationale)+'</div><div class="src">Decision saved. No configuration changed.</div></div>'
     ).join("")+'</div>'
     : "";
   const weakHtml = weak.length
@@ -4931,18 +5006,17 @@ function renderSignals(){
     weakHtml+
     '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+briefNote+
     (recs||'<div class="empty" style="padding:14px">No active recommendations this session.</div>')+'</div>'+declinedHtml;
-  box.querySelectorAll(".sig-adopt").forEach(b=>b.addEventListener("click", ()=>{
-    const r = SIGNALS.recommendations[Number(b.dataset.i)];
-    sigAdopted.add(signalKey(r));
-    flash("Adopted for this session. Nothing changed.");
-    renderSignals();
-  }));
-  box.querySelectorAll(".sig-decline").forEach(b=>b.addEventListener("click", ()=>{
-    const r = SIGNALS.recommendations[Number(b.dataset.i)];
-    sigDeclined.add(signalKey(r));
-    flash("Declined for this session. Nothing changed.");
-    renderSignals();
-  }));
+  box.querySelectorAll(".sig-adopt").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"adopt",b)));
+  box.querySelectorAll(".sig-decline").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"decline",b)));
+}
+async function saveSignalDecision(index, decision, button){
+  const recommendation=SIGNALS&&SIGNALS.recommendations ? SIGNALS.recommendations[index] : null;
+  if(!recommendation) return;
+  button.disabled=true;
+  const result=await post("/api/signals/decision",{decision,type:recommendation.type,title:recommendation.title,rationale:recommendation.rationale});
+  if(!result.ok){ button.disabled=false; flash(result.error||"Could not save the decision"); return; }
+  flash("Decision saved. No configuration changed.");
+  await loadSignals();
 }
 async function loadSignals(){
   const r = await fetch("/api/signals");

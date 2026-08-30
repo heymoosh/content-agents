@@ -30,9 +30,48 @@ import {
   type SchedulerDeps,
   appendLeadContact,
   ventureAnalysisPrompt,
+  availableEngines,
+  requestEngine,
+  requestAnalysisEngine,
+  requestInteractiveAnalysisEngine,
+  recordOutreachInitialSend,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
+
+test("engine availability requires the exact GPT-OSS model, not merely an Ollama binary", () => {
+  const missing = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\nllama3.2:latest\n" : "");
+  assert.equal(missing.find((e) => e.id === "ollama-gpt-oss")?.installed, false);
+  const ready = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\ngpt-oss:20b\n" : "");
+  assert.equal(ready.find((e) => e.id === "ollama-gpt-oss")?.installed, true);
+});
+
+test("GPT-OSS is accepted only by read-only analysis routes", () => {
+  assert.equal(requestAnalysisEngine("ollama-gpt-oss"), "ollama-gpt-oss");
+  assert.throws(() => requestEngine("ollama-gpt-oss"), /read-only|agentic|file/i);
+  assert.equal(requestEngine("codex"), "codex");
+  assert.throws(() => requestInteractiveAnalysisEngine("ollama-gpt-oss"), /self-contained|follow-up/i);
+});
+
+test("manual initial outreach sends use the folder slug and contacted event metadata", () => {
+  let recorded: unknown = null;
+  const event = recordOutreachInitialSend("outreach/leads/platform-moral-ambition", {
+    kind: "platform", latestMessage: {
+      file: "messages/message-01.md", channel: "email", status: "locked", recipient: "Jane Doe", body: "Hello",
+    }, contacts: [],
+  }, (bucket, lead, opts) => {
+    recorded = { bucket, lead, opts };
+    return { ts: "2026-08-29T00:00:00.000Z", bucket, lead, event: "contacted", ...opts } as never;
+  });
+  assert.equal(event.event, "contacted");
+  assert.deepEqual(recorded, {
+    bucket: "platform", lead: "platform-moral-ambition",
+    opts: { person: "Jane Doe", channel: "email", message: "messages/message-01.md", note: "Sent by hand from the Outreach composer" },
+  });
+  assert.throws(() => recordOutreachInitialSend("outreach/leads/platform-moral-ambition", {
+    kind: "platform", latestMessage: { file: "messages/message-01.md", channel: "email", status: "draft", recipient: "", body: "Hello" }, contacts: [],
+  }, (() => ({}) as never)), /lock/i);
+});
 
 test("fiction promotion handoff requires an approved promotional final", () => {
   const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
@@ -59,14 +98,26 @@ test("configured Content requests have one explicit draft-generation route", () 
   assert.match(source, /generateConfiguredContent/);
 });
 
-test("approval enters honest Postiz-pending state instead of legacy auto-scheduling", () => {
+test("approval dispatches through the existing reviewed platform schedulers", () => {
   const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
   const start = source.indexOf('url.pathname === "/api/status"');
   const end = source.indexOf('url.pathname === "/api/cancel"', start);
   const route = source.slice(start, end);
-  assert.match(route, /provider: "postiz"/);
-  assert.match(route, /configured: false/);
-  assert.doesNotMatch(route, /await scheduleApproved/);
+  assert.match(route, /await scheduleApproved/);
+  assert.match(route, /schedulingInFlight/);
+  assert.doesNotMatch(route, /provider: "postiz"/);
+});
+
+test("Venture handoff refuses concurrent duplicate Content writes", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const start = source.indexOf('url.pathname === "/api/venture/handoff"');
+  const end = source.indexOf('url.pathname === "/api/studio"', start);
+  const route = source.slice(start, end);
+  assert.match(route, /ventureHandoffsInFlight\.has/);
+  assert.match(route, /ventureHandoffsInFlight\.add/);
+  assert.match(route, /ventureHandoffsInFlight\.delete/);
+  assert.match(route, /readContentRequest\(existingFolder\)/);
+  assert.match(route, /existingRequest\.ventureSource\?\.artifactId/);
 });
 
 test("the E2E start seam owns the loopback listen and direct execution delegates to it", () => {

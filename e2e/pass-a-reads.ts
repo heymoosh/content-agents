@@ -138,7 +138,7 @@ async function main(): Promise<void> {
     // one request-grouped approval surface. The superseded director/workbench path is intentionally
     // absent. Apply a fixture scenario first so a source is guaranteed.
     await openRoom(s.page, "content");
-    await applyScenario(s.page, "recs-blocked");
+    await applyScenario(s.page, "content-wizard");
     await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#cwBody").catch(() => "");
     await s.page.waitForSelector("#cwBody .cw-src", { timeout: 15_000 }).catch(() => null);

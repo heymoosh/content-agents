@@ -1,11 +1,12 @@
-export type Engine = "claude" | "grok" | "codex";
+export type Engine = "claude" | "grok" | "codex" | "ollama-gpt-oss";
 
-export const ENGINES: readonly Engine[] = ["claude", "grok", "codex"];
+export const ENGINES: readonly Engine[] = ["claude", "grok", "codex", "ollama-gpt-oss"];
 
 export const ENGINE_LABELS: Record<Engine, string> = {
   claude: "Claude",
   grok: "Grok",
   codex: "GPT (Codex)",
+  "ollama-gpt-oss": "GPT-OSS (local)",
 };
 
 export type EngineRoleHint = "Writing" | "Ideation / Humor" | "Deep / Structured Analysis";
@@ -36,6 +37,12 @@ export const ENGINE_METADATA: Readonly<Record<Engine, EngineMetadata>> = Object.
     description: "Deep reasoning, structured analysis, and implementation planning.",
     roleHint: "Deep / Structured Analysis",
   }),
+  "ollama-gpt-oss": Object.freeze({
+    id: "ollama-gpt-oss",
+    label: "GPT-OSS (local)",
+    description: "Local GPT-OSS analysis through Ollama.",
+    roleHint: "Deep / Structured Analysis",
+  }),
 });
 
 export function getEngineMetadata(engine: unknown): EngineMetadata {
@@ -51,6 +58,7 @@ export const ENGINE_COMMANDS: Record<Engine, string> = {
   claude: "claude",
   grok: "grok",
   codex: "codex",
+  "ollama-gpt-oss": "ollama",
 };
 
 export interface EngineSpawnOptions {
@@ -61,6 +69,8 @@ export interface EngineSpawnOptions {
   sandbox?: "read-only" | "workspace-write" | "danger-full-access";
   outputFile?: string;
 }
+
+export { OLLAMA_MODEL, parseOllamaList, ollamaAvailability, parseOllamaAvailability } from "./ollama-availability.js";
 
 export function isEngine(value: unknown): value is Engine {
   return typeof value === "string" && (ENGINES as readonly string[]).includes(value);
@@ -83,7 +93,12 @@ export function buildEngineSpawn(
   engine: Engine,
   prompt: string,
   opts: EngineSpawnOptions,
-): { command: string; args: string[] } {
+): { command: string; args: string[]; input?: string } {
+  if (engine === "ollama-gpt-oss") {
+    // Ollama receives the prompt on stdin. This avoids putting potentially sensitive prompt
+    // content in argv/process listings and keeps invocation shell-free.
+    return { command: "ollama", args: ["run", "gpt-oss:20b"], input: prompt };
+  }
   if (engine === "codex") {
     const args = [
       "exec",

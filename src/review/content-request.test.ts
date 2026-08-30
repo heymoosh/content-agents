@@ -2,6 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildContentRequest,
+  mergeContentConfiguration,
   resolveContentCta,
   type ContentRequestInput,
   type LeadMagnet,
@@ -55,6 +56,37 @@ describe("content request domain", () => {
     const request = buildContentRequest({ ...base, includeUntreatedControl: false });
     assert.equal(request.control.enabled, false);
     assert.equal(request.variants.every((variant) => variant.identity.kind === "treated"), true);
+  });
+
+  test("accepts Venture provenance only on a Venture-owned request", () => {
+    const ventureSource = {
+      artifactId: "p1-note", phase: 1 as const, artifactKind: "text-post-note" as const,
+      messageId: "msg-1", bodyPath: "phase-1-attention/p1-note.md", claimRefs: [],
+      approval: { editorialStatus: "approved" as const, provenance: "muxin-editorial-approval" as const },
+    };
+    assert.throws(() => buildContentRequest({ ...base, ventureSource }), /Venture.*origin/i);
+    assert.throws(() => buildContentRequest({ ...base, origin: "venture", ventureSource }), /ventureId/i);
+    assert.equal(buildContentRequest({ ...base, origin: "venture", ventureId: "civic-tech", ventureSource }).ventureSource?.artifactId, "p1-note");
+  });
+
+  test("configuration edits preserve immutable source and Venture approval provenance", () => {
+    const ventureSource = {
+      artifactId: "p1-note", phase: 1 as const, artifactKind: "text-post-note" as const,
+      messageId: "msg-1", bodyPath: "phase-1-attention/p1-note.md", claimRefs: [{ claim: "One", ref: "intake:q1" }],
+      approval: { editorialStatus: "approved" as const, provenance: "muxin-editorial-approval" as const },
+    };
+    const existing = buildContentRequest({ ...base, origin: "venture", ventureId: "civic-tech", ventureSource });
+    const merged = mergeContentConfiguration(existing, {
+      ...base, origin: "studio", descriptor: "spoofed", originalInput: "replaced", ventureId: null, ventureSource: null,
+      treatments: ["shorter-version"], platforms: ["x"],
+    });
+    assert.equal(merged.origin, "venture");
+    assert.equal(merged.descriptor, existing.descriptor);
+    assert.equal(merged.originalInput, existing.originalInput);
+    assert.equal(merged.ventureId, "civic-tech");
+    assert.deepEqual(merged.ventureSource, ventureSource);
+    assert.deepEqual(merged.treatments, ["shorter-version"]);
+    assert.deepEqual(merged.platforms, ["x"]);
   });
 
   test("refuses missing, ambiguous, or cross-origin/cross-venture CTA mappings", () => {

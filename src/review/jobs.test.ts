@@ -1,10 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
+
+test("runAgentSpawn forwards a selected engine's stdin payload", () => {
+  const source = readFileSync(join(process.cwd(), "src/review/jobs.ts"), "utf8");
+  assert.match(source, /runCommandSpawn\(job, built\.command, built\.args, \{[\s\S]*?input: built\.input/);
+});
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
 // Card 9304e4a5: an out-of-scope "Ask Claude" request (retarget the platform, write a new post)
