@@ -13,6 +13,9 @@ import {
   applyTargetedRevision, createFictionPromotionDraft, directEdit,
   loadFictionPromotionDraft, saveFictionPromotionDraft, type FictionPromotionDraft,
 } from "./fiction-promotion-draft.js";
+import {
+  appendReviewCommentSafe, fictionReviewSubject, listReviewCommentsSafe,
+} from "./review-comments.js";
 
 type FictionRouteContext = {
   req: IncomingMessage;
@@ -167,6 +170,7 @@ export async function handleFictionRoute({ req, res, url, readBody, json, reques
         beats: beats?.beats ?? "",
         chapter,
         continuity: n ? readContinuityReport(slug, n) : null,
+        comments: n ? listReviewCommentsSafe("fiction", fictionReviewSubject(slug, n)) : [],
       });
     } catch (e) {
       json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -198,9 +202,16 @@ export async function handleFictionRoute({ req, res, url, readBody, json, reques
   if (req.method === "POST" && url.pathname === "/api/fiction/repass") {
     const b = await readBody(req);
     try {
+      const series = String(b.series ?? "");
+      const chapter = Number(b.chapter ?? 0);
+      const note = String(b.note ?? "");
+      const job = addFictionRepassJob(series, chapter, note, requestEngine(b.engine));
+      const history = appendReviewCommentSafe({
+        domain: "fiction", subject: fictionReviewSubject(series, chapter), body: note, operationId: job.id,
+      });
       json(res, 200, {
         ok: true,
-        job: publicJob(addFictionRepassJob(String(b.series ?? ""), Number(b.chapter ?? 0), String(b.note ?? ""), requestEngine(b.engine))),
+        job: publicJob(job), comment: history.comment, historyWarning: history.warning,
       });
     } catch (e) {
       json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });

@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoRoot } from "../db/db.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
 
 export const CHARLES_DIR = join(repoRoot, "charles");
 
@@ -63,7 +64,7 @@ function findRow(root: string, id: string): CharlesRow {
 
 function readDraft(root: string, row: CharlesRow): CharlesPost {
   const abs = resolveDraft(root, row);
-  const body = existsSync(abs) ? readFileSync(abs, "utf8") : "";
+  const body = existsSync(abs) ? splitFrontmatter(readFileSync(abs, "utf8")).body : "";
   return { ...row, body };
 }
 
@@ -80,11 +81,15 @@ export function saveCharlesPost(id: string, body: string, root: string = CHARLES
   const abs = resolveDraft(root, row);
   if (!existsSync(abs)) throw new Error("no such draft file: " + row.file);
   if (!body.trim()) throw new Error("refusing to save an empty draft");
-  writeFileSync(abs, body.replace(/\n*$/, "\n"));
+  const { header } = splitFrontmatter(readFileSync(abs, "utf8"));
+  const prose = body.trim().replace(/\n*$/, "\n");
+  writeFileSync(abs, header ? `${header}\n${prose}` : prose);
 }
 
 export function setCharlesStatus(id: string, status: string, notes?: string, root: string = CHARLES_DIR): void {
   if (!STATUSES.has(status)) throw new Error("bad status: " + status);
+  if (notes?.includes("|")) throw new Error("revision notes cannot contain a pipe");
+  if (notes && /[\r\n]/.test(notes)) throw new Error("revision notes must stay on a single line");
   findRow(root, id); // 404s before touching the file
   const path = queuePath(root);
   const lines = readFileSync(path, "utf8").split("\n");

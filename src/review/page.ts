@@ -60,6 +60,7 @@ import {
 } from "./page-capture.js";
 export * from "./page-outreach.js";
 export * from "./page-fiction.js";
+export * from "./page-charles.js";
 export * from "./page-venture.js";
 export * from "./page-signals.js";
 // Re-export the shared classifier API, while this page owns the copy it actually displays for a
@@ -1100,7 +1101,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet session">
       <div class="session-grid">
       <div class="session-main">
-      <nav class="room-pages" aria-label="Charles pages"><button type="button" class="on" data-charles-page="input">Input</button><button type="button" data-charles-page="drafts">Review drafts</button></nav>
+      <nav class="room-pages" aria-label="Charles pages"><button type="button" class="on" data-charles-page="input">Input</button><button type="button" data-charles-page="needs-review">Needs review</button><button type="button" data-charles-page="approved">Approved</button><button type="button" data-charles-page="all">All drafts</button></nav>
       <div id="charlesInputPane">
       <div class="capture charles-composer">
       <div class="capture-title">Draft a Charles post</div>
@@ -4537,6 +4538,9 @@ function ficParagraphs(body){
   return String(body||"").replace(/\\r\\n/g,"\\n").trim().split(/\\n\\s*\\n/)
     .map(p=>p.split("\\n").map(l=>l.trim()).filter(Boolean).join(" ")).filter(Boolean);
 }
+function ficEditableSpans(body){
+  return String(body||"").replace(/\\r\\n/g,"\\n").trim().split(/\\n\\s*\\n/).map(span=>span.trim()).filter(Boolean);
+}
 function ficPassJob(){
   const mine = (JOBS||[]).filter(j=>j.kind==="fiction-draft"&&(j.status==="queued"||j.status==="running"));
   return mine.length ? mine[mine.length-1] : null;
@@ -4597,18 +4601,22 @@ function renderFiction(){
       (failed.retryable ? '<div class="actions" style="margin-top:13px"><button data-retry="'+esc(failed.id)+'">Run it again</button></div>' : '')+
     '</div>';
 
+  const spans = hasScene ? ficEditableSpans(chapter.body) : [];
+  const reviewHistory = (sc.comments||[]).length
+    ? '<details class="lead-details" open style="margin-top:16px;max-width:600px"><summary>Review history · '+sc.comments.length+'</summary>'+(sc.comments||[]).map(item=>'<div class="src" style="margin-top:9px"><strong>'+esc(String(item.createdAt||"").slice(0,16).replace("T"," "))+'</strong><br>'+esc(item.body)+'</div>').join("")+'</details>'
+    : '<div class="src" style="margin-top:12px">Review history starts when you request a second pass.</div>';
   const scene = !hasScene ? '' :
     '<div style="display:flex;align-items:baseline;gap:10px;margin:32px 0 11px">'+
       '<span style="font:600 13px/1 Georgia,serif;color:'+JC.ai+'">The scene, from your beats</span>'+
       '<span class="src" style="font-style:italic">chapter '+chapter.number+(chapter.title?' · '+esc(chapter.title):'')+' · your beats, its prose</span>'+
     '</div>'+
     '<div style="max-width:600px;display:flex;flex-direction:column;gap:15px;padding-left:18px;border-left:2px solid '+JC.ai+'">'+
-      ficParagraphs(chapter.body).map(t=>'<span style="font:400 18px/1.8 Georgia,serif;color:'+JC.ai+'">'+esc(t)+'</span>').join("")+
+      spans.map((t,i)=>'<div data-passage="'+i+'"><div style="font:400 18px/1.8 Georgia,serif;color:'+JC.ai+';white-space:pre-wrap">'+esc(t)+'</div><button type="button" data-edit-passage="'+i+'" style="margin-top:5px;border:none;background:none;padding:0;color:#756b9a;font-size:12px;cursor:pointer">Edit passage</button></div>').join("")+
     '</div>'+
     '<div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
       '<button id="ficRecheck">Check the canon again</button>'+
       engineSelectHtml()+
-      '<span class="src" style="max-width:340px">It is written to stories/'+esc(ficSeries)+'/'+esc(chapter.path)+'. Nothing is approved, locked or published, and no branch or pull request was made. Read-only: it never edits the chapter itself.</span>'+
+      '<span class="src" style="max-width:340px">It is written to stories/'+esc(ficSeries)+'/'+esc(chapter.path)+'. A passage edit saves to this draft, but final acceptance and commit history stay in the story PR.</span>'+
     '</div>'+
     '<div style="margin-top:26px;max-width:600px">'+
       '<div class="wb-margin-cap">SECOND PASS · SAY WHAT TO CHANGE</div>'+
@@ -4619,7 +4627,7 @@ function renderFiction(){
       '</div>'+
       '<div class="src" style="margin-top:8px">'+(passJob
         ? 'It is running now. The draft above does not move until the new one lands.'
-        : 'It runs as its own job, with the real time on it. Nothing overwrites the draft above until you read the new one.')+'</div>'+
+        : 'It runs as its own job, with the real time on it. Nothing overwrites the draft above until you read the new one.')+'</div>'+reviewHistory+
     '</div>'+
     '<div style="margin:38px 0 0;display:flex;align-items:center;gap:12px"><span style="height:1px;flex:1;background:#efe7d6"></span><span style="font:italic 400 14px/1 Georgia,serif;color:#a89a80">the canon underneath it</span><span style="height:1px;flex:1;background:#efe7d6"></span></div>';
 
@@ -4742,10 +4750,21 @@ function renderFiction(){
     if(!note){ flash("Say what to change first"); return; }
     const engine = passBtn.closest("div")?.querySelector(".engine-select")?.value || "claude";
     post("/api/fiction/repass",{series:ficSeries, chapter:chapter.number, note:note, engine}).then(r=>{
-      if(r.ok){ ficPassNote=""; flash("Second pass queued with "+engineLabel(engine)+". The draft above stays until it lands."); loadFiction(); }
+      if(r.ok){ ficPassNote=""; flash(r.historyWarning||("Second pass queued with "+engineLabel(engine)+". The draft above stays until it lands.")); loadFiction(); }
       else flash(r.error||"Could not start it");
     });
   });
+  document.querySelectorAll("#fictionMain [data-edit-passage]").forEach(button=>button.addEventListener("click",()=>{
+    const index=Number(button.dataset.editPassage); const span=spans[index];
+    const wrap=button.closest("[data-passage]"); if(!wrap||span===undefined)return;
+    wrap.innerHTML='<textarea rows="7" style="width:100%;box-sizing:border-box;font:400 17px/1.65 Georgia,serif">'+esc(span)+'</textarea><div class="actions"><button type="button" data-save-passage>Save passage</button><button type="button" data-cancel-passage>Cancel</button></div>';
+    wrap.querySelector("[data-cancel-passage]").addEventListener("click",renderFiction);
+    wrap.querySelector("[data-save-passage]").addEventListener("click",async ()=>{
+      const replacement=wrap.querySelector("textarea").value;
+      const result=await post("/api/fiction/fix",{series:ficSeries,chapter:chapter.number,span,replacement});
+      if(result.ok){flash("Passage saved to the draft");await loadFiction();}else flash(result.error||"Could not save that passage");
+    });
+  }));
   const recheck = $("#ficRecheck");
   if(recheck) recheck.addEventListener("click", ()=>{
     const engine = recheck.closest("div")?.querySelector(".engine-select")?.value || "claude";
@@ -4812,7 +4831,7 @@ async function draftCharles(){
     $("#charlesInput").value = "";
     $("#charlesReplyInput").value = "";
     charlesId = ok[ok.length-1].result.id;
-    charlesPage = "drafts";
+    charlesPage = "needs-review";
     flash("Queued "+ok.map(x=>typeLabel(x.mode)).join(", ")+" with "+engineLabel(engine)+(failed.length?"; failed: "+failed.map(x=>typeLabel(x.mode)).join(", "):""));
     if(currentTab==="charles") loadCharles();
   } else flash(failed.map(x=>typeLabel(x.mode)+": "+(x.result.error||"failed")).join("; "));
@@ -4846,10 +4865,20 @@ let charlesId = null;
 let charlesPage = "input";
 function renderCharlesPages(){
   $("#charlesInputPane").hidden=charlesPage!=="input";
-  $("#charlesDraftPane").hidden=charlesPage!=="drafts";
+  $("#charlesDraftPane").hidden=charlesPage==="input";
   document.querySelectorAll("[data-charles-page]").forEach(button=>button.classList.toggle("on",button.dataset.charlesPage===charlesPage));
 }
-document.querySelectorAll("[data-charles-page]").forEach(button=>button.addEventListener("click",()=>{ charlesPage=button.dataset.charlesPage; renderCharlesPages(); }));
+function charlesVisiblePosts(){
+  if(charlesPage==="needs-review") return CHARLES_POSTS.filter(post=>post.status==="pending"||post.status==="revise");
+  if(charlesPage==="approved") return CHARLES_POSTS.filter(post=>post.status==="approve");
+  if(charlesPage==="all") return CHARLES_POSTS;
+  return [];
+}
+document.querySelectorAll("[data-charles-page]").forEach(button=>button.addEventListener("click",()=>{
+  charlesPage=button.dataset.charlesPage;
+  const visible=charlesVisiblePosts(); if(visible.length&&!visible.some(post=>post.id===charlesId)) charlesId=visible[0].id;
+  renderCharles(); renderCharlesPages();
+}));
 function typeLabel(t){ return t==="one-liner" ? "One-liner" : t==="essay" ? "Essay" : t==="reply" ? "Reply" : t; }
 async function loadCharles(){
   loadCharlesBrief();
@@ -4865,7 +4894,16 @@ async function loadCharles(){
   renderCharlesPages();
 }
 function renderCharles(){
-  const post = CHARLES_POSTS.find(p=>p.id===charlesId);
+  const visible = charlesVisiblePosts();
+  const post = visible.find(p=>p.id===charlesId) || visible[0];
+  if(!post){
+    $("#charlesMain").innerHTML='<div class="empty">Nothing in this view.</div>';
+    $("#charlesDraftList").innerHTML=""; return;
+  }
+  charlesId=post.id;
+  const reviewHistory=(post.comments||[]).length
+    ? '<details class="lead-details" open style="margin-top:18px"><summary>Review history · '+post.comments.length+'</summary>'+post.comments.map(item=>'<div class="src" style="margin-top:9px"><strong>'+esc(String(item.createdAt||"").slice(0,16).replace("T"," "))+'</strong><br>'+esc(item.body)+'</div>').join("")+'</details>'
+    : '<div class="src" style="margin-top:14px">Review history starts when you save a revision note.</div>';
   $("#charlesMain").innerHTML =
     '<div class="wb-label">Charles Lord Featherbottom · '+esc(typeLabel(post.type))+'</div>'+
     '<div style="display:flex;align-items:center;gap:10px;margin:2px 0 14px;">'+
@@ -4881,11 +4919,11 @@ function renderCharles(){
       (post.status==="approve"?'<button class="primary" data-act="content-handoff">Send approved draft to Content</button>':"")+
       '<button id="charlesEditBtn" data-act="edit">Edit in place</button>'+
     '</div>'+
-    '<div class="revisebox" id="charlesRevisebox"><input placeholder="what needs changing?" value="'+esc(post.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
+    '<div class="revisebox" id="charlesRevisebox"><input placeholder="what needs changing?" value="" /><button data-act="save-note">Save note</button></div>'+reviewHistory+
     '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything. An approved output can enter Content with Charles identity and CTA restrictions for optional treatments, media, and routing.</div>';
   $("#charlesDraftList").innerHTML =
     '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
-    CHARLES_POSTS.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
+    visible.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
       '<span>'+esc(typeLabel(p.type))+' · '+esc(p.id)+'</span>'+
       '<span class="pill '+pillClass(p.status)+'" style="font-size:10px">'+esc(statusLabel(p.status))+'</span>'+
     '</div>').join("");
@@ -4901,10 +4939,12 @@ async function onCharlesAction(act, item){
   } else if (act === "revise"){
     $("#charlesRevisebox").classList.toggle("show");
   } else if (act === "save-note"){
-    const note = $("#charlesRevisebox input").value;
-    const r = await post("/api/charles/status", {id:item.id, status:"revise", notes:note});
+    const noteInput = $("#charlesRevisebox input");
+    const note = noteInput.value;
+    const operationId=noteInput.dataset.operationId||(noteInput.dataset.operationId=(globalThis.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now()+"-"+Math.random())));
+    const r = await post("/api/charles/status", {id:item.id, status:"revise", notes:note, operationId});
     if (r.ok===false){ flash(r.error||"Failed"); return; }
-    flash("Marked revise");
+    flash(r.historyWarning||"Marked revise");
     loadCharles();
   } else if (act === "edit"){
     const bodyEl = $("#charlesBody");
