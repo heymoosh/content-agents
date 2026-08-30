@@ -1,10 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { changedWorktreePaths, E2E_PHASE3_SLUG, E2E_WRITE_SLUG, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
-import { existsSync } from "node:fs";
+import { changedWorktreePaths, E2E_PHASE3_SLUG, E2E_WRITE_SLUG, EXPENSIVE_ROUTES, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
+
+test("deterministic Fiction passage saves are browser-testable without allowing model jobs", () => {
+  assert.ok(!EXPENSIVE_ROUTES.includes("/api/fiction/fix"));
+  assert.ok(EXPENSIVE_ROUTES.includes("/api/fiction/draft"));
+  assert.ok(EXPENSIVE_ROUTES.includes("/api/fiction/repass"));
+});
 
 test("Playwright cache resolution stays on the real home when E2E HOME is disposable", () => {
   assert.equal(

@@ -4486,7 +4486,7 @@ async function loadFiction(){
   ficDocData = await dr.json();
   const sr = await fetch("/api/fiction/scene?series="+encodeURIComponent(ficSeries));
   ficScene = await sr.json();
-  await loadFictionPromotion();
+  if(ficPage==="promotion") await loadFictionPromotion();
   renderFiction();
   renderCaptureHandoff();
 }

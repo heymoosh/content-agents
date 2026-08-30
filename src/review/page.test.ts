@@ -3271,6 +3271,10 @@ test("Fiction keeps input visible and separates draft review from canon links", 
   assert.ok(html.includes("historyWarning"), "a history-store failure must not masquerade as a failed primary action");
   assert.ok(html.includes('ficPage = "write"'));
   assert.ok(!html.includes('aria-label="Fiction stages"'));
+  const loadStart = html.indexOf("async function loadFiction(){");
+  const loadEnd = html.indexOf("async function loadFictionPromotion(){", loadStart);
+  const loader = html.slice(loadStart, loadEnd);
+  assert.ok(loader.includes('if(ficPage==="promotion") await loadFictionPromotion()'), "opening Fiction must not fetch optional promotion state until that view is selected");
 });
 
 test("Charles composer is a labeled writing surface and explains the Content handoff", () => {

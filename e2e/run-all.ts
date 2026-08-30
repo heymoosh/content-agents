@@ -1,6 +1,7 @@
 // One command that runs the whole Studio end-to-end suite and writes a single report.
 //
 //   npm run test:e2e
+//   npm run test:e2e -- D-editorial  # one isolated pass
 //
 // Deliberately NOT part of `npm test`: that suite is 2085 in-process unit tests and stays fast and
 // browser-free. This one boots servers and drives Chromium, and belongs on its own command.
@@ -21,7 +22,8 @@ const PASSES = [
   { name: "A-reads", script: "pass-a-reads.ts", title: "Pass A — every room reads and renders (fixture mode)" },
   { name: "B-writes", script: "pass-b-writes.ts", title: "Pass B — the write flows (real server, worktree-isolated)" },
   { name: "C-383", script: "pass-c-383.ts", title: "Pass C — the phase-gated #383 surfaces" },
-  { name: "D-notcovered", script: "pass-d-notcovered.ts", title: "Pass D — deliberately NOT covered (model-job routes)" },
+  { name: "D-editorial", script: "pass-d-editorial.ts", title: "Pass D — Fiction and Charles editorial writes" },
+  { name: "E-notcovered", script: "pass-d-notcovered.ts", title: "Pass E — deliberately NOT covered (model-job routes)" },
 ];
 
 type DisposableRepo = { root: string; home: string; parent: string };
@@ -50,6 +52,11 @@ function makeDisposableRepo(): DisposableRepo {
 }
 
 function main(): void {
+  const requestedPass = process.argv[2];
+  const passes = requestedPass ? PASSES.filter((pass) => pass.name === requestedPass) : PASSES;
+  if (requestedPass && !passes.length) {
+    throw new Error(`Unknown E2E pass ${requestedPass}. Choose one of: ${PASSES.map((pass) => pass.name).join(", ")}`);
+  }
   const sharedBefore = snapshotWorktree(SHARED_ROOT);
   const disposable = makeDisposableRepo();
   // HOME below is intentionally disposable for application drafts. Pin Playwright to the cache
@@ -79,14 +86,16 @@ function main(): void {
     // earlier run; it never edits the source checkout (including its existing tracker/backlog/
     // review-queue residue).
     resetDisposableSuiteState(disposable.root, disposable.home);
-    const seed = spawnSync(tsx, [...tsxArgs, join(disposable.root, "e2e", "seed-phase3.ts"), E2E_PHASE3_SLUG], {
-      cwd: disposable.root,
-      stdio: "inherit",
-      env,
-    });
-    if (seed.status !== 0) anyFailed = true;
+    if (passes.some((pass) => pass.name === "C-383")) {
+      const seed = spawnSync(tsx, [...tsxArgs, join(disposable.root, "e2e", "seed-phase3.ts"), E2E_PHASE3_SLUG], {
+        cwd: disposable.root,
+        stdio: "inherit",
+        env,
+      });
+      if (seed.status !== 0) anyFailed = true;
+    }
 
-    for (const p of PASSES) {
+    for (const p of passes) {
       const r = spawnSync(tsx, [...tsxArgs, join(disposable.root, "e2e", p.script)], {
         cwd: disposable.root,
         stdio: "inherit",
@@ -117,7 +126,7 @@ function main(): void {
       `**${counts.pass} pass, ${counts.fail} fail, ${counts.blocked} blocked.**`,
       "",
       "Blocked means the suite did not drive the feature, so its end-to-end behaviour is genuinely",
-      "unverified rather than quietly counted as passing. Pass D lists every one, with the engine it",
+      "unverified rather than quietly counted as passing. Pass E lists every one, with the engine it",
       "runs on and the actual reason it was skipped. Note that cost is NOT the usual reason: nearly",
       "all of these run at $0 on a subscription (`claude -p`, or the local Codex CLI on the ChatGPT",
       "subscription for insights). They are skipped because a model job takes minutes and returns",
@@ -129,7 +138,7 @@ function main(): void {
       "snapshotted before and after the passes and must remain byte-identical.",
       "",
     ];
-    for (const p of PASSES) {
+    for (const p of passes) {
       const mine = rows.filter((r) => r.pass === p.name);
       if (!mine.length) continue;
       out.push(`## ${p.title}`, "", "| Feature | PR | Verdict | Detail |", "|---|---|---|---|");

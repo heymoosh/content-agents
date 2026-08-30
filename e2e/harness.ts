@@ -110,7 +110,6 @@ export const EXPENSIVE_ROUTES = [
   "/api/fiction/draft",
   "/api/fiction/repass",
   "/api/fiction/check",
-  "/api/fiction/fix",
   "/api/charles/draft",
   "/api/strategy/ask",
   "/api/strategy/insights",
