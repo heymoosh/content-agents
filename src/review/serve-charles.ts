@@ -2,6 +2,9 @@ import { type IncomingMessage, type ServerResponse } from "node:http";
 import { listCharlesPosts, readCharlesPost, saveCharlesPost, setCharlesStatus, readPersonaBrief } from "./charles.js";
 import { enqueueCharlesDraft } from "./jobs.js";
 import { type Engine } from "./engines.js";
+import {
+  appendReviewCommentSafe, charlesReviewSubject, listReviewCommentsSafe,
+} from "./review-comments.js";
 
 type CharlesRouteContext = {
   req: IncomingMessage;
@@ -18,7 +21,9 @@ export async function handleCharlesRoute({ req, res, url, readBody, json, reques
   // contract as everywhere else — approve/revise/discard just flips a status cell here, nothing
   // posts (see charles/CLAUDE.md).
   if (req.method === "GET" && url.pathname === "/api/charles") {
-    json(res, 200, { posts: listCharlesPosts() });
+    json(res, 200, { posts: listCharlesPosts().map((post) => ({
+      ...post, comments: listReviewCommentsSafe("charles", charlesReviewSubject(post.id)),
+    })) });
     return true;
   }
   if (req.method === "GET" && url.pathname === "/api/charles/persona-brief") {
@@ -32,8 +37,20 @@ export async function handleCharlesRoute({ req, res, url, readBody, json, reques
   if (req.method === "POST" && url.pathname === "/api/charles/status") {
     const b = await readBody(req);
     try {
-      setCharlesStatus(String(b.id ?? ""), String(b.status ?? ""), b.notes !== undefined ? String(b.notes) : undefined);
-      json(res, 200, { ok: true, post: readCharlesPost(String(b.id ?? "")) });
+      const id = String(b.id ?? "");
+      const status = String(b.status ?? "");
+      const notes = b.notes !== undefined ? String(b.notes) : undefined;
+      setCharlesStatus(id, status, notes);
+      let historyWarning: string | undefined;
+      if (status === "revise" && notes?.trim()) {
+        historyWarning = appendReviewCommentSafe({
+          domain: "charles", subject: charlesReviewSubject(id), body: notes,
+          operationId: b.operationId === undefined ? undefined : String(b.operationId),
+        }).warning;
+      }
+      json(res, 200, { ok: true, post: {
+        ...readCharlesPost(id), comments: listReviewCommentsSafe("charles", charlesReviewSubject(id)),
+      }, historyWarning });
     } catch (e) {
       json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
     }

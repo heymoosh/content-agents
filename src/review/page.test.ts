@@ -10,14 +10,32 @@ import {
   JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
-  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, unfixableLine,
+  jobAwaitingAnswer, jobSettled, jobsPollDue, enqueuesJob, JOB_ENQUEUE_ROUTES, JOBS_POLL_MS, fictionStatusWord, fictionStatusTone, fictionHasScene, fictionCheckRow, fictionCanonStamp, fictionSceneParagraphs, fictionEditableSpans, unfixableLine,
   classifyCapture, captureVerdict, captureHandoffVerdict, CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING,
   LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE, BOOT_ROOM,
   groupDigits, metricLine, sampleNote, familyGate, fitLine, floorNote, reuseLine, readsFromCells,
   intakeProgressLine, intakeUnanswered, intakeSaveLine, intakeSlugError,
   ventureMultiPickIds, followupDraftRequest, outreachDraftRequest, outreachMessageReviseRequest, notesPickRequest,
+  charlesPostsForPage,
   type MetricReadView, type ChannelTreatmentView, type TreatmentView, type FitBasisView,
 } from "./page.js";
+
+test("Charles pages separate work needing review from approved and historical drafts", () => {
+  const posts = [
+    { id: "p", status: "pending" }, { id: "r", status: "revise" },
+    { id: "a", status: "approve" }, { id: "d", status: "discard" },
+  ] as never[];
+  assert.deepEqual(charlesPostsForPage(posts, "needs-review").map((post) => post.id), ["p", "r"]);
+  assert.deepEqual(charlesPostsForPage(posts, "approved").map((post) => post.id), ["a"]);
+  assert.deepEqual(charlesPostsForPage(posts, "all").map((post) => post.id), ["p", "r", "a", "d"]);
+  assert.deepEqual(charlesPostsForPage(posts, "input"), []);
+});
+
+test("fictionEditableSpans keeps exact chapter bytes for surgical in-app edits", () => {
+  assert.deepEqual(fictionEditableSpans("First sentence.\nSecond sentence.\n\nAnother paragraph."), [
+    "First sentence.\nSecond sentence.", "Another paragraph.",
+  ]);
+});
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { saveIntakeDraft } from "./intake-draft.js";
@@ -3246,8 +3264,17 @@ test("Fiction keeps input visible and separates draft review from canon links", 
   assert.ok(html.includes("What happens next?"));
   assert.match(html, /const composer =\s*'<div/, "the composer must not disappear when saved beats exist");
   assert.ok(html.includes("Direct line edits and final acceptance happen in the story PR"));
+  assert.ok(html.includes("Edit passage"));
+  assert.ok(html.includes('data-edit-passage'));
+  assert.ok(html.includes("Review history"));
+  assert.ok(html.includes('span,replacement'), "the passage editor must submit the exact displayed span");
+  assert.ok(html.includes("historyWarning"), "a history-store failure must not masquerade as a failed primary action");
   assert.ok(html.includes('ficPage = "write"'));
   assert.ok(!html.includes('aria-label="Fiction stages"'));
+  const loadStart = html.indexOf("async function loadFiction(){");
+  const loadEnd = html.indexOf("async function loadFictionPromotion(){", loadStart);
+  const loader = html.slice(loadStart, loadEnd);
+  assert.ok(loader.includes('if(ficPage==="promotion") await loadFictionPromotion()'), "opening Fiction must not fetch optional promotion state until that view is selected");
 });
 
 test("Charles composer is a labeled writing surface and explains the Content handoff", () => {
@@ -3258,7 +3285,11 @@ test("Charles composer is a labeled writing surface and explains the Content han
   assert.ok(html.includes("Approved drafts can be sent to Content"));
   assert.ok(html.includes('aria-label="Charles pages"'));
   assert.ok(html.includes('data-charles-page="input"'));
-  assert.ok(html.includes('data-charles-page="drafts"'));
+  assert.ok(html.includes('data-charles-page="needs-review"'));
+  assert.ok(html.includes('data-charles-page="approved"'));
+  assert.ok(html.includes('data-charles-page="all"'));
+  assert.ok(html.includes("Review history"));
+  assert.ok(html.includes("operationId"), "a retried Charles note save must not duplicate review history");
 });
 
 test("review actions close the focus dialog before rebuilding its source list", () => {

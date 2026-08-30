@@ -31,7 +31,7 @@ const NOT_COVERED: { feature: string; route: string; engine: string; why: Reason
   { feature: "Atomize a piece into platform drafts", route: "POST /api/atomize", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Hand a thought to the creative director (develop)", route: "POST /api/develop/start|reply|format", engine: "claude -p (subscription)", why: "time+nondeterm", pr: "#349" },
   { feature: "Ask Claude to revise a draft", route: "POST /api/revise", engine: "claude -p (subscription)", why: "time+nondeterm" },
-  { feature: "Draft a fiction scene, re-pass, fix the line", route: "POST /api/fiction/draft|repass|fix", engine: "claude -p (subscription); grok-openrouter only if a series opts in", why: "time+nondeterm", pr: "#352" },
+  { feature: "Draft or re-pass a fiction scene", route: "POST /api/fiction/draft|repass", engine: "claude -p (subscription); grok-openrouter only if a series opts in", why: "time+nondeterm", pr: "#352" },
   { feature: "Run the continuity check on a chapter", route: "POST /api/fiction/check", engine: "local tsx process, free", why: "time+nondeterm", pr: "#352" },
   { feature: "Draft a Charles post", route: "POST /api/charles/draft", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Ask the strategy brief a question", route: "POST /api/strategy/ask|refresh-brief", engine: "claude -p (subscription)", why: "time+nondeterm" },

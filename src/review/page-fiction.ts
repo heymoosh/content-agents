@@ -65,3 +65,7 @@ export function fictionCanonStamp(report: { checkedAt?: string; holds?: unknown[
 export function fictionSceneParagraphs(body: string): string[] {
   return body.replace(/\r\n/g, "\n").trim().split(/\n\s*\n/).map((p) => p.split("\n").map((l) => l.trim()).filter(Boolean).join(" ")).filter(Boolean);
 }
+
+export function fictionEditableSpans(body: string): string[] {
+  return body.replace(/\r\n/g, "\n").trim().split(/\n\s*\n/).map((span) => span.trim()).filter(Boolean);
+}

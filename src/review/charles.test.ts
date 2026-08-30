@@ -31,7 +31,8 @@ test("listCharlesPosts reads every row + its draft body", () => {
     assert.equal(posts.length, 2);
     const dapper = posts.find((p) => p.id === "dapper")!;
     assert.equal(dapper.status, "pending");
-    assert.match(dapper.body, /Feeling quite dapper today/);
+    assert.equal(dapper.body, "Feeling quite dapper today.");
+    assert.ok(!dapper.body.includes("type: one-liner"), "frontmatter is metadata, not editable prose");
     const essay = posts.find((p) => p.id === "cheat-sheet")!;
     assert.equal(essay.status, "approve");
     assert.match(essay.body, /So You Wish to Be an Oligarch/);
@@ -55,6 +56,8 @@ test("setCharlesStatus flips only the targeted row's status (and notes when give
 
     assert.throws(() => setCharlesStatus("dapper", "published", undefined, root), /bad status/);
     assert.throws(() => setCharlesStatus("nope", "approve", undefined, root), /no such post/);
+    assert.throws(() => setCharlesStatus("dapper", "revise", "break | the table", root), /pipe/);
+    assert.throws(() => setCharlesStatus("dapper", "revise", "break\nthe table", root), /single line/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -64,7 +67,9 @@ test("saveCharlesPost writes only the file the row already named; refuses an emp
   const root = tmpCharles();
   try {
     saveCharlesPost("dapper", "Feeling QUITE dapper today, actually.\n", root);
-    assert.match(readFileSync(join(root, "posts", "one-liners", "dapper.md"), "utf8"), /QUITE dapper/);
+    const saved = readFileSync(join(root, "posts", "one-liners", "dapper.md"), "utf8");
+    assert.match(saved, /QUITE dapper/);
+    assert.ok(saved.startsWith("---\ntype: one-liner\n---\n"), "direct edits preserve frontmatter byte for byte");
     assert.throws(() => saveCharlesPost("dapper", "   ", root), /empty/);
     assert.throws(() => saveCharlesPost("nope", "hi", root), /no such post/);
   } finally {
