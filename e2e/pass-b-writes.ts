@@ -172,50 +172,16 @@ async function main(): Promise<void> {
       console.log(`  (controls on ${slug}: ${controls.slice(0, 12).join(" · ")})`);
     }
 
-    // ── Outreach: mark-sent is the pre-send/post-send boundary (tracker.ts owns post-send). ──
+    // ── Outreach: Gmail is the source of truth, and this fixture has no authenticated connection. ──
     await openRoom(page, "outreach");
     await waitLoaded(page, "#outreachList");
-    const trackerPath = join(ROOT, "data", "outreach", "tracker.jsonl");
-    const trackerBefore = existsSync(trackerPath) ? readFileSync(trackerPath, "utf8") : "";
-    const markSent = await page.evaluate(async () => {
-      const r = await fetch("/api/outreach/leads");
-      const j = (await r.json()) as { ok: boolean; leads: { dir: string; status: string }[] };
-      const lead = (j.leads ?? []).find((l) => l.status === "pursue") ?? (j.leads ?? [])[0];
-      if (!lead) return { ok: false, why: "no leads on the desk to mark" };
-      const res = await fetch("/api/outreach/mark-sent", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dir: lead.dir, channel: "email" }),
-      });
-      const body = await res.text();
-      let event: { lead?: string; event?: string; channel?: string } | undefined;
-      try {
-        event = (JSON.parse(body) as { event?: typeof event }).event;
-      } catch {
-        // The truncated response body below carries the useful failure detail.
-      }
-      return { ok: res.ok, status: res.status, body: body.slice(0, 200), dir: lead.dir, event };
-    });
-    const trackerAfter = existsSync(trackerPath) ? readFileSync(trackerPath, "utf8") : "";
-    const expected = markSent.event;
-    const trackerHas = trackerAfter.length > trackerBefore.length &&
-      trackerAfter.slice(trackerBefore.length).split("\n").some((line) => {
-        try {
-          const event = JSON.parse(line) as { lead?: string; event?: string; channel?: string };
-          return !!expected && event.lead === expected.lead && event.event === expected.event && event.channel === expected.channel;
-        } catch {
-          return false;
-        }
-      });
+    const outreachText = ((await page.locator("#outreachList").innerText()) ?? "").replace(/\s+/g, " ");
+    const disabledSend = await page.locator("#outreachList button:disabled", { hasText: "Connect Gmail to send" }).count();
     record({
-      feature: "Outreach mark-sent appends a real tracker event",
+      feature: "Outreach refuses sending until the intended Gmail account is connected",
       pr: "#350",
-      status: markSent.ok && trackerHas ? "pass" : markSent.ok ? "fail" : "fail",
-      detail: markSent.ok
-        ? trackerHas
-          ? `marked ${(markSent as { dir?: string }).dir}, tracker.jsonl carries the event`
-          : "route answered ok but no sent/contacted event reached tracker.jsonl"
-        : `route said ${JSON.stringify(markSent).slice(0, 200)}`,
+      status: outreachText.includes("muxin.li.pro@gmail.com") && disabledSend > 0 ? "pass" : "fail",
+      detail: `account named=${outreachText.includes("muxin.li.pro@gmail.com")}; disabled send controls=${disabledSend}`,
     });
 
     // ── Content: the approve write, the one gate rule 2 cares about. ──
@@ -243,22 +209,16 @@ async function main(): Promise<void> {
         : `${JSON.stringify(statusWrite).slice(0, 200)}`,
     });
 
-    // ── Signals: filing a backlog card is the room's only write. ──
+    // ── Signals: recommendations are session-local and do not expose a backlog write. ──
     await openRoom(page, "signals");
     await waitLoaded(page, "#signalsFamilies");
-    const backlog = await page.evaluate(async () => {
-      const res = await fetch("/api/signals/backlog", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: "E2E probe adjustment", detail: "Filed by the end-to-end suite to prove the write lands." }),
-      });
-      return { ok: res.ok, status: res.status, body: (await res.text()).slice(0, 200) };
-    });
+    const signalsText = ((await page.locator("#signalsReads").innerText()) ?? "").replace(/\s+/g, " ");
+    const backlogButtons = await page.getByRole("button", { name: "Send to backlog" }).count();
     record({
-      feature: "Signals files a backlog card",
+      feature: "Signals exposes actionable defaults without an orchestration write",
       pr: "#375",
-      status: backlog.ok ? "pass" : "fail",
-      detail: backlog.ok ? "card filed" : `route answered ${backlog.status}: ${backlog.body}`,
+      status: signalsText.includes("Content defaults") && backlogButtons === 0 ? "pass" : "fail",
+      detail: `Content defaults shown=${signalsText.includes("Content defaults")}; backlog buttons=${backlogButtons}`,
     });
 
     if (s.blockedCalls.length) {

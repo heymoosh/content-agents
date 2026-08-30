@@ -193,7 +193,6 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderPage } from "./page.js";
-import { FORBIDDEN_RECOMMENDATION_CLAIMS, claimsLiveness } from "./recommendations.js";
 import * as pageModule from "./page.js";
 import { repoRoot } from "../db/db.js";
 import { VENTURE_READ_PATHS } from "./venture-reads.js";
@@ -256,7 +255,7 @@ test("advisor job links fall back to Content without claiming a missing Workbenc
   assert.equal(target({ kind: "text", label: "Format: piece", slugs: ["not-materialized"] }, [{ slug: "not-materialized" }]), null);
 });
 
-test("the emitted Workbench resolver stays behavior-identical to the tested server resolver", () => {
+test("the emitted legacy-job resolver stays behavior-identical and opens Content configuration", () => {
   const sessions = [{ slug: "2026-08-25-piece" }];
   const browser = workbenchMirror(sessions);
   const server = (pageModule as Record<string, unknown>).workbenchJobTarget as (
@@ -273,9 +272,9 @@ test("the emitted Workbench resolver stays behavior-identical to the tested serv
     assert.equal(browser.workbenchJobTarget(job), server(job, sessions), JSON.stringify(job));
   }
   const script = emittedScripts().join("\n");
-  assert.ok(script.includes("sheet.dataset.wbSlug = s.slug"), "Workbench sessions expose a scroll target");
-  assert.ok(script.includes('querySelectorAll(".session[data-wb-slug]")'), "advisor navigation scrolls Workbench sessions");
   assert.ok(script.includes('Promise.resolve(setRoom("content")).then'), "advisor navigation has one authoritative Content load");
+  assert.ok(script.includes('CW.pane = "wizard"'), "legacy jobs land in ordinary Content configuration");
+  assert.ok(script.includes('$("#contentWizard")?.scrollIntoView'), "legacy jobs scroll to the reachable configuration surface");
 });
 
 test("queue open links carry job kind so advisor navigation is distinct from Review navigation", () => {
@@ -309,8 +308,7 @@ test("wiring guard: every emitted <script> block parses as JavaScript", () => {
 // not here yet. Keep the list at or near zero.
 // Empty, and meant to stay that way. The three routes that used to sit here
 // (/api/content/treatment, /api/signals/outcomes, /api/research/report) are all called by the page
-// now: the Content room's three-step wizard reads the first, the Signals room's outcome families
-// read the other two. /api/recommendations gained its Content-workbench caller in Slice 3b.
+// now: the Content room's configuration flow reads the first, and Signals reads the other two.
 // Add an entry only for a route whose UI genuinely has not landed yet, and delete it the moment it has.
 const PENDING_UI_ROUTES = new Set<string>([
 ]);
@@ -609,6 +607,7 @@ test("jobRoom: every job kind lands in exactly one room", () => {
   assert.equal(jobRoom("insights"), "Signals");
   assert.equal(jobRoom("pull"), "Signals");
   assert.equal(jobRoom("charles-draft"), "Charles");
+  assert.equal(jobRoom("content-generate"), "Content");
 });
 
 test("jobRailLabel: one label and color per status, and on done the rail is the room name", () => {
@@ -858,14 +857,11 @@ test("Signals: the emitted page never claims a filed recommendation already took
   assert.ok(!html.includes("Applies to next post"), 'the page must never say "Applies to next post"');
 });
 
-test("Signals: send-to-backlog copy still names the backlog and says nothing changes until it ships", () => {
+test("Signals: recommendations stay session-local and expose no orchestration write control", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
-  assert.ok(html.includes("Send to backlog"), "the action must still name the backlog");
-  assert.ok(
-    html.includes("Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships."),
-    "the honest explanation of what filing does must stay",
-  );
-  assert.ok(html.includes("filed to the backlog"), "the confirmed state must still name the backlog");
+  assert.ok(!html.includes("Send to backlog"));
+  assert.ok(!html.includes("filed to the backlog"));
+  assert.ok(html.includes("Adopted for this session. Nothing changed."));
 });
 
 test("Signals: recommendations expose session-only adopt and decline decisions", () => {
@@ -908,16 +904,16 @@ test("Signals: opens on the reads; brief and raw exports sit behind pane control
 
 // Intake guardrails are durable notes, not the room's subject. They stay fully working behind one
 // VEN.pane switch, same shape as Signals' SIG.pane. The room opens on focused work.
-test("Venture: opens on work; intake guardrails sit behind a pane control", () => {
+test("Venture: every stage loads inside the same sheet", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes('id="ventureMainSheet"'), "the thread sheet must be present");
   assert.ok(html.includes('id="ventureRead"'), "the thread itself must still be present");
-  assert.match(html, /id="ventureIntakeSheet"[^>]*\bhidden\b/, "the intake sheet starts hidden");
+  const venture = html.slice(html.indexOf('id="ventureMainSheet"'), html.indexOf('id="ventureCaptureHandoff"'));
+  assert.match(venture, /id="ventureIntakePane"[^>]*\bhidden\b/, "guardrails start as a hidden pane in the venture sheet");
+  assert.ok(!html.includes('id="ventureIntakeSheet"'), "guardrails must not replace the venture sheet");
   assert.ok(html.includes('id="ventureIntakeSections"'), "the intake fields must still exist");
   assert.ok(html.includes('data-set-ven-pane="intake"'), "a control must open the intake sheet");
-  assert.ok(html.includes('data-set-ven-pane="work"'), "the demoted sheet needs a way back to the work");
   assert.ok(html.includes("3 · Guardrails"), "the intake control must be labeled");
-  assert.ok(html.includes("Back to the venture"), "the intake sheet must offer a way back");
   assert.ok(html.includes('id="ventureAnalyzeBtn"'), "Analyze this step must still be reachable");
   assert.ok(html.includes('id="ventureRunStepBtn"'), "Run the next draft step must still be reachable");
   assert.ok(html.includes('id="ventureStartBtn"'), "Start a venture must still be reachable");
@@ -925,7 +921,7 @@ test("Venture: opens on work; intake guardrails sit behind a pane control", () =
   assert.ok(html.includes('let VEN = { pane: "work" }'), "VEN.pane must default to work");
   assert.ok(html.includes("function renderVentureSheets()"), "one function must toggle the staged sheets");
   assert.ok(html.includes('VEN.pane !== "work"'), "the work stage must follow VEN.pane");
-  assert.ok(html.includes('VEN.pane !== "intake"'), "the intake sheet must follow VEN.pane");
+  assert.ok(html.includes('VEN.pane !== "intake"'), "the intake pane must follow VEN.pane");
   assert.ok(
     !html.includes("Nothing on this screen is stored as a conversation"),
     "the long header paragraph must be trimmed so the thread is the subject",
@@ -940,7 +936,86 @@ test("Studio and Venture chrome use the simplified product language", () => {
   assert.ok(!html.includes("Format directly"));
   assert.ok(!html.includes("nothing sends itself"));
   assert.match(html, /id="studioEngine"[\s\S]*id="notesBtn"/,
-    "Browse Substack Notes belongs beside the model selector below the divider");
+    "Pull Substack Notes belongs beside the model selector below the divider");
+  assert.ok(html.includes('id="notesBtn">Pull Substack Notes</button>'));
+});
+
+test("Content separates request-grouped draft approval from publishing status", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("<h2>Approve Drafts</h2>"));
+  assert.ok(html.includes('id="publishedMain"'));
+  assert.ok(html.includes("<h2>Publishing status</h2>"));
+  assert.ok(html.includes("Select all"));
+  assert.ok(html.includes("Approve selected for publishing"));
+  assert.ok(html.includes("Open Focus Mode"));
+  assert.ok(!html.includes("Show drafts for every piece"));
+  assert.ok(!html.includes("show published / discarded"));
+});
+
+test("Fiction launch action creates a validated Content handoff and opens configuration", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('post("/api/fiction/handoff"'));
+  assert.ok(html.includes("suggestedPromotionalObjective"));
+  assert.ok(html.includes('setRoom("content")'));
+  assert.ok(html.includes("CW.step=2"));
+  assert.ok(!html.includes('$("#src").value = "Launch note for "+series.title+": "'));
+  assert.ok(html.includes("Send approved final to Content"));
+});
+
+test("Fiction Draft is a durable promotional focus flow, not the old story-scene composer", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  for (const text of ["PROMOTIONAL DRAFT", "Save direct edit", "TARGETED AI REVISION", "Revision history", "PLATFORM / MEDIA PREVIEWS", "/api/fiction/promotion/draft", "/api/fiction/promotion/revise", "/api/fiction/promotion/status"]) assert.ok(html.includes(text));
+  assert.ok(html.includes("ficPromoDraft.state==='Approved'"));
+  assert.ok(!html.includes('ficStage==="draft"?head+composer+anchor+failCard+scene'));
+});
+
+test("Outreach hides poor fits and treats Gmail as an explicit setup dependency", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("function outreachGoodFit"));
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function outreachGoodFit");
+  const policy = script.slice(start, script.indexOf("\n}", start) + 2);
+  assert.ok(!policy.includes("l.status"), "workflow status cannot override an explicit or missing fit classification");
+  assert.ok(html.includes("muxin.li.pro@gmail.com"));
+  assert.ok(html.includes("Connect Gmail to send"));
+  assert.ok(!html.includes("Paste it into your mail client and send it there."));
+  assert.ok(html.includes('<select class="engine-select" id="scoutEngine"><option value="codex">ChatGPT</option><option value="grok">Grok</option></select>'));
+  assert.ok(!html.includes('id="scoutEngine"><option value="claude"'));
+});
+
+test("approved Charles outputs can enter ordinary Content configuration", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('post("/api/charles/handoff"'));
+  assert.ok(html.includes("Send approved draft to Content"));
+  assert.ok(html.includes('CW.slug=result.request.id'));
+});
+
+test("Signals leads with actionable topic/platform/media defaults and labels sample evidence", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.indexOf('id="signalsTop"') < html.indexOf("Measurement inventory"));
+  for (const text of ["Topics earning engagement", "Platforms working", "Media and formats", "Content defaults"] ) assert.ok(html.includes(text));
+  assert.ok(html.includes("Sample data · illustrative, not measured"));
+  assert.ok(script.includes("SIGNALS.performance"), "Signals must render the recommendation-domain response");
+  assert.ok(script.includes("signals.contentDefaults"), "Content must receive separate cold-start defaults rather than reusing illustrative results");
+});
+
+test("Venture example demonstrates ventures, content, lead magnets, and statuses", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  for (const text of ["SAMPLE DATA", "Lead magnet", "Content in review", "Waiting for your decision", "Email survey"]) assert.ok(html.includes(text));
+});
+
+test("Charles composer reveals a separate quoted-post field only when Reply is selected", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.match(html, /id="charlesReplySource"[^>]*\bhidden\b/,
+    "the reply source starts hidden while the default one-liner format is selected");
+  assert.ok(html.includes('id="charlesReplyInput"'), "Reply has its own URL or quoted-post input");
+  assert.ok(html.includes('class="charles-format" type="checkbox" value="reply"'),
+    "Reply remains part of the multi-output composer");
+  assert.ok(html.includes("function renderCharlesReplySource()"),
+    "format changes must control the conditional reply field");
+  assert.ok(html.includes('mode==="reply" ? replySource+(input ? "\\nRequested angle: "+input : "") : input'),
+    "the Reply job receives both the quoted post and the optional common thought");
 });
 
 test("Venture uses one workspace select, one labeled creation action, and four staged views", () => {
@@ -1241,7 +1316,7 @@ test("outreachSendState: locked never reads as sent, because nothing records whi
 
 test("outreachSendNote: locking and sending carry the two authored notes, verbatim", () => {
   assert.equal(outreachSendNote("draft"), "Locking readies it. You send it by hand, and nothing here can send it for you.");
-  assert.equal(outreachSendNote("locked"), "Paste it into your mail client and send it there. Tell me once it has gone.");
+  assert.equal(outreachSendNote("locked"), "Gmail setup is required before this locked draft can be sent.");
   assert.equal(outreachSendNote("none"), "");
 });
 
@@ -1276,8 +1351,8 @@ test("outreach copy: no em dashes and no 'atomize' in the strings this PR adds",
   }
 });
 
-test("outreach room markup: the triage rail, the thread, and both send steps are on the page", () => {
-  const html = renderPage({ repoRoot, isDevWorktree: false });
+test("outreach room markup: the triage rail, thread, and Gmail setup boundary are on the page", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   for (const copy of [
     "WHO IS IN FRONT OF YOU, GROUPED BY WHY · PICK ONE TO DRAFT TO",
     "Where the audience already is. Bring the work, not a pitch.",
@@ -1285,10 +1360,9 @@ test("outreach room markup: the triage rail, the thread, and both send steps are
     "They are hiring for what you already built. Bring the receipt.",
     "← Back to queue",
     "Lock this message",
-    "Copy to clipboard",
-    "Mark as manually sent",
     "Locking readies it. You send it by hand, and nothing here can send it for you.",
-    "Paste it into your mail client and send it there. Tell me once it has gone.",
+    "Gmail setup required for muxin.li.pro@gmail.com",
+    "Connect Gmail to send",
     "no source recorded",
     "never pitched",
   ]) {
@@ -1513,7 +1587,7 @@ test("an enqueue arms the poll from an idle desk, where there is no job to see y
 test("every route that enqueues a job arms the poll", () => {
   for (const route of [
     "/api/atomize", "/api/notes/pick", "/api/revise", "/api/duplicate", "/api/video/generate",
-    "/api/develop/start", "/api/develop/format", "/api/strategy/refresh-brief", "/api/strategy/insights",
+    "/api/strategy/refresh-brief", "/api/strategy/insights",
     "/api/strategy/ask-insights", "/api/strategy/pull", "/api/outreach/scout", "/api/outreach/draft",
     "/api/outreach/message/revise", "/api/charles/draft", "/api/followups/draft-follow-up",
     "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check",
@@ -1611,6 +1685,7 @@ const fjob = (over: Record<string, unknown> = {}) =>
 test("the fiction job kinds land in the Fiction room, so its strip and Co-writer rail come alive", () => {
   assert.equal(jobRoom("fiction-draft"), "Fiction");
   assert.equal(jobRoom("fiction-continuity"), "Fiction");
+  assert.equal(jobRoom("fiction-promo"), "Fiction");
   assert.equal(teamRoomName(jobRoom("fiction-draft")), "Co-writer");
   // Unchanged for every other kind.
   assert.equal(jobRoom("charles-draft"), "Charles");
@@ -2079,17 +2154,18 @@ test("Studio capture: the box moved out of the Content room and into Studio", ()
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const studio = html.slice(html.indexOf('id="roomStudio"'), html.indexOf('id="roomFiction"'));
   const content = html.slice(html.indexOf('id="roomContent"'), html.indexOf('id="roomStudio"'));
-  for (const id of ['id="src"', 'id="devStartBtn"', 'id="addBtn"', 'id="notesBtn"', 'id="notesPanel"', 'id="routeBtn"', 'id="captureQuiet"']) {
+  for (const id of ['id="src"', 'id="notesBtn"', 'id="notesPanel"', 'id="routeBtn"', 'id="captureQuiet"']) {
     assert.ok(studio.includes(id), id + " must live in the Studio room now");
     assert.ok(!content.includes(id), id + " must no longer be in the Content room");
   }
+  for (const obsolete of ['id="devStartBtn"', 'id="addBtn"']) assert.ok(!studio.includes(obsolete));
   // Prototype rail + placeholder; the pre-prototype title and stacked hint paragraphs are gone.
   assert.ok(studio.includes("a thought, a link, a name, a scene"));
   assert.ok(studio.includes('placeholder="Say it however it came out."'));
   assert.ok(!studio.includes("What's on your mind today?"));
   assert.ok(!studio.includes('id="captureHint"'));
   assert.ok(!studio.includes('id="engineStatus"'));
-  assert.ok(studio.includes("It starts nothing, and nothing goes out."));
+  assert.ok(studio.includes("Nothing goes out without your review."));
   // The notes browser came with it, so its copy must not still point "below" at a sheet that is
   // now in a different room.
   assert.ok(studio.includes("waits for your yes in the Content room"));
@@ -2188,10 +2264,10 @@ test("Studio capture copy: no em dashes, and nothing claims a job was started", 
   }
 });
 
-test("Studio director copy: the visible attribution uses punctuation allowed by the voice rules", () => {
-  const html = renderPage({ repoRoot, isDevWorktree: false });
+test("Studio keeps obsolete director attribution out of the visible capture workflow", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const studio = html.slice(html.indexOf('<section class="view" id="roomStudio"'), html.indexOf('<section class="view" id="roomFiction"'));
-  assert.ok(studio.includes("Your director."));
+  assert.ok(!studio.includes("Your director."));
   assert.ok(!studio.includes("— your director"));
 });
 
@@ -2214,17 +2290,17 @@ test("Venture multi-pick markup: the UI submits the server-required set and keep
   assert.ok(html.includes("Earlier artifacts and live records appear here when the server exposes them."));
 });
 
-test("followupDraftRequest: selected engine is sent, with Claude preserved as the fallback", () => {
+test("followupDraftRequest: selected engine is sent, with ChatGPT as the Outreach fallback", () => {
   assert.deepEqual(followupDraftRequest("outreach/leads/acme", "Rae", "grok"), {
     dir: "outreach/leads/acme", recipient: "Rae", engine: "grok",
   });
   assert.deepEqual(followupDraftRequest("outreach/leads/acme"), {
-    dir: "outreach/leads/acme", engine: "claude",
+    dir: "outreach/leads/acme", engine: "codex",
   });
   const script = emittedScripts().join("\n");
   assert.ok(script.includes('class="fu-draft-control"'), "the Follow-ups action needs a picker wrapper");
   assert.ok(script.includes('post("/api/followups/draft-follow-up", followupDraftRequest(dir, person, engine))'));
-  assert.ok(script.includes('engine:engine || "claude"'), "missing selector keeps the old Claude default");
+  assert.ok(script.includes('engine:engine || "codex"'), "missing Outreach selector keeps the ChatGPT default");
 });
 
 test("Outreach directed drafts and revisions expose one engine picker and send its value", () => {
@@ -2234,17 +2310,20 @@ test("Outreach directed drafts and revisions expose one engine picker and send i
   assert.deepEqual(outreachMessageReviseRequest("leads/acme", "messages/1.md", "shorter", "codex"), {
     dir: "leads/acme", file: "messages/1.md", instruction: "shorter", engine: "codex",
   });
-  assert.equal(outreachDraftRequest("leads/acme", "say hello").engine, "claude");
-  assert.equal(outreachMessageReviseRequest("leads/acme", "messages/1.md", "warmer").engine, "claude");
+  assert.equal(outreachDraftRequest("leads/acme", "say hello").engine, "codex");
+  assert.equal(outreachMessageReviseRequest("leads/acme", "messages/1.md", "warmer").engine, "codex");
+  assert.throws(() => outreachDraftRequest("leads/acme", "say hello", undefined, "claude"), /Outreach engine/);
   const script = emittedScripts().join("\n");
-  assert.ok(script.includes('const outreachEngine = l.kind!=="content-example" ? engineSelectHtml() : "";'), "the Outreach thread needs an engine picker");
+  assert.ok(script.includes('const outreachEngine = l.kind!=="content-example" ? outreachEngineSelectHtml() : "";'), "the Outreach thread needs a restricted engine picker");
   assert.ok(!script.includes('engineSelectHtml("outreachEngine")'), "Outreach must not emit duplicate selector ids");
   assert.ok(script.includes('querySelector(".engine-select")'), "Outreach actions must read the thread-local picker");
   assert.ok(script.includes('outreachDraftRequest(dir, direction, recipient, engine)'), "directed drafts must build an engine-aware request");
   assert.ok(script.includes('post("/api/outreach/draft", outreachDraftRequest(dir, direction, recipient, engine))'));
   assert.ok(script.includes('outreachMessageReviseRequest(dir, file, instruction, engine)'), "message revisions must build an engine-aware request");
   assert.ok(script.includes('post("/api/outreach/message/revise", outreachMessageReviseRequest(dir, file, instruction, engine))'));
-  assert.ok(script.includes('engine:engine || "claude"'), "Outreach keeps Claude when no selector is available");
+  assert.ok(script.includes('<option value="codex">ChatGPT</option><option value="grok">Grok</option>'),
+    "Outreach exposes only the permitted writing engines");
+  assert.ok(script.includes('engine:engine || "codex"'), "Outreach defaults to ChatGPT when no selector is available");
 });
 
 test("Notes picker sends the selected engine", () => {
@@ -2254,18 +2333,11 @@ test("Notes picker sends the selected engine", () => {
   assert.ok(script.includes('post("/api/notes/pick", notesPickRequest(indices, $("#studioEngine").value))'));
 });
 
-test("Content workbench replies use a local engine; formatting moves to explicit treatment", () => {
-  const html = renderPage({ repoRoot, isDevWorktree: false });
+test("Content removes the obsolete Workbench and creates drafts through explicit configuration", () => {
   const script = emittedScripts().join("\n");
-  assert.ok(html.includes('class="wb-reply"'), "each workbench reply action needs its own control group");
-  assert.ok(html.includes('class="wb-handoff"'), "each workbench handoff needs its own control group");
-  assert.ok(script.includes('refreshEngineControls(box);'), "rebuilt workbench selectors must receive engine availability state");
-  assert.ok(script.includes('t.closest(".wb-reply")?.querySelector(".engine-select")'));
-  assert.ok(!script.includes('t.closest(".wb-handoff")?.querySelector(".engine-select")'));
-  assert.ok(script.includes('>Format for platforms</button>'), "the production action has the exact user-facing label");
-  assert.ok(!script.includes("Choose treatment and format"), "the old ambiguous production label is gone");
-  assert.ok(!script.includes('post("/api/develop/reply", {slug, reply, engine:$("#studioEngine").value})'));
-  assert.ok(!script.includes('post("/api/develop/format", {slug, lenses, engine:$("#studioEngine").value})'));
+  assert.ok(!script.includes('$("#workbench")'));
+  assert.ok(!script.includes('/api/develop/'));
+  assert.ok(script.includes('post("/api/content/generate", {slug:s.slug, engine})'));
 });
 
 test("Fiction drafting and second passes expose a local engine selector and send it", () => {
@@ -2283,7 +2355,7 @@ test("Studio polish keeps engine choices, capture submits, and room loads unders
   assert.ok(script.includes('Claude · Writing') && script.includes('Grok · Ideation') && script.includes('GPT (Codex) · Analysis'),
     "engine options should explain their strengths inline");
   assert.ok(script.includes("captureSubmitting"), "capture handoffs need one shared in-flight guard");
-  assert.ok(script.includes('showRoomLoading("workbench")') && script.includes('showRoomLoading("outreachList")') && script.includes('showRoomLoading("ventureThread")'),
+  assert.ok(script.includes('showRoomLoading("contentWizard")') && script.includes('showRoomLoading("outreachList")') && script.includes('showRoomLoading("ventureThread")'),
     "the three async rooms should expose a loading state");
   assert.ok(script.includes('post("/api/fiction/check",{series:ficSeries, chapter:chapter.number, engine})'),
     "the canon check must send the selected engine");
@@ -2660,36 +2732,33 @@ test("the Content wizard calls the treatment read and offers no control the back
     "the three tags that a real source.md fact can earn do ship");
 });
 
-test("the wizard's bulk yes reuses the row status route and says what it approves", () => {
+test("Content configuration exposes independent treatments, media, platforms, and an untreated control", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const script = emittedScripts().join("\n");
-  assert.ok(script.includes('post("/api/status"'), "a bulk yes must reuse the same write every card uses");
-  assert.ok(script.includes("Yes to all "), "the scoped label ships");
-  assert.ok(script.includes("Nothing outside this channel is touched"), "the scope is stated");
-  assert.ok(script.includes("Nothing posts instantly"), "scheduling is not hidden behind the word approve");
-  // A row she flagged revise must be out of reach: approving it would act against her own note.
-  assert.ok(script.includes("!DECIDED.has(r.status) && !r.status"), "the bulk yes targets untouched drafts only");
-  assert.ok(script.includes("marked revise or blocked"), "the button says what it deliberately leaves alone");
-});
-
-test("cwGroups: the bulk yes counts only untouched drafts, never a row marked revise", () => {
-  // The browser's cwGroups is DOM-bound, so this asserts the shape of the emitted source instead:
-  // the three counts must be distinct, and `fresh` (what the button acts on) must exclude a status.
-  const script = emittedScripts().join("\n");
-  const start = script.indexOf("function cwGroups(){");
-  assert.ok(start > -1, "cwGroups must reach the browser");
-  const body = script.slice(start, script.indexOf("\nfunction ", start + 10));
-  assert.match(body, /fresh: pending\.filter\(r=>!r\.status\)\.length/);
-  assert.match(body, /flagged: pending\.filter\(r=>!!r\.status\)\.length/);
-  // and a live check of the same predicate over a realistic row set
-  const rows = [
-    { status: "" }, { status: "" }, { status: "approve" }, { status: "revise" },
-    { status: "blocked" }, { status: "published" }, { status: "discard" },
-  ];
-  const DECIDED_SET = new Set(["published", "discard", "locked"]);
-  const pending = rows.filter((r) => !DECIDED_SET.has(r.status) && r.status !== "approve");
-  assert.equal(pending.length, 4, "the badge counts revise and blocked as outstanding");
-  assert.equal(pending.filter((r) => !r.status).length, 2, "but only two are what a bulk yes may touch");
-  assert.equal(pending.filter((r) => !!r.status).length, 2);
+  for (const heading of ["TREATMENTS", "MEDIA", "PLATFORMS"]) {
+    assert.ok(script.includes(heading), `${heading} must be a primary configuration section`);
+  }
+  for (const option of [
+    "CTA", "Viral rewrite", "Platform-specific framing", "Shorter version", "Thread",
+    "Counterpoint", "Summary", "Hook variants", "Static quote card", "Animated quote card",
+    "Image carousel", "Short-video script", "Video transcript / caption package",
+  ]) assert.ok(script.includes(option), `configuration option missing: ${option}`);
+  for (const kind of ["treatment", "media", "platform"]) {
+    assert.ok(script.includes(`cwConfigSectionHtml("${kind}"`), `${kind} needs its own rendered section`);
+  }
+  assert.ok(script.includes('data-config-all="\'+kind+\'"'), "each section needs Select all");
+  assert.ok(script.includes('data-config-none="\'+kind+\'"'), "each section needs Deselect all");
+  assert.ok(script.includes('data-config-kind="\'+kind+\'"'), "choices must update only their own section");
+  assert.ok(script.includes('engineSelectHtml("contentTreatmentEngine")'), "AI treatments need a nearby model selector");
+  assert.ok(script.includes('id="contentControlEnabled"'), "the untreated control must be explicit and disable-able");
+  assert.ok(script.includes("Untreated control"));
+  assert.ok(script.includes("Why these platforms?"), "recommendations need an explanation on request");
+  assert.ok(!script.includes("CHOOSE CUTS TO FORMAT"), "Cuts must not remain the primary configuration concept");
+  assert.ok(!script.includes("CHANNELS · READ, NOT CHOSEN HERE"), "the routing diagnostic must not remain the selector");
+  assert.ok(html.includes('id="contentConfigSave"') || script.includes('id="contentConfigSave"'),
+    "configuration needs one durable continue/save action");
+  assert.ok(script.includes("Save and create drafts"));
+  assert.ok(script.includes('post("/api/content/generate"'), "saved selections must enter the ordinary draft-review flow");
 });
 
 // ---------------------------------------------------------------------------
@@ -2813,10 +2882,12 @@ test("the interview types her answers in her own register, and never in the AI o
 
 // ── Slice 1: production label, keyboard access, responsive layout, copy cleanup ───────────────
 
-test("Slice 1: production step reads Format for platforms, never Hand it to the team", () => {
-  const html = renderPage({ repoRoot, isDevWorktree: false });
-  assert.ok(html.includes("Format for platforms"));
-  assert.ok(!html.includes("Hand it to the team"));
+test("Slice 1: production opens Content configuration without obsolete direct-format controls", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("Save and create drafts"));
+  const studio = html.slice(html.indexOf('id="roomStudio"'), html.indexOf('id="roomFiction"'));
+  assert.ok(!studio.includes("Format directly"));
+  assert.ok(!studio.includes("Hand it to your director"));
 });
 
 test("Slice 1: rendered page has no atomize outside /api/atomize routes", () => {
@@ -2836,15 +2907,13 @@ test("Slice 1: no rendered copy carries an em dash", () => {
     .map((line) => line.replace(/(^|[^:])\/\/.*$/, "$1"))
     .join("\n");
   // Guard against a vacuous pass: the stripper must not have eaten the page.
-  assert.ok(withoutComments.includes("Format for platforms"), "comment stripper ate the markup");
+  assert.ok(withoutComments.includes("Save and create drafts"), "comment stripper ate the markup");
   assert.ok(withoutComments.length > html.length / 2, "comment stripper removed too much");
   assert.ok(!withoutComments.includes("\u2014"), "em dash found in rendered copy");
   const fixed = [
     "No asset generated yet.",
     "No image rendered yet.",
-    "Format for platforms",
-    "No drafts exist for this piece yet. Talk to your director about it below and they land here.",
-    "Your director is working on a round. Studio has the log.",
+    "Save and create drafts",
     "Nothing needs you right now.",
     "not recorded",
   ];
@@ -2924,8 +2993,8 @@ test("Slice 5: lineRefsText survives whatever frontmatter put in source_lines", 
   const script = emittedScripts().join("\n");
   const start = script.indexOf("function lineRefsText(");
   assert.ok(start >= 0, "lineRefsText must reach the browser");
-  const end = script.indexOf("function wbCheckHtml(", start);
-  assert.ok(end > start, "lineRefsText must be followed by wbCheckHtml");
+  const end = script.indexOf("async function loadContent(", start);
+  assert.ok(end > start, "lineRefsText must be followed by Content loading");
   const lineRefsText = new Function(
     script.slice(start, end) + "\nreturn lineRefsText;",
   )() as (refs: unknown) => string;
@@ -2961,39 +3030,6 @@ test("Slice 5: Content wizard source picker is a keyboard-operable button", () =
   const html = renderPage({ repoRoot, isDevWorktree: false });
   assert.ok(html.includes('<button type="button" class="cw-src"'));
   assert.ok(!html.includes('<div class="cw-src"'));
-});
-
-// ── Slice 3b: recommendation seam in the Content workbench margin ───────────────────────────────
-
-test("Slice 3b: PATTERN READS caption reaches the page", () => {
-  const html = renderPage({ repoRoot, isDevWorktree: false });
-  assert.ok(html.includes("PATTERN READS"), "the margin caption must ship in the rendered page");
-});
-
-test("Slice 3b: recommendation path checks fixture-example explicitly", () => {
-  const script = emittedScripts().join("\n");
-  assert.ok(
-    script.includes('RECS.source === "fixture-example"'),
-    "recsBlockHtml must positive-check fixture-example (hand-mirror of recommendationExamplesShown)",
-  );
-});
-
-test("Slice 3b: recommendation block copy claims no liveness", () => {
-  const script = emittedScripts().join("\n");
-  const start = script.indexOf("async function loadRecommendations");
-  const end = script.indexOf("function wbMarginHtml");
-  assert.ok(start > -1, "loadRecommendations must ship in the browser script");
-  assert.ok(end > start, "recsBlockHtml must sit before wbMarginHtml");
-  const block = script.slice(start, end);
-  assert.equal(claimsLiveness(block), false, "recommendation block copy must not claim liveness");
-  for (const claim of FORBIDDEN_RECOMMENDATION_CLAIMS) {
-    const escaped = claim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    assert.equal(
-      new RegExp(`\\b${escaped}\\b`, "i").test(block),
-      false,
-      `recommendation block must not contain forbidden claim "${claim}"`,
-    );
-  }
 });
 
 // Muxin's voice rules ban decorative emoji in anything a human reads. The only sweep that
@@ -3142,6 +3178,57 @@ test("approval is a scan list with one accessible focus overlay", () => {
   assert.ok(script.includes("openReviewFocus"));
   assert.ok(script.includes('e.key==="Escape"'));
   assert.ok(script.includes("reviewFocusReturn"));
+  assert.ok(script.includes("reviewSelectionKey(piece.slug,row.id)"), "selection identity must include its request");
+});
+
+test("Content focus opens as a direct editor and publishing is its own page", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const review = html.slice(html.indexOf('id="reviewSheet"'), html.indexOf('id="publishedSheet"'));
+  assert.ok(html.includes('id="reviewFocusEditor"'), "focus mode needs an immediately editable field");
+  assert.ok(html.includes('id="reviewFocusSave"'));
+  assert.ok(html.includes('id="publishedSteps"'));
+  assert.ok(html.includes('id="publishedSheet"'));
+  assert.ok(!review.includes("<h2>Published</h2>"), "publishing status cannot be buried under approvals");
+});
+
+test("Content uses one four-step linked cycle on every view", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(!html.includes('class="content-pages"'), "duplicate pill navigation must be removed");
+  assert.match(script, /\["4","Publish"\]/, "publishing status is step four of the cycle");
+  assert.ok(html.includes('id="reviewSteps"'));
+  assert.ok(html.includes('id="publishedSteps"'));
+  assert.ok(script.includes('if(n === 4){ CW.pane = "published"'));
+});
+
+test("Content request filter excludes legacy drafts without an explicit request", () => {
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes("contentRequestPieces"));
+  assert.match(script, /originalInput\|\|p\.requestId/);
+});
+
+test("Fiction keeps input visible and separates draft review from canon links", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("Write next"));
+  assert.ok(html.includes("Review drafts"));
+  assert.ok(html.includes("Promotion"));
+  assert.ok(!html.includes(">Open canon</button>"), "canon belongs in the persistent rail");
+  assert.ok(html.includes("What happens next?"));
+  assert.match(html, /const composer =\s*'<div/, "the composer must not disappear when saved beats exist");
+  assert.ok(html.includes("Direct line edits and final acceptance happen in the story PR"));
+  assert.ok(html.includes('ficPage = "write"'));
+  assert.ok(!html.includes('aria-label="Fiction stages"'));
+});
+
+test("Charles composer is a labeled writing surface and explains the Content handoff", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.match(html, /class="[^"]*charles-composer/);
+  assert.ok(html.includes('for="charlesInput"'));
+  assert.ok(html.includes("Charles drafts"));
+  assert.ok(html.includes("Approved drafts can be sent to Content"));
+  assert.ok(html.includes('aria-label="Charles pages"'));
+  assert.ok(html.includes('data-charles-page="input"'));
+  assert.ok(html.includes('data-charles-page="drafts"'));
 });
 
 test("review actions close the focus dialog before rebuilding its source list", () => {
@@ -3154,22 +3241,55 @@ test("review actions close the focus dialog before rebuilding its source list", 
   assert.ok(rerender.includes("focus()"), "focus returns to the rebuilt scan row or review surface");
 });
 
-test("Content step 3 renders compact scan rows and opens full controls only in the focus dialog", () => {
+test("Content step 3 has no duplicate approval landing surface", () => {
   const script = emittedScripts().join("\n");
-  const start = script.indexOf("function renderContentWizard()");
-  const end = script.indexOf("\nfunction openReviewSheet", start);
-  const renderer = script.slice(start, end);
-  assert.ok(renderer.includes("holder.appendChild(reviewScanRowEl(piece, row))"), "#cwRows must use compact scan rows");
-  assert.ok(!renderer.includes("holder.appendChild(rowEl(piece, row))"), "expanded cards cannot remain in the primary list");
-  assert.ok(script.includes("button.addEventListener(\"click\",()=>openReviewFocus(piece,row,button))"));
-  assert.ok(script.includes("body.appendChild(rowEl(piece,row))"), "the dialog alone receives the full row controls");
+  const start = script.indexOf("function cwStep3Html()");
+  const renderer = script.slice(start, script.indexOf("\nfunction renderContentWizard", start));
+  assert.ok(renderer.includes("return ''"));
+  assert.ok(script.includes('button.querySelector(".review-open").addEventListener'));
+  assert.ok(script.includes('id="reviewFocusEditor"'), "the dialog receives its direct editing controls");
+});
+
+test("Content step navigation opens approval directly without a duplicate landing page", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes('if(n === 3){ CW.pane = "review"'));
+  assert.ok(!html.includes("Open Approve Drafts"));
+  assert.ok(!html.includes("Back to configuration</button></div></div>"));
+});
+
+test("Approve Drafts puts a searchable request filter before the other filters", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const filters = html.slice(html.indexOf('aria-label="Draft filters"'), html.indexOf('id="reviewMain"'));
+  assert.ok(filters.indexOf("Input request") < filters.indexOf("Media"));
+  assert.match(filters, /input[^>]+id="reviewRequestFilter"[^>]+list="reviewRequestOptions"/);
+  assert.ok(filters.includes('datalist id="reviewRequestOptions"'));
+  assert.ok(filters.includes('class="request-search"'), "the request search should have room for real titles");
+  const script = emittedScripts().join("\n");
+  assert.ok(script.includes("requestQuery"));
+  assert.ok(script.includes("includes(requestQuery)"));
+});
+
+test("fixture review mode shows clearly marked sample drafts without adding real requests", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: true, fixtures: true });
+  assert.ok(html.includes("FIXTURE_REVIEW_PIECE"));
+  assert.ok(html.includes("SAMPLE DATA · LAYOUT ONLY"));
+  assert.ok(html.includes("Nothing in this sample is added to your request list"));
 });
 
 test("rooms use quieter rails and honest capability boundaries", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   assert.ok(html.includes("room-rail"), "shared full-height rail primitive is present");
-  assert.ok(html.includes('id="ventureSwitcher"') && html.includes('id="ventureAddBtn"'));
-  assert.ok(html.includes('id="ventureHistory"') && html.includes("History and ledger"));
-  assert.ok(html.includes("Canon documents"));
+  assert.ok(html.includes('id="ventureSelect"') && html.includes('id="ventureStartBtn"'));
+  assert.ok(html.includes('data-set-ven-pane="history"'));
+  assert.ok(html.includes("Documents"));
   assert.ok(html.includes('id="charlesInput"') && html.includes("charles-format"));
+});
+
+test("Outreach puts a concrete recommendation before the yes-or-no choice", () => {
+  const script = emittedScripts().join("\n");
+  const start = script.indexOf("function threadHtml(l)");
+  const body = script.slice(start, script.indexOf("\nfunction ", start + 20));
+  assert.ok(body.includes("WHY THIS MAY BE WORTH A CONVERSATION"));
+  assert.ok(body.includes("recommendation+decideBtns"));
 });

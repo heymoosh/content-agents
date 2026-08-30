@@ -39,6 +39,10 @@ interface EnrichedRow extends QueueRow {
   body?: string; // derivative text / storyboard text (what a human reads)
   spin?: boolean;
   angle?: string;
+  media?: string;
+  treatment?: string;
+  variantKind?: "control" | "treated";
+  control?: boolean;
   sourceLines?: unknown;
   threadCheck?: string; // "pass" | "missing" — config/platforms.yaml home_brand thread-check
   threadSpinApplied?: boolean; // Spin already drafted the worldview thread in on a "missing" verdict
@@ -202,6 +206,10 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     out.body = body;
     out.spin = fm.spin === true;
     out.angle = typeof fm.angle === "string" ? fm.angle : undefined;
+    out.media = typeof fm.media === "string" ? fm.media : undefined;
+    out.treatment = typeof fm.treatment === "string" ? fm.treatment : undefined;
+    out.variantKind = fm.variant_kind === "control" || fm.variant_kind === "treated" ? fm.variant_kind : undefined;
+    out.control = out.variantKind === "control";
     out.sourceLines = fm.source_lines;
     out.threadCheck = classifyThread(fm);
     out.threadSpinApplied = fm.thread_spin_applied === true;
@@ -237,6 +245,8 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
       out.hasAsset = true;
     }
   }
+  if (kind === "video" && !out.body) loadMd(join("derivatives", `${row.id}.md`));
+  if (out.body && existsSync(join(folder, "derivatives", `${row.id}.md`))) out.editable = true;
   // "Duplicate to platform" only makes sense on a real text post — not an empty draft, and not an
   // asset row (image/video/storyboard) that has no body of its own to re-angle. Also excluded for
   // "reply to mention" rows — see isReply above.
@@ -382,7 +392,7 @@ function writeCutComments(folder: string, all: Record<string, CutComment[]>): vo
 // A lens is always a slugified name (see src/atomize/cuts.ts's addCut) — this is the one guard
 // every cut function below routes `lens` through before it ever reaches a join(), the same
 // posture saveDerivative() already takes on its `id` param. Without it, a client-supplied `lens`
-// like "../../../secret" would let /api/cut-save write outside the content folder entirely
+// like "../../../secret" would let a cut-edit caller write outside the content folder entirely
 // (path.join does NOT sandbox ".." segments) — caught in self-vet before this ever shipped.
 export function isValidLens(lens: string): boolean {
   return /^[a-z][a-z0-9-]*$/.test(lens);

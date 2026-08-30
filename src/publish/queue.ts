@@ -139,14 +139,22 @@ export interface NewQueueRow {
 }
 
 export function appendRow(folder: string, row: NewQueueRow): void {
+  appendRows(folder, [row]);
+}
+
+/** Append a validated batch with one queue-file write so configured variants cannot land partially. */
+export function appendRows(folder: string, rows: readonly NewQueueRow[]): void {
   const path = join(folder, "review-queue.md");
   const text = readFileSync(path, "utf8").replace(/\n*$/, "\n");
-  const cells = [
-    row.id, row.platform, row.format, row.asset,
-    "—", "—", "—", // native/brand/cta — unscored; this action doesn't run the scoring rubric
-    row.status, row.notes ?? "", row.origin ?? "",
-  ].map((c) => formatCell(String(c).replace(/[|\n\r]/g, " ").trim()));
-  writeFileSync(path, text + "|" + cells.join("|") + "|\n");
+  const lines = rows.map((row) => {
+    const cells = [
+      row.id, row.platform, row.format, row.asset,
+      "—", "—", "—", // native/brand/cta — unscored; this action doesn't run the scoring rubric
+      row.status, row.notes ?? "", row.origin ?? "",
+    ].map((c) => formatCell(String(c).replace(/[|\n\r]/g, " ").trim()));
+    return "|" + cells.join("|") + "|";
+  });
+  writeFileSync(path, text + (lines.length ? lines.join("\n") + "\n" : ""));
 }
 
 // Status of the (at most one) storyboard row in folder's review-queue.md — the render gate

@@ -25,12 +25,6 @@
 // lives in JOB_ROOM_KINDS (including Venture via venture-analysis). No rewrite.
 
 import type { JobView, JobRoom } from "./page.js";
-import {
-  describeRecommendation,
-  type RecommendationAvailability,
-  type RecommendationExample,
-  type RecommendationRead,
-} from "./recommendations.js";
 
 export const FIXTURE_ENV_VAR = "REVIEW_FIXTURES";
 
@@ -661,131 +655,6 @@ const CONTENT_SCENARIOS: FixtureScenario[] = [
     label: "the treatment read fails",
     room: "content",
     overrides: { ...FX_CONTENT_BASE, "/api/content/treatment": { error: "FIXTURE: bad slug" } },
-  },
-];
-
-// ── Recommendations: the Content workbench margin seam ───────────────────────────────────────────
-//
-// Production always answers blockedRecommendationRead(). These scenarios force each availability
-// state (and one fixture-example body) so the PATTERN READS margin can be reviewed without a
-// corpus. Headline/detail come from describeRecommendation so the copy cannot drift.
-
-function fxRecs(
-  availability: RecommendationAvailability,
-  over: Partial<RecommendationRead> = {},
-): RecommendationRead {
-  const { headline, detail } = describeRecommendation(availability);
-  return {
-    availability,
-    source: "reviewed-interface",
-    headline,
-    detail,
-    examples: [],
-    ...over,
-  };
-}
-
-const FX_REC_EXAMPLES: RecommendationExample[] = [
-  {
-    id: "FIXTURE: ex-01",
-    platform: "FIXTURE: short-form note",
-    mechanism: "FIXTURE: open with a concrete observation",
-    whyItCouldFit: "FIXTURE: the piece already states a concrete observation in its first lines.",
-    evidence: [
-      {
-        label: "FIXTURE: local shape note",
-        reference: "FIXTURE: local-ref-01",
-        caveat: "FIXTURE: shape illustration only, not a reviewed mechanism.",
-      },
-    ],
-    confidence: "low",
-  },
-  {
-    id: "FIXTURE: ex-02",
-    platform: "FIXTURE: threaded post",
-    mechanism: "FIXTURE: one claim per beat",
-    whyItCouldFit: "FIXTURE: the source breaks cleanly into separate claims you already wrote.",
-    evidence: [
-      {
-        label: "FIXTURE: beat spacing note",
-        reference: "FIXTURE: local-ref-02",
-        caveat: "FIXTURE: placeholder evidence, not a creator citation.",
-      },
-      {
-        label: "FIXTURE: second local note",
-        reference: "FIXTURE: local-ref-03",
-        caveat: "FIXTURE: still a shape example, still unreviewed.",
-      },
-    ],
-    confidence: "medium",
-  },
-  {
-    id: "FIXTURE: ex-03",
-    platform: "FIXTURE: image card",
-    mechanism: "FIXTURE: single-line pull",
-    whyItCouldFit: "FIXTURE: one line in the source already stands alone as a card quote.",
-    evidence: [
-      {
-        label: "FIXTURE: pull-line note",
-        reference: "FIXTURE: local-ref-04",
-        caveat: "FIXTURE: local placeholder, never a handle or URL.",
-      },
-    ],
-    confidence: "low",
-  },
-];
-
-const RECOMMENDATION_SCENARIOS: FixtureScenario[] = [
-  {
-    id: "recs-blocked",
-    group: "Recommendations",
-    label: "blocked, the corpus is not reviewed",
-    room: "content",
-    overrides: { ...FX_CONTENT_BASE, "/api/recommendations": fxRecs("blocked") },
-  },
-  {
-    id: "recs-insufficient",
-    group: "Recommendations",
-    label: "the evidence is too thin",
-    room: "content",
-    overrides: { ...FX_CONTENT_BASE, "/api/recommendations": fxRecs("insufficient-evidence") },
-  },
-  {
-    id: "recs-awaiting-review",
-    group: "Recommendations",
-    label: "proposals waiting on your read",
-    room: "content",
-    overrides: { ...FX_CONTENT_BASE, "/api/recommendations": fxRecs("awaiting-review") },
-  },
-  {
-    id: "recs-unavailable",
-    group: "Recommendations",
-    label: "the read failed",
-    room: "content",
-    overrides: { ...FX_CONTENT_BASE, "/api/recommendations": fxRecs("unavailable") },
-  },
-  {
-    id: "recs-empty",
-    group: "Recommendations",
-    label: "nothing for this piece",
-    room: "content",
-    overrides: { ...FX_CONTENT_BASE, "/api/recommendations": fxRecs("empty") },
-  },
-  {
-    id: "recs-fixture-examples",
-    group: "Recommendations",
-    label: "example shapes, not reviewed",
-    room: "content",
-    overrides: {
-      ...FX_CONTENT_BASE,
-      "/api/recommendations": {
-        availability: "empty",
-        source: "fixture-example",
-        headline: "FIXTURE: example shapes only",
-        detail: "FIXTURE: these illustrate the seam shape. Nothing here is reviewed.",
-        examples: FX_REC_EXAMPLES,
-      } satisfies RecommendationRead,
-    },
   },
 ];
 
@@ -1678,7 +1547,6 @@ export const FIXTURE_SCENARIOS: FixtureScenario[] = [
   ...SIGNALS_SCENARIOS,
   ...OUTREACH_SCENARIOS,
   ...CHARLES_SCENARIOS,
-  ...RECOMMENDATION_SCENARIOS,
   ...Object.entries(EMPTY_BY_ROOM).map(([tab, overrides]) => ({
     id: `empty-${tab}`, group: "Empty", label: tab, room: tab, overrides,
   })),

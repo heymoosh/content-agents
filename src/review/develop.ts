@@ -12,7 +12,7 @@
 // body. What the GUI previews (previewText below) is resolved by the same function, so
 // what-you-see-is-what-you-accept.
 
-import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { addCut, listCuts, DEFAULT_LENS } from "../atomize/cuts.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
@@ -419,7 +419,10 @@ export function contentSessionForFolder(
   } catch {
     /* no queue yet */
   }
-  if (!session && !cuts.length && !pending) return null;
+  // A validated cross-room handoff intentionally arrives before any draft exists. Its durable
+  // content-request.json makes it a real Content source that must open in configuration, rather
+  // than disappearing until an unrelated generation step happens.
+  if (!session && !cuts.length && !pending && !existsSync(join(folder, "content-request.json"))) return null;
   return {
     slug,
     title: firstHeading(folder),

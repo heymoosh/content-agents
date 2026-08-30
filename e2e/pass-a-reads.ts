@@ -134,75 +134,30 @@ async function main(): Promise<void> {
       detail: followText.trim().slice(0, 120).replace(/\s+/g, " "),
     });
 
-    // The workbench (the director's notes: proposed cut, reply box, Format for platforms, and the
-    // PATTERN READS seam) no longer renders open by default — it moved behind a control on wizard
-    // step 2 for the picked piece (rules.md carve-out 1). Reach it the way a person does: pick a
-    // source, then open the director's notes on it. Apply recs-blocked FIRST, before picking a
-    // source: it forces three real Content sessions (a dev worktree's own /api/content can be
-    // empty, per the banner at the top of this page), so the pick is guaranteed a row to click
-    // rather than depending on whatever this checkout happens to have on disk.
+    // Content now moves from a source into independent treatments, media, and platforms, then into
+    // one request-grouped approval surface. The superseded director/workbench path is intentionally
+    // absent. Apply a fixture scenario first so a source is guaranteed.
     await openRoom(s.page, "content");
     await applyScenario(s.page, "recs-blocked");
     await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#cwBody").catch(() => "");
     await s.page.waitForSelector("#cwBody .cw-src", { timeout: 15_000 }).catch(() => null);
     await s.page.click("#cwBody .cw-src");
-    await s.page.waitForSelector('#cwBody [data-set-pane="workbench"]', { timeout: 15_000 }).catch(() => null);
-    await s.page.click('#cwBody [data-set-pane="workbench"]');
-    await s.page.waitForSelector("#workbench:not([hidden])", { timeout: 15_000 }).catch(() => null);
-    await waitLoaded(s.page, "#workbench").catch(() => "");
-
-    // Production label: Format for platforms is what a person sees; "Hand it to the team" and any
-    // visible "atomize" are banned interface copy.
-    const contentBody = ((await s.page.locator("body").innerText()) ?? "").replace(/\s+/g, " ").trim();
-    const hasFormat = contentBody.includes("Format for platforms");
-    const hasHandoff = contentBody.includes("Hand it to the team");
-    const hasAtomize = /atomize/i.test(contentBody);
-    const formatBtns = await s.page.locator("#workbench .dev-format-btn").count();
-    if (!hasFormat && formatBtns === 0) {
-      record({
-        feature: "Production label is Format for platforms, not atomize",
-        status: "blocked",
-        detail: `no Format for platforms on screen (workbench format buttons=0); Hand it to the team=${hasHandoff}; atomize=${hasAtomize}`,
-      });
-    } else {
-      record({
-        feature: "Production label is Format for platforms, not atomize",
-        status: hasFormat && !hasHandoff && !hasAtomize ? "pass" : "fail",
-        detail: `Format for platforms=${hasFormat}; Hand it to the team=${hasHandoff}; atomize=${hasAtomize}; format buttons=${formatBtns}`,
-      });
-    }
-
-    // Recommendation seam honesty: the margin names PATTERN READS and never claims the corpus is
-    // approved, live, proven, viral, or a winner. recs-blocked (applied above, before the pick) also
-    // forces /api/recommendations, and the workbench pane opened above stays open across it (a
-    // fixture apply re-fetches in place, it does not navigate) — so the block's own selector is
-    // unchanged: #workbench .wb-recs.
-    // Scope to the seam's own block, not the whole margin: a director's angle summary may fairly
-    // use a word this seam must never use, about Muxin's own routing rather than a corpus claim.
-    // waitLoaded returns as soon as the container stops saying Loading, which on a second visit to
-    // this room can be the previous render still on screen, so wait for the block itself.
-    await s.page.waitForSelector("#workbench .wb-recs", { timeout: 15_000 }).catch(() => null);
-    const marginText = ((await textOf(s.page, "#workbench .wb-recs")) || "").replace(/\s+/g, " ").trim();
-    if (!marginText) {
-      record({
-        feature: "Recommendation margin never claims proven or live status",
-        status: "fail",
-        detail: "recs-blocked scenario applied; PATTERN READS block still did not render",
-      });
-    } else {
-      const hasCaption = /PATTERN READS/.test(marginText);
-      const claimHits = ["approved", "live", "proven", "viral", "winner"].filter((w) =>
-        new RegExp(`\\b${w}\\b`, "i").test(marginText)
-      );
-      record({
-        feature: "Recommendation margin never claims proven or live status",
-        status: hasCaption && claimHits.length === 0 ? "pass" : "fail",
-        detail: hasCaption
-          ? `caption present; forbidden whole-words=[${claimHits.join(",") || "none"}]; margin≈"${marginText.slice(0, 140)}"`
-          : `PATTERN READS missing; margin≈"${marginText.slice(0, 140)}"`,
-      });
-    }
+    const configText = ((await textOf(s.page, "#cwBody")) || "").replace(/\s+/g, " ").trim();
+    const configOk = ["TREATMENTS", "MEDIA", "PLATFORMS", "Untreated control", "Save configuration"].every((copy) => configText.includes(copy));
+    record({
+      feature: "Content opens independent configuration with an untreated control",
+      status: configOk ? "pass" : "fail",
+      detail: configText.slice(0, 220),
+    });
+    await s.page.click('#cwSteps [data-step="3"]');
+    await s.page.click('#cwBody [data-set-pane="review"]');
+    const approvalText = ((await textOf(s.page, "#reviewSheet")) || "").replace(/\s+/g, " ").trim();
+    record({
+      feature: "Content opens request-grouped approval and separate Published status",
+      status: approvalText.includes("Approve Drafts") && approvalText.includes("Published") ? "pass" : "fail",
+      detail: approvalText.slice(0, 220),
+    });
 
     // The seam's production answer is a blocked read: reviewed-interface, no examples.
     const recsRead = await s.page.evaluate(async () => {

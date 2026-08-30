@@ -286,13 +286,30 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .session-margin { border-left:1px solid #efe7d6; padding:44px 26px 36px 24px; background:#faf7f0;
     display:flex; flex-direction:column; gap:16px; min-height:100%; }
   .room-rail { position:sticky; top:78px; align-self:start; max-height:calc(100vh - 96px); overflow:auto; }
-  .scan-row { width:100%; display:grid; grid-template-columns:110px minmax(0,1fr) auto; gap:14px; text-align:left;
+  .scan-row { width:100%; display:grid; grid-template-columns:32px minmax(150px,190px) minmax(260px,1fr) auto auto; gap:14px; align-items:center; text-align:left;
     padding:13px 4px; border:0; border-top:1px solid var(--line); border-radius:0; background:none; }
   .scan-row:hover { background:#faf7f0; }
   .focus-backdrop { position:fixed; inset:0; z-index:80; background:rgba(28,26,23,.42); display:grid; place-items:center; padding:28px; }
   .focus-backdrop[hidden] { display:none; }
   .focus-dialog { width:min(880px,100%); max-height:calc(100vh - 56px); overflow:auto; background:var(--paper);
     border:1px solid var(--line); border-radius:12px; box-shadow:0 18px 60px rgba(0,0,0,.22); padding:22px; }
+  .review-focus-editor { width:100%; min-height:260px; box-sizing:border-box; margin-top:16px; padding:16px;
+    font:400 18px/1.65 Georgia,"Times New Roman",serif; color:var(--ink); background:#fff;
+    border:1px solid #d8cfbb; border-left:3px solid var(--blue); border-radius:0 8px 8px 0; resize:vertical; }
+  .room-pages { display:flex; align-items:baseline; gap:24px; flex-wrap:wrap; padding-bottom:14px; margin-bottom:22px; border-bottom:1px solid #dfd4bb; }
+  .room-pages button { border:0; border-bottom:1.5px solid transparent; border-radius:0; background:none; color:#9b907b; padding:0 0 5px; font:inherit; cursor:pointer; }
+  .room-pages button.on { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
+  .request-search { width:min(680px,calc(100vw - 220px)); min-width:420px; padding:9px 12px; }
+  .publish-row { display:grid; grid-template-columns:minmax(150px,1.2fr) minmax(110px,.7fr) minmax(150px,1fr) minmax(150px,1fr); gap:14px;
+    align-items:start; padding:13px 4px; border-top:1px solid var(--line); }
+  .publish-row.head { font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; color:#8a7f6d; letter-spacing:.05em; text-transform:uppercase; }
+  .charles-composer { padding-bottom:24px; border-bottom:1px solid #efe7d6; }
+  .charles-composer label[for=charlesInput] { display:block; font-weight:600; margin:18px 0 8px; }
+  .charles-composer #charlesInput { min-height:150px; box-sizing:border-box; padding:14px 16px; border:1px solid #cfc4ad;
+    border-left:3px solid var(--blue); border-radius:0 8px 8px 0; background:#fff; }
+  .charles-controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px; }
+  @media (max-width:760px) { .scan-row { grid-template-columns:28px minmax(0,1fr) auto; }
+    .scan-row > :nth-child(3), .scan-row > :nth-child(5) { grid-column:2 / -1; } }
   .wb-title { font:600 20px/1.3 Georgia,"Times New Roman",serif; margin-bottom:16px; }
   .wb-label { font:italic 400 13px/1.5 Georgia,serif; color:#a89a80; margin-bottom:12px; }
   .wb-source { font:400 19px/1.55 Georgia,"Times New Roman",serif; color:var(--ink);
@@ -911,7 +928,7 @@ export function renderPage(opts: { repoRoot: string; isDevWorktree: boolean; fix
   .sig-sample { font-size:12.5px; line-height:1.55; color:#5a5346; margin-top:8px; }
   .sig-plat { display:grid; grid-template-columns:120px 96px minmax(0,1fr); gap:14px; align-items:baseline;
     padding:9px 0; border-top:1px solid #f2ece0; font-size:13px; }
-  /* Content: the three-step wizard */
+  /* Content: one four-view cycle */
   .cw-steps { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid #dfd4bb; }
   .cw-step { border:none; background:none; padding:0; display:flex; align-items:baseline; gap:7px; cursor:pointer; }
   .cw-step[disabled] { cursor:default; }
@@ -988,16 +1005,28 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="cw-steps" id="cwSteps"></div>
       <div id="cwBody"><div class="empty">Loading…</div></div>
     </div>
-    <div id="workbench" hidden></div>
     <div class="sheet" id="reviewSheet" hidden>
+      <div class="cw-steps" id="reviewSteps"></div>
       <div class="sheet-head">
-        <button type="button" class="cw-back" data-set-pane="wizard">Back to the wizard</button>
-        <h2>Drafts for your yes</h2>
+        <h2>Approve Drafts</h2>
         <span class="grow"></span>
-        <label class="toggle" id="decidedWrap"><input type="checkbox" id="showDecided" /> show published / discarded</label>
+        <button type="button" class="cw-back" id="reviewSelectAll">Select all</button>
+        <button type="button" class="primary" id="reviewApproveSelected">Approve selected for publishing</button>
       </div>
-      <div class="sheet-sub">Approve schedules it. Nothing posts without a yes here.</div>
+      <div class="sheet-sub">Review related outputs together by input request. Approval moves work into the publishing workflow; it does not claim that a provider accepted it.</div>
+      <div class="cw-tabs" aria-label="Draft filters">
+        <label style="flex-basis:100%">Input request <input class="request-search" id="reviewRequestFilter" list="reviewRequestOptions" type="search" placeholder="Search or choose an input request" autocomplete="off"><datalist id="reviewRequestOptions"></datalist></label>
+        <label>Media <select id="reviewMediaFilter"><option value="">All</option></select></label>
+        <label>Platform <select id="reviewPlatformFilter"><option value="">All</option></select></label>
+        <label>Treatment <select id="reviewTreatmentFilter"><option value="">All</option></select></label>
+      </div>
       <div id="reviewMain" style="margin-top:14px"><div class="empty">Loading…</div></div>
+    </div>
+    <div class="sheet" id="publishedSheet" hidden>
+      <div class="cw-steps" id="publishedSteps"></div>
+      <div class="sheet-head"><h2>Publishing status</h2><span class="grow"></span></div>
+      <div class="sheet-sub">Scheduling and publication status by input request. Postiz is not connected in this repository, so provider actions remain a setup dependency and are never shown as complete.</div>
+      <div id="publishedMain" style="margin-top:14px"><div class="empty">Nothing has entered publishing yet.</div></div>
     </div>
   </section>
   <section class="view" id="roomStudio" hidden>
@@ -1020,7 +1049,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
           </div>
           <div class="sheet-foot" style="justify-content:flex-start">
             <label class="engine-choice"><span>Run with</span><select class="engine-select" id="studioEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-            <button type="button" class="wb-link" id="notesBtn">Browse Substack Notes</button>
+            <button type="button" class="wb-link" id="notesBtn">Pull Substack Notes</button>
           </div>
         </div>
         <div class="link-ask" id="linkAsk" hidden>
@@ -1071,30 +1100,39 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet session">
       <div class="session-grid">
       <div class="session-main">
-      <div class="capture" style="padding:0 0 22px;border-bottom:1px solid #efe7d6">
+      <nav class="room-pages" aria-label="Charles pages"><button type="button" class="on" data-charles-page="input">Input</button><button type="button" data-charles-page="drafts">Review drafts</button></nav>
+      <div id="charlesInputPane">
+      <div class="capture charles-composer">
       <div class="capture-title">Draft a Charles post</div>
-      <div class="ingest-actions" style="align-items:center">
-        <label class="engine-choice"><span>Run with</span><select class="engine-select" id="charlesEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label>
-        <textarea id="charlesInput" rows="5" style="flex:1;min-width:220px" placeholder="Topic, angle, or a URL for a reply"></textarea>
-        <button class="primary" id="charlesDraftBtn">Draft</button>
-      </div>
+      <label for="charlesInput">Topic, angle, or idea</label>
+      <textarea id="charlesInput" rows="6" placeholder="What should Charles write about?"></textarea>
       <fieldset style="border:0;padding:10px 0 0;margin:0"><legend class="wb-label">FORMATS · EACH QUEUES SEPARATELY</legend>
         <label><input class="charles-format" type="checkbox" value="oneliner" checked> One-liner</label>
         <label><input class="charles-format" type="checkbox" value="essay"> Essay</label>
         <label><input class="charles-format" type="checkbox" value="reply"> Reply</label>
       </fieldset>
+      <div class="charles-controls"><label class="engine-choice"><span>Draft with</span><select class="engine-select" id="charlesEngine"><option value="claude">Claude</option><option value="grok">Grok</option><option value="codex">GPT (Codex)</option></select></label><button class="primary" id="charlesDraftBtn">Draft selected formats</button></div>
+      <div id="charlesReplySource" hidden style="margin-top:12px">
+        <label class="wb-label" for="charlesReplyInput">POST OR ARTICLE TO REPLY TO</label>
+        <input id="charlesReplyInput" type="url" style="width:100%" placeholder="Paste the URL or quoted post" />
+        <div class="hint" style="margin-top:5px">Charles will respond to this source using the thought above as optional direction.</div>
+      </div>
       <div class="hint">Runs the real /charles skill with the engine you choose. Lands in the queue below as "pending". Nothing posts on its own.</div>
       </div>
+      </div>
+      <div id="charlesDraftPane" hidden>
+      <div><div class="wb-margin-cap">Charles drafts</div><p class="sheet-sub">Choose a draft to review. Approved drafts can be sent to Content for platform treatments and publishing.</p></div>
+      <div id="charlesDraftList" style="margin-top:20px"></div>
       <div id="charlesMain" style="margin-top:24px"><div class="empty">Loading…</div></div>
       </div>
+      </div>
       <div class="session-margin room-rail" id="charlesSide">
-        <details id="charlesPersonaPanel">
+        <details id="charlesPersonaPanel" open>
           <summary class="wb-margin-cap">PERSONA CONTEXT</summary>
           <div class="sheet-sub" style="margin-top:10px">Muxin's original brief, verbatim, for copying into her other persona tools.</div>
           <button id="charlesBriefCopyBtn" style="margin-top:10px">Copy persona brief</button>
           <textarea id="charlesBriefText" readonly style="width:100%;min-height:140px;margin-top:10px;font:400 11px/1.5 ui-monospace,monospace;padding:10px;border:1px dashed #e0d6c0;border-radius:8px;background:#fcfbf7;resize:vertical;"></textarea>
         </details>
-        <div id="charlesDraftList" style="margin-top:20px"></div>
       </div>
       </div>
     </div>
@@ -1128,10 +1166,8 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       </div>
       <div id="ventureDocumentsPane" hidden><div id="ventureDocuments"></div><div id="ventureDocumentReader" hidden></div></div>
       <div id="ventureHistoryPane" hidden><div id="ventureRail"></div></div>
-    </div>
-    <div class="sheet" id="ventureIntakeSheet" hidden style="padding:22px 40px">
+      <div id="ventureIntakePane" hidden>
       <div class="sheet-head">
-        <button type="button" class="cw-back" data-set-ven-pane="work">Back to the venture</button>
         <h2>Intake guardrails</h2>
         <span class="grow"></span>
         <span class="src">Voice and scorecard fields save as you type</span>
@@ -1139,6 +1175,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
       <div class="sheet-sub">These fields are separate from the 25-question interview. They survive a reload, never advance a phase, and remain durable notes for this venture until you choose to use them.</div>
       <div id="ventureIntakeSections">
         <div class="empty" style="padding:18px 0">Choose a venture to load its intake guardrails.</div>
+      </div>
       </div>
     </div>
     <div class="sheet" id="ventureCaptureHandoff" hidden></div>
@@ -1152,13 +1189,13 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="signalsReads">
     <div class="sheet-head"><h2>Signals</h2><span class="grow"></span><span class="src" id="signalsBriefDate"></span></div>
     <div class="sheet-sub">Where you fit so far, what's worth changing (your call), and what's too weak to trust. Data tunes the dials, never the person.</div>
+    <div id="signalsTop"><div class="empty">Loading…</div></div>
     <details style="margin-top:26px"><summary class="wb-label">Measurement inventory</summary><div style="margin-top:18px">
       <div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80">This read</div>
       <div style="font:400 27px/1.35 Georgia,'Times New Roman',serif;color:#1c1a17;margin:8px 0 0;max-width:520px">Four things, kept apart</div>
       <div class="sheet-sub" style="max-width:560px">One number across all four would hide the thing you most need to see. Nothing on this page adds them up, and two of them are never allowed to argue for dropping a pillar or a platform.</div>
       <div id="signalsFamilies"><div class="empty">Loading…</div></div>
     </div><div id="signalsResearch"></div></details>
-    <div id="signalsTop"><div class="empty">Loading…</div></div>
     <div class="wb-sep" style="margin-top:30px"><span class="rule"></span><span class="txt">go deeper</span><span class="rule"></span></div>
     <div class="strategy" style="max-width:none;margin-top:14px">
       <div class="strategy-actions">
@@ -1226,7 +1263,7 @@ ${opts.isDevWorktree ? `<div class="worktree-banner">⚠ Dev worktree checkout (
     <div class="sheet" id="outreachPane">
       <div id="outreachCaptureHandoff" hidden></div>
       <div id="outreachList"><div class="empty">Loading…</div></div>
-      <div class="sheet-foot" id="outreachFoot"><label class="engine-choice"><span>Scout with</span><select class="engine-select" id="scoutEngine"><option value="claude">Claude</option><option value="grok">Grok</option></select></label></div>
+      <div class="sheet-foot" id="outreachFoot"><label class="engine-choice"><span>Scout with</span><select class="engine-select" id="scoutEngine"><option value="codex">ChatGPT</option><option value="grok">Grok</option></select></label></div>
     </div>
     <div class="sheet" id="followupsPane" hidden>
       <div class="sheet-head"><h2>Follow-ups</h2></div>
@@ -1242,8 +1279,18 @@ ${opts.fixtures ? fixturePanelHtml() + fixtureScriptHtml() : ""}
 <script>
 const $ = (s, r=document) => r.querySelector(s);
 let DATA = { pieces: [], pending: 0 };
-let showDecided = false;
+const FIXTURE_REVIEW_PIECE = ${opts.fixtures ? JSON.stringify({
+  slug: "sample-ai-power-request", requestId: "sample-layout-only",
+  descriptor: "Why do we seem to fear AI more than we fear power?",
+  title: "Why do we seem to fear AI more than we fear power?",
+  originalInput: "A sample source used only to make the review layout visible in fixture mode.", sample: true,
+  rows: [
+    { id: "quote-card-1-bluesky", platform: "bluesky", media: "static-quote-card", format: "image", treatment: "quote-card", status: "pending", editable: true, body: "People worry AI will mint a new economic underclass. America already has one; check the Gini wealth index before deciding what is new here." },
+    { id: "thread-1-linkedin", platform: "linkedin", media: "text", format: "thread", treatment: "platform-framing", status: "pending", editable: true, body: "We fear new systems of power while treating old concentrations of power as background conditions. That asymmetry is worth examining." },
+  ],
+}) : "null"};
 const DECIDED = new Set(["published","discard","locked"]);
+const reviewSelected = new Set();
 // In-flight action registries, keyed by stable row.id / piece.slug — NOT stored on the row/DATA
 // objects. The 3s job poll (setInterval below) calls load() on ANY job status change anywhere,
 // which replaces DATA wholesale and rebuilds every row's DOM from scratch; a flag or "thinking…"
@@ -1274,6 +1321,7 @@ function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"
 const ENGINE_LABELS = {claude:"Claude", grok:"Grok", codex:"GPT (Codex)"};
 const ENGINE_ROLES = {claude:"Writing", grok:"Ideation", codex:"Analysis"};
 const ENGINE_OPTIONS = '<option value="claude">Claude · Writing</option><option value="grok">Grok · Ideation</option><option value="codex">GPT (Codex) · Analysis</option>';
+const OUTREACH_ENGINE_OPTIONS = '<option value="codex">ChatGPT</option><option value="grok">Grok</option>';
 let ENGINE_STATUS = {claude:true, grok:true, codex:true};
 function engineLabel(id){ return ENGINE_LABELS[id] || "Claude"; }
 const ENGINE_PREFERENCE_KEY = "content-agents-preferred-engine";
@@ -1286,6 +1334,7 @@ function rememberEngine(value){
   try { localStorage.setItem(ENGINE_PREFERENCE_KEY, value); } catch(e) {}
 }
 function engineSelectHtml(id){ return '<label class="engine-choice"><span>Run with</span><select class="engine-select"'+(id?' id="'+id+'"':'')+'>'+ENGINE_OPTIONS+'</select></label>'; }
+function outreachEngineSelectHtml(){ return '<label class="engine-choice"><span>Draft with</span><select class="engine-select outreach-engine">'+OUTREACH_ENGINE_OPTIONS+'</select></label>'; }
 function refreshEngineControls(root=document){
   const preferred = preferredEngine();
   root.querySelectorAll(".engine-select").forEach(sel=>{
@@ -1481,20 +1530,42 @@ function rowEl(piece, row){
   return el;
 }
 let reviewFocusReturn = null;
+function reviewSelectionKey(requestId,variantId){ return JSON.stringify([requestId,variantId]); }
 function reviewScanRowEl(piece,row){
-  const button=document.createElement("button");
-  button.type="button"; button.className="scan-row"; button.dataset.reviewId=row.id;
+  const button=document.createElement("div");
+  const selectionKey=reviewSelectionKey(piece.slug,row.id);
+  button.className="scan-row"; button.dataset.reviewKey=selectionKey;
   const lead=String(row.body||row.notes||"No generated asset yet").replace(/\\s+/g," ").slice(0,150);
-  button.innerHTML='<span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span></span><span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block;margin-top:3px">'+esc(lead)+'</span></span><span class="pill '+pillClass(row.status)+'">'+esc(statusLabel(row.status))+'</span>';
-  button.addEventListener("click",()=>openReviewFocus(piece,row,button));
+  const treatment=row.control===true||row.variantKind==="control" ? "Untreated control" : esc(row.treatment||row.angle||"Treated variant");
+  button.innerHTML='<label aria-label="Select '+esc(row.id)+'"><input type="checkbox" class="review-check"'+(reviewSelected.has(selectionKey)?" checked":"")+'></label><span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="src" style="display:block;margin-top:4px">'+esc(row.media||row.format||row.kind||"content")+' · '+treatment+'</span></span><span style="min-width:0"><strong>'+esc(row.id)+'</strong><span class="src" style="display:block;margin-top:3px;max-height:4.5em;overflow:auto">'+esc(lead)+'</span></span><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span><button type="button" class="cw-back review-open">Open Focus Mode</button>';
+  button.querySelector(".review-check").addEventListener("change",e=>{ if(e.target.checked) reviewSelected.add(selectionKey); else reviewSelected.delete(selectionKey); });
+  button.querySelector(".review-open").addEventListener("click",()=>openReviewFocus(piece,row,button.querySelector(".review-open")));
   return button;
+}
+function reviewStateLabel(status){
+  if(status==="approve"||status==="published"||status==="locked") return "Approved";
+  if(status==="revise"||status==="blocked") return "Changes requested";
+  if(status==="discard") return "Rejected";
+  return "Draft";
+}
+function contentRequestPieces(pieces){ return (pieces||[]).filter(p=>p.originalInput||p.requestId); }
+function reviewVisiblePieces(){
+  const real=contentRequestPieces(DATA.pieces);
+  return real.length||!FIXTURE_REVIEW_PIECE ? real : [FIXTURE_REVIEW_PIECE];
 }
 function openReviewFocus(piece,row,returnTo){
   reviewFocusReturn=returnTo;
-  const body=$("#reviewFocusBody"); body.innerHTML=""; body.appendChild(rowEl(piece,row));
+  const body=$("#reviewFocusBody");
+  body.innerHTML='<div class="rowhead"><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span class="fmt">'+esc(row.format||row.kind||"content")+' · '+esc(row.id)+'</span><span class="pill '+pillClass(row.status)+'">'+esc(reviewStateLabel(row.status))+'</span></div>'+
+    '<label class="wb-label" for="reviewFocusEditor" style="display:block;margin-top:18px">EDIT THE DRAFT DIRECTLY</label>'+
+    '<textarea id="reviewFocusEditor" class="review-focus-editor">'+esc(row.body||"")+'</textarea>'+
+    '<div class="actions"><button type="button" id="reviewFocusSave"'+(row.editable?'':' disabled')+'>Save edit</button><button type="button" class="approve" data-focus-act="approve">Approve</button><button type="button" class="revise" data-focus-act="revise">Request changes</button><button type="button" class="discard" data-focus-act="discard">Discard</button></div>'+
+    (row.editable?'':'<div class="src">This asset is not text-editable here.</div>');
   $("#reviewFocusTitle").textContent=piece.title+" · "+row.platform;
   $("#reviewFocus").hidden=false; $("#reviewFocus .focus-dialog").focus();
-  refreshEngineControls(body);
+  const editor=$("#reviewFocusEditor"); if(row.editable) editor.focus();
+  $("#reviewFocusSave").addEventListener("click",async ()=>{ const result=await post("/api/derivative",{slug:piece.slug,id:row.id,body:editor.value}); if(result.ok===false){flash(result.error||"Could not save");return;} row.body=editor.value.trim(); flash("Saved"); closeReviewFocus(); rerender(); });
+  body.querySelectorAll("[data-focus-act]").forEach(button=>button.addEventListener("click",async ()=>{ const act=button.dataset.focusAct; if(act==="revise"){ closeReviewFocus(); openReviewFocus(piece,row,returnTo); flash("Edit the draft directly, or use Revise with an engine from the draft list"); return; } const result=await post("/api/status",{slug:piece.slug,id:row.id,status:act}); if(result.ok===false){flash(result.error||"Could not update status");return;} row.status=act; flash(act==="approve"?"Approved": "Discarded"); closeReviewFocus(); rerender(); }));
 }
 function closeReviewFocus(){
   $("#reviewFocus").hidden=true; $("#reviewFocusBody").innerHTML="";
@@ -1626,23 +1697,79 @@ function rerender(){
 function render(){
   const main = $("#reviewMain"); main.innerHTML = "";
   let shown = 0, pending = 0;
-  for (const piece of DATA.pieces){
-    const rows = piece.rows.filter(r => showDecided || !DECIDED.has(r.status));
+  const mediaFilter=$("#reviewMediaFilter")?.value||"";
+  const platformFilter=$("#reviewPlatformFilter")?.value||"";
+  const treatmentFilter=$("#reviewTreatmentFilter")?.value||"";
+  const requestQuery=($("#reviewRequestFilter")?.value||"").trim().toLowerCase();
+  for (const piece of reviewVisiblePieces()){
+    const rows = piece.rows.filter(r => !DECIDED.has(r.status))
+      .filter(r=>!mediaFilter||(r.media||r.kind)===mediaFilter)
+      .filter(r=>!platformFilter||r.platform===platformFilter)
+      .filter(r=>!treatmentFilter||(treatmentFilter==="control" ? r.control===true||r.variantKind==="control" : r.treatment===treatmentFilter||(treatmentFilter==="treated"&&!(r.control===true||r.variantKind==="control"))))
+      .filter(()=>!requestQuery||[piece.slug,piece.descriptor,piece.title].some(value=>String(value||"").toLowerCase().includes(requestQuery)));
     pending += piece.rows.filter(r=>!DECIDED.has(r.status)).length;
     if (!rows.length) continue;
     shown += rows.length;
     const sec = document.createElement("section"); sec.className = "piece";
-    sec.innerHTML = '<h2>'+esc(piece.title)+'</h2><div class="slug">'+esc(piece.slug)+'</div>';
+    const source=String(piece.originalInput||piece.sourceBody||piece.title||"").replace(/\\s+/g," ").split(" ").slice(0,75).join(" ");
+    sec.innerHTML = (piece.sample?'<div class="cw-rail t-amber">SAMPLE DATA · LAYOUT ONLY</div><div class="src">Nothing in this sample is added to your request list.</div>':'')+'<h3>'+esc(piece.descriptor||piece.title)+'</h3><div class="slug">Descriptor · '+esc(piece.descriptor||piece.title)+' · '+esc(piece.slug)+'</div><details><summary class="cw-back">Original input</summary><div class="src" style="max-width:680px;margin-top:8px">'+esc(source)+(source.split(" ").length>=75?"…":"")+'</div></details>';
     for (const row of rows) sec.appendChild(reviewScanRowEl(piece, row));
     main.appendChild(sec);
   }
   $("#count").textContent = String(pending);
   $("#count").hidden = pending === 0;
-  if (!shown) main.innerHTML = '<div class="empty">Nothing '+(showDecided?"here yet":"awaiting review")+'.</div>';
+  if (!shown) main.innerHTML = '<div class="empty">Nothing awaiting review for these filters.</div>';
+  renderReviewFilters();
+  renderPublished();
   refreshEngineControls();
   // Step 3 of the wizard renders the SAME rows out of the same DATA, so a status change anywhere
   // has to repaint it too. renderContentWizard never calls back into render().
   if (typeof renderContentWizard === "function") renderContentWizard();
+}
+function renderReviewFilters(){
+  const media=$("#reviewMediaFilter"), platform=$("#reviewPlatformFilter"), treatment=$("#reviewTreatmentFilter"), request=$("#reviewRequestFilter"), requestOptions=$("#reviewRequestOptions");
+  if(!media||!platform||!treatment||!request||!requestOptions) return;
+  const mv=media.value, pv=platform.value, tv=treatment.value;
+  const visiblePieces=reviewVisiblePieces();
+  const rows=visiblePieces.flatMap(p=>p.rows||[]);
+  const mediaValues=[...new Set(rows.map(r=>r.media||r.kind).filter(Boolean))];
+  const platforms=[...new Set(visiblePieces.flatMap(p=>(p.rows||[]).map(r=>r.platform)))];
+  const treatments=[...new Set(rows.filter(r=>!(r.control===true||r.variantKind==="control")).map(r=>r.treatment||"treated").filter(Boolean))];
+  media.innerHTML='<option value="">All</option>'+mediaValues.map(value=>'<option value="'+esc(value)+'">'+esc(value)+'</option>').join(""); media.value=mv;
+  platform.innerHTML='<option value="">All</option>'+platforms.map(p=>'<option value="'+esc(p)+'">'+esc(p)+'</option>').join(""); platform.value=pv;
+  treatment.innerHTML='<option value="">All</option><option value="control">Untreated control</option>'+treatments.map(value=>'<option value="'+esc(value)+'">'+esc(value==="treated"?"Treated":value)+'</option>').join(""); treatment.value=tv;
+  const requestedPieces=visiblePieces;
+  requestOptions.innerHTML=requestedPieces.map(p=>'<option value="'+esc(p.descriptor||p.title)+'">'+esc(p.slug)+'</option>').join("");
+}
+function publishingState(row){
+  if(row.scheduleError||row.reconciled&&row.reconciled.state==="mismatch") return "Failed";
+  if(row.reconciled&&row.reconciled.state==="scheduled"||row.scheduledWhen) return "Scheduled";
+  if(row.status==="published") return "Published";
+  return "Pending";
+}
+function renderPublished(){
+  const main=$("#publishedMain"); if(!main) return; main.innerHTML=""; let shown=0;
+  for(const piece of contentRequestPieces(DATA.pieces)){
+    const rows=(piece.rows||[]).filter(r=>r.status==="approve"||r.status==="published"||r.status==="locked"||r.scheduleError);
+    if(!rows.length) continue; shown+=rows.length;
+    const sec=document.createElement("section"); sec.className="piece";
+    sec.innerHTML='<h3>'+esc(piece.descriptor||piece.title)+'</h3><div class="slug">Input request · '+esc(piece.slug)+'</div><div class="publish-row head"><span>Draft</span><span>Destination</span><span>Planned / sent</span><span>Provider status</span></div>';
+    for(const row of rows){
+      const state=publishingState(row), item=document.createElement("div"); item.className="publish-row";
+      const error=row.scheduleError||(row.reconciled&&row.reconciled.reason)||"";
+      const provider=row.reconciled&&row.reconciled.provider||"Postiz";
+      item.innerHTML='<span><strong>'+esc(row.id)+'</strong><span class="src" style="display:block">'+esc(row.format||row.kind||"content")+'</span></span><span class="badge '+esc(row.platform)+'">'+esc(row.platform)+'</span><span><span class="pill">'+state+'</span><span class="src" style="display:block">'+esc(row.scheduledWhen||"No send time recorded")+'</span></span><span class="src"><strong>'+esc(provider)+'</strong><br>'+(error?esc(error)+' · Retry requires provider setup.':'Live provider status unavailable until connected.')+'</span>';
+      sec.appendChild(item);
+    }
+    main.appendChild(sec);
+  }
+  if(!shown) main.innerHTML='<div class="empty">Nothing has entered publishing yet.</div>';
+}
+async function approveReviewSelection(){
+  const targets=[];
+  for(const piece of DATA.pieces||[]) for(const row of piece.rows||[]) if(reviewSelected.has(reviewSelectionKey(piece.slug,row.id))&&!DECIDED.has(row.status)) targets.push({piece,row});
+  for(const {piece,row} of targets){ const result=await post("/api/status",{slug:piece.slug,id:row.id,status:"approve"}); if(result&&result.ok===false) flash(result.error||"Approve blocked"); }
+  reviewSelected.clear(); await load();
 }
 
 // ── rooms ──
@@ -2058,7 +2185,7 @@ function outreachSendState(msg){
 }
 function outreachSendNote(state){
   if(state==="draft") return "Locking readies it. You send it by hand, and nothing here can send it for you.";
-  if(state==="locked") return "Paste it into your mail client and send it there. Tell me once it has gone.";
+  if(state==="locked") return "Gmail setup is required before this locked draft can be sent.";
   return "";
 }
 function outreachSendBadge(state, hasLoggedSend){
@@ -2091,10 +2218,16 @@ function outreachOpeningLine(l){
   const tail = /[.?!]$/.test(reason) ? "" : ".";
   return "I put "+who+" in front of you for this reason: "+reason+tail+" Want to lead with that, or keep it short and just ask for a quick chat?";
 }
+function outreachGoodFit(l){
+  const fit=String(l.classificationOrFit||l.fit||l.classification||"").trim().toLowerCase();
+  if(l.kind==="platform") return fit==="strong"||fit==="partial";
+  if(l.kind==="client") return fit==="turnaround"||fit==="greenfield";
+  return false;
+}
 
 // ── Triage: the queue, grouped by why ──
 function triageHtml(){
-  const groups = groupLeadsBySegment(OUTREACH_LEADS);
+  const groups = groupLeadsBySegment((OUTREACH_LEADS||[]).filter(outreachGoodFit));
   if(!groups.length) return '<div class="empty">No leads yet. Scout new leads above runs the discovery agent. Nothing is contacted or sent automatically.</div>';
   const body = groups.map(g=>
     '<div class="tri-group">'+
@@ -2135,10 +2268,12 @@ function outreachMarginHtml(l){
   const stats = (l.jsaStats||[]).slice(0,3).map(s=>'<div class="d" style="font-size:12.5px;color:#5a5346;">'+esc(s.label)+': '+esc(s.value)+'</div>').join("");
   const profile = (l.profileRest||l.profile) ? '<details class="lead-details"><summary>Full profile</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.profileRest||l.profile)+'</div></details>' : "";
   const reasoning = l.classificationNote ? '<details class="lead-details"><summary>Full why-fit reasoning</summary><div class="ntext" style="white-space:pre-wrap;font-size:12.5px;">'+esc(l.classificationNote)+'</div></details>' : "";
-  return '<div class="session-margin"><div class="wb-margin-cap">WHY THIS IS ON YOUR DESK</div>'+
+  const matchRows=matchmakerRead(l).rows;
+  const matchDetail=matchRows.length?'<details class="lead-details"><summary>Why this lead?</summary><div class="mm-grid">'+matchRows.map(r=>'<div class="mm-row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>').join("")+'</div></details>':"";
+  return '<div class="session-margin"><details class="outreach-why"><summary class="wb-margin-cap">WHY THIS LEAD?</summary>'+
     (items || '<div class="src">No evidence recorded on this lead yet.</div>')+
-    (stats?'<div>'+stats+'</div>':"")+reasoning+profile+
-    '<div class="wb-reply"><span class="mono-note">Every claim here carries its source, or says it has none. This page stays tied to the follow-up row. Months from now: the why, what you said, the date, one click.</span></div></div>';
+    (stats?'<div>'+stats+'</div>':"")+matchDetail+reasoning+profile+'</details>'+
+    '<div class="wb-reply"><div class="wb-margin-cap">FOLLOW-UP</div><span class="mono-note">After a send is logged, its reminder and history stay here.</span></div></div>';
 }
 
 // ── The conversational half: I ask, you say which way to take it, then I draft ──
@@ -2207,13 +2342,7 @@ function sendStepsHtml(l){
   if(state === "draft"){
     return '<div class="send-steps"><button class="primary out-lock" data-dir="'+esc(l.dir)+'" data-file="'+esc(msg.file)+'"'+(pending?" disabled":"")+'>'+(pending?"Locking…":"Lock this message")+'</button>'+note+'</div>';
   }
-  const channels = ["email","linkedin-dm","contact-form","podcast-pitch"];
-  const chanSel = '<select class="sent-channel">'+channels.map(c=>'<option value="'+c+'"'+(c===(msg.channel||"email")?" selected":"")+'>'+c+'</option>').join("")+'</select>';
-  const people = (l.contacts||[]).map(c=>c.name);
-  const personSel = '<select class="sent-person"><option value="">(no specific person)</option>'+people.map(n=>'<option value="'+esc(n)+'"'+(msg.recipient===n?" selected":"")+'>'+esc(n)+'</option>').join("")+'</select>';
-  const copyBtn = '<button class="primary out-copy" data-dir="'+esc(l.dir)+'">Copy to clipboard</button>';
-  const markBar = '<div class="sent-bar">'+personSel+chanSel+'<button class="go sent-go" data-dir="'+esc(l.dir)+'">Mark as manually sent</button></div>';
-  return '<div class="send-steps">'+copyBtn+note+'</div>'+markBar;
+  return '<div class="send-steps"><button type="button" class="primary" disabled>Connect Gmail to send</button><span class="send-note">Gmail setup required for muxin.li.pro@gmail.com. Authenticate that account and grant send permission before this control can work.</span></div>';
 }
 
 function whoBoxHtml(l){
@@ -2236,19 +2365,19 @@ function threadHtml(l){
   const provChip = (l.whySource === "gpt-codex" ? '<span class="legacy-chip" style="background:#efeafd;color:#5b46b8">why: analyst, GPT-routed</span>' : l.whySource === "claude-cli" ? '<span class="legacy-chip">why: analyst, Claude</span>' : "")+(l.source === "jsa" ? '<span class="legacy-chip">research: JSA</span>' : "");
   const mmr = matchmakerRead(l);
   const legacy = mmr.legacy ? ' <span class="legacy-chip">legacy read, the pitch angle standing in until this lead is re-qualified</span>' : "";
-  const mm = mmr.rows.length
-    ? '<div class="mm-grid">'+mmr.rows.map(r=>'<div class="mm-row"><span class="k">'+esc(r.k)+'</span><span class="v">'+esc(r.v)+'</span></div>').join("")+'</div>'
-    : "";
   // The direction composer replaces the old one-click "Draft the message": drafting now starts from
   // what she typed, so the thread only offers it once the lead is one she said to pursue.
   const canDraft = !l.latestMessage && l.kind!=="content-example" && (l.status==="pursue"||l.status==="qualified");
   const direction = (canDraft || pending || l.latestMessage) && l.kind!=="content-example" ? directionHtml(l) : "";
-  const outreachEngine = l.kind!=="content-example" ? engineSelectHtml() : "";
+  const outreachEngine = l.kind!=="content-example" ? outreachEngineSelectHtml() : "";
   const decideBtns = l.kind==="content-example" ? "" :
-    '<div class="wb-handoff">'+
-      (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Worth pursuing</button><button class="out-pass" data-dir="'+esc(l.dir)+'">Pass</button>' : "")+
-      '<span class="note">Pursue or pass just marks your call. Drafting writes a message for you to shape; only you ever send it.</span>'+
+    '<div class="wb-handoff" style="margin-top:18px">'+
+      (undecided ? '<button class="primary out-pursue" data-dir="'+esc(l.dir)+'">Interested</button><button class="out-pass" data-dir="'+esc(l.dir)+'">Not for me</button>' : '<span class="pill">'+esc(l.status)+'</span>')+
+      '<span class="note">This only records your yes or no.</span>'+
     '</div>';
+  const recommendation = l.kind==="content-example" ? "" :
+    '<div class="outreach-recommendation" style="margin-top:18px;padding:14px 16px;border-left:2px solid var(--green);background:#f5f9f4">'+
+      '<div class="wb-margin-cap">WHY THIS MAY BE WORTH A CONVERSATION</div><p style="margin:6px 0 0;max-width:680px">'+esc(mmr.headline||"The research suggests a plausible overlap, but you should decide whether it is strong enough to pursue.")+'</p></div>';
   const notes = '<div class="lead-notes">'+
     (l.muxinNotes ? '<div class="my-notes">'+esc(l.muxinNotes)+'</div>' : "")+
     '<div class="aibox show"><input class="lead-note-input" placeholder="your note on this lead (what stood out)…" /><button class="lead-note-save" data-dir="'+esc(l.dir)+'">Save note</button></div></div>';
@@ -2257,10 +2386,10 @@ function threadHtml(l){
     '<div class="thread-head"><span class="thread-seg">'+esc(threadSegLabel(seg))+'</span>'+
       '<span class="thread-who">'+esc(l.name||l.dir)+'</span>'+
       '<span class="thread-person">'+esc(contactsLine(l.contacts))+'</span></div>'+
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="seg-chip '+esc(seg)+'">'+esc(info.label)+'</span>'+fitChip+'<span class="src">'+esc(info.line)+'</span><span class="grow"></span>'+provChip+'</div>'+
-    '<div class="wb-label" style="margin:14px 0 0;">Why this matters to you, in plain terms'+legacy+'</div>'+
-    '<div class="dossier-why">'+esc(mmr.headline)+'</div>'+
-    mm + whoBoxHtml(l) + outreachEngine + direction + outreachMessageBox(l) + sendStepsHtml(l) + decideBtns + notes +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="seg-chip '+esc(seg)+'">'+esc(info.label)+'</span>'+fitChip+'</div>'+recommendation+decideBtns+
+    '<details class="outreach-why" style="margin-top:14px"><summary>Why this lead?</summary><p class="src">'+esc(mmr.headline)+'</p></details>'+
+    '<details style="margin-top:14px"><summary>Recipient</summary>'+whoBoxHtml(l)+'</details>'+outreachEngine + direction + outreachMessageBox(l) + sendStepsHtml(l) +
+    '<details style="margin-top:18px"><summary>Notes</summary>'+notes+'</details>'+
     (l.url?'<div class="src" style="margin-top:10px;"><a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.url)+'</a></div>':"")+
   '</div>'+outreachMarginHtml(l)+'</div>';
 }
@@ -2268,7 +2397,7 @@ function threadHtml(l){
 function renderOutreachBox(){
   if(!OUTREACH_LEADS) return;
   const box = $("#outreachList");
-  const leads = OUTREACH_LEADS;
+  const leads = OUTREACH_LEADS.filter(outreachGoodFit);
   if(!leads.length){
     activeLeadDir = null;
     box.innerHTML = '<div class="empty">No leads yet. Scout new leads above runs the discovery agent. Nothing is contacted or sent automatically.</div>';
@@ -2282,7 +2411,7 @@ function renderOutreachBox(){
   box.querySelectorAll("button.out-back").forEach(b=>b.addEventListener("click",()=>{ activeLeadDir = null; renderOutreachBox(); }));
   box.querySelectorAll("button.dir-send").forEach(b=>b.addEventListener("click", ()=>{
     const select = b.closest(".dossier-grid")?.querySelector(".engine-select");
-    outreachDraft(b.dataset.dir, b, select ? select.value : "claude");
+    outreachDraft(b.dataset.dir, b, select ? select.value : "codex");
   }));
   // Kept out of the render loop on purpose: re-rendering per keystroke would eat the caret. The
   // typed text is stashed so a refresh mid-thought does not lose it, and the button just enables.
@@ -2295,21 +2424,16 @@ function renderOutreachBox(){
   box.querySelectorAll("button.out-pursue").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pursue")));
   box.querySelectorAll("button.out-pass").forEach(b=>b.addEventListener("click", ()=>outreachDecide(b.dataset.dir,"pass")));
   box.querySelectorAll("button.out-lock").forEach(b=>b.addEventListener("click", ()=>outreachLock(b.dataset.dir, b.dataset.file)));
-  box.querySelectorAll("button.out-copy").forEach(b=>b.addEventListener("click", ()=>outreachCopy(b)));
   box.querySelectorAll("button.lead-note-save").forEach(b=>b.addEventListener("click", ()=>outreachSaveNote(b)));
   box.querySelectorAll("button.msg-save").forEach(b=>b.addEventListener("click", ()=>outreachMsgSave(b)));
   box.querySelectorAll("button.msg-revise").forEach(b=>b.addEventListener("click", ()=>{
     const select = b.closest(".dossier-grid")?.querySelector(".engine-select");
-    outreachMsgRevise(b, select ? select.value : "claude");
+    outreachMsgRevise(b, select ? select.value : "codex");
   }));
   box.querySelectorAll("button.who-add").forEach(b=>b.addEventListener("click", ()=>outreachAddContact(b.dataset.dir, b.dataset.name, "")));
   box.querySelectorAll("button.who-save").forEach(b=>b.addEventListener("click", ()=>{
     const wrap = b.closest(".who-box");
     outreachAddContact(b.dataset.dir, wrap.querySelector(".who-name").value.trim(), wrap.querySelector(".who-role").value.trim());
-  }));
-  box.querySelectorAll("button.sent-go").forEach(b=>b.addEventListener("click", ()=>{
-    const bar = b.closest(".sent-bar");
-    outreachMarkSent(b.dataset.dir, bar.querySelector(".sent-person").value, bar.querySelector(".sent-channel").value);
   }));
 }
 
@@ -2342,23 +2466,6 @@ async function outreachLock(dir, file){
     lockPending.delete(dir);
     await loadOutreach();
   }
-}
-
-function outreachCopy(b){
-  const grid = b.closest(".dossier-grid");
-  const body = grid ? grid.querySelector(".lead-msg .body") : null;
-  const text = body ? body.textContent : "";
-  if(!text){ flash("Nothing to copy yet"); return; }
-  try { if(navigator.clipboard) navigator.clipboard.writeText(text); } catch (e) {}
-  flash("Copied. Paste it into your mail client and send it there.");
-}
-
-// Logging a send hands the lead back to the queue, where the row now reads its real
-// "pitched <date>, by hand" off the tracker event this just wrote.
-async function outreachMarkSent(dir, person, channel){
-  const r = await post("/api/outreach/mark-sent", {dir, person, channel});
-  if(r.ok){ flash("Logged. The clock starts today; see Follow-ups."); activeLeadDir = null; await loadOutreach(); }
-  else flash(r.error || "Could not log the send");
 }
 
 async function outreachSaveNote(b){
@@ -2404,7 +2511,7 @@ async function outreachMsgRevise(b, engine){
 async function scoutRun(){
   if(scoutInFlight) return;
   scoutInFlight = true;
-  const engine = $("#scoutEngine")?.value || "claude";
+  const engine = $("#scoutEngine")?.value || "codex";
   const box = $("#outreachList");
   const banner = document.createElement("div");
   banner.className = "hint";
@@ -2462,22 +2569,8 @@ async function loadOutreach(){
 }
 
 
-// ── Content room: the workbench (Content Studio Riff 3a/3b) ──
-// One sheet for the piece picked in the wizard: Muxin's source verbatim in serif behind the blue
-// pencil, each cut rendered as the message it is, the director's checks in the margin, one clear
-// handoff. Accept still builds cuts server-side from verbatim lines only (what you see IS what
-// gets accepted); the reply box runs another advisor round as a queued job; "Format for platforms"
-// runs the formatting pipeline. Nothing publishes: every draft lands in "Drafts for your yes".
+// Content source sessions feed the configuration wizard and preserve provenance for review rows.
 let WB_SESSIONS = [];
-let RECS = null;
-const devReplyPending = new Set(); // slugs with a just-clicked reply, before the job shows in JOBS
-const wbExpanded = new Set();      // slugs whose full source text is expanded
-
-function devWorking(slug){
-  return devReplyPending.has(slug) || JOBS.some(j =>
-    (j.kind==="develop"||j.kind==="develop-reply") && (j.status==="queued"||j.status==="running") &&
-    (j.label==="Develop: "+slug || j.label==="Advisor reply: "+slug));
-}
 function fmtDay(iso){
   if(!iso) return "";
   const p = iso.split("-");
@@ -2497,240 +2590,27 @@ function lineRefsText(refs){
   if(!parts.length) return "";
   return (parts.length===1 ? "line " : "lines ")+parts.join(", ");
 }
-function wbCheckHtml(cls, verdict, label, textHtml){
-  return '<div class="wb-check '+cls+'"><span class="t"><span class="verdict">'+esc(verdict)+'</span> · '+esc(label)+'</span><span class="d">'+textHtml+'</span></div>';
-}
-// Hand-mirror of describeRecommendation("unavailable") in recommendations.ts — keep in sync by hand.
-const RECS_UNAVAILABLE = {
-  availability:"unavailable",
-  source:"reviewed-interface",
-  headline:"The recommendation source could not be read.",
-  detail:"This is a failed read, not an empty answer. Repair the source, then you review whatever comes back before it is usable.",
-  examples:[]
-};
-async function loadRecommendations(){
-  try {
-    const r = await fetch("/api/recommendations");
-    if(!r.ok){ RECS = RECS_UNAVAILABLE; return; }
-    const d = await r.json();
-    RECS = d;
-  } catch(e) {
-    RECS = RECS_UNAVAILABLE;
-  }
-}
-function recsBlockHtml(){
-  if(!RECS) return "";
-  let examplesHtml = "";
-  // Hand-mirror of recommendationExamplesShown() in recommendations.ts: only fixture-example
-  // responses may expose recommendation bodies. Explicit positive check, never a negative on
-  // reviewed-interface.
-  if(RECS.source === "fixture-example" && RECS.examples && RECS.examples.length){
-    // Hand-mirror of RECOMMENDATION_EXAMPLE_NOTICE in recommendations.ts — keep in sync by hand.
-    const notice = "This example only illustrates the shape the seam will carry; it is not something you have reviewed or signed off on.";
-    for(const ex of RECS.examples){
-      let evidenceHtml = "";
-      for(const ev of (ex.evidence || [])){
-        evidenceHtml += '<div class="wb-rec-ev">'+esc(ev.label)+' · '+esc(ev.reference)+
-          '<div class="src">'+esc(ev.caveat)+'</div></div>';
-      }
-      examplesHtml += '<div class="wb-rec-ex"><div class="src">'+esc(notice)+'</div>'+
-        '<div class="wb-rec-plat">'+esc(ex.platform)+'</div>'+
-        '<div class="wb-rec-mech">'+esc(ex.mechanism)+'</div>'+
-        '<div class="wb-rec-why">'+esc(ex.whyItCouldFit)+'</div>'+
-        evidenceHtml+
-        '<div class="wb-rec-conf">'+esc(ex.confidence)+'</div></div>';
-    }
-  }
-  // The block gets its own class so a reader, a test, or the e2e pass can scope to the seam's own
-  // copy. The margin around it can fairly use words this seam must never use, because there they
-  // describe Muxin's own routing rather than a corpus mechanism.
-  return '<div class="wb-recs"><div class="wb-margin-cap">PATTERN READS</div>'+
-    '<div class="wb-margin-sub">'+esc(RECS.headline)+'</div>'+
-    '<div class="src">'+esc(RECS.detail)+'</div>'+
-    examplesHtml+'</div>';
-}
-function wbMarginHtml(s){
-  const kindLabel = {cta:"CTA check", spin:"Platform spin", routing:"Routing", note:"Note"};
-  const checks = [];
-  const last = s.rounds.length ? s.rounds[s.rounds.length-1] : null;
-  if(last) for(const c of last.cards){
-    if(c.kind==="angle") continue;
-    checks.push(wbCheckHtml("", "checked", kindLabel[c.kind]||c.kind, esc(c.summary||c.title)));
-  }
-  // The extraction guarantee, synthesized from the cuts' own recorded provenance.
-  const withLines = s.cuts.filter(c=>c.sourceLines && c.sourceLines.length);
-  if(withLines.length){
-    const refs = withLines.map(c=>lineRefsText(c.sourceLines)).join("; ");
-    checks.push(wbCheckHtml("green", "held", "Extraction", esc("Every word is yours ("+refs+"), verbatim and trimmed. Nothing composed.")));
-  }
-  const body = checks.length ? checks.join("")
-    : '<div class="wb-margin-sub">No director notes on this piece yet.</div>';
-  const reply = devWorking(s.slug)
-    ? '<div class="dev-working">Your director is working on a round. Studio has the log.</div>'
-    : '<div class="wb-reply">'+engineSelectHtml()+'<input class="wb-reply-input" placeholder="Push back, or ask for another angle…" data-slug="'+esc(s.slug)+'" />'+
-      '<button class="wb-reply-send" data-slug="'+esc(s.slug)+'">'+(s.rounds.length?"Send to your director":"Ask for a read")+'</button>'+
-      '<span class="mono-note">Studio carries the clock and the log while a round runs.</span></div>';
-  return '<div class="session-margin">'+
-    '<div><div class="wb-margin-cap">WHAT YOUR DIRECTOR CHECKED</div>'+
-    (s.rounds.length ? '<div class="wb-margin-sub">Ran the lenses against your words. Kept only what earned its place.</div>' : "")+
-    '</div>'+body+recsBlockHtml()+reply+'</div>';
-}
-function wbAngleHtml(slug, card){
-  const refs = lineRefsText(card.sourceLines);
-  const preview = card.previewText!==undefined
-    ? '<div class="dev-preview-label">your lines, verbatim ('+esc(refs)+')</div><div class="dev-preview">'+esc(card.previewText)+'</div>'
-    : (card.previewError ? '<div class="aierr">⚠ '+esc(card.previewError)+'</div>' : "");
-  const actions = card.previewText!==undefined
-    ? '<div class="actions"><input class="dev-lens" value="'+esc(card.lens||"")+'" title="name for this cut (lowercase-with-dashes)" /><button class="dev-accept" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Accept as cut</button><button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Dismiss</button></div>'
-    : '<div class="actions"><button class="dev-dismiss" data-slug="'+esc(slug)+'" data-card="'+esc(card.id)+'">Dismiss</button></div>';
-  return '<div class="wb-proposal">'+
-    '<div class="wb-cut-head"><span class="lens">Your director proposes a cut</span><span class="sub">'+esc(card.lens||"")+'</span></div>'+
-    '<div style="font-weight:600;font-size:14px;margin-bottom:4px;">'+esc(card.title)+'</div>'+
-    (card.summary?'<div class="dev-summary">'+esc(card.summary)+'</div>':"")+preview+actions+'</div>';
-}
-function wbSessionEl(s){
-  const sheet = document.createElement("div");
-  sheet.className = "sheet session";
-  sheet.dataset.wbSlug = s.slug;
-  const expanded = wbExpanded.has(s.slug);
-  const longSource = s.sourceBody.length > 420;
-  const openAngles = [];
-  for(const round of s.rounds) for(const c of round.cards) if(c.kind==="angle" && c.status==="open") openAngles.push(c);
-  let main = '<div class="wb-title">'+esc(s.title)+'</div>'+
-    '<div class="wb-label">You wrote'+(s.date?", "+fmtDay(s.date):"")+'</div>'+
-    '<div class="wb-source'+((longSource&&!expanded)?" clamped":"")+'">'+esc(s.sourceBody)+'</div>'+
-    (longSource?'<button type="button" class="wb-expand" data-slug="'+esc(s.slug)+'">'+(expanded?"show less":"read the whole page")+'</button>':"");
-  if(s.cuts.length){
-    main += '<div class="wb-sep"><span class="rule"></span><span class="txt">your director shaped '+(s.cuts.length>1?"cuts":"a cut")+'</span><span class="rule"></span></div>';
-    for(const c of s.cuts){
-      main += '<div class="wb-cut" data-lens="'+esc(c.lens)+'">'+
-        '<div class="wb-cut-head"><span class="lens">The cut</span><span class="sub">'+esc(c.lens)+' · still your words, trimmed</span><span class="grow"></span><button class="wb-link wb-cut-edit" data-slug="'+esc(s.slug)+'" data-lens="'+esc(c.lens)+'">Edit the cut</button></div>'+
-        '<div class="wb-cut-body">'+esc(c.body)+'</div></div>';
-    }
-  }
-  for(const card of openAngles) main += wbAngleHtml(s.slug, card);
-  main += '<div class="wb-handoff"><button class="primary dev-format-btn" data-slug="'+esc(s.slug)+'">Format for platforms</button>'+
-    '<span class="note">Pick the cuts, treatments, and model in the Content treatment step. The explicit selection is saved before any formatting job starts.</span></div>';
-  if(s.pending) main += '<div class="wb-links"><button type="button" class="wb-link wb-goto-review">See '+s.pending+' draft'+(s.pending===1?"":"s")+' waiting for your yes</button></div>';
-  sheet.innerHTML = '<div class="session-grid"><div class="session-main">'+main+'</div>'+wbMarginHtml(s)+'</div>';
-  return sheet;
-}
-// The workbench used to render every active piece's session at once, stacked below the wizard
-// regardless of which step was showing. The prototype gives this surface no home of its own, so
-// per rules.md carve-out 1 it moves rather than disappears: it now opens for exactly the piece
-// picked in the wizard (CW.slug), reached from a control on step 2, and shows nothing otherwise.
-function renderWorkbench(){
-  const box = $("#workbench");
-  box.innerHTML = "";
-  if(CW.pane !== "workbench") return;
-  const s = WB_SESSIONS.find(x=>x.slug===CW.slug);
-  const back = '<button type="button" class="cw-back" data-set-pane="wizard">Back to the treatment</button>';
-  if(!s){
-    box.innerHTML = '<div class="sheet">'+back+'<div class="empty" style="margin-top:16px">That source is no longer on the desk.</div></div>';
-  } else {
-    const el = wbSessionEl(s);
-    const backWrap = document.createElement("div");
-    backWrap.innerHTML = back;
-    el.querySelector(".session-main").prepend(backWrap.firstChild);
-    box.appendChild(el);
-  }
-  refreshEngineControls(box);
-}
 async function loadContent(){
-  showRoomLoading("workbench");
+  showRoomLoading("contentWizard");
   try {
     const r = await fetch("/api/content");
     if(!r.ok) throw new Error("content "+r.status);
     const d = await r.json();
     WB_SESSIONS = d.sessions || [];
-    await loadRecommendations();
-    renderWorkbench();
     renderContentWizard();
-    hideRoomLoading("workbench");
+    hideRoomLoading("contentWizard");
     connectionRecovered();
   } catch(e) {
-    hideRoomLoading("workbench");
-    $("#workbench").innerHTML = '<div class="load-error" role="alert"><strong>Could not load the Workbench.</strong><div>Your existing drafts are unchanged. Check the server, then try again.</div><button type="button" id="contentRetry">Try again</button></div>';
+    hideRoomLoading("contentWizard");
+    $("#cwBody").innerHTML = '<div class="load-error" role="alert"><strong>Could not load Content.</strong><div>Your existing drafts are unchanged. Check the server, then try again.</div><button type="button" id="contentRetry">Try again</button></div>';
     $("#contentRetry")?.addEventListener("click", loadContent);
-    connectionState("Content Studio could not load the Workbench. Your existing drafts are unchanged.");
+    connectionState("Content Studio could not load Content. Your existing drafts are unchanged.");
   }
 }
-async function devStart(){
-  const ta = $("#src"); const source = ta.value.trim();
-  if(!source || captureSubmitting) { if(!source) flash("Write or paste something first"); return; }
-  const engine = $("#studioEngine").value;
-  setCaptureSubmitting(true);
-  try {
-    const r = await post("/api/develop/start",{source, engine});
-    if(r.ok){ ta.value=""; flash("Handed over to "+engineLabel(engine)); loadJobs(); }
-    else flash(r.error || "Could not hand it over");
-  } finally { setCaptureSubmitting(false); }
-}
-// Delegated — the workbench is rebuilt wholesale on every load, same pattern as the notes list.
-$("#workbench").addEventListener("click", async (e)=>{
-  const t = e.target;
-  if (!t || !t.classList) return;
-  if (t.dataset.setPane){ CW.pane = t.dataset.setPane; renderContentWizard(); renderWorkbench(); return; }
-  if (t.classList.contains("dev-accept")){
-    const lensInput = t.closest(".actions").querySelector(".dev-lens");
-    t.disabled = true;
-    const body = {slug:t.dataset.slug, cardId:t.dataset.card};
-    if (lensInput && lensInput.value.trim()) body.lens = lensInput.value.trim();
-    const r = await post("/api/develop/accept", body);
-    if(r.ok){ flash("Cut made: "+r.lens+": your words, on the page"); await loadContent(); }
-    else { t.disabled = false; flash(r.error || "Could not accept"); }
-  } else if (t.classList.contains("dev-dismiss")){
-    t.disabled = true;
-    const r = await post("/api/develop/dismiss", {slug:t.dataset.slug, cardId:t.dataset.card});
-    if(r.ok){ await loadContent(); } else { t.disabled = false; flash(r.error || "Could not dismiss"); }
-  } else if (t.classList.contains("wb-reply-send")){
-    const slug = t.dataset.slug;
-    const inp = t.closest(".wb-reply").querySelector(".wb-reply-input");
-    const localEngine = t.closest(".wb-reply")?.querySelector(".engine-select");
-    const engine = localEngine ? localEngine.value : "claude";
-    const reply = inp ? inp.value.trim() : "";
-    const session = WB_SESSIONS.find(x=>x.slug===slug);
-    const hasRounds = session && session.rounds.length;
-    if(!reply && hasRounds){ flash("Type something for your director first"); return; }
-    devReplyPending.add(slug); renderWorkbench();
-    try {
-      const r = reply
-        ? await post("/api/develop/reply", {slug, reply, engine})
-        : await post("/api/develop/start", {slug, engine});
-      if(r.ok){ flash("Handed over to "+engineLabel(engine)); await loadJobs(); }
-      else flash(r.error || "Could not queue the round");
-    } finally { devReplyPending.delete(slug); renderWorkbench(); }
-  } else if (t.classList.contains("dev-format-btn")){
-    const slug = t.dataset.slug;
-    CW.slug = slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null;
-    CW.selection = null; CW.selectionFor = null; CW.selectionErr = null; CW.yesErrors = []; CW.pane = "wizard";
-    renderWorkbench(); renderContentWizard(); cwLoadTreatment();
-  } else if (t.classList.contains("wb-cut-edit")){
-    const cutEl = t.closest(".wb-cut");
-    if(t.dataset.mode === "save"){
-      const ta = cutEl.querySelector("textarea");
-      const r = await post("/api/cut-save", {slug:t.dataset.slug, lens:t.dataset.lens, body:ta ? ta.value : ""});
-      if(r.ok){ flash("Saved"); await loadContent(); }
-      else flash(r.error || "Could not save");
-    } else {
-      const bodyEl = cutEl.querySelector(".wb-cut-body");
-      const ta = document.createElement("textarea");
-      ta.value = bodyEl.textContent;
-      bodyEl.replaceWith(ta);
-      t.textContent = "Save"; t.dataset.mode = "save";
-    }
-  } else if (t.classList.contains("wb-expand")){
-    const slug = t.dataset.slug;
-    if(wbExpanded.has(slug)) wbExpanded.delete(slug); else wbExpanded.add(slug);
-    renderWorkbench();
-  } else if (t.classList.contains("wb-goto-review")){
-    openReviewSheet();
-  }
-});
 
 // ── Content: the three-step wizard (pick a source, decide the treatment, approve the drafts) ──
 //
-// Step 1 reads GET /api/content (the same sessions the workbench pane renders), step 2 reads
+// Step 1 reads GET /api/content, step 2 reads
 // GET /api/content/treatment?slug=…, step 3 reads the piece's own rows out of GET /api/queue and
 // approves them through the SAME POST /api/status every review card uses. No new write path.
 //
@@ -2741,11 +2621,8 @@ $("#workbench").addEventListener("click", async (e)=>{
 //   * the per-draft treatment block (a CTA toggle and persona spins sized by an audience cluster).
 //     Nothing in src/ clusters Muxin's own audience, so none of it has a source.
 //   * the VENTURE source tag. Nothing hands a Venture artifact to content/. See develop.ts.
-// CW.pane picks which of the room's three sheets is on screen: "wizard" (the default, the step
-// rail + step body), "workbench" (the director's notes on the picked piece, opened from step 2),
-// or "review" (every piece's drafts at once, opened from step 3 or from Studio). Exactly one
-// shows at a time — see renderContentWizard, which is the single place that toggles all three.
-let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, launching:false, loading:false, yesErrors:[], pane:"wizard" };
+// CW.pane picks either the configuration wizard or the grouped review surface.
+let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, signalDefaults:null, launching:false, loading:false, yesErrors:[], pane:"wizard", config:null };
 
 // ── begin the treatment mirror ──
 // Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
@@ -2822,52 +2699,78 @@ function readsFromCells(t, cuts){
 }
 // ── end of the treatment mirror ──
 
-const CW_STEPS = [["1","Pick a source"],["2","Review the treatment"],["3","Approve the drafts"]];
+const CW_STEPS = [["1","Pick a source"],["2","Review the treatment"],["3","Approve the drafts"],["4","Publish"]];
 const CW_TAGCLASS = { "SUBSTACK":"substack", "YOURS":"yours", "READ IN":"readin" };
+const CONTENT_CONFIG_OPTIONS = {
+  treatment: [
+    ["cta","CTA"],["viral-rewrite","Viral rewrite"],["platform-framing","Platform-specific framing"],
+    ["shorter-version","Shorter version"],["thread","Thread"],["counterpoint","Counterpoint"],
+    ["summary","Summary"],["hook-variants","Hook variants"],
+  ],
+  media: [
+    ["static-quote-card","Static quote card"],["animated-quote-card","Animated quote card"],
+    ["image","Image"],["image-carousel","Image carousel"],["short-video-script","Short-video script"],
+    ["video-caption-package","Video transcript / caption package"],["audiogram","Audiogram / waveform clip"],
+  ],
+  platform: [
+    ["substack","Substack"],["linkedin","LinkedIn"],["x","X"],["bluesky","Bluesky"],
+    ["threads","Threads"],["instagram","Instagram"],["tiktok","TikTok"],["youtube","YouTube"],
+  ],
+};
+
+function contentRequestOrigin(s){
+  const origin = String(s.origin||"").toLowerCase();
+  if(origin.includes("fiction")) return "fiction";
+  if(origin.includes("charles")) return "charles";
+  if(origin.includes("venture")) return "venture";
+  return "human-inference";
+}
+function cwEnsureConfig(){
+  const s = cwSession();
+  if(!s) return null;
+  if(CW.config && CW.config.slug===s.slug) return CW.config;
+  const routed = (CW.treat && CW.treat.channels || []).filter(c=>c.decision!=="exclude").map(c=>c.channel);
+  const supported = CONTENT_CONFIG_OPTIONS.platform.map(x=>x[0]);
+  const platforms = routed.filter(p=>supported.includes(p));
+  const defaults = CW.signalDefaults || {};
+  const recommended = key => (defaults[key]||[]).filter(x=>x.recommended).map(x=>x.option);
+  const treatments = recommended("treatments").filter(x=>CONTENT_CONFIG_OPTIONS.treatment.some(o=>o[0]===x));
+  const media = recommended("media").filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
+  const defaultPlatforms = recommended("platforms").filter(x=>supported.includes(x));
+  CW.config = {
+    slug:s.slug,
+    treatment:new Set(treatments.length ? treatments : ["summary"]),
+    media:new Set(media.length ? media : ["static-quote-card"]),
+    platform:new Set(platforms.length ? platforms : defaultPlatforms.length ? defaultPlatforms : ["bluesky"]),
+    control:true,
+    saving:false,
+    saved:false,
+  };
+  return CW.config;
+}
+function cwConfigSectionHtml(kind, title, options, s){
+  const cfg = cwEnsureConfig();
+  const choices = options.map(([id,label])=>{
+    const audioOnly = id==="audiogram" && !/audio|podcast/i.test(String(s.sourceKind||""));
+    const mappingBlocked = id==="cta";
+    const disabled = audioOnly || mappingBlocked;
+    const why = mappingBlocked ? "CTA mapping required before this can be selected." : audioOnly ? "Available when the source includes audio." : "";
+    return '<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-config-kind="'+kind+'" value="'+id+'"'+(cfg[kind].has(id)?" checked":"")+(disabled?" disabled":"")+'><span>'+label+(why?'<span class="src" style="display:block">'+why+'</span>':"")+'</span></label>';
+  }).join("");
+  const model = kind==="treatment" ? engineSelectHtml("contentTreatmentEngine") : "";
+  return '<section class="cw-config" style="margin-top:24px;padding-top:20px;border-top:1px solid #efe7d6">'+
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="fam-ask">'+title+'</span>'+model+'<span class="grow"></span>'+
+    '<button type="button" class="cw-back" data-config-all="'+kind+'">Select all</button><button type="button" class="cw-back" data-config-none="'+kind+'">Deselect all</button></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 18px;margin-top:14px">'+choices+'</div></section>';
+}
 
 function cwSources(){ return WB_SESSIONS || []; }
 function cwSession(){ return cwSources().filter(s=>s.slug===CW.slug)[0] || null; }
 function cwPiece(){ return (DATA.pieces||[]).filter(p=>p.slug===CW.slug)[0] || null; }
 function cwRows(){ const p = cwPiece(); return p ? p.rows : []; }
-// One group per channel this piece actually has drafts for. Three counts, not one, because a bulk
-// yes must not touch everything a badge counts:
-//   pending  neither decided nor already approved. This is what the tab badge and the step rail
-//            report, matching the review sheet's own idea of outstanding work.
-//   fresh    no status at all. ONLY these are what "Yes to all" approves.
-//   flagged  pending but carrying a status of her own (revise, blocked). A bulk yes that swept a
-//            row she asked to have changed would approve, and on a scheduled platform SCHEDULE,
-//            the very draft she flagged. Those stay hers to handle one at a time.
-function cwGroups(){
-  const order = [];
-  const byPlatform = {};
-  for(const r of cwRows()){
-    if(!byPlatform[r.platform]){ byPlatform[r.platform] = []; order.push(r.platform); }
-    byPlatform[r.platform].push(r);
-  }
-  return order.map(platform=>{
-    const rows = byPlatform[platform];
-    const pending = rows.filter(r=>!DECIDED.has(r.status) && r.status!=="approve");
-    return {
-      platform: platform,
-      rows: rows,
-      total: rows.length,
-      pending: pending.length,
-      fresh: pending.filter(r=>!r.status).length,
-      flagged: pending.filter(r=>!!r.status).length,
-    };
-  });
-}
-function cwActiveGroup(){
-  const gs = cwGroups();
-  return gs.filter(g=>g.platform===CW.tab)[0] || gs[0] || null;
-}
-function cwChannel(name){
-  if(!CW.treat) return null;
-  return CW.treat.channels.filter(c=>c.channel===name)[0] || null;
-}
 function cwStep(){
   if(!CW.slug) return 1;
-  return CW.step > 3 ? 3 : CW.step < 1 ? 1 : CW.step;
+  return CW.step > 2 ? 2 : CW.step < 1 ? 1 : CW.step;
 }
 function cwRail(step){
   if(step === 1){
@@ -2880,25 +2783,24 @@ function cwRail(step){
     const n = CW.treat.channels.length;
     return { text: n+" CHANNEL"+(n===1?"":"S")+" READ FOR THIS PIECE", tone:"grey" };
   }
-  const gs = cwGroups();
-  const total = gs.reduce((a,g)=>a+g.total, 0);
-  const pending = gs.reduce((a,g)=>a+g.pending, 0);
+  const rows = cwRows();
+  const total = rows.length;
+  const pending = rows.filter(row=>!DECIDED.has(row.status)&&row.status!=="approve").length;
   if(!total) return { text:"NO DRAFTS EXIST FOR THIS PIECE YET", tone:"amber" };
   return pending
     ? { text: pending+" OF "+total+" STILL NEED YOUR YES", tone:"amber" }
     : { text:"ALL "+total+" HAVE YOUR YES", tone:"green" };
 }
 function cwStepsHtml(step){
-  const rail = cwRail(step);
   return CW_STEPS.map((sd,i)=>{
     const num = i+1;
     const cls = num===step ? " on" : num<step ? " done" : "";
-    const reachable = num===1 || !!CW.slug;
+    const reachable = num===1 || num>=3 || !!CW.slug;
     return '<span style="display:flex;align-items:baseline;gap:9px">'+
       '<button class="cw-step'+cls+'" data-step="'+num+'"'+(reachable?"":" disabled")+'>'+
       '<span class="num">'+sd[0]+'</span><span class="nm">'+esc(sd[1])+'</span></button>'+
-      '<span class="cw-sep">'+(i<2?"→":"")+'</span></span>';
-  }).join("")+'<span style="flex:1"></span><span class="cw-rail t-'+rail.tone+'">'+esc(rail.text)+'</span>';
+      '<span class="cw-sep">'+(i<3?"→":"")+'</span></span>';
+  }).join("");
 }
 // Step 1's line is a pick-aid, not a developer readout: date and the drafts-waiting count are real
 // reads Muxin needs to choose between sources. tagBasis (why the tag is what it is, e.g. "source.md
@@ -2916,7 +2818,7 @@ function cwSourceMeta(s){
 function cwStep1Html(){
   const sources = cwSources();
   if(!sources.length){
-    return '<div class="empty">Nothing on the desk yet. Hand something to your director in Studio, or format it directly, and it shows up here.</div>';
+    return '<div class="empty">Nothing on the desk yet. Start with an idea or source in Studio, then choose Content when it is ready for configuration.</div>';
   }
   const rows = sources.map(s=>{
     const tag = s.tag || "UNTAGGED";
@@ -2968,129 +2870,37 @@ function cwChannelHtml(c){
     '<div class="slot">NEXT FREE SLOT · '+esc(c.slot ? c.slot.label : "")+'</div>'+
     '</div>';
 }
-// The director/develop surface (the proposed cut, the reply box, Format for platforms) has no
-// home in the prototype's three-step design, so per rules.md carve-out 1 it moves here instead of
-// disappearing: one demoted, mono control at the foot of the sheet, same treatment Outreach gave
-// its engine picker, opening the workbench for exactly this piece rather than stacking it. It is
-// independent of the treatment read, so every step 2 state offers it, including a failed read.
-function cwWbFootHtml(s){
-  const wbNote = s.pending
-    ? s.pending+' draft'+(s.pending===1?"":"s")+' already made from this.'
-    : 'Nothing made from this yet.';
-  return '<div class="sheet-foot" style="justify-content:flex-start;align-items:baseline;gap:10px">'+
-    '<button type="button" class="cw-back" data-set-pane="workbench">Talk to your director about this piece</button>'+
-    '<span class="src">'+esc(wbNote)+' The proposed cut, the reply box, and Format for platforms live there.</span></div>';
-}
 function cwStep2Html(){
   const s = cwSession();
   if(!s) return '<div class="empty">That source is no longer on the desk. Pick another one.</div>';
-  if(CW.treatErr){
-    return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read the treatment for this piece: '+esc(CW.treatErr)+'</div>'+cwWbFootHtml(s);
-  }
-  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading the treatment…</div>'+cwWbFootHtml(s);
-  const cells = readsFromCells(CW.treat, s.cuts||[]).map(c=>
-    '<span class="cw-cell"><span class="k">'+esc(c.k)+'</span><span class="v t-'+c.tone+'">'+esc(c.v)+'</span></span>'
-  ).join("");
-  const chans = CW.treat.channels.map(cwChannelHtml).join("");
-  const groups = cwGroups();
-  const total = groups.reduce((a,g)=>a+g.total, 0);
-  const forward = total
-    ? '<button class="primary cw-fwd" data-step="3">See the '+total+' draft'+(total===1?"":"s")+'</button>'+
-      '<span class="src" style="max-width:360px">Every one of them still waits for your yes, one channel at a time.</span>'
-    : '<span class="fam-note t-amber" style="margin:0">No drafts exist for this piece yet. Talk to your director about it below and they land here.</span>';
-  const lenses = (s.cuts||[]).map(c=>'<label style="display:flex;gap:7px"><input type="checkbox" data-cw-lens value="'+esc(c.lens)+'" checked> '+esc(c.lens)+'</label>').join("");
-  const run = lenses
-    ? engineSelectHtml("contentTreatmentEngine")+'<button class="primary" data-cw-launch'+(CW.launching?" disabled":"")+'>'+(CW.launching?"Formatting…":"Format selected cuts")+'</button>'
-    : '<span class="fam-note t-amber" style="margin:0">No cuts are ready to format yet. Open the director controls below to make one.</span>';
+  if(CW.treatErr) return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
+  if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading recommendations…</div>';
+  const cfg = cwEnsureConfig();
+  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms?</summary><div class="src" style="margin-top:8px;max-width:620px">Selections start from this source\\'s routing evidence. When that evidence is insufficient, Substack and LinkedIn are safe cold-start defaults. Every checkbox remains yours to change.</div></details>';
   return cwPickedHtml(s)+
-    '<div class="cw-reads">'+cells+'</div>'+
-    '<div class="fam-ask" style="margin-top:28px">CHOOSE CUTS TO FORMAT</div>'+
-    '<div class="src" style="margin-top:6px;max-width:620px">The treatment above is a read of routing and reuse. Choose the cuts you want to format, then review every resulting draft below before approving anything.</div>'+
-    '<div style="margin-top:14px"><div style="display:flex;flex-direction:column;gap:8px">'+(lenses||'<span class="src">No cuts yet.</span>')+'</div></div>'+
-    '<div class="cw-yesall">'+run+'<span class="src">Formatting uses the existing cut route. It creates drafts only; nothing is approved or published here.</span></div>'+
-    '<div class="fam-ask" style="margin-top:28px">CHANNELS · READ, NOT CHOSEN HERE</div>'+
-    '<div class="src" style="margin-top:6px;max-width:560px">The defaults list in config/routing.yaml is the only thing that includes or skips a channel, so this grid reports what routing decided rather than offering to change it. Each row carries the reuse window that belongs to that channel and its own next free slot.</div>'+
-    '<div class="cw-chans">'+chans+'</div>'+
-    '<div class="cw-yesall">'+forward+'</div>'+
-    cwWbFootHtml(s);
+    '<div class="src" style="margin-top:18px;max-width:640px">Choose treatments, media, and platforms independently. Recommendations preselect a starting point; they never remove your control.</div>'+
+    cwConfigSectionHtml("treatment","TREATMENTS",CONTENT_CONFIG_OPTIONS.treatment,s)+
+    cwConfigSectionHtml("media","MEDIA",CONTENT_CONFIG_OPTIONS.media,s)+
+    cwConfigSectionHtml("platform","PLATFORMS",CONTENT_CONFIG_OPTIONS.platform,s)+recommendation+
+    '<label style="display:flex;gap:9px;align-items:flex-start;margin-top:22px;padding:14px;background:#faf7f0;border:1px solid #efe7d6;border-radius:8px"><input type="checkbox" id="contentControlEnabled"'+(cfg.control?" checked":"")+'><span><b>Untreated control</b><span class="src" style="display:block">Create one source-preserving control for each selected platform and media combination. You can disable it explicitly.</span></span></label>'+
+    '<div class="cw-yesall"><button type="button" class="primary" id="contentConfigSave" data-config-save'+(cfg.saving?" disabled":"")+'>'+(cfg.saving?"Creating drafts…":cfg.saved?"Drafts created":"Save and create drafts")+'</button>'+
+    '<span class="src">This stores the request, creates its untreated control and treated drafts, then sends them to Approve Drafts. It does not approve, schedule, or publish anything.</span></div>';
 }
 function cwStep3Html(){
-  const s = cwSession();
-  const groups = cwGroups();
-  const total = groups.reduce((a,g)=>a+g.total, 0);
-  if(!total){
-    return '<div class="cw-yesall" style="border:none;padding:0;margin-top:20px"><button class="cw-back" data-step="2">Back to the treatment</button></div>'+
-      '<div class="empty">No drafts exist for this piece yet.</div>';
-  }
-  const active = cwActiveGroup();
-  const tabs = groups.map(g=>
-    '<button class="cw-tab'+(g.platform===active.platform?" on":"")+'" data-tab="'+esc(g.platform)+'">'+
-    '<span>'+esc(g.platform)+'</span>'+
-    '<span class="badge t-'+(g.pending?"amber":"green")+'">'+(g.pending?g.pending+" OF "+g.total:"ALL YES")+'</span></button>'
-  ).join("");
-  const c = cwChannel(active.platform);
-  let head = '<span class="src">No treatment read for '+esc(active.platform)+', so nothing here says how it fits.</span>';
-  if(c){
-    const fit = fitLine(c, CW.treat.floor);
-    const reuse = reuseLine(c);
-    head = '<span class="fit t-'+fit.tone+'" style="font:9.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em">'+esc(fit.label)+'</span>'+
-      '<span class="src" style="max-width:430px">'+esc(fit.basis)+'</span>'+
-      '<span style="flex:1"></span>'+
-      '<span class="src t-'+reuse.tone+'">'+esc(reuse.text)+'</span>';
-  }
-  const errs = CW.yesErrors.length
-    ? '<div class="fam-note t-amber">'+CW.yesErrors.map(e=>esc(e)).join("<br />")+'</div>'
-    : "";
-  const schedulable = ["x","linkedin","bluesky"].indexOf(active.platform) >= 0;
-  const flagged = active.flagged
-    ? ' '+active.flagged+' you marked revise or blocked '+(active.flagged===1?"stays":"stay")+' yours to handle one at a time, and this button leaves '+(active.flagged===1?"it":"them")+' alone.'
-    : "";
-  const yesAll = active.fresh
-    ? '<button class="cw-yes-all">Yes to all '+active.fresh+' left in '+esc(active.platform)+'</button>'+
-      '<span class="src" style="max-width:460px">Approves only the '+active.fresh+' untouched draft'+(active.fresh===1?"":"s")+' in '+esc(active.platform)+
-      ', one call each, exactly the same call the Approve button on each card makes. '+
-      (schedulable
-        ? 'On '+esc(active.platform)+' that also books the next free slot as a scheduled Typefully draft. Nothing posts instantly.'
-        : 'On '+esc(active.platform)+' it marks the draft ready and schedules nothing.')+
-      ' Nothing outside this channel is touched.'+flagged+'</span>'
-    : '<span class="src" style="max-width:460px">'+
-      (active.flagged
-        ? 'Nothing in '+esc(active.platform)+' is waiting on a plain yes.'+flagged
-        : 'Every draft in '+esc(active.platform)+' already has your yes.')+'</span>';
-  return '<div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-top:20px">'+
-    '<span class="fam-ask">'+total+' DRAFT'+(total===1?"":"S")+' ON THIS PIECE · '+groups.length+' CHANNEL'+(groups.length===1?"":"S")+'</span>'+
-    '<span style="flex:1"></span><button class="cw-back" data-step="2">Change nothing, look at the treatment again</button></div>'+
-    '<div class="src" style="max-width:560px">'+(s?esc(s.title):"")+'</div>'+
-    '<div class="cw-tabs">'+tabs+'</div>'+
-    '<div class="cw-tabhead">'+head+'</div>'+
-    '<div id="cwRows" style="margin-top:14px"></div>'+
-    '<div class="cw-yesall">'+yesAll+'</div>'+errs+
-    '<div class="src" style="margin-top:8px;max-width:560px">A yes marks a draft ready and holds it. Nothing posts from this room.</div>'+
-    // Retired from the default stack (rules.md #5.2 keeps the strip, but the cross-piece "Drafts
-    // for your yes" sheet is not part of the prototype's three-step design) and reachable only from
-    // here: this step is per-piece, the sheet below sweeps every piece at once.
-    '<div class="sheet-foot" style="justify-content:flex-start"><button type="button" class="cw-back" data-set-pane="review">Show drafts for every piece</button></div>';
+  return '';
 }
-// The room opens on exactly one sheet. renderContentWizard is the single place that decides which
-// of the three (the wizard itself, the director's workbench, or every piece's drafts at once) is
-// on screen, driven by CW.pane. The wizard body only needs building while it is the visible pane;
-// the other two build their own content in renderWorkbench() / render()'s #reviewMain pass.
+// The room opens on exactly one sheet: configuration or grouped review.
 function renderContentWizard(){
   $("#contentWizard").hidden = CW.pane !== "wizard";
-  $("#workbench").hidden = CW.pane !== "workbench";
   $("#reviewSheet").hidden = CW.pane !== "review";
-  if(CW.pane !== "wizard") return;
+  $("#publishedSheet").hidden = CW.pane !== "published";
+  if(CW.pane === "review"){ $("#reviewSteps").innerHTML=cwStepsHtml(3); return; }
+  if(CW.pane === "published"){ $("#publishedSteps").innerHTML=cwStepsHtml(4); renderPublished(); return; }
   const step = cwStep();
   $("#cwSteps").innerHTML = cwStepsHtml(step);
   const body = $("#cwBody");
   body.innerHTML = step === 1 ? cwStep1Html() : step === 2 ? cwStep2Html() : cwStep3Html();
   refreshEngineControls(body);
-  if(step === 3){
-    const holder = $("#cwRows");
-    const piece = cwPiece();
-    const active = cwActiveGroup();
-    if(holder && piece && active) for(const row of active.rows) holder.appendChild(reviewScanRowEl(piece, row));
-  }
 }
 // Opened from step 3's "Show every piece's drafts" or from a Studio jump — the cross-piece sweep
 // the wizard's own step 3 (per-piece) cannot do.
@@ -3104,8 +2914,12 @@ async function cwLoadTreatment(){
   if(!slug) return;
   CW.loading = true; CW.treatErr = null;
   try {
-    const r = await fetch("/api/content/treatment?slug="+encodeURIComponent(slug));
+    const [r, signals] = await Promise.all([
+      fetch("/api/content/treatment?slug="+encodeURIComponent(slug)),
+      fetch("/api/signals").then(x=>x.json()).catch(()=>null),
+    ]);
     const d = await r.json();
+    CW.signalDefaults = signals && signals.contentDefaults || null;
     if(d && d.error){ CW.treat = null; CW.treatFor = null; CW.treatErr = d.error; }
     else { CW.treat = d; CW.treatFor = slug; CW.treatErr = null; }
   } catch(e){
@@ -3115,68 +2929,79 @@ async function cwLoadTreatment(){
     if(CW.slug === slug) renderContentWizard();
   }
 }
-async function cwLaunch(btn){
+function cwSelectableConfigIds(kind){
   const s = cwSession();
-  if(!s || !CW.treat || CW.launching) return;
-  const slug = CW.slug;
-  const root = btn.closest("#cwBody");
-  const lenses = [...root.querySelectorAll("[data-cw-lens]:checked")].map(x=>x.value);
-  if(!lenses.length){ flash("Pick at least one cut"); return; }
-  const engine = $("#contentTreatmentEngine").value;
-  CW.launching = true; renderContentWizard();
-  try {
-    const launched = await post("/api/develop/format", {slug, lenses, engine});
-    if(!launched.ok){ flash(launched.error || "Could not start formatting"); return; }
-    flash("Formatting queued with "+engineLabel(engine)+" for "+launched.jobs.length+" cut(s)");
-    loadJobs(); await loadContent();
-  } catch(e) {
-    flash(e instanceof Error ? e.message : String(e));
-  } finally { CW.launching = false; renderContentWizard(); }
+  return CONTENT_CONFIG_OPTIONS[kind].map(x=>x[0]).filter(id=>id!=="cta" && (id!=="audiogram" || /audio|podcast/i.test(String(s&&s.sourceKind||""))));
 }
-async function cwYesAll(btn){
-  const g = cwActiveGroup();
-  if(!g || !CW.slug) return;
-  // Only untouched drafts. A row she marked revise (or one the pipeline blocked) is deliberately
-  // out of reach here, because approving it would act against the note she left on it.
-  const targets = g.rows.filter(r=>!DECIDED.has(r.status) && !r.status);
-  btn.disabled = true;
-  // Every refusal is kept and rendered. A bulk yes must never report success it did not get.
-  CW.yesErrors = targets.filter(r=>r.approveBlocked).map(r=>r.id+": "+r.approveBlocked);
-  let done = 0;
-  for(const row of targets.filter(r=>!r.approveBlocked)){
-    const res = await post("/api/status",{slug:CW.slug,id:row.id,status:"approve"});
-    if(res && res.ok === false) CW.yesErrors.push(row.id+": "+(res.error||"the approve was refused"));
-    else if(res && res.scheduleError) CW.yesErrors.push(row.id+": approved, but scheduling failed, "+res.scheduleError);
-    else done++;
-  }
-  await load(); // re-reads every row's real status from the server rather than assuming
-  flash(done ? "Yes on "+done+" in "+g.platform : "Nothing was approved");
-  renderContentWizard();
+async function cwSaveConfig(){
+  const s = cwSession(), cfg = cwEnsureConfig();
+  if(!s || !cfg || cfg.saving) return;
+  if(!cfg.platform.size){ flash("Choose at least one platform"); return; }
+  const engine = $("#contentTreatmentEngine")?.value || "codex";
+  cfg.saving = true; renderContentWizard();
+  const recommendedPlatforms = (CW.treat && CW.treat.channels || []).filter(c=>c.decision!=="exclude").map(c=>c.channel);
+  const signalEvidence = ["treatments","media","platforms"].flatMap(key=>(CW.signalDefaults&&CW.signalDefaults[key]||[]).filter(x=>x.recommended).map(x=>({
+    option:x.option, kind:key==="treatments"?"treatment":key==="platforms"?"platform":"media",
+    reason:x.explanation, source:x.source, recommended:true,
+  })));
+  const evidence = [
+    ...signalEvidence,
+    ...recommendedPlatforms.map(option=>({option,kind:"platform",reason:"Current routing includes this platform",source:"routing",recommended:true})),
+  ];
+  const origin = contentRequestOrigin(s);
+  const request = {
+    id:s.slug, origin, descriptor:s.title, originalInput:s.sourceBody,
+    treatments:[...cfg.treatment], media:[...cfg.media], platforms:[...cfg.platform],
+    recommendationEvidence:evidence, includeUntreatedControl:cfg.control,
+    ventureId:origin==="fiction" ? "least-of-us-fiction" : null,
+  };
+  try{
+    const result = await post("/api/content/request", {slug:s.slug, request});
+    if(!result.ok) throw new Error(result.error||"Could not save configuration");
+    const generated = await post("/api/content/generate", {slug:s.slug, engine});
+    if(!generated.ok) throw new Error("Configuration saved, but drafts were not created: "+(generated.error||"generation failed"));
+    cfg.saved = true; CW.step=3; CW.pane="review"; flash(generated.ids.length+" configured drafts created"); await load(); await loadContent();
+  }catch(e){ flash(e instanceof Error?e.message:String(e)); }
+  finally{ cfg.saving = false; renderContentWizard(); }
 }
-// Delegated: the wizard is rebuilt wholesale on every render, same pattern as the workbench.
+// Delegated: the wizard is rebuilt wholesale on every render.
 $("#contentWizard").addEventListener("click", (e)=>{
-  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-tab],[data-set-pane],[data-cw-launch],.cw-yes-all") : null;
+  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-set-pane],[data-config-all],[data-config-none],[data-config-save]") : null;
   if(!t) return;
-  if(t.classList.contains("cw-yes-all")){ cwYesAll(t); return; }
-  if(t.dataset.cwLaunch !== undefined){ cwLaunch(t); return; }
+  if(t.dataset.configSave !== undefined){ cwSaveConfig(); return; }
+  if(t.dataset.configAll !== undefined || t.dataset.configNone !== undefined){
+    const kind = t.dataset.configAll !== undefined ? t.dataset.configAll : t.dataset.configNone;
+    const cfg = cwEnsureConfig();
+    cfg[kind] = new Set(t.dataset.configAll !== undefined ? cwSelectableConfigIds(kind) : []);
+    cfg.saved = false; renderContentWizard(); return;
+  }
   if(t.dataset.setPane !== undefined){
     CW.pane = t.dataset.setPane;
     renderContentWizard();
-    if(CW.pane === "workbench") renderWorkbench();
     return;
   }
-  if(t.dataset.tab !== undefined){ CW.tab = t.dataset.tab; CW.yesErrors = []; renderContentWizard(); return; }
   if(t.dataset.slug !== undefined){
-    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = []; CW.pane = "wizard";
+    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null;
     renderContentWizard(); cwLoadTreatment(); return;
   }
   if(t.dataset.step !== undefined){
     const n = Number(t.dataset.step);
     if(n > 1 && !CW.slug) return;
+    if(n === 3){ CW.pane = "review"; renderContentWizard(); return; }
+    if(n === 4){ CW.pane = "published"; renderContentWizard(); return; }
     CW.step = n; CW.yesErrors = []; CW.pane = "wizard";
     renderContentWizard();
     if(n === 2 && CW.slug && CW.treatFor !== CW.slug) cwLoadTreatment();
   }
+});
+$("#contentWizard").addEventListener("change", (e)=>{
+  const target = e.target, cfg = cwEnsureConfig();
+  if(!cfg || !target) return;
+  if(target.id==="contentControlEnabled"){ cfg.control = !!target.checked; cfg.saved = false; return; }
+  const kind = target.dataset && target.dataset.configKind;
+  if(!kind) return;
+  if(target.checked) cfg[kind].add(target.value); else cfg[kind].delete(target.value);
+  cfg.saved = false;
 });
 
 // "Draft it": her typed direction rides into THIS run's prompt via POST /api/outreach/draft. It
@@ -3234,6 +3059,13 @@ let ficDocData = null;
 let ficScene = null;      // { beats, chapter, continuity } from /api/fiction/scene
 let ficPassNote = "";
 let ficFixed = {};        // spans fixed in this session, so the rail says "fixed" until the next check
+let ficPage = "write";
+let ficPromoRequest = "";
+let ficPromoObjective = "Invite readers into the series with a spoiler-light chapter preview.";
+let ficPromoChapter = null;
+let ficPromoDraft = null;
+let ficPromoBusy = false;
+let ficPromoError = "";
 // ── Venture room ────────────────────────────────────────────────────────────────────────────────
 //
 // The thread is read-only except for explicit, server-gated controls: the selected-engine analysis
@@ -3248,11 +3080,11 @@ let ficFixed = {};        // spans fixed in this session, so the rail says "fixe
 // The Start-a-venture interview is a separate overlay on the thread pane, same as before.
 let VEN = { pane: "work" };
 function renderVentureSheets(){
-  $("#ventureMainSheet").hidden = VEN.pane === "intake";
-  $("#ventureIntakeSheet").hidden = VEN.pane !== "intake";
+  $("#ventureMainSheet").hidden = false;
   $("#ventureWorkPane").hidden = VEN.pane !== "work";
   $("#ventureDocumentsPane").hidden = VEN.pane !== "documents";
   $("#ventureHistoryPane").hidden = VEN.pane !== "history";
+  $("#ventureIntakePane").hidden = VEN.pane !== "intake";
   document.querySelectorAll(".venture-stage").forEach(b=>b.classList.toggle("on", b.dataset.setVenPane===VEN.pane));
 }
 let VENTURE_SLUGS = [];
@@ -3282,7 +3114,7 @@ function intakeValue(section, field){
 function renderVentureIntake(){
   const box = $("#ventureIntakeSections");
   if(!box) return;
-  // Sheet chrome (title, back control, save hint) lives on #ventureIntakeSheet. This only fills fields.
+  // Pane chrome and save hint live on #ventureIntakePane. This only fills fields.
   const body = Object.entries(INTAKE_FIELDS).map(([section, fields])=>
     '<div style="margin-top:18px"><div class="wb-label">'+esc(section==="voice"?"Voice":"Scorecard")+'</div>'+
     '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px">'+fields.map(field=>{
@@ -4034,7 +3866,7 @@ function renderVenture(){
 function renderVentureExample(){
   $("#ventureDay").textContent = "read-only example";
   $("#ventureEngine").disabled = true; $("#ventureAnalyzeBtn").disabled = true; $("#ventureRunStepBtn").disabled = true;
-  $("#ventureThread").innerHTML = '<div class="venture-example"><div class="vmono">EXAMPLE · PHASE 1, ATTENTION</div><h3 style="margin-top:10px">A small consulting offer for mission-driven operators</h3><p class="vnote">First, answer the intake one question at a time. The system turns those answers into a research plan, then stops for your review.</p><div class="vreceipt"><i style="background:#2f7d46"></i><span>Intake complete · voice and truth constraints recorded</span></div><div class="vblock"><div class="vmono">YOUR NEXT DECISION</div><div class="vtitle" style="margin-top:8px">Approve the research plan?</div><div class="vnote">After your yes, Venture proposes ten evidence-seeking post ideas. You choose three. It drafts only those three and stops again before anything goes out.</div></div><div class="vreceipt"><i style="background:#9a6b12"></i><span>Nothing advances until you make the highlighted decision</span></div></div>';
+  $("#ventureThread").innerHTML = '<div class="venture-example"><div class="vmono">SAMPLE DATA · ILLUSTRATIVE, NOT LIVE</div><h3 style="margin-top:10px">A small consulting offer for mission-driven operators</h3><p class="vnote">This sample shows the path from intake to evidence, content, and an email-acquisition asset. Nothing here writes product state.</p><div class="vreceipt"><i style="background:#2f7d46"></i><span>Intake complete · voice and truth constraints recorded</span></div><div class="vblock"><div class="vmono">Content in review</div><div class="vtitle" style="margin-top:8px">Why good operators miss institutional incentives</div><div class="vnote">Status · Draft · LinkedIn short post + image. Waiting for your decision before it moves.</div></div><div class="vblock"><div class="vmono">Lead magnet</div><div class="vtitle" style="margin-top:8px">Operator incentives field guide</div><div class="vnote">Status · Ready for review · CTA acquires an email, then offers an optional Email survey that records reader interests.</div></div><div class="vblock"><div class="vmono">NEXT ACTION</div><div class="vtitle" style="margin-top:8px">Waiting for your decision</div><div class="vnote">Approve the research plan, choose three content ideas, or revise the lead magnet. Each action stops at the next human gate.</div></div></div>';
   $("#ventureDocuments").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE DOCUMENTS</div><p class="vnote">As work advances, this stage holds the research plan, selected ideas, draft posts, lead magnet, offer outline, operating plan, and Day 14 review. Each remains visibly draft, approved, or live.</p></div>';
   $("#ventureRail").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE HISTORY</div><p class="vnote">Every selection, approval, delivery confirmation, and checkpoint appears here as an audit trail. Earlier phases stay available without crowding the current work screen.</p></div>';
   $("#ventureIntakeSections").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE GUARDRAILS</div><p class="vnote"><strong>Voice:</strong> plainspoken, specific, and skeptical of inflated claims.</p><p class="vnote"><strong>Truth boundary:</strong> treat demand as a hypothesis until real replies or purchases support it.</p><p class="vnote"><strong>Day 14:</strong> three live probes, a sustainable posting pace, and at least five substantive replies from the intended audience.</p><p class="from">Read-only. Start your own venture to record real guardrails.</p></div>';
@@ -4062,7 +3894,7 @@ function switchVenture(slug){
   if(slug==="__example__"){ renderVentureExample(); return; }
   loadVenture();
 }
-// Pane switch for the demoted intake sheet (mirrors Signals' SIG.pane). Lives on the room, not
+// Pane switch for the in-sheet venture views. Lives on the room, not
 // inside the rebuilt thread, so a plain listener on #roomVenture is enough.
 $("#roomVenture").addEventListener("click", (e)=>{
   const t = e.target.closest ? e.target.closest("[data-set-ven-pane]") : null;
@@ -4229,7 +4061,7 @@ function ivResumable(){
 }
 
 function ivShow(on){
-  // Interview sits on the thread pane. Leaving intake guardrails open would stack two sheets.
+  // Interview sits on the thread pane. Leaving guardrails open would stack two work surfaces.
   if(on){ VEN.pane = "work"; renderVentureSheets(); }
   $("#ventureRead").hidden = on;
   $("#ventureIntake").hidden = !on;
@@ -4570,13 +4402,22 @@ async function loadFiction(){
   }
   if(!ficSeries || !FICTION.some(s=>s.slug===ficSeries)) ficSeries = FICTION[0].slug;
   const series = FICTION.find(s=>s.slug===ficSeries);
+  if(ficPromoChapter==null && series.chapters && series.chapters.length) ficPromoChapter=series.chapters[0].chapter;
   if(!ficDocPath || !series.docs.some(d=>d.path===ficDocPath)) ficDocPath = series.docs[0].path;
   const dr = await fetch("/api/fiction/doc?series="+encodeURIComponent(ficSeries)+"&path="+encodeURIComponent(ficDocPath));
   ficDocData = await dr.json();
   const sr = await fetch("/api/fiction/scene?series="+encodeURIComponent(ficSeries));
   ficScene = await sr.json();
+  await loadFictionPromotion();
   renderFiction();
   renderCaptureHandoff();
+}
+async function loadFictionPromotion(){
+  if(!ficSeries || !ficPromoChapter){ ficPromoDraft=null; return; }
+  try{
+    const r=await fetch("/api/fiction/promotion?series="+encodeURIComponent(ficSeries)+"&chapter="+encodeURIComponent(ficPromoChapter));
+    const d=await r.json(); ficPromoDraft=d.ok?d.draft:null; ficPromoError=d.ok?"":(d.error||"Could not load promotion draft");
+  }catch(e){ ficPromoDraft=null; ficPromoError=e instanceof Error?e.message:String(e); }
 }
 function ficStatusWord(hasScene){
   const mine = (JOBS||[]).filter(j=>jobRoom(j.kind)==="Fiction");
@@ -4649,13 +4490,13 @@ function renderFiction(){
       '<span style="font:10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:'+tone.fg+';background:'+tone.bg+';border:1px solid '+tone.bd+';border-radius:4px;padding:2px 7px">'+esc(word)+'</span>'+
     '</div>';
 
-  const composer = beats ? '' :
+  const composer =
     '<div style="font:400 27px/1.35 Georgia,serif;margin:6px 0 18px;max-width:520px">What happens next?</div>'+
     '<div style="background:#fffdf8;border:1px solid #d8cfbb;border-radius:8px;padding:20px 22px;max-width:600px">'+
-      '<textarea id="ficBeats" rows="3" placeholder="Say the beats. Who is in it, what turns, what you want it to feel like." style="width:100%;box-sizing:border-box;border:none;background:transparent;padding:0;resize:vertical;font:400 18px/1.6 Georgia,serif;color:var(--ink)"></textarea>'+
+      '<textarea id="ficBeats" rows="5" placeholder="Say the beats. Who is in it, what turns, what you want it to feel like." style="width:100%;box-sizing:border-box;border:none;background:transparent;padding:0;resize:vertical;font:400 18px/1.6 Georgia,serif;color:var(--ink)">'+esc(beats)+'</textarea>'+
       '<div style="display:flex;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid #efe7d6">'+
         engineSelectHtml()+
-        '<button class="primary" id="ficDraftBtn" style="flex:none;white-space:nowrap">Draft it</button>'+
+        '<button class="primary" id="ficDraftBtn" style="flex:none;white-space:nowrap">'+(beats?'Draft another pass':'Draft it')+'</button>'+
         '<span class="src">It writes a first pass and checks the canon while it goes. You read it before anything is kept.</span>'+
       '</div>'+
     '</div>';
@@ -4705,8 +4546,11 @@ function renderFiction(){
     '</div>'+
     '<div style="margin:38px 0 0;display:flex;align-items:center;gap:12px"><span style="height:1px;flex:1;background:#efe7d6"></span><span style="font:italic 400 14px/1 Georgia,serif;color:#a89a80">the canon underneath it</span><span style="height:1px;flex:1;background:#efe7d6"></span></div>';
 
-  $("#fictionMain").innerHTML =
-    head + composer + anchor + failCard + scene +
+  const stageNav='<nav class="room-pages" aria-label="Fiction pages">'+[["write","Write next"],["review","Review drafts"],["promotion","Promotion"]].map(([id,label])=>'<button type="button" class="'+(ficPage===id?'on':'')+'" data-fiction-page="'+id+'">'+label+'</button>').join('')+'</nav>';
+  const chapterOptions=(series.chapters||[]).map(ch=>'<option value="'+ch.chapter+'"'+(Number(ficPromoChapter)===ch.chapter?' selected':'')+'>'+esc(ch.label)+'</option>').join("");
+  if(ficPromoChapter==null&&series.chapters&&series.chapters.length) ficPromoChapter=series.chapters[0].chapter;
+  const intake='<div style="margin-top:24px"><div class="wb-label">OPTIONAL STORY PROMOTION</div><h3>Promote a finished chapter</h3><p class="src">This is separate from writing the story. Choose a locked chapter and say what the promotion should do; approved copy can then move to Content.</p><label class="wb-label" for="ficPromoChapter">SERIES / CHAPTER</label><select id="ficPromoChapter" style="width:100%;max-width:520px">'+chapterOptions+'</select><label class="wb-label" for="ficPromoRequest" style="display:block;margin-top:18px">WHAT SHOULD THIS PROMOTION DO?</label><textarea id="ficPromoRequest" rows="5" style="width:100%;max-width:600px" placeholder="Describe the launch note, audience, and spoiler boundary.">'+esc(ficPromoRequest)+'</textarea><label class="wb-label" for="ficPromoObjective" style="display:block;margin-top:18px">SUGGESTED OBJECTIVE</label><input id="ficPromoObjective" style="width:100%;max-width:600px" value="'+esc(ficPromoObjective)+'"></div>';
+  const canonPanel=
     '<div class="wb-label" style="margin-top:34px">The philosophy · your canon</div>'+
     '<div style="font:400 27px/1.35 Georgia,serif;margin:2px 0 14px;">'+esc(doc.label)+'</div>'+
     '<div id="ficBody" style="font:400 16px/1.75 Georgia,serif;border:1px dashed #e0d6c0;border-radius:8px;padding:20px 22px;background:#fcfbf7;white-space:pre-wrap;max-height:520px;overflow:auto;">'+esc(d.body)+'</div>'+
@@ -4716,6 +4560,25 @@ function renderFiction(){
         : '<span class="src">Append-only: /story lock writes this ledger; the desk only reads it.</span>')+
     '</div>'+history+
     '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">First passes happen here, checked against this canon as they are written. Line editing and the commit history stay in your GitHub flow (/story), where you already work sentence by sentence.</div>';
+  const promoHistory=ficPromoDraft&&ficPromoDraft.revisionHistory&&ficPromoDraft.revisionHistory.length
+    ? '<details class="lead-details" style="margin-top:14px"><summary>Revision history · '+ficPromoDraft.revisionHistory.length+'</summary>'+ficPromoDraft.revisionHistory.map((item,i)=>'<div class="src" style="margin-top:8px">'+(i+1)+' · '+esc(item.kind)+(item.model?' · '+esc(item.model):'')+(item.instruction?' · '+esc(item.instruction):'')+'</div>').join("")+'</details>' : '';
+  const promoDraftPanel=!ficPromoDraft
+    ? '<div style="margin-top:28px;max-width:680px"><div class="wb-label">PROMOTIONAL DRAFT</div><p class="src">Uses the approved chapter and locked quote passages selected in Intake. It never edits the story chapter.</p>'+
+      (ficPromoError?'<div class="fam-note t-amber">'+esc(ficPromoError)+'</div>':'')+
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+engineSelectHtml("ficPromoEngine")+'<button type="button" class="primary" id="ficPromoDraftCreate"'+(ficPromoBusy||!String(ficPromoRequest).trim()?' disabled':'')+'>'+(ficPromoBusy?'Drafting…':'Draft promotion')+'</button></div></div>'
+    : '<div style="margin-top:28px;max-width:760px"><div style="display:flex;align-items:center;gap:10px"><div class="wb-label" style="margin:0">PROMOTIONAL DRAFT</div><span class="pill">'+esc(ficPromoDraft.state)+'</span></div>'+
+      '<textarea id="ficPromoBody" rows="14" style="width:100%;box-sizing:border-box;margin-top:12px;font:400 17px/1.65 Georgia,serif">'+esc(ficPromoDraft.body)+'</textarea>'+
+      '<div class="actions"><button type="button" id="ficPromoSave"'+(ficPromoBusy?' disabled':'')+'>Save direct edit</button><button type="button" class="primary" id="ficPromoApprove"'+(ficPromoBusy||ficPromoDraft.state==='Approved'?' disabled':'')+'>Approve final</button><button type="button" id="ficPromoReject"'+(ficPromoBusy?' disabled':'')+'>Reject</button></div>'+
+      '<div class="wb-margin-cap" style="margin-top:22px">TARGETED AI REVISION</div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px"><input id="ficPromoInstruction" style="flex:1;min-width:260px" placeholder="Ask for one focused change">'+engineSelectHtml("ficPromoRevisionEngine")+'<button type="button" id="ficPromoRevise"'+(ficPromoBusy?' disabled':'')+'>Request revision</button></div>'+
+      '<div class="wb-margin-cap" style="margin-top:22px">PLATFORM / MEDIA PREVIEWS</div><div class="stat-tiles">'+(ficPromoDraft.previews||[]).map(p=>'<div class="stat-tile"><strong>'+esc(p.label)+'</strong><span class="l">'+esc(p.platform)+' · '+esc(p.media)+'</span></div>').join("")+'</div>'+promoHistory+(ficPromoError?'<div class="fam-note t-amber">'+esc(ficPromoError)+'</div>':'')+'</div>';
+  const finalPanel=head+(ficPromoDraft&&ficPromoDraft.state==='Approved'
+    ? '<div style="max-width:680px;margin-top:22px"><div class="wb-label">APPROVED PROMOTIONAL FINAL</div><div style="white-space:pre-wrap;font:400 18px/1.7 Georgia,serif">'+esc(ficPromoDraft.body)+'</div></div>'
+    : '<div class="empty">No approved promotional final is available yet. Draft and approve the promotion before handing it to Content.</div>')+
+    '<div style="margin-top:26px;padding:18px;border:1px solid #d8cfbb;border-radius:8px;background:#fffdf8"><div class="wb-label">CONTENT HANDOFF</div><p class="src">Creates a durable Content source from the approved promotional final, the selected locked chapter, its quoteable passages, canon restrictions, fiction origin, and your promotion request. It publishes nothing.</p><button type="button" class="primary" id="ficPromoNote"'+(!(ficPromoDraft&&ficPromoDraft.state==='Approved')?' disabled':'')+'>Send approved final to Content</button></div>';
+  const promotionPage=intake+promoDraftPanel+(ficPromoDraft&&ficPromoDraft.state==='Approved'?finalPanel:'');
+  const reviewPage=head+(hasScene?anchor+failCard+scene:'<div class="empty">No draft yet. Add your direction in Write next, then draft a first pass.</div>')+
+    '<div class="src" style="max-width:680px;margin-top:24px;padding-top:16px;border-top:1px solid #efe7d6">Direct line edits and final acceptance happen in the story PR. Use the revision note here to ask for another focused pass; the canonical chapter is never silently overwritten.</div>';
+  $("#fictionMain").innerHTML = stageNav+(ficPage==="write"?head+composer+failCard:ficPage==="review"?reviewPage:ficPage==="canon"?canonPanel:promotionPage);
 
   const rows = [].concat(rep?rep.conflicts||[]:[], rep?rep.holds||[]:[]);
   const checks = rows.length
@@ -4738,12 +4601,48 @@ function renderFiction(){
     '<div style="height:1px;background:#efe7d6;margin:14px 0"></div>'+
     '<div class="wb-margin-cap">YOUR CANON · CLICK TO OPEN</div>'+
     series.docs.map(x=>'<div class="lead-chip'+(x.path===ficDocPath?" on":"")+'" style="display:flex" data-path="'+esc(x.path)+'">'+esc(x.label)+'</div>').join("")+
-    '<div class="wb-reply"><div class="wb-margin-cap">PROMOTE THE SERIES</div>'+
-    '<button type="button" class="wb-link" id="ficPromoNote">Start a launch note in Content</button>'+
-    '<span class="mono-note">Promo is the only bridge to the rest of the studio: teasers quote LOCKED chapters verbatim. Character art is not wired into this room yet.</span></div>';
+    '<div class="wb-reply"><div class="wb-margin-cap">PROMOTION BRIDGE</div><span class="mono-note">Only Final can hand an approved chapter to Content. The route validates the lock and quote provenance before writing anything.</span></div>';
 
   refreshEngineControls($("#fictionMain"));
-  document.querySelectorAll("#fictionSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ ficDocPath=c.dataset.path; loadFiction(); }));
+  document.querySelectorAll("#fictionMain [data-fiction-page]").forEach(button=>button.addEventListener("click",async ()=>{
+    ficPromoRequest=$("#ficPromoRequest")?.value??ficPromoRequest;
+    ficPromoObjective=$("#ficPromoObjective")?.value??ficPromoObjective;
+    ficPromoChapter=Number($("#ficPromoChapter")?.value||ficPromoChapter);
+    ficPage=button.dataset.fictionPage;
+    if(ficPage==="promotion") await loadFictionPromotion();
+    renderFiction();
+  }));
+  $("#ficPromoRequest")?.addEventListener("input",e=>{ ficPromoRequest=e.target.value; });
+  $("#ficPromoObjective")?.addEventListener("input",e=>{ ficPromoObjective=e.target.value; });
+  $("#ficPromoChapter")?.addEventListener("change",async e=>{ ficPromoChapter=Number(e.target.value); ficPromoDraft=null; await loadFictionPromotion(); });
+  const promoCreate=$("#ficPromoDraftCreate");
+  if(promoCreate) promoCreate.addEventListener("click",async ()=>{
+    const engine=$("#ficPromoEngine")?.value||"codex";
+    ficPromoBusy=true; ficPromoError=""; renderFiction();
+    const chapterInfo=(series.chapters||[]).find(item=>item.chapter===Number(ficPromoChapter));
+    const result=await post("/api/fiction/promotion/draft",{series:ficSeries,chapter:ficPromoChapter,descriptor:series.title+" · "+(chapterInfo?chapterInfo.label:"Chapter "+ficPromoChapter)+" promotion",originalInput:ficPromoRequest,objective:ficPromoObjective,engine});
+    ficPromoBusy=false; if(result.ok){ficPromoDraft=result.draft;flash("Promotional draft ready");}else ficPromoError=result.error||"Could not draft promotion"; renderFiction();
+  });
+  const promoSave=$("#ficPromoSave");
+  if(promoSave) promoSave.addEventListener("click",async ()=>{
+    const result=await post("/api/fiction/promotion/save",{series:ficSeries,chapter:ficPromoChapter,body:$("#ficPromoBody").value});
+    if(result.ok){ficPromoDraft=result.draft;ficPromoError="";flash("Direct edit saved");}else ficPromoError=result.error||"Could not save"; renderFiction();
+  });
+  const promoRevise=$("#ficPromoRevise");
+  if(promoRevise) promoRevise.addEventListener("click",async ()=>{
+    const instruction=$("#ficPromoInstruction").value.trim(); if(!instruction){flash("Ask for one focused change first");return;}
+    const engine=$("#ficPromoRevisionEngine")?.value||"codex";
+    ficPromoBusy=true;ficPromoError="";renderFiction();
+    const result=await post("/api/fiction/promotion/revise",{series:ficSeries,chapter:ficPromoChapter,instruction,engine});
+    ficPromoBusy=false;if(result.ok){ficPromoDraft=result.draft;flash("Targeted revision ready");}else ficPromoError=result.error||"Could not revise";renderFiction();
+  });
+  for(const pair of [["ficPromoApprove","Approved"],["ficPromoReject","Rejected"]]){
+    const button=$("#"+pair[0]); if(button) button.addEventListener("click",async ()=>{
+      const result=await post("/api/fiction/promotion/status",{series:ficSeries,chapter:ficPromoChapter,state:pair[1]});
+      if(result.ok){ficPromoDraft=result.draft;ficPromoError="";flash(pair[1]==="Approved"?"Promotion approved":"Promotion rejected");}else ficPromoError=result.error||"Could not update status";renderFiction();
+    });
+  }
+  document.querySelectorAll("#fictionSide .lead-chip").forEach(c=>c.addEventListener("click",()=>{ ficDocPath=c.dataset.path; ficPage="canon"; loadFiction(); }));
   const draftBtn = $("#ficDraftBtn");
   if(draftBtn) draftBtn.addEventListener("click", ()=>{
     const t = ($("#ficBeats").value||"").trim();
@@ -4806,32 +4705,46 @@ function renderFiction(){
     editBtn.textContent = "Save to canon"; editBtn.dataset.mode = "save";
   });
   const promo = $("#ficPromoNote");
-  if(promo) promo.addEventListener("click", ()=>{
-    setRoom("studio"); // the capture box lives in Studio now, so the promo bridge goes there
-    $("#src").value = "Launch note for "+series.title+": ";
-    $("#src").focus();
+  if(promo) promo.addEventListener("click", async ()=>{
+    promo.disabled=true;
+    const descriptor=series.title+" · chapter "+ficPromoChapter+" launch";
+    const result=await post("/api/fiction/handoff",{slug:"fiction-handoff",series:ficSeries,chapter:Number(ficPromoChapter),descriptor,originalInput:ficPromoRequest,suggestedPromotionalObjective:ficPromoObjective});
+    if(!result.ok){ promo.disabled=false; flash(result.error||"Could not create the Content handoff"); return; }
+    await setRoom("content");
+    CW.slug=result.request.id; CW.step=2; CW.pane="wizard"; CW.config=null; CW.treat=null; CW.treatFor=null; renderContentWizard(); cwLoadTreatment();
+    flash("Fiction handoff opened in Content configuration");
   });
 }
 
 async function draftCharles(){
   const input = $("#charlesInput").value.trim();
+  const replySource = $("#charlesReplyInput").value.trim();
   const modes=[...document.querySelectorAll(".charles-format:checked")].map(x=>x.value);
   if(!modes.length){ flash("Choose at least one format"); return; }
-  if(modes.includes("reply") && !input){ flash("Paste a URL before queueing a reply"); return; }
+  if(modes.includes("reply") && !replySource){ flash("Paste a URL or quoted post before queueing a reply"); return; }
   const btn = $("#charlesDraftBtn");
   btn.disabled = true; btn.textContent = "Queueing checked formats…";
   const engine=$("#charlesEngine").value;
   const results=[];
-  for(const mode of modes) results.push({mode,result:await post("/api/charles/draft", {mode, input, engine})});
+  for(const mode of modes) results.push({mode,result:await post("/api/charles/draft", {
+    mode, input:mode==="reply" ? replySource+(input ? "\\nRequested angle: "+input : "") : input, engine,
+  })});
   btn.disabled = false; btn.textContent = "Draft";
   const ok=results.filter(x=>x.result.ok), failed=results.filter(x=>!x.result.ok);
   if(ok.length){
     $("#charlesInput").value = "";
+    $("#charlesReplyInput").value = "";
     charlesId = ok[ok.length-1].result.id;
+    charlesPage = "drafts";
     flash("Queued "+ok.map(x=>typeLabel(x.mode)).join(", ")+" with "+engineLabel(engine)+(failed.length?"; failed: "+failed.map(x=>typeLabel(x.mode)).join(", "):""));
     if(currentTab==="charles") loadCharles();
   } else flash(failed.map(x=>typeLabel(x.mode)+": "+(x.result.error||"failed")).join("; "));
 }
+function renderCharlesReplySource(){
+  $("#charlesReplySource").hidden = ![...document.querySelectorAll(".charles-format:checked")].some(x=>x.value==="reply");
+}
+document.querySelectorAll(".charles-format").forEach(x=>x.addEventListener("change", renderCharlesReplySource));
+renderCharlesReplySource();
 $("#charlesDraftBtn").addEventListener("click", draftCharles);
 
 let charlesBriefLoaded = false;
@@ -4853,6 +4766,13 @@ $("#charlesBriefCopyBtn").addEventListener("click", async ()=>{
 // posts anything — approving just flips the status cell; Muxin pastes it to Substack herself.
 let CHARLES_POSTS = [];
 let charlesId = null;
+let charlesPage = "input";
+function renderCharlesPages(){
+  $("#charlesInputPane").hidden=charlesPage!=="input";
+  $("#charlesDraftPane").hidden=charlesPage!=="drafts";
+  document.querySelectorAll("[data-charles-page]").forEach(button=>button.classList.toggle("on",button.dataset.charlesPage===charlesPage));
+}
+document.querySelectorAll("[data-charles-page]").forEach(button=>button.addEventListener("click",()=>{ charlesPage=button.dataset.charlesPage; renderCharlesPages(); }));
 function typeLabel(t){ return t==="one-liner" ? "One-liner" : t==="essay" ? "Essay" : t==="reply" ? "Reply" : t; }
 async function loadCharles(){
   loadCharlesBrief();
@@ -4861,10 +4781,11 @@ async function loadCharles(){
   if(!CHARLES_POSTS.length){
     $("#charlesMain").innerHTML = '<div class="empty">Nothing drafted yet. Pick a mode above and hit Draft.</div>';
     $("#charlesDraftList").innerHTML = "";
-    return;
+    renderCharlesPages(); return;
   }
   if(!charlesId || !CHARLES_POSTS.some(p=>p.id===charlesId)) charlesId = CHARLES_POSTS[0].id;
   renderCharles();
+  renderCharlesPages();
 }
 function renderCharles(){
   const post = CHARLES_POSTS.find(p=>p.id===charlesId);
@@ -4880,10 +4801,11 @@ function renderCharles(){
       '<button class="revise'+(post.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(post.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
       '<span class="spacer"></span>'+
+      (post.status==="approve"?'<button class="primary" data-act="content-handoff">Send approved draft to Content</button>':"")+
       '<button id="charlesEditBtn" data-act="edit">Edit in place</button>'+
     '</div>'+
     '<div class="revisebox" id="charlesRevisebox"><input placeholder="what needs changing?" value="'+esc(post.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
-    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything. Charles has no live-posting credentials on purpose (charles/CLAUDE.md). Once approved, paste it to Substack yourself.</div>';
+    '<div style="margin-top:26px;padding-top:16px;border-top:1px solid #efe7d6;" class="src">Approving here does not post anything. An approved output can enter Content with Charles identity and CTA restrictions for optional treatments, media, and routing.</div>';
   $("#charlesDraftList").innerHTML =
     '<div class="wb-margin-cap">DRAFTS · CLICK TO OPEN</div>'+
     CHARLES_POSTS.map(p=>'<div class="lead-chip'+(p.id===charlesId?" on":"")+'" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px" data-id="'+esc(p.id)+'">'+
@@ -4921,6 +4843,12 @@ async function onCharlesAction(act, item){
     ta.style.cssText = "width:100%;min-height:380px;font:400 15px/1.7 Georgia,serif;border:none;background:transparent;resize:vertical;";
     bodyEl.innerHTML=""; bodyEl.appendChild(ta);
     btn.textContent = "Save draft"; btn.dataset.mode = "save";
+  } else if (act === "content-handoff"){
+    const result=await post("/api/charles/handoff",{postId:item.id,thought:item.body,selectedOutputs:[item.type],descriptor:"Charles · "+typeLabel(item.type),originalInput:item.body});
+    if(!result.ok){ flash(result.error||"Could not create the Content handoff"); return; }
+    await setRoom("content");
+    CW.slug=result.request.id; CW.step=2; CW.pane="wizard"; CW.config=null; CW.treat=null; CW.treatFor=null; renderContentWizard(); cwLoadTreatment();
+    flash("Charles draft opened in Content configuration");
   }
 }
 
@@ -4933,7 +4861,6 @@ async function onCharlesAction(act, item){
 // foot controls and the insights "Brief:" link share one switch. The last two sheets are
 // pre-prototype developer surfaces relocated behind those controls so the room opens on the reads.
 let SIGNALS = null;
-const sigSent = new Set();
 // Signals decisions are acknowledgements for this browser page only. Keep the key stable across
 // refreshes of the brief while leaving the API and the backlog handoff untouched; a full reload
 // creates fresh Sets and therefore restores every recommendation.
@@ -4943,12 +4870,30 @@ function signalKey(r){ return JSON.stringify([r.type, r.title]); }
 function signalStatusLabel(c){
   return c.status.startsWith("OK") ? c.weeks+" wks of data" : "insufficient · directional only";
 }
+function signalsPracticalHtml(){
+  const read=SIGNALS&&SIGNALS.performance;
+  if(read&&read.summary){
+    const top=read.summary.top;
+    return '<section style="margin-top:22px"><div class="wb-label">WHAT IS WORKING NOW</div><div class="src" style="margin:5px 0 12px">Sample data · illustrative, not measured</div><div class="stat-tiles">'+
+      '<div class="stat-tile"><strong>Topics earning engagement</strong><span class="l">'+esc(top.topic)+'</span></div>'+
+      '<div class="stat-tile"><strong>Platforms working</strong><span class="l">'+esc(top.platform)+' for the illustrative sample</span></div>'+
+      '<div class="stat-tile"><strong>Media and formats</strong><span class="l">'+esc(top.media)+' with '+esc(top.format)+'</span></div>'+
+      '<div class="stat-tile"><strong>Content defaults</strong><span class="l">'+esc(read.summary.action)+'</span></div>'+
+      '</div><div class="src" style="margin-top:10px">This sample never preselects a real request. Real requests use separate safe defaults and every choice remains editable.</div></section>';
+  }
+  return '<section style="margin-top:22px"><div class="wb-label">WHAT IS WORKING NOW</div><div class="src" style="margin:5px 0 12px">Sample data · illustrative, not measured</div><div class="stat-tiles">'+
+    '<div class="stat-tile"><strong>Topics earning engagement</strong><span class="l">Work, status, and institutional incentives</span></div>'+
+    '<div class="stat-tile"><strong>Platforms working</strong><span class="l">LinkedIn for the sample topic</span></div>'+
+    '<div class="stat-tile"><strong>Media and formats</strong><span class="l">Carousel outperforming plain text in the sample</span></div>'+
+    '<div class="stat-tile"><strong>Content defaults</strong><span class="l">Preselect short post + image; every choice remains editable</span></div>'+
+    '</div><div class="src" style="margin-top:10px">Insufficient measured evidence keeps the current safe defaults. A measured zero will appear as 0; unavailable outcomes say not measured.</div></section>';
+}
 function renderSignals(){
   if(!SIGNALS) return;
   $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
   const box = $("#signalsTop");
   if(!SIGNALS.briefPath){
-    box.innerHTML = '<div class="empty">No strategy brief yet. Open the latest strategy brief below and use Refresh brief to create the first one. It may take a few minutes, and progress appears in Studio.</div>';
+    box.innerHTML = signalsPracticalHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
     return;
   }
   const fitCards = (SIGNALS.confidence||[]).map(c=>{
@@ -4962,16 +4907,12 @@ function renderSignals(){
   const recs = (SIGNALS.recommendations||[]).map((r,i)=>{
     const key = signalKey(r);
     if(sigDeclined.has(key)) return "";
-    const sent = sigSent.has(r.title);
     const adopted = sigAdopted.has(key);
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
       '<div class="dev-summary">'+esc(r.rationale)+'</div>'+
       '<div class="actions">'+
         '<button class="'+(adopted?'':'primary ')+'sig-adopt" data-i="'+i+'"'+(adopted?' disabled':'')+'>'+(adopted?'Adopted for this session':'Adopt')+'</button>'+
         '<button class="sig-decline" data-i="'+i+'">Decline</button>'+
-        (sent
-          ? '<span class="scheduled">✓ filed to the backlog: the pipeline grooms it from here</span>'
-          : '<button class="primary sig-send" data-i="'+i+'">Send to backlog</button><span class="src">Files a card; Claude Code works out where it applies and tracks whether it held. Nothing changes until that ships.</span>')+
         (adopted ? '<span class="src">Adopted for this session. Nothing changed.</span>' : '')+
       '</div></div>';
   }).join("");
@@ -4985,7 +4926,7 @@ function renderSignals(){
     ? '<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>'
     : "";
   const briefNote = '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>';
-  box.innerHTML =
+  box.innerHTML = signalsPracticalHtml()+
     '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
     weakHtml+
     '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+briefNote+
@@ -5001,13 +4942,6 @@ function renderSignals(){
     sigDeclined.add(signalKey(r));
     flash("Declined for this session. Nothing changed.");
     renderSignals();
-  }));
-  box.querySelectorAll(".sig-send").forEach(b=>b.addEventListener("click", async ()=>{
-    const r = SIGNALS.recommendations[Number(b.dataset.i)];
-    b.disabled = true;
-    const res = await post("/api/signals/backlog", {title: r.title, detail: "["+r.type+"] "+r.rationale});
-    if(res.ok){ sigSent.add(r.title); flash("Filed to the backlog"); renderSignals(); }
-    else { b.disabled = false; flash(res.error || "Could not file it"); if((res.error||"").includes("already")) { sigSent.add(r.title); renderSignals(); } }
   }));
 }
 async function loadSignals(){
@@ -5257,7 +5191,7 @@ function followupRowHtml(row){
   const status = pending
     ? '<div class="hint" style="margin-left:26px;">drafting… (the Studio room has progress + log)</div>'
     : err ? '<div class="aierr" style="margin-left:26px;">⚠ '+esc(err)+'</div>' : "";
-  const draftBtn = row.dir && !disabled ? '<span class="fu-draft-control">'+engineSelectHtml()+'<button class="fu-draft" data-dir="'+esc(row.dir)+'" data-person="'+esc(row.person||"")+'"'+(pending?" disabled":"")+'>'+(pending?"Drafting…":"Draft a follow-up")+'</button></span>' : "";
+  const draftBtn = row.dir && !disabled ? '<span class="fu-draft-control">'+outreachEngineSelectHtml()+'<button class="fu-draft" data-dir="'+esc(row.dir)+'" data-person="'+esc(row.person||"")+'"'+(pending?" disabled":"")+'>'+(pending?"Drafting…":"Draft a follow-up")+'</button></span>' : "";
   const noteInput = disabled ? "" : '<input class="fu-note" placeholder="optional note (kept in the ledger)…" />';
   return '<div class="fu-row">'+
     '<div class="fu-head"><span class="fu-dot" style="background:'+fuDotColor(row.status)+'"></span>'+
@@ -5299,7 +5233,7 @@ function renderFollowupsBox(){
   box.querySelectorAll("button.fu-moveon").forEach(b=>b.addEventListener("click", ()=>followupAction("move-on", args(b))));
   box.querySelectorAll("button.fu-draft").forEach(b=>b.addEventListener("click", ()=>{
     const select = b.closest(".fu-draft-control")?.querySelector(".engine-select");
-    followupDraft(b.dataset.dir, b.dataset.person, select ? select.value : "claude");
+    followupDraft(b.dataset.dir, b.dataset.person, select ? select.value : "codex");
   }));
 }
 async function loadFollowups(){
@@ -5317,7 +5251,7 @@ async function followupAction(action, body){
   else flash(r.error || "Failed");
 }
 function followupDraftRequest(dir, person, engine){
-  return { dir:dir, ...(person ? {recipient:person} : {}), engine:engine || "claude" };
+  return { dir:dir, ...(person ? {recipient:person} : {}), engine:engine || "codex" };
 }
 async function followupDraft(dir, person, engine){
   if(fuPending.has(dir)) return; // already in flight — never a second real claude -p spawn
@@ -5364,14 +5298,14 @@ function jobsPollDue(jobs, now, armedUntil){
   if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
   return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
 }
-const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/develop/start","/api/develop/reply","/api/develop/format","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check"];
+const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/content/generate","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check","/api/fiction/promotion/draft","/api/fiction/promotion/revise"];
 function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path); }
 function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
   if(kind==="pull"||kind==="strategy"||kind==="insights"||kind==="ask-insights"||kind==="brief-revise") return "Signals";
   if(kind==="venture-analysis"||kind==="venture-step") return "Venture";
   if(kind==="charles-draft") return "Charles";
-  if(kind==="fiction-draft"||kind==="fiction-continuity") return "Fiction";
+  if(kind==="fiction-draft"||kind==="fiction-continuity"||kind==="fiction-promo") return "Fiction";
   return "Content";
 }
 function jobLanding(room){
@@ -5463,20 +5397,15 @@ function openWorkbenchJob(j){
   Promise.resolve(setRoom("content")).then(()=>{
     const slug = workbenchJobTarget(j);
     if(!slug) return;
-    // The workbench now opens for one piece at a time (see rules.md #1's carve-out), so jumping to
-    // a job's session means picking that slug and switching into the workbench pane, not scrolling
-    // to a sheet that used to render every session stacked at once. Reset step/treatment state the
-    // same way the wizard's own source-picker click does: without this, "Back to the treatment"
-    // for a piece nobody picked through step 1 renders "Reading the treatment…" forever, because
-    // nothing here would otherwise trigger cwLoadTreatment() for it.
+    // Advisor-era jobs now land in the ordinary Content configuration for their source. The old
+    // Workbench/cuts surface is not a reachable alternate review path.
     if(CW.slug !== slug){
       CW.slug = slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = [];
       cwLoadTreatment();
     }
-    CW.pane = "workbench";
-    renderContentWizard(); renderWorkbench();
-    const target = [...document.querySelectorAll(".session[data-wb-slug]")].find(el=>el.dataset.wbSlug===slug);
-    if(target) target.scrollIntoView({behavior:"smooth", block:"start"});
+    CW.pane = "wizard";
+    renderContentWizard();
+    $("#contentWizard")?.scrollIntoView({behavior:"smooth", block:"start"});
   });
 }
 // The per-job Stop control, on the two surfaces a live job appears on. Same button, same handler.
@@ -5774,7 +5703,7 @@ function captureHandoffSummary(capture){
 }
 function setCaptureSubmitting(busy){
   captureSubmitting = busy;
-  ["#addBtn", "#devStartBtn"].forEach(id=>{ const button=$(id); if(button) button.disabled=busy; });
+  const button=$("#routeBtn"); if(button) button.disabled=busy;
 }
 
 function captureText(){ return ($("#src").value||"").trim(); }
@@ -5969,13 +5898,24 @@ $("#notesBtn").addEventListener("click", openNotes);
 $("#notesCloseBtn").addEventListener("click", closeNotes);
 $("#notesShowDrafted").addEventListener("change",(e)=>{ notesShowDrafted = e.target.checked; renderNotes(); });
 $("#notesDraftBtn").addEventListener("click", draftSelectedNotes);
-$("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") devStart(); });
+$("#src").addEventListener("keydown",(e)=>{ if((e.metaKey||e.ctrlKey)&&e.key==="Enter") routeCapture(); });
 setInterval(()=>{ if(jobsPollDue(JOBS, Date.now(), jobsPollArmedUntil)) loadJobs(); }, JOBS_POLL_MS);
 
-$("#showDecided").addEventListener("change", (e)=>{ showDecided = e.target.checked; render(); });
+for(const id of ["reviewMediaFilter","reviewPlatformFilter","reviewTreatmentFilter"]) $("#"+id).addEventListener("change",render);
+$("#reviewRequestFilter").addEventListener("input",render);
+$("#reviewSelectAll").addEventListener("click",()=>{ document.querySelectorAll("#reviewMain .review-check").forEach(box=>{ box.checked=true; reviewSelected.add(box.closest(".scan-row").dataset.reviewKey); }); });
+$("#reviewApproveSelected").addEventListener("click",approveReviewSelection);
 $("#reviewSheet").addEventListener("click", (e)=>{
-  const t = e.target.closest ? e.target.closest("[data-set-pane]") : null;
-  if(t){ CW.pane = t.dataset.setPane; renderContentWizard(); }
+  const t = e.target.closest ? e.target.closest("[data-step]") : null;
+  if(!t) return; const n=Number(t.dataset.step);
+  if(n===4) CW.pane="published"; else if(n===3) CW.pane="review"; else { CW.pane="wizard"; CW.step=n; if(n===2&&CW.slug&&CW.treatFor!==CW.slug) cwLoadTreatment(); }
+  renderContentWizard();
+});
+$("#publishedSheet").addEventListener("click", (e)=>{
+  const t = e.target.closest ? e.target.closest("[data-step]") : null;
+  if(!t) return; const n=Number(t.dataset.step);
+  if(n===4) CW.pane="published"; else if(n===3) CW.pane="review"; else { CW.pane="wizard"; CW.step=n; if(n===2&&CW.slug&&CW.treatFor!==CW.slug) cwLoadTreatment(); }
+  renderContentWizard();
 });
 setRoom(${JSON.stringify(BOOT_ROOM)});
 // The desk header's live date ("Thursday · Jul 17").
