@@ -86,6 +86,7 @@ export function setStatus(folder: string, row: QueueRow, status: string): void {
 export interface QueueCellUpdate {
   status?: string;
   notes?: string;
+  asset?: string;
 }
 
 // A blank cell is a single space ("| |"), matching how every other row in a fresh review-queue.md
@@ -115,6 +116,7 @@ export function writeCell(folder: string, id: string, updates: QueueCellUpdate):
     // either one so neither can shift the row's column boundaries.
     if (updates.status !== undefined) cells[8] = formatCell(updates.status.replace(/[|\n\r]/g, " ").trim());
     if (updates.notes !== undefined) cells[9] = formatCell(updates.notes.replace(/[|\n\r]/g, " ").trim());
+    if (updates.asset !== undefined) cells[4] = formatCell(updates.asset.replace(/[|\n\r]/g, " ").trim());
     lines[i] = cells.join("|");
     writeFileSync(path, lines.join("\n"));
     return true;

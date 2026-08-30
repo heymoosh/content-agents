@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  replyContextHtml, imageMissingHtml, storyboardJobDone, formatElapsed, fmtDays, renderInsightsMeta,
+  replyContextHtml, imageMissingHtml, mediaPlanActionsHtml, storyboardJobDone, formatElapsed, fmtDays, renderInsightsMeta,
   JOB_COLORS, STRIP_LINGER_MS, jobRoom, jobLandingSentence, jobRailLabel, jobClockText, jobsAhead, jobStepDots,
   dotColor, jobProgressPct, jobFooter, jobLogLine, jobOpenLabel, stripJobFor, stripRailLabel, stripClockText,
   stripFooter, teamRailHeader, teamRoomName, teamLiveRows, restingTeamRows, jobAnswerEcho, ANSWERED_FOOTER,
@@ -94,6 +94,15 @@ test("imageMissingHtml: a non-image row renders nothing", () => {
   assert.equal(imageMissingHtml({ kind: "text" }), "");
   assert.equal(imageMissingHtml({ kind: "video" }), "");
   assert.equal(imageMissingHtml({}), "");
+});
+
+test("configured quote/video stage rows expose approval and actual-render actions", () => {
+  for (const id of ["static-card", "animated-card", "short-video"]) {
+    const html = mediaPlanActionsHtml(`media-stages/${id}.json`);
+    assert.match(html, /approve-media-plan/);
+    assert.match(html, /render-media/);
+  }
+  assert.equal(mediaPlanActionsHtml("images/already-rendered.png"), "");
 });
 
 // Unit tests for storyboardJobDone() — the pure, DOM-free mirror of the inline logic loadJobs()
@@ -891,6 +900,16 @@ test("Signals: recommendations expose durable adopt and decline decisions", () =
   assert.ok(!html.includes("const sigAdopted = new Set()"));
   assert.ok(!html.includes("const sigDeclined = new Set()"));
   assert.ok(html.includes('function signalKey(r){ return r.type+":"+r.title; }'));
+});
+
+test("Signals: adoption, Muxin review, exact preview, apply, and rollback stay separate", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes("Exact preview"));
+  assert.ok(html.includes("Approve exact change"));
+  assert.ok(html.includes("Apply approved change"));
+  assert.ok(html.includes("Intent saved. Configuration still unchanged."));
+  assert.ok(html.includes('post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action'));
+  assert.ok(html.includes('action==="rollback"'));
 });
 
 // The strategy brief and raw-exports sheets are pre-prototype developer surfaces. They stay fully
@@ -2170,20 +2189,18 @@ test("durable capture verdict: every routed capture names the room it chose, and
     assert.ok(v.line.includes(room), "the verdict must name the room it picked: " + room);
     assert.deepEqual(mirror(room), v, "the browser copy of captureVerdict must match: " + room);
   }
-  for (const room of ["Fiction", "Outreach", "Venture"] as const) {
-    assert.ok(captureHandoffVerdict(room).line.includes("choose the next action"));
+  for (const room of ["Content", "Fiction", "Outreach", "Venture"] as const) {
+    assert.equal(captureHandoffVerdict(room).actionLabel, "Start on it");
   }
-  assert.equal(captureHandoffVerdict("Content").actionLabel, null);
-  assert.equal(captureHandoffVerdict("Fiction").actionLabel, "Keep it in Fiction");
 });
 
 test("Studio capture: the rendered durable-handoff verdict makes no stale routing promise", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const script = emittedScripts().join("\n");
   for (const line of [
-    "I read this as Fiction. Keep it in Fiction as a capture, then choose the next action there.",
-    "I read this as Outreach. Keep it in Outreach as a capture, then choose the next action there.",
-    "I read this as Venture. Keep it in Venture as a capture, then choose the next action there.",
+    "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.",
+    "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.",
+    "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.",
   ]) assert.ok(script.includes(JSON.stringify(line)), line);
   for (const stale of [
     "I can put it in the composer as your beats",
@@ -2194,8 +2211,8 @@ test("Studio capture: the rendered durable-handoff verdict makes no stale routin
     assert.ok(!html.includes(stale), "stale rendered promise: " + stale);
     assert.ok(!script.includes(stale), "stale client promise: " + stale);
   }
-  assert.ok(script.includes('localStorage.setItem(CAPTURE_HANDOFF_KEY'), "a verdict is saved as a durable handoff");
-  assert.ok(script.includes("Nothing was submitted or started."), "the handoff waits for an explicit next action");
+  assert.ok(script.includes('post("/api/captures", {room:room, text:t})'), "a verdict is saved by the repository server");
+  assert.ok(script.includes("Saved in the repository. Nothing has been approved or published."), "the handoff waits for an explicit next action");
 });
 
 test("Studio capture: the box moved out of the Content room and into Studio", () => {
@@ -2281,35 +2298,42 @@ test("the bare-link ask: three controls, the honest explainer, and the honest Si
   assert.ok(script.includes('ta.readOnly = true; ta.classList.add("dimmed");'));
 });
 
-// The capture section may only reach routes that exist. Outreach drafting needs a lead folder and
-// Venture has no free-text entry, so a dispatch to either would be a claim this system cannot back.
-test("Studio capture: the dispatch never posts to a route that cannot take free text", () => {
+test("Studio capture: top-level Start on it advances every classified build to its safe human gate", () => {
   const script = emittedScripts().join("\n");
   const start = script.indexOf("// ── Studio capture: one front door (v7 Studio)");
   const end = script.indexOf("// ── Substack Notes checklist");
   assert.ok(start > -1 && end > start, "the capture client section must be identifiable");
   const section = script.slice(start, end);
   const paths = [...new Set([...section.matchAll(/\/api\/[a-z0-9/-]+/g)].map((m) => m[0]))].sort();
-  assert.deepEqual(paths, [], "a capture handoff must not call an API route");
-  assert.ok(section.includes('localStorage.setItem(CAPTURE_HANDOFF_KEY'));
-  assert.ok(section.includes('readCaptureHandoffs()'));
+  assert.deepEqual(paths, ["/api/captures", "/api/captures/start"]);
+  assert.ok(section.includes('SERVER_CAPTURES'));
   assert.ok(section.includes('CAPTURE WAITING HERE'));
-  assert.ok(section.includes('Choose the next action in this room. Nothing was submitted or started.'));
+  assert.ok(section.includes('Start on it'));
+  assert.ok(section.includes('Approval and publishing remain separate.'));
+  assert.ok(section.includes('post("/api/captures/start"'), "Content starts the advisor-only action");
+  assert.ok(section.includes('beats.value=text'), "Fiction prepares beats without auto-drafting");
+  assert.ok(section.includes('setOutreachSub("leads")'), "Outreach opens the required lead chooser");
+  assert.ok(section.includes('$("#ventureRunStepBtn")?.focus()'), "Venture opens its current human-gated step");
+  assert.ok(!section.includes('$("#ficDraftBtn").click()'));
+  assert.ok(!section.includes('$("#ventureRunStepBtn").click()'));
   for (const id of ["contentCaptureHandoff", "fictionCaptureHandoff", "outreachCaptureHandoff", "ventureCaptureHandoff", "signalsCaptureHandoff", "charlesCaptureHandoff"]) {
     assert.ok(section.includes(id), id + " must surface a pending capture in its owning room");
   }
-  assert.ok(!/function takeCaptureTo[\s\S]*?post\(/.test(section), "routing a capture must never start work");
+  const routeBody = section.slice(section.indexOf("async function takeCaptureTo"), section.indexOf("let SERVER_CAPTURES"));
+  assert.ok(routeBody.includes('/api/captures'), "routing persists through the server");
+  assert.ok(routeBody.includes('advanceCaptureSafely(room,t)'), "the top-level action must advance after its durable save");
 });
 
-test("Studio capture copy: no em dashes, and nothing claims a job was started", () => {
+test("Studio capture copy: no em dashes and every classified build names its safe next gate", () => {
   const strings = [
     CAPTURE_RAIL_IDLE, CAPTURE_RAIL_ASKING, LINK_ASK_HEADING, LINK_ASK_EXPLAINER, LINK_ASK_SIGNALS_NOTE,
-    ...(["Content", "Fiction", "Outreach", "Venture"] as const).map((r) => captureVerdict(r).line),
+    ...(["Content", "Fiction", "Outreach", "Venture"] as const).map((r) => captureHandoffVerdict(r).line),
   ];
   for (const s of strings) assert.ok(!s.includes("—"), "em dash in capture copy: " + s);
-  for (const r of ["Outreach", "Venture"] as const) {
-    assert.ok(/cannot start/.test(captureVerdict(r).line), r + " must say plainly that it cannot start one");
-  }
+  assert.match(captureHandoffVerdict("Content").line, /advisor round/);
+  assert.match(captureHandoffVerdict("Fiction").line, /review before drafting/);
+  assert.match(captureHandoffVerdict("Outreach").line, /choose the person/);
+  assert.match(captureHandoffVerdict("Venture").line, /does not run or approve/);
 });
 
 test("Studio keeps obsolete director attribution out of the visible capture workflow", () => {
@@ -2381,11 +2405,23 @@ test("Notes picker sends the selected engine", () => {
   assert.ok(script.includes('post("/api/notes/pick", notesPickRequest(indices, $("#studioEngine").value))'));
 });
 
-test("Content removes the obsolete Workbench and creates drafts through explicit configuration", () => {
+test("Content restores advisor and exact-source cuts before explicit configuration", () => {
   const script = emittedScripts().join("\n");
   assert.ok(!script.includes('$("#workbench")'));
-  assert.ok(!script.includes('/api/develop/'));
+  assert.ok(script.includes('/api/develop/start'));
+  assert.ok(script.includes('/api/develop/reply'));
+  assert.ok(script.includes('/api/develop/accept'));
+  assert.ok(script.includes('data-open-config'));
+  assert.ok(script.includes('kind:"approved-cut"'));
   assert.ok(script.includes('post("/api/content/generate", {slug:s.slug, engine})'));
+});
+
+test("Studio reads and displays provider reconciliation health", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  assert.ok(html.includes('fetch("/api/publishing/reconciliation-health")'));
+  assert.ok(html.includes('id="publishingReconciliationHealth"'));
+  assert.ok(html.includes("Delivery checks current"));
+  assert.ok(html.includes("Delivery checks stopped:"));
 });
 
 test("Fiction drafting and second passes expose a local engine selector and send it", () => {
@@ -2432,7 +2468,7 @@ test("boot room: Studio, with the nav highlight, currentTab and the first fetch 
   // Anchored at the boot call site itself: `setRoom("content")` is still legitimate elsewhere, as
   // the Studio needs-you rows' click-through into the Content room.
   assert.ok(
-    script.includes('setRoom("' + BOOT_ROOM + '");\n// The desk header'),
+    script.includes('setRoom("' + BOOT_ROOM + '");\nloadCaptures().then(renderCaptureHandoff);\n// The desk header'),
     "the boot setRoom must name the boot room",
   );
   // setRoom(boot) fires the room's own reads, but "last refreshed" is stamped off this list, and an
@@ -3353,4 +3389,12 @@ test("Outreach puts a concrete recommendation before the yes-or-no choice", () =
   const body = script.slice(start, script.indexOf("\nfunction ", start + 20));
   assert.ok(body.includes("WHY THIS MAY BE WORTH A CONVERSATION"));
   assert.ok(body.includes("recommendation+decideBtns"));
+});
+test("configured media rows expose distinct plan approval and render actions", () => {
+  const source = readFileSync(join(process.cwd(), "src/review/page.ts"), "utf8");
+  assert.match(source, /data-act="approve-media-plan"/);
+  assert.match(source, /data-act="render-media"/);
+  assert.match(source, /\/api\/content\/media\/approve/);
+  assert.match(source, /\/api\/content\/media\/render/);
+  assert.match(source, /JSON\.stringify\(row\.mediaStage,null,2\)/);
 });

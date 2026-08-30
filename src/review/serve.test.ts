@@ -98,6 +98,15 @@ test("configured Content requests have one explicit draft-generation route", () 
   assert.match(source, /generateConfiguredContent/);
 });
 
+test("configured media has separate plan approval and queued render routes", () => {
+  const source = readFileSync(join(process.cwd(), "src/review/serve.ts"), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/content/media/approve"'));
+  assert.ok(source.includes('url.pathname === "/api/content/media/render"'));
+  assert.match(source, /approveConfiguredMediaStage\(safeFolder\(slug\), id\)/);
+  assert.match(source, /executeConfiguredMediaStage\(folder, id, defaultConfiguredMediaRenderer\)/);
+  assert.match(source, /runQueued\("configured-media-render"/);
+});
+
 test("the initial GUI Content save derives source authority on the server", () => {
   const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
   const start = source.indexOf('url.pathname === "/api/content/request"');
@@ -233,6 +242,14 @@ test("approveBlockReason allows the same storyboard row once video/storyboard.md
     (p) => p === "/content/2026-06-16-foo/video/storyboard.md",
   );
   assert.equal(reason, null);
+});
+
+test("approveBlockReason never treats a configured media plan record as a finished publishable asset", () => {
+  const staged: QueueRow = {
+    id: "carousel-1", platform: "linkedin", format: "image", asset: "media-stages/carousel-1.json",
+    status: "pending", notes: "", origin: "from GUI queue", lineIndex: 0,
+  };
+  assert.match(approveBlockReason("/content/example", staged, () => true) ?? "", /staged media plan.*not a rendered asset/i);
 });
 
 test("approveBlockReason never blocks text rows, even with nothing on disk", () => {

@@ -1,7 +1,9 @@
 import { lstat, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { buildContentRequest, mergeContentConfiguration, type ContentRequest, type ContentRequestInput, type RecommendationEvidence } from "./content-request.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
+import { extractSourceLines } from "./develop.js";
 
 const FILE_NAME = "content-request.json";
 
@@ -80,7 +82,11 @@ export async function writeContentRequest(contentRoot: string, input: ContentReq
  */
 export async function authorizeGuiContentRequest(contentRoot: string, input: ContentRequestInput, existing?: ContentRequest): Promise<ContentRequestInput> {
   const candidate = existing ? mergeContentConfiguration(existing, input) : input;
-  if (existing && (existing.sourceProvenance || existing.sourceContext || existing.ventureSource)) return candidate;
+  // Cross-room handoffs establish their authority in their owning route. Preserve that authority
+  // when the Content room changes configuration, but do not let ordinary Content requests use
+  // this shortcut: every ordinary save must still revalidate its approved advisor cut on disk.
+  if (existing && (existing.sourceContext || existing.ventureSource)) return candidate;
+  if (existing && existing.origin === "charles" && existing.sourceProvenance) return candidate;
   if (existing && existing.origin !== "studio" && existing.origin !== "human-inference") {
     throw new Error(`existing ${existing.origin} request has no server-owned source authority`);
   }
@@ -94,46 +100,30 @@ export async function authorizeGuiContentRequest(contentRoot: string, input: Con
   if (crossRoom) {
     throw new Error("cross-room Content request is missing; recover it from its owning room instead of rebranding the source");
   }
-  const canonical = String(fm.canonical_url ?? "").trim().toLowerCase();
-  const humanInference = canonical.includes("humaninference.substack.com/")
-    || storedOrigin.includes("substack.com/@humaninference/");
-  if (!humanInference) {
-    throw new Error("source.md has no explicit Human Inference identity compatible with delivery policy");
-  }
-  const lines = raw.split("\n");
-  let first = 0;
-  if (lines[0] === "---") {
-    const close = lines.indexOf("---", 1);
-    if (close < 0) throw new Error("source.md frontmatter is not closed");
-    first = close + 1;
-  }
-  while (first < lines.length && !lines[first]!.trim()) first++;
-  let last = lines.length - 1;
-  while (last >= first && !lines[last]!.trim()) last--;
-  if (last < first) throw new Error("source.md body is empty");
-  const authoritativeBody = lines.slice(first, last + 1).join("\n").trim();
-  if (candidate.originalInput.trim() !== authoritativeBody) {
-    throw new Error("content request body does not match authoritative source.md");
-  }
-  const sourceLines: (number | string)[] = [];
-  let paragraphStart = first;
-  for (let index = first; index <= last + 1; index++) {
-    if (index <= last && lines[index]!.trim()) continue;
-    const paragraphEnd = index - 1;
-    if (paragraphEnd >= paragraphStart) {
-      const from = paragraphStart + 1;
-      const to = paragraphEnd + 1;
-      sourceLines.push(from === to ? from : `${from}-${to}`);
-    }
-    paragraphStart = index + 1;
-  }
+  // The browser names the accepted cut, but the server re-reads its exact body and immutable
+  // source-line provenance on every save. Whole-source configuration is intentionally forbidden:
+  // the advisor and Muxin's explicit cut approval are the gate before formatting.
+  const requested = input.sourceProvenance?.kind === "approved-cut"
+    ? input.sourceProvenance
+    : candidate.sourceProvenance?.kind === "approved-cut" ? candidate.sourceProvenance : null;
+  if (!requested) throw new Error("an approved advisor cut is required before Content configuration");
+  const lens = requested.lens?.trim() ?? "";
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(lens)) throw new Error("approved cut lens is invalid");
+  const cutPath = join(root, "cuts", lens, "cut.md");
+  if (!existsSync(cutPath)) throw new Error("approved advisor cut does not exist");
+  const cut = splitFrontmatter(await readFile(cutPath, "utf8"));
+  const refs = Array.isArray(cut.fm.source_lines) ? cut.fm.source_lines as (number | string)[] : [];
+  if (!refs.length) throw new Error("approved cut has no server-owned source_lines");
+  const resolved = extractSourceLines(root, refs);
+  if (cut.body.trim() !== resolved.trim()) throw new Error("approved cut body does not match its cited source_lines");
+  if (candidate.originalInput.trim() !== cut.body.trim()) throw new Error("content request body does not match the approved cut");
   return {
     ...candidate,
     origin: "human-inference",
-    originalInput: authoritativeBody,
+    originalInput: cut.body.trim(),
     ventureId: null,
     ventureSource: null,
-    sourceProvenance: { kind: "source", sourceLines },
+    sourceProvenance: { kind: "approved-cut", lens, sourceLines: refs },
     sourceContext: null,
   };
 }

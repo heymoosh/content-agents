@@ -25,6 +25,10 @@ import { briefRevisePrompt, latestBriefPath } from "./serve.js";
 import { logCost } from "../util/cost-log.js";
 import { buildEngineSpawn, enginePrompt, ENGINE_COMMANDS, ENGINE_LABELS, type Engine, type EngineSpawnOptions } from "./engines.js";
 import type { ContentRequest, ContentVariant } from "./content-request.js";
+import { configuredMediaPlan, configuredMediaStage, type ConfiguredMediaPlan, type ConfiguredMediaSourceInputs, type ConfiguredMediaStage } from "./configured-media.js";
+import { acquireJobExecutionLease, readDurableJobs, recoverAbandonedJobs, removeDurableJobs, upsertDurableJob } from "../runtime/durable-jobs.js";
+import { processAlive, type FileLease } from "../runtime/file-lock.js";
+import { migrateLegacyDataDirectory } from "../runtime/data-root.js";
 import {
   createFictionJobs,
   fictionDraftPrompt as fictionDraftPromptImpl,
@@ -55,7 +59,7 @@ export type { CharlesDraftMode } from "./charles-jobs.js";
 // Per-job stdout/stderr logs for the atomize job queue (see the Job interface below) — persisted
 // to disk so a job's real output survives past the 40MB in-memory buffer execFile used to impose,
 // and so a "view log" link + failure log-tail have something to read.
-const JOB_LOG_DIR = join(homedir(), ".content-agents", "logs", "gui-jobs");
+const JOB_LOG_DIR = migrateLegacyDataDirectory(["logs", "gui-jobs"], join(homedir(), ".content-agents"));
 export function jobLogPath(jobId: string): string {
   return join(JOB_LOG_DIR, `${jobId}.log`);
 }
@@ -466,10 +470,85 @@ export function resolveConfiguredProvenance(folder: string, request: ContentRequ
   return { body, sourceLines };
 }
 
-function configuredRowFormat(media: string): { format: string; asset: (id: string) => string } {
-  if (["static-quote-card", "image", "image-carousel"].includes(media)) return { format: "image", asset: (id) => `assets/${id}.png` };
-  if (["animated-quote-card", "audiogram"].includes(media)) return { format: "video", asset: (id) => `assets/${id}.mp4` };
-  return { format: "text", asset: (id) => `derivatives/${id}.md` };
+export interface ConfiguredMediaOutput {
+  readonly id: string;
+  readonly queue: { readonly format: string; readonly asset: string };
+  readonly record: {
+    readonly version: "configured-media-stage-v1";
+    readonly id: string;
+    readonly platform: string;
+    readonly media: string;
+    readonly status: "staged";
+    readonly stage: ConfiguredMediaStage["stage"] | "draft-ready";
+    readonly derivativePath: string;
+    readonly outputPath?: string;
+    readonly approvalGate: string;
+    readonly nextCommand?: readonly string[];
+    readonly primitives?: readonly string[];
+    readonly sourcePaths?: readonly string[];
+    readonly plan?: ConfiguredMediaPlan;
+  };
+}
+
+/** Preflight the whole request before generation starts, so one unavailable medium leaves no partial output. */
+export function buildConfiguredMediaOutputs(
+  variants: readonly ContentVariant[],
+  inputs: ConfiguredMediaSourceInputs = {},
+): ConfiguredMediaOutput[] {
+  const shortVideos = variants.filter((variant) => variant.media === "short-video-script");
+  if (shortVideos.length > 1) {
+    throw new Error("configured short-video generation currently supports one staged script per content folder; choose one control/treatment because the existing storyboard approval gate is folder-scoped");
+  }
+  const stagedInputs = shortVideos.length ? { ...inputs, stagedStoryboard: true } : inputs;
+  return variants.map((variant) => {
+    const derivativePath = `derivatives/${variant.identity.id}.md`;
+    if (variant.media === "none") {
+      return {
+        id: variant.identity.id,
+        queue: { format: "text", asset: derivativePath },
+        record: {
+          version: "configured-media-stage-v1", id: variant.identity.id, platform: variant.platform,
+          media: variant.media, status: "staged", stage: "draft-ready", derivativePath,
+          approvalGate: "ordinary review-queue approval",
+        },
+      };
+    }
+    const staged = configuredMediaStage(variant.media, variant.identity.id, stagedInputs);
+    return {
+      id: variant.identity.id,
+      queue: staged.queue,
+      record: {
+        version: "configured-media-stage-v1", id: variant.identity.id, platform: variant.platform,
+        media: variant.media, status: "staged", stage: staged.stage, derivativePath,
+        ...(staged.stage === "render-required" ? { outputPath: variant.media === "static-quote-card" ? `images/${variant.identity.id}.png` : `images/${variant.identity.id}.mp4` } : {}),
+        approvalGate: staged.stage === "storyboard-required"
+          ? "the inspectable source-bound media plan must be explicitly approved before the storyboard-derived render runs"
+          : staged.stage === "render-required"
+            ? "the inspectable quote render plan must be explicitly approved before its verified output can replace this stage row"
+            : "the inspectable plan/source stage must be explicitly approved before any render, transcription, or paid provider work",
+        nextCommand: staged.command,
+        primitives: staged.primitives,
+        ...(staged.sourcePaths ? { sourcePaths: staged.sourcePaths } : {}),
+      },
+    };
+  });
+}
+
+function configuredMediaSourceInputs(folder: string): ConfiguredMediaSourceInputs {
+  const firstExisting = (paths: readonly string[]): string | undefined => paths.find((path) => existsSync(join(folder, path)));
+  const sourceAudioPath = firstExisting([
+    "source-audio.wav", "source-audio.mp3", "source-audio.m4a", "source-audio.ogg",
+  ]);
+  const sourceVideoPath = firstExisting([
+    "source-video.mp4", "source-video.mov", "source-video.webm", "video/source.mp4", "video/source.mov", "video/source.webm",
+  ]);
+  const storyboardApproved = existsSync(join(folder, "video", "storyboard.md"))
+    && readQueue(folder).rows.some((row) => row.format === "storyboard" && row.status === "approve");
+  return {
+    ...(sourceAudioPath ? { sourceAudioPath } : {}),
+    ...(sourceVideoPath ? { sourceVideoPath } : {}),
+    ...(storyboardApproved ? { approvedStoryboard: true } : {}),
+  };
 }
 
 /** Generate every configured variant into the ordinary review queue; never approves or publishes. */
@@ -479,10 +558,15 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
   if (!request.variants.length) throw new Error("content request has no configured variants");
   const ids = request.variants.map((variant) => variant.identity.id);
   if (new Set(ids).size !== ids.length || ids.some((id) => !/^[\w.-]+$/.test(id))) throw new Error("content request has unsafe or duplicate variant ids");
+  const mediaOutputs = buildConfiguredMediaOutputs(request.variants, configuredMediaSourceInputs(folder));
   const existing = new Set(readQueue(folder).rows.map((row) => row.id));
-  const occupancy = ids.map((id) => ({ row: existing.has(id), file: existsSync(join(folder, "derivatives", `${id}.md`)) }));
-  if (occupancy.every((state) => state.row && state.file)) return { ids, existing: true };
-  if (occupancy.some((state) => state.row || state.file)) throw new Error("only some configured drafts exist; refusing to overwrite or duplicate them");
+  const occupancy = ids.map((id) => ({
+    row: existing.has(id),
+    file: existsSync(join(folder, "derivatives", `${id}.md`)),
+    stage: existsSync(join(folder, "media-stages", `${id}.json`)),
+  }));
+  if (occupancy.every((state) => state.row && state.file && state.stage)) return { ids, existing: true };
+  if (occupancy.some((state) => state.row || state.file || state.stage)) throw new Error("only some configured drafts or media stages exist; refusing to overwrite or duplicate them");
   const treated = request.variants.filter((variant) => variant.identity.kind === "treated");
   // This policy gate deliberately precedes runQueued and every mkdir/write/append: a refused
   // origin-specific treatment leaves zero jobs, files, and review rows behind.
@@ -511,6 +595,7 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
       bodies = new Map(treated.map((variant) => [variant.identity.id, { body: request.originalInput, sourceLines: [] }]));
     }
     mkdirSync(join(folder, "derivatives"), { recursive: true });
+    mkdirSync(join(folder, "media-stages"), { recursive: true });
     const created: string[] = [];
     const queueRows: NewQueueRow[] = [];
     try {
@@ -524,8 +609,13 @@ export async function generateConfiguredContent(slug: string, request: ContentRe
         const treatment = variant.treatments.join(", ");
         const frontmatter = ["---", `platform: ${JSON.stringify(variant.platform)}`, `media: ${JSON.stringify(variant.media)}`, `variant_kind: ${JSON.stringify(variant.identity.kind)}`, `treatment: ${JSON.stringify(treatment)}`, `request_id: ${JSON.stringify(request.id)}`, ...(generated.sourceLines.length ? [`source_lines: ${JSON.stringify(generated.sourceLines)}`] : []), ...(generated.contextKind ? [`source_context_kind: ${JSON.stringify(generated.contextKind)}`, `restriction_refs: ${JSON.stringify(generated.restrictionRefs ?? [])}`] : []), "---", ""].join("\n");
         writeFileSync(path, frontmatter + body.trim() + "\n", { flag: "wx" }); created.push(path);
-        const target = configuredRowFormat(variant.media);
-        queueRows.push({ id, platform: variant.platform, format: target.format, asset: target.asset(id), status: "pending", notes: variant.identity.kind === "control" ? "Untreated control" : `Treatment: ${treatment}`, origin: "from GUI queue" });
+        const mediaOutput = mediaOutputs.find((output) => output.id === id)!;
+        const stagePath = join(folder, "media-stages", `${id}.json`);
+        const stagedRecord = variant.media === "none"
+          ? mediaOutput.record
+          : { ...mediaOutput.record, plan: configuredMediaPlan(variant.media, body) };
+        writeFileSync(stagePath, JSON.stringify(stagedRecord, null, 2) + "\n", { flag: "wx" }); created.push(stagePath);
+        queueRows.push({ id, platform: variant.platform, format: mediaOutput.queue.format, asset: mediaOutput.queue.asset, status: "pending", notes: variant.identity.kind === "control" ? "Untreated control" : `Treatment: ${treatment}`, origin: "from GUI queue" });
       }
       appendRows(folder, queueRows);
     } catch (error) {
@@ -582,7 +672,7 @@ export type JobKind =
   | "revise" | "brief-revise" | "insights" | "ask-insights" | "venture-analysis" | "venture-step" | "duplicate" | "draft-follow-up"
   | "outreach-revise"
   | "pull" | "strategy" | "scout" | "charles-draft"
-  | "fiction-draft" | "fiction-continuity" | "fiction-promo" | "content-generate";
+  | "fiction-draft" | "fiction-continuity" | "fiction-promo" | "content-generate" | "configured-media-render";
 
 // Kinds whose stdout IS the deliverable, not a progress channel. `runDraft` takes the spawn's
 // stdout as the outreach message body, and `ask-insights` returns it as the answer Muxin reads.
@@ -616,6 +706,7 @@ interface Job {
   retryable: boolean; // whether Retry is worth offering — see isRetryableFailure
   ask: { question: string; options: string[]; askedAt: number } | null;
   answer: string | null; // what Muxin picked, on the requeued job that carries it forward
+  ownerPid?: number; // process that owns the in-memory execution closure; other processes display only
   // Task jobs only (revise/brief-revise/insights/ask-insights/duplicate) — the actual work this job
   // runs once it's its turn. Never serialized: publicJob() below is an explicit allowlist that omits
   // it, so this stays an internal queue-execution detail, not part of the polled /api/jobs shape.
@@ -653,9 +744,22 @@ function freshJobFields(): Pick<Job, "status" | "slugs" | "error" | "createdAt" 
     steps: [], stepTotal: null, step: 0, failedAtStep: null, retryable: false, ask: null, answer: null,
   };
 }
-export const jobs: Job[] = [];
+function hydrateDurableJobs(): Job[] {
+  const stored = readDurableJobs();
+  const recovered = recoverAbandonedJobs(stored);
+  recovered.forEach((record, index) => { if (record !== stored[index]) upsertDurableJob(record); });
+  return recovered.map((record) => ({
+    ...freshJobFields(), ...record,
+    id: String(record.id), kind: record.kind as JobKind, label: String(record.label),
+    arg: typeof record.arg === "string" ? record.arg : "", engine: (record.engine as Engine | undefined) ?? "claude",
+    task: undefined, proc: undefined, discard: undefined,
+  } as Job));
+}
+export const jobs: Job[] = hydrateDurableJobs();
+function persistJob(j: Job): void { j.ownerPid = process.pid; upsertDurableJob({ ...publicJob(j), arg: j.arg, ownerPid: j.ownerPid }); }
 let jobSeq = 0;
 let draining = false;
+let executionLease: FileLease | null = null;
 
 // "Clear queue" (GUI) only ever removes finished entries — queued/running jobs stay untouched, and
 // so does an UNANSWERED `blocked` job: it is waiting on Muxin, not finished work, and clearing it
@@ -672,12 +776,15 @@ export function jobIsSweepable(job: Pick<Job, "status" | "answer">): boolean {
 }
 export function clearFinishedJobs(): number {
   let removed = 0;
+  const removedIds: string[] = [];
   for (let i = jobs.length - 1; i >= 0; i--) {
     if (jobIsSweepable(jobs[i])) {
+      removedIds.push(jobs[i].id);
       jobs.splice(i, 1);
       removed++;
     }
   }
+  if (removed) removeDurableJobs(removedIds.filter(Boolean));
   return removed;
 }
 
@@ -731,6 +838,7 @@ export function runQueued<T>(kind: JobKind, label: string, task: (job: Job) => P
       },
     };
     jobs.push(job);
+    persistJob(job);
     void drain();
   });
 }
@@ -1094,6 +1202,7 @@ export function addJob(kind: AtomizeFamilyKind, rawArg: string, label: string, r
   const arg = kind === "text" || kind === "file" ? materializeInboxArg(kind, rawArg, id, rawText) : rawArg;
   const job: Job = { id, kind, label, arg, engine, ...freshJobFields() };
   jobs.push(job);
+  persistJob(job);
   void drain();
   return job;
 }
@@ -1129,11 +1238,25 @@ export function developJobInFlight(slug: string): boolean {
 // file / pasted text); an existing folder comes in as `{ slug }` instead. Reply rounds are
 // enqueued by addDevelopReplyJob AFTER serve.ts persisted the reply to develop/log.md — the spawn
 // argv stays a fixed `/develop content/<slug>`, no free text in it.
-export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, rawText?: string, engine: Engine = "claude"): Job {
-  const id = nextJobId();
+export function addDevelopJob(kind: "url" | "file" | "text", rawArg: string, label: string, rawText?: string, engine: Engine = "claude", reservedId?: string): Job {
+  const id = reservedId ?? nextJobId();
+  const local = jobs.find((job) => job.id === id);
+  const abandoned = (job: { status?: unknown; error?: unknown; ownerPid?: unknown }) => (
+    job.status === "failed"
+      && job.error === "The prior process exited before this non-idempotent job finished. It was not resumed automatically."
+  ) || ((job.status === "queued" || job.status === "running") && !processAlive(Number(job.ownerPid ?? 0)));
+  if (local && !abandoned(local)) return local;
+  if (local) jobs.splice(jobs.indexOf(local), 1);
+  const durable = readDurableJobs().find((job) => job.id === id);
+  if (durable && !abandoned(durable)) {
+    const recovered = { ...freshJobFields(), ...durable, id, kind: durable.kind as JobKind, label: String(durable.label), arg: typeof durable.arg === "string" ? durable.arg : "", engine: (durable.engine as Engine | undefined) ?? engine } as Job;
+    jobs.push(recovered);
+    return recovered;
+  }
   const arg = kind === "url" ? rawArg : materializeInboxArg(kind, rawArg, id, rawText);
   const job: Job = { id, kind: "develop", label: `Develop: ${label}`, arg, engine, ...freshJobFields() };
   jobs.push(job);
+  persistJob(job);
   void drain();
   return job;
 }
@@ -1148,6 +1271,7 @@ export function addDevelopFolderJob(slug: string, kind: "develop" | "develop-rep
   const label = kind === "develop-reply" ? `Advisor reply: ${slug}` : `Develop: ${slug}`;
   const job: Job = { id: nextJobId(), kind, label, arg, engine, ...freshJobFields() };
   jobs.push(job);
+  persistJob(job);
   void drain();
   return job;
 }
@@ -1370,6 +1494,11 @@ function settleJob(job: Job): void {
     job.proc = undefined;
     if (alreadySettled) return;
     job.finishedAt = Date.now();
+    // A task-closure stop settles before its orphaned promise returns. Release the durable
+    // execution lease at that same point, just as the ordinary settle path does, or every later
+    // queued job remains stuck behind a lock whose in-process owner has already stopped.
+    executionLease?.release();
+    executionLease = null;
     draining = false;
     void drain(); // next queued job — the lane she just freed
     return;
@@ -1393,6 +1522,9 @@ function settleJob(job: Job): void {
     job.retryable = job.lastSpawn ? isRetryableFailure(job.lastSpawn) : true;
   }
   job.finishedAt = Date.now();
+  persistJob(job);
+  executionLease?.release();
+  executionLease = null;
   draining = false;
   void drain(); // next queued job
 }
@@ -1411,11 +1543,17 @@ export function atomizeArtifactVerdict(failure: string | null, createdSlugs: num
 // `draining` mutex, so GUI-wide Claude concurrency is bounded no matter which button fired it.
 async function drain(): Promise<void> {
   if (draining) return;
-  const job = jobs.find((j) => j.status === "queued");
+  const job = jobs.find((j) => j.status === "queued" && (j.ownerPid === undefined || j.ownerPid === process.pid));
   if (!job) return;
+  executionLease = acquireJobExecutionLease();
+  if (!executionLease) {
+    setTimeout(() => { void drain(); }, 100);
+    return;
+  }
   draining = true;
   job.status = "running";
   job.startedAt = Date.now();
+  persistJob(job);
 
   if (job.task) {
     // Generic task job (revise/brief-revise/insights/ask-insights/duplicate). The task itself
@@ -1526,6 +1664,7 @@ export function answerJob(id: string, answer: string): { error: string } | { job
     answer,
   };
   jobs.push(job);
+  persistJob(job);
   void drain();
   return { job };
 }
@@ -1562,6 +1701,7 @@ export function stopJob(id: string): { error: string } | { job: Job; stopped: bo
     job.retryable = false;
     job.finishedAt = Date.now();
     job.discard?.(new Error("you stopped this one"));
+    persistJob(job);
     return { job, stopped: true };
   }
 
@@ -1604,6 +1744,7 @@ export function retryJob(id: string): { error: string } | { job: Job } {
   // Stale state from the failed attempt would otherwise leak into settleJob's next verdict.
   job.ask = null;
   job.lastSpawn = undefined;
+  persistJob(job);
   void drain();
   return { job };
 }

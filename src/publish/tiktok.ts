@@ -223,7 +223,8 @@ async function main() {
     return;
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
-  await publishTikTok(folder);
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "tiktok");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (e.g. in tests) without

@@ -177,7 +177,8 @@ async function main() {
     process.exit(1);
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
-  await publishShorts(folder);
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "video");
 }
 
 // Read-only: list the channel's currently-scheduled Shorts (status.publishAt in the future) for the

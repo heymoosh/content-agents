@@ -316,7 +316,9 @@ async function main() {
     process.exit(1);
   }
   const folder = isAbsolute(folderArg) ? folderArg : join(repoRoot, folderArg);
-  await publishCards(folder, { atOverride, forceReuse });
+  if (atOverride || forceReuse) throw new Error("legacy scheduling overrides are unavailable on the unified capability-selected publish path");
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "card");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (e.g. in tests) without

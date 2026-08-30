@@ -75,8 +75,11 @@ import {
   enqueueFollowUpDraft,
   enqueueDirectedDraft,
   generateConfiguredContent,
+  addDevelopJob,
+  addDevelopFolderJob,
+  developJobInFlight,
 } from "./jobs.js";
-import { listContentSessions } from "./develop.js";
+import { listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
 import { renderPage } from "./page.js";
 import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
@@ -100,6 +103,10 @@ import { seriesDirFor } from "./fiction.js";
 import { loadFictionPromotionDraft } from "./fiction-promotion-draft.js";
 import { createApprovedCharlesHandoff } from "./charles-content-handoff-store.js";
 import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
+import { listCaptures, saveCapture, startCapture, type CaptureRoom } from "./captures.js";
+import { approveConfiguredMediaStage, defaultConfiguredMediaRenderer, executeConfiguredMediaStage } from "./configured-media-runtime.js";
+import { saveCutBody, addCutComment } from "./rows.js";
+import { providerReconciliationHealth, startProviderReconciliationLoop } from "./provider-reconciliation-runner.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich), jobs.ts (classifySource,
@@ -898,6 +905,10 @@ const server = createServer(async (req, res) => {
       json(res, 200, { engines: availableEngines(), default: "claude" });
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/publishing/reconciliation-health") {
+      json(res, 200, providerReconciliationHealth());
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/api/queue") {
       const pieces = await listPieces();
       // liveStateAsOf: when the background Typefully/PostPeer poll last actually ran (P1 cache
@@ -1151,6 +1162,35 @@ const server = createServer(async (req, res) => {
       json(res, 200, await buildStudioHome());
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/captures") {
+      json(res, 200, { ok: true, captures: listCaptures() });
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/captures") {
+      const b = await readBody(req);
+      const room = String(b.room ?? "") as CaptureRoom;
+      if (!["Content", "Fiction", "Outreach", "Venture", "Signals", "Charles"].includes(room)) {
+        json(res, 400, { ok: false, error: "capture room is invalid" }); return;
+      }
+      try { json(res, 200, { ok: true, capture: saveCapture(room, String(b.text ?? "")) }); }
+      catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    // Content's Start on it action is deliberately advisor-only. It can create source/cuts, but
+    // it has no approval, scheduling, or publishing capability.
+    if (req.method === "POST" && url.pathname === "/api/captures/start") {
+      const b = await readBody(req);
+      try {
+        const result = startCapture("Content", String(b.text ?? ""), (jobId, capture) => {
+          const dispatch = sourceDispatch(classifySource(capture.text), capture.text);
+          if ("error" in dispatch) throw new Error(dispatch.error);
+          if (dispatch.kind === "notes" || dispatch.kind === "continue" || dispatch.kind === "video") throw new Error("Content capture needs pasted text, a file path, or a URL");
+          return addDevelopJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText, requestEngine(b.engine), jobId);
+        });
+        json(res, 200, { ok: true, capture: result.capture, ...(result.job ? { job: publicJob(result.job) } : {}), replayed: result.replayed });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
     // The Content room's workbench aggregate: per active piece — Muxin's source verbatim, the
     // advisor rounds, each cut as a readable message with provenance, pending review count.
     if (req.method === "GET" && url.pathname === "/api/content") {
@@ -1212,6 +1252,71 @@ const server = createServer(async (req, res) => {
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/content/media/approve") {
+      const b = await readBody(req);
+      try {
+        const slug = String(b.slug ?? "").trim(), id = String(b.id ?? "").trim();
+        const stage = approveConfiguredMediaStage(safeFolder(slug), id);
+        json(res, 200, { ok: true, stage });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/content/media/render") {
+      const b = await readBody(req);
+      try {
+        const slug = String(b.slug ?? "").trim(), id = String(b.id ?? "").trim();
+        const folder = safeFolder(slug);
+        const result = runQueued("configured-media-render", `Render configured media: ${slug}/${id}`, async (job) => {
+          job.slugs = [slug];
+          return executeConfiguredMediaStage(folder, id, defaultConfiguredMediaRenderer);
+        }, "codex");
+        json(res, 200, { ok: true, queued: true, ids: [id] });
+        void result.catch(() => undefined);
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/start") {
+      const b = await readBody(req); const slug = String(b.slug ?? "").trim();
+      try {
+        if (!slug) throw new Error("an existing Content source is required");
+        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop", requestEngine(b.engine))) });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/reply") {
+      const b = await readBody(req); const slug = String(b.slug ?? ""); const reply = String(b.reply ?? "").trim();
+      if (!reply) { json(res, 400, { ok: false, error: "type a reply for the advisor first" }); return; }
+      try {
+        if (developJobInFlight(slug)) { json(res, 409, { ok: false, error: "the advisor is already working on this piece" }); return; }
+        appendReplyBySlug(slug, reply);
+        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop-reply", requestEngine(b.engine))) });
+      } catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/accept") {
+      const b = await readBody(req);
+      try { json(res, 200, { ok: true, ...acceptAngleBySlug(String(b.slug ?? ""), String(b.cardId ?? ""), b.lens == null ? undefined : String(b.lens), b.title == null ? undefined : String(b.title)) }); }
+      catch (e) { json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/develop/dismiss") {
+      const b = await readBody(req);
+      try { dismissCardBySlug(String(b.slug ?? ""), String(b.cardId ?? "")); json(res, 200, { ok: true }); }
+      catch (e) { json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/cut-save") {
+      const b = await readBody(req);
+      try { saveCutBody(String(b.slug ?? ""), String(b.lens ?? ""), String(b.body ?? "")); json(res, 200, { ok: true }); }
+      catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/cut-comment") {
+      const b = await readBody(req);
+      try { json(res, 200, { ok: true, comment: addCutComment(String(b.slug ?? ""), String(b.lens ?? ""), Number(b.line), String(b.text ?? "")) }); }
+      catch (e) { json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/revise") {
@@ -1862,6 +1967,7 @@ export function startReviewServer(): void {
   // so there is no opt-in flag to keep: if that ever changes, add one explicitly rather than
   // widening the default.
   server.listen(PORT, "127.0.0.1", () => {
+    if (!FIXTURES_ON) startProviderReconciliationLoop();
     if (FIXTURES_ON) {
       console.log(`\n  ⚠ FIXTURE MODE (${FIXTURE_ENV_VAR}=1) — the desk can serve fake data and every write is refused.`);
     }

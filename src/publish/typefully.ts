@@ -482,7 +482,9 @@ async function main() {
     process.argv.includes("--no-schedule") ||
     (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
   const forceReuse = process.argv.includes("--force-reuse");
-  await publishText(folder, { noSchedule, forceReuse });
+  if (noSchedule || forceReuse) throw new Error("legacy scheduling overrides are unavailable on the unified capability-selected publish path");
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "text");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)

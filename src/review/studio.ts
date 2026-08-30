@@ -14,6 +14,7 @@ import { listCharlesPosts } from "./charles.js";
 import { listVentures } from "../venture/paths.js";
 import { readDecisions } from "../venture/decisions.js";
 import { readArtifacts } from "../venture/artifacts.js";
+import { ledgerPath } from "../publish/slots.js";
 
 export interface NeedsYouItem {
   room: "content" | "outreach" | "followups" | "signals" | "charles" | "venture";
@@ -45,7 +46,7 @@ export interface StudioHome {
 
 // Future claims in the publish slot ledger — "Publisher: holding N approved posts for slots".
 export function countFutureSlotClaims(nowIso: string = new Date().toISOString(), path?: string): number {
-  const ledger = path ?? join(repoRoot, "data", "publish-schedule.jsonl");
+  const ledger = path ?? ledgerPath();
   if (!existsSync(ledger)) return 0;
   let count = 0;
   for (const line of readFileSync(ledger, "utf8").split("\n").filter(Boolean)) {

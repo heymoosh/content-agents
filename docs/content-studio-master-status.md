@@ -5,6 +5,10 @@
 `origin/main` at `5aecbb5`, plus the uncommitted Phase 0 working-tree changes described below
 **Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
 coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
+**Phase 1 status:** implementation and deterministic verification are complete for durable capture and
+safe next actions, advisor-cut enforcement, seven staged media pipelines, normalized delivery and
+reconciliation, one locked operational data root, the gated Postiz-first/Typefully-fallback canary
+matrix, and reviewed Signals apply/rollback; authenticated provider lifecycle canaries remain unrun.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 

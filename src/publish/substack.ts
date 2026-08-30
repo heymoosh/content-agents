@@ -316,7 +316,9 @@ async function main() {
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
   try {
-    await publishSubstack(folder, { dryRun, headed });
+    if (dryRun || headed) throw new Error("legacy browser overrides are unavailable on the unified capability-selected publish path");
+    const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+    await publishApprovedViaConfiguredProviders(folder, "substack");
   } catch (e) {
     reportFailure(e);
     process.exit(1);

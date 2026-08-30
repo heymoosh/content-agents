@@ -49,11 +49,13 @@ function seedLedger(claims: Claim[]): void {
 
 describe("slots.ts: writeLedgerAtomic + releaseClaims", () => {
   before(() => {
+    process.env.CONTENT_AGENTS_TEST_LEDGER = LEDGER;
     savedExisted = existsSync(LEDGER);
     savedLedger = savedExisted ? readFileSync(LEDGER, "utf8") : null;
   });
 
   after(() => {
+    delete process.env.CONTENT_AGENTS_TEST_LEDGER;
     if (savedExisted) writeFileSync(LEDGER, savedLedger ?? "");
     else if (existsSync(LEDGER)) unlinkSync(LEDGER);
   });

@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { buildContentRequest } from "./content-request.js";
-import { assertConfiguredTreatmentPolicy, configuredContentPrompt, parseConfiguredVariantBodies, parseVentureConfiguredBodies, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
+import { assertConfiguredTreatmentPolicy, buildConfiguredMediaOutputs, configuredContentPrompt, parseConfiguredVariantBodies, parseVentureConfiguredBodies, resolveConfiguredAuthoritative, resolveConfiguredProvenance, ventureConfiguredContentPrompt } from "./jobs.js";
 
 const request = buildContentRequest({
   id: "request-1", origin: "studio", descriptor: "A useful idea", originalInput: "The exact source.",
@@ -96,4 +96,43 @@ test("authoritative resolution fails closed on missing or forged source/cut prov
   writeFileSync(join(folder, "cuts", "angle", "cut.md"), "---\nsource_lines: [2]\n---\n\nforged\n");
   const cut = buildContentRequest({ ...request, sourceProvenance: { kind: "approved-cut", lens: "angle", sourceLines: [2] } });
   assert.throws(() => resolveConfiguredProvenance(folder, cut), /does not match/);
+});
+
+test("configured generation preflights media inputs and never invents missing final assets", () => {
+  const supported = buildContentRequest({
+    id: "supported", origin: "studio", descriptor: "source", originalInput: "Source.",
+    treatments: [], platforms: ["linkedin"], media: ["static-quote-card", "short-video-script"],
+    sourceProvenance: { kind: "source", sourceLines: [1] },
+  });
+  const outputs = buildConfiguredMediaOutputs(supported.variants);
+  assert.equal(outputs.length, 2);
+  assert.equal(outputs[0]!.queue.asset.startsWith("media-stages/"), true);
+  assert.equal(outputs[0]!.record.stage, "render-required");
+  assert.deepEqual(outputs[1]!.queue, { format: "storyboard", asset: `media-stages/${outputs[1]!.id}.json` });
+  assert.equal(outputs[1]!.record.stage, "storyboard-required");
+  assert.equal(outputs.every((output) => output.record.status === "staged"), true);
+
+  const plans = buildContentRequest({
+    id: "plans", origin: "studio", descriptor: "source", originalInput: "Source.",
+    treatments: [], platforms: ["linkedin"], media: ["image", "image-carousel"],
+    sourceProvenance: { kind: "source", sourceLines: [1] },
+  });
+  const planOutputs = buildConfiguredMediaOutputs(plans.variants);
+  assert.equal(planOutputs.every((output) => output.queue.asset.startsWith("media-stages/")), true);
+  assert.equal(planOutputs.every((output) => output.record.outputPath === undefined), true);
+
+  const needsAudio = buildContentRequest({
+    id: "audio", origin: "studio", descriptor: "source", originalInput: "Source.",
+    treatments: [], platforms: ["linkedin"], media: ["audiogram"],
+    sourceProvenance: { kind: "source", sourceLines: [1] },
+  });
+  assert.throws(() => buildConfiguredMediaOutputs(needsAudio.variants), /requires a source audio file/i);
+  assert.doesNotThrow(() => buildConfiguredMediaOutputs(needsAudio.variants, { sourceAudioPath: "incoming/source.wav" }));
+
+  const twoVideos = buildContentRequest({
+    id: "two-videos", origin: "studio", descriptor: "source", originalInput: "Source.",
+    treatments: ["shorter"], platforms: ["linkedin"], media: ["short-video-script"],
+    sourceProvenance: { kind: "source", sourceLines: [1] },
+  });
+  assert.throws(() => buildConfiguredMediaOutputs(twoVideos.variants), /one staged script.*folder-scoped/);
 });

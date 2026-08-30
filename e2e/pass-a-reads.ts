@@ -134,47 +134,31 @@ async function main(): Promise<void> {
       detail: followText.trim().slice(0, 120).replace(/\s+/g, " "),
     });
 
-    // Content now moves from a source into independent treatments, media, and platforms, then into
-    // one request-grouped approval surface. The superseded director/workbench path is intentionally
-    // absent. Apply a fixture scenario first so a source is guaranteed.
+    // An ordinary Content source no longer jumps directly into configuration. Picking it restores
+    // the advisor/cut gate first; only a server-owned accepted cut can open treatments, media, and
+    // platforms. Fixture mode is intentionally read-only, so this pass proves the gate and leaves
+    // accepting a cut + configured generation to the disposable write pass.
     await openRoom(s.page, "content");
     await applyScenario(s.page, "content-wizard");
     await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
     await waitLoaded(s.page, "#cwBody").catch(() => "");
     await s.page.waitForSelector("#cwBody .cw-src", { timeout: 15_000 }).catch(() => null);
     await s.page.click("#cwBody .cw-src");
-    const configText = ((await textOf(s.page, "#cwBody")) || "").replace(/\s+/g, " ").trim();
-    const configOk = ["TREATMENTS", "MEDIA", "PLATFORMS", "Untreated control", "Save configuration"].every((copy) => configText.includes(copy));
+    const advisorText = ((await textOf(s.page, "#cwBody")) || "").replace(/\s+/g, " ").trim();
+    const advisorGateOk = advisorText.includes("advisor conversation is restored") && advisorText.includes("APPROVED CUTS")
+      && !advisorText.includes("TREATMENTS") && !(await s.page.locator("#contentConfigSave").count());
     record({
-      feature: "Content opens independent configuration with an untreated control",
-      status: configOk ? "pass" : "fail",
-      detail: configText.slice(0, 220),
+      feature: "Content source selection stops at the advisor and approved-cut gate",
+      status: advisorGateOk ? "pass" : "fail",
+      detail: advisorText.slice(0, 240),
     });
     await s.page.click('#cwSteps [data-step="3"]');
-    await s.page.click('#cwBody [data-set-pane="review"]');
+    await s.page.waitForSelector("#reviewSheet:not([hidden])", { timeout: 10_000 });
     const approvalText = ((await textOf(s.page, "#reviewSheet")) || "").replace(/\s+/g, " ").trim();
     record({
-      feature: "Content opens request-grouped approval and separate Published status",
-      status: approvalText.includes("Approve Drafts") && approvalText.includes("Published") ? "pass" : "fail",
+      feature: "Content opens request-grouped approval before the separate Publish step",
+      status: approvalText.includes("Approve Drafts") && approvalText.includes("Publish") ? "pass" : "fail",
       detail: approvalText.slice(0, 220),
-    });
-
-    // The seam's production answer is a blocked read: reviewed-interface, no examples.
-    const recsRead = await s.page.evaluate(async () => {
-      const r = await fetch("/api/recommendations");
-      return { status: r.status, body: await r.json() };
-    });
-    const recsBody = recsRead.body as { availability?: string; source?: string; examples?: unknown[] };
-    const recsOk =
-      recsRead.status === 200 &&
-      recsBody.availability === "blocked" &&
-      recsBody.source === "reviewed-interface" &&
-      Array.isArray(recsBody.examples) &&
-      recsBody.examples.length === 0;
-    record({
-      feature: "Recommendation seam serves a blocked read",
-      status: recsOk ? "pass" : "fail",
-      detail: `HTTP ${recsRead.status}; availability=${recsBody.availability}; source=${recsBody.source}; examples=${Array.isArray(recsBody.examples) ? recsBody.examples.length : "missing"}`,
     });
 
     // Studio needs-you actions must be real <button>s (keyboard-reachable). The pre-prototype

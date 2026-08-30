@@ -14,6 +14,7 @@ const FICTION_SLUG = "e2e-fiction-treatment-refusal";
 function seedSource(): void {
   const folder = join(ROOT, "content", SLUG);
   mkdirSync(join(folder, "derivatives"), { recursive: true });
+  mkdirSync(join(folder, "cuts", "approved-e2e"), { recursive: true });
   writeFileSync(join(folder, "derivatives", "seed-pending.md"), "---\nplatform: bluesky\nsource_lines: [7]\n---\n\nThe approved first claim is exactly this sentence.\n");
   writeFileSync(join(folder, "source.md"), [
     "---",
@@ -33,6 +34,18 @@ function seedSource(): void {
     "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |",
     "|----|----------|--------|-------|-------------|------------|-----|--------|-------|",
     "| seed-pending | bluesky | text | derivatives/seed-pending.md | 5 | 5 | no | pending | E2E source discovery seed |",
+    "",
+  ].join("\n"));
+  // This is the deterministic stand-in for the completed advisor decision. The browser still has
+  // to choose it, and request persistence re-reads this file before accepting its provenance.
+  writeFileSync(join(folder, "cuts", "approved-e2e", "cut.md"), [
+    "---",
+    "title: Approved E2E cut",
+    'source_lines: ["8-9"]',
+    "---",
+    "",
+    "The approved first claim is exactly this sentence.",
+    "The approved second claim stays inside the same boundary.",
     "",
   ].join("\n"));
 }
@@ -66,10 +79,49 @@ async function main(): Promise<void> {
   try {
     session = await openSession(PORT, { allowInjectedRoutes: ["/api/content/generate"] });
     const { page } = session;
+
+    // Exercise the canonical front door without starting a real advisor model: capture through
+    // Studio, make the durable Content handoff, and prove Start on it is the next explicit action.
+    await page.fill("#src", "A source idea with enough context for Content versions and an exact-source advisor cut.");
+    await page.click("#routeBtn");
+    await page.waitForSelector("#captureVerdict:not([hidden]) .cap-go", { timeout: 10_000 });
+    const verdict = (await page.locator("#captureVerdict").innerText()).replace(/\s+/g, " ");
+    if (!verdict.includes("Content")) throw new Error(`capture classified outside Content: ${verdict}`);
+    await page.click("#captureVerdict .cap-go");
+    await page.waitForSelector("#contentCaptureHandoff .cap-start", { timeout: 10_000 });
+    const captures = await page.evaluate(async () => {
+      const response = await fetch("/api/captures");
+      return await response.json() as { ok?: boolean; captures?: { room?: string; text?: string }[] };
+    });
+    record({
+      feature: "Studio capture persists in Content and waits for explicit Start on it",
+      status: captures.ok && captures.captures?.some((capture) => capture.room === "Content" && capture.text?.includes("exact-source advisor cut")) ? "pass" : "fail",
+      detail: `handoff button visible; durable Content captures=${captures.captures?.filter((capture) => capture.room === "Content").length ?? 0}; advisor not invoked`,
+    });
+
     await openRoom(page, "content");
     await waitLoaded(page, "#contentWizard");
-    await page.click(`[data-slug="${SLUG}"]`);
+    const seededSession = await page.evaluate(async (slug) => {
+      const response = await fetch("/api/content");
+      const body = await response.json() as { sessions?: { slug?: string; cuts?: { lens?: string }[] }[] };
+      return body.sessions?.find((candidate) => candidate.slug === slug) ?? null;
+    }, SLUG);
+    if (!seededSession?.cuts?.some((cut) => cut.lens === "approved-e2e")) {
+      throw new Error(`seeded approved cut missing from server-owned Content read: ${JSON.stringify(seededSession)}`);
+    }
+    await page.click(`#cwBody .cw-src[data-slug="${SLUG}"]`);
+    await page.waitForSelector('input[name="approvedCut"][value="approved-e2e"]', { state: "attached", timeout: 15_000 });
+    const gated = (await page.locator("#cwBody").innerText()).includes("Pick one approved cut before configuration")
+      && await page.locator("#contentConfigSave").count() === 0;
+    await page.check('input[name="approvedCut"][value="approved-e2e"]');
+    await page.waitForSelector("[data-open-config]", { timeout: 10_000 });
+    await page.click("[data-open-config]");
     await page.waitForSelector("#contentConfigSave", { timeout: 15_000 });
+    record({
+      feature: "Approved server-owned cut unlocks Content configuration",
+      status: gated ? "pass" : "fail",
+      detail: `advisor gate before selection=${gated}; configuration opened after approved-e2e cut`,
+    });
     // Text-only keeps this pass focused on provenance-bearing derivatives rather than the still
     // separate configured-media rendering gap.
     await page.click('[data-config-none="media"]');

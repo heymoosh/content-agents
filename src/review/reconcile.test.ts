@@ -90,6 +90,36 @@ describe("findLoggedRef — parsing publish-log.md's free-text lines", () => {
 });
 
 describe("reconcileRow — the actual GOAL_CONDITION scenario", () => {
+  test("structured events are authoritative and bypass legacy free-text/live-list correlation", () => {
+    const result = reconcileRow(
+      row({ id: "x-1", platform: "x", status: "published" }),
+      { text: "", error: "legacy log unreadable" },
+      { typefullyDrafts: null, typefullyError: "offline", postpeerPosts: null },
+      {
+        slug: "piece", rowId: "x-1", provider: "postiz", state: "live", at: "2026-01-03T00:00:00.000Z",
+        providerObjectId: "postiz-1", providerAccountId: "human-inference/postiz",
+        canonicalUrl: "https://social.test/post/1", providerPublishedAt: "2026-01-03T00:00:00.000Z",
+      },
+    );
+    assert.equal(result.state, "scheduled");
+    assert.equal(result.deliveryState, "live");
+    assert.equal(result.provider, "postiz");
+    assert.equal(result.providerObjectId, "postiz-1");
+    assert.equal(result.providerAccountId, "human-inference/postiz");
+    assert.equal(result.canonicalUrl, "https://social.test/post/1");
+  });
+
+  test("structured terminal failures preserve their normalized reason instead of parsing logs", () => {
+    for (const state of ["blocked", "canceled", "deleted", "failed"] as const) {
+      const result = reconcileRow(row({}), { text: "" }, NO_LIVE, {
+        slug: "piece", rowId: "r-1", provider: "typefully", state, at: "2026-01-01T00:00:00.000Z",
+      });
+      assert.equal(result.state, "mismatch");
+      assert.equal(result.deliveryState, state);
+      assert.match(result.reason ?? "", new RegExp(state));
+    }
+  });
+
   test("a published text row whose draft IS live shows the provider's real scheduled time", () => {
     const log = `- 2026-07-04T00:00:00.000Z — x-1 → typefully draft 98765 (x, Fri 9:00am PT)\n`;
     const live: LiveProviderState = {

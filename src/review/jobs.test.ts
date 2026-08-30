@@ -6,6 +6,18 @@ import { tmpdir } from "node:os";
 import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
 
+async function waitForJobStatus(
+  job: { status: string },
+  status: string,
+  timeoutMs = 2_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (job.status !== status && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(job.status, status);
+}
+
 test("runAgentSpawn forwards a selected engine's stdin payload", () => {
   const source = readFileSync(join(process.cwd(), "src/review/jobs.ts"), "utf8");
   assert.match(source, /runCommandSpawn\(job, built\.command, built\.args, \{[\s\S]*?input: built\.input/);
@@ -1183,9 +1195,8 @@ test("stopping a task-closure job with no subprocess still settles as stopped an
     await new Promise<void>((r) => { release = r; });
     return "the answer nobody is waiting for any more";
   });
-  await new Promise((r) => setTimeout(r, 20));
   const job = jobs.find((j) => j.label === "mid-await, nothing to kill")!;
-  assert.equal(job.status, "running");
+  await waitForJobStatus(job, "running");
   assert.equal(job.proc, undefined, "a task closure has no child process to signal");
 
   const out = stopJob(job.id);
@@ -1209,8 +1220,8 @@ test("an orphaned stopped task resolving late does not double-release the job la
   const stoppedRun = runQueued("insights", "orphan", async () => {
     await new Promise<void>((r) => { release = r; });
   });
-  await new Promise((r) => setTimeout(r, 20));
   const orphan = jobs.find((j) => j.label === "orphan")!;
+  await waitForJobStatus(orphan, "running");
 
   let concurrent = 0;
   let maxConcurrent = 0;
