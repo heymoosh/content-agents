@@ -42,6 +42,7 @@ function inputFromStored(request: ContentRequest): ContentRequestInput {
     recommendationEvidence: evidence,
     includeUntreatedControl: request.control.enabled,
     ventureId: request.ventureId,
+    ventureSource: request.ventureSource,
   };
 }
 

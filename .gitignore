@@ -13,6 +13,9 @@ data/processed/**
 !data/processed/.gitkeep
 data/cost-log.csv
 data/publish-schedule.jsonl
+data/publishing-status.jsonl
+data/.publishing-claims/
+data/signals-decisions.jsonl
 data/.test-publish-schedule.*.jsonl
 # notes-spread-ledger.jsonl is intentionally committed (cloud dedup memory) — keep it tracked
 !data/notes-spread-ledger.jsonl

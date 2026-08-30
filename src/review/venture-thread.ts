@@ -102,6 +102,8 @@ export interface CardMsg {
    * nothing there). null on every other artifact kind, so the panel is absent rather than empty.
    */
   findings: CardFinding[] | null;
+  /** True only when this approved primary post can enter idempotent Content configuration. */
+  contentHandoffEligible: boolean;
 }
 
 export interface CardFinding {
@@ -866,6 +868,9 @@ function cardFor(a: VentureArtifact, minEvidence: ThreadInput["minEvidence"]): C
     claimRefs: a.claim_refs ?? [],
     actions: cardActions(a, minEvidence),
     findings: emergentFindings(a),
+    contentHandoffEligible: Boolean(a.body_path)
+      && (a.artifact_kind === "substack-post" || a.artifact_kind === "text-post-note")
+      && a.editorial_status === "approved" && a.delivery_status === "ready",
   };
 }
 

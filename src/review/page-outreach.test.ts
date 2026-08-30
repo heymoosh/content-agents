@@ -46,13 +46,13 @@ test("Outreach recommendation markup excludes poor-fit leads", () => {
   assert.doesNotMatch(html, /Bad|Do not show/);
 });
 
-test("selected Outreach composer includes concise fit, direction, model, contact, and honest Gmail state", () => {
+test("selected Outreach composer includes concise fit, direction, model, contact, and manual-send controls", () => {
   const html = renderSelectedOutreachComposer({
     dir: "outreach/leads/good", kind: "client", name: "Good", classification: "greenfield",
     whyMutual: "We share a useful overlap.", pitchAngle: "Lead with the overlap.",
     contacts: [{ name: "Rae", role: "Founder" }],
   }, { account: "other@example.com", authenticated: true, sendPermission: true });
-  for (const text of ["Good", "We share a useful overlap.", "Lead with the overlap.", "Rae", "ChatGPT", "Grok", "muxin.li.pro@gmail.com", "Connect Gmail and grant send permission before sending."]) assert.match(html, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const text of ["Good", "We share a useful overlap.", "Lead with the overlap.", "Rae", "ChatGPT", "Grok", "Copy message", "I sent this by hand"]) assert.match(html, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.doesNotMatch(html, /Claude/);
   assert.match(html, /textarea[^>]+id="outreachDirection"/);
 });
@@ -69,10 +69,11 @@ test("selected Outreach is a lightweight yes-or-no message workspace", () => {
   assert.match(html, /details[^>]+class="outreach-why"/);
 });
 
-test("Gmail remains disabled even if credentials are reported ready until a send route is connected", () => {
+test("Outreach does not advertise a Gmail send path", () => {
   const html = renderSelectedOutreachComposer({ dir: "outreach/leads/good", kind: "client", classification: "greenfield" }, {
     account: "muxin.li.pro@gmail.com", authenticated: true, sendPermission: true,
   });
-  assert.match(html, /outreach-send" disabled/);
-  assert.match(html, /send route is not connected/i);
+  assert.doesNotMatch(html, /Gmail|Connect Gmail|outreach-send/);
+  assert.match(html, /outreach-copy/);
+  assert.match(html, /outreach-mark-sent/);
 });

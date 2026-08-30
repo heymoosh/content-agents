@@ -31,6 +31,21 @@ describe("content request store", () => {
     assert.deepEqual(JSON.parse(await readFile(join(root, "content-request.json"), "utf8")), written);
   });
 
+  test("preserves Venture source and approval provenance across persistence", async () => {
+    const root = await rootDir();
+    const ventureInput: ContentRequestInput = {
+      ...input, origin: "venture", ventureId: "civic-tech",
+      ventureSource: {
+        artifactId: "p1-note", phase: 1, artifactKind: "text-post-note", messageId: "msg-1",
+        bodyPath: "phase-1-attention/p1-note.md", claimRefs: [{ claim: "One", ref: "intake:q1" }],
+        approval: { editorialStatus: "approved", provenance: "muxin-editorial-approval" },
+      },
+    };
+    const written = await writeContentRequest(root, ventureInput);
+    assert.ok(written.ventureSource);
+    assert.deepEqual((await readContentRequest(root)).ventureSource, written.ventureSource);
+  });
+
   test("validates writes through the domain builder", async () => {
     const root = await rootDir();
     await assert.rejects(() => writeContentRequest(root, { ...input, originalInput: "" }), /originalInput is required/);

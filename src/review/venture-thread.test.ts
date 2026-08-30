@@ -206,6 +206,14 @@ test("approved-and-not-sent never reads as live, on the card or in the checkpoin
   assert.notEqual(st.dot, "green");
 });
 
+test("only approved ready primary posts expose the Content handoff", () => {
+  const card = (over: Partial<VentureArtifact>) => buildVentureThread(input({ artifacts: [artifact({ artifact_id: "x", body_path: "phase/x.md", ...over })] })).messages.find((m) => m.kind === "card");
+  assert.equal(card({ artifact_kind: "substack-post", editorial_status: "approved", delivery_status: "ready" })?.contentHandoffEligible, true);
+  assert.equal(card({ artifact_kind: "text-post-note", editorial_status: "approved", delivery_status: "ready" })?.contentHandoffEligible, true);
+  assert.equal(card({ artifact_kind: "lead-magnet", editorial_status: "approved", delivery_status: "ready" })?.contentHandoffEligible, false);
+  assert.equal(card({ artifact_kind: "substack-post", editorial_status: "draft", delivery_status: "awaiting_approval" })?.contentHandoffEligible, false);
+});
+
 test("a retracted artifact is not flattened into a plain discard", () => {
   const plain = cardState(artifact({ artifact_id: "x", editorial_status: "discarded", delivery_status: "cancelled" }));
   const retracted = cardState(

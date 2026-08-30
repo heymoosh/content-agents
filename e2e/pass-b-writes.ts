@@ -172,16 +172,23 @@ async function main(): Promise<void> {
       console.log(`  (controls on ${slug}: ${controls.slice(0, 12).join(" · ")})`);
     }
 
-    // ── Outreach: Gmail is the source of truth, and this fixture has no authenticated connection. ──
+    // ── Outreach: delivery is manual; the Studio copies and records a send but never implies Gmail. ──
     await openRoom(page, "outreach");
     await waitLoaded(page, "#outreachList");
+    const rows = page.locator("#outreachList button.tri-row");
+    let manualControls = 0;
+    for (let i = 0; i < await rows.count(); i++) {
+      await rows.nth(i).click();
+      manualControls = await page.locator("#outreachList button", { hasText: "I sent this by hand" }).count();
+      if (manualControls > 0) break;
+      await page.locator("#outreachList button.out-back").click();
+    }
     const outreachText = ((await page.locator("#outreachList").innerText()) ?? "").replace(/\s+/g, " ");
-    const disabledSend = await page.locator("#outreachList button:disabled", { hasText: "Connect Gmail to send" }).count();
+    const copyControls = await page.locator("#outreachList button", { hasText: "Copy message" }).count();
     record({
-      feature: "Outreach refuses sending until the intended Gmail account is connected",
-      pr: "#350",
-      status: outreachText.includes("muxin.li.pro@gmail.com") && disabledSend > 0 ? "pass" : "fail",
-      detail: `account named=${outreachText.includes("muxin.li.pro@gmail.com")}; disabled send controls=${disabledSend}`,
+      feature: "Outreach exposes manual copy and sent-by-hand recording without claiming Gmail delivery",
+      status: copyControls > 0 && manualControls > 0 && !/Gmail|Connect Gmail/.test(outreachText) ? "pass" : "fail",
+      detail: `copy controls=${copyControls}; sent-by-hand controls=${manualControls}; Gmail claimed=${/Gmail|Connect Gmail/.test(outreachText)}`,
     });
 
     // ── Content: the approve write, the one gate rule 2 cares about. ──
