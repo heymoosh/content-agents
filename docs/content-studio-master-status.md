@@ -1,14 +1,16 @@
 # Content Studio master status
 
 **Last reconciled:** 2026-08-30
-**Repository baseline:** current branch `docs/content-studio-master-status` at `39bbf7b`, based on
-`origin/main` at `5aecbb5`, plus the uncommitted Phase 0 working-tree changes described below
+**Repository baseline:** PR #412 branch `docs/content-studio-master-status-final`, rebased onto
+`origin/main` at `06bd00c`, with Phase 0 already landed on `main` and Phase 1 committed on this branch.
 **Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
 coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
 **Phase 1 status:** implementation and deterministic verification are complete for durable capture and
 safe next actions, advisor-cut enforcement, seven staged media pipelines, normalized delivery and
 reconciliation, one locked operational data root, the gated Postiz-first/Typefully-fallback canary
 matrix, and reviewed Signals apply/rollback; authenticated provider lifecycle canaries remain unrun.
+**Generation review:** open `docs/reviews/content-studio-phase1-generation-review.html` for Codex-run
+ordinary Content, Venture, cross-room refusal, and all-seven-media examples from a synthetic fixture.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
