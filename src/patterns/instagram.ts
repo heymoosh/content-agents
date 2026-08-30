@@ -108,7 +108,7 @@ export function readCredentials(env: NodeJS.ProcessEnv = process.env): Instagram
         "     GET /oauth/access_token?grant_type=fb_exchange_token&client_id=<APP_ID>\n" +
         "       &client_secret=<APP_SECRET>&fb_exchange_token=<SHORT_TOKEN>\n" +
         "     That long-lived token is IG_GRAPH_ACCESS_TOKEN.\n" +
-        "See .env.example for the exact lines to copy.",
+        "Add the Instagram Graph variables to the repository .env.",
     );
   }
   return {

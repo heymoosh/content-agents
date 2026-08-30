@@ -158,7 +158,7 @@ async function main() {
     const handle = process.env.BLUESKY_HANDLE;
     const password = process.env.BLUESKY_APP_PASSWORD;
     if (!handle || !password) {
-      console.error("Set BLUESKY_HANDLE and BLUESKY_APP_PASSWORD in .env (see .env.example).");
+      console.error("Set BLUESKY_HANDLE and BLUESKY_APP_PASSWORD in the repository .env.");
       process.exit(1);
     }
     const agent = new AtpAgent({ service: "https://bsky.social" });

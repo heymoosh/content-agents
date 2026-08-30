@@ -2311,6 +2311,8 @@ test("Studio capture: top-level Start on it advances every classified build to i
   assert.ok(section.includes('Start on it'));
   assert.ok(section.includes('Approval and publishing remain separate.'));
   assert.ok(section.includes('post("/api/captures/start"'), "Content starts the advisor-only action");
+  const advanceBody = section.slice(section.indexOf("async function advanceCaptureSafely"), section.indexOf("async function takeCaptureTo"));
+  assert.ok(advanceBody.includes('setRoom("content")'), "Content opens the owning room before the advisor-only action");
   assert.ok(section.includes('beats.value=text'), "Fiction prepares beats without auto-drafting");
   assert.ok(section.includes('setOutreachSub("leads")'), "Outreach opens the required lead chooser");
   assert.ok(section.includes('$("#ventureRunStepBtn")?.focus()'), "Venture opens its current human-gated step");

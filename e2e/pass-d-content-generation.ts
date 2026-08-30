@@ -80,23 +80,24 @@ async function main(): Promise<void> {
     session = await openSession(PORT, { allowInjectedRoutes: ["/api/content/generate"] });
     const { page } = session;
 
-    // Exercise the canonical front door without starting a real advisor model: capture through
-    // Studio, make the durable Content handoff, and prove Start on it is the next explicit action.
+    // Exercise the canonical front door. The top-level action persists the capture and starts the
+    // advisor-only job; the disposable engine route ensures no real model is invoked.
     await page.fill("#src", "A source idea with enough context for Content versions and an exact-source advisor cut.");
     await page.click("#routeBtn");
     await page.waitForSelector("#captureVerdict:not([hidden]) .cap-go", { timeout: 10_000 });
     const verdict = (await page.locator("#captureVerdict").innerText()).replace(/\s+/g, " ");
     if (!verdict.includes("Content")) throw new Error(`capture classified outside Content: ${verdict}`);
     await page.click("#captureVerdict .cap-go");
-    await page.waitForSelector("#contentCaptureHandoff .cap-start", { timeout: 10_000 });
+    await page.waitForSelector("#contentCaptureHandoff:not([hidden]) .capture-handoff", { timeout: 15_000 });
     const captures = await page.evaluate(async () => {
       const response = await fetch("/api/captures");
-      return await response.json() as { ok?: boolean; captures?: { room?: string; text?: string }[] };
+      return await response.json() as { ok?: boolean; captures?: { room?: string; text?: string; jobId?: string }[] };
     });
+    const contentCapture = captures.captures?.find((capture) => capture.room === "Content" && capture.text?.includes("exact-source advisor cut"));
     record({
-      feature: "Studio capture persists in Content and waits for explicit Start on it",
-      status: captures.ok && captures.captures?.some((capture) => capture.room === "Content" && capture.text?.includes("exact-source advisor cut")) ? "pass" : "fail",
-      detail: `handoff button visible; durable Content captures=${captures.captures?.filter((capture) => capture.room === "Content").length ?? 0}; advisor not invoked`,
+      feature: "Studio capture persists in Content and starts only the advisor gate",
+      status: captures.ok && !!contentCapture?.jobId ? "pass" : "fail",
+      detail: `durable Content captures=${captures.captures?.filter((capture) => capture.room === "Content").length ?? 0}; advisor job=${contentCapture?.jobId ?? "missing"}; approval and publishing remain separate`,
     });
 
     await openRoom(page, "content");

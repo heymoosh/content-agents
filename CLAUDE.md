@@ -88,12 +88,12 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      instead by `charles/config/persona.yaml`. The em-dash ban still carries over, same as
      Build 2's fiction. See `charles/AGENTS.md`.
 6. **Prefer subscription / free model routes; minimize per-token API cost.** Default any model
-   call to the cheapest acceptable route: Claude via the Claude Code subscription (harness
-   subagents, $0 marginal — e.g. `/story` claude-native) and free-local media (Remotion / SVG /
-   HyperFrames, kokoro TTS) before paid APIs. Grok and GPT have no subscription API — their keys
-   bill per token via OpenRouter / direct — so use them ONLY where they add value Claude can't
-   (e.g. Grok's fiction voice, paid image step-ups): opt-in, logged to `data/cost-log.csv`, never
-   the silent default. New builds inherit this.
+   call to the cheapest acceptable route: Claude, Grok, and GPT/Codex through their installed,
+   signed-in subscription CLIs, plus free-local media (Remotion / SVG / HyperFrames, kokoro TTS,
+   whisper.cpp) before paid APIs. Reserve Grok for deliberate cross-family work. OpenRouter is a
+   temporary exception for Kling video generation while local Wan 2.2 is evaluated; every paid
+   call remains opt-in and logged to `data/cost-log.csv`. Attended Codex image generation is a
+   reviewed-file workflow, not a callable repository API. New builds inherit this.
 7. **PR auto-merge: hold only for changes to content-generation LOGIC, never for generated
    content itself.** The conductor auto-merges any green-CI PR by default. The ONLY reason to hold
    a PR open for Muxin's explicit review is a change to the *code/prompts that decide what content
@@ -194,6 +194,6 @@ content-agents-originated work (backlog cards or runtime skill calls, e.g. the o
   also de-conflict against each platform they fan out to. Edit `config/platforms.yaml` to change
   cadence — Typefully gets explicit times, not its "next-free-slot"; TikTok still honors
   `TIKTOK_SCHEDULE_AT` as a manual one-off override.
-- Secrets in `.env` only (see `.env.example`). Never commit `.env` or `data/analytics.db`.
+- Secrets in the single repository-root `.env` only. Never commit `.env` or `data/analytics.db`.
 - A freshly created git worktree has no `node_modules`. Run `npm run worktree:setup` (a plain
   `npm ci` from the committed lockfile) once before running `npm test` or any script in it.

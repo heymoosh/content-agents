@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { scheduleApproved, type SchedulerDeps } from "./studio-scheduling.js";
 import type { QueueRow } from "../publish/queue.js";
 import type { DeliveryPolicyDecision } from "../publish/delivery-policy.js";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const row = (over: Partial<QueueRow> = {}): QueueRow => ({
   id: "x-1", platform: "x", format: "text", asset: "derivatives/x-1.md", status: "approve", notes: "", lineIndex: 1, ...over,
@@ -34,6 +37,48 @@ test("production scheduler selects discovered Postiz capability before legacy pr
   assert.deepEqual(calls, ["postiz"]);
   assert.equal((result.scheduled as { providerObjectId: string }).providerObjectId, "pz-1");
   assert.equal(result.scheduleError, null);
+});
+
+test("Postiz-only credentials are not blocked by the provisional Typefully route", async () => {
+  const folder = mkdtempSync(join(tmpdir(), "studio-postiz-only-"));
+  writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+  const calls: string[] = [];
+  const configured = deps(true, calls);
+  delete configured.resolveDeliveryPolicy;
+  const previousPostiz = process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID;
+  const previousTypefully = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+  process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = "human-inference/postiz";
+  delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+  try {
+    const result = await scheduleApproved(folder, row(), configured);
+    assert.deepEqual(calls, ["postiz"]);
+    assert.equal(result.scheduleError, null);
+  } finally {
+    if (previousPostiz === undefined) delete process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID;
+    else process.env.CONTENT_AGENTS_POSTIZ_ACCOUNT_ID = previousPostiz;
+    if (previousTypefully === undefined) delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+    else process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = previousTypefully;
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("legacy fallback still requires its exact provider account assertion after discovery", async () => {
+  const folder = mkdtempSync(join(tmpdir(), "studio-fallback-policy-"));
+  writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
+  const calls: string[] = [];
+  const configured = deps(false, calls);
+  delete configured.resolveDeliveryPolicy;
+  const previousTypefully = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+  delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+  try {
+    const result = await scheduleApproved(folder, row(), configured);
+    assert.deepEqual(calls, []);
+    assert.match(result.scheduleError ?? "", /CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID is missing/);
+  } finally {
+    if (previousTypefully === undefined) delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+    else process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = previousTypefully;
+    rmSync(folder, { recursive: true, force: true });
+  }
 });
 
 test("legacy provider fallback occurs only after discovered registry says capability is unsupported", async () => {

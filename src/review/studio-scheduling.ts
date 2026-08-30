@@ -8,7 +8,7 @@ import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { checkReuse } from "../publish/reuse-guard.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
-import { assertProviderDispatch, resolveDeliveryPolicy, writeReadyToPaste, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
+import { assertProviderDispatch, resolveDeliveryIntent, resolveDeliveryPolicy, writeReadyToPaste, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { claimSlots } from "../publish/slots.js";
 import {
@@ -181,14 +181,36 @@ export async function scheduleApproved(
   // Outreach approval locks a message and never contacts a publishing provider.
   let selected: SelectedSchedulingProvider | undefined;
   if (kind !== "outreach-lock") {
+    // Blocked/manual origin policy is provider-independent and must run before any capability
+    // discovery. Besides being faster, this guarantees those origins make zero network calls.
+    // Use the legacy route only as a provisional provider name; provider-authorized origins are
+    // resolved again below after the actual Postiz-first route is known.
+    const provisionalProvider = legacyProvider(kind).provider;
+    const provisionalPolicy = policyDecision
+      ?? (deps.resolveDeliveryPolicy
+        ? deps.resolveDeliveryPolicy(folder, provisionalProvider)
+        : resolveDeliveryIntent(folder, provisionalProvider));
+    if (provisionalPolicy.mode === "blocked") {
+      return { scheduled: null, scheduleError: `delivery policy blocked: ${provisionalPolicy.reason}` };
+    }
+    if (provisionalPolicy.mode === "manual") {
+      return { scheduled: writeReadyToPaste(folder, row, provisionalPolicy), scheduleError: null };
+    }
+    // Injected scheduler dependencies are a hermetic test/embedding seam. They opt into Postiz
+    // only by supplying an explicit registry or env; ambient credentials must not trigger network.
+    const providerDeps = deps === DEFAULT_SCHEDULER_DEPS || deps.fetchPostizRegistry || deps.postizEnv
+      ? deps
+      : { ...deps, postizEnv: {} };
     try {
       selected = policyDecision?.provider === "postiz"
-        ? await selectConfiguredProvider(row, deps)
-        : policyDecision ? { provider: policyDecision.provider as SelectedSchedulingProvider["provider"] } : await selectConfiguredProvider(row, deps);
+        ? await selectConfiguredProvider(row, providerDeps)
+        : policyDecision ? { provider: policyDecision.provider as SelectedSchedulingProvider["provider"] } : await selectConfiguredProvider(row, providerDeps);
     }
     catch (e) { return { scheduled: null, scheduleError: e instanceof Error ? e.message : String(e) }; }
     const provider = selected.provider;
-    const policy = policyDecision ?? (deps.resolveDeliveryPolicy ?? resolveDeliveryPolicy)(folder, provider);
+    const policy = policyDecision ?? (deps.resolveDeliveryPolicy && provider === provisionalProvider
+      ? provisionalPolicy
+      : (deps.resolveDeliveryPolicy ?? resolveDeliveryPolicy)(folder, provider));
     if (policy.mode === "blocked") return { scheduled: null, scheduleError: `delivery policy blocked: ${policy.reason}` };
     if (policy.mode === "manual") return { scheduled: writeReadyToPaste(folder, row, policy), scheduleError: null };
     if (!policy.providerAccountId) return { scheduled: null, scheduleError: "delivery policy blocked: provider account mapping is missing" };

@@ -5953,6 +5953,7 @@ function showCaptureVerdict(room){
 // human gate with the capture visible, without auto-drafting, approving, scheduling, or publishing.
 async function advanceCaptureSafely(room, text){
   if(room==="Content"){
+    await Promise.resolve(setRoom("content"));
     const r=await post("/api/captures/start",{text:text,engine:$("#studioEngine").value});
     if(!r.ok) throw new Error(r.error||"Could not start the advisor");
     await loadCaptures(); loadJobs();

@@ -11,6 +11,16 @@ reconciliation, one locked operational data root, the gated Postiz-first/Typeful
 matrix, and reviewed Signals apply/rollback; authenticated provider lifecycle canaries remain unrun.
 **Generation review:** open `docs/reviews/content-studio-phase1-generation-review.html` for Codex-run
 ordinary Content, Venture, cross-room refusal, and all-seven-media examples from a synthetic fixture.
+**Provider-cost update:** Studio edits already route Claude, Grok, and GPT/Codex through local
+subscription CLIs. Grok prose now uses the subscription CLI, transcription uses local whisper.cpp,
+and unattended image generation is disabled; reviewed Codex-generated image files are the preferred
+art path until Studio has a reviewed-file attachment step. OpenRouter remains temporarily for Kling video interpolation only while Wan 2.2
+is evaluated locally; HunyuanVideo 1.5 is not a fit for this Apple-Silicon machine.
+**Verification status:** the subscription-backed Grok prose adapter completed a live nonempty
+canary at zero reported cost; provider-policy, Studio scheduling, and Content capture regressions
+are covered locally. The Postiz adapter is not ready for a live canary because its account and
+capability contract still does not match the self-hosted API, so publishing remains blocked pending
+that correction and an attended lifecycle test.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
@@ -107,7 +117,7 @@ The system is **not** complete end to end. The largest unresolved boundaries are
 
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
-| Engine selection | Choose per run. Prefer subscription/free routes. Grok is opt-in and paid. Stop GPT-OSS experiments unless Muxin explicitly reopens them. | Claude, Grok, Codex, and restricted local-engine dispatch exist across supported actions; availability and engine provenance are exposed. PR #406. | Extensive argv/domain/UI tests; real multi-engine jobs remain nondeterministic and unverified end to end. | Mark GPT-OSS paused in product choices, not available merely because Ollama reports a model. Stamp Fiction draft and continuity outputs with engine provenance consistently. |
+| Engine selection | Choose per run. Prefer subscription/free routes. Claude, Grok, and GPT/Codex use their installed subscription CLIs; reserve Grok for deliberate cross-family work. Stop GPT-OSS experiments unless Muxin explicitly reopens them. | Claude, Grok, Codex, and restricted local-engine dispatch exist across supported actions; availability and engine provenance are exposed. PR #406. | Extensive argv/domain/UI tests; real multi-engine jobs remain nondeterministic and unverified end to end. | Mark GPT-OSS paused in product choices, not available merely because Ollama reports a model. Stamp Fiction draft and continuity outputs with engine provenance consistently. |
 | Shared job queue | One bounded lane, real elapsed time, logs, stop/retry, blocked questions, engine attribution, artifact-based success. | One serialized in-memory queue with persisted logs and visible job state exists. | Strong unit and deterministic browser coverage. | Queue state is memory-only. Restart loses queued/running/blocked jobs, no cross-process global mutex exists, and a killed model may leave partial writes. Add a durable job/event store and recovery contract if restart recovery is promised. |
 | Approval boundary | Generation never implies approval; no delivery without explicit approval. | Review queues and Muxin-only Venture/Fiction/Charles gates are enforced in domain code. | Strong deterministic tests. | Provider and cross-brand integration must continue to fail closed while the account/policy gaps above remain. |
 

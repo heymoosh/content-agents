@@ -33,7 +33,7 @@ export const NOT_COVERED: { feature: string; route: string; engine: string; why:
   { feature: "Run configured Content generation against an authenticated live CLI", route: "POST /api/content/generate", engine: "selected Studio CLI engine (Codex, Claude, or Grok)", why: "time+nondeterm" },
   { feature: "Hand a thought to the creative director (develop)", route: "POST /api/develop/start|reply|format", engine: "claude -p (subscription)", why: "time+nondeterm", pr: "#349" },
   { feature: "Ask Claude to revise a draft", route: "POST /api/revise", engine: "claude -p (subscription)", why: "time+nondeterm" },
-  { feature: "Draft or re-pass a fiction scene", route: "POST /api/fiction/draft|repass", engine: "claude -p (subscription); grok-openrouter only if a series opts in", why: "time+nondeterm", pr: "#352" },
+  { feature: "Draft or re-pass a fiction scene", route: "POST /api/fiction/draft|repass", engine: "selected Claude, Grok, or Codex subscription CLI", why: "time+nondeterm", pr: "#352" },
   { feature: "Run the continuity check on a chapter", route: "POST /api/fiction/check", engine: "local tsx process, free", why: "time+nondeterm", pr: "#352" },
   { feature: "Draft a Charles post", route: "POST /api/charles/draft", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Ask the strategy brief a question", route: "POST /api/strategy/ask|refresh-brief", engine: "claude -p (subscription)", why: "time+nondeterm" },
@@ -43,8 +43,8 @@ export const NOT_COVERED: { feature: string; route: string; engine: string; why:
   { feature: "Stamp captured_at on newly captured evidence", route: "inside the scout / research-capture run", engine: "local process", why: "time+nondeterm", pr: "#383" },
   { feature: "Browse and spread Substack Notes", route: "GET /api/notes", engine: "live Substack fetch, free", why: "live" },
   { feature: "Pull fresh analytics", route: "POST /api/strategy/pull", engine: "saved real-Chrome session, free", why: "live" },
-  { feature: "Generate a video / storyboard render", route: "POST /api/video/generate", engine: "claude -p for the script, then openrouter-image + Kling for the render", why: "metered", pr: "#352" },
-  { feature: "Transcribe an audio memo (the /atomize audio path)", route: "inside POST /api/atomize", engine: "Gemini transcription, a deliberate paid opt-in", why: "metered" },
+  { feature: "Generate a video / storyboard render", route: "POST /api/video/generate", engine: "subscription CLI for the script; reviewed Codex image files; Kling remains the temporary metered interpolation step", why: "metered", pr: "#352" },
+  { feature: "Transcribe an audio memo (the /atomize audio path)", route: "inside POST /api/atomize", engine: "local whisper.cpp", why: "time+nondeterm" },
 ];
 
 function main(): void {
