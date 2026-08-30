@@ -7,18 +7,22 @@ what has been verified, and what remains.
 
 ## Authority and update rule
 
-This is the master **implementation-status** document. It does not replace the product and safety
-authorities below:
+This is the master **implementation-status and current-decision** document. It records the
+current implementation truth and resolved product decisions. It does not replace the product
+and safety authorities below:
 
-1. Product intent: `docs/Muxin's Vision for Content Studio.md` and
-   `docs/content-studio-vision.md`.
-2. Repository safety: root `CLAUDE.md` and `AGENTS.md`.
-3. Domain behavior: `stories/AGENTS.md`, `venture/AGENTS.md`, `venture/rules.md`,
+1. Current product direction: `docs/Muxin's Vision for Content Studio.md`. This is the newer
+   product-direction document and supersedes older wording where a later explicit decision differs.
+2. Foundational product principles and detailed UX intent: `docs/content-studio-vision.md`.
+   It remains authoritative except where superseded by the newer vision or a later explicit decision.
+3. Repository safety: root `CLAUDE.md` and `AGENTS.md`.
+4. Domain behavior: `stories/AGENTS.md`, `venture/AGENTS.md`, `venture/rules.md`,
    `venture/rules.yaml`, `docs/venture-schema-contract.md`, and `charles/AGENTS.md`.
-4. Typed target contracts: `docs/content-system-contracts.md` and
+5. Typed target contracts: `docs/content-system-contracts.md` and
    `docs/content-system-blueprint.md`.
-5. Current implementation status and remaining scope: **this file**.
-6. Work index and historical record: `docs/content-agents-backlog.md` and
+6. Current implementation status, resolved implementation decisions, and remaining scope:
+   **this file**.
+7. Work index and historical record: `docs/content-agents-backlog.md` and
    `docs/content-agents-backlog.archive.md`. The backlog is not a second status specification.
 
 Any merge that changes a product decision, runtime capability, provider, verification level, or
@@ -76,7 +80,7 @@ The system is **not** complete end to end. The largest unresolved boundaries are
 
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
-| Global Studio shell | One global room bar; each room has a small local view menu; persistent references live in the right rail. | Seven rooms are implemented: Studio, Venture, Content, Outreach, Fiction, Charles, Signals. PR #404. | Deterministic tested in DOM and Chromium fixture passes. | `src/review/page.ts` remains a very large generated HTML/JS module. The old six-room wording predates Charles becoming a separate room. |
+| Global Studio shell | One global room bar; each room has a small local view menu; persistent references live in the right rail. | Seven rooms are implemented: Studio, Venture, Content, Outreach, Fiction, Charles, Signals. PR #404. | Deterministic tested in DOM and Chromium fixture passes. | `src/review/page.ts` remains a very large generated HTML/JS module. Keep room labels and supporting documentation synchronized with the seven-room model. |
 | Studio capture | One front door accepts a thought or link, identifies the destination, explains it, and starts the next safe step. | Classification and a `content-studio.capture-handoff.v1` browser `localStorage` record exist. The target room can display and clear it. | Deterministic browser/UI coverage. | **Partially wired.** The capture is not repository-durable, starts no backend job, and has no real next action in Content. “Start on it” currently overstates the result. |
 | Advisor and cuts | Muxin supplies substance; the advisor proposes lens/CTA choices; Muxin edits message-level cuts before formatting. | `/develop`, recommendation rounds, deterministic accept/dismiss, cuts, and cut comments exist. | Deterministic unit coverage; model route not browser-verified. | The advisor/cut path is not the primary current Content cycle. Reconnect it before platform/media formatting. |
 | Content configuration | The system recommends treatments, media, and destinations; Muxin accepts or overrides rather than constructing the plan from scratch. | Durable `content-request.json`, treatment/media/platform selections, untreated controls, recommendations, provenance, and grouped input-request filters exist. PR #406. | Deterministic unit/UI coverage. | Current UI makes Muxin choose the matrix directly. Real recommendation evidence is blocked or generic until reviewed mechanism data exists. |
@@ -97,23 +101,30 @@ The system is **not** complete end to end. The largest unresolved boundaries are
 
 ### Provider matrix
 
+Postiz is the canonical social publishing infrastructure and the primary target path. A
+self-hosted Postiz instance is the default path for destinations and media it currently supports.
+The available destination/media matrix must come from that instance rather than from an assumed
+universal capability list. Typefully remains a working fallback and must not be removed until the
+Postiz path is implemented and verified. Provider-specific or manual paths remain exceptions where
+Postiz does not support the required destination or capability.
+
 | Destination | Current provider/path | State | What is still unverified or missing |
 |---|---|---|---|
-| X, LinkedIn, Bluesky, Mastodon, Threads text | Typefully scheduled drafts | Provider unverified in the current reconciliation | Run a gated create/list/cancel canary for all configured accounts; confirm current DELETE behavior and persist provider IDs structurally. |
-| X, LinkedIn, Bluesky quote cards | Native Typefully image drafts | Provider unverified | Run media-upload plus create/list/cancel canary. |
-| TikTok | PostPeer upload and scheduled post | Provider unverified | PostPeer list/cancel endpoints are inferred in code comments. Verify schedule/list/cancel live. |
-| YouTube Shorts | YouTube Data API, private until `publishAt` | Provider unverified | Verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation. |
+| X, LinkedIn, Bluesky, Mastodon, Threads text | **Target:** self-hosted Postiz; **current fallback:** Typefully scheduled drafts | Postiz **Not implemented**; Typefully provider unverified | Implement and verify the Postiz account/auth/create/list/cancel/reconciliation path. Keep Typefully working and verify its fallback lifecycle before any migration or removal. |
+| X, LinkedIn, Bluesky quote cards | **Target:** self-hosted Postiz where supported; **current fallback:** native Typefully image drafts | Postiz **Not implemented**; Typefully provider unverified | Verify Postiz media upload and create/list/cancel. Keep Typefully media fallback available until the Postiz path is verified. |
+| TikTok | **Target:** Postiz where supported; **current exception/fallback:** PostPeer upload and scheduled post | Postiz **Not implemented**; PostPeer provider unverified | Confirm whether the connected Postiz instance supports TikTok and the required media. Otherwise verify PostPeer schedule/list/cancel live. |
+| YouTube Shorts | **Target:** Postiz where supported; **current exception/fallback:** YouTube Data API, private until `publishAt` | Postiz **Not implemented**; YouTube provider unverified | Confirm Postiz capability first. If unsupported, verify OAuth upload, scheduled-public transition, final URL, and terminal reconciliation for the YouTube path. |
 | Substack Notes | Constrained saved-session browser automation | Provider unverified | Run an explicitly approved canary; maintain selectors; add independent live confirmation. Full essays remain manual. |
 | Community/manual destinations | `ready-to-paste/` | Intentionally manual | Surface the handoff and status in the Studio consistently. |
-| Postiz | None | **Not implemented** | Postiz is only a documented Typefully fallback. No adapter, environment variables, routes, jobs, account mapping, reconciliation, or tests exist in reachable history. Decide primary vs fallback before building it. |
-| Outreach email/Gmail | Manual copy and “I sent this by hand” | **Intentionally manual** | Gmail is not an unfinished feature under the latest decision. No Gmail send path exists. Reopen only by an explicit product decision. |
+| Postiz | Self-hosted Postiz | **Decided primary; Not implemented** | No adapter, environment variables, routes, jobs, account mapping, reconciliation, or tests exist in reachable history. Build the primary path, expose capabilities dynamically, and verify it before changing the working fallback. |
+| Outreach email/Gmail | **Target:** send from the Content Agents GUI through the connected email account after explicit approval; **current fallback:** manual/external send with a “sent elsewhere” record | **Not implemented** for GUI sending; manual fallback currently available | Add authenticated send, success/failure reconciliation, and automatic sent-state updates. Keep manual/external sending for unsupported channels such as LinkedIn DMs. |
 
 ### Scheduler and publishing status
 
 | Capability | Current state | Verification | Remaining work |
 |---|---|---|---|
 | Unified scheduler | `src/publish/slots.ts`, `config/platforms.yaml`, and local append-only `data/publish-schedule.jsonl` claim PT/DST-aware slots across streams. | Strong deterministic tests. | The ledger is gitignored and checkout-local. Define one operational data root and cross-process concurrency/recovery behavior. |
-| Publish orchestration | Per-provider scripts plus `publish:all`; Studio approval dispatches provider-specific scheduling. | Deterministic tests with mocked providers. | Use one canonical capability registry. Current Content choices omit supported Mastodon, expose unsupported Instagram generation/delivery, and omit community. |
+| Publish orchestration | Studio approval dispatches through Postiz first for supported destinations/media, with Typefully retained as the working fallback and specialized exceptions only where needed. | Deterministic tests with mocked providers; Postiz is not implemented. | Use the self-hosted Postiz capability/account registry as canonical. Keep Typefully fallback behavior verified during migration. Current Content choices omit supported Mastodon, expose unsupported Instagram generation/delivery, and omit community. |
 | Publishing status | PR #406 added append-only `data/publishing-status.jsonl`, atomic per-row attempts, planned provider/time, retry blocking, uncertainty, and human reconciliation. | Strong deterministic unit/UI coverage. | There is no reliable terminal `published/live` ingest across all providers. Distinguish delivered, deleted, canceled, failed, private, and uncertain; persist provider IDs and `published_at`/URL instead of parsing free-text logs. |
 
 ## Venture
@@ -125,7 +136,7 @@ history and its “nothing built yet” statement is obsolete.
 |---|---|---|---|---|
 | State authority and gates | `canon.md` is authority; decisions/artifacts are append-only; all selections, approvals, live confirmations, and checkpoints are hard Muxin-only predicates. Phase 4 ends in a Day-14 human decision, not checkpoint 4. | Implemented across `src/venture/`, `venture/AGENTS.md`, rules, and schema contract. | Extensive phase/state/CLI tests. | Keep the master and root scan docs synchronized with runtime predicates. |
 | Intake and Phase 1 Attention | 25-question intake, fixed scorecard, reviewed research plan, platform decision, 10 ideas, exactly 3 selected probes, approvals/live evidence, research-read continuation decision. | Implemented. | Unit/CLI plus disposable-browser intake/autosave/commit. | Run a real venture through model-produced plan/ideas/drafts and real delivery evidence. |
-| Phase 2 Audience | Select lead magnet, draft magnet and landing-page copy, review existing survey, draft welcome email, optional announcement. External capture/survey already exist. | Implemented as composition and gates. No email provider is built by design. | Unit/CLI tests. | Installation, capture, email sending, and live confirmation remain manual/outside the repo. |
+| Phase 2 Audience | Select lead magnet, draft magnet and landing-page copy, review existing survey, draft welcome email, optional announcement. External capture/survey already exist. | Implemented as composition and gates. No Venture-specific email provider is built. | Unit/CLI tests. | Installation, capture, Venture email delivery, and live confirmation remain manual/outside the repo. Content Studio Outreach email is tracked separately below. |
 | Phase 3 Offer | Privacy-preserving response intake, 20 minimum/30 target gate, clusters, problem and transformation decisions, outline, price/format, price decision, checkpoint 3. | Implemented. | Strong tests plus browser response/artifact writes. | Survey response ingestion is manual; no external survey/email connector. Real-volume analysis remains operationally unverified. |
 | Phase 4 Operations | Time-budget choice, approved operating plan, manual thank-yous, approved Day-14 facts, final explicit decision. | Implemented. | Unit/CLI tests. | No real Day-14 run yet. Thank-you delivery remains manual by design. |
 | Venture Studio UI | Work/Documents/Intake and guardrails/History, decision and artifact actions, response intake, evidence, pace/checkpoint, one engine-owned next step. | Implemented across Venture review modules. | Deterministic UI and browser write coverage. | No GUI `deliver` action/retry flow. Real model step and Substack delivery remain provider-unverified. |
@@ -135,12 +146,12 @@ history and its “nothing built yet” statement is obsolete.
 
 | Capability | Latest decision | Current state | Verification | Remaining work |
 |---|---|---|---|---|
-| Fit lifecycle | Source/add, cited research, qualify, pursue/pass, editable draft, lock, manual send, per-person follow-ups. Poor fits never advance. | Implemented for client/platform flows with JSA read-only integration and matchmaker reads. | Extensive deterministic tests; selected historic real research exists. | Model-generated first draft/revision remains unverified end to end. |
+| Fit lifecycle | Source/add, cited research, qualify, pursue/pass, editable draft, lock, approved send, per-person follow-ups. Poor fits never advance. | Implemented for client/platform flows with JSA read-only integration and matchmaker reads. | Extensive deterministic tests; selected historic real research exists. | Model-generated first draft/revision remains unverified end to end. GUI delivery remains incomplete. |
 | Matchmaker read | Show why them, why Muxin, and why now before the yes/no choice. | Implemented and surfaced. | Unit/UI coverage. | Keep sources and current direction editable and visible. |
 | Discovery | Bounded cited scouting with caps and honest downgrade. | A smaller `/scout` implementation exists. | Parser/budget/unit tests; live Scout is unverified. | **Partially wired.** The ratified Phase 5 anchor graph, rolling lens state, fuzzy permanent frontier, pass-reason learning, calibration loop, and rate-limit behavior are not complete. Keep Phase 5 open. |
 | Contact selection | Muxin can use extracted contacts or add one manually. | Implemented manual/research-extracted path. | UI/unit coverage. | Automated contact discovery and public-email harvesting are not implemented. |
 | Draft, edit, lock | Direction input, engine choice, direct edit, revise with model, validation, immutable lock. | Implemented. | Unit/route/UI coverage. | Add deterministic injected-engine browser coverage for draft/revise. |
-| Send | Copy locked message, send externally, then record “sent by hand.” | Intentionally manual; no Gmail UI or send route. | Browser coverage verifies manual policy. | None unless Muxin changes the decision. Remove or rename unused Gmail-shaped readiness types if they keep causing confusion. |
+| Send | Send a locked message from the Content Agents GUI through the connected email account after Muxin's explicit approval; retain manual/external sending for unsupported channels such as LinkedIn DMs. | **Not implemented** for Gmail GUI sending; no Gmail UI or send route. Manual/external “sent elsewhere” recording remains available. | Browser coverage verifies the manual fallback and approval boundary. | Add authenticated send, provider success/failure reconciliation, and automatic sent-state updates. Keep the fallback for unsupported channels. |
 | Follow-ups | Append-only per-person clocks with origin context; client/platform/inbound/job-search buckets; mark sent/responded/move on; no guilt styling. | Implemented. | Strong tests and browser tracker write coverage. | Drafting support is limited for buckets without lead folders. Actual delivery remains external. Weekly Strategy summary integration remains open. |
 | Outreach to Content | Locked outreach can become extraction-first Content source. | Existing reuse path. | Deterministic tests around source/lock boundaries. | Exclude cold B2B outreach derivatives from resonance metrics until the open strategy decision is implemented. |
 
@@ -195,7 +206,9 @@ history and its “nothing built yet” statement is obsolete.
 4. Persist provider IDs and terminal delivery outcomes; reconcile delivered vs canceled/deleted/
    failed/private/uncertain for every provider.
 5. Define one operational scheduler/job data root with cross-process locking and restart recovery.
-6. Add gated live canaries for Typefully, PostPeer, YouTube, and Substack. A live canary must never
+6. Add gated live canaries with **Postiz first** for each supported destination/media, then verify
+   **Typefully as the fallback** before any migration or removal. Verify PostPeer, YouTube, and
+   Substack only for destinations or capabilities Postiz does not support. A live canary must never
    bypass approval or make an instant public post.
 7. Make adopted Signals changes enter a separate explicit apply/review audit flow.
 
@@ -210,13 +223,17 @@ history and its “nothing built yet” statement is obsolete.
    recommendations.
 6. Connect the Grow contracts to the real source-to-review-to-delivery-to-outcome lifecycle.
 
-### Explicit decision required, not assumed backlog
+### Recorded product decisions
 
-1. Postiz: remain a Typefully fallback, become primary, or be dropped. It is not implemented.
-2. Outreach sending: current decision is manual. Gmail should not be treated as missing unless
-   Muxin explicitly reverses that decision.
-3. Charles delivery: current decision is ready-to-paste. Do not infer account automation from the
-   existence of a Content handoff.
+1. Postiz is the canonical primary social publishing infrastructure. Self-hosted Postiz is the
+   default path for supported destinations/media, but it is not implemented yet.
+2. Typefully remains the working fallback and must not be removed before Postiz is implemented and
+   verified.
+3. Outreach email is intended to send from the Content Agents GUI after Muxin's explicit approval.
+   Successful sends must update sent state automatically. Manual/external sending remains the
+   fallback for unsupported channels.
+4. Charles delivery remains ready-to-paste. Do not infer account automation from the existence of
+   a Content handoff.
 
 ## Known stale or historical documents
 
@@ -229,8 +246,8 @@ These files remain useful sources, but must not be read as current completion le
   PR #406 implemented most dispatch boundaries; GPT-OSS attempts are now paused.
 - `docs/publishing-logic-audit.md`: June snapshot predating current providers, platforms, and
   publishing-status ledger.
-- `docs/setup-typefully.md`: stale network count and scheduling description; Postiz remains only
-  fallback prose.
+- `docs/setup-typefully.md`: stale network count and scheduling description; Typefully remains the
+  working fallback while self-hosted Postiz is implemented and verified as primary.
 - `docs/unified-queue-plan.md`: valuable original plan, but several gaps later shipped.
 - Disposable `e2e/RESULTS.md` reports: point-in-time run artifacts, not cumulative product truth.
 - `docs/content-system-blueprint.md` and `docs/content-system-contracts.md`: target contracts and

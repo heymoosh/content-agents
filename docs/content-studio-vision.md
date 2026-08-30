@@ -1,15 +1,15 @@
 <!-- Source: Claude Design project "Content Studio Riff" (09c28898-3226-4fe5-8702-ac0d81fab484),
      content-studio-vision.md, retrieved verbatim 2026-07-19. This is the written intent behind
-     the six-room review GUI (PRs #248–#256); check design decisions against it.
-     Revised 2026-08-07: Venture locked in as the permanent sixth room, after Studio and before
-     Content (see the 2026-08-07 audit handoff and docs/venture-build-plan.md — the handoff is an
-     external planning document Muxin holds outside this repo, not a file checked in under docs/).
-     Everything else in this file is unchanged from the 2026-07-19 original except where noted. -->
+     the seven-room review GUI (PRs #248–#256); check design decisions against it.
+     Revised 2026-08-30: the newer Muxin's Vision for Content Studio is the current product
+     direction. This file retains foundational principles and detailed UX intent except where a
+     later explicit decision supersedes it. Venture and Charles are permanent rooms. -->
 
 # Content Studio — what I actually want out of this system
 
 My own notes, captured so nothing gets lost. This is the "why" behind the redesign. If a
-future decision contradicts something here, this file is the intent to check against.
+future decision contradicts something here, check the newer product-direction document and the
+master status decision record before treating this older wording as current.
 
 Written in my voice, my rules: no em dashes, plain verbs, no AI tells.
 
@@ -25,13 +25,14 @@ The division is the whole point:
 - **I bring** the insight, the instinct, the nuance, the final yes.
 - **The team handles** the repetition: tying in a branding phrase, choosing the right ask for
   where the piece sits and checking it actually fits the message, spot checks on format and
-  storytelling hooks, applying best practices, picking the platform and media and format,
-  generating visuals, doing the per-platform posting.
+  storytelling hooks, applying best practices, recommending the platform, media, and format,
+  generating visuals, and doing the per-platform posting after I approve the plan.
 
 I don't want to remember to "apply this framing" or "use that tagline." I don't want to think
 about which platform, what media, what format, or handle posting. I don't want to manually make
-visuals. All of that is repetitive. The one exception is idea scout offering me suggestions,
-which I welcome.
+visuals. All of that is repetitive. The system should recommend the destinations, media, and
+formats, then I can accept or override the recommendation without constructing the matrix from
+scratch. The one exception is idea scout offering me suggestions, which I welcome.
 
 ## The mental model I want: one conversation
 
@@ -51,9 +52,9 @@ The old app got this backwards: the "cut" showed me a raw working file full of p
 notes and line-number citations. I had no idea what message it made, what lens was applied, or
 why. That is plumbing. A cut should read as a message.
 
-## The six rooms
+## The seven rooms
 
-Everything lives in six rooms. Any single object (a content idea, a venture step, an outreach
+Everything lives in seven rooms. Any single object (a content idea, a venture step, an outreach
 lead, a fiction scene) opens as the same conversation described above.
 
 1. **Studio (home).** One capture bar for anything. One "needs your judgment" queue that mixes
@@ -63,16 +64,26 @@ lead, a fiction scene) opens as the same conversation described above.
 2. **Venture.** See the dedicated section below.
 
 3. **Content.** The Workbench. My thought, the advisor's lens recommendations, the cut (the core
-   message I edit before formatting), then the team formats it per platform. I never pick
-   platform or media. Every draft still waits for my yes in Review before anything schedules.
+   message I edit before formatting), then the team recommends and formats it per platform. I do
+   not construct the platform/media plan from scratch. I can accept or override any part of the
+   recommendation. Every draft still waits for my yes in Review before anything schedules.
    Content coming from a venture step goes through this exact same room, not a separate one. It
    just carries a plain tag saying where it came from: "From Venture" or "From Studio."
+
+   Approved social distribution stays inside Content Studio. Self-hosted Postiz is the canonical
+   primary publishing infrastructure for destinations and media it supports. Typefully remains a
+   working fallback and must stay available until Postiz is implemented and verified. Provider
+   plumbing should stay invisible unless it needs attention.
 
 4. **Outreach.** See the dedicated section below.
 
 5. **Fiction.** See below. The only overlap with the rest of the system is social promo.
 
-6. **Signals.** See below.
+6. **Charles.** A separate persona and brand with its own voice, persona source, review rules,
+   and social needs. Charles can use the same Content engine and platform/media recommendation
+   logic, but never inherit Muxin's or Fiction's identity.
+
+7. **Signals.** See below.
 
 ## Venture, in detail
 
@@ -127,7 +138,11 @@ what I said, when, and a link back to the original dossier. Something marks "I s
 this person at this org on this date with this intent," and the tracker runs the clock from
 there. Different people at the same org get separate clocks, both linked to the one org dossier.
 
-Nothing in outreach sends anything. Sending stays a manual, by-hand action I take.
+Outreach can send an approved email directly from the Content Agents GUI through my connected
+email account. Sending always requires my explicit decision against the locked message, and a
+successful send updates the sent state automatically. Manual or external sending remains
+available for unsupported channels such as LinkedIn DMs, with the same relationship history and
+follow-up clock updated when I record the external send.
 
 ## Signals, in detail
 
