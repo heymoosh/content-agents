@@ -2,6 +2,7 @@ import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
@@ -163,7 +164,7 @@ export const isTikTokRow = (platform: string): boolean => platform === "tiktok";
 // With no opts it behaves exactly as the CLI did — every approved tiktok row — so /publish is unchanged.
 export async function publishTikTok(
   folder: string,
-  opts: { onlyIds?: string[] } = {}
+  opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledTikTok[]> {
   const { rows } = readQueue(folder);
   let approved = rows.filter((r) => r.status === "approve" && isTikTokRow(r.platform));
@@ -172,6 +173,7 @@ export async function publishTikTok(
     console.log("no approved tiktok rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "postpeer", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to TikTok too recently.
   const slug = basename(folder);

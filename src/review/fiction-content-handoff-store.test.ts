@@ -22,6 +22,7 @@ describe("locked fiction chapter handoff store", () => {
       root, series: "the-least-of-us", chapter: 3,
       id: "fiction-launch-3", originalInput: "Promote this chapter.",
       descriptor: "A door that remembers", suggestedPromotionalObjective: "Invite readers to begin.",
+      approvedPromotionBody: "Approved promotion body.",
     });
     assert.equal(handoff.origin, "fiction");
     assert.deepEqual(handoff.series, { id: "the-least-of-us", title: "The Least of Us" });
@@ -34,10 +35,10 @@ describe("locked fiction chapter handoff store", () => {
 
   test("refuses missing, non-locked, or passage-less chapter source state", async () => {
     const draftRoot = await fixture("draft");
-    assert.throws(() => createLockedChapterHandoff({ root: draftRoot, series: "the-least-of-us", chapter: 3, id: "x", originalInput: "x", descriptor: "x", suggestedPromotionalObjective: "x" }), /locked|approved/i);
+    assert.throws(() => createLockedChapterHandoff({ root: draftRoot, series: "the-least-of-us", chapter: 3, id: "x", originalInput: "x", descriptor: "x", suggestedPromotionalObjective: "x", approvedPromotionBody: "x" }), /locked|approved/i);
     const emptyRoot = await fixture("approved", "\n\n");
-    assert.throws(() => createLockedChapterHandoff({ root: emptyRoot, series: "the-least-of-us", chapter: 3, id: "x", originalInput: "x", descriptor: "x", suggestedPromotionalObjective: "x" }), /passage|empty/i);
+    assert.throws(() => createLockedChapterHandoff({ root: emptyRoot, series: "the-least-of-us", chapter: 3, id: "x", originalInput: "x", descriptor: "x", suggestedPromotionalObjective: "x", approvedPromotionBody: "x" }), /passage|empty/i);
     const missingRoot = await fixture();
-    assert.throws(() => createLockedChapterHandoff({ root: missingRoot, series: "the-least-of-us", chapter: 4, id: "x", originalInput: "x", descriptor: "x", suggestedPromotionalObjective: "x" }), /chapter|source|canon/i);
+    assert.throws(() => createLockedChapterHandoff({ root: missingRoot, series: "the-least-of-us", chapter: 4, id: "x", originalInput: "x", descriptor: "x", suggestedPromotionalObjective: "x", approvedPromotionBody: "x" }), /chapter|source|canon/i);
   });
 });

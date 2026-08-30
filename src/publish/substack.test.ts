@@ -34,6 +34,7 @@ function tmpFolder(): string {
   const dir = mkdtempSync(join(tmpdir(), "substack-test-"));
   mkdirSync(join(dir, "derivatives"), { recursive: true });
   dirs.push(dir);
+  writeFileSync(join(dir, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
   return dir;
 }
 
@@ -71,13 +72,17 @@ const shouldNotBeCalled: PostFn = async () => {
 let savedBets: string | null = null;
 
 describe("publishSubstack", () => {
+  const originalAccountId = process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID;
   before(() => {
     process.env.CONTENT_AGENTS_TEST_LEDGER = TEST_LEDGER;
     savedBets = existsSync(BETS_PATH) ? readFileSync(BETS_PATH, "utf8") : null;
+    process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID = "human-inference/substack";
   });
 
   after(() => {
     delete process.env.CONTENT_AGENTS_TEST_LEDGER;
+    if (originalAccountId === undefined) delete process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID;
+    else process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID = originalAccountId;
     if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
     if (savedBets === null) writeFileSync(BETS_PATH, "");
     else writeFileSync(BETS_PATH, savedBets);

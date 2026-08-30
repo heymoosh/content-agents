@@ -41,6 +41,7 @@ export interface FictionContentHandoffInput {
   readonly descriptor: string;
   /** Preserved exactly as supplied, including whitespace and line breaks. */
   readonly originalInput: string;
+  readonly approvedPromotionBody: string;
 }
 
 export interface FictionContentHandoff extends Omit<FictionContentHandoffInput, "sourcePassages" | "restrictions"> {
@@ -89,6 +90,7 @@ export function createFictionContentHandoff(input: FictionContentHandoffInput): 
     suggestedPromotionalObjective: required(input.suggestedPromotionalObjective, "suggestedPromotionalObjective"),
     descriptor: required(input.descriptor, "descriptor"),
     originalInput: required(input.originalInput, "originalInput"),
+    approvedPromotionBody: required(input.approvedPromotionBody, "approvedPromotionBody"),
   };
 }
 
@@ -101,6 +103,11 @@ export function toContentRequestInput(handoff: FictionContentHandoff): ContentRe
     descriptor: handoff.descriptor,
     originalInput: handoff.originalInput,
     ventureId: FICTION_VENTURE_ID,
+    sourceContext: {
+      kind: "fiction-approved-promotion", authoritativeBody: handoff.approvedPromotionBody,
+      series: handoff.series, chapter: handoff.chapter, sourcePassages: handoff.sourcePassages,
+      restrictions: handoff.restrictions,
+    },
   };
 }
 

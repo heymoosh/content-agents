@@ -9,6 +9,7 @@ export interface LockedChapterHandoffOptions {
   readonly descriptor: string;
   readonly suggestedPromotionalObjective: string;
   readonly originalInput: string;
+  readonly approvedPromotionBody: string;
 }
 
 /** Reads only an approved chapter and turns its nonempty source lines into quoteable passages. */
@@ -32,5 +33,6 @@ export function createLockedChapterHandoff(options: LockedChapterHandoffOptions)
     suggestedPromotionalObjective: options.suggestedPromotionalObjective,
     descriptor: options.descriptor,
     originalInput: options.originalInput,
+    approvedPromotionBody: options.approvedPromotionBody,
   });
 }

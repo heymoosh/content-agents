@@ -44,12 +44,14 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
   const originalKey = process.env.TYPEFULLY_API_KEY;
   const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
   const originalBetsPath = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  const originalAccountId = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
   const dirs: string[] = [];
 
   before(() => {
     process.env.TYPEFULLY_API_KEY = "test-key";
     process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
     process.env.CONTENT_AGENTS_TEST_BETS_PATH = TEST_BETS_PATH;
+    process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
   });
 
   after(() => {
@@ -60,6 +62,8 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
     if (originalBetsPath === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
     else process.env.CONTENT_AGENTS_TEST_BETS_PATH = originalBetsPath;
+    if (originalAccountId === undefined) delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+    else process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = originalAccountId;
     if (existsSync(TEST_BETS_PATH)) rmSync(TEST_BETS_PATH, { force: true });
     for (const d of dirs) rmSync(d, { recursive: true, force: true });
   });
@@ -94,6 +98,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
   function tmpFolder(rowLine: string, captionFrontmatter: string): string {
     const folder = mkdtempSync(join(tmpdir(), "cards-test-"));
     dirs.push(folder);
+    writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
     mkdirSync(join(folder, "derivatives"), { recursive: true });
     mkdirSync(join(folder, "images"), { recursive: true });
     writeFileSync(

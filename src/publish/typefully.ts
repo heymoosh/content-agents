@@ -17,6 +17,7 @@ import {
 import { claimSlots, fmtLa, cadenceSourceFor } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
 // Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
@@ -322,7 +323,7 @@ export interface ScheduledRow {
 // are unchanged.
 export async function publishText(
   folder: string,
-  opts: { onlyIds?: string[]; noSchedule?: boolean; forceReuse?: boolean } = {}
+  opts: { onlyIds?: string[]; noSchedule?: boolean; forceReuse?: boolean; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledRow[]> {
   const { rows } = readQueue(folder);
   let approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
@@ -331,6 +332,7 @@ export async function publishText(
     console.log("no approved x/linkedin/bluesky rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
 
   // UNSCHEDULED-draft mode (opts.noSchedule): skip claimSlots + OMIT publish_at, so drafts are saved
   // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them. Used by

@@ -4,6 +4,13 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { changedWorktreePaths, E2E_PHASE3_SLUG, E2E_WRITE_SLUG, EXPENSIVE_ROUTES, playwrightBrowsersPath, resetDisposableSuiteState, snapshotWorktree } from "./harness.js";
+import { NOT_COVERED } from "./pass-d-notcovered.js";
+
+test("live content generation fails closed outside the disposable injected-engine browser pass", () => {
+  const route = "/api/content/generate";
+  assert.ok(EXPENSIVE_ROUTES.includes(route));
+  assert.ok(NOT_COVERED.some((item) => item.route === `POST ${route}` && /authenticated live CLI/i.test(item.feature)));
+});
 
 test("deterministic Fiction passage saves are browser-testable without allowing model jobs", () => {
   assert.ok(!EXPENSIVE_ROUTES.includes("/api/fiction/fix"));

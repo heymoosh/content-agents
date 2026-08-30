@@ -25,6 +25,7 @@ import {
   loadPlatformMax,
   rowDraftTitle,
 } from "./typefully.js";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 
 // Schedule approved `quote-card` (image) rows from a content folder's review queue to
 // X/LinkedIn/Bluesky, NATIVELY through Typefully (2026-07-08 rewire — src/publish/typefully.ts's
@@ -155,7 +156,7 @@ export interface ScheduledCard {
 // opts it behaves exactly as the CLI did — every approved card in the folder — so /publish is unchanged.
 export async function publishCards(
   folder: string,
-  opts: { onlyIds?: string[]; atOverride?: string; forceReuse?: boolean } = {}
+  opts: { onlyIds?: string[]; atOverride?: string; forceReuse?: boolean; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledCard[]> {
   let cards = approvedCards(folder);
   if (opts.onlyIds) cards = cards.filter((r) => opts.onlyIds!.includes(r.id));
@@ -163,6 +164,7 @@ export async function publishCards(
     console.log("no approved quote-card rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
 
   // Reuse guard: per TARGET platform (like publishText's checkReuse(slug, r.platform)), not a
   // shared "quote-card" bucket — bets.md Placed rows are keyed by the row's real destination

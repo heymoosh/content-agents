@@ -83,10 +83,41 @@ describe("content request domain", () => {
     assert.equal(merged.origin, "venture");
     assert.equal(merged.descriptor, existing.descriptor);
     assert.equal(merged.originalInput, existing.originalInput);
+    assert.deepEqual(merged.sourceContext, existing.sourceContext);
     assert.equal(merged.ventureId, "civic-tech");
     assert.deepEqual(merged.ventureSource, ventureSource);
     assert.deepEqual(merged.treatments, ["shorter-version"]);
     assert.deepEqual(merged.platforms, ["x"]);
+  });
+
+  test("configuration edits cannot forge or erase authoritative source provenance", () => {
+    const existing = buildContentRequest({ ...base, sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [2, "4-5"] } });
+    const merged = mergeContentConfiguration(existing, { ...base, sourceProvenance: { kind: "source", sourceLines: [99] } });
+    assert.deepEqual(merged.sourceProvenance, existing.sourceProvenance);
+  });
+
+  test("configuration edits cannot replace the server-owned generation source context", () => {
+    const sourceContext = {
+      kind: "charles-approved-post" as const,
+      authoritativeBody: "Approved Charles body.",
+      personaRef: "charles/config/persona.yaml" as const,
+      identity: "charles-lord-featherbottom" as const,
+      restrictions: ["Manual delivery only.", "No em dashes."],
+    };
+    const existing = buildContentRequest({ ...base, origin: "charles", ventureId: "charles", sourceContext });
+    const merged = mergeContentConfiguration(existing, {
+      ...base, origin: "charles", ventureId: "charles",
+      sourceContext: { ...sourceContext, authoritativeBody: "SPOOFED CLIENT BODY" },
+      originalInput: "SPOOFED INSTRUCTION",
+    });
+    assert.deepEqual(merged.sourceContext, sourceContext);
+    assert.equal(merged.originalInput, existing.originalInput);
+  });
+
+  test("rejects empty and malformed source provenance", () => {
+    assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [] } }), /requires source_lines/);
+    assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [0] } }), /invalid/);
+    assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "approved-cut", sourceLines: [1] } }), /requires a lens/);
   });
 
   test("refuses missing, ambiguous, or cross-origin/cross-venture CTA mappings", () => {

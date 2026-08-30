@@ -2,6 +2,7 @@ import "../util/env.js";
 import { readFileSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
@@ -161,6 +162,7 @@ export async function publishSubstack(
     now?: Date; // test-only override; never call new Date()/Date.now() inside the machine
     headed?: boolean;
     postFn?: PostFn;
+    deliveryPolicy?: DeliveryPolicyDecision;
   } = {}
 ): Promise<ScheduledSubstack[]> {
   const now = opts.now ?? new Date();
@@ -175,6 +177,7 @@ export async function publishSubstack(
     console.log("no approved substack rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "substack", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to Substack too recently (config/platforms.yaml
   // substack.min_reuse_days). Checked even on a dry run, so --dry-run honestly reports a block.

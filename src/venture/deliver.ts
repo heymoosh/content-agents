@@ -8,6 +8,7 @@ import { checkReuse } from "../publish/reuse-guard.js";
 import { postNoteToSubstack, type PostContext, type PostFn } from "../publish/substack.js";
 import { PullError } from "../pull/errors.js";
 import { loadRules, artifactKindRule, evidenceMeetsMinimum, requireRulesVersionMatch } from "./rules.js";
+import { assertProviderDispatch } from "../publish/delivery-policy.js";
 
 // The ONLY place venture content leaves the repo. Two paths, per rules.md §5.4/§5.5 + the
 // artifact-kind table (venture/rules.yaml):
@@ -63,6 +64,11 @@ async function deliverApp(slug: string, a: VentureArtifact, at: string, opts: { 
   const now = opts.now ?? new Date();
   const postFn = opts.postFn ?? postNoteToSubstack;
   const asset = assetKey(slug, a.artifact_id);
+
+  // Venture bypasses publishSubstack's queue-shaped wrapper and calls the native Notes function
+  // directly, so it must enforce the same authoritative origin/account policy here, before even
+  // claiming a slot. artifacts.jsonl is the durable identity source for this Venture directory.
+  assertProviderDispatch(ventureDir(slug), "substack");
 
   const reuseCheck = checkReuse(a.artifact_id, WINDOW_KEY);
   if (!reuseCheck.allowed) {

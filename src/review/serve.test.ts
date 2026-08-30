@@ -98,6 +98,15 @@ test("configured Content requests have one explicit draft-generation route", () 
   assert.match(source, /generateConfiguredContent/);
 });
 
+test("the initial GUI Content save derives source authority on the server", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const start = source.indexOf('url.pathname === "/api/content/request"');
+  const end = source.indexOf('url.pathname === "/api/content/generate"', start);
+  const route = source.slice(start, end);
+  assert.match(route, /authorizeGuiContentRequest\(folder, input, existing\)/);
+  assert.doesNotMatch(route, /:\s*input\s*;/, "fresh client input must not be persisted as source authority");
+});
+
 test("approval dispatches through the existing reviewed platform schedulers", () => {
   const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
   const start = source.indexOf('url.pathname === "/api/status"');
@@ -376,6 +385,11 @@ function stubDeps(): { deps: SchedulerDeps; calls: Record<string, { folder: stri
       publishShorts: rec("publishShorts"),
       publishSubstack: rec("publishSubstack"),
       lockOutreachMessage: rec("lockOutreachMessage"),
+      resolveDeliveryPolicy: (_folder, provider) => ({
+        policyVersion: "delivery-policy-v1", origin: "human-inference", brand: "human-inference",
+        provider, providerAccountId: provider === "manual" ? null : `human-inference/${provider}`,
+        mode: provider === "manual" ? "manual" : "provider", reason: "test fixture",
+      }),
     },
   };
 }
