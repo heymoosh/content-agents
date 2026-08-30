@@ -12,7 +12,7 @@ import { bootServer, openSession, openRoom, waitLoaded, record, results, ROOT } 
 const PORT = 4794;
 
 async function pickVenture(page: import("playwright").Page, slug: string): Promise<void> {
-  await page.selectOption("#ventureSlug", slug);
+  await page.selectOption("#ventureSelect", slug);
   await page.waitForTimeout(1500);
 }
 
@@ -22,15 +22,18 @@ async function main(): Promise<void> {
   // throwaway one for this worktree — a real one lives in Muxin's .env, which is deliberately not
   // copied here. The separate check at the end covers what happens when it is missing.
   const server = await bootServer({ RESEARCH_HASH_KEY: "e2e-throwaway-key-not-a-secret" }, PORT);
-  const s = await openSession(PORT);
-  const { page } = s;
+  let s: Awaited<ReturnType<typeof openSession>> | null = null;
 
   try {
+    s = await openSession(PORT);
+    const { page } = s;
     await openRoom(page, "venture");
     await waitLoaded(page, "#ventureThread").catch(() => {});
 
     const slugs = await page.evaluate(() =>
-      Array.from(document.querySelectorAll("#ventureSlug option")).map((o) => (o as HTMLOptionElement).value)
+      Array.from(document.querySelectorAll<HTMLOptionElement>("#ventureSelect option"))
+        .map((el) => el.value)
+        .filter(Boolean)
     );
     console.log(`  (ventures on the desk: ${slugs.join(", ")})`);
 
@@ -169,8 +172,8 @@ async function main(): Promise<void> {
       console.log(`\n  (aborted ${s.blockedCalls.length} model-spawning call(s): ${[...new Set(s.blockedCalls)].join(", ")})`);
     }
   } finally {
-    await s.close();
-    server.stop();
+    if (s) await s.close();
+    await server.stop();
   }
 
   // ── What the response form says when RESEARCH_HASH_KEY is NOT configured. The refusal is
@@ -179,11 +182,12 @@ async function main(): Promise<void> {
   // Driven through the real form, not a hand-built payload: only the form fills every field the
   // route requires, so the refusal we read back is the one Muxin would actually see.
   const bare = await bootServer({ RESEARCH_HASH_KEY: "" }, PORT + 10);
-  const s2 = await openSession(PORT + 10);
+  let s2: Awaited<ReturnType<typeof openSession>> | null = null;
   try {
+    s2 = await openSession(PORT + 10);
     await openRoom(s2.page, "venture");
     await waitLoaded(s2.page, "#ventureThread").catch(() => {});
-    await s2.page.selectOption("#ventureSlug", "e2e-phase3");
+    await s2.page.selectOption("#ventureSelect", "e2e-phase3");
     await s2.page.waitForTimeout(1500);
     await s2.page.click("#vAddResponse");
     await s2.page.waitForSelector("#vr-exact_quote", { timeout: 10_000 });
@@ -212,8 +216,8 @@ async function main(): Promise<void> {
         : "no refusal shown (the write went through without a hash key configured)",
     });
   } finally {
-    await s2.close();
-    bare.stop();
+    if (s2) await s2.close();
+    await bare.stop();
   }
 
   const failed = results.filter((r) => r.status === "fail").length;

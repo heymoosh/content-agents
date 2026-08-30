@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -33,6 +33,50 @@ import {
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
+
+test("fiction promotion handoff requires an approved promotional final", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/fiction/handoff"'));
+  assert.match(source, /createLockedChapterHandoff/);
+  assert.match(source, /scaffoldContentFolder/);
+  assert.match(source, /writeContentRequest\(folder/);
+  assert.match(source, /sourceKind: "fiction-promotion"/);
+  assert.match(source, /promotion\.state !== "Approved"/);
+  assert.match(source, /text: promotion\.body/);
+});
+
+test("Charles promotion has an approved request-only handoff route", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/charles/handoff"'));
+  assert.match(source, /createApprovedCharlesHandoff/);
+  assert.match(source, /toCharlesContentRequestInput/);
+});
+
+test("configured Content requests have one explicit draft-generation route", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/content/generate"'));
+  assert.match(source, /readContentRequest\(safeFolder\(slug\)\)/);
+  assert.match(source, /generateConfiguredContent/);
+});
+
+test("approval enters honest Postiz-pending state instead of legacy auto-scheduling", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const start = source.indexOf('url.pathname === "/api/status"');
+  const end = source.indexOf('url.pathname === "/api/cancel"', start);
+  const route = source.slice(start, end);
+  assert.match(route, /provider: "postiz"/);
+  assert.match(route, /configured: false/);
+  assert.doesNotMatch(route, /await scheduleApproved/);
+});
+
+test("the E2E start seam owns the loopback listen and direct execution delegates to it", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const seam = source.indexOf("export function startReviewServer");
+  const guard = source.indexOf("startReviewServer();", seam + 1);
+  assert.ok(seam >= 0, "serve.ts must export the explicit start seam");
+  assert.ok(guard > seam, "the direct-run guard must delegate to the seam");
+  assert.match(source.slice(seam, guard), /server\.listen\(PORT, "127\.0\.0\.1"/);
+});
 
 test("ventureAnalysisPrompt is read-only and carries the server-derived state", () => {
   const prompt = ventureAnalysisPrompt("my-venture", { phase: 2, next: "review" });
@@ -615,31 +659,32 @@ test("outreachDraftGuard refuses anything outside a real outreach/leads/<dir> fo
 
 test("outreachDraftGuard accepts a real lead folder and passes the direction through", () => {
   const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: "  keep it short  " });
-  assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: "keep it short", engine: "claude" });
+  assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: "keep it short", engine: "codex" });
 });
 
 test("outreachDraftGuard turns a blank direction into undefined, never an empty string", () => {
   // Load-bearing: `undefined` is what keeps buildDraftPrompt byte-identical for existing callers.
   for (const blank of ["", "   ", "\n\t "]) {
     const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: blank });
-    assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "claude" });
+    assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "codex" });
   }
   assert.deepEqual(outreachDraftGuard({ dir: "outreach/leads/client-acme-co" }), {
     dir: "outreach/leads/client-acme-co",
     direction: undefined,
-    engine: "claude",
+    engine: "codex",
   });
 });
 
-test("outreachDraftGuard normalizes the optional engine for the directed draft route", () => {
+test("outreachDraftGuard accepts ChatGPT/Grok and rejects every other outreach engine", () => {
   assert.deepEqual(
     outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "grok" }),
     { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "grok" },
   );
-  assert.deepEqual(
-    outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "unsupported" }),
-    { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "claude" },
-  );
+  for (const engine of ["claude", "unsupported"]) {
+    const result = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine });
+    assert.ok("error" in result);
+    assert.match((result as { error: string }).error, /ChatGPT or Grok/);
+  }
 });
 
 test("outreachDraftGuard caps a pasted-document direction before it reaches a spawn", () => {
@@ -657,8 +702,9 @@ test("followUpDraftGuard validates the route folder and propagates the optional 
   );
   assert.deepEqual(
     followUpDraftGuard({ dir: "outreach/leads/client-acme-co" }),
-    { dir: "outreach/leads/client-acme-co", engine: "claude" },
+    { dir: "outreach/leads/client-acme-co", engine: "codex" },
   );
+  assert.ok("error" in followUpDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "claude" }));
   assert.ok("error" in followUpDraftGuard({ dir: "outreach/leads/../escape", engine: "codex" }));
 });
 

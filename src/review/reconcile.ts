@@ -173,7 +173,7 @@ export function reconcileRow(row: QueueRow, publishLog: PublishLogRead, live: Li
       provider: "upload-post",
       state: "unavailable",
       reason:
-        "scheduled via the retired upload-post failover (no live adapter since PR #130) — check/cancel by hand at upload-post.com",
+        "scheduled via the retired upload-post failover (no live adapter since PR #130). Check/cancel by hand at upload-post.com",
     };
   }
   if (live.postpeerPosts === null) {

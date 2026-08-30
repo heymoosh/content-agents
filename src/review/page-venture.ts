@@ -59,7 +59,7 @@ export function intakeUnanswered(drafts: { n: number; text: string }[], total: n
 
 export function intakeSaveLine(s: { state: string; savedAt?: string; error?: string }): string {
   if (s.state === "saving") return "saving…";
-  if (s.state === "failed") return "NOT SAVED — " + (s.error || "the server did not answer");
+  if (s.state === "failed") return "NOT SAVED. " + (s.error || "the server did not answer");
   if (s.state === "saved") {
     const d = s.savedAt ? new Date(s.savedAt) : null;
     if (!d || isNaN(d.getTime())) return "saved";

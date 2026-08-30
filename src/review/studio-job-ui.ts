@@ -48,7 +48,7 @@ export function jobRoom(kind: string): JobRoom {
   if (kind === "pull" || kind === "strategy" || kind === "insights" || kind === "ask-insights" || kind === "brief-revise") return "Signals";
   if (kind === "venture-analysis" || kind === "venture-step") return "Venture";
   if (kind === "charles-draft") return "Charles";
-  if (kind === "fiction-draft" || kind === "fiction-continuity") return "Fiction";
+  if (kind === "fiction-draft" || kind === "fiction-continuity" || kind === "fiction-promo") return "Fiction";
   // url/file/text/notes/continue/video/develop/develop-reply/revise/duplicate — the production crew
   // ("revise" here is a CONTENT derivative revise, which belongs in Content)
   return "Content";
@@ -243,12 +243,12 @@ export function jobsPollDue(jobs: JobView[], now: number, armedUntil = 0): boole
 // arming happens when the request goes out, not when it comes back.
 export const JOB_ENQUEUE_ROUTES: readonly string[] = [
   "/api/atomize", "/api/notes/pick", "/api/revise", "/api/duplicate", "/api/video/generate",
-  "/api/develop/start", "/api/develop/reply", "/api/develop/format",
+  "/api/content/generate",
   "/api/strategy/ask", "/api/strategy/refresh-brief", "/api/strategy/insights",
   "/api/strategy/ask-insights", "/api/strategy/pull",
   "/api/outreach/scout", "/api/outreach/draft", "/api/outreach/message/revise",
   "/api/charles/draft", "/api/followups/draft-follow-up",
-  "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check", "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
+  "/api/fiction/draft", "/api/fiction/repass", "/api/fiction/check", "/api/fiction/promotion/draft", "/api/fiction/promotion/revise", "/api/venture/:slug/analyze", "/api/venture/:slug/run-step",
 ];
 export function enqueuesJob(path: string): boolean {
   return JOB_ENQUEUE_ROUTES.includes(path) || /^\/api\/venture\/[^/]+\/analyze$/.test(path);

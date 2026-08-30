@@ -1,6 +1,7 @@
 import { type IncomingMessage, type ServerResponse } from "node:http";
 import { openDb } from "../db/db.js";
 import { readSignals, appendBacklogCard, readOutcomeFamilies, readResearchReport } from "./signals.js";
+import { buildSignalsRecommendationRead } from "./signals-recommendations.js";
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -16,7 +17,7 @@ export async function handleSignalsRoute({ req, res, url, readBody, json }: Sign
   // Signals room (design 3e): the deterministic read of the latest brief, and the one write —
   // sending an adjustment to the repo backlog as a card. Muxin decides; nothing self-adopts.
   if (req.method === "GET" && url.pathname === "/api/signals") {
-    json(res, 200, readSignals());
+    json(res, 200, { ...readSignals(), ...buildSignalsRecommendationRead() });
     return true;
   }
   // Card D: the four outcome families, grouped at read time out of data/analytics.db

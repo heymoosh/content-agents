@@ -4,7 +4,9 @@
 // exactly what fixture mode was built for — prototype-port-rules Rule 4). Fixture mode is read-only
 // by construction, so this pass proves reads only; writes are Pass B.
 
-import { bootServer, openSession, openRoom, waitLoaded, textOf, record, results } from "./harness.js";
+import { bootServer, openSession, openRoom, waitLoaded, textOf, record, results,
+  applyScenario,
+} from "./harness.js";
 
 const PORT = 4791;
 
@@ -22,8 +24,9 @@ const ROOMS: { room: string; label: string; panes: string[]; pr?: string }[] = [
 async function main(): Promise<void> {
   console.log("\n=== Pass A: reads, fixture mode ===\n");
   const server = await bootServer({ REVIEW_FIXTURES: "1" }, PORT);
-  const s = await openSession(PORT);
+  let s: Awaited<ReturnType<typeof openSession>> | null = null;
   try {
+    s = await openSession(PORT);
     // The fixture banner is a safety claim (fixtures.ts §3: "a screenshot cannot hide it"). If it is
     // missing while the flag is on, fixture data is reaching a screen unlabelled.
     const bannerVisible = await s.page.locator("#fxBanner").isVisible().catch(() => false);
@@ -96,13 +99,20 @@ async function main(): Promise<void> {
     });
 
     // #349/#378: the job queue surface, and a job's step markers when it has them.
+    // The queue renders only when a job exists, so an idle studio shows nothing rather than a sheet
+    // announcing its own emptiness. Apply a running job first: with that scenario the queue MUST
+    // list it, so absence is a failure rather than an empty-fixture excuse.
     await openRoom(s.page, "studio");
+    await applyScenario(s.page, "job-running");
+    await s.page.waitForSelector("#jobs:not([hidden])", { timeout: 15_000 }).catch(() => null);
     const jobsText = await textOf(s.page, "#jobs");
     record({
       feature: "Studio job queue lists jobs",
       pr: "#349",
       status: jobsText.trim().length > 0 ? "pass" : "fail",
-      detail: jobsText.trim().length > 0 ? `${jobsText.trim().slice(0, 100).replace(/\s+/g, " ")}…` : "job queue empty in fixture mode",
+      detail: jobsText.trim().length > 0
+        ? `${jobsText.trim().slice(0, 100).replace(/\s+/g, " ")}…`
+        : "job-running scenario applied and the queue still listed nothing",
     });
 
     // #350: Outreach is a triage queue grouped by reason, then a thread.
@@ -122,6 +132,124 @@ async function main(): Promise<void> {
       pr: "#350",
       status: followText.trim().length > 0 ? "pass" : "fail",
       detail: followText.trim().slice(0, 120).replace(/\s+/g, " "),
+    });
+
+    // Content now moves from a source into independent treatments, media, and platforms, then into
+    // one request-grouped approval surface. The superseded director/workbench path is intentionally
+    // absent. Apply a fixture scenario first so a source is guaranteed.
+    await openRoom(s.page, "content");
+    await applyScenario(s.page, "recs-blocked");
+    await s.page.waitForSelector("#roomContent:not([hidden])", { timeout: 15_000 });
+    await waitLoaded(s.page, "#cwBody").catch(() => "");
+    await s.page.waitForSelector("#cwBody .cw-src", { timeout: 15_000 }).catch(() => null);
+    await s.page.click("#cwBody .cw-src");
+    const configText = ((await textOf(s.page, "#cwBody")) || "").replace(/\s+/g, " ").trim();
+    const configOk = ["TREATMENTS", "MEDIA", "PLATFORMS", "Untreated control", "Save configuration"].every((copy) => configText.includes(copy));
+    record({
+      feature: "Content opens independent configuration with an untreated control",
+      status: configOk ? "pass" : "fail",
+      detail: configText.slice(0, 220),
+    });
+    await s.page.click('#cwSteps [data-step="3"]');
+    await s.page.click('#cwBody [data-set-pane="review"]');
+    const approvalText = ((await textOf(s.page, "#reviewSheet")) || "").replace(/\s+/g, " ").trim();
+    record({
+      feature: "Content opens request-grouped approval and separate Published status",
+      status: approvalText.includes("Approve Drafts") && approvalText.includes("Published") ? "pass" : "fail",
+      detail: approvalText.slice(0, 220),
+    });
+
+    // The seam's production answer is a blocked read: reviewed-interface, no examples.
+    const recsRead = await s.page.evaluate(async () => {
+      const r = await fetch("/api/recommendations");
+      return { status: r.status, body: await r.json() };
+    });
+    const recsBody = recsRead.body as { availability?: string; source?: string; examples?: unknown[] };
+    const recsOk =
+      recsRead.status === 200 &&
+      recsBody.availability === "blocked" &&
+      recsBody.source === "reviewed-interface" &&
+      Array.isArray(recsBody.examples) &&
+      recsBody.examples.length === 0;
+    record({
+      feature: "Recommendation seam serves a blocked read",
+      status: recsOk ? "pass" : "fail",
+      detail: `HTTP ${recsRead.status}; availability=${recsBody.availability}; source=${recsBody.source}; examples=${Array.isArray(recsBody.examples) ? recsBody.examples.length : "missing"}`,
+    });
+
+    // Studio needs-you actions must be real <button>s (keyboard-reachable). The pre-prototype
+    // stat tiles were removed in the Studio subtraction pass; this check covers only what remains.
+    // Apply a Studio scenario first so a missing needs-you list names what was tried; no fixture
+    // overrides /api/studio with a non-empty needsYou, so empty after apply stays blocked (not pass).
+    await applyScenario(s.page, "job-queued");
+    await s.page.waitForSelector("#roomStudio:not([hidden])", { timeout: 15_000 });
+    await waitLoaded(s.page, "#studioMain").catch(() => "");
+    const btnNy = await s.page.locator("#studioMain button.ny-go").count();
+    const spanNy = await s.page.locator("#studioMain span.ny-go").count();
+    if (btnNy === 0) {
+      record({
+        feature: "Studio needs-you actions are real buttons",
+        status: spanNy > 0 ? "fail" : "blocked",
+        detail:
+          spanNy > 0
+            ? `job-queued scenario applied; needs-you empty, but found non-buttons: span.ny-go=${spanNy}`
+            : `job-queued scenario applied; Studio needs-you list still empty (0 button.ny-go); cannot verify action controls are buttons. span.ny-go=${spanNy}`,
+      });
+    } else {
+      record({
+        feature: "Studio needs-you actions are real buttons",
+        status: spanNy === 0 ? "pass" : "fail",
+        detail: `button.ny-go=${btnNy}, span.ny-go=${spanNy}`,
+      });
+    }
+
+    // Room nav is keyboard-operable: Enter on a room button changes room and sets aria-current.
+    await openRoom(s.page, "studio");
+    const beforeRoom = await s.page.locator("button.room.on").getAttribute("data-room");
+    // Any room BUT the one already open, so this stays true whatever order the nav runs in.
+    const otherRoomBtn = s.page.locator("nav.rooms button.room:not(.on)").first();
+    const targetRoom = await otherRoomBtn.getAttribute("data-room");
+    await otherRoomBtn.focus();
+    await s.page.keyboard.press("Enter");
+    const targetId = "#room" + (targetRoom ?? "").charAt(0).toUpperCase() + (targetRoom ?? "").slice(1);
+    await s.page.waitForSelector(`${targetId}:not([hidden])`, { timeout: 15_000 }).catch(() => {});
+    const afterRoom = await s.page.locator("button.room.on").getAttribute("data-room");
+    const currentAttr = await s.page.locator("button.room.on").getAttribute("aria-current");
+    const roomChanged = afterRoom != null && afterRoom !== beforeRoom;
+    record({
+      feature: "Room nav responds to Enter and announces current page",
+      status: roomChanged && currentAttr === "page" ? "pass" : "fail",
+      detail: `before=${beforeRoom}; after=${afterRoom}; aria-current=${currentAttr}`,
+    });
+
+    // Narrow window: Content, Outreach, and Studio must not scroll horizontally at 700×900.
+    const originalViewport = s.page.viewportSize() ?? { width: 1280, height: 720 };
+    await s.page.setViewportSize({ width: 700, height: 900 });
+    const narrowRooms: { room: string; pane: string }[] = [
+      { room: "content", pane: "#reviewMain" },
+      { room: "outreach", pane: "#outreachList" },
+      { room: "studio", pane: "#studioMain" },
+    ];
+    const narrowDetails: string[] = [];
+    let narrowFail = false;
+    let narrowBlocked = false;
+    for (const nr of narrowRooms) {
+      await openRoom(s.page, nr.room);
+      await waitLoaded(s.page, nr.pane).catch(() => "");
+      const widths = await s.page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      const ok = widths.scrollWidth <= widths.clientWidth + 1;
+      narrowDetails.push(`${nr.room}: scrollWidth=${widths.scrollWidth} clientWidth=${widths.clientWidth}`);
+      if (!ok) narrowFail = true;
+      if (widths.clientWidth === 0) narrowBlocked = true;
+    }
+    await s.page.setViewportSize(originalViewport);
+    record({
+      feature: "Narrow viewport has no horizontal scroll (Content, Outreach, Studio)",
+      status: narrowBlocked ? "blocked" : narrowFail ? "fail" : "pass",
+      detail: narrowDetails.join("; "),
     });
 
     // Fixture mode's central safety promise: it cannot write. Prove it from the browser.
@@ -144,8 +272,8 @@ async function main(): Promise<void> {
       console.log(`\n  (suite aborted ${s.blockedCalls.length} model-spawning call(s): ${[...new Set(s.blockedCalls)].join(", ")})`);
     }
   } finally {
-    await s.close();
-    server.stop();
+    if (s) await s.close();
+    await server.stop();
   }
 
   const failed = results.filter((r) => r.status === "fail").length;

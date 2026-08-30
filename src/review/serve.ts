@@ -27,13 +27,13 @@ import { repoRoot, openDb } from "../db/db.js";
 import { readQueue, type QueueRow } from "../publish/queue.js";
 import { TEXT_PLATFORMS } from "../publish/typefully.js";
 import { fetchNotesList, scaffoldPicked } from "../atomize/new-notes.js";
+import { scaffoldContentFolder } from "../atomize/new-content.js";
 import { listLeadDetails } from "../outreach/status.js";
 import { setFrontmatterField } from "../outreach/qualify.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { handleVentureRead } from "./venture-reads.js";
 import { handleVentureWrite } from "./venture-writes.js";
-import { buildFollowups, markResponded, markContacted, moveOn, markSent, latestLockedMessage, isBucket } from "../outreach/tracker.js";
-import { CHANNELS } from "../outreach/draft.js";
+import { buildFollowups, markResponded, markContacted, moveOn, isBucket } from "../outreach/tracker.js";
 import {
   enrich,
   listPieces,
@@ -46,7 +46,6 @@ import {
   VIDEO_EXT,
   getLiveStateAsOf,
   cancelScheduled,
-  saveCutBody,
 } from "./rows.js";
 import {
   classifySource,
@@ -75,13 +74,9 @@ import {
   decodeSpawnFailure,
   enqueueFollowUpDraft,
   enqueueDirectedDraft,
-  addDevelopJob,
-  addDevelopFolderJob,
-  developJobInFlight,
-  buildFormatArg,
+  generateConfiguredContent,
 } from "./jobs.js";
-import { listContentSessions, acceptAngleBySlug, dismissCardBySlug, appendReplyBySlug } from "./develop.js";
-import { listCuts } from "../atomize/cuts.js";
+import { listContentSessions } from "./develop.js";
 import { renderPage } from "./page.js";
 import { fixturesEnabled, FIXTURE_ENV_VAR, FIXTURE_WRITE_REFUSAL } from "./fixtures.js";
 import { buildStudioHome } from "./studio.js";
@@ -93,6 +88,15 @@ import { scheduleApproved, scheduleKind } from "./studio-scheduling.js";
 import { handleFictionRoute } from "./serve-fiction.js";
 import { handleCharlesRoute } from "./serve-charles.js";
 import { handleSignalsRoute } from "./serve-signals.js";
+import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
+import { readContentRequest, writeContentRequest } from "./content-request-store.js";
+import type { ContentRequestInput } from "./content-request.js";
+import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
+import { toContentRequestInput } from "./fiction-content-handoff.js";
+import { seriesDirFor } from "./fiction.js";
+import { loadFictionPromotionDraft } from "./fiction-promotion-draft.js";
+import { createApprovedCharlesHandoff } from "./charles-content-handoff-store.js";
+import { toCharlesContentRequestInput } from "./charles-content-handoff.js";
 
 // Re-exported so serve.test.ts's existing imports keep working UNCHANGED after this split — the
 // implementations now live in rows.ts (approveBlockReason, enrich), jobs.ts (classifySource,
@@ -337,9 +341,9 @@ async function generateInsights(engine: Engine = "claude"): Promise<InsightsResu
       `**No analytics data in this checkout (0 posts in data/analytics.db).**\n\n` +
       (IS_DEV_WORKTREE
         ? `This GUI is running from a Claude Code dev worktree, which has its own empty, gitignored ` +
-          `data/analytics.db — it's never synced with your real checkout. Run \`npm run review\` from ` +
+          `data/analytics.db. It's never synced with your real checkout. Run \`npm run review\` from ` +
           `your main repo checkout instead to see live numbers.\n`
-        : `\`data/analytics.db\` is gitignored (per-checkout, never synced by git) — either this checkout ` +
+        : `\`data/analytics.db\` is gitignored (per-checkout, never synced by git). Either this checkout ` +
           `has never been ingested, or something pulled into a different copy. Run \`npm run ingest\` / ` +
           `\`npm run pull\` here, or check you're in the checkout you expect.\n`);
     return { summary, engine, freshness: null, brief: null, untagged: 0 };
@@ -533,7 +537,7 @@ async function refreshBrief(engine: Engine = "claude"): Promise<{ path: string }
     const after = latestBriefPath();
     const changed = after && (after !== before || statSync(after).mtimeMs > beforeMtime);
     if (!after || !changed) {
-      throw new Error("/strategy ran but no new or updated brief landed in briefs/ — check the job log");
+      throw new Error("/strategy ran but no new or updated brief landed in briefs/. Check the job log");
     }
     return { path: after.slice(repoRoot.length + 1) };
   }, engine);
@@ -642,24 +646,28 @@ export const MAX_DIRECTION_CHARS = 2000;
 // keeps the drafting prompt byte-identical to the one every existing caller already builds.
 export function outreachDraftGuard(
   body: Record<string, unknown>,
-): { error: string } | { dir: string; direction: string | undefined; engine: Engine } {
+): { error: string } | { dir: string; direction: string | undefined; engine: OutreachEngine } {
   const dir = String(body.dir ?? "");
   if (!isValidLeadDir(dir)) return { error: "not a valid outreach lead folder" };
   const direction = String(body.direction ?? "").trim();
   if (direction.length > MAX_DIRECTION_CHARS) {
     return { error: `keep the direction under ${MAX_DIRECTION_CHARS} characters` };
   }
-  return { dir, direction: direction || undefined, engine: requestEngine(body.engine) };
+  const engine = body.engine === undefined ? "codex" : body.engine;
+  if (!isOutreachEngine(engine)) return { error: "Outreach engine must be ChatGPT or Grok" };
+  return { dir, direction: direction || undefined, engine };
 }
 
 // Follow-ups have no typed direction and no second draft surface: keep their request guard
 // separate so the optional engine cannot accidentally leak into the directed first-draft route.
 // Invalid engine ids retain the existing default posture, while the job receives the normalized
 // value and therefore cannot silently fall back after enqueueing.
-export function followUpDraftGuard(body: Record<string, unknown>): { error: string } | { dir: string; engine: Engine } {
+export function followUpDraftGuard(body: Record<string, unknown>): { error: string } | { dir: string; engine: OutreachEngine } {
   const dir = String(body.dir ?? "");
   if (!isValidLeadDir(dir)) return { error: "not a valid outreach lead folder" };
-  return { dir, engine: requestEngine(body.engine) };
+  const engine = body.engine === undefined ? "codex" : body.engine;
+  if (!isOutreachEngine(engine)) return { error: "Outreach engine must be ChatGPT or Grok" };
+  return { dir, engine };
 }
 
 // Pure, exported for unit testing: append one dated note line under a lead.md's `## Muxin notes`
@@ -884,45 +892,18 @@ const server = createServer(async (req, res) => {
         json(res, 404, { ok: false });
         return;
       }
-      // Approve → auto-schedule (Muxin's choice): the row goes straight to a SCHEDULED post/draft via
-      // its platform's existing publish function — text → Typefully, quote-card → cards.ts, tiktok →
-      // tiktok.ts, YouTube Short → youtube.ts — which flips the row to "published". No separate
-      // /publish run needed. A scheduling failure is returned (not thrown) so the row stays "approve"
-      // and the GUI can show why. Rows no scheduler owns just get the plain approve status.
-      let scheduled: unknown = null;
-      let scheduleError: string | null = null;
-      if (approveFolder && approveRow) {
-        // In-flight guard: a publisher only flips the row to "published" AFTER its real network
-        // call, so two near-simultaneous approve requests for the same row (a double-click, a
-        // client retry) would otherwise both read status="approve" and both fire a duplicate
-        // PostPeer/YouTube/Typefully call before either write lands. Keyed per row so unrelated
-        // rows/folders keep scheduling concurrently.
-        const inFlightKey = `${slug}/${id}`;
-        if (schedulingInFlight.has(inFlightKey)) {
-          json(res, 200, { ok: true, scheduled: null, scheduleError: "already scheduling this row — try again in a moment" });
-          return;
-        }
-        schedulingInFlight.add(inFlightKey);
-        try {
-          ({ scheduled, scheduleError } = await scheduleApproved(approveFolder, approveRow));
-          // A schedule failure (e.g. the reuse guard) leaves the row at "approve" (scheduleApproved
-          // never flips it to "published") but until now the reason only ever flashed once in the
-          // browser (page.ts's flash toast) — miss it, and the only remaining signal is reconcile.ts
-          // flagging it days later with a generic "not found" mismatch. Persist the real reason into
-          // the row's own notes column so it survives a reload, on top of (not instead of) that flash.
-          if (scheduleError) {
-            const priorNotes = notes !== undefined ? notes : approveRow.notes;
-            const persisted =
-              priorNotes && priorNotes.trim()
-                ? `${priorNotes.trim()} | schedule failed: ${scheduleError}`
-                : `schedule failed: ${scheduleError}`;
-            updateRow(slug, id, "approve", persisted);
+      // Approval and publishing are separate states. The required self-hosted Postiz adapter is
+      // not configured in this repository, so an approval enters the publishing queue as Pending
+      // and stops. It must never fall through to the legacy Typefully/PostPeer schedulers.
+      const publishing = approveFolder && approveRow
+        ? {
+            provider: "postiz",
+            status: "Pending",
+            configured: false,
+            setupRequired: "Connect the self-hosted Postiz instance before scheduling or publishing.",
           }
-        } finally {
-          schedulingInFlight.delete(inFlightKey);
-        }
-      }
-      json(res, 200, { ok: true, scheduled, scheduleError });
+        : null;
+      json(res, 200, { ok: true, scheduled: null, scheduleError: null, publishing });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/cancel") {
@@ -948,7 +929,7 @@ const server = createServer(async (req, res) => {
       }
       const inFlightKey = `${slug}/${id}`;
       if (schedulingInFlight.has(inFlightKey)) {
-        json(res, 200, { ok: false, error: "already scheduling/canceling this row — try again in a moment" });
+        json(res, 200, { ok: false, error: "already scheduling/canceling this row. Try again in a moment" });
         return;
       }
       schedulingInFlight.add(inFlightKey);
@@ -967,24 +948,66 @@ const server = createServer(async (req, res) => {
       json(res, 200, { ok: true });
       return;
     }
-    // Cut edits from the workbench: version review before formatting — no scheduling, no status,
-    // nothing publishes from here.
-    if (req.method === "POST" && url.pathname === "/api/cut-save") {
+    if (await handleFictionRoute({ req, res, url, readBody, json, requestEngine })) return;
+    // Promotion handoff only: read one already-approved chapter, persist its validated content
+    // configuration, and stop. This does not draft, generate, approve, schedule, or publish.
+    if (req.method === "POST" && url.pathname === "/api/fiction/handoff") {
       const b = await readBody(req);
       try {
-        saveCutBody(String(b.slug ?? ""), String(b.lens ?? ""), String(b.body ?? ""));
-        json(res, 200, { ok: true });
+        const requestedId = String(b.slug ?? "fiction-handoff").trim();
+        const series = String(b.series ?? "");
+        const chapter = Number(b.chapter ?? 0);
+        const promotion = await loadFictionPromotionDraft(seriesDirFor(series), `chapter-${chapter}`);
+        if (promotion.state !== "Approved") throw new Error("fiction promotion draft must be approved before Content handoff");
+        const handoff = createLockedChapterHandoff({
+          root: join(repoRoot, "stories"),
+          series,
+          chapter,
+          id: requestedId,
+          descriptor: promotion.request.descriptor,
+          suggestedPromotionalObjective: promotion.request.suggestedPromotionalObjective,
+          originalInput: promotion.request.originalInput,
+        });
+        const folder = scaffoldContentFolder({
+          title: handoff.descriptor,
+          origin: `fiction:${handoff.series.id}:chapter-${handoff.chapter.number}`,
+          publishedAt: null,
+          sourceKind: "fiction-promotion",
+          text: promotion.body,
+        });
+        const slug = basename(folder);
+        const request = await writeContentRequest(folder, toContentRequestInput({ ...handoff, id: slug }));
+        json(res, 200, { ok: true, handoff, request });
       } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
       return;
     }
-    // ── Develop tab: the advisor stage ─────────────────────────────────────────────────────────
-    // A queued `/develop` round proposes recommendation cards (angles/CTA/spin/routing) — nothing
-    // here formats, queues, or publishes anything. Accept/dismiss are deterministic server-side
-    // writes (src/review/develop.ts): an accepted angle becomes a cut whose body is assembled
-    // ONLY from Muxin's verbatim source.md lines, never from advisor text (CLAUDE.md rule 1).
-    if (await handleFictionRoute({ req, res, url, readBody, json, requestEngine })) return;
+    // Charles promotion handoff only: approved persona copy becomes an ordinary Content source.
+    // This never drafts, selects a CTA, approves, schedules, or publishes anything.
+    if (req.method === "POST" && url.pathname === "/api/charles/handoff") {
+      const b = await readBody(req);
+      try {
+        const handoff = createApprovedCharlesHandoff({
+          root: join(repoRoot, "charles"),
+          postId: String(b.postId ?? ""),
+          thought: String(b.thought ?? ""),
+          replySource: b.replySource === undefined ? undefined : String(b.replySource),
+          selectedOutputs: Array.isArray(b.selectedOutputs) ? b.selectedOutputs.map(String) : [],
+          descriptor: String(b.descriptor ?? ""), originalInput: String(b.originalInput ?? ""),
+          inheritedVentureId: b.inheritedVentureId === undefined ? undefined : String(b.inheritedVentureId),
+        });
+        const folder = scaffoldContentFolder({
+          title: handoff.descriptor, origin: `charles:${handoff.identity.persona}`,
+          publishedAt: null, sourceKind: "charles", text: [handoff.thought, handoff.replySource].filter(Boolean).join("\n\n"),
+        });
+        const request = await writeContentRequest(folder, toCharlesContentRequestInput({ ...handoff, id: basename(folder) }));
+        json(res, 200, { ok: true, handoff, request });
+      } catch (e) {
+        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
+      }
+      return;
+    }
     if (await handleCharlesRoute({ req, res, url, readBody, json, requestEngine })) return;
     if (await handleSignalsRoute({ req, res, url, readBody, json })) return;
     // Studio home (design 3c): counts, the ranked needs-you list, and the team's honest status.
@@ -1011,105 +1034,41 @@ const server = createServer(async (req, res) => {
       }
       return;
     }
-    if (req.method === "POST" && url.pathname === "/api/develop/start") {
+    // Durable configuration for one existing source. This records independent treatment, media,
+    // platform, recommendation and control choices only; generation remains a separate explicit
+    // action, so saving this request cannot approve, schedule, or publish anything.
+    if (req.method === "GET" && url.pathname === "/api/content/request") {
+      const slug = (url.searchParams.get("slug") ?? "").trim();
+      try {
+        json(res, 200, { ok: true, request: await readContentRequest(safeFolder(slug)) });
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        if (/ENOENT|no such file/i.test(error)) json(res, 200, { ok: true, request: null });
+        else json(res, 400, { ok: false, error });
+      }
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/content/request") {
       const b = await readBody(req);
       const slug = String(b.slug ?? "").trim();
       try {
-        if (slug) {
-          json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop", requestEngine(b.engine))) });
-          return;
-        }
-        const source = String(b.source ?? "");
-        if (!source.trim()) {
-          json(res, 400, { ok: false, error: "paste some text, a file path, or a URL first" });
-          return;
-        }
-        const dispatch = sourceDispatch(classifySource(source), source);
-        if ("error" in dispatch) {
-          json(res, 400, { ok: false, error: dispatch.error });
-          return;
-        }
-        if (dispatch.kind === "notes" || dispatch.kind === "continue" || dispatch.kind === "video") {
-          json(res, 400, { ok: false, error: "drop a URL, file path, or pasted text here" });
-          return;
-        }
-        const job = addDevelopJob(dispatch.kind, dispatch.arg, dispatch.label, dispatch.rawText, requestEngine(b.engine));
-        json(res, 200, { ok: true, job: publicJob(job) });
+        const input = b.request as ContentRequestInput;
+        if (!input || typeof input !== "object") throw new Error("content request is required");
+        if (input.id !== slug) throw new Error("content request id must match its source slug");
+        const request = await writeContentRequest(safeFolder(slug), input);
+        json(res, 200, { ok: true, request });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
       return;
     }
-    if (req.method === "POST" && url.pathname === "/api/develop/reply") {
+    if (req.method === "POST" && url.pathname === "/api/content/generate") {
       const b = await readBody(req);
-      const slug = String(b.slug ?? "");
-      const reply = String(b.reply ?? "").trim();
-      if (!reply) {
-        json(res, 400, { ok: false, error: "type a reply for the advisor first" });
-        return;
-      }
+      const slug = String(b.slug ?? "").trim();
       try {
-        if (developJobInFlight(slug)) {
-          json(res, 409, { ok: false, error: "the advisor is already working on this piece — wait for that round to land" });
-          return;
-        }
-        // Persist the reply BEFORE enqueueing: the spawn argv stays a fixed `/develop
-        // content/<slug>`, and the reply is on disk for the audit trail even if the job dies.
-        appendReplyBySlug(slug, reply);
-        json(res, 200, { ok: true, job: publicJob(addDevelopFolderJob(slug, "develop-reply", requestEngine(b.engine))) });
-      } catch (e) {
-        json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/develop/accept") {
-      const b = await readBody(req);
-      try {
-        const result = acceptAngleBySlug(
-          String(b.slug ?? ""),
-          String(b.cardId ?? ""),
-          b.lens === undefined ? undefined : String(b.lens),
-          b.title === undefined ? undefined : String(b.title),
-        );
+        const request = await readContentRequest(safeFolder(slug));
+        const result = await generateConfiguredContent(slug, request, requestEngine(b.engine));
         json(res, 200, { ok: true, ...result });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    if (req.method === "POST" && url.pathname === "/api/develop/dismiss") {
-      const b = await readBody(req);
-      try {
-        dismissCardBySlug(String(b.slug ?? ""), String(b.cardId ?? ""));
-        json(res, 200, { ok: true });
-      } catch (e) {
-        json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
-      }
-      return;
-    }
-    // "Format for platforms": one `continue` job per selected cut, resuming the normal /atomize
-    // steps 2-8 on the already-scaffolded folder/cut. Everything still lands `pending` in the
-    // Review tab — CLAUDE.md rule 2 holds, nothing here publishes.
-    if (req.method === "POST" && url.pathname === "/api/develop/format") {
-      const b = await readBody(req);
-      const slug = String(b.slug ?? "");
-      const lenses = Array.isArray(b.lenses) ? b.lenses.map(String) : [];
-      if (!lenses.length) {
-        json(res, 400, { ok: false, error: "pick at least one cut to format" });
-        return;
-      }
-      try {
-        const folder = safeFolder(slug);
-        const known = new Set(["extract", ...listCuts(folder)]);
-        const unknown = lenses.filter((l) => !known.has(l));
-        if (unknown.length) {
-          json(res, 400, { ok: false, error: `no such cut: ${unknown.join(", ")}` });
-          return;
-        }
-        const queued = lenses.map((lens) =>
-          publicJob(addJob("continue", buildFormatArg(slug, lens), `Format for platforms: ${slug} (${lens})`, undefined, requestEngine(b.engine))),
-        );
-        json(res, 200, { ok: true, jobs: queued });
       } catch (e) {
         json(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
@@ -1267,7 +1226,7 @@ const server = createServer(async (req, res) => {
       try {
         text = readFileSync(jobLogPath(jobId), "utf8");
       } catch {
-        text = "(no log yet — the job hasn't produced output)";
+        text = "(no log yet: the job hasn't produced output)";
       }
       res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
       res.end(text);
@@ -1306,7 +1265,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/strategy/brief") {
       const abs = latestBriefPath();
       if (!abs) {
-        json(res, 200, { ok: false, error: "no strategy brief exists yet — run /strategy first" });
+        json(res, 200, { ok: false, error: "no strategy brief exists yet. Run /strategy first" });
         return;
       }
       json(res, 200, { ok: true, path: abs.slice(repoRoot.length + 1), content: readFileSync(abs, "utf8") });
@@ -1328,7 +1287,7 @@ const server = createServer(async (req, res) => {
     // pull-style jobs); progress is visible via /api/jobs + the job log meanwhile.
     if (req.method === "POST" && url.pathname === "/api/strategy/refresh-brief") {
       if (jobInFlight("strategy")) {
-        json(res, 409, { ok: false, error: "a /strategy run is already in progress — see the Add / Queue tab" });
+        json(res, 409, { ok: false, error: "a /strategy run is already in progress. See the Add / Queue tab" });
         return;
       }
       try {
@@ -1423,7 +1382,7 @@ const server = createServer(async (req, res) => {
     // send path); found leads land researched/intake awaiting Pursue/Pass.
     if (req.method === "POST" && url.pathname === "/api/outreach/scout") {
       if (jobInFlight("scout")) {
-        json(res, 409, { ok: false, error: "a scout run is already in progress — see the Add / Queue tab" });
+        json(res, 409, { ok: false, error: "a scout run is already in progress. See the Add / Queue tab" });
         return;
       }
       const b = await readBody(req);
@@ -1455,34 +1414,6 @@ const server = createServer(async (req, res) => {
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
       }
-      return;
-    }
-    // "Mark as sent" (design 3d): the step that puts a person on the follow-ups ledger. Appends a
-    // `contacted` tracker event carrying person + channel + which locked message -- the due-date
-    // clock starts here. Nothing is transmitted; Muxin already sent it by hand.
-    if (req.method === "POST" && url.pathname === "/api/outreach/mark-sent") {
-      const b = await readBody(req);
-      const dir = String(b.dir ?? "");
-      const person = String(b.person ?? "").trim();
-      const channel = String(b.channel ?? "").trim();
-      if (!isValidLeadDir(dir)) {
-        json(res, 400, { ok: false, error: "not a valid outreach lead folder" });
-        return;
-      }
-      if (channel && !(CHANNELS as readonly string[]).includes(channel)) {
-        json(res, 400, { ok: false, error: `channel must be one of ${CHANNELS.join(", ")}` });
-        return;
-      }
-      const leadDirName = dir.split("/").pop()!;
-      const bucket = leadDirName.startsWith("platform-") ? "platform" : "client";
-      const locked = latestLockedMessage(join(repoRoot, dir));
-      const event = markSent(bucket, leadDirName, {
-        person: person || undefined,
-        channel: channel || locked?.channel,
-        message: locked?.messageId,
-        note: b.note ? String(b.note) : undefined,
-      });
-      json(res, 200, { ok: true, event });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/outreach/note") {
@@ -1520,7 +1451,7 @@ const server = createServer(async (req, res) => {
         const abs = join(repoRoot, dir, file);
         const { header, fm } = splitFrontmatter(readFileSync(abs, "utf8"));
         if (String(fm.status ?? "").trim() === "locked") {
-          json(res, 200, { ok: false, error: "this message is locked — use Draft follow-up for a new touch instead" });
+          json(res, 200, { ok: false, error: "this message is locked. Use Draft follow-up for a new touch instead" });
           return;
         }
         // `header` keeps its own trailing newline (splitFrontmatter's byte-exact block).
@@ -1542,7 +1473,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       try {
-        const { body } = await reviseOutreachMessage(dir, file, String(b.instruction ?? ""), requestEngine(b.engine));
+        const { body } = await reviseOutreachMessage(dir, file, String(b.instruction ?? ""), b.engine);
         json(res, 200, { ok: true, body });
       } catch (e) {
         json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) });
@@ -1762,8 +1693,13 @@ const server = createServer(async (req, res) => {
 });
 
 // Start the server only when run directly (npm run review), so tests can import revisePrompt et al.
-// without binding the port.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// without binding the port. The explicit function is also the narrow seam used by the hermetic
+// E2E harness: a loader/eval entrypoint cannot reliably satisfy this module-identity check, while
+// an intentional caller can still start the exact same server without changing production routes.
+let startRequested = false;
+export function startReviewServer(): void {
+  if (startRequested) return;
+  startRequested = true;
   // Loopback ONLY, deliberately. This server has no authentication and it both writes real state
   // (approve / revise / discard) and triggers real publishes, so binding every interface — Node's
   // default when no host is passed — put it on the local Wi-Fi for anyone to drive. It also made
@@ -1778,4 +1714,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log("  Approve / revise / discard / edit every pending derivative in one place.");
     console.log("  Only 'approve' rows are acted on by /publish. Ctrl-C to stop.\n");
   });
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  startReviewServer();
 }

@@ -4,6 +4,7 @@ import { repoRoot } from "../db/db.js";
 import { runDraft, draftModel, type DraftResult } from "../outreach/draft.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { ENGINE_COMMANDS, ENGINE_LABELS, type Engine } from "./engines.js";
+import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
 import { decodeSpawnFailure, logTailSuffix, runClaudeSpawn, runQueued } from "./jobs.js";
 
 const REVISE_TIMEOUT_MS = 180_000;
@@ -11,6 +12,11 @@ const DRAFT_TIMEOUT_MS = 120_000;
 
 function engineName(job: { engine?: Engine }): string {
   return ENGINE_LABELS[job.engine ?? "claude"];
+}
+
+function requireOutreachEngine(engine: unknown): OutreachEngine {
+  if (!isOutreachEngine(engine)) throw new Error(`Outreach engine must be ChatGPT or Grok; received ${String(engine)}`);
+  return engine;
 }
 
 // Same "revise ONE file with Claude" pattern as briefRevisePrompt/reviseBrief, scoped to a drafted
@@ -37,13 +43,14 @@ export function outreachMessageRevisePrompt(relPath: string, channel: string, in
 // locked message — a locked text is Muxin's final word; a new angle goes through the existing
 // draft-follow-up path instead. `dir`/`file` are validated by the route (isValidLeadDir + the
 // messages/message-NN.md shape) before this runs.
-export async function reviseOutreachMessage(dir: string, file: string, instruction: string, engine: Engine = "claude"): Promise<{ body: string }> {
-  if (!instruction.trim()) throw new Error("tell Claude what to change first");
+export async function reviseOutreachMessage(dir: string, file: string, instruction: string, engine: unknown = "codex"): Promise<{ body: string }> {
+  const outreachEngine = requireOutreachEngine(engine);
+  if (!instruction.trim()) throw new Error("tell ChatGPT or Grok what to change first");
   const abs = join(repoRoot, dir, file);
   if (!existsSync(abs)) throw new Error("no such message to revise");
   const before = splitFrontmatter(readFileSync(abs, "utf8"));
   if (String(before.fm.status ?? "").trim() === "locked") {
-    throw new Error("this message is locked — use Draft follow-up for a new touch instead");
+    throw new Error("this message is locked. Use Draft follow-up for a new touch instead");
   }
   const channel = typeof before.fm.channel === "string" ? before.fm.channel : "";
   const prompt = outreachMessageRevisePrompt(`${dir}/${file}`, channel, instruction.trim());
@@ -60,10 +67,10 @@ export async function reviseOutreachMessage(dir: string, file: string, instructi
     if (failure) throw new Error(failure);
     const after = splitFrontmatter(readFileSync(abs, "utf8")).body;
     if (after === before.body) {
-      throw new Error(`${engineName(job)} ran but didn't change anything — try a more specific instruction`);
+      throw new Error(`${engineName(job)} ran but didn't change anything. Try a more specific instruction`);
     }
     return { body: after.trim() };
-  }, engine);
+  }, outreachEngine);
 }
 
 // ── Follow-ups tab: "Draft follow-up" ────────────────────────────────────────────────────────
@@ -100,9 +107,10 @@ export function enqueueOutreachDraft(
   label: string,
   dir: string,
   opts: { channel?: string; recipient?: string; direction?: string },
-  engine: Engine = "claude",
+  engine: unknown = "codex",
   deps: OutreachDraftJobDeps = {},
 ): Promise<DraftResult> {
+  const outreachEngine = requireOutreachEngine(engine);
   const draft = deps.runDraft ?? runDraft;
   const spawn = deps.spawn ?? runClaudeSpawn;
   return runQueued("draft-follow-up", label, (job) =>
@@ -130,7 +138,7 @@ export function enqueueOutreachDraft(
         return text;
       },
     }),
-    engine,
+    outreachEngine,
   );
 }
 
@@ -138,9 +146,10 @@ export async function enqueueFollowUpDraft(
   dir: string,
   channel?: string,
   recipient?: string,
-  engine: Engine = "claude",
+  engine: unknown = "codex",
+  deps: OutreachDraftJobDeps = {},
 ): Promise<DraftResult> {
-  return enqueueOutreachDraft(`Draft follow-up: ${dir}`, dir, { channel, recipient }, engine);
+  return enqueueOutreachDraft(`Draft follow-up: ${dir}`, dir, { channel, recipient }, engine, deps);
 }
 
 // ── Outreach thread: the directed first draft (v7 handoff §3, the conversational half) ───────
@@ -154,7 +163,7 @@ export async function enqueueDirectedDraft(
   channel?: string,
   recipient?: string,
   direction?: string,
-  engine: Engine = "claude",
+  engine: unknown = "codex",
   deps: OutreachDraftJobDeps = {},
 ): Promise<DraftResult> {
   return enqueueOutreachDraft(`Draft message: ${dir}`, dir, { channel, recipient, direction }, engine, deps);

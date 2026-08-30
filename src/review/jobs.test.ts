@@ -236,7 +236,7 @@ test("decodeSpawnFailure reports enoent the same way regardless of verb options"
   const result = decodeSpawnFailure({ code: null, timedOut: false, enoent: true }, "job-x", {
     timeoutVerb: "atomize", timeoutLabel: "15 min", exitVerb: "atomize",
   });
-  assert.equal(result, "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
+  assert.equal(result, "the `claude` CLI isn't on this server's PATH. Start the GUI from a terminal where `claude` runs");
 });
 
 test("decodeSpawnFailure uses timeoutVerb + timeoutLabel, and omits the log tail by default", () => {
@@ -266,7 +266,7 @@ test("decodeSpawnFailure names the given command in the enoent message (runComma
   const result = decodeSpawnFailure({ code: null, timedOut: false, enoent: true }, "job-x", {
     timeoutVerb: "scout", timeoutLabel: "30 min", exitVerb: "scout", command: "npm",
   });
-  assert.equal(result, "the `npm` CLI isn't on this server's PATH — start the GUI from a terminal where `npm` runs");
+  assert.equal(result, "the `npm` CLI isn't on this server's PATH. Start the GUI from a terminal where `npm` runs");
 });
 
 // ── outreachMessageRevisePrompt — the Outreach tab's inline "Revise with AI" on a drafted message.
