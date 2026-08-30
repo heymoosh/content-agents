@@ -7,6 +7,7 @@ import { publishShorts, isShortRow } from "../publish/youtube.js";
 import { publishSubstack, isSubstackRow } from "../publish/substack.js";
 import { checkReuse } from "../publish/reuse-guard.js";
 import { lockOutreachMessageRow } from "../outreach/lock.js";
+import { resolveDeliveryPolicy, writeReadyToPaste, type DeliveryPolicyDecision } from "../publish/delivery-policy.js";
 
 // Approve → auto-schedule routing. Which platform scheduler an approved row belongs to. Each check
 // calls the OWNING publisher's own exported predicate (isQuoteCardRow, isTikTokRow, isShortRow,
@@ -37,12 +38,14 @@ export function scheduleKind(row: QueueRow): ScheduleKind | null {
 // The five folder-level publish functions the dispatch routes to. Injected (default = the real ones)
 // so scheduleApproved is unit-testable WITHOUT any real PostPeer / Upload-Post / YouTube / browser call.
 export interface SchedulerDeps {
-  publishText: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
-  publishCards: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
-  publishTikTok: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
-  publishShorts: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
-  publishSubstack: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+  publishText: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
+  publishCards: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
+  publishTikTok: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
+  publishShorts: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
+  publishSubstack: (folder: string, opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision }) => Promise<unknown[]>;
   lockOutreachMessage: (folder: string, opts: { onlyIds?: string[] }) => Promise<unknown[]>;
+  /** Test/embedding seam; production always uses the persisted content-request origin. */
+  resolveDeliveryPolicy?: typeof resolveDeliveryPolicy;
 }
 const DEFAULT_SCHEDULER_DEPS: SchedulerDeps = {
   publishText,
@@ -82,10 +85,19 @@ function reuseGuardPlatform(kind: ScheduleKind, row: QueueRow): string | null {
 export async function scheduleApproved(
   folder: string,
   row: QueueRow,
-  deps: SchedulerDeps = DEFAULT_SCHEDULER_DEPS
+  deps: SchedulerDeps = DEFAULT_SCHEDULER_DEPS,
+  policyDecision?: DeliveryPolicyDecision,
 ): Promise<{ scheduled: unknown; scheduleError: string | null }> {
   const kind = scheduleKind(row);
   if (!kind) return { scheduled: null, scheduleError: null };
+  // Outreach approval locks a message and never contacts a publishing provider.
+  if (kind !== "outreach-lock") {
+    const provider = kind === "text" || kind === "card" ? "typefully" : kind === "tiktok" ? "postpeer" : kind === "video" ? "youtube" : "substack";
+    const policy = policyDecision ?? (deps.resolveDeliveryPolicy ?? resolveDeliveryPolicy)(folder, provider);
+    if (policy.mode === "blocked") return { scheduled: null, scheduleError: `delivery policy blocked: ${policy.reason}` };
+    if (policy.mode === "manual") return { scheduled: writeReadyToPaste(folder, row, policy), scheduleError: null };
+    if (!policy.providerAccountId) return { scheduled: null, scheduleError: "delivery policy blocked: provider account mapping is missing" };
+  }
   const fn =
     kind === "text" ? deps.publishText
     : kind === "card" ? deps.publishCards
@@ -94,7 +106,7 @@ export async function scheduleApproved(
     : kind === "outreach-lock" ? deps.lockOutreachMessage
     : deps.publishShorts;
   try {
-    const done = await fn(folder, { onlyIds: [row.id] });
+    const done = await fn(folder, { onlyIds: [row.id], ...(policyDecision ? { deliveryPolicy: policyDecision } : {}) });
     if (done.length === 0) {
       // The publisher didn't throw, so recompute the check it silently skipped on to find out WHY —
       // when it's the reuse guard, persist a machine-parseable reason (reconcile.ts's

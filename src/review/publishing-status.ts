@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { repoRoot } from "../db/db.js";
 import type { QueueRow } from "../publish/queue.js";
 import { scheduleApproved, scheduleKind, type ScheduleKind } from "./studio-scheduling.js";
+import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode } from "../publish/delivery-policy.js";
 
 export type PublishingState = "scheduling" | "scheduled" | "private" | "blocked" | "uncertain" | "cleared";
 export type PublishingResolution = "exists" | "not-created";
@@ -17,6 +18,12 @@ export interface PublishingStatus {
   plannedFor?: string;
   ref?: string;
   error?: string;
+  policyVersion?: string;
+  origin?: string;
+  brand?: DeliveryBrand | null;
+  deliveryMode?: DeliveryMode;
+  providerAccountId?: string | null;
+  policyReason?: string;
 }
 
 export const PUBLISHING_STATUS_PATH = join(repoRoot, "data", "publishing-status.jsonl");
@@ -175,15 +182,28 @@ export async function scheduleApprovedOnce(
     const blocked = publishingRetryBlock(slug, row, path);
     if (blocked) throw new Error(blocked);
     const provider = providerForKind(kind);
-    appendPublishingStatus({ slug, rowId: row.id, provider, state: "scheduling", at: new Date().toISOString() }, path);
-    const result = await schedule(folder, row);
+    const policy = kind === "outreach-lock"
+      ? { policyVersion: "delivery-policy-v1" as const, origin: "unknown" as const, brand: null, provider: "manual" as const, providerAccountId: null, mode: "manual" as const, reason: "outreach approval locks copy for human sending and never dispatches a publishing provider" }
+      : resolveDeliveryPolicy(folder, provider);
+    const audit = {
+      policyVersion: policy.policyVersion, origin: policy.origin, brand: policy.brand,
+      deliveryMode: policy.mode, providerAccountId: policy.providerAccountId, policyReason: policy.reason,
+    };
+    if (policy.mode === "blocked") {
+      const status: PublishingStatus = { slug, rowId: row.id, provider, state: "blocked", at: new Date().toISOString(), error: `delivery policy blocked: ${policy.reason}`, ...audit };
+      appendPublishingStatus(status, path);
+      return { scheduled: null, scheduleError: status.error ?? null, publishing: status };
+    }
+    appendPublishingStatus({ slug, rowId: row.id, provider, state: "scheduling", at: new Date().toISOString(), ...audit }, path);
+    const result = await schedule(folder, row, undefined, policy);
     const status: PublishingStatus = result.scheduleError
       ? {
           slug, rowId: row.id, provider,
           state: result.scheduleError.startsWith("blocked by reuse guard") ? "blocked" : "uncertain",
           at: new Date().toISOString(), error: result.scheduleError,
+          ...audit,
         }
-      : { slug, rowId: row.id, provider, state: acceptedState(result.scheduled), at: new Date().toISOString(), ...details(result.scheduled) };
+      : { slug, rowId: row.id, provider, state: acceptedState(result.scheduled), at: new Date().toISOString(), ...details(result.scheduled), ...audit };
     appendPublishingStatus(status, path);
     return { ...result, publishing: status };
   } finally {

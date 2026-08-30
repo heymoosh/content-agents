@@ -7,6 +7,7 @@
 // browser-free. This one boots servers and drives Chromium, and belongs on its own command.
 
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -23,6 +24,7 @@ const PASSES = [
   { name: "B-writes", script: "pass-b-writes.ts", title: "Pass B — the write flows (real server, worktree-isolated)" },
   { name: "C-383", script: "pass-c-383.ts", title: "Pass C — the phase-gated #383 surfaces" },
   { name: "D-editorial", script: "pass-d-editorial.ts", title: "Pass D — Fiction and Charles editorial writes" },
+  { name: "D-content-generation", script: "pass-d-content-generation.ts", title: "Pass D — configured Content generation with a disposable injected engine" },
   { name: "E-notcovered", script: "pass-d-notcovered.ts", title: "Pass E — deliberately NOT covered (model-job routes)" },
 ];
 
@@ -70,6 +72,8 @@ function main(): void {
     HOME: disposable.home,
     PLAYWRIGHT_BROWSERS_PATH: browsersPath,
   };
+  const configuredEngineToken = randomUUID();
+  writeFileSync(join(disposable.root, ".e2e-configured-engine-token"), configuredEngineToken, { mode: 0o600 });
   const ledger = join(disposable.root, "e2e", "results.jsonl");
   // Invoke Node's tsx loader directly. The .bin/tsx launcher opens an IPC pipe and can exit
   // before a detached child is ready, which makes bootServer report a misleading clean exit.
@@ -99,7 +103,7 @@ function main(): void {
       const r = spawnSync(tsx, [...tsxArgs, join(disposable.root, "e2e", p.script)], {
         cwd: disposable.root,
         stdio: "inherit",
-        env: { ...env, E2E_PASS: p.name },
+        env: { ...env, E2E_PASS: p.name, ...(p.name === "D-content-generation" ? { CONTENT_AGENTS_E2E_CONFIGURED_ENGINE_TOKEN: configuredEngineToken } : {}) },
       });
       if (r.status !== 0) anyFailed = true;
     }

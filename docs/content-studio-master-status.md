@@ -1,7 +1,10 @@
 # Content Studio master status
 
-**Last reconciled:** 2026-08-30  
-**Repository baseline:** `main` at `db046d4` (through PRs #404, #405, #406, and #407)  
+**Last reconciled:** 2026-08-30
+**Repository baseline:** current branch `docs/content-studio-master-status` at `39bbf7b`, based on
+`origin/main` at `5aecbb5`, plus the uncommitted Phase 0 working-tree changes described below
+**Phase 0 status:** operational provenance and policy wiring are complete with deterministic browser
+coverage, and one authenticated Codex generation canary passed; authenticated provider canaries remain.
 **Purpose:** one current answer to what Content Studio is meant to do, what is actually wired,
 what has been verified, and what remains.
 
@@ -58,23 +61,28 @@ Content handoff, Signals decisions, Outreach tracking improvements, durable Cont
 and engine boundaries. PR #407 added Fiction passage editing and review history plus Charles
 status views, prose-only editing, and retry-safe review notes.
 
+The current working tree closes the four Phase 0 safety boundaries with deterministic coverage:
+configured Muxin-voice generation is constrained within an approved source/cut boundary; Fiction
+and Charles handoffs preserve their approved body and domain restrictions; delivery resolves origin
+to a fail-closed brand/account policy; and a disposable injected-engine Chromium pass now drives
+the real configured-generation GUI flow. These changes are not yet a PR or merge. A bounded
+authenticated Codex CLI generation canary passed in a throwaway repository copy; no authenticated
+provider lifecycle canary is claimed. A read-only authenticated Substack saved-session check also
+passed, proving login readiness but not create/list/cancel or live delivery.
+
 The system is **not** complete end to end. The largest unresolved boundaries are:
 
-1. Configured Content generation can compose treated variants without `source_lines` and does not
-   yet reuse the established extraction-first cut/format pipeline.
-2. Fiction and Charles can hand approved work to Content, but generic generation may use the
-   request text instead of the approved body and does not carry their canon/persona rules.
-3. Delivery has no origin/brand-to-provider-account policy, so shared publishing cannot yet safely
-   guarantee that Charles, Fiction, and Human Inference use the correct identities.
-4. Configured media choices produce Markdown rows and declared asset paths, not the requested
+1. Configured media choices produce Markdown rows and declared asset paths, not the requested
    rendered image, carousel, audiogram, or video assets.
-5. Publishing records scheduling attempts but does not reliably confirm terminal live delivery
+2. Publishing records scheduling attempts but does not reliably confirm terminal live delivery
    across providers.
-6. Studio capture is browser-local and does not start durable work.
-7. Signals adoption records Muxin's decision but does not apply an approved change to system
+3. Studio capture is browser-local and does not start durable work.
+4. Signals adoption records Muxin's decision but does not apply an approved change to system
    behavior.
-8. The newer Grow/pattern architecture contains many useful typed contracts, but much of it remains
+5. The newer Grow/pattern architecture contains many useful typed contracts, but much of it remains
    scaffolded or partially connected to live generation, review, delivery, and outcomes.
+6. Provider delivery lifecycles remain live-unverified because this environment has no provider
+   credentials or non-secret account bindings.
 
 ## Studio and Content
 
@@ -83,11 +91,11 @@ The system is **not** complete end to end. The largest unresolved boundaries are
 | Global Studio shell | One global room bar; each room has a small local view menu; persistent references live in the right rail. | Seven rooms are implemented: Studio, Venture, Content, Outreach, Fiction, Charles, Signals. PR #404. | Deterministic tested in DOM and Chromium fixture passes. | `src/review/page.ts` remains a very large generated HTML/JS module. Keep room labels and supporting documentation synchronized with the seven-room model. |
 | Studio capture | One front door accepts a thought or link, identifies the destination, explains it, and starts the next safe step. | Classification and a `content-studio.capture-handoff.v1` browser `localStorage` record exist. The target room can display and clear it. | Deterministic browser/UI coverage. | **Partially wired.** The capture is not repository-durable, starts no backend job, and has no real next action in Content. “Start on it” currently overstates the result. |
 | Advisor and cuts | Muxin supplies substance; the advisor proposes lens/CTA choices; Muxin edits message-level cuts before formatting. | `/develop`, recommendation rounds, deterministic accept/dismiss, cuts, and cut comments exist. | Deterministic unit coverage; model route not browser-verified. | The advisor/cut path is not the primary current Content cycle. Reconnect it before platform/media formatting. |
-| Content configuration | The system recommends treatments, media, and destinations; Muxin accepts or overrides rather than constructing the plan from scratch. | Durable `content-request.json`, treatment/media/platform selections, untreated controls, recommendations, provenance, and grouped input-request filters exist. PR #406. | Deterministic unit/UI coverage. | Current UI makes Muxin choose the matrix directly. Real recommendation evidence is blocked or generic until reviewed mechanism data exists. |
-| Configured text generation | Extraction-first for Muxin's content; every generated item remains pending review and preserves provenance. | `generateConfiguredContent()` calls the selected engine and writes requested derivative rows. Controls preserve `originalInput`. | Unit-tested output counts/IDs. No real model E2E. | **Blocked for safety.** Treated summaries, counterpoints, and rewrites are model-composed without `source_lines` and bypass the established extraction-first pipeline. Route through approved cut/format logic or add an explicitly approved, provenance-preserving exception before calling this complete. |
+| Content configuration | The system recommends treatments, media, and destinations; Muxin accepts or overrides rather than constructing the plan from scratch. | Durable `content-request.json` now persists validated source or approved-cut provenance, treatment/media/platform selections, untreated controls, recommendations, and grouped input-request filters. The working-tree merge path preserves the authoritative provenance/context rather than accepting client replacement. | Deterministic request, persistence, and UI coverage. | Current UI makes Muxin choose the matrix directly. Real recommendation evidence is blocked or generic until reviewed mechanism data exists. |
+| Configured text generation | Extraction-first for Muxin's content; every generated item remains pending review and preserves provenance. | In the working tree, Human Inference/Studio generation requires authoritative `source_lines`, resolves them through the established source/cut extractor, accepts only a nonempty engine-selected subset/reordering within the approved boundary, writes the selected `source_lines` to frontmatter, and refuses body/provenance mismatches. The engine selects approved lines; it does not compose treated prose. | Deterministic prompt/parser/provenance/output coverage, a disposable injected-engine Chromium pass through the real GUI save-and-generate flow, and one bounded authenticated Codex CLI generation canary in a throwaway repository copy. | Keep provenance enforcement fail-closed while reconnecting advisor/cut review. Repeat authenticated canaries when engine adapters change. |
 | Media generation | Requested media should invoke the relevant text/script, review, render, and asset pipeline. Paid steps remain explicit. | The classic quote-card, image, storyboard/video, captions, TTS, and render subsystems exist. The configured request can name media and declare expected paths. | Classic subsystems have deterministic tests; paid/live paths are gated. | **Partially wired.** Configured image, carousel, audiogram, and video selections do not create the assets. Wire each media type to its real staged pipeline and review gates. |
 | Content review | Group by original request; edit directly; comment/revise; approve explicitly; keep publishing status separate. | Searchable request filter, direct derivative editor, revise notes/engine, bulk selection, approval, and four-step Content views exist. PRs #404/#406. | Strong unit/UI coverage. | Add a disposable-browser pass for Content direct edit, grouped approval, and injected provider outcomes. Clarify in UI that approval currently attempts scheduling immediately. |
-| Cross-room Content handoffs | Venture, Fiction, and Charles reuse one Content workflow while retaining source identity, voice/canon rules, CTA ownership, and delivery policy. | Typed idempotent handoff contracts and routes exist for all three. Approval requirements and some CTA/provenance mismatches are tested. | Deterministic unit/route coverage. | **Blocked for safety for Fiction/Charles delivery.** Generic generation reads `originalInput`, not necessarily the approved body, and lacks canon/persona context. Provider dispatch has no origin/account gate. Fix source/body and brand-policy propagation before enabling broad shared publishing. |
+| Cross-room Content handoffs | Venture, Fiction, and Charles reuse one Content workflow while retaining source identity, voice/canon rules, CTA ownership, and delivery policy. | Typed idempotent handoff contracts and routes exist for all three. The working tree requires and persists Fiction's approved promotion body plus locked passages/canon/provenance restrictions, and Charles's approved post body plus persona/CTA/manual-delivery restrictions. Fiction/Charles configured generation permits only an untreated control copied from that approved body and records context/restriction references; any treated variant fails closed before a job or write. Venture retains its scoped composition exception: treated variants use an approved Venture artifact, `claim_refs`, `config/voice.yaml`, and the no-invented-proof constraint. | Deterministic unit, persistence, route, generation-policy, and Venture prompt/parser coverage. The disposable Chromium pass directly proves Fiction treatment refusal before a job or derivative write. | Add broader cross-room browser scenarios for approved-body/restriction display and Venture composition. Fiction remains provider-blocked until it has a separate configured account; Charles remains manual by decision. |
 
 ## Models, jobs, and runtime safety
 
@@ -124,8 +132,8 @@ Postiz does not support the required destination or capability.
 | Capability | Current state | Verification | Remaining work |
 |---|---|---|---|
 | Unified scheduler | `src/publish/slots.ts`, `config/platforms.yaml`, and local append-only `data/publish-schedule.jsonl` claim PT/DST-aware slots across streams. | Strong deterministic tests. | The ledger is gitignored and checkout-local. Define one operational data root and cross-process concurrency/recovery behavior. |
-| Publish orchestration | Studio approval dispatches through Postiz first for supported destinations/media, with Typefully retained as the working fallback and specialized exceptions only where needed. | Deterministic tests with mocked providers; Postiz is not implemented. | Use the self-hosted Postiz capability/account registry as canonical. Keep Typefully fallback behavior verified during migration. Current Content choices omit supported Mastodon, expose unsupported Instagram generation/delivery, and omit community. |
-| Publishing status | PR #406 added append-only `data/publishing-status.jsonl`, atomic per-row attempts, planned provider/time, retry blocking, uncertainty, and human reconciliation. | Strong deterministic unit/UI coverage. | There is no reliable terminal `published/live` ingest across all providers. Distinguish delivered, deleted, canceled, failed, private, and uncertain; persist provider IDs and `published_at`/URL instead of parsing free-text logs. |
+| Publish orchestration | Studio approval dispatches through the currently implemented provider paths; Postiz remains the decided but unimplemented primary. The working tree resolves persisted origin before dispatch: Human Inference/Venture require an exact non-secret account assertion matching the credential identity, Fiction fails closed without a separate account, Charles writes ready-to-paste copy, and missing/ambiguous origins are blocked. Publisher adapters also assert the supplied policy at their boundary. | Deterministic policy-matrix, scheduler, adapter, and mocked-provider tests only; Postiz is not implemented and no authenticated provider lifecycle was exercised. | Use the self-hosted Postiz capability/account registry as canonical. Keep Typefully fallback behavior verified during migration. Current Content choices omit supported Mastodon, expose unsupported Instagram generation/delivery, and omit community. Configure and live-verify each asserted account before operational dispatch. |
+| Publishing status | Append-only `data/publishing-status.jsonl` records atomic per-row attempts, planned provider/time, retry blocking, uncertainty, and human reconciliation. The working tree also records policy version, origin, brand, delivery mode, provider account ID, and policy reason, including blocked/manual outcomes. | Strong deterministic unit/UI coverage; no authenticated provider verification. | There is no reliable terminal `published/live` ingest across all providers. Distinguish delivered, deleted, canceled, failed, private, and uncertain; persist provider IDs and `published_at`/URL instead of parsing free-text logs. |
 
 ## Venture
 
@@ -163,7 +171,7 @@ history and its “nothing built yet” statement is obsolete.
 | Final chapter approval | GitHub PR is the final chapter review loop. Surgical comment-driven changes only. Lock updates append-only canon. | Existing `/story` workflow remains authoritative. | Strong deterministic tests; established operational workflow. | No UI bridge that promotes a Studio-created scene into the chapter PR and lock flow. |
 | Idea routing | Fiction should accept an idea and decide whether it belongs in world, character, plot, chapter, or imagery while preserving Muxin's wording for non-chapter material. | Not implemented as one conversational inbox. | None end to end. | Build the idea conversation/router, cleanup-without-paraphrase storage, and reviewable writes to the correct canonical document. |
 | PR comment engine routing | Muxin may name different engines for individual GitHub comment edits. | Not implemented. | None. | Parse approved PR comments, bind exact spans and requested engine, execute surgically, reply with provenance. |
-| Fiction to Content | Approved promotion based on approved/locked chapter may enter Content with fixed Fiction ownership. | Typed handoff exists. | Unit/route coverage. | **Blocked for safety downstream.** Use approved promo body and canon/source restrictions in generation; add Fiction-specific platform/account mapping. |
+| Fiction to Content | Approved promotion based on approved/locked chapter may enter Content with fixed Fiction ownership. | Typed handoff exists. The working tree preserves the approved promo body and canon/source restrictions, permits only an untreated control, and records a blocked delivery-policy outcome when no Fiction account is configured. | Deterministic handoff, generation-policy, delivery-policy, and publishing-ledger coverage. | Deterministic safety boundaries are closed. Operational provider delivery remains blocked until Fiction has a separately configured and verified platform/account mapping. |
 
 ## Charles
 
@@ -173,7 +181,7 @@ history and its “nothing built yet” statement is obsolete.
 | Review and editing | Input, Needs review, Approved, All; prose-only editor; append-only retry-safe review notes. | Implemented in PR #407. | Disposable Chromium proves prose save, frontmatter preservation, retry deduplication, and reload history. | Review history is local single-process JSONL and silently appears empty on read failure. Add visible health/error state if it becomes operationally important. |
 | Persona editing | Muxin wants to update the persona source from the Studio without accidental rewriting. | The persona brief can be read/copied; production persona files are not directly editable in the UI. | Read-only UI coverage. | Add an explicit, reviewable persona-edit workflow that preserves the verbatim brief and treats changes to drafting logic as held for review. |
 | Delivery | Charles remains ready-to-paste unless Muxin explicitly approves account automation. | Intentionally manual in `charles/AGENTS.md`. | Policy tests. | No Charles-owned provider/account implementation, by design. |
-| Charles to Content | Approved Charles prose can request platform treatments without inheriting another venture/CTA. | Typed handoff exists. | Unit/route coverage. | **Blocked for safety downstream.** Generic generation lacks persona context and provider dispatch lacks a Charles-account/ready-to-paste gate. |
+| Charles to Content | Approved Charles prose can enter Content without inheriting another venture/CTA. | Typed handoff exists. The working tree preserves approved prose and persona restrictions, refuses unsupported treatments, and records manual ready-to-paste delivery as private with no provider account. | Deterministic handoff, generation-policy, delivery-policy, and publishing-ledger coverage. | Deterministic safety boundaries are closed. Delivery remains intentionally manual unless Muxin explicitly changes the policy; no authenticated Charles provider path is claimed. |
 
 ## Signals, analytics, patterns, and Grow
 
@@ -189,14 +197,30 @@ history and its “nothing built yet” statement is obsolete.
 
 ### P0: safety and truthfulness before broader use
 
-1. Repair configured Content generation so extraction-first provenance is enforced. No treated
-   Muxin-voice variant should ship without an approved source/cut and traceable claim boundary.
-2. Repair Fiction/Charles handoff source selection so generation reads the approved body, plus
-   canon/persona restrictions, rather than only the request text.
-3. Add an origin/brand-to-provider-account and delivery-policy gate. Charles must remain manual
-   until explicitly changed; Fiction and Human Inference must never share identity accidentally.
-4. Add the Content generation route to the E2E blocked/unverified inventory until a meaningful
-   injected-engine browser pass exists.
+Implemented in the current uncommitted working tree, with deterministic evidence:
+
+1. Configured Muxin-voice generation enforces approved source/cut provenance and writes the
+   engine-selected nonempty subset/reordering as traceable `source_lines`; missing, mismatched,
+   or out-of-bound references fail closed.
+2. Fiction/Charles handoffs preserve the approved body plus canon/persona/provenance/CTA
+   restrictions in the durable Content request. Configured generation copies that body only for an
+   untreated control and refuses treated variants before starting a job or writing output. Venture
+   treated variants remain on their separate approved-artifact composition path, constrained by
+   `claim_refs`, `config/voice.yaml`, and the no-invented-proof rule.
+3. Delivery applies a versioned origin/brand/account policy at scheduling and provider boundaries.
+   Charles is manual ready-to-paste, Fiction is blocked without its own account, Human Inference/
+   Venture require exact account assertions, and ambiguous/missing origins are blocked.
+4. `POST /api/content/generate` remains blocked by default in browser tests, but a one-run token
+   tied to the disposable repository enables a deterministic injected engine for one Chromium pass.
+   That pass proves GUI authority, traced pending output, zero external calls, and Fiction treatment
+   refusal. Pass E separately inventories only authenticated live CLI execution as nondeterministic.
+
+One bounded authenticated Codex CLI generation canary passed in a throwaway repository copy. No
+provider credential or non-secret provider-account binding is available in this environment, so no
+authenticated provider lifecycle canary ran. Before operationally broadening delivery, configure
+and explicitly gate those provider canaries. Do not treat a working-tree diff or deterministic test
+as a PR, merge, or live delivery proof. The read-only `publish:substack -- --check` probe did confirm
+that the saved Substack browser session is currently authenticated.
 
 ### P1: complete the promised operating loop
 

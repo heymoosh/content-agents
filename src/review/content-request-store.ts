@@ -1,6 +1,7 @@
 import { lstat, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { buildContentRequest, type ContentRequest, type ContentRequestInput, type RecommendationEvidence } from "./content-request.js";
+import { buildContentRequest, mergeContentConfiguration, type ContentRequest, type ContentRequestInput, type RecommendationEvidence } from "./content-request.js";
+import { splitFrontmatter } from "../util/frontmatter.js";
 
 const FILE_NAME = "content-request.json";
 
@@ -43,6 +44,8 @@ function inputFromStored(request: ContentRequest): ContentRequestInput {
     includeUntreatedControl: request.control.enabled,
     ventureId: request.ventureId,
     ventureSource: request.ventureSource,
+    sourceProvenance: request.sourceProvenance,
+    sourceContext: request.sourceContext,
   };
 }
 
@@ -66,6 +69,73 @@ export async function writeContentRequest(contentRoot: string, input: ContentReq
     await rm(tempRoot, { recursive: true, force: true });
   }
   return request;
+}
+
+/**
+ * Establish authority for an ordinary Content-room save from the source file on disk, including
+ * upgrading an older request that predates persisted provenance.
+ * The browser may choose configuration fields, but it cannot assert provenance, cross-room
+ * context, or a different body/brand. Cross-room routes create their own already-authorized
+ * requests before the Content room can edit configuration.
+ */
+export async function authorizeGuiContentRequest(contentRoot: string, input: ContentRequestInput, existing?: ContentRequest): Promise<ContentRequestInput> {
+  const candidate = existing ? mergeContentConfiguration(existing, input) : input;
+  if (existing && (existing.sourceProvenance || existing.sourceContext || existing.ventureSource)) return candidate;
+  if (existing && existing.origin !== "studio" && existing.origin !== "human-inference") {
+    throw new Error(`existing ${existing.origin} request has no server-owned source authority`);
+  }
+  const { root } = await targetPath(contentRoot);
+  const raw = await readFile(join(root, "source.md"), "utf8");
+  const { fm } = splitFrontmatter(raw);
+  const storedOrigin = String(fm.origin ?? "").trim().toLowerCase();
+  const sourceKind = String(fm.source_kind ?? "").trim().toLowerCase();
+  const crossRoom = ["fiction-promotion", "charles", "venture"].includes(sourceKind)
+    || /^(fiction|charles|venture):/.test(storedOrigin);
+  if (crossRoom) {
+    throw new Error("cross-room Content request is missing; recover it from its owning room instead of rebranding the source");
+  }
+  const canonical = String(fm.canonical_url ?? "").trim().toLowerCase();
+  const humanInference = canonical.includes("humaninference.substack.com/")
+    || storedOrigin.includes("substack.com/@humaninference/");
+  if (!humanInference) {
+    throw new Error("source.md has no explicit Human Inference identity compatible with delivery policy");
+  }
+  const lines = raw.split("\n");
+  let first = 0;
+  if (lines[0] === "---") {
+    const close = lines.indexOf("---", 1);
+    if (close < 0) throw new Error("source.md frontmatter is not closed");
+    first = close + 1;
+  }
+  while (first < lines.length && !lines[first]!.trim()) first++;
+  let last = lines.length - 1;
+  while (last >= first && !lines[last]!.trim()) last--;
+  if (last < first) throw new Error("source.md body is empty");
+  const authoritativeBody = lines.slice(first, last + 1).join("\n").trim();
+  if (candidate.originalInput.trim() !== authoritativeBody) {
+    throw new Error("content request body does not match authoritative source.md");
+  }
+  const sourceLines: (number | string)[] = [];
+  let paragraphStart = first;
+  for (let index = first; index <= last + 1; index++) {
+    if (index <= last && lines[index]!.trim()) continue;
+    const paragraphEnd = index - 1;
+    if (paragraphEnd >= paragraphStart) {
+      const from = paragraphStart + 1;
+      const to = paragraphEnd + 1;
+      sourceLines.push(from === to ? from : `${from}-${to}`);
+    }
+    paragraphStart = index + 1;
+  }
+  return {
+    ...candidate,
+    origin: "human-inference",
+    originalInput: authoritativeBody,
+    ventureId: null,
+    ventureSource: null,
+    sourceProvenance: { kind: "source", sourceLines },
+    sourceContext: null,
+  };
 }
 
 /** Read and rebuild a persisted request, applying the same domain validation as writes. */

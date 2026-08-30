@@ -18,6 +18,7 @@
 // "everything was covered", which is the same class of lie as rendering a number nobody measured.
 
 import { record, results } from "./harness.js";
+import { pathToFileURL } from "node:url";
 
 type Reason = "time+nondeterm" | "metered" | "live";
 
@@ -27,8 +28,9 @@ const ROUTE_COST: Record<Reason, string> = {
   live: "$0, but reaches a live third-party service or a saved browser session",
 };
 
-const NOT_COVERED: { feature: string; route: string; engine: string; why: Reason; pr?: string }[] = [
+export const NOT_COVERED: { feature: string; route: string; engine: string; why: Reason; pr?: string }[] = [
   { feature: "Atomize a piece into platform drafts", route: "POST /api/atomize", engine: "claude -p (subscription)", why: "time+nondeterm" },
+  { feature: "Run configured Content generation against an authenticated live CLI", route: "POST /api/content/generate", engine: "selected Studio CLI engine (Codex, Claude, or Grok)", why: "time+nondeterm" },
   { feature: "Hand a thought to the creative director (develop)", route: "POST /api/develop/start|reply|format", engine: "claude -p (subscription)", why: "time+nondeterm", pr: "#349" },
   { feature: "Ask Claude to revise a draft", route: "POST /api/revise", engine: "claude -p (subscription)", why: "time+nondeterm" },
   { feature: "Draft or re-pass a fiction scene", route: "POST /api/fiction/draft|repass", engine: "claude -p (subscription); grok-openrouter only if a series opts in", why: "time+nondeterm", pr: "#352" },
@@ -46,7 +48,7 @@ const NOT_COVERED: { feature: string; route: string; engine: string; why: Reason
 ];
 
 function main(): void {
-  console.log("\n=== Pass D: deliberately not covered ===\n");
+  console.log("\n=== Pass E: deliberately not covered ===\n");
   for (const n of NOT_COVERED) {
     record({
       feature: n.feature,
@@ -57,9 +59,9 @@ function main(): void {
   }
   const metered = NOT_COVERED.filter((n) => n.why === "metered").length;
   console.log(
-    `\nPass D: ${results.length} features not covered. Only ${metered} of them cost money; the rest are $0 subscription or free-local and were skipped for runtime and non-determinism.\n`
+    `\nPass E: ${results.length} features not covered. Only ${metered} of them cost money; the rest are $0 subscription or free-local and were skipped for runtime and non-determinism.\n`
   );
   process.exit(0);
 }
 
-main();
+if (process.env.E2E_PASS === "E-notcovered" || (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)) main();

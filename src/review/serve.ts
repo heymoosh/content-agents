@@ -92,8 +92,8 @@ import { handleSignalsRoute } from "./serve-signals.js";
 import { createApprovedVentureHandoff, findExistingVentureContentFolder } from "./venture-content-handoff-store.js";
 import { toContentRequestInput as ventureToContentRequestInput } from "./venture-content-handoff.js";
 import { isOutreachEngine, type OutreachEngine } from "./page-outreach.js";
-import { readContentRequest, writeContentRequest } from "./content-request-store.js";
-import { mergeContentConfiguration, type ContentRequestInput } from "./content-request.js";
+import { authorizeGuiContentRequest, readContentRequest, writeContentRequest } from "./content-request-store.js";
+import type { ContentRequestInput } from "./content-request.js";
 import { createLockedChapterHandoff } from "./fiction-content-handoff-store.js";
 import { toContentRequestInput } from "./fiction-content-handoff.js";
 import { seriesDirFor } from "./fiction.js";
@@ -1062,6 +1062,7 @@ const server = createServer(async (req, res) => {
           descriptor: promotion.request.descriptor,
           suggestedPromotionalObjective: promotion.request.suggestedPromotionalObjective,
           originalInput: promotion.request.originalInput,
+          approvedPromotionBody: promotion.body,
         });
         const folder = scaffoldContentFolder({
           title: handoff.descriptor,
@@ -1094,7 +1095,7 @@ const server = createServer(async (req, res) => {
         });
         const folder = scaffoldContentFolder({
           title: handoff.descriptor, origin: `charles:${handoff.identity.persona}`,
-          publishedAt: null, sourceKind: "charles", text: [handoff.thought, handoff.replySource].filter(Boolean).join("\n\n"),
+          publishedAt: null, sourceKind: "charles", text: handoff.approvedPostBody,
         });
         const request = await writeContentRequest(folder, toCharlesContentRequestInput({ ...handoff, id: basename(folder) }));
         json(res, 200, { ok: true, handoff, request });
@@ -1192,9 +1193,8 @@ const server = createServer(async (req, res) => {
         if (input.id !== slug) throw new Error("content request id must match its source slug");
         const folder = safeFolder(slug);
         const storedPath = join(folder, "content-request.json");
-        const safeInput = existsSync(storedPath)
-          ? mergeContentConfiguration(await readContentRequest(folder), input)
-          : input;
+        const existing = existsSync(storedPath) ? await readContentRequest(folder) : undefined;
+        const safeInput = await authorizeGuiContentRequest(folder, input, existing);
         const request = await writeContentRequest(folder, safeInput);
         json(res, 200, { ok: true, request });
       } catch (e) {

@@ -102,6 +102,7 @@ export function changedWorktreePaths(before: Map<string, string>, after: Map<str
 // "not drivable without spawning a model job" — an honest gap, not a pass.
 export const EXPENSIVE_ROUTES = [
   "/api/atomize",
+  "/api/content/generate",
   "/api/develop/start",
   "/api/develop/reply",
   "/api/develop/format",
@@ -281,7 +282,7 @@ export type Session = {
   close: () => Promise<void>;
 };
 
-export async function openSession(port: number): Promise<Session> {
+export async function openSession(port: number, options: { allowInjectedRoutes?: readonly string[] } = {}): Promise<Session> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
@@ -303,7 +304,8 @@ export async function openSession(port: number): Promise<Session> {
   // page load through the handler for no benefit, and only API routes can spawn a model job.
     await page.route("**/api/**", async (route, req: Request) => {
     const path = new URL(req.url()).pathname;
-    if (EXPENSIVE_ROUTES.some((e) => path === e || path.startsWith(e + "/"))) {
+    const explicitlyInjected = options.allowInjectedRoutes?.includes(path) === true;
+    if (!explicitlyInjected && EXPENSIVE_ROUTES.some((e) => path === e || path.startsWith(e + "/"))) {
       blockedCalls.push(`${req.method()} ${path}`);
       await route.abort();
       return;

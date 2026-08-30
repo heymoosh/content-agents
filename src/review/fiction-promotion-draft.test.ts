@@ -15,6 +15,7 @@ const handoff = {
   sourcePassages: [{ ref: "chapter-03:line-1", text: "The door remembered her hand.", locked: true as const }],
   restrictions: { canon: ["Preserve established canon."], provenance: ["Quote only locked passages."] },
   suggestedPromotionalObjective: "Invite readers to start.", descriptor: "A door that remembers", originalInput: "Promote chapter 3.",
+  approvedPromotionBody: "Approved promotion body.",
 };
 const base: FictionPromotionDraftInput = {
   id: "draft-1", request: handoff, body: "The door remembered her hand.", state: "Draft",

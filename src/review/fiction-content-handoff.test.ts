@@ -22,6 +22,7 @@ const base: FictionContentHandoffInput = {
   suggestedPromotionalObjective: "Invite readers to begin the serialized story.",
   descriptor: "A door that remembers",
   originalInput: "Promote chapter 3 with a tense, spoiler-light launch note.\nKeep the mystery intact.",
+  approvedPromotionBody: "The approved promotion copy.\nRead chapter three.",
 };
 
 describe("fiction content handoff", () => {
@@ -50,6 +51,10 @@ describe("fiction content handoff", () => {
     assert.equal(input.ventureId, FICTION_VENTURE_ID);
     assert.equal(input.originalInput, base.originalInput);
     assert.equal(input.descriptor, base.descriptor);
+    assert.equal(input.sourceContext?.kind, "fiction-approved-promotion");
+    assert.equal(input.sourceContext?.authoritativeBody, base.approvedPromotionBody);
+    assert.deepEqual(input.sourceContext && "series" in input.sourceContext ? input.sourceContext.series : null, base.series);
+    assert.deepEqual(input.sourceContext && "sourcePassages" in input.sourceContext ? input.sourceContext.sourcePassages : null, base.sourcePassages);
     assert.equal("cta" in input, false);
     assert.match(input.originalInput, /spoiler-light/);
   });

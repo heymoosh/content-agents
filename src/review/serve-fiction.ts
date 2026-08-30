@@ -97,6 +97,7 @@ export async function handleFictionRoute({ req, res, url, readBody, json, reques
         root: dirname(seriesDir), series, chapter, id: promotionId(chapter),
         descriptor: String(b.descriptor ?? ""), originalInput: String(b.originalInput ?? ""),
         suggestedPromotionalObjective: String(b.objective ?? ""),
+        approvedPromotionBody: "Drafting placeholder",
       });
       const seed = createFictionPromotionDraft({ id: promotionId(chapter), request, body: "Drafting placeholder", state: "Draft", previews: [
         { platform: "substack", media: "text", label: "Launch note" },

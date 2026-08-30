@@ -56,6 +56,7 @@ function queueFixture(status: string): string {
 function makeFolder(status: string): string {
   const folder = mkdtempSync(join(tmpdir(), "reply-gate-test-"));
   mkdirSync(join(folder, "derivatives"), { recursive: true });
+  writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
   writeFileSync(join(folder, "review-queue.md"), queueFixture(status));
   writeFileSync(
     join(folder, "derivatives", "bluesky-1.md"),
@@ -106,6 +107,7 @@ describe("companion: the SAME row DOES ship once manually set to approve (a real
   before(() => {
     process.env.TYPEFULLY_API_KEY = "test-key";
     process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set-1";
+    process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
   });
 
   // Cleanup is a TARGETED removal (drop only the line carrying our own [folder/row] key), never a
@@ -116,6 +118,7 @@ describe("companion: the SAME row DOES ship once manually set to approve (a real
   after(() => {
     delete process.env.TYPEFULLY_API_KEY;
     delete process.env.TYPEFULLY_SOCIAL_SET_ID;
+    delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
     if (folder && existsSync(BETS_PATH)) {
       const key = `[${basename(folder)}/`;
       const lines = readFileSync(BETS_PATH, "utf8").split("\n");

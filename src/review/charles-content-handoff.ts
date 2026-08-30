@@ -12,6 +12,7 @@ export interface CharlesContentHandoffInput {
   readonly selectedOutputs: readonly string[];
   readonly descriptor: string;
   readonly originalInput: string;
+  readonly approvedPostBody: string;
   /** A value here represents an attempted CTA/venture inheritance and is refused unless Charles-owned. */
   readonly inheritedVentureId?: string | null;
 }
@@ -43,6 +44,7 @@ export function createCharlesContentHandoff(input: CharlesContentHandoffInput): 
     id, origin: "charles", thought,
     replySource: input.replySource === undefined ? undefined : required(input.replySource, "replySource"),
     selectedOutputs: selectedOutputs as CharlesOutput[], descriptor, originalInput,
+    approvedPostBody: required(input.approvedPostBody, "approvedPostBody"),
     identity: { persona: CHARLES_IDENTITY, ventureId: CHARLES_VENTURE_ID },
     ctaRestrictions: ["Use Charles-specific lead magnets only; never inherit Fiction, Venture, or Human Inference CTAs."],
   };
@@ -50,5 +52,18 @@ export function createCharlesContentHandoff(input: CharlesContentHandoffInput): 
 
 export function toCharlesContentRequestInput(handoff: CharlesContentHandoff): ContentRequestInput {
   if (handoff.origin !== "charles" || handoff.identity.ventureId !== CHARLES_VENTURE_ID) throw new Error("invalid Charles ownership");
-  return { id: handoff.id, origin: "charles", descriptor: handoff.descriptor, originalInput: handoff.originalInput, ventureId: CHARLES_VENTURE_ID };
+  return {
+    id: handoff.id, origin: "charles", descriptor: handoff.descriptor, originalInput: handoff.originalInput, ventureId: CHARLES_VENTURE_ID,
+    sourceContext: {
+      kind: "charles-approved-post", authoritativeBody: handoff.approvedPostBody,
+      personaRef: "charles/config/persona.yaml", identity: CHARLES_IDENTITY,
+      restrictions: [
+        "Preserve Charles Lord Featherbottom's persona identity and voice.",
+        "Useful leaks must remain truthful to charles/config/persona.yaml sources.",
+        "Delivery is manual and ready-to-paste only; never publish automatically.",
+        "Do not use em dashes.",
+        ...handoff.ctaRestrictions,
+      ],
+    },
+  };
 }

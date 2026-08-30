@@ -23,6 +23,25 @@ export interface VentureContentSource {
   readonly approval: { readonly editorialStatus: "approved"; readonly provenance: "muxin-editorial-approval" };
 }
 
+export interface FictionSourceContext {
+  readonly kind: "fiction-approved-promotion";
+  readonly authoritativeBody: string;
+  readonly series: { readonly id: string; readonly title: string };
+  readonly chapter: { readonly number: number; readonly title: string };
+  readonly sourcePassages: readonly { readonly ref: string; readonly text: string; readonly locked: true }[];
+  readonly restrictions: { readonly canon: readonly string[]; readonly provenance: readonly string[] };
+}
+
+export interface CharlesSourceContext {
+  readonly kind: "charles-approved-post";
+  readonly authoritativeBody: string;
+  readonly personaRef: "charles/config/persona.yaml";
+  readonly identity: "charles-lord-featherbottom";
+  readonly restrictions: readonly string[];
+}
+
+export type ContentSourceContext = FictionSourceContext | CharlesSourceContext;
+
 export interface ContentRequestInput {
   readonly id: string;
   readonly origin: ContentOrigin;
@@ -36,6 +55,14 @@ export interface ContentRequestInput {
   readonly includeUntreatedControl?: boolean;
   readonly ventureId?: string | null;
   readonly ventureSource?: VentureContentSource | null;
+  readonly sourceProvenance?: ContentSourceProvenance | null;
+  readonly sourceContext?: ContentSourceContext | null;
+}
+
+export interface ContentSourceProvenance {
+  readonly kind: "source" | "approved-cut";
+  readonly sourceLines: readonly (number | string)[];
+  readonly lens?: string;
 }
 
 export interface ContentSelections {
@@ -71,6 +98,8 @@ export interface ContentRequest {
   readonly originalInput: string;
   readonly ventureId: string | null;
   readonly ventureSource: VentureContentSource | null;
+  readonly sourceProvenance: ContentSourceProvenance | null;
+  readonly sourceContext: ContentSourceContext | null;
   readonly selections: ContentSelections;
   readonly recommendations: {
     readonly treatments: Recommendation[];
@@ -143,6 +172,49 @@ function ventureSource(value: VentureContentSource | null | undefined): VentureC
   };
 }
 
+function sourceProvenance(value: ContentSourceProvenance | null | undefined): ContentSourceProvenance | null {
+  if (value == null) return null;
+  if (value.kind !== "source" && value.kind !== "approved-cut") throw new Error("source provenance kind is invalid");
+  if (!Array.isArray(value.sourceLines) || value.sourceLines.length === 0) throw new Error("source provenance requires source_lines");
+  const sourceLines = value.sourceLines.map((ref, index) => {
+    if (typeof ref === "number" && Number.isInteger(ref) && ref > 0) return ref;
+    if (typeof ref === "string" && /^\d+-\d+$/.test(ref)) return ref;
+    throw new Error(`source provenance source_lines[${index}] is invalid`);
+  });
+  const lens = value.lens?.trim();
+  if (value.kind === "approved-cut" && !lens) throw new Error("approved-cut provenance requires a lens");
+  if (value.kind === "source" && lens) throw new Error("source provenance cannot name a cut lens");
+  return { kind: value.kind, sourceLines, ...(lens ? { lens } : {}) };
+}
+
+function sourceContext(value: ContentSourceContext | null | undefined, origin: ContentOrigin): ContentSourceContext | null {
+  if (value == null) return null;
+  const authoritativeBody = required(value.authoritativeBody, "source context authoritativeBody");
+  if (value.kind === "fiction-approved-promotion") {
+    if (origin !== "fiction") throw new Error("Fiction source context requires a Fiction origin");
+    if (!Number.isInteger(value.chapter?.number) || value.chapter.number < 1) throw new Error("source context chapter.number is invalid");
+    if (!value.sourcePassages?.length) throw new Error("fiction source context passages are required");
+    return {
+      kind: value.kind, authoritativeBody,
+      series: { id: required(value.series?.id, "source context series.id"), title: required(value.series?.title, "source context series.title") },
+      chapter: { number: value.chapter.number, title: required(value.chapter.title, "source context chapter.title") },
+      sourcePassages: value.sourcePassages.map((item, index) => {
+        if (item.locked !== true) throw new Error(`source context passage[${index}] must be locked`);
+        return { ref: required(item.ref, `source context passage[${index}].ref`), text: required(item.text, `source context passage[${index}].text`), locked: true as const };
+      }),
+      restrictions: { canon: selections(value.restrictions?.canon, "source context canon"), provenance: selections(value.restrictions?.provenance, "source context provenance") },
+    };
+  }
+  if (value.kind === "charles-approved-post") {
+    if (origin !== "charles") throw new Error("Charles source context requires a Charles origin");
+    if (value.personaRef !== "charles/config/persona.yaml" || value.identity !== "charles-lord-featherbottom") throw new Error("Charles source identity is invalid");
+    const restrictions = selections(value.restrictions, "source context restrictions");
+    if (!restrictions.length) throw new Error("Charles source restrictions are required");
+    return { kind: value.kind, authoritativeBody, personaRef: value.personaRef, identity: value.identity, restrictions };
+  }
+  throw new Error("source context kind is invalid");
+}
+
 export function buildContentRequest(input: ContentRequestInput): ContentRequest {
   const id = required(input.id, "id");
   if (!ORIGINS.has(input.origin)) throw new Error("origin is unknown");
@@ -176,7 +248,7 @@ export function buildContentRequest(input: ContentRequestInput): ContentRequest 
   }
   return {
     kind: "content_request", version: CONTENT_REQUEST_VERSION, id, origin: input.origin, descriptor, originalInput: input.originalInput,
-    ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), selections: selected, recommendations: recs,
+    ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), sourceProvenance: sourceProvenance(input.sourceProvenance), sourceContext: sourceContext(input.sourceContext, input.origin), selections: selected, recommendations: recs,
     control: { enabled: controlEnabled }, variants,
   };
 }
@@ -190,6 +262,8 @@ export function mergeContentConfiguration(existing: ContentRequest, incoming: Co
     originalInput: existing.originalInput,
     ventureId: existing.ventureId,
     ventureSource: existing.ventureSource,
+    sourceProvenance: existing.sourceProvenance,
+    sourceContext: existing.sourceContext,
     treatments: incoming.treatments,
     media: incoming.media,
     platforms: incoming.platforms,

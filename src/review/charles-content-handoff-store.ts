@@ -19,6 +19,7 @@ export function createApprovedCharlesHandoff(options: CharlesPostHandoffOptions)
   if (!post.body.trim()) throw new Error("Charles post has no source body");
   return createCharlesContentHandoff({
     id: options.postId, thought: options.thought || post.body,
+    approvedPostBody: post.body,
     replySource: options.replySource, selectedOutputs: options.selectedOutputs,
     descriptor: options.descriptor, originalInput: options.originalInput,
     inheritedVentureId: options.inheritedVentureId,
