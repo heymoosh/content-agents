@@ -14,3 +14,15 @@ description = "Verified false positive: the linkedin-client-secret rule matches 
 paths = [
   '''src/patterns/collectors/linkedin\.ts''',
 ]
+
+[[allowlists]]
+description = "Verified historical false positives: this retained review artifact contains only deterministic SHA-256 artifact/cohort fingerprints. Current file and flagged commit 15b76c6 were read in full on 2026-08-30; neither contains a credential."
+paths = [
+  '''docs/content-studio-program/runs/pattern-review-staging-20260825/review-staging-result\.json''',
+]
+
+[[allowlists]]
+description = "Verified historical false positive: this retained decision artifact contains a deterministic SHA-256 candidate-cohort fingerprint. Current file and flagged commit d091f62 were read in full on 2026-08-30; neither contains a credential."
+paths = [
+  '''docs/content-studio-program/runs/pattern-evidence-gate-20260825/candidate-account-slate-decision\.json''',
+]
