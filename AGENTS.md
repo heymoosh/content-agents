@@ -27,6 +27,25 @@ use `AGENTS.md` so any agent can discover them consistently.
 - Maturity: when you finish a feature or open a PR (not small fixes), check the next rung in `docs/maturity.md` and propose it if its trigger fires — never auto-apply.
 - Living document: when a correction recurs, add the rule here.
 
+## Repository delivery policy
+
+- This is a private, local-first repository. The declared merge gate is
+  `npm run check`, recorded in `.orch/config.toml` and exposed through
+  `.repo-policy/check`.
+- Ordinary lint, typecheck, unit tests, quality checks, and builds run locally.
+  Do not add a pull-request or push-triggered GitHub Action merely to repeat
+  them. The existing `ci.yml` workflow is a manual diagnostic only.
+- Retain hosted Actions only for a concrete external need such as security
+  scanning, scheduled dependency review, publishing, or a real production
+  deployment.
+- This repository currently has no Vercel production project. Do not add
+  `vercel.json` or a Vercel workflow solely for policy compliance. The delivery
+  path is merge to `main`, then run the tool locally as documented in README.
+- If a Vercel production project is introduced, set
+  `git.deploymentEnabled: false`. Any production deployment workflow must be
+  triggered only by tags matching `v*`, never by pull requests or ordinary
+  pushes to `main`.
+
 ## Machine facts (this Mac) — any agent, any vendor
 
 Hard-won on 2026-07-17; these are properties of Muxin's machine, not of any one AI tool.

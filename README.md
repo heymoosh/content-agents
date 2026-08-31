@@ -64,6 +64,19 @@ folder too. One window, one folder, that's the whole system.
 Plain scripts (Claude runs these for you, but they work standalone): `npm run ingest`,
 `npm run bluesky`, `npm run snapshot`, `npm run resonance`, `npm run render`, `npm run publish:*`.
 
+## Verification and delivery
+
+This is a private, local-first tool, not a deployed web application. Run
+`npm run check` locally before merging. Merging to `main` is the repository's
+delivery event; use the commands above from the local checkout afterward.
+
+There is no Vercel production project for this repository, so it intentionally
+has no `vercel.json` and no production deployment workflow. The ordinary CI
+workflow is manual-only for deliberate diagnostics. Hosted automation is
+reserved for the existing security scan and scheduled advisory dependency
+work. See `.repo-policy/README.md` for the full policy and the requirements
+that apply if a production deployment is added later.
+
 ## Video: essay → auto-short
 
 Text + image posts work today with no extra setup. Video is the part that needs a one-time

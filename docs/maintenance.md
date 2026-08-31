@@ -21,12 +21,12 @@ file, don't restart from scratch.
   external-user/data exposure, not credential sensitivity in general — but
   the scanners below apply regardless of class per invariant 2.
 - **Maturity stage:** `docs/maturity.md` says Stage 0 explicitly (not
-  inferred). CI (`ci.yml`: typecheck + test) already exists, ahead of the
-  Stage 0 "deliberately absent" guidance — not this audit's call to change.
+  inferred). CI (`ci.yml`: typecheck + test) is manual-only for deliberate
+  diagnostics; routine verification runs locally through `npm run check`.
 - **Ecosystems:** npm/Node only.
 - **Change velocity:** active — 315 commits in the last 30 days.
-- **Already in place:** required status check `check` on `main`
-  (typecheck + test).
+- **Already in place:** branch protection on `main` with no required hosted
+  status contexts; the local merge gate is `npm run check`.
 
 ## Gaps found and what this PR does
 
@@ -92,7 +92,9 @@ Not filed (on-demand / no repo-specific gap found):
 
 ## Skipped (already covered)
 
-- Required-status-check gating: `check` already required on `main`.
+- Required-status-check gating: no hosted context is required on `main`, which
+  matches the local-first policy. The manually dispatched `check` workflow is
+  diagnostic and is not a merge gate.
 - Idea generation from epics (propose-cards) and idea scout (monthly cadence
   for Class A): both already running — `docs/.idea-scout-stamp` and two
   `ORIGIN: idea-scout 2026-07-14` cards already on the board.
