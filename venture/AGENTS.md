@@ -67,6 +67,14 @@ inference. If a gate field is unset, the correct behavior is to stop and ask, ev
 | `editorial_status: approved` | `p4-day-14-review` artifact | making the Day 14 decision (`day-14-decide`) |
 | decision `status: selected`, `selected_by: "muxin"` | `day-14-decision` (`p4-day-14-decision`) | `phase-4-completed` (alongside `p4-operating-plan` and `daily-operating-plan-choice` above) — Phase 4's own completion, not a fourth checkpoint |
 
+Signals handoffs are accepted only by the Venture-owned `src/venture/signals-input.ts` seam. The
+Content/Signals view remains read-only; Venture requires an independent Muxin action, current
+venture phase/rules, qualified measured evidence, and exact body-free identity. An accepted handoff
+creates at most one `signals-input` internal artifact (`delivery_mode: none`, `publishable: false`)
+plus an idempotent canon decision event. Rejection or a request for more evidence records the
+decision event but creates no artifact. This never clears a checkpoint, unlocks a phase, or
+publishes. Same identity with changed bytes fails closed.
+
 **This is Build 2's expensive lesson, built in on day one.** `/story` shipped without a beat-sheet
 approval gate and drafted an inert chapter before the gate was retrofitted (commit `26bf36c`).
 Venture's equivalent gate lives in **script-level predicates and checkable state**

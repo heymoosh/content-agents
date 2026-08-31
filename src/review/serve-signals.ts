@@ -9,13 +9,16 @@ import { applySignalsProposal, proposeSignalsChange, readSignalsProposals, recon
 import { applyApprovedExperimentToContent, approveExperimentPlan, assertExperimentPlanCanGenerate, type AppliedExperimentContentHandoff, type ExperimentPlan, type ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
 import { buildLiveSignalsExperimentPerformance, buildSignalsExperimentInterpretationPrompt, type ExperimentAnalyticsObservation, type SignalsExperimentPerformanceRow } from "../grow/signals-experiment-performance.js";
 import { loadExperimentPlan, loadExperimentPlanDecision, markExperimentContentHandoff, readExperimentPlans, readExperimentPlansForPerformance, recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
-import { readExperimentInterpretations, recordExperimentInterpretation, reviewExperimentInterpretation, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
+import { loadExperimentInterpretation, readExperimentInterpretations, recordExperimentInterpretation, reviewExperimentInterpretation, type ExperimentInterpretationInput } from "./signals-experiment-result-store.js";
 import { isEngine, type Engine } from "./engines.js";
 import { safeFolder } from "./rows.js";
 import { readPublishingStatuses } from "./publishing-status.js";
 import { buildOutcomeLedger, readOutcomeLedger } from "../grow/outcome-ledger.js";
 import type { SignalsExperimentProposalRequest, SignalsExperimentProposalResult } from "./signals-experiment-proposal.js";
 import { isBrandId } from "../identity/brand.js";
+import { readSignalsVentureProposals, recordSignalsVentureDecision, recordSignalsVentureProposal, signalsVentureProposalId, type SignalsVentureDecision } from "./signals-venture-handoff-store.js";
+import { readCanonEvents } from "../venture/canon.js";
+import { computeState } from "../venture/state.js";
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -29,6 +32,8 @@ type SignalsRouteContext = {
   configRoot?: string;
   experimentPlansPath?: string;
   experimentResultsPath?: string;
+  ventureHandoffsPath?: string;
+  readVentureState?: (slug: string) => { current_phase: number };
   readExperimentPerformance?: () => unknown;
   interpretExperiment?: (id: string, engine: Engine) => Promise<ExperimentInterpretationInput & { readonly autoWinner?: false }>;
   applyExperimentPlan?: (plan: ExperimentPlan, decision: ExperimentPlanDecision) => Promise<AppliedExperimentContentHandoff>;
@@ -75,7 +80,7 @@ export function prepareLiveExperimentInterpretation(id: string, experimentPlansP
 
 // Signals stays split by its existing response contracts: signal summary, outcome families, and
 // redacted research report remain separate reads; decisions are explicit append-only writes.
-export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, readExperimentPerformance, interpretExperiment, applyExperimentPlan, proposeExperiment }: SignalsRouteContext): Promise<boolean> {
+export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, experimentResultsPath, ventureHandoffsPath, readVentureState, readExperimentPerformance, interpretExperiment, applyExperimentPlan, proposeExperiment }: SignalsRouteContext): Promise<boolean> {
   // Signals room (design 3e): deterministic brief + durable user decisions. Muxin decides;
   // adoption records intent only and never mutates configuration or the repository backlog.
   if (req.method === "GET" && url.pathname === "/api/signals") {
@@ -94,7 +99,26 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
       experimentPlans: readExperimentPlans(experimentPlansPath),
       experimentPerformance: readExperimentPerformance?.() ?? readLiveExperimentPerformance(experimentPlansPath),
       experimentInterpretations: readExperimentInterpretations(experimentResultsPath),
+      // A missing/unavailable optional handoff ledger is an honest empty read, like the other
+      // Signals projections. It must not make the core Signals room fail to load.
+      ventureHandoffs: readSignalsVentureProposals(ventureHandoffsPath).map((proposal) => {
+        const decision = readCanonEvents(proposal.ventureSlug).find((event) => event.type === "signals-input-decision" && event.id === `${proposal.ventureSlug}/signals-input/${proposal.id}`);
+        return { ...proposal, ventureDecision: decision ? { outcome: decision.fields.outcome, decidedAt: decision.at, decisionRef: decision.fields.decision_ref } : null };
+      }),
     });
+    return true;
+  }
+  if (req.method === "POST" && /^\/api\/signals\/venture-handoff\/[^/]+\/decision$/.test(url.pathname)) {
+    const [, , , , encodedId] = url.pathname.split("/");
+    const id = decodeURIComponent(encodedId);
+    const body = await readBody(req);
+    try {
+      const decision = String(body.decision ?? "") as SignalsVentureDecision;
+      const proposal = recordSignalsVentureDecision(id, decision, String(body.rationale ?? ""), ventureHandoffsPath);
+      json(res, 200, { ok: true, proposal, openVenture: proposal.ventureSlug });
+    } catch (e) {
+      json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e), ventureHandoffs: readSignalsVentureProposals(ventureHandoffsPath) });
+    }
     return true;
   }
   if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/interpret$/.test(url.pathname)) {
@@ -131,6 +155,54 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
     } catch (e) {
       json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e), experimentPlans: readExperimentPlans(experimentPlansPath) });
     }
+    return true;
+  }
+  if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/venture-handoff\/propose$/.test(url.pathname)) {
+    const [, , , , encodedId] = url.pathname.split("/");
+    const id = decodeURIComponent(encodedId);
+    const body = await readBody(req);
+    try {
+      const ventureSlug = String(body.ventureSlug ?? "").trim();
+      const phase = Number(body.phase);
+      if (!ventureSlug || !Number.isInteger(phase) || phase < 1) throw new Error("named ventureSlug and positive phase are required");
+      const ventureState = (readVentureState ?? computeState)(ventureSlug);
+      if (ventureState.current_phase !== phase) throw new Error(`Venture ${ventureSlug} is in phase ${ventureState.current_phase}, not phase ${phase}`);
+      const plan = loadExperimentPlan(id, experimentPlansPath);
+      const interpretation = loadExperimentInterpretation(id, experimentResultsPath);
+      if (interpretation.reviewStatus !== "accepted") throw new Error("an accepted experiment interpretation is required");
+      if (interpretation.recommendation === "reject") throw new Error("a rejected experiment interpretation cannot become a Venture input");
+      const performance = (readExperimentPerformance?.() ?? readLiveExperimentPerformance(experimentPlansPath)) as { experiments?: SignalsExperimentPerformanceRow[] };
+      const row = performance.experiments?.find((item) => item.experimentId === id);
+      if (!row || row.analysisStatus !== "ready") throw new Error("a ready measured performance row is required");
+      const family = row.primaryMetric.family;
+      if (family !== "audience" && family !== "business") throw new Error("only qualified funnel or business evidence can become a Venture input");
+      if (!row.outcomeRefs.length || !row.primaryComparison?.treatment || !row.primaryComparison.control) throw new Error("both measured arms and outcome references are required");
+      if (!row.outcomeRefs.some((ref) => ref.startsWith("outcome:"))) throw new Error("qualified funnel or business evidence requires an attributed outcome ledger record");
+      if (!row.primaryOutcomeRefs?.treatment.some((ref) => ref.startsWith("outcome:"))
+        || !row.primaryOutcomeRefs.control.some((ref) => ref.startsWith("outcome:"))) {
+        throw new Error("each primary experiment arm requires attributed outcome-ledger evidence; provider-only metrics do not qualify");
+      }
+      const generated = readExperimentPlans(experimentPlansPath).find((item) => item.experimentId === id)?.generatedIds ?? [];
+      const expectedVariants = plan.contentRequest.variants.map((variant) => variant.identity.id).sort();
+      if (generated.length !== expectedVariants.length || [...generated].sort().some((variantId, index) => variantId !== expectedVariants[index])) {
+        throw new Error("the exact experiment Content handoff variants are required");
+      }
+      if (row.primaryComparison.treatment.variantId !== plan.recommendation.expectedOutcome.variantId
+        || row.primaryComparison.control.variantId !== plan.recommendation.expectedOutcome.comparisonRef) {
+        throw new Error("measured treatment/control variant lineage does not match the experiment plan");
+      }
+      const proposal = recordSignalsVentureProposal({
+        id: signalsVentureProposalId(id, ventureSlug, phase), ventureSlug, phase, sourceId: plan.contentRequest.id,
+        variantId: row.primaryComparison.treatment.variantId, experimentId: id, title: plan.recommendation.hypothesis,
+        factualSummary: `${row.primaryMetric.metric} was measured across both experiment arms.`, proposedInput: interpretation.rationale,
+        rationale: interpretation.rationale, confidence: interpretation.confidence,
+        evidenceRefs: [...new Set([...interpretation.evidenceRefs, ...row.primaryOutcomeRefs.treatment, ...row.primaryOutcomeRefs.control])],
+        inputKind: family === "business" ? "business" : "funnel", contentItemRefs: generated,
+        scope: plan.contentRequest.id, sampleSize: { treatment: row.primaryComparison.treatment.sample, control: row.primaryComparison.control.sample },
+        provenance: { planDigest: plan.digest, interpretationId: interpretation.id }, caveats: [...interpretation.caveats], qualification: "qualified", evidenceStatus: "measured",
+      }, ventureHandoffsPath);
+      json(res, 200, { ok: true, proposal });
+    } catch (e) { json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e) }); }
     return true;
   }
   if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/interpretation\/(accept|reject)$/.test(url.pathname)) {

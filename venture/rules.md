@@ -84,6 +84,10 @@ not the 14-day phase logic itself. Locked 2026-08-07, alongside the room-placeme
 10. Every automated recommendation — platform fit, media mix, cadence, framing, CTA — stays
     recommendation-only and approval-gated. Nothing here authorizes an automatic content-engine
     change without Muxin's explicit adoption.
+11. An accepted, measured Signals handoff is stored as an internal `signals-input` artifact in the
+    Venture's current phase. It is never publishable, never clears a checkpoint, and never changes a
+    locked Venture decision by itself. This additive cross-system receipt does not reinterpret the
+    fixed source material or any phase rubric stamped by the current rules version.
 
 **Authority note (Muxin, 2026-08-07).** This file, `docs/venture-build-plan.md`, and
 `docs/venture-schema-contract.md` are the authority for Venture CTA and strategy behavior.

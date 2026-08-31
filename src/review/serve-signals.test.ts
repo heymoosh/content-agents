@@ -8,7 +8,9 @@ import { appendSignalsDecision, readSignalsDecisions } from "./signals-decisions
 import { buildContentRequest } from "./content-request.js";
 import { approveExperimentPlan, buildExperimentPlan } from "../grow/experiment-content-handoff.js";
 import { signalsExperimentRecommendation } from "../grow/experiment-test-fixtures.js";
-import { recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { markExperimentContentHandoff, recordExperimentPlan, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { readSignalsVentureProposals, recordSignalsVentureProposal } from "./signals-venture-handoff-store.js";
+import { recordExperimentInterpretation, reviewExperimentInterpretation } from "./signals-experiment-result-store.js";
 
 function harness(method: string, path: string, body: Record<string, unknown> = {}) {
   let response: { code: number; value: unknown } | undefined;
@@ -31,8 +33,126 @@ test("decline is durably recorded and returned by a later Signals read", async (
     assert.equal(h.response()?.code, 200);
     assert.equal(readSignalsDecisions(ledger)["TEST:Try the audit hook"].decision, "decline");
     const read = harness("GET", "/api/signals");
-    assert.equal(await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: ledger, proposalsPath: join(root, "proposals"), experimentPlansPath: join(root, "plans") }), true);
+    assert.equal(await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: ledger, proposalsPath: join(root, "proposals"), experimentPlansPath: join(root, "plans"), ventureHandoffsPath: join(root, "venture-handoffs.jsonl") }), true);
     assert.deepEqual((read.response()?.value as any).decisions["TEST:Try the audit hook"].decision, "decline");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals Venture handoff decision returns the named Venture and never writes Venture state", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-venture-"));
+  const handoffs = join(root, "handoffs.jsonl");
+  try {
+    const p = recordSignalsVentureProposal({ id: "learn-1", ventureSlug: "venture-a", phase: 2, sourceId: "s", variantId: "v", experimentId: "e", title: "A bounded input", factualSummary: "Observed fact", proposedInput: "Try this", rationale: "Useful next test", confidence: "medium", evidenceRefs: ["outcome:1"], inputKind: "funnel", contentItemRefs: ["item-1"], scope: "one venture", sampleSize: { treatment: 10, control: 10 }, provenance: { planDigest: "sha256:plan", interpretationId: "sha256:interp" }, caveats: ["caveat"], qualification: "qualified", evidenceStatus: "measured" }, handoffs);
+    const h = harness("POST", `/api/signals/venture-handoff/${p.id}/decision`, { decision: "adopt", rationale: "I want to use this input" });
+    assert.equal(await handleSignalsRoute({ ...h, res: {} as any, ventureHandoffsPath: handoffs }), true);
+    assert.equal(h.response()?.code, 200);
+    assert.deepEqual((h.response()?.value as any).openVenture, "venture-a");
+    assert.equal((h.response()?.value as any).proposal.status, "adopted");
+    const read = harness("GET", "/api/signals");
+    await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), ventureHandoffsPath: handoffs, proposalsPath: join(root, "changes"), experimentPlansPath: join(root, "plans") });
+    assert.equal((read.response()?.value as any).ventureHandoffs[0].status, "adopted");
+    assert.equal((read.response()?.value as any).ventureHandoffs[0].ventureGate, "blocked");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals Venture proposal is derived only from accepted measured experiment state", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-venture-create-"));
+  const plansPath = join(root, "plans.jsonl"), resultsPath = join(root, "results.jsonl"), handoffs = join(root, "handoffs.jsonl");
+  try {
+    const input = { id: "content-create", origin: "human-inference" as const, descriptor: "input", originalInput: "source", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request = buildContentRequest(input);
+    const treated = request.variants.find((v) => v.identity.kind === "treated")!.identity.id;
+    const control = request.variants.find((v) => v.identity.kind === "control")!.identity.id;
+    const plan = buildExperimentPlan({ recommendation: { ...signalsExperimentRecommendation({ variantId: treated, comparisonRef: control }), id: "experiment-create", confidence: "high" }, contentRequest: input, variablesByVariant: Object.fromEntries(request.variants.map((v) => [v.identity.id, { opening: v.identity.kind }])), capacity: { availablePublishingUnits: 10, availableDays: 7 } });
+    recordExperimentPlan(plan, plansPath);
+    const approved = approveExperimentPlan(plan, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" });
+    reviewExperimentPlan(plan.recommendation.id, approved, plansPath);
+    markExperimentContentHandoff(plan.recommendation.id, { experimentId: plan.recommendation.id, generatedIds: [treated, control], copyApproval: "pending-in-content" }, plansPath);
+    const interpretation = recordExperimentInterpretation({ experimentId: plan.recommendation.id, recommendation: "keep", rationale: "Use the measured opening as the next audience input.", evidenceRefs: ["outcome:1"], confidence: "high", caveats: ["bounded"], engine: "codex" }, resultsPath);
+    reviewExperimentInterpretation(plan.recommendation.id, "accepted", "I accept this reading.", resultsPath);
+    const response = harness("POST", "/api/signals/experiments/experiment-create/venture-handoff/propose", { ventureSlug: "venture-a", phase: 2, proposedInput: "client tamper", evidenceRefs: ["client-tamper"] });
+    await handleSignalsRoute({ ...response, res: {} as any, experimentPlansPath: plansPath, experimentResultsPath: resultsPath, ventureHandoffsPath: handoffs, readVentureState: () => ({ current_phase: 2 }), readExperimentPerformance: () => ({ experiments: [{ experimentId: "experiment-create", analysisStatus: "ready", primaryMetric: { family: "audience", metric: "opt-ins" }, outcomeRefs: ["outcome:1"], primaryOutcomeRefs: { treatment: ["outcome:treatment"], control: ["outcome:control"] }, primaryComparison: { treatment: { variantId: treated, sample: 10, value: 2 }, control: { variantId: control, sample: 10, value: 1 } } }] }) });
+    assert.equal(response.response()?.code, 200, JSON.stringify(response.response()?.value));
+    const value = response.response()?.value as any;
+    assert.equal(value.proposal.proposedInput, interpretation.rationale);
+    assert.equal(value.proposal.ventureSlug, "venture-a");
+    assert.equal(value.proposal.evidenceStatus, "measured");
+    assert.deepEqual(value.proposal.evidenceRefs, ["outcome:1", "outcome:control", "outcome:treatment"]);
+
+    const stalePhase = harness("POST", "/api/signals/experiments/experiment-create/venture-handoff/propose", { ventureSlug: "venture-stale", phase: 2 });
+    await handleSignalsRoute({ ...stalePhase, res: {} as any, experimentPlansPath: plansPath, experimentResultsPath: resultsPath, ventureHandoffsPath: handoffs, readVentureState: () => ({ current_phase: 3 }), readExperimentPerformance: () => ({ experiments: [] }) });
+    assert.equal(stalePhase.response()?.code, 409);
+    assert.match(String((stalePhase.response()?.value as any).error), /phase 3.*not phase 2/i);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals Venture proposal rejects generic conversation and provider-only audience metrics", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-venture-qualification-"));
+  const plansPath = join(root, "plans.jsonl"), resultsPath = join(root, "results.jsonl"), handoffs = join(root, "handoffs.jsonl");
+  try {
+    const input = { id: "content-qualified", origin: "human-inference" as const, descriptor: "input", originalInput: "source", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request = buildContentRequest(input);
+    const treated = request.variants.find((v) => v.identity.kind === "treated")!.identity.id;
+    const control = request.variants.find((v) => v.identity.kind === "control")!.identity.id;
+    const plan = buildExperimentPlan({ recommendation: { ...signalsExperimentRecommendation({ variantId: treated, comparisonRef: control }), id: "experiment-qualified", confidence: "high" }, contentRequest: input, variablesByVariant: Object.fromEntries(request.variants.map((v) => [v.identity.id, { opening: v.identity.kind }])), capacity: { availablePublishingUnits: 10, availableDays: 7 } });
+    recordExperimentPlan(plan, plansPath);
+    const approved = approveExperimentPlan(plan, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" });
+    reviewExperimentPlan(plan.recommendation.id, approved, plansPath);
+    markExperimentContentHandoff(plan.recommendation.id, { experimentId: plan.recommendation.id, generatedIds: [treated, control], copyApproval: "pending-in-content" }, plansPath);
+    recordExperimentInterpretation({ experimentId: plan.recommendation.id, recommendation: "keep", rationale: "Measured, but not yet a Venture-qualified outcome.", evidenceRefs: ["analytics:1"], confidence: "high", caveats: ["bounded"], engine: "codex" }, resultsPath);
+    reviewExperimentInterpretation(plan.recommendation.id, "accepted", "I accept this content reading only.", resultsPath);
+
+    for (const family of ["attention", "conversation", "audience"] as const) {
+      const response = harness("POST", "/api/signals/experiments/experiment-qualified/venture-handoff/propose", { ventureSlug: `venture-${family}`, phase: 2 });
+      await handleSignalsRoute({ ...response, res: {} as any, experimentPlansPath: plansPath, experimentResultsPath: resultsPath, ventureHandoffsPath: handoffs, readVentureState: () => ({ current_phase: 2 }), readExperimentPerformance: () => ({ experiments: [{ experimentId: "experiment-qualified", analysisStatus: "ready", primaryMetric: { family, metric: family === "attention" ? "impressions" : family === "conversation" ? "replies" : "clicks" }, outcomeRefs: ["analytics:1", "outcome:unrelated-guardrail"], primaryOutcomeRefs: { treatment: [], control: [] }, primaryComparison: { treatment: { variantId: treated, sample: 10, value: 2 }, control: { variantId: control, sample: 10, value: 1 } } }] }) });
+      assert.equal(response.response()?.code, 409);
+      assert.match(String((response.response()?.value as any).error), /qualified funnel|business|outcome[- ]ledger/i);
+    }
+    assert.deepEqual(readSignalsVentureProposals(handoffs), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals Venture proposal rejects rejected interpretations and mismatched experiment variants", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-venture-lineage-"));
+  const plansPath = join(root, "plans.jsonl"), resultsPath = join(root, "results.jsonl"), handoffs = join(root, "handoffs.jsonl");
+  try {
+    const input = { id: "content-lineage", origin: "human-inference" as const, descriptor: "input", originalInput: "source", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request = buildContentRequest(input);
+    const treated = request.variants.find((v) => v.identity.kind === "treated")!.identity.id;
+    const control = request.variants.find((v) => v.identity.kind === "control")!.identity.id;
+    const plan = buildExperimentPlan({ recommendation: { ...signalsExperimentRecommendation({ variantId: treated, comparisonRef: control }), id: "experiment-lineage", confidence: "high" }, contentRequest: input, variablesByVariant: Object.fromEntries(request.variants.map((v) => [v.identity.id, { opening: v.identity.kind }])), capacity: { availablePublishingUnits: 10, availableDays: 7 } });
+    recordExperimentPlan(plan, plansPath);
+    const approved = approveExperimentPlan(plan, { status: "approved", decidedBy: "muxin", decidedAt: "2026-08-31T18:00:00.000Z" });
+    reviewExperimentPlan(plan.recommendation.id, approved, plansPath);
+    markExperimentContentHandoff(plan.recommendation.id, { experimentId: plan.recommendation.id, generatedIds: [treated, control], copyApproval: "pending-in-content" }, plansPath);
+    recordExperimentInterpretation({ experimentId: plan.recommendation.id, recommendation: "reject", rationale: "This result should not become a Venture input.", evidenceRefs: ["outcome:lineage"], confidence: "high", caveats: ["bounded"], engine: "codex" }, resultsPath);
+    reviewExperimentInterpretation(plan.recommendation.id, "accepted", "I accept the rejection reading.", resultsPath);
+    const performance = (treatmentId: string) => ({ experiments: [{ experimentId: "experiment-lineage", analysisStatus: "ready", primaryMetric: { family: "business", metric: "qualified-inquiries" }, outcomeRefs: ["outcome:lineage"], primaryOutcomeRefs: { treatment: ["outcome:lineage"], control: ["outcome:lineage"] }, primaryComparison: { treatment: { variantId: treatmentId, sample: 10, value: 2 }, control: { variantId: control, sample: 10, value: 1 } } }] });
+
+    const rejected = harness("POST", "/api/signals/experiments/experiment-lineage/venture-handoff/propose", { ventureSlug: "venture-rejected", phase: 2 });
+    await handleSignalsRoute({ ...rejected, res: {} as any, experimentPlansPath: plansPath, experimentResultsPath: resultsPath, ventureHandoffsPath: handoffs, readVentureState: () => ({ current_phase: 2 }), readExperimentPerformance: () => performance(treated) });
+    assert.equal(rejected.response()?.code, 409);
+    assert.match(String((rejected.response()?.value as any).error), /reject/i);
+
+    // A non-rejected interpretation is required before the lineage branch can be reached.
+    const acceptedResults = join(root, "accepted-results.jsonl");
+    recordExperimentInterpretation({ experimentId: plan.recommendation.id, recommendation: "keep", rationale: "A qualified result.", evidenceRefs: ["outcome:lineage"], confidence: "high", caveats: ["bounded"], engine: "codex" }, acceptedResults);
+    reviewExperimentInterpretation(plan.recommendation.id, "accepted", "I accept this reading.", acceptedResults);
+    const mismatched = harness("POST", "/api/signals/experiments/experiment-lineage/venture-handoff/propose", { ventureSlug: "venture-mismatch", phase: 2 });
+    await handleSignalsRoute({ ...mismatched, res: {} as any, experimentPlansPath: plansPath, experimentResultsPath: acceptedResults, ventureHandoffsPath: handoffs, readVentureState: () => ({ current_phase: 2 }), readExperimentPerformance: () => performance("wrong-treatment") });
+    assert.equal(mismatched.response()?.code, 409);
+    assert.match(String((mismatched.response()?.value as any).error), /variant|lineage|treatment/i);
+    assert.deepEqual(readSignalsVentureProposals(handoffs), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals read fails closed on a corrupt Venture handoff ledger", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-corrupt-handoff-"));
+  const path = join(root, "handoffs.jsonl");
+  try {
+    writeFileSync(path, "{not-json}\n");
+    const read = harness("GET", "/api/signals");
+    await assert.rejects(() => handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: join(root, "plans"), ventureHandoffsPath: path }));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -100,7 +220,7 @@ test("Signals experiment approval triggers canonical Content generation but leav
     assert.equal(value.decision.authorizesCopyApproval, false);
     assert.equal(value.experimentPlans[0].status, "drafts-pending-content-review");
     const read = harness("GET", "/api/signals");
-    await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: plansPath });
+    await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: plansPath, ventureHandoffsPath: join(root, "venture-handoffs.jsonl") });
     assert.equal((read.response()?.value as any).experimentPlans[0].generatedCopyIncluded, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -201,20 +321,24 @@ test("Signals proposal endpoint records an honest no-experiment without creating
 });
 
 test("Signals read exposes collecting and ready experiment evidence from the measurement loop", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-performance-"));
   const read = harness("GET", "/api/signals");
   const experimentPerformance = {
     kind: "signals_experiment_performance", version: "signals-experiment-performance-v1",
     experiments: [{ experimentId: "ready", analysisStatus: "ready", blockers: [], autoWinner: false }],
     autoWinner: false, sideEffects: "none",
   };
-  await handleSignalsRoute({
-    ...read, res: {} as any,
-    decisionsPath: join(tmpdir(), "missing-signals-decisions"),
-    proposalsPath: join(tmpdir(), "missing-signals-proposals"),
-    experimentPlansPath: join(tmpdir(), "missing-signals-plans"),
-    readExperimentPerformance: () => experimentPerformance,
-  } as any);
-  assert.deepEqual((read.response()?.value as any).experimentPerformance, experimentPerformance);
+  try {
+    await handleSignalsRoute({
+      ...read, res: {} as any,
+      decisionsPath: join(root, "missing-signals-decisions"),
+      proposalsPath: join(root, "missing-signals-proposals"),
+      experimentPlansPath: join(root, "missing-signals-plans"),
+      ventureHandoffsPath: join(root, "missing-venture-handoffs.jsonl"),
+      readExperimentPerformance: () => experimentPerformance,
+    } as any);
+    assert.deepEqual((read.response()?.value as any).experimentPerformance, experimentPerformance);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("Signals interpretation stays reviewable, persists the human decision, and never selects a winner", async () => {

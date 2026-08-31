@@ -439,6 +439,7 @@ require a new artifact.
 | `phase_1_research_read` | see §2C — expanded 2026-08-07, corrective pass |
 | `day-14-review` | see §5.1's scorecard read model below |
 | `thank-you-note` | `response_id` (must name a real record in `responses.jsonl`), `influenced_idea_or_section`, `note_text` (rules.md §8.4 caps it at two short sentences unless `muxin_asked_for_more: true`) |
+| `signals-input` | body-free accepted Signals handoff metadata: pointer, source/evidence/content refs, scope, sample size, provenance, caveats, lineage, Content decision ref, Venture gate ref, qualification, evidence status, and Venture decision fact |
 
 Two structured kinds — `phase_1_research_plan` and `phase_1_research_read` — get their own subsection
 (§2C) rather than a single table cell, because the 2026-08-07 review found the original one-line
@@ -719,6 +720,7 @@ script sets them without judgment.
 | `daily-operating-plan` | `none` | false | internal artifact | n/a | 4 |
 | `day-14-review` | `none` | false | internal artifact | n/a | 4 |
 | `thank-you-note` | `manual` | false | sent by hand | `attestation` | 4 |
+| `signals-input` | `none` | false | internal accepted Signals input; no delivery or checkpoint effect | — | current Venture phase |
 
 **Renamed from `text-post-longform` (2026-08-07).** A Starter Kit sprint post is capped under 150
 words (`venture/rules.md` §5.3) — calling that "long-form" was actively misleading, flagged by the

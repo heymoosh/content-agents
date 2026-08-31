@@ -98,6 +98,7 @@ describe("Signals per-experiment performance view", () => {
       "analytics:guardrail-control", "analytics:guardrail-treatment", "analytics:primary-control-1",
       "analytics:primary-control-2", "analytics:primary-treatment-1", "analytics:primary-treatment-2",
     ]);
+    assert.deepEqual(row.primaryOutcomeRefs, { treatment: [], control: [] }, "provider observations never masquerade as outcome-ledger evidence");
   });
 
   test("keeps a one-sided or guardrail-free result collecting", () => {

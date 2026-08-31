@@ -1060,6 +1060,23 @@ test("Signals decisions persist through the API instead of browser-session Sets"
   assert.ok(!html.includes("Declined this session"));
 });
 
+test("Signals Venture inputs stay in the Signals surface and keep the Venture gate separate", () => {
+  const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
+  const script = emittedScripts().join("\n");
+  assert.ok(html.includes("VENTURE INPUTS"));
+  assert.ok(html.includes("Request more evidence"));
+  assert.ok(script.includes("ventureHandoffs"));
+  assert.ok(script.includes('/api/signals/venture-handoff/'));
+  assert.ok(script.includes("Venture remains separately gated"));
+  assert.ok(!script.includes('button.dataset.id)+"/accept'));
+  const signalsAction = script.slice(script.indexOf('"/signals-input/'), script.indexOf('"/signals-input/') + 700);
+  assert.ok(signalsAction.includes("outcome: signalsInput.dataset.signalsInputAction"));
+  assert.ok(signalsAction.includes("reason"));
+  for (const forbidden of ["rulesVersion", "contentDecisionRef", "ventureGateRef", "decisionRef", "measured"]) {
+    assert.ok(!signalsAction.includes(forbidden), "Venture authority field must not be client-supplied: "+forbidden);
+  }
+});
+
 test("GPT-OSS is selectable for read-only Signals analysis but not file-writing strategy runs", () => {
   const html = renderPage({ repoRoot: process.cwd(), isDevWorktree: false });
   const analysis = html.slice(html.indexOf('id="signalsAnalysisEngine"') - 120, html.indexOf('id="signalsAnalysisEngine"') + 500);
@@ -3452,4 +3469,14 @@ test("Signals experiments expose collecting or ready evidence and keep interpret
   assert.match(html, /This never selects a winner/);
   assert.match(html, /displayLabel\(analysisStatus\)/);
   assert.match(html, /displayLabel\(interpretation\.confidence\)/);
+});
+
+test("Venture Signals inputs stop offering decision buttons after the durable Venture decision projects back", () => {
+  const script = emittedScripts().join("\n");
+  assert.match(script, /p\.ventureDecision\?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS'/);
+  assert.match(script, /p\.ventureDecision\?'':'<div class="vacts">/);
+  assert.match(script, /outcome: signalsInput\.dataset\.signalsInputAction, reason/);
+  for (const forged of ["rulesVersion", "contentDecisionRef", "ventureGateRef", "decisionRef", "measured"]) {
+    assert.doesNotMatch(script.slice(script.indexOf("const signalsInput ="), script.indexOf("const card =", script.indexOf("const signalsInput ="))), new RegExp(forged));
+  }
 });

@@ -3223,6 +3223,7 @@ function renderVentureSheets(){
 let VENTURE_SLUGS = [];
 let ventureSlug = null;
 let VENTURE_THREAD = null;
+let VENTURE_SIGNALS = null;
 let VENTURE_SUMMARIES = {};
 let VENTURE_DOCUMENTS = [];
 let ventureDocument = null;
@@ -3383,12 +3384,13 @@ async function loadVenture(){
   const requestedSlug = ventureSlug;
   showRoomLoading("ventureThread");
   try {
-    const r = await fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread");
+    const [r, signalsResponse] = await Promise.all([fetch("/api/venture/"+encodeURIComponent(requestedSlug)+"/thread"), fetch("/api/signals").catch(()=>null)]);
     if(!r.ok) throw new Error("venture "+r.status);
     const j = await r.json();
     if(requestedSlug !== ventureSlug){ hideRoomLoading("ventureThread"); return; }
     if(!j.ok) throw new Error(j.error || "could not read this venture");
     VENTURE_THREAD = j.thread;
+    VENTURE_SIGNALS = signalsResponse&&signalsResponse.ok ? await signalsResponse.json() : null;
     VENTURE_SUMMARIES[requestedSlug] = j.thread;
     $("#ventureRunStepBtn").disabled = false;
     renderVenture();
@@ -3963,7 +3965,9 @@ function renderVenture(){
   const t = VENTURE_THREAD;
   if(!t){ $("#ventureThread").innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
   $("#ventureDay").textContent = vDayLine(t.elapsedDays);
-  $("#ventureThread").innerHTML = t.messages.map(m=>{
+  const signals = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).filter(p=>p.ventureSlug===ventureSlug&&p.status==="adopted");
+  const signalsHtml = signals.map(p=>'<div class="vblock" data-signals-input="'+esc(p.id)+'"><div class="vmono">SIGNALS INPUT · '+(p.ventureDecision?'DECIDED IN VENTURE':'ADOPTED IN SIGNALS')+'</div><div class="vtitle" style="font-size:20px">'+esc(p.title)+'</div><div class="vnote" style="margin-top:8px">'+esc(p.proposedInput)+' · measured '+esc(p.evidenceStatus)+' evidence · phase '+esc(p.phase)+(p.ventureDecision?' · Venture decision: '+esc(p.ventureDecision.outcome):'')+'</div>'+(p.ventureDecision?'':'<div class="vacts"><button class="primary" data-signals-input-action="accept" data-signals-input-id="'+esc(p.id)+'">Accept in Venture</button><button data-signals-input-action="request-more-evidence" data-signals-input-id="'+esc(p.id)+'">Request more evidence</button><button data-signals-input-action="reject" data-signals-input-id="'+esc(p.id)+'">Reject</button></div>')+'</div>').join('');
+  $("#ventureThread").innerHTML = signalsHtml + t.messages.map(m=>{
     if(m.kind==="rail") return '<div class="vmono">'+esc(m.text)+'</div>';
     if(m.kind==="said") return '<div class="vsaid">'+esc(m.text)+'</div>';
     if(m.kind==="receipt") return '<div class="vreceipt"><i style="background:'+vDot(m.dot)+'"></i><span>'+esc(m.text)+'</span></div>';
@@ -4007,7 +4011,7 @@ function renderVentureExample(){
   $("#ventureRail").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE HISTORY</div><p class="vnote">Every selection, approval, delivery confirmation, and checkpoint appears here as an audit trail. Earlier phases stay available without crowding the current work screen.</p></div>';
   $("#ventureIntakeSections").innerHTML='<div class="venture-example"><div class="vmono">EXAMPLE GUARDRAILS</div><p class="vnote"><strong>Voice:</strong> plainspoken, specific, and skeptical of inflated claims.</p><p class="vnote"><strong>Truth boundary:</strong> treat demand as a hypothesis until real replies or purchases support it.</p><p class="vnote"><strong>Day 14:</strong> three live probes, a sustainable posting pace, and at least five substantive replies from the intended audience.</p><p class="from">Read-only. Start your own venture to record real guardrails.</p></div>';
 }
-document.addEventListener("click", e=>{
+document.addEventListener("click", async e=>{
   const target=e.target && e.target.closest ? e.target.closest("[data-venture-slug]") : null;
   if(target){ switchVenture(target.dataset.ventureSlug); return; }
   const doc=e.target && e.target.closest ? e.target.closest("[data-venture-document]") : null;
@@ -4071,6 +4075,19 @@ document.addEventListener("click", e=>{
     if(o.kind === "pace") return ventureWrite("/pace", { postsPerWeek: val() }, "Pace recorded", o.key);
     if(o.kind === "editing") return vSaveBody(id, val());
     if(o.kind === "response") return vSubmitResponse();
+    return;
+  }
+
+  const signalsInput = t.closest("[data-signals-input-action]");
+  if(signalsInput){
+    const proposal = (VENTURE_SIGNALS&&VENTURE_SIGNALS.ventureHandoffs||[]).find(p=>p.id===signalsInput.dataset.signalsInputId&&p.ventureSlug===ventureSlug);
+    if(!proposal) return;
+    const reason = prompt(signalsInput.dataset.signalsInputAction==="accept"?"Why accept this Signals input in Venture?":signalsInput.dataset.signalsInputAction==="reject"?"Why reject this Signals input?":"What evidence is still needed?")||"";
+    if(!reason.trim()) return;
+    signalsInput.disabled=true;
+    ventureWrite("/signals-input/"+encodeURIComponent(proposal.id)+"/decision", {
+      outcome: signalsInput.dataset.signalsInputAction, reason,
+    }, "Signals input decision recorded", "signals-input:"+proposal.id).then(result=>{ if(result) loadSignals(); });
     return;
   }
 
@@ -5121,7 +5138,7 @@ function signalsExperimentsHtml(){
         '<div class="src">Confidence: '+esc(displayLabel(interpretation.confidence))+' · Evidence: '+(interpretation.evidenceRefs||[]).map(esc).join(', ')+'</div>'+
         ((interpretation.caveats||[]).length?'<div class="src">Caveats: '+interpretation.caveats.map(esc).join('; ')+'</div>':'')+
         (reviewStatus==="pending"?'<div class="actions"><button class="sig-experiment-interpret-review primary" data-id="'+esc(p.experimentId)+'" data-action="accept">Accept interpretation</button><button class="sig-experiment-interpret-review" data-id="'+esc(p.experimentId)+'" data-action="reject">Reject analysis</button><span class="src">Your review records the learning. It does not change routing or select a winner.</span></div>'
-          : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>');
+          : '<div class="src">Interpretation review: '+esc(reviewStatus)+' by Muxin. Winner remains unset.</div>'+(reviewStatus==="accepted"?'<div class="actions"><button class="sig-venture-propose primary" data-id="'+esc(p.experimentId)+'">Propose as Venture input</button><span class="src">Requires a named Venture and phase. Signals records the proposal only.</span></div>':'') );
     }
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.hypothesis)+'</span></div>'+
       '<div class="dev-summary"><strong>Observation:</strong> '+esc(p.observation)+'</div>'+
@@ -5141,13 +5158,27 @@ function signalsExperimentsHtml(){
       '<div class="actions">'+controls+'</div>'+measurement+'</div>';
   }).join('')+'</section>';
 }
+function signalsVentureHandoffsHtml(){
+  const rows=(SIGNALS&&SIGNALS.ventureHandoffs)||[];
+  if(!rows.length) return '';
+  return '<section style="margin-top:26px"><div class="wb-label">VENTURE INPUTS</div><div class="src" style="margin:5px 0 12px">Learning proposals stay in Signals until you decide. This never creates Venture artifacts or accepts a Venture gate.</div>'+rows.map(p=>{
+    const status=String(p.status||"pending");
+    const controls=status==="pending"
+      ? '<button class="sig-venture-decision primary" data-id="'+esc(p.id)+'" data-action="adopt">Adopt for Venture</button><button class="sig-venture-decision" data-id="'+esc(p.id)+'" data-action="request-more-evidence">Request more evidence</button><button class="sig-venture-decision" data-id="'+esc(p.id)+'" data-action="decline">Decline</button>'
+      : status==="adopted" ? '<button class="sig-venture-open primary" data-slug="'+esc(p.ventureSlug)+'">Open '+esc(p.ventureSlug)+'</button>' : '<span class="src">'+esc(status.replaceAll("-"," "))+'</span>';
+    return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(p.confidence)+' confidence</span><span style="font-weight:600;font-size:14px;">'+esc(p.title)+'</span></div><div class="dev-summary"><strong>Observed:</strong> '+esc(p.factualSummary)+'</div><div class="dev-summary"><strong>Proposed Venture input:</strong> '+esc(p.proposedInput)+'</div><div class="src"><strong>Evidence:</strong> '+p.evidenceRefs.map(esc).join(', ')+' · '+esc(p.sourceId)+' / '+esc(p.variantId)+' / '+esc(p.experimentId)+'</div>'+ (p.muxinRationale?'<div class="src"><strong>Your decision:</strong> '+esc(p.muxinRationale)+'</div>':'') +'<div class="actions">'+controls+'</div></div>';
+  }).join('')+'</section>';
+}
 function renderSignals(){
   if(!SIGNALS) return;
   $("#signalsBriefDate").textContent = SIGNALS.briefDate ? "data through "+SIGNALS.briefDate : "";
   const box = $("#signalsTop");
   if(!SIGNALS.briefPath){
-    box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
+    box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+'<div class="empty">No live strategy brief yet. The clearly labeled sample above demonstrates the intended read; open the latest strategy brief below to replace it with evidence.</div>';
     bindSignalsExperimentActions(box);
+    box.querySelectorAll(".sig-venture-decision").forEach(b=>b.addEventListener("click", ()=>decideSignalsVenture(b)));
+    box.querySelectorAll(".sig-venture-open").forEach(b=>b.addEventListener("click", ()=>{ setRoom("venture"); switchVenture(b.dataset.slug); }));
+    box.querySelectorAll(".sig-venture-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsVenture(b)));
     return;
   }
   const fitCards = (SIGNALS.confidence||[]).map(c=>{
@@ -5182,7 +5213,7 @@ function renderSignals(){
     ? '<div class="src" style="margin-top:10px">Too weak to trust yet: '+weak.map(c=>esc(c.channel)).join(", ")+'. We will not build on those.</div>'
     : "";
   const briefNote = '<div class="src" style="margin-bottom:6px">Straight from the latest brief. These do not change anything by themselves.</div>';
-  box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+
+  box.innerHTML = signalsPracticalHtml()+signalsExperimentsHtml()+signalsVentureHandoffsHtml()+
     '<div style="margin-top:16px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:8px;">Where you fit, so far</div><div class="stat-tiles" style="margin-top:8px">'+fitCards+'</div></div>'+
     weakHtml+
     '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:4px;">Worth changing, your call</div>'+briefNote+
@@ -5193,6 +5224,28 @@ function renderSignals(){
   box.querySelectorAll(".sig-proposal-apply").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"apply",b)));
   box.querySelectorAll(".sig-proposal-rollback").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"rollback",b)));
   bindSignalsExperimentActions(box);
+  box.querySelectorAll(".sig-venture-decision").forEach(b=>b.addEventListener("click", ()=>decideSignalsVenture(b)));
+  box.querySelectorAll(".sig-venture-open").forEach(b=>b.addEventListener("click", ()=>{ setRoom("venture"); switchVenture(b.dataset.slug); }));
+  box.querySelectorAll(".sig-venture-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsVenture(b)));
+}
+async function proposeSignalsVenture(button){
+  const ventureSlug=(prompt("Named Venture slug:")||"").trim();
+  const phase=Number(prompt("Venture phase:","2")||"");
+  if(!ventureSlug||!Number.isInteger(phase)||phase<1){flash("A named Venture and positive phase are required.");return;}
+  button.disabled=true;
+  const result=await post("/api/signals/experiments/"+encodeURIComponent(button.dataset.id)+"/venture-handoff/propose",{ventureSlug,phase});
+  if(!result.ok){button.disabled=false;flash(result.error||"Could not propose Venture input");return;}
+  flash("Venture input proposal saved in Signals. Venture remains separately gated.");
+  await loadSignals();
+}
+async function decideSignalsVenture(button){
+  const rationale=prompt(button.dataset.action==="adopt"?"Why adopt this Venture input?":button.dataset.action==="decline"?"Why decline this Venture input?":"What evidence is still needed?")||"";
+  if(!rationale.trim()) return;
+  button.disabled=true;
+  const result=await post("/api/signals/venture-handoff/"+encodeURIComponent(button.dataset.id)+"/decision",{decision:button.dataset.action,rationale});
+  if(!result.ok){button.disabled=false;flash(result.error||"Could not record the Signals decision");return;}
+  flash(button.dataset.action==="adopt"?"Signals decision saved. Venture remains separately gated.":"Signals decision saved.");
+  await loadSignals();
 }
 function bindSignalsExperimentActions(box){
   box.querySelectorAll(".sig-experiment-propose").forEach(b=>b.addEventListener("click", ()=>proposeSignalsExperiment(b)));

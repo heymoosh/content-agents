@@ -104,6 +104,8 @@ export interface SignalsExperimentPerformanceRow {
   readonly elapsedDays: number | null;
   readonly observation: SuccessObservation | null;
   readonly primaryComparison: Pick<ExperimentMetricComparison, "treatment" | "control"> | null;
+  /** Outcome-ledger evidence attached to each primary arm; provider analytics never populate this. */
+  readonly primaryOutcomeRefs: { readonly treatment: readonly string[]; readonly control: readonly string[] };
   readonly guardrailComparisons: ExperimentMetricComparison[];
   readonly outcomeRefs: string[];
   readonly analysisStatus: "collecting" | "ready" | "closed" | "insufficient-evidence";
@@ -392,6 +394,10 @@ export function buildSignalsExperimentPerformance(input: SignalsExperimentPerfor
     if (ledger?.readiness.status === "blocked") blockers.push(...ledger.readiness.blockers);
     const observation = record?.successObservations.find((item) => item.family === recommendation.primaryMetric.family && item.metric === recommendation.primaryMetric.metric) ?? null;
     const primary = usesFacts ? comparison(experimentFacts, recommendation, recommendation.primaryMetric.family, recommendation.primaryMetric.metric) : null;
+    const primaryOutcomeFacts = experimentFacts.filter((fact) => fact.source === "outcome-ledger"
+      && fact.family === recommendation.primaryMetric.family && fact.metric === recommendation.primaryMetric.metric);
+    const primaryOutcomeRefs = (variantId: string): string[] => [...new Set(primaryOutcomeFacts
+      .filter((fact) => fact.variantId === variantId).flatMap((fact) => fact.evidenceRefs))].sort();
     const guardrails = usesFacts ? recommendation.guardrails.map((guardrail) => comparison(experimentFacts, recommendation, guardrail.family, guardrail.metric)) : [];
     if (usesFacts) {
       if (!primary?.treatment) blockers.push("primary metric treatment arm is missing");
@@ -423,6 +429,10 @@ export function buildSignalsExperimentPerformance(input: SignalsExperimentPerfor
       elapsedDays: days,
       observation: observation ? { ...observation, outcomeRefs: [...observation.outcomeRefs] } : null,
       primaryComparison: primary ? { treatment: primary.treatment, control: primary.control } : null,
+      primaryOutcomeRefs: {
+        treatment: primaryOutcomeRefs(recommendation.expectedOutcome.variantId),
+        control: primaryOutcomeRefs(recommendation.expectedOutcome.comparisonRef),
+      },
       guardrailComparisons: guardrails,
       outcomeRefs: usesFacts
         ? [...new Set(experimentFacts.flatMap((fact) => fact.evidenceRefs))].sort()
