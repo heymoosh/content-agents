@@ -165,7 +165,7 @@ export async function publishShorts(
     appendPublishLog(folder, `${row.id} → youtube ${url} (${when})`);
     appendBetPlacement(folder, row.id, "youtube", publishAt ? `${url} @ ${labels[i]}` : url, fm, title);
     console.log(publishAt ? `scheduled: ${url} → goes public ${labels[i]}` : `uploaded: ${url}`);
-    results.push({ id: row.id, platform: "youtube", when, ref: url, autoPublishes: !!publishAt });
+    results.push({ id: row.id, platform: "youtube", when, ...(publishAt ? { plannedFor: publishAt } : {}), ref: url, autoPublishes: !!publishAt });
   }
   return results;
 }

@@ -148,6 +148,7 @@ export interface ScheduledCard {
   id: string;
   platform: string; // destination platform (x | linkedin | bluesky)
   when: string; // human PT label (matches publishText/publishShorts, not a raw ISO string)
+  plannedFor?: string; // exact provider/ledger timestamp when observed in this run
   ref: string; // "typefully draft <id>"
 }
 
@@ -282,7 +283,7 @@ export async function publishCards(
         `scheduled: ${row.id} (${target}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
           (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
       );
-      results.push({ id: row.id, platform: target, when, ref: `typefully draft ${draft.id ?? "?"}` });
+      results.push({ id: row.id, platform: target, when, plannedFor: scheduledFor, ref: `typefully draft ${draft.id ?? "?"}` });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`  ✗ ${row.id}: ${msg}`);

@@ -46,12 +46,12 @@ describe("durable publishing status", () => {
     const path = ledger(); let calls = 0;
     const folder = contentFolder();
     const first = await scheduleApprovedOnce(folder, "piece", row, async () => {
-      calls++; return { scheduled: { id: "x-1", platform: "x", when: "Monday 9:00 AM", draftId: "tf-1" }, scheduleError: null };
+      calls++; return { scheduled: { id: "x-1", platform: "x", when: "Monday 9:00 AM", plannedFor: "2026-09-01T16:00:00.000Z", draftId: "tf-1" }, scheduleError: null };
     }, path);
     assert.equal(first.publishing.state, "planned");
     assert.equal(first.publishing.provider, "typefully");
     assert.equal(first.publishing.ref, "tf-1");
-    assert.equal(first.publishing.plannedFor, "Monday 9:00 AM");
+    assert.equal(first.publishing.plannedFor, "2026-09-01T16:00:00.000Z");
     assert.equal(first.publishing.origin, "human-inference");
     assert.equal(first.publishing.brand, "human-inference");
     assert.equal(first.publishing.deliveryMode, "provider");

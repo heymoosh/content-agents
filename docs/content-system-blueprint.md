@@ -765,9 +765,21 @@ Neither mode claims a slot, contacts a provider, or publishes. A ready binding r
 total, scheduled, and available slot facts; the older remaining-capacity-only packet stays honest
 and cannot be promoted to a fully bound delivery merely because a number was present.
 
+`src/grow/experiment-scheduling.ts` closes the deterministic scheduler-record seam without
+weakening that gate. It accepts only an unchanged handoff candidate whose canonical queue row is
+still explicitly `approve`, rechecks the exact derivative bytes, and dispatches through Studio's
+existing attempt-ledgered `scheduleApprovedOnce` boundary. It then re-reads the queue and binds the
+observed provider object, exact claimed ISO time, and publish lineage into the Grow delivery
+record. Failed or uncertain calls remain blocked evidence and never become fabricated scheduled
+state. The legacy publisher adapters now return their exact claimed timestamp in addition to the
+human display label. `npm run grow:experiment-schedule` is preview-only by default; the explicit
+`--schedule` flag is required before it applies the handoff or contacts a provider. No path
+auto-approves or treats provider acceptance as confirmed publication.
+
 The current real packet remains pending Muxin's item-level decisions, so it advances the vertical
-slice but does not complete this phase. After a decision is applied, the remaining live boundary is
-the explicit scheduler/provider action and its observed facts, followed later by outcome evidence.
+slice but does not complete this phase. After a decision is applied, the deterministic scheduling
+boundary is ready; the remaining operational evidence is an explicitly authorized provider action
+and its observed result, followed later by outcome evidence.
 
 ### Phase 4: Venture learning
 

@@ -313,6 +313,7 @@ export interface ScheduledRow {
   id: string;
   platform: string;
   when: string; // human PT label, or "unscheduled"
+  plannedFor: string | null; // exact provider/ledger timestamp; null for an unscheduled draft
   draftId: string;
   manualComment: string | null;
 }
@@ -460,7 +461,7 @@ export async function publishText(
       `${verb}: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
         (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
     );
-    results.push({ id: row.id, platform: row.platform, when, draftId: String(draft.id ?? "?"), manualComment });
+    results.push({ id: row.id, platform: row.platform, when, plannedFor: publishAt, draftId: String(draft.id ?? "?"), manualComment });
   }
   return results;
 }

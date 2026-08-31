@@ -152,6 +152,7 @@ export interface ScheduledTikTok {
   id: string;
   platform: string; // always "tiktok"
   when: string; // human PT label (matches publishText/publishShorts, not a raw ISO string)
+  plannedFor: string; // exact provider/ledger timestamp
   ref: string; // provider post ref
 }
 
@@ -207,7 +208,7 @@ export async function publishTikTok(
     appendPublishLog(folder, `${row.id} → tiktok ${ref} (scheduled ${scheduledFor})`);
     appendBetPlacement(folder, row.id, "tiktok", `${ref} @ ${scheduledFor}`, fm, caption);
     console.log(`scheduled: ${row.id} → tiktok ${ref} @ ${scheduledFor}`);
-    results.push({ id: row.id, platform: "tiktok", when: fmtLa(new Date(scheduledFor)), ref });
+    results.push({ id: row.id, platform: "tiktok", when: fmtLa(new Date(scheduledFor)), plannedFor: scheduledFor, ref });
   }
   return results;
 }
