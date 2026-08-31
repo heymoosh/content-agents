@@ -697,17 +697,24 @@ normalized evidence set, reviewable summaries and selection rules, denominators,
 source citations, originality checks, and Muxin's judgment are present. A provisional inventory
 does not unlock Grow variants or permit a winner claim.
 
-`research-dossier-v1` is the first end-to-end Phase 2 decision boundary. It binds one declared
+`research-dossier-v2` is the first end-to-end Phase 2 decision boundary. It binds one declared
 question and intended use to an exact included/excluded evidence set, an explicit selection
 policy, reviewed baselines, descriptive summaries, citation closure, caveats, and originality
-checks. `npm run patterns:research-dossier -- build` produces JSON, Markdown, or a static HTML
-review artifact; `decide` accepts only an explicit Muxin decision and makes that immutable dossier
+checks. The canonical path begins with `npm run patterns:research-dossier -- propose`, which emits
+a body-free `research-dossier-review-v1` packet without any Muxin review stamps. `review` accepts
+only a complete explicit Muxin approval bound to that packet's digest and every evidence,
+baseline, and originality ID; it then creates the still-pending dossier while retaining the
+normalized packet and review receipt inside the dossier digest. `build` is a validate/render-only
+adapter for legacy already-stamped inputs and produces JSON, Markdown, or static HTML; its output
+cannot receive a usability decision because it has no digest-bound packet and receipt.
+`decide` accepts only a separate explicit Muxin usability decision and makes that immutable dossier
 usable as an observation, hypothesis, or experiment input, or records revise/reject. Missing
 denominators, dates, baseline matches, citations, selection coverage, reviewed originality, or
 Muxin authority fail closed. The artifact is body-free and never permits winner claims. This
-vertical slice does not make the phase complete by itself: the repository still needs a real
-question-scoped dossier built from populated reviewed ledgers and Muxin's recorded judgment, and
-broader account/baseline coverage remains incomplete.
+vertical slice completed the Phase 2 ship predicate on 2026-08-31 with a real question-scoped
+dossier, populated reviewed evidence, and Muxin's recorded `hypothesis` disposition. Broader
+account/baseline coverage remains incomplete and is continuing evidence expansion, not a reason to
+misstate the completed vertical slice as an integrated recommendation engine.
 
 For this increment, the Phase 2 comparison predicate is explicit: every comparison must name its
 source/post-level evidence rows, explicit pool membership, popularity and sample scopes, baseline

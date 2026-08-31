@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const RESEARCH_DOSSIER_VERSION = "research-dossier-v1" as const;
+export const RESEARCH_DOSSIER_VERSION = "research-dossier-v2" as const;
 
 export type ResearchDossierIntendedUse = "observation" | "hypothesis" | "experiment_input";
 export type ResearchDossierDisposition = ResearchDossierIntendedUse | "revise" | "reject";
@@ -92,6 +92,45 @@ export interface ResearchDossierInput {
   summaries: ResearchPatternSummaryInput[];
 }
 
+export type ResearchEvidenceProposal = Omit<ResearchEvidenceInput, "reviewStatus" | "reviewedBy" | "reviewedAt">;
+export type ResearchBaselineProposal = Omit<ResearchBaselineInput, "reviewStatus" | "reviewedBy" | "reviewedAt">;
+export type ResearchOriginalityProposal = Omit<ResearchPatternSummaryInput["originality"], "status" | "checkedBy" | "checkedAt">;
+export type ResearchPatternSummaryProposal = Omit<ResearchPatternSummaryInput, "originality"> & {
+  originality: ResearchOriginalityProposal;
+};
+
+export interface ResearchDossierProposalInput {
+  question: ResearchQuestion;
+  selectionPolicy: ResearchSelectionPolicy;
+  evidence: ResearchEvidenceProposal[];
+  baselines: ResearchBaselineProposal[];
+  selections: ResearchEvidenceSelection[];
+  summaries: ResearchPatternSummaryProposal[];
+}
+
+export interface ResearchDossierReviewPacket {
+  kind: "research_dossier_review_packet";
+  version: "research-dossier-review-v1";
+  proposal: ResearchDossierProposalInput;
+  reviewStatus: "pending_muxin_evidence_review";
+  bodyIncluded: false;
+  winnerClaimsAllowed: false;
+  digest: string;
+}
+
+export interface ResearchDossierEvidenceReviewDecision {
+  reviewedBy: "Muxin";
+  reviewedAt: string;
+  packetDigest: string;
+  policyApproved: true;
+  evidenceApprovals: string[];
+  baselineApprovals: string[];
+  originalityApprovals: string[];
+  note: string;
+}
+
+export type ResearchDossierEvidenceReviewReceipt = ResearchDossierEvidenceReviewDecision;
+
 export interface ResearchDossierDecision {
   decidedBy: "Muxin";
   decidedAt: string;
@@ -112,6 +151,8 @@ export interface ResearchDossier {
   baselines: ResearchBaselineInput[];
   summaries: ResearchPatternSummaryInput[];
   citations: Array<{ evidenceId: string; links: string[]; provenance: string }>;
+  evidenceReviewPacket: ResearchDossierReviewPacket | null;
+  evidenceReview: ResearchDossierEvidenceReviewReceipt | null;
   usabilityDecision: ResearchDossierDecision | null;
   readiness: {
     status: "pending_muxin_review" | "usable" | "revision_requested" | "rejected";
@@ -125,7 +166,7 @@ export interface ResearchDossier {
 type UnknownRecord = Record<string, unknown>;
 
 const INPUT_KEYS = new Set(["question", "selectionPolicy", "evidence", "baselines", "selections", "summaries"]);
-const DOSSIER_KEYS = new Set(["kind", "version", "question", "selectionPolicy", "boundedEvidence", "baselines", "summaries", "citations", "usabilityDecision", "readiness", "bodyIncluded", "winnerClaimsAllowed", "digest"]);
+const DOSSIER_KEYS = new Set(["kind", "version", "question", "selectionPolicy", "boundedEvidence", "baselines", "summaries", "citations", "evidenceReviewPacket", "evidenceReview", "usabilityDecision", "readiness", "bodyIncluded", "winnerClaimsAllowed", "digest"]);
 const QUESTION_KEYS = new Set(["id", "text", "intendedUse"]);
 const POLICY_KEYS = new Set(["description", "inclusionCriteria", "exclusionCriteria"]);
 const BOUNDED_KEYS = new Set(["included", "excluded"]);
@@ -137,6 +178,11 @@ const ORIGINALITY_KEYS = new Set(["status", "checkedAgainstEvidenceRefs", "note"
 const EXCLUSION_KEYS = new Set(["evidenceId", "reason"]);
 const CITATION_KEYS = new Set(["evidenceId", "links", "provenance"]);
 const READINESS_KEYS = new Set(["status", "blockers"]);
+const EVIDENCE_REVIEW_KEYS = new Set(["reviewedBy", "reviewedAt", "packetDigest", "policyApproved", "evidenceApprovals", "baselineApprovals", "originalityApprovals", "note"]);
+const PROPOSAL_EVIDENCE_KEYS = new Set([...EVIDENCE_KEYS].filter((key) => key !== "reviewStatus" && key !== "reviewedBy" && key !== "reviewedAt"));
+const PROPOSAL_BASELINE_KEYS = new Set([...BASELINE_KEYS].filter((key) => key !== "reviewStatus" && key !== "reviewedBy" && key !== "reviewedAt"));
+const PROPOSAL_ORIGINALITY_KEYS = new Set([...ORIGINALITY_KEYS].filter((key) => key !== "status" && key !== "checkedBy" && key !== "checkedAt"));
+const SELECTION_KEYS = new Set(["evidenceId", "disposition", "reason"]);
 const FORBIDDEN_KEYS = new Set([
   "body", "creatorBody", "postBody", "rawBody", "transcript", "opener", "hook", "winner", "ranking", "score",
 ]);
@@ -184,6 +230,7 @@ function assertDossierShape(value: unknown): void {
   for (const [index, citation] of recordArray(dossier.citations, "dossier.citations").entries()) {
     assertExactKeys(citation, CITATION_KEYS, `dossier.citations[${index}]`);
   }
+  if (dossier.evidenceReview !== null) assertExactKeys(dossier.evidenceReview, EVIDENCE_REVIEW_KEYS, "dossier.evidenceReview");
   assertExactKeys(dossier.readiness, READINESS_KEYS, "dossier.readiness");
 }
 
@@ -357,6 +404,158 @@ function digestPayload(dossier: Omit<ResearchDossier, "digest" | "readiness" | "
   return `sha256:${createHash("sha256").update(stableJson(dossier)).digest("hex")}`;
 }
 
+const SYNTHETIC_REVIEW_TIME = "1970-01-01T00:00:00.000Z";
+
+function proposalDigest(packet: Omit<ResearchDossierReviewPacket, "digest">): string {
+  return `sha256:${createHash("sha256").update(stableJson(packet)).digest("hex")}`;
+}
+
+function approvalSet(value: unknown, expected: readonly string[], label: string): string[] {
+  const approved = strings(value, label, expected.length === 0).sort();
+  const wanted = [...expected].sort();
+  if (stableJson(approved) !== stableJson(wanted)) fail(`${label} must approve every exact reviewed id`);
+  return approved;
+}
+
+/**
+ * Normalize a proposed evidence set without stamping it as human-reviewed. Internally, fixed
+ * synthetic review values let the existing dossier validator exercise every evidence, baseline,
+ * selection, citation, and originality invariant. Those values are stripped before the packet is
+ * returned and never cross the review boundary.
+ */
+export function buildResearchDossierReviewPacket(value: ResearchDossierProposalInput): ResearchDossierReviewPacket {
+  rejectUnsupported(value, "proposal", true);
+  const source = assertExactKeys(value, INPUT_KEYS, "proposal");
+  assertExactKeys(source.question, QUESTION_KEYS, "proposal.question");
+  assertExactKeys(source.selectionPolicy, POLICY_KEYS, "proposal.selectionPolicy");
+  if (!Array.isArray(source.evidence) || !Array.isArray(source.baselines) || !Array.isArray(source.selections) || !Array.isArray(source.summaries)) {
+    fail("proposal evidence, baselines, selections, and summaries must be arrays");
+  }
+  const proposalEvidence = source.evidence.map((raw, index) => {
+    const row = assertExactKeys(raw, PROPOSAL_EVIDENCE_KEYS, `proposal.evidence[${index}]`);
+    assertExactKeys(row.metric, METRIC_KEYS, `proposal.evidence[${index}].metric`);
+    return row as unknown as ResearchEvidenceProposal;
+  });
+  const proposalBaselines = source.baselines.map((raw, index) => assertExactKeys(raw, PROPOSAL_BASELINE_KEYS, `proposal.baselines[${index}]`) as unknown as ResearchBaselineProposal);
+  const proposalSelections = source.selections.map((raw, index) => assertExactKeys(raw, SELECTION_KEYS, `proposal.selections[${index}]`) as unknown as ResearchEvidenceSelection);
+  const proposalSummaries = source.summaries.map((raw, index) => {
+    const row = assertExactKeys(raw, SUMMARY_KEYS, `proposal.summaries[${index}]`);
+    const originality = assertExactKeys(row.originality, PROPOSAL_ORIGINALITY_KEYS, `proposal.summaries[${index}].originality`);
+    return { ...(row as unknown as Omit<ResearchPatternSummaryProposal, "originality">), originality: originality as unknown as ResearchOriginalityProposal };
+  });
+  const synthetic: ResearchDossierInput = {
+    question: source.question as ResearchQuestion,
+    selectionPolicy: source.selectionPolicy as ResearchSelectionPolicy,
+    evidence: proposalEvidence.map((row) => ({
+      ...row,
+      reviewStatus: "reviewed",
+      reviewedBy: "Muxin",
+      reviewedAt: SYNTHETIC_REVIEW_TIME,
+    })),
+    baselines: proposalBaselines.map((row) => ({
+      ...row,
+      reviewStatus: "reviewed",
+      reviewedBy: "Muxin",
+      reviewedAt: SYNTHETIC_REVIEW_TIME,
+    })),
+    selections: proposalSelections,
+    summaries: proposalSummaries.map((summary) => ({
+        ...summary,
+        originality: {
+          ...summary.originality,
+          status: "passed",
+          checkedBy: "Muxin",
+          checkedAt: SYNTHETIC_REVIEW_TIME,
+        },
+      })),
+  };
+  buildResearchDossier(synthetic);
+
+  const normalizedEvidence = synthetic.evidence.map((row, index) => {
+    const { reviewStatus: _status, reviewedBy: _by, reviewedAt: _at, ...proposal } = normalizeEvidence(row, index);
+    return proposal;
+  }).sort((left, right) => left.id.localeCompare(right.id));
+  const normalizedBaselines = synthetic.baselines.map((row, index) => {
+    const { reviewStatus: _status, reviewedBy: _by, reviewedAt: _at, ...proposal } = normalizeBaseline(row, index);
+    return proposal;
+  }).sort((left, right) => left.id.localeCompare(right.id));
+  const includedIds = new Set(synthetic.selections.filter((row) => row.disposition === "include").map((row) => row.evidenceId));
+  const normalizedSummaries = synthetic.summaries.map((row, index) => {
+    const normalized = normalizeSummary(row, index, includedIds);
+    const { status: _status, checkedBy: _by, checkedAt: _at, ...originality } = normalized.originality;
+    return { ...normalized, originality };
+  }).sort((left, right) => left.id.localeCompare(right.id));
+  const dossier = buildResearchDossier(synthetic);
+  const proposal: ResearchDossierProposalInput = {
+    question: dossier.question,
+    selectionPolicy: dossier.selectionPolicy,
+    evidence: normalizedEvidence,
+    baselines: normalizedBaselines,
+    selections: synthetic.selections.map((row) => ({
+      evidenceId: text(row.evidenceId, "proposal.selections.evidenceId"),
+      disposition: row.disposition,
+      reason: text(row.reason, "proposal.selections.reason"),
+    })).sort((left, right) => left.evidenceId.localeCompare(right.evidenceId)),
+    summaries: normalizedSummaries,
+  };
+  const core: Omit<ResearchDossierReviewPacket, "digest"> = {
+    kind: "research_dossier_review_packet",
+    version: "research-dossier-review-v1",
+    proposal,
+    reviewStatus: "pending_muxin_evidence_review",
+    bodyIncluded: false,
+    winnerClaimsAllowed: false,
+  };
+  return freeze({ ...core, digest: proposalDigest(core) });
+}
+
+/** Apply only a complete, digest-bound approval. Revise/reject leaves the packet pending. */
+export function recordResearchDossierEvidenceReview(
+  packet: ResearchDossierReviewPacket,
+  value: ResearchDossierEvidenceReviewDecision,
+): ResearchDossier {
+  const supplied = record(packet, "reviewPacket");
+  if (supplied.kind !== "research_dossier_review_packet" || supplied.version !== "research-dossier-review-v1"
+    || supplied.reviewStatus !== "pending_muxin_evidence_review" || supplied.bodyIncluded !== false
+    || supplied.winnerClaimsAllowed !== false) fail("review packet contract is invalid");
+  const canonical = buildResearchDossierReviewPacket(supplied.proposal as ResearchDossierProposalInput);
+  if (supplied.digest !== canonical.digest || stableJson(supplied) !== stableJson(canonical)) {
+    fail("review packet digest does not match; packet may have been tampered with");
+  }
+  const decision = assertExactKeys(value, EVIDENCE_REVIEW_KEYS, "evidenceReview");
+  if (decision.reviewedBy !== "Muxin") fail("evidenceReview.reviewedBy must be Muxin");
+  if (decision.packetDigest !== canonical.digest) fail("evidenceReview.packetDigest must match the reviewed packet digest");
+  if (decision.policyApproved !== true) fail("evidenceReview.policyApproved must be true");
+  const reviewedAt = timestamp(decision.reviewedAt, "evidenceReview.reviewedAt");
+  const note = text(decision.note, "evidenceReview.note");
+  const evidenceApprovals = approvalSet(decision.evidenceApprovals, canonical.proposal.evidence.map((row) => row.id), "evidenceReview.evidenceApprovals");
+  const baselineApprovals = approvalSet(decision.baselineApprovals, canonical.proposal.baselines.map((row) => row.id), "evidenceReview.baselineApprovals");
+  const originalityApprovals = approvalSet(decision.originalityApprovals, canonical.proposal.summaries.map((row) => row.id), "evidenceReview.originalityApprovals");
+
+  const dossier = buildResearchDossier({
+    ...canonical.proposal,
+    evidence: canonical.proposal.evidence.map((row) => ({ ...row, reviewStatus: "reviewed", reviewedBy: "Muxin", reviewedAt })),
+    baselines: canonical.proposal.baselines.map((row) => ({ ...row, reviewStatus: "reviewed", reviewedBy: "Muxin", reviewedAt })),
+    summaries: canonical.proposal.summaries.map((row) => ({
+      ...row,
+      originality: { ...row.originality, status: "passed", checkedBy: "Muxin", checkedAt: reviewedAt },
+    })),
+  });
+  const evidenceReview: ResearchDossierEvidenceReviewReceipt = {
+    reviewedBy: "Muxin",
+    reviewedAt,
+    packetDigest: canonical.digest,
+    policyApproved: true,
+    evidenceApprovals,
+    baselineApprovals,
+    originalityApprovals,
+    note,
+  };
+  const { digest: _digest, readiness, usabilityDecision, ...withoutDigest } = dossier;
+  const core = { ...withoutDigest, evidenceReviewPacket: canonical, evidenceReview };
+  return freeze({ ...core, readiness, usabilityDecision, digest: digestPayload(core) });
+}
+
 export function buildResearchDossier(input: ResearchDossierInput): ResearchDossier {
   rejectUnsupported(input, "input", true);
   const source = record(input, "input");
@@ -421,6 +620,8 @@ export function buildResearchDossier(input: ResearchDossierInput): ResearchDossi
     baselines: usedBaselines,
     summaries,
     citations: included.map((row) => ({ evidenceId: row.id, links: row.evidenceLinks, provenance: row.provenance })),
+    evidenceReviewPacket: null,
+    evidenceReview: null,
     bodyIncluded: false,
     winnerClaimsAllowed: false,
   };
@@ -439,6 +640,9 @@ export function recordResearchDossierDecision(dossier: ResearchDossier, input: R
     fail("dossier contract is invalid");
   }
   if (dossier.usabilityDecision !== null) fail("dossier already has a usability decision");
+  if (dossier.evidenceReviewPacket === null || dossier.evidenceReview === null) {
+    fail("digest-bound Muxin evidence review packet and receipt are required before a usability decision");
+  }
   if (dossier.readiness.status !== "pending_muxin_review"
     || stableJson(dossier.readiness.blockers) !== stableJson(["Muxin usability decision is required"])) {
     fail("only a canonical pending dossier may receive a decision");
@@ -457,6 +661,12 @@ export function recordResearchDossierDecision(dossier: ResearchDossier, input: R
     if (includedIds.has(row.evidenceId)) fail(`excluded evidence ${row.evidenceId} is also included`);
     if (exclusionIds.has(row.evidenceId)) fail(`duplicate excluded evidence id ${row.evidenceId}`);
     exclusionIds.add(row.evidenceId);
+  }
+  const canonicalReviewed = recordResearchDossierEvidenceReview(dossier.evidenceReviewPacket, dossier.evidenceReview);
+  const { digest: _canonicalDigest, readiness: _canonicalReadiness, usabilityDecision: _canonicalDecision, ...canonicalReviewedCore } = canonicalReviewed;
+  const { digest: _suppliedDigest, readiness: _suppliedReadiness, usabilityDecision: _suppliedDecision, ...suppliedReviewedCore } = dossier;
+  if (stableJson(canonicalReviewedCore) !== stableJson(suppliedReviewedCore)) {
+    fail("dossier does not canonically match its evidence review packet and receipt");
   }
   const rebuilt = buildResearchDossier({
     question: dossier.question,

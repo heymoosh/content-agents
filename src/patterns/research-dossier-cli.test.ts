@@ -38,6 +38,17 @@ const validInput = JSON.stringify({
   }],
 });
 
+const pendingInput = JSON.stringify((() => {
+  const value = JSON.parse(validInput);
+  value.evidence = value.evidence.map(({ reviewStatus: _status, reviewedBy: _by, reviewedAt: _at, ...row }: Record<string, unknown>) => row);
+  value.baselines = value.baselines.map(({ reviewStatus: _status, reviewedBy: _by, reviewedAt: _at, ...row }: Record<string, unknown>) => row);
+  value.summaries = value.summaries.map((summary: { originality: Record<string, unknown> }) => {
+    const { status: _status, checkedBy: _by, checkedAt: _at, ...originality } = summary.originality;
+    return { ...summary, originality };
+  });
+  return value;
+})());
+
 test("parses build and decide commands without implicit files or decisions", () => {
   assert.deepEqual(parseResearchDossierArgs(["build", "--file", "input.json", "--format", "html"]), {
     command: "build", inputPath: "input.json", format: "html", outputPath: null,
@@ -47,6 +58,47 @@ test("parses build and decide commands without implicit files or decisions", () 
   });
   assert.throws(() => parseResearchDossierArgs(["build", "--file", "input.json", "--format", "pdf"]), /format/i);
   assert.throws(() => parseResearchDossierArgs(["decide", "--dossier", "dossier.json"]), /decision/i);
+});
+
+test("parses explicit propose and evidence-review commands", () => {
+  assert.deepEqual(parseResearchDossierArgs(["propose", "--file", "proposal.json", "--output", "packet.json"]), {
+    command: "propose", inputPath: "proposal.json", outputPath: "packet.json",
+  });
+  assert.deepEqual(parseResearchDossierArgs(["review", "--packet", "packet.json", "--decision", "review.json", "--output", "dossier.json"]), {
+    command: "review", packetPath: "packet.json", decisionPath: "review.json", outputPath: "dossier.json",
+  });
+  assert.throws(() => parseResearchDossierArgs(["review", "--packet", "packet.json"]), /decision/i);
+});
+
+test("CLI creates a pending packet then applies only its exact evidence review", () => {
+  let packetJson = "";
+  assert.equal(main(["propose", "--file", "proposal.json"], {
+    readFile: () => pendingInput,
+    write: (value) => { packetJson += value; },
+    writeFile: () => { throw new Error("unexpected file write"); },
+    error: () => {},
+  }), 0);
+  const packet = JSON.parse(packetJson);
+  assert.equal(packet.reviewStatus, "pending_muxin_evidence_review");
+  assert.doesNotMatch(packetJson, /"reviewedBy": "Muxin"|"checkedBy": "Muxin"/);
+
+  const decision = JSON.stringify({
+    reviewedBy: "Muxin", reviewedAt: "2026-08-30T20:00:00Z", packetDigest: packet.digest,
+    policyApproved: true, evidenceApprovals: ["e1"], baselineApprovals: ["b1"],
+    originalityApprovals: ["summary-1"], note: "Reviewed as shown.",
+  });
+  const files = new Map([["packet.json", packetJson], ["review.json", decision]]);
+  let dossierJson = "";
+  assert.equal(main(["review", "--packet", "packet.json", "--decision", "review.json"], {
+    readFile: (path) => files.get(path) ?? "",
+    write: (value) => { dossierJson += value; },
+    writeFile: () => { throw new Error("unexpected file write"); },
+    error: () => {},
+  }), 0);
+  const dossier = JSON.parse(dossierJson);
+  assert.equal(dossier.readiness.status, "pending_muxin_review");
+  assert.match(renderResearchDossierMarkdown(dossier), /Reviewed as shown/);
+  assert.match(renderResearchDossierHtml(dossier), /Reviewed as shown/);
 });
 
 test("renders a scannable review artifact with evidence, caveats, citations, and the pending decision gate", () => {
@@ -73,9 +125,20 @@ test("renders a scannable review artifact with evidence, caveats, citations, and
 });
 
 test("records an injected explicit decision and writes only the requested output", () => {
+  let packetJson = "";
+  assert.equal(main(["propose", "--file", "proposal.json"], {
+    readFile: () => pendingInput, write: (value) => { packetJson += value; }, writeFile: () => {}, error: () => {},
+  }), 0);
+  const packet = JSON.parse(packetJson);
+  const evidenceDecision = JSON.stringify({
+    reviewedBy: "Muxin", reviewedAt: "2026-08-30T17:00:00Z", packetDigest: packet.digest,
+    policyApproved: true, evidenceApprovals: ["e1"], baselineApprovals: ["b1"],
+    originalityApprovals: ["summary-1"], note: "Evidence reviewed.",
+  });
   let dossierJson = "";
-  assert.equal(main(["build", "--file", "input.json", "--format", "json"], {
-    readFile: () => validInput, write: (value) => { dossierJson += value; }, writeFile: () => {}, error: () => {},
+  assert.equal(main(["review", "--packet", "packet.json", "--decision", "evidence-decision.json"], {
+    readFile: (path) => path === "packet.json" ? packetJson : evidenceDecision,
+    write: (value) => { dossierJson += value; }, writeFile: () => {}, error: () => {},
   }), 0);
   const files = new Map([
     ["dossier.json", dossierJson],

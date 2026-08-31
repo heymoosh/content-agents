@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -7,6 +8,7 @@ import {
   type ResearchDossierDecision,
   type ResearchDossierInput,
 } from "./research-dossier.js";
+import * as researchDossierApi from "./research-dossier.js";
 
 function input(overrides: Partial<ResearchDossierInput> = {}): ResearchDossierInput {
   return {
@@ -102,11 +104,138 @@ function input(overrides: Partial<ResearchDossierInput> = {}): ResearchDossierIn
   };
 }
 
+function pendingProposal(): unknown {
+  const reviewed = input();
+  return {
+    ...reviewed,
+    evidence: reviewed.evidence.map(({ reviewStatus: _status, reviewedBy: _by, reviewedAt: _at, ...row }) => row),
+    baselines: reviewed.baselines.map(({ reviewStatus: _status, reviewedBy: _by, reviewedAt: _at, ...row }) => row),
+    summaries: reviewed.summaries.map((summary) => ({
+      ...summary,
+      originality: {
+        checkedAgainstEvidenceRefs: summary.originality.checkedAgainstEvidenceRefs,
+        note: summary.originality.note,
+        method: summary.originality.method,
+      },
+    })),
+  };
+}
+
+function evidenceReviewedDossier(): ReturnType<typeof buildResearchDossier> {
+  const api = researchDossierApi as unknown as {
+    buildResearchDossierReviewPacket(value: unknown): { digest: string; proposal: { evidence: Array<{ id: string }>; baselines: Array<{ id: string }>; summaries: Array<{ id: string }> } };
+    recordResearchDossierEvidenceReview(packet: unknown, decision: unknown): ReturnType<typeof buildResearchDossier>;
+  };
+  const packet = api.buildResearchDossierReviewPacket(pendingProposal());
+  return api.recordResearchDossierEvidenceReview(packet, {
+    reviewedBy: "Muxin",
+    reviewedAt: "2026-08-30T17:00:00Z",
+    packetDigest: packet.digest,
+    policyApproved: true,
+    evidenceApprovals: packet.proposal.evidence.map((row) => row.id),
+    baselineApprovals: packet.proposal.baselines.map((row) => row.id),
+    originalityApprovals: packet.proposal.summaries.map((row) => row.id),
+    note: "Evidence review completed for the test fixture.",
+  });
+}
+
+function stableJsonForTest(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJsonForTest).join(",")}]`;
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  const row = value as Record<string, unknown>;
+  return `{${Object.keys(row).sort().map((key) => `${JSON.stringify(key)}:${stableJsonForTest(row[key])}`).join(",")}}`;
+}
+
+function rehashDossierForTest(value: Record<string, unknown>): void {
+  const { digest: _digest, readiness: _readiness, usabilityDecision: _decision, ...core } = value;
+  value.digest = `sha256:${createHash("sha256").update(stableJsonForTest(core)).digest("hex")}`;
+}
+
+test("creates a digest-bound pending review packet without manufacturing Muxin approval", () => {
+  const api = researchDossierApi as unknown as {
+    buildResearchDossierReviewPacket(value: unknown): {
+      kind: string;
+      digest: string;
+      reviewStatus: string;
+      proposal: unknown;
+    };
+  };
+  const packet = api.buildResearchDossierReviewPacket(pendingProposal());
+
+  assert.equal(packet.kind, "research_dossier_review_packet");
+  assert.equal(packet.reviewStatus, "pending_muxin_evidence_review");
+  assert.match(packet.digest, /^sha256:[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(packet), /"reviewedBy":"Muxin"|"checkedBy":"Muxin"/);
+  assert.deepEqual(api.buildResearchDossierReviewPacket(pendingProposal()), packet);
+
+  const prestamped = structuredClone(pendingProposal()) as { evidence: Array<Record<string, unknown>> };
+  prestamped.evidence[0]!.reviewedBy = "Muxin";
+  assert.throws(() => api.buildResearchDossierReviewPacket(prestamped), /unknown field.*reviewedBy|reviewedBy.*unsupported/i);
+
+  const disguisedBody = structuredClone(pendingProposal()) as { evidence: Array<Record<string, unknown>> };
+  disguisedBody.evidence[0]!.secretBody = "creator copy";
+  assert.throws(() => api.buildResearchDossierReviewPacket(disguisedBody), /unknown field.*secretBody/i);
+});
+
+test("applies exact Muxin approvals to the reviewed proposal and leaves usability pending", () => {
+  const api = researchDossierApi as unknown as {
+    buildResearchDossierReviewPacket(value: unknown): { digest: string };
+    recordResearchDossierEvidenceReview(packet: unknown, decision: unknown): ReturnType<typeof buildResearchDossier>;
+  };
+  const packet = api.buildResearchDossierReviewPacket(pendingProposal());
+  const dossier = api.recordResearchDossierEvidenceReview(packet, {
+    reviewedBy: "Muxin",
+    reviewedAt: "2026-08-30T20:00:00Z",
+    packetDigest: packet.digest,
+    policyApproved: true,
+    evidenceApprovals: ["evidence-a", "evidence-b"],
+    baselineApprovals: ["baseline-a", "baseline-b"],
+    originalityApprovals: ["summary-context-first"],
+    note: "Evidence, selection policy, baselines, and originality boundary reviewed as shown.",
+  });
+
+  assert.equal(dossier.readiness.status, "pending_muxin_review");
+  assert.equal(dossier.usabilityDecision, null);
+  assert.ok(dossier.boundedEvidence.included.every((row) => row.reviewedBy === "Muxin"));
+  assert.ok(dossier.baselines.every((row) => row.reviewedBy === "Muxin"));
+  assert.ok(dossier.summaries.every((row) => row.originality.checkedBy === "Muxin"));
+  const receipt = (dossier as unknown as { evidenceReview: { packetDigest: string; note: string } | null }).evidenceReview;
+  assert.equal(receipt?.packetDigest, packet.digest);
+  assert.equal(receipt?.note, "Evidence, selection policy, baselines, and originality boundary reviewed as shown.");
+  assert.equal((dossier as unknown as { evidenceReviewPacket: { digest: string } | null }).evidenceReviewPacket?.digest, packet.digest);
+});
+
+test("evidence review fails closed on tampering, partial approval, or a rejected policy", () => {
+  const api = researchDossierApi as unknown as {
+    buildResearchDossierReviewPacket(value: unknown): { digest: string };
+    recordResearchDossierEvidenceReview(packet: unknown, decision: unknown): unknown;
+  };
+  const packet = api.buildResearchDossierReviewPacket(pendingProposal());
+  const decision = {
+    reviewedBy: "Muxin",
+    reviewedAt: "2026-08-30T20:00:00Z",
+    packetDigest: packet.digest,
+    policyApproved: true,
+    evidenceApprovals: ["evidence-a", "evidence-b"],
+    baselineApprovals: ["baseline-a", "baseline-b"],
+    originalityApprovals: ["summary-context-first"],
+    note: "Reviewed.",
+  };
+
+  assert.throws(() => api.recordResearchDossierEvidenceReview(packet, { ...decision, packetDigest: "sha256:deadbeef" }), /digest/i);
+  assert.throws(() => api.recordResearchDossierEvidenceReview(packet, { ...decision, evidenceApprovals: ["evidence-a"] }), /evidence.*approval/i);
+  assert.throws(() => api.recordResearchDossierEvidenceReview(packet, { ...decision, policyApproved: false }), /policy.*approved/i);
+  assert.throws(() => api.recordResearchDossierEvidenceReview(packet, { ...decision, body: "smuggled creator copy" }), /unknown field|body/i);
+  const tampered = structuredClone(packet) as unknown as { proposal: { question: { text: string } } };
+  tampered.proposal.question.text = "Tampered question";
+  assert.throws(() => api.recordResearchDossierEvidenceReview(tampered, decision), /digest|tamper/i);
+});
+
 test("builds a deterministic, body-free, question-scoped dossier that remains pending human judgment", () => {
   const dossier = buildResearchDossier(input());
 
   assert.equal(dossier.kind, "research_dossier");
-  assert.equal(dossier.version, "research-dossier-v1");
+  assert.equal(dossier.version, "research-dossier-v2");
   assert.deepEqual(dossier.boundedEvidence.included.map((row) => row.id), ["evidence-a", "evidence-b"]);
   assert.deepEqual(dossier.citations.map((citation) => citation.evidenceId), ["evidence-a", "evidence-b"]);
   assert.equal(dossier.readiness.status, "pending_muxin_review");
@@ -187,7 +316,30 @@ test("fails closed on incomplete evidence, citation closure, selection coverage,
 });
 
 test("only an explicit Muxin decision makes a dossier usable and decisions are immutable", () => {
-  const dossier = buildResearchDossier(input());
+  const unreceipted = buildResearchDossier(input());
+  assert.throws(() => recordResearchDossierDecision(unreceipted, {
+    decidedBy: "Muxin", decidedAt: "2026-08-30T18:00:00Z", disposition: "hypothesis",
+    note: "This must not bypass evidence review.", dossierDigest: unreceipted.digest,
+  }), /evidence review.*required|receipt.*required/i);
+
+  const api = researchDossierApi as unknown as { buildResearchDossierReviewPacket(value: unknown): { digest: string; proposal: { evidence: Array<{ id: string }>; baselines: Array<{ id: string }>; summaries: Array<{ id: string }> } } };
+  const packet = api.buildResearchDossierReviewPacket(pendingProposal());
+  const forged = structuredClone(unreceipted) as unknown as Record<string, unknown> & { evidenceReviewPacket: unknown; evidenceReview: unknown };
+  forged.evidenceReviewPacket = packet;
+  forged.evidenceReview = {
+    reviewedBy: "Muxin", reviewedAt: "2026-08-30T17:00:00Z", packetDigest: packet.digest,
+    policyApproved: true,
+    evidenceApprovals: packet.proposal.evidence.map((row) => row.id),
+    baselineApprovals: packet.proposal.baselines.map((row) => row.id),
+    originalityApprovals: packet.proposal.summaries.map((row) => row.id), note: "Forged receipt.",
+  };
+  rehashDossierForTest(forged);
+  assert.throws(() => recordResearchDossierDecision(forged as unknown as ReturnType<typeof buildResearchDossier>, {
+    decidedBy: "Muxin", decidedAt: "2026-08-30T18:00:00Z", disposition: "hypothesis",
+    note: "This must not pass.", dossierDigest: forged.digest as string,
+  }), /canonical|packet|receipt|review/i);
+
+  const dossier = evidenceReviewedDossier();
   assert.throws(() => recordResearchDossierDecision(dossier, {
     decidedBy: "editor",
     decidedAt: "2026-08-30T18:00:00Z",
@@ -219,7 +371,7 @@ test("only an explicit Muxin decision makes a dossier usable and decisions are i
   assert.throws(() => recordResearchDossierDecision(tampered, {
     decidedBy: "Muxin", decidedAt: "2026-08-30T18:00:00Z", disposition: "observation",
     note: "Use it.", dossierDigest: dossier.digest,
-  }), /digest|tamper/i);
+  }), /digest|tamper|canonical/i);
 
   const bodyBearing = JSON.parse(JSON.stringify(dossier));
   bodyBearing.body = "PRIVATE CREATOR BODY";
