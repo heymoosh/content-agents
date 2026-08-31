@@ -415,9 +415,7 @@ export async function publishText(
     // Resolve the CTA line(s) (shared funnel layer — src/publish/cta.ts), then place them per
     // cta.yaml. A derivative can carry 2+ stacked CTAs when it matched multiple content types.
     const { ctas, usedFallback } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
-    if (usedFallback) {
-      console.log(`  ↳ note: ${row.id} cta → homepage (no canonical_url in source.md)`);
-    }
+    if (usedFallback) console.log(`  ↳ note: ${row.id} used the configured CTA fallback`);
     const placement = cfg.placement[row.platform] ?? "inline";
     const { posts, manualComment } = buildPosts(body, ctas, placement, maxMap[row.platform] ?? Infinity);
 
@@ -482,7 +480,9 @@ async function main() {
     process.argv.includes("--no-schedule") ||
     (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
   const forceReuse = process.argv.includes("--force-reuse");
-  await publishText(folder, { noSchedule, forceReuse });
+  if (noSchedule || forceReuse) throw new Error("legacy scheduling overrides are unavailable on the unified capability-selected publish path");
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "text");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)

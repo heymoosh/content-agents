@@ -6,7 +6,7 @@ import { splitFrontmatter } from "../util/frontmatter.js";
 
 export const DELIVERY_POLICY_VERSION = "delivery-policy-v1" as const;
 
-export type DeliveryProvider = "typefully" | "postpeer" | "youtube" | "substack" | "manual";
+export type DeliveryProvider = "postiz" | "typefully" | "postpeer" | "youtube" | "substack" | "manual";
 export type DeliveryBrand = "human-inference" | "fiction" | "charles";
 export type DeliveryMode = "provider" | "manual" | "blocked";
 
@@ -21,6 +21,7 @@ export interface DeliveryPolicyDecision {
 }
 
 const HUMAN_INFERENCE_ACCOUNTS: Readonly<Record<Exclude<DeliveryProvider, "manual">, string>> = {
+  postiz: "human-inference/postiz",
   typefully: "human-inference/typefully",
   postpeer: "human-inference/postpeer",
   youtube: "human-inference/youtube",
@@ -93,10 +94,16 @@ function storedOrigin(folder: string): { origin: ContentOrigin | "missing" | "un
   } catch { return { origin: "unknown" }; }
 }
 
-export function resolveDeliveryPolicy(folder: string, provider: DeliveryProvider): DeliveryPolicyDecision {
+/** Resolve durable content identity without consulting provider credentials. */
+export function resolveDeliveryIntent(folder: string, provider: DeliveryProvider): DeliveryPolicyDecision {
   const resolved = storedOrigin(folder);
   let decision = decideDeliveryPolicy(resolved.origin, provider);
   if (resolved.rationale) decision = { ...decision, reason: `${resolved.rationale}; ${decision.reason}` };
+  return decision;
+}
+
+export function resolveDeliveryPolicy(folder: string, provider: DeliveryProvider): DeliveryPolicyDecision {
+  const decision = resolveDeliveryIntent(folder, provider);
   if (decision.mode !== "provider") return decision;
   const envKey = `CONTENT_AGENTS_${provider.toUpperCase()}_ACCOUNT_ID`;
   const configuredAccount = process.env[envKey]?.trim();

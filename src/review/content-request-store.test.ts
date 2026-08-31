@@ -22,21 +22,12 @@ async function rootDir(): Promise<string> {
 }
 
 describe("content request store", () => {
-  test("derives immutable source provenance from source.md for the initial GUI save", async () => {
+  test("ordinary initial GUI save refuses whole-source configuration before an advisor cut is approved", async () => {
     const root = await rootDir();
     await writeFile(join(root, "source.md"), "---\ntitle: A source\norigin: https://humaninference.substack.com/p/source\ncanonical_url: https://humaninference.substack.com/p/source\n---\n\nFirst line.\n\nSecond line.\n");
-    const authorized = await authorizeGuiContentRequest(root, {
-      ...input,
-      originalInput: "First line.\n\nSecond line.",
-      sourceProvenance: { kind: "approved-cut", lens: "forged", sourceLines: [999] },
-      sourceContext: {
-        kind: "charles-approved-post", authoritativeBody: "forged", personaRef: "charles/config/persona.yaml",
-        identity: "charles-lord-featherbottom", restrictions: ["forged"],
-      },
-    });
-    assert.equal(authorized.origin, "human-inference");
-    assert.deepEqual(authorized.sourceProvenance, { kind: "source", sourceLines: [7, 9] });
-    assert.equal(authorized.sourceContext, null);
+    await assert.rejects(() => authorizeGuiContentRequest(root, {
+      ...input, originalInput: "First line.\n\nSecond line.", sourceProvenance: null,
+    }), /approved advisor cut is required/i);
   });
 
   test("initial GUI authority rejects a client body that is not the server source", async () => {
@@ -44,8 +35,31 @@ describe("content request store", () => {
     await writeFile(join(root, "source.md"), "---\ntitle: A source\ncanonical_url: https://humaninference.substack.com/p/source\n---\n\nAuthoritative body.\n");
     await assert.rejects(
       () => authorizeGuiContentRequest(root, { ...input, originalInput: "client replacement" }),
-      /does not match.*source\.md/i,
+      /approved advisor cut is required/i,
     );
+  });
+
+  test("approved-cut configuration binds the cut body and source_lines read by the server", async () => {
+    const root = await rootDir();
+    await mkdir(join(root, "cuts", "belief-audit"), { recursive: true });
+    await writeFile(join(root, "source.md"), "---\ntitle: A source\ncanonical_url: https://humaninference.substack.com/p/source\n---\n\nOne.\nTwo.\n");
+    await writeFile(join(root, "cuts", "belief-audit", "cut.md"), "---\ntitle: Belief audit\nsource_lines: [6]\n---\n\nOne.\n");
+    const authorized = await authorizeGuiContentRequest(root, {
+      ...input, originalInput: "One.", sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [999] },
+    });
+    assert.equal(authorized.originalInput, "One.");
+    assert.deepEqual(authorized.sourceProvenance, { kind: "approved-cut", lens: "belief-audit", sourceLines: [6], canonicalUrl: "https://humaninference.substack.com/p/source" });
+  });
+
+  test("an edited cut containing an uncited claim is refused even when its stale source_lines remain", async () => {
+    const root = await rootDir();
+    await mkdir(join(root, "cuts", "belief-audit"), { recursive: true });
+    await writeFile(join(root, "source.md"), "---\ntitle: A source\ncanonical_url: https://humaninference.substack.com/p/source\n---\n\nOne supported claim.\n");
+    await writeFile(join(root, "cuts", "belief-audit", "cut.md"), "---\ntitle: Belief audit\nsource_lines: [6]\n---\n\nOne supported claim plus an invented result.\n");
+    await assert.rejects(() => authorizeGuiContentRequest(root, {
+      ...input, originalInput: "One supported claim plus an invented result.",
+      sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [6] },
+    }), /cut body does not match.*source_lines/i);
   });
 
   test("missing cross-room requests cannot be recovered by rebranding their source as Human Inference", async () => {
@@ -63,26 +77,38 @@ describe("content request store", () => {
     }
   });
 
-  test("ordinary GUI authorization requires an explicit Human Inference source identity", async () => {
+  test("ordinary GUI authorization requires an approved cut even for a Human Inference source", async () => {
     const root = await rootDir();
     await writeFile(join(root, "source.md"), "---\ntitle: Ambiguous\norigin: pasted-text\n---\n\nAuthoritative body.\n");
     await assert.rejects(
       () => authorizeGuiContentRequest(root, { ...input, originalInput: "Authoritative body." }),
-      /Human Inference.*identity|identity.*Human Inference/i,
+      /approved advisor cut is required/i,
     );
   });
 
-  test("an existing authority-less GUI request is upgraded from source.md without trusting the client", async () => {
+  test("an existing authority-less GUI request cannot be upgraded from the whole source", async () => {
     const root = await rootDir();
     await writeFile(join(root, "source.md"), "---\ntitle: A source\ncanonical_url: https://humaninference.substack.com/p/source\n---\n\nAuthoritative body.\n");
     const existing = buildContentRequest({ ...input, originalInput: "Authoritative body.", sourceProvenance: null });
-    const authorized = await authorizeGuiContentRequest(root, {
+    await assert.rejects(() => authorizeGuiContentRequest(root, {
       ...input, originalInput: "forged replacement", sourceProvenance: { kind: "source", sourceLines: [999] },
       treatments: ["shorter-version"],
-    }, existing);
-    assert.equal(authorized.originalInput, "Authoritative body.");
-    assert.deepEqual(authorized.sourceProvenance, { kind: "source", sourceLines: [6] });
-    assert.deepEqual(authorized.treatments, ["shorter-version"]);
+    }, existing), /approved advisor cut is required/i);
+  });
+
+  test("an existing approved-cut request is revalidated against disk on every configuration save", async () => {
+    const root = await rootDir();
+    await mkdir(join(root, "cuts", "belief-audit"), { recursive: true });
+    await writeFile(join(root, "source.md"), "---\ntitle: A source\n---\n\nOne supported claim.\n");
+    await writeFile(join(root, "cuts", "belief-audit", "cut.md"), "---\nsource_lines: [5]\n---\n\nOne supported claim.\n");
+    const existing = buildContentRequest({
+      ...input, originalInput: "One supported claim.",
+      sourceProvenance: { kind: "approved-cut", lens: "belief-audit", sourceLines: [5] },
+    });
+    await writeFile(join(root, "cuts", "belief-audit", "cut.md"), "---\nsource_lines: [5]\n---\n\nA changed uncited claim.\n");
+    await assert.rejects(() => authorizeGuiContentRequest(root, {
+      ...input, originalInput: "One supported claim.", treatments: ["shorter-version"],
+    }, existing), /cut body does not match.*source_lines/i);
   });
 
   test("writes and reads a validated request while preserving originalInput verbatim", async () => {

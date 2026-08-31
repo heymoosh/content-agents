@@ -63,6 +63,7 @@ export interface ContentSourceProvenance {
   readonly kind: "source" | "approved-cut";
   readonly sourceLines: readonly (number | string)[];
   readonly lens?: string;
+  readonly canonicalUrl?: string;
 }
 
 export interface ContentSelections {
@@ -182,9 +183,15 @@ function sourceProvenance(value: ContentSourceProvenance | null | undefined): Co
     throw new Error(`source provenance source_lines[${index}] is invalid`);
   });
   const lens = value.lens?.trim();
+  const canonicalUrl = value.canonicalUrl?.trim();
+  if (canonicalUrl) {
+    let parsed: URL;
+    try { parsed = new URL(canonicalUrl); } catch { throw new Error("source provenance canonicalUrl is invalid"); }
+    if (parsed.protocol !== "https:") throw new Error("source provenance canonicalUrl must use https");
+  }
   if (value.kind === "approved-cut" && !lens) throw new Error("approved-cut provenance requires a lens");
   if (value.kind === "source" && lens) throw new Error("source provenance cannot name a cut lens");
-  return { kind: value.kind, sourceLines, ...(lens ? { lens } : {}) };
+  return { kind: value.kind, sourceLines, ...(lens ? { lens } : {}), ...(canonicalUrl ? { canonicalUrl } : {}) };
 }
 
 function sourceContext(value: ContentSourceContext | null | undefined, origin: ContentOrigin): ContentSourceContext | null {

@@ -4,6 +4,8 @@ import { isQuoteCardRow } from "../publish/cards.js";
 import { isTikTokRow } from "../publish/tiktok.js";
 import type { PostPeerPost } from "../publish/postpeer-status.js";
 import { fmtLa } from "../publish/slots.js";
+import type { DeliveryProvider, DeliveryState } from "./delivery-event.js";
+import type { PublishingStatus } from "./publishing-status.js";
 
 // Live Typefully/PostPeer schedule reconciliation for the review GUI (read-only — never pushes or
 // cancels anything).
@@ -32,8 +34,14 @@ import { fmtLa } from "../publish/slots.js";
 export type ReconcileState = "scheduled" | "mismatch" | "not-applicable" | "unavailable";
 
 export interface ReconciledStatus {
-  provider: "typefully" | "postpeer" | "upload-post" | null;
+  provider: DeliveryProvider | null;
   state: ReconcileState;
+  deliveryState?: DeliveryState;
+  providerObjectId?: string;
+  providerAccountId?: string | null;
+  canonicalUrl?: string;
+  providerUpdatedAt?: string;
+  providerPublishedAt?: string;
   when?: string; // human PT label, from the provider's live data — the source of truth, not a cached guess
   reason?: string;
 }
@@ -130,8 +138,36 @@ function safeWhen(iso: string | undefined): string | undefined {
 
 // Reconcile ONE row against the live provider state already fetched (fetch once per /api/queue
 // call, matched here per row — see src/review/serve.ts). Pure/sync: no network, no fs.
-export function reconcileRow(row: QueueRow, publishLog: PublishLogRead, live: LiveProviderState): ReconciledStatus {
+function reconcileAuthoritative(status: PublishingStatus): ReconciledStatus {
+  const normalized = status.state === "scheduling" || status.state === "scheduled" ? "planned"
+    : status.state === "cleared" ? "canceled" : status.state;
+  const deliveryState = normalized as DeliveryState;
+  const common = {
+    provider: status.provider,
+    deliveryState,
+    ...(status.providerObjectId ?? status.ref ? { providerObjectId: status.providerObjectId ?? status.ref } : {}),
+    ...(status.providerAccountId !== undefined ? { providerAccountId: status.providerAccountId } : {}),
+    ...(status.canonicalUrl ? { canonicalUrl: status.canonicalUrl } : {}),
+    ...(status.providerUpdatedAt ? { providerUpdatedAt: status.providerUpdatedAt } : {}),
+    ...(status.providerPublishedAt ? { providerPublishedAt: status.providerPublishedAt } : {}),
+  };
+  if (deliveryState === "planned" || deliveryState === "delivered" || deliveryState === "live" || deliveryState === "private") {
+    return { ...common, state: "scheduled", when: safeWhen(status.providerPublishedAt ?? status.plannedFor) };
+  }
+  if (deliveryState === "uncertain") return { ...common, state: "unavailable", reason: status.error ?? "provider outcome is uncertain" };
+  return { ...common, state: "mismatch", reason: status.error ?? `authoritative delivery event is ${deliveryState}` };
+}
+
+export function reconcileRow(
+  row: QueueRow,
+  publishLog: PublishLogRead,
+  live: LiveProviderState,
+  publishingStatus?: PublishingStatus,
+): ReconciledStatus {
   if (!needsReconciliation(row)) return { provider: null, state: "not-applicable" };
+  // The structured append-only event is authoritative. Free-text parsing below exists only for
+  // pre-event history and is deliberately marked unavailable when its provider cannot be checked.
+  if (publishingStatus) return reconcileAuthoritative(publishingStatus);
   // Text rows and quote-cards both schedule through Typefully now (cards.ts, 2026-07-08 rewire).
   // Only TikTok is left on PostPeer.
   const throughTypefully = TEXT_PLATFORMS.has(row.platform) || isQuoteCardRow(row.platform);

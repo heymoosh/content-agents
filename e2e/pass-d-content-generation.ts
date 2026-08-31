@@ -14,6 +14,7 @@ const FICTION_SLUG = "e2e-fiction-treatment-refusal";
 function seedSource(): void {
   const folder = join(ROOT, "content", SLUG);
   mkdirSync(join(folder, "derivatives"), { recursive: true });
+  mkdirSync(join(folder, "cuts", "approved-e2e"), { recursive: true });
   writeFileSync(join(folder, "derivatives", "seed-pending.md"), "---\nplatform: bluesky\nsource_lines: [7]\n---\n\nThe approved first claim is exactly this sentence.\n");
   writeFileSync(join(folder, "source.md"), [
     "---",
@@ -33,6 +34,18 @@ function seedSource(): void {
     "| id | platform | format | asset | native(1-5) | brand(1-5) | cta | status | notes |",
     "|----|----------|--------|-------|-------------|------------|-----|--------|-------|",
     "| seed-pending | bluesky | text | derivatives/seed-pending.md | 5 | 5 | no | pending | E2E source discovery seed |",
+    "",
+  ].join("\n"));
+  // This is the deterministic stand-in for the completed advisor decision. The browser still has
+  // to choose it, and request persistence re-reads this file before accepting its provenance.
+  writeFileSync(join(folder, "cuts", "approved-e2e", "cut.md"), [
+    "---",
+    "title: Approved E2E cut",
+    'source_lines: ["8-9"]',
+    "---",
+    "",
+    "The approved first claim is exactly this sentence.",
+    "The approved second claim stays inside the same boundary.",
     "",
   ].join("\n"));
 }
@@ -66,10 +79,50 @@ async function main(): Promise<void> {
   try {
     session = await openSession(PORT, { allowInjectedRoutes: ["/api/content/generate"] });
     const { page } = session;
+
+    // Exercise the canonical front door. The top-level action persists the capture and starts the
+    // advisor-only job; the disposable engine route ensures no real model is invoked.
+    await page.fill("#src", "A source idea with enough context for Content versions and an exact-source advisor cut.");
+    await page.click("#routeBtn");
+    await page.waitForSelector("#captureVerdict:not([hidden]) .cap-go", { timeout: 10_000 });
+    const verdict = (await page.locator("#captureVerdict").innerText()).replace(/\s+/g, " ");
+    if (!verdict.includes("Content")) throw new Error(`capture classified outside Content: ${verdict}`);
+    await page.click("#captureVerdict .cap-go");
+    await page.waitForSelector("#contentCaptureHandoff:not([hidden]) .capture-handoff", { timeout: 15_000 });
+    const captures = await page.evaluate(async () => {
+      const response = await fetch("/api/captures");
+      return await response.json() as { ok?: boolean; captures?: { room?: string; text?: string; jobId?: string }[] };
+    });
+    const contentCapture = captures.captures?.find((capture) => capture.room === "Content" && capture.text?.includes("exact-source advisor cut"));
+    record({
+      feature: "Studio capture persists in Content and starts only the advisor gate",
+      status: captures.ok && !!contentCapture?.jobId ? "pass" : "fail",
+      detail: `durable Content captures=${captures.captures?.filter((capture) => capture.room === "Content").length ?? 0}; advisor job=${contentCapture?.jobId ?? "missing"}; approval and publishing remain separate`,
+    });
+
     await openRoom(page, "content");
     await waitLoaded(page, "#contentWizard");
-    await page.click(`[data-slug="${SLUG}"]`);
+    const seededSession = await page.evaluate(async (slug) => {
+      const response = await fetch("/api/content");
+      const body = await response.json() as { sessions?: { slug?: string; cuts?: { lens?: string }[] }[] };
+      return body.sessions?.find((candidate) => candidate.slug === slug) ?? null;
+    }, SLUG);
+    if (!seededSession?.cuts?.some((cut) => cut.lens === "approved-e2e")) {
+      throw new Error(`seeded approved cut missing from server-owned Content read: ${JSON.stringify(seededSession)}`);
+    }
+    await page.click(`#cwBody .cw-src[data-slug="${SLUG}"]`);
+    await page.waitForSelector('input[name="approvedCut"][value="approved-e2e"]', { state: "attached", timeout: 15_000 });
+    const gated = (await page.locator("#cwBody").innerText()).includes("Pick one approved cut before configuration")
+      && await page.locator("#contentConfigSave").count() === 0;
+    await page.check('input[name="approvedCut"][value="approved-e2e"]');
+    await page.waitForSelector("[data-open-config]", { timeout: 10_000 });
+    await page.click("[data-open-config]");
     await page.waitForSelector("#contentConfigSave", { timeout: 15_000 });
+    record({
+      feature: "Approved server-owned cut unlocks Content configuration",
+      status: gated ? "pass" : "fail",
+      detail: `advisor gate before selection=${gated}; configuration opened after approved-e2e cut`,
+    });
     // Text-only keeps this pass focused on provenance-bearing derivatives rather than the still
     // separate configured-media rendering gap.
     await page.click('[data-config-none="media"]');
@@ -87,19 +140,27 @@ async function main(): Promise<void> {
     await page.waitForFunction(() => document.querySelector("#reviewSheet")?.hasAttribute("hidden") === false, undefined, { timeout: 20_000 }).catch(() => {});
 
     const folder = join(ROOT, "content", SLUG);
-    const stored = JSON.parse(readFileSync(join(folder, "content-request.json"), "utf8")) as { sourceProvenance?: { sourceLines?: unknown[] } };
+    const stored = JSON.parse(readFileSync(join(folder, "content-request.json"), "utf8")) as { sourceProvenance?: { sourceLines?: unknown[]; canonicalUrl?: string } };
     const derivativeFiles = readdirSync(join(folder, "derivatives")).filter((name) => name.endsWith(".md"));
     const derivatives = derivativeFiles.map((name) => readFileSync(join(folder, "derivatives", name), "utf8"));
     const queue = readFileSync(join(folder, "review-queue.md"), "utf8");
-    const traced = derivatives.length > 0 && derivatives.every((body) => /source_lines:\s*\[/.test(body));
-    const authoritative = derivatives.every((body) => body.includes("The approved first claim is exactly this sentence.") && !body.includes("invented"));
+    const generated = (payload.ids ?? []).map((id) => readFileSync(join(folder, "derivatives", `${id}.md`), "utf8"));
+    const traced = generated.length > 0 && generated.every((body) => /source_lines:\s*\[/.test(body));
+    const controlExact = generated.some((body) => /variant_kind:\s*["']?control/.test(body)
+      && body.endsWith("The approved first claim is exactly this sentence.\nThe approved second claim stays inside the same boundary."));
+    const treatedStandalone = generated.some((body) => /variant_kind:\s*["']?treated/.test(body)
+      && body.includes("Fixture standalone point 1.") && !body.includes("invented"));
+    const editorStamped = generated.some((body) => /variant_kind:\s*["']?treated/.test(body)
+      && !/^editor_pass:/m.test(body));
+    const essayCta = generated.every((body) => /^cta:\s*source$/m.test(body) && /^cta_label:\s*["']Read the full essay:["']$/m.test(body))
+      && stored.sourceProvenance?.canonicalUrl === "https://humaninference.substack.com/p/e2e-authoritative-source";
     const pending = (payload.ids ?? []).every((id) => new RegExp(`\\| ${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\|[^\\n]+\\| pending \\|`).test(queue));
     const passed = response.ok() && payload.ok === true && payload.engineExecution === "disposable-injected"
-      && Array.isArray(stored.sourceProvenance?.sourceLines) && traced && authoritative && pending;
+      && Array.isArray(stored.sourceProvenance?.sourceLines) && traced && controlExact && treatedStandalone && editorStamped && essayCta && pending;
     record({
       feature: "Content GUI saves authoritative provenance and generates pending traced derivatives",
       status: passed ? "pass" : "fail",
-      detail: `HTTP ${response.status()}; injected=${payload.engineExecution}; derivatives=${derivativeFiles.length}; traced=${traced}; authoritative=${authoritative}; pending=${pending}${payload.error ? `; error=${payload.error}` : ""}`,
+      detail: `HTTP ${response.status()}; injected=${payload.engineExecution}; derivatives=${derivativeFiles.length}; traced=${traced}; controlExact=${controlExact}; treatedStandalone=${treatedStandalone}; editorStamped=${editorStamped}; essayCta=${essayCta}; pending=${pending}${payload.error ? `; error=${payload.error}` : ""}`,
     });
     record({
       feature: "Configured-generation browser pass cannot invoke a real model or provider",

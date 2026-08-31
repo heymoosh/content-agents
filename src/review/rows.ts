@@ -49,6 +49,7 @@ interface EnrichedRow extends QueueRow {
   threadSpinApplied?: boolean; // Spin already drafted the worldview thread in on a "missing" verdict
   replyToText?: string; // "reply to mention" rows (card db22283f) — what the mention/reply said
   assetUrl?: string; // image/video preview URL
+  mediaStage?: Record<string, unknown>; // inspectable configured-media plan/source gate
   editable: boolean; // can the body be edited-and-saved here?
   revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
   hasAsset: boolean;
@@ -107,6 +108,9 @@ export function approveBlockReason(
   row: QueueRow,
   exists: (p: string) => boolean = existsSync,
 ): string | null {
+  if (row.asset?.startsWith("media-stages/") && row.asset.endsWith(".json")) {
+    return "staged media plan is inspectable but is not a rendered asset. Approve the plan/source stage and run its named pipeline before approving delivery";
+  }
   if (row.format === "storyboard") {
     return exists(join(folder, "video", "storyboard.md")) ? null : "storyboard not rendered yet. Run /video";
   }
@@ -196,11 +200,20 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     revisable: !isReply && existsSync(join(folder, "derivatives", `${row.id}.md`)),
     hasAsset: false,
     approveBlocked: approveBlockReason(folder, row),
-    reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live) : undefined,
+    reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live, publishingStatus) : undefined,
     canGenerateStoryboard: kind === "storyboard" && !existsSync(join(folder, "video", "storyboard.md")),
     duplicatable: false, // finalized below, once hasAsset is known
   };
   const assetUrl = (file: string) => `/asset?slug=${encodeURIComponent(slug)}&file=${encodeURIComponent(file)}`;
+
+  if (asset.startsWith("media-stages/") && asset.endsWith(".json")) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(folder, asset), "utf8"));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) out.mediaStage = parsed as Record<string, unknown>;
+    } catch {
+      // approveBlockReason still blocks a malformed/missing stage from being treated as an asset.
+    }
+  }
 
   const loadMd = (relPath: string) => {
     const p = join(folder, relPath);

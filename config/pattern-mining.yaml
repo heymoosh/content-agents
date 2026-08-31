@@ -879,7 +879,7 @@ accounts:
   #             RSS carries no subscriber count.
   #             The route now is Reddit's own OAuth JSON API, run by `npm run patterns:reddit`
   #             with a free script app (REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET /
-  #             REDDIT_USER_AGENT in .env, see .env.example). It returns the subscriber count, the
+  #             REDDIT_USER_AGENT in the repository .env). It returns the subscriber count, the
   #             score, the upvote ratio and the comment count on every post, so a reddit
   #             `followers` is a number this route CAN see. The rows below still say null because
   #             nobody has run it with credentials yet: fill each one in by hand from what that

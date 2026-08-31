@@ -17,14 +17,15 @@ folder too. One window, one folder, that's the whole system.
 ## One-time setup (in this order)
 
 1. `npm install` (already done if Claude built this on your machine)
-2. `cp .env.example .env` — then add keys **as you need them**, not all at once:
+2. Edit the existing local `.env` and add credentials **as you need them**, not all at once. The
+   repository intentionally keeps one gitignored credential file rather than a second template:
 
    | Key | Needed for | When |
    |---|---|---|
    | *(none)* | Analytics import + strategy briefs + text derivatives | works today |
    | `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD` | auto-fetch Bluesky stats | 2 min, do early |
-   | `GEMINI_API_KEY` | quote-card backgrounds, video scene images, voice-memo transcription | when you want images |
-   | `OPENROUTER_API_KEY` | Grok writes the hook-driven video script | when you want video |
+   | *(subscription CLIs)* | Claude, Grok, and GPT/Codex model selections in Studio | sign in to each installed CLI; no API key here |
+   | `OPENROUTER_API_KEY` | Kling video interpolation only | temporarily, when rendering generated video |
    | *local video tools* | voiceover (Kokoro) + captions (whisper.cpp) — no API key, but installs | when you want video — see `docs/setup-kokoro.md` |
    | *yt-dlp* | reading YouTube transcripts into the pattern corpus (no API key). Install with `brew install yt-dlp` | when you run `/patterns collect` on YouTube |
    | `TYPEFULLY_API_KEY` | scheduled posting to X + LinkedIn + Bluesky | when ready to publish — see `docs/setup-typefully.md` |
@@ -70,13 +71,15 @@ install, because voiceover runs **locally and free** (Kokoro) instead of a paid 
 
 **How the video flow works** (the point: you steer with words, not by dictating every shot):
 
-1. `/atomize <your essay>` — Grok drafts a 60–90s hook-driven script, then Claude storyboards
+1. `/atomize <your essay>` — the selected subscription-backed model drafts a 60–90s hook-driven script, then Claude storyboards
    it into 5–7 scenes (one visual per scene, styled from `config/style.yaml`) and writes
    `content/<slug>/video/storyboard.md`. **It stops here. Nothing is generated yet.**
 2. **You read the storyboard as text** (~30 sec) — the cheap checkpoint. Edit any scene, then
    set the `storyboard` row in `review-queue.md` to `approve` (or `revise` + a note).
-3. `npm run render -- --render-video content/<slug>` — only now does it spend: generates the
-   scene images, voiceover, captions, and the final 9:16 MP4 + thumbnail. (Claude runs this for
+3. Generate strong scene art in an attended Codex session, review it, and supply the approved files.
+   `npm run render -- --render-video content/<slug>` then creates the voiceover, captions, and final
+   9:16 MP4 + thumbnail. Unattended image generation is disabled until a reviewed-file attachment
+   step is wired. (Claude runs this for
    you once you approve; it refuses to run while the storyboard is still `pending`.)
 
 Bad scene direction costs nothing to fix (it's just text); a bad image costs ~$0.02; voice is
@@ -84,7 +87,7 @@ free. Video scripts are the one place the system writes *for* you — it drafts 
 ideas, and you approve every storyboard before anything renders.
 
 **One-time video setup** — follow `docs/setup-kokoro.md`. In short:
-- Set `OPENROUTER_API_KEY` (Grok, the script writer) and `GEMINI_API_KEY` (scene images).
+- Set `OPENROUTER_API_KEY` only while Kling remains the production video interpolator.
 - Run **Kokoro** for voiceover — easiest is one Docker command (kokoro-fastapi).
 - Install **whisper.cpp** (+ a model) and **ffmpeg** — these turn the voiceover into
   word-by-word captions. (Kokoro doesn't emit timing; whisper.cpp recovers it.)
@@ -97,8 +100,9 @@ skipped in the review queue.
 ## Costs (steady state)
 
 - Typefully paid plan (API access) — you've opted in
-- Gemini pay-per-use — pennies (scene/quote-card images $0.02 each)
-- OpenRouter (Grok script) — ~$0.01 per video
+- Claude, Grok, GPT/Codex text work — existing subscriptions through their local CLIs
+- Image generation — attended Codex generation and reviewed file handoff; no image API key
+- OpenRouter — Kling video interpolation only, temporarily
 - Voiceover — **free** (Kokoro runs locally); ElevenLabs ~$6/mo only if you swap to it
 - Everything else (Remotion, whisper.cpp, Bluesky, YouTube, this repo) — free
 - Every generated dollar is logged in `data/cost-log.csv`

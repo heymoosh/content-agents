@@ -118,6 +118,8 @@ describe("content request domain", () => {
     assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [] } }), /requires source_lines/);
     assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [0] } }), /invalid/);
     assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "approved-cut", sourceLines: [1] } }), /requires a lens/);
+    assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [1], canonicalUrl: "http://example.com" } }), /must use https/);
+    assert.equal(buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [1], canonicalUrl: "https://example.com/essay" } }).sourceProvenance?.canonicalUrl, "https://example.com/essay");
   });
 
   test("refuses missing, ambiguous, or cross-origin/cross-venture CTA mappings", () => {

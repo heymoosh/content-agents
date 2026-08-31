@@ -256,9 +256,7 @@ export async function publishCards(
 
       const { text: caption, fm } = cardCopy(folder, row.id);
       const { ctas, usedFallback } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
-      if (usedFallback) {
-        console.log(`  ↳ note: ${row.id} cta → homepage (no canonical_url in source.md)`);
-      }
+      if (usedFallback) console.log(`  ↳ note: ${row.id} used the configured CTA fallback`);
       const placement = cfg.placement[target] ?? "inline";
       const { posts, manualComment } = buildPosts(caption, ctas, placement, maxMap[target] ?? Infinity);
 
@@ -316,7 +314,9 @@ async function main() {
     process.exit(1);
   }
   const folder = isAbsolute(folderArg) ? folderArg : join(repoRoot, folderArg);
-  await publishCards(folder, { atOverride, forceReuse });
+  if (atOverride || forceReuse) throw new Error("legacy scheduling overrides are unavailable on the unified capability-selected publish path");
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "card");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (e.g. in tests) without

@@ -7,7 +7,7 @@
 //
 // EXPENSIVE_ROUTES are aborted at the browser (see harness.ts). Nothing here starts a model job.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bootServer, openSession, openRoom, waitLoaded, record, results, ROOT } from "./harness.js";
 
@@ -21,6 +21,18 @@ function answerFor(n: number): string {
 
 async function main(): Promise<void> {
   console.log("\n=== Pass B: writes, real server (worktree-isolated) ===\n");
+  // Keep the manual-send assertion independent of whatever personal lead data happens to exist.
+  const outreachFixture = join(ROOT, "outreach", "leads", "e2e-manual-send");
+  mkdirSync(join(outreachFixture, "messages"), { recursive: true });
+  writeFileSync(join(outreachFixture, "lead.md"), [
+    "---", "kind: client", 'name: "E2E Manual Send"', "url: https://example.invalid/e2e",
+    "source: e2e", "status: pursue", "classification: greenfield", 'pitch_angle: "Verify the manual handoff"', "---",
+    "", "## Profile", "", "Disposable browser fixture.",
+  ].join("\n"));
+  writeFileSync(join(outreachFixture, "messages", "message-01.md"), [
+    "---", "lead: e2e-manual-send", "channel: email", "status: locked", "locked_at: 2026-08-30", "---", "",
+    "Hello from the disposable manual-send fixture.",
+  ].join("\n"));
   const server = await bootServer({}, PORT);
   let s: Awaited<ReturnType<typeof openSession>> | null = null;
 

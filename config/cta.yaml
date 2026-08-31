@@ -37,8 +37,9 @@ targets:                 # default CTA per pillar — /atomize fills `cta` + `ct
 # (voice memo, raw thought, or `canonical_url` not pasted into source.md). /publish swaps in
 # this url + label so the funnel still converts to an owned subscriber instead of breaking.
 source_fallback:
-  url: "https://humaninference.ai"
-  label: "More from me (free to subscribe):"
+  # No generic homepage fallback. If there is no published source URL, the resolver emits no
+  # forced link unless a reviewed high-fit/high-value destination was explicitly approved.
+  label: "Read the full piece:"
 
 placement:               # WHERE the link goes per platform (from Branding/.../Platform Reference.md)
   x: reply               # links in-post = 30-50% reach penalty → link goes in the first reply
@@ -59,7 +60,7 @@ placement:               # WHERE the link goes per platform (from Branding/.../P
 # - A derivative can override the pillar default by setting its own `cta:` in frontmatter — a
 #   literal url (e.g. a civic-leaning Bluesky post on a human-ai essay → the voting tool), or
 #   `none` for no link.
-# - Note-derived content (source_kind: substack-note) links to the ORIGINAL note by default: an
-#   empty `cta` on a note resolves to the note's own canonical_url (a Note is itself the
-#   destination). Enforced in src/publish/cta.ts, scoped to notes — essays are unaffected. An
-#   explicit `cta: none` or a literal url on a note derivative still wins.
+# - Note-derived content (source_kind: substack-note) never links back to the original Note.
+#   Notes are already complete short-form objects, so empty or `cta: source` resolves to no link.
+#   A separately reviewed literal/project destination may still be used when it meets the normal
+#   high-fit/high-value policy; essays and other published sources are unaffected.

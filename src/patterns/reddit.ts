@@ -80,7 +80,7 @@ export function readCredentials(env: NodeJS.ProcessEnv = process.env): RedditCre
         "  REDDIT_CLIENT_SECRET  the field labelled 'secret'\n" +
         "  REDDIT_USER_AGENT     a description you write, in Reddit's required format:\n" +
         "                        platform:app-id:version (by /u/your-reddit-username)\n" +
-        "See .env.example for the exact lines to copy.",
+        "Add the Reddit variables to the repository .env.",
     );
   }
   return { clientId: clientId!, clientSecret: clientSecret!, userAgent: userAgent! };

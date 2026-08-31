@@ -109,6 +109,13 @@ export function imageMissingHtml(row: { kind?: string; assetUrl?: string }): str
   return '<div class="src missing-img">No image rendered yet.</div>';
 }
 
+/** Actions shared by every persisted configured-media stage, independent of media kind. */
+export function mediaPlanActionsHtml(asset: string | undefined): string {
+  return String(asset || "").startsWith("media-stages/")
+    ? '<span class="storyboard-control"><button data-act="approve-media-plan">Approve media plan/source</button><button class="storyboard" data-act="render-media">Render approved media</button></span>'
+    : "";
+}
+
 // Pure, DOM-free mirror of the inline logic the client <script> below uses to clear its
 // storyboardSlugs in-flight registry once a piece's real "Generate storyboard" video job actually
 // resolves (done, failed, or stopped by Muxin) — not the instant the click fires (card fbfea28b: the old row.storyboardQueued
@@ -162,8 +169,8 @@ export function workbenchJobTarget(
 
 export type CaptureHandoff = { room: string; text: string; id?: string };
 
-// A capture is an inbox item, not a command. This deliberately produces the same shape as a
-// Studio needs-you row without reaching into any generator, sender, publisher, or policy surface.
+// A capture remains an inbox item until Muxin chooses Start on it. That action may prepare a
+// build-specific human gate, but never approves, schedules, or publishes.
 export function captureHandoffSummary(capture: CaptureHandoff | null): {
   room: string; label: string; text: string; detail: string; action: string;
 } | null {
@@ -177,16 +184,14 @@ export function captureHandoffSummary(capture: CaptureHandoff | null): {
   };
 }
 
-// page-capture.ts owns the classifier, but its old verdict copy described pre-handoff behavior.
-// This page owns the durable handoff surface, so its verdict says only what this surface does:
-// save the capture and wait for Muxin's explicit next action in the owning room.
+// Start on it saves first, then advances to the safest real next action each build can accept.
 export function captureHandoffVerdict(room: "Content" | "Fiction" | "Outreach" | "Venture"): {
   room: string; line: string; actionLabel: string | null;
 } {
-  if (room === "Content") return { room, line: "I read this as Content. Keep it in Content as a capture, then choose the next action there.", actionLabel: null };
-  if (room === "Fiction") return { room, line: "I read this as Fiction. Keep it in Fiction as a capture, then choose the next action there.", actionLabel: "Keep it in Fiction" };
-  if (room === "Outreach") return { room, line: "I read this as Outreach. Keep it in Outreach as a capture, then choose the next action there.", actionLabel: "Keep it in Outreach" };
-  return { room, line: "I read this as Venture. Keep it in Venture as a capture, then choose the next action there.", actionLabel: "Keep it in Venture" };
+  if (room === "Content") return { room, line: "I read this as Content. Start on it opens an advisor round. Approval and publishing stay separate.", actionLabel: "Start on it" };
+  if (room === "Fiction") return { room, line: "I read this as Fiction. Start on it puts these beats in Write next for you to review before drafting.", actionLabel: "Start on it" };
+  if (room === "Outreach") return { room, line: "I read this as Outreach. Start on it opens the lead chooser; you still choose the person before any draft.", actionLabel: "Start on it" };
+  return { room, line: "I read this as Venture. Start on it opens the current human-gated venture step. It does not run or approve it.", actionLabel: "Start on it" };
 }
 
 
@@ -1431,7 +1436,8 @@ function rowEl(piece, row){
     ? '<div class="reply-context">↳ replying to: '+esc(replyText.replace(/\\s+/g," ").slice(0,220))+'</div>'
     : "";
   let preview = "";
-  if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
+  if (row.mediaStage) preview = '<pre class="body story" data-media-stage>'+esc(JSON.stringify(row.mediaStage,null,2))+'</pre>';
+  else if (row.assetUrl && row.kind === "image") preview = '<img class="preview" src="'+row.assetUrl+'" alt="card" />';
   else if (row.assetUrl && row.kind === "video") preview = '<video class="preview" src="'+row.assetUrl+'" controls muted></video>';
   // Quote-card row whose PNG hasn't been rendered yet — flag it explicitly instead of falling
   // through to plain-text rendering, which looked identical to a normal card (card 4c3dd6fc).
@@ -1478,6 +1484,7 @@ function rowEl(piece, row){
         ? '<span class="hint">generating storyboard… (the Studio room has progress)</span>'
         : '<span class="storyboard-control">'+engineSelectHtml()+'<button class="storyboard" data-act="gen-storyboard">Generate storyboard</button></span>')
     : "";
+  const mediaPlanBtns = mediaPlanActionsHtml(row.asset);
   // "Duplicate to platform" (card 9304e4a5's missing "create a post for another platform"):
   // options come from DATA.textPlatforms (server's TEXT_PLATFORMS), excluding this row's own
   // platform so the dropdown only ever offers an actual new target.
@@ -1505,7 +1512,7 @@ function rowEl(piece, row){
         (approveDisabled ? ' disabled title="'+esc(row.approveBlocked)+'"' : "")+'>'+approveLabel+'</button>'+
       '<button class="revise'+(row.status==="revise"?" on":"")+'" data-act="revise">Revise</button>'+
       '<button class="discard'+(row.status==="discard"?" on":"")+'" data-act="discard">Discard</button>'+
-      '<span class="spacer"></span>'+ storyboardBtn + editBtn + aiBtn + dupBtn + cancelBtn +
+      '<span class="spacer"></span>'+ storyboardBtn + mediaPlanBtns + editBtn + aiBtn + dupBtn + cancelBtn +
     '</div>'+
     '<div class="revisebox"><input placeholder="what needs changing?" value="'+esc(row.notes||"")+'" /><button data-act="save-note">Save note</button></div>'+
     // Reopens (and stays open) when a prior "Ask Claude" attempt failed, or while one is in flight
@@ -1646,6 +1653,16 @@ async function onAction(e, piece, row, el){
     if(r.ok){ storyboardSlugs.add(piece.slug); flash("Queued with "+engineLabel(engine)+"; generating storyboard"); loadJobs(); }
     else { e.target.disabled = false; flash(r.error || "Could not queue /video"); }
     rerender();
+  } else if (act === "approve-media-plan"){
+    e.target.disabled = true;
+    const r = await post("/api/content/media/approve",{slug:piece.slug,id:row.id});
+    flash(r.ok ? "Media plan/source approved. Rendering is still a separate action." : (r.error||"Could not approve media plan"));
+    if(!r.ok) e.target.disabled=false;
+  } else if (act === "render-media"){
+    e.target.disabled = true;
+    const r = await post("/api/content/media/render",{slug:piece.slug,id:row.id});
+    if(r.ok){ flash("Configured media render queued"); loadJobs(); }
+    else { e.target.disabled=false; flash(r.error||"Could not queue media render"); }
   } else if (act === "dup"){
     const box = el.querySelector(".dupbox"); box.classList.toggle("show");
     if(!box.classList.contains("show")) row.dupError = null; // closing dismisses any stale error
@@ -2685,7 +2702,7 @@ async function loadContent(){
 //     Nothing in src/ clusters Muxin's own audience, so none of it has a source.
 //   * the VENTURE source tag. Nothing hands a Venture artifact to content/. See develop.ts.
 // CW.pane picks either the configuration wizard or the grouped review surface.
-let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, signalDefaults:null, launching:false, loading:false, yesErrors:[], pane:"wizard", config:null };
+let CW = { slug:null, step:1, tab:null, treat:null, treatFor:null, treatErr:null, signalDefaults:null, launching:false, loading:false, yesErrors:[], pane:"wizard", config:null, approvedLens:null };
 
 // ── begin the treatment mirror ──
 // Rule 5: written twice, once exported from page.ts for DOM-free tests and once here. Keep both.
@@ -2776,7 +2793,7 @@ const CONTENT_CONFIG_OPTIONS = {
     ["video-caption-package","Video transcript / caption package"],["audiogram","Audiogram / waveform clip"],
   ],
   platform: [
-    ["substack","Substack"],["linkedin","LinkedIn"],["x","X"],["bluesky","Bluesky"],
+    ["substack","Substack"],["linkedin","LinkedIn"],["x","X"],["bluesky","Bluesky"],["mastodon","Mastodon"],
     ["threads","Threads"],["instagram","Instagram"],["tiktok","TikTok"],["youtube","YouTube"],
   ],
 };
@@ -2792,19 +2809,24 @@ function cwEnsureConfig(){
   const s = cwSession();
   if(!s) return null;
   if(CW.config && CW.config.slug===s.slug) return CW.config;
-  const routed = (CW.treat && CW.treat.channels || []).filter(c=>c.decision!=="exclude").map(c=>c.channel);
+  const routed = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
   const supported = CONTENT_CONFIG_OPTIONS.platform.map(x=>x[0]);
   const platforms = routed.filter(p=>supported.includes(p));
   const defaults = CW.signalDefaults || {};
+  const sourceDistribution = CW.treat && CW.treat.distribution || {platforms:[],media:[]};
   const recommended = key => (defaults[key]||[]).filter(x=>x.recommended).map(x=>x.option);
   const treatments = recommended("treatments").filter(x=>CONTENT_CONFIG_OPTIONS.treatment.some(o=>o[0]===x));
-  const media = recommended("media").filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
+  const sourceMedia = (sourceDistribution.media||[]).map(x=>x.option).filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
+  const sourcePlatforms = (sourceDistribution.platforms||[]).map(x=>x.option).filter(x=>supported.includes(x));
+  const platformRequiredMedia = (sourceDistribution.platforms||[]).filter(x=>sourcePlatforms.includes(x.option) && x.requiredMedia).map(x=>x.requiredMedia);
+  const media = [...new Set([...sourceMedia, ...platformRequiredMedia])];
+  const fallbackMedia = recommended("media").filter(x=>CONTENT_CONFIG_OPTIONS.media.some(o=>o[0]===x));
   const defaultPlatforms = recommended("platforms").filter(x=>supported.includes(x));
   CW.config = {
     slug:s.slug,
     treatment:new Set(treatments.length ? treatments : ["summary"]),
-    media:new Set(media.length ? media : ["static-quote-card"]),
-    platform:new Set(platforms.length ? platforms : defaultPlatforms.length ? defaultPlatforms : ["bluesky"]),
+    media:new Set(media.length ? media : fallbackMedia),
+    platform:new Set(platforms.length ? platforms : sourcePlatforms.length ? sourcePlatforms : defaultPlatforms.length ? defaultPlatforms : ["bluesky"]),
     control:true,
     saving:false,
     saved:false,
@@ -2933,13 +2955,34 @@ function cwChannelHtml(c){
     '<div class="slot">NEXT FREE SLOT · '+esc(c.slot ? c.slot.label : "")+'</div>'+
     '</div>';
 }
+function cwAdvisorHtml(s){
+  const rounds=(s.rounds||[]).map(r=>'<section style="margin-top:18px"><div class="fam-ask">ADVISOR ROUND '+esc(r.index)+'</div>'+
+    (r.replyText?'<div class="src" style="margin-top:6px">You: '+esc(r.replyText)+'</div>':'')+
+    r.cards.map(c=>'<div style="margin-top:12px;padding:13px;border:1px solid #e5dcc9;border-radius:8px"><b>'+esc(c.title||c.kind)+'</b><div class="src" style="margin-top:5px">'+esc(c.summary||'')+'</div>'+
+      (c.previewText?'<pre style="white-space:pre-wrap;font:14px/1.55 Georgia,serif">'+esc(c.previewText)+'</pre>':'')+
+      (c.status==='open'?'<div class="actions"><button data-dev-accept data-card="'+esc(c.id)+'" data-slug="'+esc(s.slug)+'">Accept exact-source cut</button><input class="dev-lens" value="'+esc(c.lens||'')+'" aria-label="Cut name"><button data-dev-dismiss data-card="'+esc(c.id)+'" data-slug="'+esc(s.slug)+'">Dismiss</button></div>':'<div class="src">'+esc(c.status)+'</div>')+'</div>').join('')+'</section>').join('');
+  const cuts=(s.cuts||[]).map(c=>'<label style="display:block;margin-top:14px;padding:14px;border:1px solid #ded4bd;border-radius:8px"><input type="radio" name="approvedCut" data-approved-cut value="'+esc(c.lens)+'"'+(CW.approvedLens===c.lens?' checked':'')+'> <b>'+esc(c.title||c.lens)+'</b><span class="src" style="display:block">Exact source '+esc(lineRefsText(c.sourceLines))+'</span><textarea data-cut-body="'+esc(c.lens)+'" rows="6" style="width:100%;margin-top:9px">'+esc(c.body)+'</textarea><div class="actions"><button data-cut-save data-lens="'+esc(c.lens)+'">Save edit</button><input data-cut-comment-text placeholder="Comment on this cut"><input data-cut-comment-line type="number" min="1" value="1" aria-label="Line"><button data-cut-comment data-lens="'+esc(c.lens)+'">Add comment</button></div></label>').join('');
+  return cwPickedHtml(s)+'<div class="src" style="margin-top:16px">The advisor conversation is restored from develop/advice.json. Accept builds only from the cited source lines. Pick one approved cut before configuration.</div>'+rounds+
+    (!rounds?'<button class="primary" data-dev-start data-slug="'+esc(s.slug)+'" style="margin-top:18px">Ask the advisor</button>':'')+
+    '<div style="margin-top:24px"><div class="fam-ask">APPROVED CUTS</div>'+ (cuts||'<div class="empty">Accept an exact-source cut before choosing treatments.</div>')+'</div>'+
+    '<div class="wb-reply"><input class="wb-reply-input" placeholder="Reply to the advisor"><button data-dev-reply data-slug="'+esc(s.slug)+'">Reply</button></div>'+
+    (CW.approvedLens?'<button class="primary" data-open-config style="margin-top:20px">Configure this approved cut</button>':'');
+}
 function cwStep2Html(){
   const s = cwSession();
   if(!s) return '<div class="empty">That source is no longer on the desk. Pick another one.</div>';
+  // Approved cross-room handoffs already carry their owning room's human approval/context. The
+  // advisor/cut gate is for ordinary Muxin-voice Content sources, not a second approval system for
+  // Fiction, Charles, or Venture.
+  if(contentRequestOrigin(s)!=="human-inference"){ const crossCfg=cwEnsureConfig(); crossCfg.open=true; }
+  if(!CW.config || !CW.config.open) return cwAdvisorHtml(s);
   if(CW.treatErr) return cwPickedHtml(s)+'<div class="fam-note t-amber" style="margin-top:16px">Could not read recommendations for this piece: '+esc(CW.treatErr)+'</div>';
   if(!CW.treat || CW.treatFor !== CW.slug) return cwPickedHtml(s)+'<div class="empty">Reading recommendations…</div>';
   const cfg = cwEnsureConfig();
-  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms?</summary><div class="src" style="margin-top:8px;max-width:620px">Selections start from this source\\'s routing evidence. When that evidence is insufficient, Substack and LinkedIn are safe cold-start defaults. Every checkbox remains yours to change.</div></details>';
+  const dist=CW.treat.distribution||{platforms:[],media:[],mediaRationale:""};
+  const platformWhy=(dist.platforms||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
+  const mediaWhy=(dist.media||[]).map(x=>'<div style="margin-top:8px"><b>'+esc(x.option)+'</b><div class="src">'+esc(x.reason)+'</div></div>').join('');
+  const recommendation = '<details style="margin-top:16px"><summary class="cw-back">Why these platforms and media?</summary><div style="margin-top:8px;max-width:680px">'+platformWhy+(mediaWhy||'<div class="src" style="margin-top:8px">'+esc(dist.mediaRationale||'Text only.')+'</div>')+'<div class="src" style="margin-top:10px">Source fit supplies the cold-start recommendation. Existing routing and measured performance evidence remain stronger when available. Every checkbox remains yours to change.</div></div></details>';
   return cwPickedHtml(s)+
     '<div class="src" style="margin-top:18px;max-width:640px">Choose treatments, media, and platforms independently. Recommendations preselect a starting point; they never remove your control.</div>'+
     cwConfigSectionHtml("treatment","TREATMENTS",CONTENT_CONFIG_OPTIONS.treatment,s)+
@@ -3002,21 +3045,27 @@ async function cwSaveConfig(){
   if(!cfg.platform.size){ flash("Choose at least one platform"); return; }
   const engine = $("#contentTreatmentEngine")?.value || "codex";
   cfg.saving = true; renderContentWizard();
-  const recommendedPlatforms = (CW.treat && CW.treat.channels || []).filter(c=>c.decision!=="exclude").map(c=>c.channel);
+  const recommendedPlatforms = (CW.treat && CW.treat.channels || []).filter(c=>c.decision==="include").map(c=>c.channel);
   const signalEvidence = ["treatments","media","platforms"].flatMap(key=>(CW.signalDefaults&&CW.signalDefaults[key]||[]).filter(x=>x.recommended).map(x=>({
     option:x.option, kind:key==="treatments"?"treatment":key==="platforms"?"platform":"media",
     reason:x.explanation, source:x.source, recommended:true,
   })));
+  const distributionEvidence = [
+    ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.platforms)||[]).map(x=>({option:x.option,kind:"platform",reason:x.reason,source:"source-fit",recommended:true})),
+    ...((CW.treat&&CW.treat.distribution&&CW.treat.distribution.media)||[]).map(x=>({option:x.option,kind:"media",reason:x.reason,source:"source-fit",recommended:true})),
+  ];
   const evidence = [
+    ...distributionEvidence,
     ...signalEvidence,
     ...recommendedPlatforms.map(option=>({option,kind:"platform",reason:"Current routing includes this platform",source:"routing",recommended:true})),
   ];
   const origin = contentRequestOrigin(s);
   const request = {
-    id:s.slug, origin, descriptor:s.title, originalInput:s.sourceBody,
+    id:s.slug, origin, descriptor:s.title, originalInput:((s.cuts||[]).find(c=>c.lens===CW.approvedLens)||{}).body||s.sourceBody,
     treatments:[...cfg.treatment], media:[...cfg.media], platforms:[...cfg.platform],
     recommendationEvidence:evidence, includeUntreatedControl:cfg.control,
     ventureId:origin==="fiction" ? "least-of-us-fiction" : null,
+    sourceProvenance:(()=>{ const cut=(s.cuts||[]).find(c=>c.lens===CW.approvedLens); return cut?{kind:"approved-cut",lens:cut.lens,sourceLines:cut.sourceLines}:null; })(),
   };
   try{
     const result = await post("/api/content/request", {slug:s.slug, request});
@@ -3029,8 +3078,15 @@ async function cwSaveConfig(){
 }
 // Delegated: the wizard is rebuilt wholesale on every render.
 $("#contentWizard").addEventListener("click", (e)=>{
-  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-set-pane],[data-config-all],[data-config-none],[data-config-save]") : null;
+  const t = e.target.closest ? e.target.closest("[data-step],[data-slug],[data-set-pane],[data-config-all],[data-config-none],[data-config-save],[data-dev-start],[data-dev-reply],[data-dev-accept],[data-dev-dismiss],[data-cut-save],[data-cut-comment],[data-open-config]") : null;
   if(!t) return;
+  if(t.dataset.openConfig!==undefined){ const cfg=cwEnsureConfig(); cfg.open=true; renderContentWizard(); cwLoadTreatment(); return; }
+  if(t.dataset.devStart!==undefined){ t.disabled=true; post('/api/develop/start',{slug:t.dataset.slug,engine:$('#studioEngine').value}).then(r=>{flash(r.ok?'Advisor started':r.error);loadJobs();}); return; }
+  if(t.dataset.devReply!==undefined){ const input=t.closest('.wb-reply').querySelector('.wb-reply-input'); const reply=input.value.trim(); if(!reply){flash('Type a reply first');return;} t.disabled=true; post('/api/develop/reply',{slug:t.dataset.slug,reply,engine:$('#studioEngine').value}).then(r=>{flash(r.ok?'Reply queued':r.error);loadJobs();}); return; }
+  if(t.dataset.devAccept!==undefined){ const lens=t.closest('.actions').querySelector('.dev-lens').value.trim(); post('/api/develop/accept',{slug:t.dataset.slug,cardId:t.dataset.card,lens}).then(async r=>{flash(r.ok?'Exact-source cut accepted':r.error);if(r.ok){CW.approvedLens=r.lens;await loadContent();}}); return; }
+  if(t.dataset.devDismiss!==undefined){ post('/api/develop/dismiss',{slug:t.dataset.slug,cardId:t.dataset.card}).then(async r=>{flash(r.ok?'Dismissed':r.error);if(r.ok)await loadContent();}); return; }
+  if(t.dataset.cutSave!==undefined){ const ta=t.closest('label').querySelector('[data-cut-body]'); post('/api/cut-save',{slug:CW.slug,lens:t.dataset.lens,body:ta.value}).then(async r=>{flash(r.ok?'Cut saved':r.error);if(r.ok)await loadContent();}); return; }
+  if(t.dataset.cutComment!==undefined){ const row=t.closest('label'), text=row.querySelector('[data-cut-comment-text]').value, line=row.querySelector('[data-cut-comment-line]').value; post('/api/cut-comment',{slug:CW.slug,lens:t.dataset.lens,text,line}).then(r=>flash(r.ok?'Comment saved':r.error)); return; }
   if(t.dataset.configSave !== undefined){ cwSaveConfig(); return; }
   if(t.dataset.configAll !== undefined || t.dataset.configNone !== undefined){
     const kind = t.dataset.configAll !== undefined ? t.dataset.configAll : t.dataset.configNone;
@@ -3044,8 +3100,8 @@ $("#contentWizard").addEventListener("click", (e)=>{
     return;
   }
   if(t.dataset.slug !== undefined){
-    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null;
-    renderContentWizard(); cwLoadTreatment(); return;
+    CW.slug = t.dataset.slug; CW.step = 2; CW.tab = null; CW.treat = null; CW.treatFor = null; CW.treatErr = null; CW.yesErrors = []; CW.pane = "wizard"; CW.config = null; CW.approvedLens=null;
+    renderContentWizard(); return;
   }
   if(t.dataset.step !== undefined){
     const n = Number(t.dataset.step);
@@ -3059,6 +3115,7 @@ $("#contentWizard").addEventListener("click", (e)=>{
 });
 $("#contentWizard").addEventListener("change", (e)=>{
   const target = e.target, cfg = cwEnsureConfig();
+  if(target&&target.dataset&&target.dataset.approvedCut!==undefined){ CW.approvedLens=target.value; renderContentWizard(); return; }
   if(!cfg || !target) return;
   if(target.id==="contentControlEnabled"){ cfg.control = !!target.checked; cfg.saved = false; return; }
   const kind = target.dataset && target.dataset.configKind;
@@ -4971,8 +5028,8 @@ async function onCharlesAction(act, item){
 
 // ── Signals room (Content Studio Riff 3e) ──
 // Deterministic read of the latest brief: per-channel confidence cards and the brief's own
-// [DO MORE]/[TEST]/[DO LESS] recommendations as "worth changing, your call" cards. Send to
-// backlog files a card for the Claude Code pipeline; nothing changes by itself.
+// [DO MORE]/[TEST]/[DO LESS] recommendations as "worth changing, your call" cards. Adoption
+// creates an auditable proposal only; review and apply remain separate Muxin actions.
 //
 // The room's pane state (SIG) and renderSignalsSheets live with the brief/raw loaders above so the
 // foot controls and the insights "Brief:" link share one switch. The last two sheets are
@@ -4983,6 +5040,14 @@ let SIGNALS = null;
 function signalKey(r){ return r.type+":"+r.title; }
 function signalStatusLabel(c){
   return c.status.startsWith("OK") ? c.weeks+" wks of data" : "insufficient · directional only";
+}
+function signalDeltaHtml(p){
+  if(!p) return "";
+  if(!p.delta) return '<div class="fam-note t-amber">Blocked: '+esc(p.blockedReason||"outside the current allowlist")+'</div>';
+  const d=p.delta;
+  const exact=d.kind==="cadence" ? d.file+": platforms."+d.platform+"."+d.field+" · "+d.before+" → "+d.after : d.file+": defaults."+d.pillar+" · "+d.platform+" · "+(d.before?"included":"not included")+" → "+(d.after?"included":"not included");
+  const controls=p.status==="pending" ? '<button class="sig-proposal-review primary" data-id="'+esc(p.id)+'" data-action="approve">Approve exact change</button><button class="sig-proposal-review" data-id="'+esc(p.id)+'" data-action="reject">Reject</button>' : p.status==="approved" ? '<button class="sig-proposal-apply primary" data-id="'+esc(p.id)+'">Apply approved change</button>' : p.status==="applied" ? '<span class="src">Applied. Audit record saved.</span><button class="sig-proposal-rollback" data-id="'+esc(p.id)+'">Rollback</button>' : '<span class="src">'+esc(p.status.replaceAll("_"," "))+'</span>';
+  return '<div class="fam-note"><strong>Exact preview</strong><br>'+esc(exact)+'</div><div class="actions">'+controls+'</div>';
 }
 function signalsPracticalHtml(){
   const read=SIGNALS&&SIGNALS.performance;
@@ -5023,13 +5088,14 @@ function renderSignals(){
     const decision = r.decision || (SIGNALS.decisions&&SIGNALS.decisions[key]||{}).decision;
     if(decision==="decline") return "";
     const adopted = decision==="adopt";
+    const proposal=(SIGNALS.changeProposals||[]).find(p=>signalKey(p.recommendation)===key);
     return '<div class="wb-proposal"><div class="wb-cut-head"><span class="lens">'+esc(r.type.toLowerCase())+'</span><span style="font-weight:600;font-size:14px;">'+esc(r.title)+'</span></div>'+
       '<div class="dev-summary">'+esc(r.rationale)+'</div>'+
       '<div class="actions">'+
         '<button class="'+(adopted?'':'primary ')+'sig-adopt" data-i="'+i+'"'+(adopted?' disabled':'')+'>'+(adopted?'Adopted':'Adopt')+'</button>'+
         '<button class="sig-decline" data-i="'+i+'">Decline</button>'+
-        (adopted ? '<span class="src">Decision saved. No configuration changed.</span>' : '')+
-      '</div></div>';
+        (adopted ? '<span class="src">Intent saved. Configuration still unchanged.</span>' : '')+
+      '</div>'+signalDeltaHtml(proposal)+'</div>';
   }).join("");
   const declinedHtml = declined.length
     ? '<div style="margin-top:26px"><div style="font:600 14px/1 Georgia,serif;margin-bottom:6px;">Declined</div>'+declined.map(r=>
@@ -5048,6 +5114,25 @@ function renderSignals(){
     (recs||'<div class="empty" style="padding:14px">No active recommendations this session.</div>')+'</div>'+declinedHtml;
   box.querySelectorAll(".sig-adopt").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"adopt",b)));
   box.querySelectorAll(".sig-decline").forEach(b=>b.addEventListener("click", ()=>saveSignalDecision(Number(b.dataset.i),"decline",b)));
+  box.querySelectorAll(".sig-proposal-review").forEach(b=>b.addEventListener("click", ()=>reviewSignalProposal(b.dataset.id,b.dataset.action,b)));
+  box.querySelectorAll(".sig-proposal-apply").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"apply",b)));
+  box.querySelectorAll(".sig-proposal-rollback").forEach(b=>b.addEventListener("click", ()=>actOnSignalProposal(b.dataset.id,"rollback",b)));
+}
+async function reviewSignalProposal(id,action,button){
+  const evidence=prompt(action==="approve" ? "Why is this exact change approved?" : "Why reject this proposal?");
+  if(!evidence) return;
+  button.disabled=true;
+  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence});
+  if(!result.ok){ button.disabled=false; flash(result.error||"Could not review proposal"); return; }
+  flash(action==="approve" ? "Proposal approved. It has not been applied." : "Proposal rejected."); await loadSignals();
+}
+async function actOnSignalProposal(id,action,button){
+  let evidence="";
+  if(action==="rollback"){ evidence=prompt("Why roll this change back?")||""; if(!evidence) return; }
+  button.disabled=true;
+  const result=await post("/api/signals/proposals/"+encodeURIComponent(id)+"/"+action,{evidence});
+  if(!result.ok){ button.disabled=false; flash(result.error||"Could not "+action+" proposal"); return; }
+  flash(action==="apply" ? "Approved Signals change applied." : "Signals change rolled back."); await loadSignals();
 }
 async function saveSignalDecision(index, decision, button){
   const recommendation=SIGNALS&&SIGNALS.recommendations ? SIGNALS.recommendations[index] : null;
@@ -5211,6 +5296,14 @@ async function loadOutcomes(){
 // and what the team is doing, from real queue/ledger data. Click-throughs land in the room that
 // owns each item.
 let STUDIO = null;
+let PUBLISH_RECONCILIATION_HEALTH = null;
+function publishingHealthLine(health){
+  if(!health) return "Delivery checks unavailable";
+  if(health.state==="failed") return "Delivery checks stopped: "+(health.error||"provider reconciliation failed");
+  if(health.state==="running") return "Delivery checks running now";
+  if(health.state==="ok") return "Delivery checks current"+(health.lastCompletedAt?" · "+String(health.lastCompletedAt).slice(0,16).replace("T"," "):"");
+  return "Delivery checks waiting for the first run";
+}
 function studioDateLine(){
   const now = new Date();
   const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -5238,6 +5331,7 @@ function renderStudio(){
     '<div style="font:italic 400 14px/1.5 Georgia,serif;color:#a89a80;margin-bottom:6px">'+studioDateLine()+'</div>'+
     '<div style="font:400 30px/1.25 Georgia,serif;margin:0 0 22px;">Needs you today</div>'+
     (rows || '<div class="empty" style="padding:20px 0">Nothing needs you right now.</div>')+
+    '<div id="publishingReconciliationHealth" class="src" style="margin-top:18px">'+esc(publishingHealthLine(PUBLISH_RECONCILIATION_HEALTH))+'</div>'+
     closing;
   renderTeamRail();
   document.querySelectorAll("#studioMain .ny-go").forEach(a=>a.addEventListener("click",()=>{
@@ -5250,9 +5344,13 @@ function renderStudio(){
 }
 async function loadStudio(){
   try {
-    const r = await fetch("/api/studio");
+    const [r, healthResponse] = await Promise.all([
+      fetch("/api/studio"),
+      fetch("/api/publishing/reconciliation-health").catch(()=>null),
+    ]);
     if(!r.ok) throw new Error("studio "+r.status);
     STUDIO = await r.json();
+    PUBLISH_RECONCILIATION_HEALTH = healthResponse&&healthResponse.ok ? await healthResponse.json() : null;
     renderStudio();
     connectionRecovered();
   } catch(e) {
@@ -5412,7 +5510,7 @@ function jobsPollDue(jobs, now, armedUntil){
   if(jobs.some(j=>j.status==="queued"||j.status==="running")) return true;
   return jobs.some(j=>j.finishedAt!=null && now-j.finishedAt < STRIP_LINGER_MS + JOBS_POLL_MS);
 }
-const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/content/generate","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check","/api/fiction/promotion/draft","/api/fiction/promotion/revise"];
+const JOB_ENQUEUE_ROUTES = ["/api/atomize","/api/notes/pick","/api/revise","/api/duplicate","/api/video/generate","/api/content/generate","/api/content/media/render","/api/strategy/ask","/api/strategy/refresh-brief","/api/strategy/insights","/api/strategy/ask-insights","/api/strategy/pull","/api/outreach/scout","/api/outreach/draft","/api/outreach/message/revise","/api/charles/draft","/api/followups/draft-follow-up","/api/fiction/draft","/api/fiction/repass","/api/fiction/check","/api/fiction/promotion/draft","/api/fiction/promotion/revise"];
 function enqueuesJob(path){ return JOB_ENQUEUE_ROUTES.includes(path) || /^\\/api\\/venture\\/[^/]+\\/(analyze|run-step)$/.test(path); }
 function jobRoom(kind){
   if(kind==="scout"||kind==="draft-follow-up"||kind==="outreach-revise") return "Outreach";
@@ -5780,10 +5878,10 @@ function classifyCapture(text){
   return {kind:"room", room:"Content"};
 }
 function captureVerdict(room){
-  if(room==="Content") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Content").line)}, actionLabel:null};
-  if(room==="Fiction") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Fiction").line)}, actionLabel:"Keep it in Fiction"};
-  if(room==="Outreach") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Outreach").line)}, actionLabel:"Keep it in Outreach"};
-  return {room:room, line:${JSON.stringify(captureHandoffVerdict("Venture").line)}, actionLabel:"Keep it in Venture"};
+  if(room==="Content") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Content").line)}, actionLabel:"Start on it"};
+  if(room==="Fiction") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Fiction").line)}, actionLabel:"Start on it"};
+  if(room==="Outreach") return {room:room, line:${JSON.stringify(captureHandoffVerdict("Outreach").line)}, actionLabel:"Start on it"};
+  return {room:room, line:${JSON.stringify(captureHandoffVerdict("Venture").line)}, actionLabel:"Start on it"};
 }
 // ── end of the capture mirror ──
 
@@ -5856,7 +5954,7 @@ function showCaptureVerdict(room){
   const box = $("#captureVerdict");
   const others = ["Content","Fiction","Outreach","Venture"].filter(r=>r!==room);
   box.innerHTML = '<div>'+esc(v.line)+'</div>'+
-    '<div class="cv-row"><button class="primary cap-go">Keep it in '+esc(room)+'</button></div>'+
+      '<div class="cv-row"><button class="primary cap-go">Start on it</button></div>'+
     '<div class="cv-row"><span>Wrong room?</span>'+
       others.map(r=>'<button class="cap-move" data-room="'+r+'">'+r+'</button>').join("")+'</div>';
   box.hidden = false;
@@ -5864,17 +5962,52 @@ function showCaptureVerdict(room){
   if(go) go.addEventListener("click", ()=>takeCaptureTo(room));
   box.querySelectorAll(".cap-move").forEach(b=>b.addEventListener("click", ()=>showCaptureVerdict(b.dataset.room)));
 }
-// Routing saves one durable inbox item, then opens its owning room. It never turns the handoff into
-// a run: Muxin chooses any next action from that room herself.
-function takeCaptureTo(room){
+// Save before advancing. Content starts an advisor-only job. Other builds prepare their existing
+// human gate with the capture visible, without auto-drafting, approving, scheduling, or publishing.
+async function advanceCaptureSafely(room, text){
+  if(room==="Content"){
+    await Promise.resolve(setRoom("content"));
+    const r=await post("/api/captures/start",{text:text,engine:$("#studioEngine").value});
+    if(!r.ok) throw new Error(r.error||"Could not start the advisor");
+    await loadCaptures(); loadJobs();
+    return "Advisor started. It cannot approve or publish.";
+  }
+  await Promise.resolve(setRoom(room.toLowerCase()));
+  if(room==="Fiction"){
+    await loadFiction();
+    ficPage="write"; renderFiction();
+    const beats=$("#ficBeats"); if(beats&&!beats.value.trim()) beats.value=text;
+    beats?.focus();
+    return "Your beats are in Write next. Review them before drafting.";
+  }
+  if(room==="Outreach"){
+    setOutreachSub("leads");
+    $("#outreachList button, #outreachList [tabindex]")?.focus();
+    return "Choose the lead this belongs to before drafting.";
+  }
+  await loadVenture();
+  $("#ventureRunStepBtn")?.focus();
+  return "The current venture step is open. Review its human gate before running it.";
+}
+async function takeCaptureTo(room){
   const t = captureText();
   if(!t){ flash("Write or paste something first"); return; }
-  if(!saveCaptureHandoff(room, t)){ flash("Could not save this capture. It is still in the box."); return; }
-  $("#src").value = "";
-  hideCaptureVerdict();
-  setRoom(room.toLowerCase());
-  renderCaptureHandoff();
-  flash("Kept it in "+room+". It is waiting for your next action.");
+  const saved = await post("/api/captures", {room:room, text:t});
+  if(!saved.ok){ flash(saved.error||"Could not save this capture. It is still in the box."); return; }
+  try {
+    const message=await advanceCaptureSafely(room,t);
+    $("#src").value = "";
+    hideCaptureVerdict();
+    await loadCaptures(); renderCaptureHandoff();
+    flash(message);
+  } catch(e) {
+    flash(e instanceof Error?e.message:String(e));
+  }
+}
+let SERVER_CAPTURES = [];
+async function loadCaptures(){
+  try { const r=await fetch("/api/captures"); const d=await r.json(); if(d.ok) SERVER_CAPTURES=d.captures||[]; }
+  catch(e) { /* keep the last repository read visible */ }
 }
 function renderCaptureHandoff(){
   const targets = [
@@ -5888,17 +6021,23 @@ function renderCaptureHandoff(){
   for(const [room, id, label] of targets){
     const box = $("#"+id);
     if(!box) continue;
-    const captures = readCaptureHandoffs().filter(c=>c.room===label);
+    const captures = SERVER_CAPTURES.filter(c=>c.room===label);
     if(!captures.length || currentTab !== room){ box.hidden = true; box.innerHTML = ""; continue; }
     box.hidden = false;
     box.innerHTML = captures.map(capture=>'<div class="capture-handoff" data-capture-id="'+esc(capture.id)+'" style="border:1px solid #d8cfbb;background:#fffdf8;border-radius:8px;padding:13px 15px;margin-top:14px">'+
       '<div class="wb-label">CAPTURE WAITING HERE</div>'+
       '<div style="font:400 16px/1.6 Georgia,serif;white-space:pre-wrap;margin-top:6px">'+esc(capture.text)+'</div>'+
-      '<div class="actions" style="margin-top:10px"><button class="cap-return">Back to Studio capture</button><button class="cap-clear">Clear this capture</button><span class="src">Choose the next action in this room. Nothing was submitted or started.</span></div>'+
+      '<div class="actions" style="margin-top:10px">'+(label==="Content"&&!capture.jobId?'<button class="primary cap-start">Start on it</button>':'')+'<button class="cap-return">Back to Studio capture</button><span class="src">'+(capture.jobId?'Advisor started. Approval and publishing remain separate.':'Saved in the repository. Nothing has been approved or published.')+'</span></div>'+
       '</div>').join("");
     box.querySelectorAll(".capture-handoff").forEach(card=>{
+      card.querySelector(".cap-start")?.addEventListener("click", async (event)=>{
+        event.target.disabled=true;
+        const capture=SERVER_CAPTURES.find(c=>c.id===card.dataset.captureId);
+        const r=await post("/api/captures/start",{text:capture&&capture.text,engine:$("#studioEngine").value});
+        if(r.ok){ flash("Advisor started. It cannot approve or publish."); await loadCaptures(); renderCaptureHandoff(); loadJobs(); }
+        else { event.target.disabled=false; flash(r.error||"Could not start the advisor"); }
+      });
       card.querySelector(".cap-return")?.addEventListener("click", ()=>{ setRoom("studio"); $("#src").focus(); });
-      card.querySelector(".cap-clear")?.addEventListener("click", ()=>{ clearCaptureHandoff(card.dataset.captureId); renderCaptureHandoff(); if(currentTab==="studio") renderStudio(); flash("Capture cleared"); });
     });
   }
 }
@@ -5913,17 +6052,19 @@ function routeCapture(){
 async function linkReadForContent(){
   const url = linkAskUrl;
   if(!url) return;
-  if(!saveCaptureHandoff("Content", url)){ flash("Could not save this capture. It is still in the box."); return; }
-  closeLinkAsk(true); setRoom("content"); renderCaptureHandoff();
-  flash("Kept it in Content. Choose the next action there.");
+  const r=await post("/api/captures",{room:"Content",text:url});
+  if(!r.ok){ flash(r.error||"Could not save this capture. It is still in the box."); return; }
+  closeLinkAsk(true); await loadCaptures(); setRoom("content"); renderCaptureHandoff();
+  flash("Kept it in Content. Start on it when you want the advisor.");
 }
 // "Source for Signals" keeps an inbox item and nothing more. There is no referrer record, no
 // funnel data and no job kind that takes a URL, so this must never imply traffic attribution.
 async function linkFileForSignals(){
   const url = linkAskUrl;
   if(!url) return;
-  if(!saveCaptureHandoff("Signals", url)){ flash("Could not save this capture. It is still in the box."); return; }
-  closeLinkAsk(true); setRoom("signals"); renderCaptureHandoff();
+  const r=await post("/api/captures",{room:"Signals",text:url});
+  if(!r.ok){ flash(r.error||"Could not save this capture. It is still in the box."); return; }
+  closeLinkAsk(true); await loadCaptures(); setRoom("signals"); renderCaptureHandoff();
   flash("Kept it in Signals. Choose the next action there.");
 }
 $("#routeBtn").addEventListener("click", routeCapture);
@@ -6032,6 +6173,7 @@ $("#publishedSheet").addEventListener("click", (e)=>{
   renderContentWizard();
 });
 setRoom(${JSON.stringify(BOOT_ROOM)});
+loadCaptures().then(renderCaptureHandoff);
 // The desk header's live date ("Thursday · Jul 17").
 {
   const now = new Date();

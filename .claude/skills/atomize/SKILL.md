@@ -13,13 +13,18 @@ cards — so you can run it on everything. Turning a piece into a **video short 
 deliberate `/video` skill** (script → storyboard → review → render); it's heavier and costs
 real money, so it's opt-in per piece, not bundled here.
 
-## The extraction-first rule (non-negotiable)
+## The source-grounded rule (non-negotiable)
 
-- Derivatives are built from **verbatim sentences** in the source. You may trim, tighten, and
-  reformat for the platform. You may NOT compose new claims, arguments, metaphors, or
-  worldview statements in Muxin's voice.
-- Every derivative carries `source_lines` frontmatter listing the source.md line numbers its
-  text came from. If you can't point at lines, you wrote it — delete it.
+- Untreated controls are byte-for-byte exact. A strict `--no-spin` derivative is built from
+  **verbatim sentences** in the source and may only be trimmed, tightened, and reformatted.
+- A configured social treatment or normal Spin derivative may re-hook, reorder, clarify, and add
+  connective structure so it makes one standalone point for a reader who has not seen the essay.
+  It may NOT invent new factual claims, statistics, examples, experiences, metaphors, arguments,
+  or worldview positions in Muxin's voice. Every substantive claim must remain supported by its
+  cited source lines.
+- Every derivative carries `source_lines` frontmatter listing the source.md line numbers that
+  support it. If you can't point at supporting lines, you wrote it — delete it. Connective wording
+  is not a new claim, but a contextless excerpt is not a finished social treatment either.
 - If the source is too thin to atomize honestly, say so and stop. Do not pad.
 
 **Spin rides on top of this rule; it does not replace it.** Since 2026-07-02 Spin is the
@@ -282,6 +287,16 @@ to the same `source.md` and the same platform-fit decision.
    CTA text now depends on WHAT the post is about, not which pillar it's tagged. For each text
    derivative, judge which of these 8 content types it plausibly is (one, or more than one — don't
    force a single choice when it genuinely fits several):
+   - **Published-source CTA is the default and stays on.** When `source.md` has a real
+     `canonical_url`, every derivative points back to that essay, chapter, or other long-form
+     published source unless Muxin explicitly set `cta: none` or a literal destination override.
+     A Substack Note never links back to itself.
+     A content-type classification never displaces the source with a generic sales ask.
+   - **Promotional CTAs must earn their place.** With no published source, a project, offer, or
+     lead-generating destination is eligible only when an existing reviewed destination is marked
+     `cta_reviewed: true`, `cta_fit: high`, and `cta_value: high`. Never create or imply a lead
+     magnet merely because the post could use a CTA. Missing fit, value, review, or URL means no
+     forced link.
    - `essay_excerpt` — expands/quotes a Substack essay's argument.
    - `society_capitalism_piece` — a broader society/capitalism worldview post.
    - `ai_agency_thesis` — the AI-agency thesis specifically.
@@ -308,12 +323,11 @@ to the same `source.md` and the same platform-fit decision.
      here, and if so what's the URL?" Stamp `project_url` only with what she gives you. If she has
      none, or none is genuinely relevant to this post, omit `project_url` entirely — that CTA line
      is simply dropped, never filled with an unrelated project just to have a link.
-   - **The 4 work-flavored types resolve to Muxin's LinkedIn profile by default — but on
-     LinkedIn especially (X to a lesser degree, card d2746598), give that line a TACTICAL,
-     source-topic-tied `cta_label` instead of leaving it generic.** `product_builder_insight`,
-     `project_demo`, `offer_adjacent_post`, and `case_study` are fundamentally "connect for work"
-     asks, so their non-project entry resolves to Muxin's LinkedIn profile (a fixed config value),
-     never the essay/Substack link — that part is automatic, you never set the URL. What you DO
+   - **A canonical long-form source wins over work-flavored promotion.** With no canonical source,
+     the 4 work-flavored types may resolve to Muxin's LinkedIn profile only after the configured
+     destination clears the reviewed, high-fit, high-value promotional gate. On LinkedIn
+     especially (X to a lesser degree), give that line a TACTICAL, source-topic-tied `cta_label`
+     instead of leaving it generic. What you DO
      set (optional, `cta_label` frontmatter — the same field the literal-`cta` override already
      uses) is the LINE ITSELF: something the reader could apply RIGHT NOW, tied to THIS post's
      actual insight, not a generic "Connect on LinkedIn." Michael Callaway principle: content
@@ -367,9 +381,8 @@ to the same `source.md` and the same platform-fit decision.
      link-free. Donations are never the headline ask; the default CTA is "come read / subscribe"
      (or whatever the classified content type's own text says).
    - **Check `canonical_url`.** If source.md has no `canonical_url` (a local draft, not yet
-     published), tell Muxin to paste the published essay URL into source.md before `/publish` —
-     otherwise any `source`-destination CTA link falls back to the Substack home instead of the
-     essay.
+     published), tell Muxin to paste the published essay URL into source.md before `/publish`.
+     There is no homepage fallback: without a real reviewed destination, publish stays link-free.
 
 5. **Score honestly** (the frontmatter `scores`):
    - `native`: does this read like a real human post on that platform? (1–5)

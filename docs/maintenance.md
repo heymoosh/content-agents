@@ -15,7 +15,7 @@ file, don't restart from scratch.
   cron, that posts to public platforms (YouTube, TikTok, Bluesky, Typefully)
   under her own accounts. No third-party PII or accounts are handled, so it
   doesn't meet the Class B/C bar despite holding real credentials
-  (`.env.example` lists API keys and OAuth secrets for YouTube, ElevenLabs,
+  (the gitignored repository `.env` holds API keys and OAuth secrets for YouTube, ElevenLabs,
   OpenRouter, Typefully, PostPeer, plus a Bluesky app password). Flagging
   that distinction here rather than bumping the class: the rubric's axis is
   external-user/data exposure, not credential sensitivity in general — but

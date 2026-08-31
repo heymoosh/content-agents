@@ -95,7 +95,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     return { calls };
   }
 
-  function tmpFolder(rowLine: string, captionFrontmatter: string): string {
+  function tmpFolder(rowLine: string, captionFrontmatter: string, sourceFrontmatter = ""): string {
     const folder = mkdtempSync(join(tmpdir(), "cards-test-"));
     dirs.push(folder);
     writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
@@ -108,6 +108,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
         rowLine
     );
     writeFileSync(join(folder, "derivatives", "quote-card-1-x.md"), `${captionFrontmatter}Context caption for the card.\n`);
+    if (sourceFrontmatter) writeFileSync(join(folder, "source.md"), sourceFrontmatter);
     writeFileSync(join(folder, "images", "quote-card-1.png"), "not real png bytes, just a fixture for the mocked upload");
     return folder;
   }
@@ -179,7 +180,8 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     stubTypefully();
     const folder = tmpFolder(
       `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
-      `---\nplatform: quote-card:x\ncta: source\n---\n`
+      `---\nplatform: quote-card:x\ncta: source\n---\n`,
+      `---\ncanonical_url: https://example.com/essay\nsource_kind: essay\n---\n`
     );
 
     await publishCards(folder, { atOverride: FUTURE_ISO });
@@ -191,7 +193,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     stubTypefully();
     const folder = tmpFolder(
       `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
-      `---\nplatform: quote-card:x\ncontent_type: [offer_adjacent_post]\n---\n`
+      `---\nplatform: quote-card:x\ncontent_type: [offer_adjacent_post]\ncta_reviewed: true\ncta_fit: high\ncta_value: high\n---\n`
     );
 
     await publishCards(folder, { atOverride: FUTURE_ISO });

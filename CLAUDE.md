@@ -24,6 +24,15 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    lines from the source; light edits for platform format only. NEVER compose new claims,
    arguments, or worldview statements in Muxin's voice. Every such derivative must carry
    `source_lines` frontmatter tracing the lines it was built from.
+   - **Scoped exception -- approved social treatments.** A configured Content Studio treatment
+     may re-hook, reorder, trim, clarify, and add connective structure so an essay-derived social
+     post makes one intelligible standalone point. It may not invent a factual claim, statistic,
+     example, experience, metaphor, or worldview position outside its cited `source_lines`.
+     The untreated control remains byte-for-byte exact. Treated copy must pass `config/voice.yaml`,
+     strip source footnote syntax, carry source provenance, attach `cta: source` when an essay or
+     other long-form source has a canonical URL, never link back to a Substack Note, and remain pending until Muxin reviews it. This is the same narrow
+     source-grounded latitude used by Spin and `/patterns rewrite`, not permission for freeform
+     authorship or untraced claims.
    - **Scoped exception -- common platform hook templates.** The newer Grow/patterns path may
      generate a platform-specific opening from a common, widely shared hook template in mad-lib
      form, using Muxin's supplied thought, claim, experience, evidence, and point of view. This
@@ -73,6 +82,11 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
    files — they're more reliable. Where no usable API exists (e.g. Substack), a constrained browser
    agent MAY post, but only on content Muxin has approved — rule 2 still governs, nothing posts
    unreviewed. Never auto-post via browser without that approval.
+   Published-source CTAs follow the same review-first policy: a derivative with a canonical essay
+   or chapter points back to that long-form source by default. A Substack Note never links back to
+   itself. A project, offer, or lead-generating CTA
+   may replace an absent source only when its destination already exists and is explicitly reviewed
+   as both high-fit and high-value. Never invent a lead magnet or force a generic promotional ask.
 4. **Discrete verifiable outputs.** Every pipeline step writes a file or DB rows that can be
    inspected. Scripts do deterministic work; Claude does judgment (tagging, synthesis,
    extraction, scoring) inline while running skills.
@@ -88,12 +102,12 @@ Systems for Muxin Li's content operation, orchestrated by Claude Code:
      instead by `charles/config/persona.yaml`. The em-dash ban still carries over, same as
      Build 2's fiction. See `charles/AGENTS.md`.
 6. **Prefer subscription / free model routes; minimize per-token API cost.** Default any model
-   call to the cheapest acceptable route: Claude via the Claude Code subscription (harness
-   subagents, $0 marginal — e.g. `/story` claude-native) and free-local media (Remotion / SVG /
-   HyperFrames, kokoro TTS) before paid APIs. Grok and GPT have no subscription API — their keys
-   bill per token via OpenRouter / direct — so use them ONLY where they add value Claude can't
-   (e.g. Grok's fiction voice, paid image step-ups): opt-in, logged to `data/cost-log.csv`, never
-   the silent default. New builds inherit this.
+   call to the cheapest acceptable route: Claude, Grok, and GPT/Codex through their installed,
+   signed-in subscription CLIs, plus free-local media (Remotion / SVG / HyperFrames, kokoro TTS,
+   whisper.cpp) before paid APIs. Reserve Grok for deliberate cross-family work. OpenRouter is a
+   temporary exception for Kling video generation while local Wan 2.2 is evaluated; every paid
+   call remains opt-in and logged to `data/cost-log.csv`. Attended Codex image generation is a
+   reviewed-file workflow, not a callable repository API. New builds inherit this.
 7. **PR auto-merge: hold only for changes to content-generation LOGIC, never for generated
    content itself.** The conductor auto-merges any green-CI PR by default. The ONLY reason to hold
    a PR open for Muxin's explicit review is a change to the *code/prompts that decide what content
@@ -194,6 +208,6 @@ content-agents-originated work (backlog cards or runtime skill calls, e.g. the o
   also de-conflict against each platform they fan out to. Edit `config/platforms.yaml` to change
   cadence — Typefully gets explicit times, not its "next-free-slot"; TikTok still honors
   `TIKTOK_SCHEDULE_AT` as a manual one-off override.
-- Secrets in `.env` only (see `.env.example`). Never commit `.env` or `data/analytics.db`.
+- Secrets in the single repository-root `.env` only. Never commit `.env` or `data/analytics.db`.
 - A freshly created git worktree has no `node_modules`. Run `npm run worktree:setup` (a plain
   `npm ci` from the committed lockfile) once before running `npm test` or any script in it.

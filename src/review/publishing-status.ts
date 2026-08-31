@@ -1,14 +1,23 @@
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
-import { repoRoot } from "../db/db.js";
+import { migrateLegacyDataFile } from "../runtime/data-root.js";
+import { withFileLock } from "../runtime/file-lock.js";
 import type { QueueRow } from "../publish/queue.js";
-import { scheduleApproved, scheduleKind, type ScheduleKind } from "./studio-scheduling.js";
-import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode } from "../publish/delivery-policy.js";
+import { scheduleApproved, scheduleKind, selectConfiguredProvider, type ScheduleKind, type SchedulerDeps } from "./studio-scheduling.js";
+import { resolveDeliveryPolicy, type DeliveryBrand, type DeliveryMode, type DeliveryProvider as PolicyDeliveryProvider } from "../publish/delivery-policy.js";
+import {
+  newDeliveryEvent,
+  parseDeliveryEvent,
+  type DeliveryEvent,
+  type DeliveryProvider,
+  type DeliveryState,
+  normalizeProviderStatus,
+} from "./delivery-event.js";
 
-export type PublishingState = "scheduling" | "scheduled" | "private" | "blocked" | "uncertain" | "cleared";
+export type PublishingState = DeliveryState | "scheduling" | "scheduled" | "cleared";
 export type PublishingResolution = "exists" | "not-created";
-export type PublishingProvider = "typefully" | "postpeer" | "youtube" | "substack" | "manual";
+export type PublishingProvider = DeliveryProvider;
 export interface PublishingStatus {
   slug: string;
   rowId: string;
@@ -24,9 +33,19 @@ export interface PublishingStatus {
   deliveryMode?: DeliveryMode;
   providerAccountId?: string | null;
   policyReason?: string;
+  schemaVersion?: 1;
+  eventId?: string;
+  providerObjectId?: string;
+  canonicalUrl?: string;
+  providerCreatedAt?: string;
+  providerUpdatedAt?: string;
+  providerPublishedAt?: string;
+  legacyState?: string;
+  evidenceKind?: "provider" | "human";
+  evidence?: string;
 }
 
-export const PUBLISHING_STATUS_PATH = join(repoRoot, "data", "publishing-status.jsonl");
+export const PUBLISHING_STATUS_PATH = migrateLegacyDataFile(["publishing-status.jsonl"]);
 export function publishingKey(slug: string, rowId: string): string { return `${slug}/${rowId}`; }
 
 function claimPath(slug: string, rowId: string, ledgerPath: string): string {
@@ -67,7 +86,7 @@ function publishingClaimIsActive(slug: string, rowId: string, ledgerPath: string
   } catch { return true; }
 }
 
-export function providerForKind(kind: ScheduleKind): PublishingProvider {
+export function providerForKind(kind: ScheduleKind): PolicyDeliveryProvider {
   if (kind === "text" || kind === "card") return "typefully";
   if (kind === "tiktok") return "postpeer";
   if (kind === "video") return "youtube";
@@ -76,24 +95,42 @@ export function providerForKind(kind: ScheduleKind): PublishingProvider {
 }
 
 export function appendPublishingStatus(status: PublishingStatus, path: string = PUBLISHING_STATUS_PATH): void {
-  mkdirSync(dirname(path), { recursive: true });
-  if (existsSync(path)) {
-    const current = readFileSync(path, "utf8");
-    if (current.length > 0 && !current.endsWith("\n")) appendFileSync(path, "\n", { encoding: "utf8", mode: 0o600 });
-  }
-  appendFileSync(path, JSON.stringify(status) + "\n", { encoding: "utf8", mode: 0o600 });
+  const normalized = parseDeliveryEvent(status);
+  if (!normalized) throw new Error(`invalid publishing status event for ${status.slug}/${status.rowId}`);
+  const { schemaVersion: _schemaVersion, eventId: _eventId, ...eventFields } = normalized;
+  const event = status.schemaVersion === 1 && status.eventId ? normalized : newDeliveryEvent(eventFields);
+  withFileLock(`${path}.lock`, () => {
+    mkdirSync(dirname(path), { recursive: true });
+    if (existsSync(path)) {
+      const current = readFileSync(path, "utf8");
+      if (current.length > 0 && !current.endsWith("\n")) appendFileSync(path, "\n", { encoding: "utf8", mode: 0o600 });
+    }
+    appendFileSync(path, JSON.stringify(event) + "\n", { encoding: "utf8", mode: 0o600 });
+  });
 }
 
-export function readPublishingStatuses(path: string = PUBLISHING_STATUS_PATH): Record<string, PublishingStatus> {
-  if (!existsSync(path)) return {};
-  const latest: Record<string, PublishingStatus> = {};
+export function readPublishingHistory(path: string = PUBLISHING_STATUS_PATH): DeliveryEvent[] {
+  if (!existsSync(path)) return [];
+  const events: DeliveryEvent[] = [];
   for (const line of readFileSync(path, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
-      const status = JSON.parse(line) as PublishingStatus;
-      if (!status.slug || !status.rowId || !status.provider || !status.state || !status.at) continue;
-      latest[publishingKey(status.slug, status.rowId)] = status;
+      const event = parseDeliveryEvent(JSON.parse(line));
+      if (event) events.push(event);
     } catch { /* retain all complete earlier append-only events */ }
+  }
+  return events;
+}
+
+export function readPublishingStatuses(path: string = PUBLISHING_STATUS_PATH): Record<string, PublishingStatus> {
+  const latest: Record<string, PublishingStatus> = {};
+  for (const event of readPublishingHistory(path)) {
+    latest[publishingKey(event.slug, event.rowId)] = {
+      ...event,
+      ...(event.providerObjectId ? { ref: event.providerObjectId } : {}),
+      brand: (event.brand as DeliveryBrand | null | undefined),
+      deliveryMode: (event.deliveryMode as DeliveryMode | undefined),
+    };
   }
   return latest;
 }
@@ -101,10 +138,13 @@ export function readPublishingStatuses(path: string = PUBLISHING_STATUS_PATH): R
 export function publishingRetryBlock(slug: string, row: QueueRow, path: string = PUBLISHING_STATUS_PATH): string | null {
   if (row.status === "published" || row.status === "locked") return "this row was already scheduled or locked";
   const existing = readPublishingStatuses(path)[publishingKey(slug, row.id)];
-  if (existing && ["scheduling", "scheduled", "private", "uncertain"].includes(existing.state)) {
+  if (existing && ["scheduling", "scheduled", "planned", "delivered", "live", "private", "uncertain"].includes(existing.state)) {
     return `this row already has a ${existing.state} publishing attempt; reconcile it before retrying`;
   }
-  if (row.status === "approve" && existing?.state !== "blocked" && existing?.state !== "cleared") return "this row is already approved; reconcile its provider state before retrying";
+  if (row.status === "approve" && existing?.state !== "blocked" && existing?.state !== "cleared"
+      && existing?.state !== "canceled" && existing?.state !== "deleted" && existing?.state !== "failed") {
+    return "this row is already approved; reconcile its provider state before retrying";
+  }
   return null;
 }
 
@@ -134,12 +174,12 @@ export function resolvePublishingAttempt(
     if (!provider) throw new Error("the uncertain publishing provider is unknown");
     const status: PublishingStatus = resolution === "exists"
       ? {
-          slug, rowId, provider, state: "scheduled", at: new Date().toISOString(),
-          ...(details.ref?.trim() ? { ref: details.ref.trim() } : {}),
+          slug, rowId, provider, state: "planned", at: new Date().toISOString(),
+          ...(details.ref?.trim() ? { providerObjectId: details.ref.trim(), ref: details.ref.trim() } : {}),
           ...(details.plannedFor?.trim() ? { plannedFor: details.plannedFor.trim() } : {}),
         }
       : {
-          slug, rowId, provider, state: "cleared", at: new Date().toISOString(),
+          slug, rowId, provider, state: "canceled", at: new Date().toISOString(),
           error: "Muxin checked the provider and confirmed that nothing was created; retry is allowed",
         };
     appendPublishingStatus(status, path);
@@ -149,17 +189,63 @@ export function resolvePublishingAttempt(
   }
 }
 
-function details(value: unknown): { plannedFor?: string; ref?: string } {
+export function recordHumanDeliveryEvidence(
+  slug: string,
+  rowId: string,
+  state: Extract<DeliveryState, "delivered" | "live" | "canceled" | "deleted" | "failed" | "private">,
+  details: { evidence: string; canonicalUrl?: string; providerPublishedAt?: string },
+  path: string = PUBLISHING_STATUS_PATH,
+): PublishingStatus {
+  if (!details.evidence.trim()) throw new Error("human delivery evidence is required");
+  const releaseClaim = claimPublishingAttempt(slug, rowId, path);
+  try {
+    const existing = readPublishingStatuses(path)[publishingKey(slug, rowId)];
+    if (!existing) throw new Error("this row has no publishing attempt to reconcile");
+    const status: PublishingStatus = {
+      ...existing, state, at: new Date().toISOString(), evidenceKind: "human", evidence: details.evidence.trim(),
+      ...(details.canonicalUrl?.trim() ? { canonicalUrl: details.canonicalUrl.trim() } : {}),
+      ...(details.providerPublishedAt?.trim() ? { providerPublishedAt: details.providerPublishedAt.trim() } : {}),
+      schemaVersion: undefined, eventId: undefined, error: undefined,
+    };
+    appendPublishingStatus(status, path);
+    return status;
+  } finally { releaseClaim(); }
+}
+
+function stableProviderObjectId(provider: PublishingProvider, raw: string): string {
+  const value = raw.trim();
+  if (provider === "typefully") return value.replace(/^typefully\s+draft\s+/i, "");
+  if (provider === "postpeer") return value.replace(/^(?:tiktok\s+)?postpeer\s+post\s+/i, "");
+  if (provider === "youtube") {
+    try {
+      const url = new URL(value);
+      const shortId = url.pathname.match(/\/(?:shorts|embed)\/([^/?#]+)/)?.[1];
+      return shortId ?? url.searchParams.get("v") ?? value;
+    } catch { return value; }
+  }
+  return value;
+}
+
+function details(provider: PublishingProvider, value: unknown): Omit<ReturnType<typeof normalizeProviderStatus>, "provider" | "state"> & { ref?: string } {
   if (!value || typeof value !== "object") return {};
   const item = value as Record<string, unknown>;
-  const plannedFor = typeof item.when === "string" && item.when ? item.when : undefined;
+  const plannedFor = typeof (item.plannedFor ?? item.when) === "string" && (item.plannedFor ?? item.when) ? String(item.plannedFor ?? item.when) : undefined;
   const rawRef = item.ref ?? item.draftId;
-  const ref = typeof rawRef === "string" && rawRef ? rawRef : undefined;
-  return { ...(plannedFor ? { plannedFor } : {}), ...(ref ? { ref } : {}) };
+  const ref = typeof rawRef === "string" && rawRef ? stableProviderObjectId(provider, rawRef) : undefined;
+  const string = (key: string): string | undefined => typeof item[key] === "string" && item[key] ? item[key] as string : undefined;
+  return {
+    ...(plannedFor ? { plannedFor } : {}), ...(ref ? { ref, providerObjectId: ref } : {}),
+    ...(string("providerObjectId") ? { providerObjectId: stableProviderObjectId(provider, string("providerObjectId")!) } : {}),
+    ...(string("providerAccountId") ? { providerAccountId: string("providerAccountId") } : {}),
+    ...(string("canonicalUrl") ? { canonicalUrl: string("canonicalUrl") } : {}),
+    ...(string("providerCreatedAt") ? { providerCreatedAt: string("providerCreatedAt") } : {}),
+    ...(string("providerUpdatedAt") ? { providerUpdatedAt: string("providerUpdatedAt") } : {}),
+    ...(string("providerPublishedAt") ? { providerPublishedAt: string("providerPublishedAt") } : {}),
+  };
 }
 
 function acceptedState(value: unknown): PublishingState {
-  return value && typeof value === "object" && (value as Record<string, unknown>).autoPublishes === false ? "private" : "scheduled";
+  return value && typeof value === "object" && (value as Record<string, unknown>).autoPublishes === false ? "private" : "planned";
 }
 
 /**
@@ -172,6 +258,7 @@ export async function scheduleApprovedOnce(
   row: QueueRow,
   schedule: typeof scheduleApproved = scheduleApproved,
   path: string = PUBLISHING_STATUS_PATH,
+  selectionDeps?: Pick<SchedulerDeps, "fetchPostizRegistry" | "postizEnv">,
 ): Promise<{ scheduled: unknown; scheduleError: string | null; publishing: PublishingStatus }> {
   const kind = scheduleKind(row);
   if (!kind) throw new Error("no publishing provider owns this row");
@@ -181,7 +268,23 @@ export async function scheduleApprovedOnce(
     // UI read and this process acquiring the lock.
     const blocked = publishingRetryBlock(slug, row, path);
     if (blocked) throw new Error(blocked);
-    const provider = providerForKind(kind);
+    let provider: PublishingProvider;
+    try {
+      provider = (schedule === scheduleApproved || selectionDeps) && kind !== "outreach-lock"
+        ? (await selectConfiguredProvider(row, selectionDeps)).provider
+        : providerForKind(kind);
+    } catch (error) {
+      // Provider discovery happens before dispatch. Persist that exact boundary so an approved row
+      // is not stranded with an empty ledger, while keeping retries safe: no provider write could
+      // have happened yet, so `failed` truthfully permits another explicit approval attempt.
+      const message = `provider selection failed before dispatch; no provider request was made: ${error instanceof Error ? error.message : String(error)}`;
+      const status: PublishingStatus = {
+        slug, rowId: row.id, provider: providerForKind(kind), state: "failed",
+        at: new Date().toISOString(), error: message,
+      };
+      appendPublishingStatus(status, path);
+      return { scheduled: null, scheduleError: message, publishing: status };
+    }
     const policy = kind === "outreach-lock"
       ? { policyVersion: "delivery-policy-v1" as const, origin: "unknown" as const, brand: null, provider: "manual" as const, providerAccountId: null, mode: "manual" as const, reason: "outreach approval locks copy for human sending and never dispatches a publishing provider" }
       : resolveDeliveryPolicy(folder, provider);
@@ -194,7 +297,7 @@ export async function scheduleApprovedOnce(
       appendPublishingStatus(status, path);
       return { scheduled: null, scheduleError: status.error ?? null, publishing: status };
     }
-    appendPublishingStatus({ slug, rowId: row.id, provider, state: "scheduling", at: new Date().toISOString(), ...audit }, path);
+    appendPublishingStatus({ slug, rowId: row.id, provider, state: "uncertain", at: new Date().toISOString(), ...audit }, path);
     const result = await schedule(folder, row, undefined, policy);
     const status: PublishingStatus = result.scheduleError
       ? {
@@ -203,7 +306,11 @@ export async function scheduleApprovedOnce(
           at: new Date().toISOString(), error: result.scheduleError,
           ...audit,
         }
-      : { slug, rowId: row.id, provider, state: acceptedState(result.scheduled), at: new Date().toISOString(), ...details(result.scheduled), ...audit };
+      : (() => {
+          const normalized = normalizeProviderStatus(provider, result.scheduled);
+          const observedState = normalized.state === "uncertain" ? acceptedState(result.scheduled) : normalized.state;
+          return { slug, rowId: row.id, provider, state: observedState, at: new Date().toISOString(), ...audit, ...details(provider, result.scheduled) };
+        })();
     appendPublishingStatus(status, path);
     return { ...result, publishing: status };
   } finally {

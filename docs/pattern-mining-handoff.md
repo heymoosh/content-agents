@@ -64,7 +64,7 @@ npm run pull:login -- threads                 # one-time human login
 | Item | State |
 |---|---|
 | Reddit API key | **Declined.** Use the browser or RSS route instead. |
-| Instagram `IG_GRAPH_ACCESS_TOKEN`, `IG_GRAPH_USER_ID` | Not set. `.env.example` has the full walkthrough. |
+| Instagram `IG_GRAPH_ACCESS_TOKEN`, `IG_GRAPH_USER_ID` | Add these to the gitignored repository `.env`; setup is documented beside the Instagram collector. |
 | Threads login | Not run. Field names are UNVERIFIED; expect `UI_CHANGED` on the first run and read the payload dump it names. |
 | PR #358 `feat/patterns-auto-collect` | **Merge it FIRST, then rebase this branch.** It is the recurring half (weekly cron, `discover.ts`, a `collectors/` registry) that this branch never built. It renames `targets` to `analysis_sample` and our `collect.ts` reads the old field, so whoever merges second eats that compile error. Only 7 files overlap. |
 

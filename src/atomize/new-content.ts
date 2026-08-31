@@ -1,5 +1,5 @@
 import "../util/env.js";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, extname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRoot } from "../db/db.js";
@@ -65,6 +65,7 @@ async function resolveSource(arg: string): Promise<{
   publishedAt: string | null;
   text: string;
   sourceKind?: string;
+  sourceBinaryPath?: string;
 }> {
   if (/^https?:\/\//.test(arg)) {
     const post = await fetchSubstackPost(arg);
@@ -82,6 +83,8 @@ async function resolveSource(arg: string): Promise<{
       origin: `voice-memo:${basename(arg)}`,
       publishedAt: null,
       text,
+      sourceKind: "audio",
+      sourceBinaryPath: arg,
     };
   }
   return resolveFileSource(arg, readFileSync(arg, "utf8"));
@@ -107,12 +110,17 @@ export interface ScaffoldSource {
   publishedAt: string | null;
   text: string;
   sourceKind?: string; // e.g. "substack-note" — omitted for essays/files/audio
+  sourceBinaryPath?: string;
 }
 
 // Scaffold content/<date>-<slug>/ (source.md + subfolders + empty review queue) from a resolved
 // source. Shared by /atomize (essays/files/audio/paste) and /atomize notes (one folder per note).
 // Throws "already exists: <dir>" if the folder is already there, so callers can skip or abort.
 export function scaffoldContentFolder(src: ScaffoldSource): string {
+  const sourceBinaryExtension = src.sourceBinaryPath ? extname(src.sourceBinaryPath).toLowerCase() : "";
+  if (src.sourceBinaryPath && (!AUDIO_EXTS.has(sourceBinaryExtension) || !existsSync(src.sourceBinaryPath))) {
+    throw new Error("source binary is not an existing supported audio file");
+  }
   const date = new Date().toISOString().slice(0, 10);
   const dir = join(repoRoot, "content", `${date}-${slugify(src.title)}`);
   if (existsSync(join(dir, "source.md"))) throw new Error(`already exists: ${dir}`);
@@ -133,6 +141,9 @@ export function scaffoldContentFolder(src: ScaffoldSource): string {
     join(dir, "source.md"),
     `---\ntitle: "${src.title.replace(/"/g, '\\"')}"\norigin: ${src.origin}\n${canonicalLine}\n${sourceKindLine}published_at: ${src.publishedAt ?? "null"}\ningested_at: ${new Date().toISOString()}\n---\n\n${body}\n`
   );
+  if (src.sourceBinaryPath) {
+    copyFileSync(src.sourceBinaryPath, join(dir, `source-audio${sourceBinaryExtension}`));
+  }
   const ctaReminder = canonicalUrl
     ? ""
     : `> CTA: this draft has no \`canonical_url\` yet. To send "read more" posts to the essay itself, paste the published URL into source.md \`canonical_url:\` before /publish — otherwise those CTAs fall back to the Substack home.\n\n`;

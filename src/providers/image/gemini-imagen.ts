@@ -13,7 +13,7 @@ export const provider: ImageProvider = {
   name: "gemini-imagen",
   async generate({ prompt, aspect, outPath, params }) {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY missing in .env (see .env.example)");
+    if (!key) throw new Error("GEMINI_API_KEY missing in the repository .env");
     const model = (params?.model as string) ?? DEFAULT_MODEL;
     const cost = (params?.cost_usd as number) ?? DEFAULT_COST;
 

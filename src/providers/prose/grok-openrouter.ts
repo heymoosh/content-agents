@@ -14,7 +14,7 @@ export const provider: ProseProvider = {
   name: "grok-openrouter",
   async generate({ system, context, instructions }) {
     const key = process.env.OPENROUTER_API_KEY;
-    if (!key) throw new Error("OPENROUTER_API_KEY missing in .env (see .env.example)");
+    if (!key) throw new Error("OPENROUTER_API_KEY missing in the repository .env");
 
     const res = await fetchWithRetry(
       "https://openrouter.ai/api/v1/chat/completions",

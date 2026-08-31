@@ -201,12 +201,28 @@ export function resolveCtaLines(
   ctCfg: ContentTypesConfig
 ): { ctas: ResolvedCta[]; usedFallback: boolean } {
   const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
-  if (!rawCta) {
+  if (sourceKind === "substack-note" && (!rawCta || rawCta.toLowerCase() === "source")) {
+    return { ctas: [], usedFallback: false };
+  }
+  if (rawCta) {
+    const { url, label, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
+    return { ctas: url ? [{ url, label }] : [], usedFallback };
+  }
+  // POSSE default: when a real published source exists, every derivative points back to it.
+  // Content-type lead routing must never displace the essay or chapter that produced the
+  // post. A deliberate literal/none override above remains the only stronger instruction.
+  if (canonicalUrl) {
+    const { url, label, usedFallback } = resolveCta({ cta: "source" }, canonicalUrl, cfg, sourceKind);
+    return { ctas: url ? [{ url, label }] : [], usedFallback };
+  }
+  const promotionalCtaApproved = fm.cta_reviewed === true && fm.cta_fit === "high" && fm.cta_value === "high";
+  if (promotionalCtaApproved) {
     const viaContentType = resolveContentTypeCtas(fm, canonicalUrl, cfg, ctCfg);
     if (viaContentType.ctas.length > 0) return viaContentType;
   }
-  const { url, label, usedFallback } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
-  return { ctas: url ? [{ url, label }] : [], usedFallback };
+  // No published source and no reviewed high-fit/high-value destination means no forced link.
+  // This path never fabricates a lead magnet or substitutes a generic homepage.
+  return { ctas: [], usedFallback: false };
 }
 
 // First content_type entry (array + primary/secondary order) whose url actually resolves — the
@@ -239,7 +255,7 @@ function firstResolvedContentTypeDestination(
 }
 
 // The primary CTA destination a published post will actually use — mirrors resolveCtaLines'
-// precedence (explicit fm.cta wins, else content_type routing, else the note-default upgrade)
+// precedence (explicit fm.cta wins, else canonical long-form source, else reviewed content-type routing)
 // exactly, by delegating to the same two leaf resolvers (firstResolvedContentTypeDestination /
 // resolveCta) rather than re-implementing the branching. Returns null when nothing resolves to a
 // url (no CTA was actually placed) or the CTA is a literal override url (not one of the three
@@ -253,14 +269,14 @@ export function resolvePrimaryCtaDestination(
   ctCfg: ContentTypesConfig
 ): CtaDestination | null {
   const rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
-  if (!rawCta) {
+  if (!rawCta && canonicalUrl && sourceKind !== "substack-note") return "source";
+  if (!rawCta && fm.cta_reviewed === true && fm.cta_fit === "high" && fm.cta_value === "high") {
     const dest = firstResolvedContentTypeDestination(fm, canonicalUrl, cfg, ctCfg);
     if (dest) return dest;
   }
   const { url } = resolveCta(fm, canonicalUrl, cfg, sourceKind);
   if (!url) return null;
   let effectiveCta = rawCta;
-  if (sourceKind === "substack-note" && !effectiveCta) effectiveCta = "source";
   return effectiveCta.toLowerCase() === "source" ? "source" : null;
 }
 
@@ -291,11 +307,8 @@ export function loadSourceKind(folder: string): string {
 // link; `source` → the essay's canonical_url, falling back to the configured home; any other value
 // → a literal url. `usedFallback` lets callers note when `source` fell back to the homepage.
 //
-// Note-derived content (source_kind: substack-note) defaults to `source`: a Substack Note is itself
-// the destination, so a note card/post should link back to the original note. An empty `cta` on a
-// note resolves to the note's canonical_url instead of "no link". An explicit `cta: none` or a
-// literal url on the derivative still wins — only the EMPTY default is upgraded, and only for notes,
-// so non-note content (essays etc.) is completely unaffected.
+// Note-derived content (source_kind: substack-note) never links back to the Note. Empty and
+// `cta: source` both resolve to no link. Literal non-source destinations remain explicit overrides.
 export function resolveCta(
   fm: Record<string, unknown>,
   canonicalUrl: string | null,
@@ -304,16 +317,17 @@ export function resolveCta(
 ): { url: string | null; label: string; usedFallback: boolean } {
   let rawCta = typeof fm.cta === "string" ? fm.cta.trim() : "";
   let label = typeof fm.cta_label === "string" ? fm.cta_label : "";
-  // Notes link to the original note by default: treat an empty cta as `source`.
-  if (sourceKind === "substack-note" && !rawCta) rawCta = "source";
+  // Notes are already complete short-form objects. Empty/source CTAs never link back to a Note.
+  if (sourceKind === "substack-note" && (!rawCta || rawCta.toLowerCase() === "source")) {
+    return { url: null, label: "", usedFallback: false };
+  }
   if (!rawCta || rawCta.toLowerCase() === "none") {
     return { url: null, label, usedFallback: false };
   }
   if (rawCta.toLowerCase() === "source") {
     const { url, usedFallback } = resolveSourceUrl(canonicalUrl, cfg);
-    if (usedFallback && cfg.fallbackLabel) label = cfg.fallbackLabel;
+    if (!label && cfg.fallbackLabel) label = cfg.fallbackLabel;
     return { url, label, usedFallback: usedFallback && url != null };
   }
   return { url: rawCta, label, usedFallback: false };
 }
-
