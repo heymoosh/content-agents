@@ -323,6 +323,29 @@ falsifiable hypothesis. Experiment owns the controlled execution, review, schedu
 measurement, and return of results to Signals. Existing `grow-*` code and command names are legacy
 implementation identifiers, not a reason to expose Grow as a separate product concept.
 
+Signals orders approval-ready proposals by confidence and expected information value. Higher
+confidence proposals consume scarce generation and publishing capacity first. Low-confidence
+proposals are withheld by default unless Signals can show that the uncertainty is unusually
+important, the experiment is cheap, and the expected learning is worth the capacity. This ordering
+does not convert confidence into evidence of a winner.
+
+The user flow has two different human decisions and one canonical copy surface:
+
+1. Signals shows a body-free experiment plan with its evidence, hypothesis, controls, metrics,
+   guardrails, confidence, and decision rule. Muxin approves or declines the plan.
+2. Plan approval creates an experiment-tagged request through the ordinary configured Content
+   generator. It does not approve any prose.
+3. The generator applies the requested treatments and media/platform choices, then the blind
+   cold-feed editor and normal voice, CTA, provenance, and platform checks.
+4. Every generated variant lands `pending` in the ordinary Content review queue. Content is the
+   only place Muxin edits or gives final copy approval before scheduling and publishing.
+5. Delivery and observed outcomes retain the experiment id. Signals groups those facts per
+   experiment, applies its declared keep/revise/reject rule, and presents the interpretation.
+
+Experiment therefore has no separate copy-review page or duplicate approval state. Multiple
+experiments may occupy different lifecycle states concurrently; identity and capacity accounting,
+not a global singleton, keep their drafts, deliveries, and outcomes separate.
+
 - `develop` is the advisor and cut engine. It recommends angles and assembles cuts from source
   material; it is not an invisible author.
 - `brand-lens` checks fit and identifies gaps. It recommends; it does not rewrite prose into the
@@ -734,16 +757,15 @@ generalizing from a single account or small sample.
 
 ### Phase 3: Experiment execution
 
-**Ship predicate:** Given one normal Content input, a Signals recommendation with qualified
-evidence and an approval-ready hypothesis, a selected platform set, and the configured review and
-slot capacity, the owner produces a readable cut, bounded platform/format
-variants, a review bundle, and publish-ready records. Each output retains lineage, experiment
-variables, treatment rationale, evidence status, and pending decisions. Muxin decides which items
-are approved, edited, rejected, or sent for another pass. The review bundle makes that decision
-explicit, the capacity manifest keeps candidate volume separate from approved publish volume, and
-the experiment record preserves scope and measured outcome families. Evidence is the cut, variant
-bundle, decision record, scheduler record, and any outcome record. The owner is Experiment execution,
-with review/publish owning the approval and delivery gate.
+**Ship predicate:** Given qualified evidence and normal Content inputs, Signals ranks one or more
+body-free, approval-ready experiment plans. Muxin may approve any subset. Each approved plan creates
+an experiment-tagged request through the configured Content generator, which produces bounded
+platform/media treatments and puts them `pending` in the ordinary Content queue after the normal
+editor and policy gates. Muxin performs final copy review only in Content. Concurrent experiments
+retain distinct lineage through review, delivery, provider observations, and outcomes, and Signals
+can present a per-experiment interpretation against the original keep/revise/reject rule. Evidence
+is the ranked Signals proposal and plan decision, Content request and pending review rows, final copy
+decisions, scheduler/provider records, outcome records, and Signals interpretation.
 
 The approval surface must show the motivating observation and evidence, interpretation,
 directional falsifiable hypothesis, reason the input is a valid test, controlled variable,
@@ -811,12 +833,12 @@ scheduled are included. `npm run grow:experiment-run -- --input <envelope.json>`
 does not contact providers, alter the queue, infer outcomes, select a winner, or create a Venture
 handoff. Failed, duplicate, drifted, unapproved, or pre-decision observations fail closed.
 
-The current real packet retains its science input, raw response, parsed recommendation provenance,
-and cold-feed-editor evidence under `docs/reviews/`. It remains pending Muxin's item-level decisions,
-so it advances the vertical slice but does not complete this phase. After a decision is applied,
-the deterministic scheduling boundary and running-record transition are ready; the remaining
-operational evidence is an explicitly authorized provider action and its observed result, followed
-later by outcome evidence and Signals interpretation.
+The retained real packet preserves useful science input, raw response, parsed recommendation
+provenance, and cold-feed-editor evidence under `docs/reviews/`; Muxin approved its rationale on
+2026-08-31. Its separate body-bearing item review is now historical vertical-slice evidence, not the
+target product workflow. Phase 3 remains incomplete until plan approval feeds the canonical
+configured Content generator, produces ordinary `pending` review rows, supports multiple active
+experiment identities, and later returns grouped outcome evidence to Signals.
 
 ### Phase 4: Cross-system learning and Venture handoff
 

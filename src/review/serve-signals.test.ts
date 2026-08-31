@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { handleSignalsRoute } from "./serve-signals.js";
 import { appendSignalsDecision, readSignalsDecisions } from "./signals-decisions.js";
+import { buildContentRequest } from "./content-request.js";
+import { buildExperimentPlan } from "../grow/experiment-content-handoff.js";
+import { signalsExperimentRecommendation } from "../grow/experiment-test-fixtures.js";
+import { recordExperimentPlan } from "./signals-experiment-plan-store.js";
 
 function harness(method: string, path: string, body: Record<string, unknown> = {}) {
   let response: { code: number; value: unknown } | undefined;
@@ -63,5 +67,39 @@ test("proposal review endpoints keep approval separate from apply", async () => 
     const apply = harness("POST", `/api/signals/proposals/${id}/apply`);
     await handleSignalsRoute({ ...apply, res: {} as any, proposalsPath, configRoot: root });
     assert.match(readFileSync(join(root, "config/platforms.yaml"), "utf8"), /posts_per_week: 5/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("Signals experiment approval triggers canonical Content generation but leaves copy approval pending", async () => {
+  const root = mkdtempSync(join(tmpdir(), "serve-signals-experiment-"));
+  const plansPath = join(root, "plans.jsonl");
+  try {
+    const input = { id: "content-one", origin: "human-inference" as const, descriptor: "experiment", originalInput: "Source.", treatments: ["summary"], media: ["none"], platforms: ["linkedin"], sourceProvenance: { kind: "source" as const, sourceLines: [1] } };
+    const request = buildContentRequest(input);
+    const variantId = request.variants.find((variant) => variant.identity.kind === "treated")!.identity.id;
+    const comparisonRef = request.variants.find((variant) => variant.identity.kind === "control")!.identity.id;
+    const plan = buildExperimentPlan({
+      recommendation: { ...signalsExperimentRecommendation({ variantId, comparisonRef, minimumSample: 10 }), id: "experiment-one", confidence: "high" },
+      contentRequest: input,
+      variablesByVariant: Object.fromEntries(request.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }])),
+    });
+    recordExperimentPlan(plan, plansPath);
+    const approve = harness("POST", "/api/signals/experiments/experiment-one/approve");
+    await handleSignalsRoute({
+      ...approve, res: {} as any, experimentPlansPath: plansPath,
+      applyExperimentPlan: async (proposal, decision) => ({
+        kind: "experiment_content_handoff", version: "experiment-content-handoff-v1", experimentId: proposal.recommendation.id,
+        contentRequest: { ...proposal.contentRequest, experiment: null }, generatedIds: [variantId, comparisonRef],
+        copyApproval: "pending-in-content", contentIsCanonicalReviewSurface: true,
+      }),
+    });
+    assert.equal(approve.response()?.code, 200);
+    const value = approve.response()?.value as any;
+    assert.equal(value.handoff.copyApproval, "pending-in-content");
+    assert.equal(value.decision.authorizesCopyApproval, false);
+    assert.equal(value.experimentPlans[0].status, "drafts-pending-content-review");
+    const read = harness("GET", "/api/signals");
+    await handleSignalsRoute({ ...read, res: {} as any, decisionsPath: join(root, "decisions"), proposalsPath: join(root, "changes"), experimentPlansPath: plansPath });
+    assert.equal((read.response()?.value as any).experimentPlans[0].generatedCopyIncluded, false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

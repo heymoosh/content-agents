@@ -114,6 +114,21 @@ describe("content request domain", () => {
     assert.equal(merged.originalInput, existing.originalInput);
   });
 
+  test("experiment lineage is server-owned and survives ordinary configuration edits", () => {
+    const configured = buildContentRequest({ ...base, treatments: ["summary"], media: ["none"], platforms: ["linkedin"] });
+    const variablesByVariant = Object.fromEntries(configured.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }]));
+    const experiment = {
+      id: "experiment:opening", recommendationId: "signals:opening",
+      planProposalDigest: `sha256:${"a".repeat(64)}`, planDecisionDigest: `sha256:${"b".repeat(64)}`,
+      planApprovedAt: "2026-08-31T18:00:00.000Z", hypothesis: "A grounded opening will improve replies.",
+      controlledVariable: "opening", variablesByVariant,
+    };
+    const existing = buildContentRequest({ ...base, treatments: ["summary"], media: ["none"], platforms: ["linkedin"], experiment });
+    assert.equal(existing.experiment?.copyApproval, "pending-in-content");
+    assert.equal(mergeContentConfiguration(existing, { ...base, treatments: ["counterpoint"], experiment: null }).experiment, existing.experiment);
+    assert.throws(() => buildContentRequest({ ...base, treatments: ["summary"], media: ["none"], platforms: ["linkedin"], experiment: { ...experiment, variablesByVariant: {} } }), /cover every configured variant/i);
+  });
+
   test("rejects empty and malformed source provenance", () => {
     assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [] } }), /requires source_lines/);
     assert.throws(() => buildContentRequest({ ...base, sourceProvenance: { kind: "source", sourceLines: [0] } }), /invalid/);

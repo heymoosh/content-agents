@@ -30,6 +30,8 @@ describe("Signals science agent experiment recommendation", () => {
   test("builds a body-free prompt that preserves outcome and Venture boundaries", () => {
     const built = buildSignalsExperimentSciencePrompt(input());
     assert.match(built.prompt, /directional and falsifiable/i);
+    assert.match(built.prompt, /Prefer high-confidence recommendations/i);
+    assert.match(built.prompt, /low-confidence recommendation will be deferred before content generation/i);
     assert.match(built.prompt, /genuine former belief and correction/i);
     assert.match(built.prompt, /Never read or infer Venture survey/i);
     assert.match(built.prompt, /attention, conversation, audience, and business outcomes separate/i);

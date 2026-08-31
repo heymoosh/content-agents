@@ -141,6 +141,22 @@ describe("content request store", () => {
     assert.deepEqual((await readContentRequest(root)).sourceProvenance, written.sourceProvenance);
   });
 
+  test("preserves approved experiment-plan lineage across persistence", async () => {
+    const root = await rootDir();
+    const base = buildContentRequest({ ...input, treatments: ["summary"], media: ["none"], platforms: ["linkedin"] });
+    const variablesByVariant = Object.fromEntries(base.variants.map((variant) => [variant.identity.id, { opening: variant.identity.kind }]));
+    const written = await writeContentRequest(root, {
+      ...input, treatments: ["summary"], media: ["none"], platforms: ["linkedin"],
+      experiment: {
+        id: "experiment:opening", recommendationId: "signals:opening",
+        planProposalDigest: `sha256:${"a".repeat(64)}`, planDecisionDigest: `sha256:${"b".repeat(64)}`,
+        planApprovedAt: "2026-08-31T18:00:00.000Z", hypothesis: "A grounded opening will improve replies.",
+        controlledVariable: "opening", variablesByVariant,
+      },
+    });
+    assert.deepEqual((await readContentRequest(root)).experiment, written.experiment);
+  });
+
   test("preserves server-owned fiction source context across persistence", async () => {
     const root = await rootDir();
     const fictionInput: ContentRequestInput = {

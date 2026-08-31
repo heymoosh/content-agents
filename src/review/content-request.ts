@@ -57,6 +57,24 @@ export interface ContentRequestInput {
   readonly ventureSource?: VentureContentSource | null;
   readonly sourceProvenance?: ContentSourceProvenance | null;
   readonly sourceContext?: ContentSourceContext | null;
+  /** Server-owned experiment lineage. Plan approval authorizes drafting, never copy approval. */
+  readonly experiment?: ContentExperimentContextInput | null;
+}
+
+export interface ContentExperimentContextInput {
+  readonly id: string;
+  readonly recommendationId: string;
+  readonly planProposalDigest: string;
+  readonly planDecisionDigest: string;
+  readonly planApprovedAt: string;
+  readonly hypothesis: string;
+  readonly controlledVariable: string;
+  readonly variablesByVariant: Readonly<Record<string, Readonly<Record<string, string>>>>;
+}
+
+export interface ContentExperimentContext extends ContentExperimentContextInput {
+  readonly planApprovedBy: "muxin";
+  readonly copyApproval: "pending-in-content";
 }
 
 export interface ContentSourceProvenance {
@@ -101,6 +119,7 @@ export interface ContentRequest {
   readonly ventureSource: VentureContentSource | null;
   readonly sourceProvenance: ContentSourceProvenance | null;
   readonly sourceContext: ContentSourceContext | null;
+  readonly experiment: ContentExperimentContext | null;
   readonly selections: ContentSelections;
   readonly recommendations: {
     readonly treatments: Recommendation[];
@@ -222,6 +241,37 @@ function sourceContext(value: ContentSourceContext | null | undefined, origin: C
   throw new Error("source context kind is invalid");
 }
 
+function experimentContext(value: ContentExperimentContextInput | null | undefined, variants: readonly ContentVariant[]): ContentExperimentContext | null {
+  if (value == null) return null;
+  const digest = (item: unknown, field: string): string => {
+    const normalized = required(item, field);
+    if (!/^sha256:[a-f0-9]{64}$/.test(normalized)) throw new Error(`${field} is invalid`);
+    return normalized;
+  };
+  const planApprovedAt = required(value.planApprovedAt, "experiment planApprovedAt");
+  if (Number.isNaN(Date.parse(planApprovedAt))) throw new Error("experiment planApprovedAt is invalid");
+  const variantIds = variants.map((variant) => variant.identity.id).sort();
+  const suppliedIds = Object.keys(value.variablesByVariant ?? {}).sort();
+  if (JSON.stringify(variantIds) !== JSON.stringify(suppliedIds)) throw new Error("experiment variables must cover every configured variant exactly");
+  const variablesByVariant = Object.fromEntries(variantIds.map((variantId) => {
+    const source = value.variablesByVariant[variantId];
+    if (!source || typeof source !== "object" || Array.isArray(source) || Object.keys(source).length === 0) throw new Error(`experiment variables for ${variantId} must not be empty`);
+    return [variantId, Object.fromEntries(Object.entries(source).sort(([a], [b]) => a.localeCompare(b)).map(([name, option]) => [required(name, `experiment variable name for ${variantId}`), required(option, `experiment variable ${name} for ${variantId}`)]))];
+  }));
+  return {
+    id: required(value.id, "experiment id"),
+    recommendationId: required(value.recommendationId, "experiment recommendationId"),
+    planProposalDigest: digest(value.planProposalDigest, "experiment planProposalDigest"),
+    planDecisionDigest: digest(value.planDecisionDigest, "experiment planDecisionDigest"),
+    planApprovedAt,
+    hypothesis: required(value.hypothesis, "experiment hypothesis"),
+    controlledVariable: required(value.controlledVariable, "experiment controlledVariable"),
+    variablesByVariant,
+    planApprovedBy: "muxin",
+    copyApproval: "pending-in-content",
+  };
+}
+
 export function buildContentRequest(input: ContentRequestInput): ContentRequest {
   const id = required(input.id, "id");
   if (!ORIGINS.has(input.origin)) throw new Error("origin is unknown");
@@ -255,7 +305,7 @@ export function buildContentRequest(input: ContentRequestInput): ContentRequest 
   }
   return {
     kind: "content_request", version: CONTENT_REQUEST_VERSION, id, origin: input.origin, descriptor, originalInput: input.originalInput,
-    ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), sourceProvenance: sourceProvenance(input.sourceProvenance), sourceContext: sourceContext(input.sourceContext, input.origin), selections: selected, recommendations: recs,
+    ventureId: input.ventureId ?? null, ventureSource: ventureSource(input.ventureSource), sourceProvenance: sourceProvenance(input.sourceProvenance), sourceContext: sourceContext(input.sourceContext, input.origin), experiment: experimentContext(input.experiment, variants), selections: selected, recommendations: recs,
     control: { enabled: controlEnabled }, variants,
   };
 }
@@ -271,6 +321,7 @@ export function mergeContentConfiguration(existing: ContentRequest, incoming: Co
     ventureSource: existing.ventureSource,
     sourceProvenance: existing.sourceProvenance,
     sourceContext: existing.sourceContext,
+    experiment: existing.experiment,
     treatments: incoming.treatments,
     media: incoming.media,
     platforms: incoming.platforms,

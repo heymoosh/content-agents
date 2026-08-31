@@ -4,6 +4,9 @@ import { readSignals, readOutcomeFamilies, readResearchReport } from "./signals.
 import { buildSignalsRecommendationRead } from "./signals-recommendations.js";
 import { appendSignalsDecision, readSignalsDecisions, recommendationKey, type SignalsDecisionKind, type SignalsRecommendationType } from "./signals-decisions.js";
 import { applySignalsProposal, proposeSignalsChange, readSignalsProposals, reconcileSignalsApplyIntents, reviewSignalsProposal, rollbackSignalsProposal } from "./signals-change-proposals.js";
+import { applyApprovedExperimentToContent, approveExperimentPlan, type AppliedExperimentContentHandoff, type ExperimentPlan, type ExperimentPlanDecision } from "../grow/experiment-content-handoff.js";
+import { loadExperimentPlan, loadExperimentPlanDecision, markExperimentContentHandoff, readExperimentPlans, reviewExperimentPlan } from "./signals-experiment-plan-store.js";
+import { safeFolder } from "./rows.js";
 
 type SignalsRouteContext = {
   req: IncomingMessage;
@@ -15,11 +18,13 @@ type SignalsRouteContext = {
   appendDecision?: typeof appendSignalsDecision;
   proposalsPath?: string;
   configRoot?: string;
+  experimentPlansPath?: string;
+  applyExperimentPlan?: (plan: ExperimentPlan, decision: ExperimentPlanDecision) => Promise<AppliedExperimentContentHandoff>;
 };
 
 // Signals stays split by its existing response contracts: signal summary, outcome families, and
 // redacted research report remain separate reads; decisions are explicit append-only writes.
-export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot }: SignalsRouteContext): Promise<boolean> {
+export async function handleSignalsRoute({ req, res, url, readBody, json, decisionsPath, appendDecision, proposalsPath, configRoot, experimentPlansPath, applyExperimentPlan }: SignalsRouteContext): Promise<boolean> {
   // Signals room (design 3e): deterministic brief + durable user decisions. Muxin decides;
   // adoption records intent only and never mutates configuration or the repository backlog.
   if (req.method === "GET" && url.pathname === "/api/signals") {
@@ -35,7 +40,32 @@ export async function handleSignalsRoute({ req, res, url, readBody, json, decisi
         decision: decisions[recommendationKey(recommendation.type, recommendation.title)]?.decision ?? null,
       })),
       changeProposals: readSignalsProposals(proposalsPath),
+      experimentPlans: readExperimentPlans(experimentPlansPath),
     });
+    return true;
+  }
+  if (req.method === "POST" && /^\/api\/signals\/experiments\/[^/]+\/(approve|decline|start)$/.test(url.pathname)) {
+    const [, , , , encodedId, action] = url.pathname.split("/");
+    const id = decodeURIComponent(encodedId);
+    try {
+      const plan = loadExperimentPlan(id, experimentPlansPath);
+      let decision = loadExperimentPlanDecision(id, experimentPlansPath);
+      if (action === "approve" || action === "decline") {
+        if (decision) throw new Error(`experiment plan ${id} was already reviewed`);
+        decision = approveExperimentPlan(plan, { status: action === "approve" ? "approved" : "declined", decidedBy: "muxin", decidedAt: new Date().toISOString() });
+        reviewExperimentPlan(id, decision, experimentPlansPath);
+      }
+      if (!decision || decision.status !== "approved") {
+        json(res, 200, { ok: true, decision, experimentPlans: readExperimentPlans(experimentPlansPath) });
+        return true;
+      }
+      const apply = applyExperimentPlan ?? ((proposal, approved) => applyApprovedExperimentToContent(safeFolder(proposal.contentRequest.id), proposal, approved));
+      const handoff = await apply(plan, decision);
+      markExperimentContentHandoff(id, handoff, experimentPlansPath);
+      json(res, 200, { ok: true, decision, handoff, experimentPlans: readExperimentPlans(experimentPlansPath) });
+    } catch (e) {
+      json(res, 409, { ok: false, error: e instanceof Error ? e.message : String(e), experimentPlans: readExperimentPlans(experimentPlansPath) });
+    }
     return true;
   }
   // Card D: the four outcome families, grouped at read time out of data/analytics.db
