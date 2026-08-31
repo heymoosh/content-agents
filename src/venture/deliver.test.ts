@@ -13,12 +13,16 @@ import { useTempVentureRoot, clearTempVentureRoot } from "./test-venture-root.js
 const SLUG = "zz-test-deliver";
 const TEST_LEDGER = join(tmpdir(), "venture-deliver-test-ledger.jsonl");
 let rules: VentureRules;
+const priorSubstackAccount = process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID;
 
 before(() => {
   process.env.CONTENT_AGENTS_TEST_LEDGER = TEST_LEDGER;
+  process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID = "human-inference/substack";
 });
 after(() => {
   delete process.env.CONTENT_AGENTS_TEST_LEDGER;
+  if (priorSubstackAccount === undefined) delete process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID;
+  else process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID = priorSubstackAccount;
   if (existsSync(TEST_LEDGER)) unlinkSync(TEST_LEDGER);
 });
 
@@ -152,6 +156,23 @@ describe("confirmManualDelivery", () => {
 });
 
 describe("deliverVenture -- app (text-post-note), the live-posting-critical path", () => {
+  test("missing provider-account binding blocks before claiming a slot or calling Substack", async () => {
+    seedApprovedPost("text-post-note");
+    delete process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID;
+    let calls = 0;
+    try {
+      await assert.rejects(
+        () => deliverVenture(SLUG, { postFn: async () => { calls++; return { ref: "must-not-exist" }; } }),
+        /delivery policy blocked.*ACCOUNT_ID.*missing/i,
+      );
+      assert.equal(calls, 0);
+      assert.equal(existsSync(TEST_LEDGER), false, "policy refusal must happen before slot-claim side effects");
+      assert.equal(readArtifact(SLUG, "p1-a")?.delivery_status, "ready");
+    } finally {
+      process.env.CONTENT_AGENTS_SUBSTACK_ACCOUNT_ID = "human-inference/substack";
+    }
+  });
+
   test("first run claims a slot, does not post", async () => {
     seedApprovedPost("text-post-note");
     const postFn = async () => {

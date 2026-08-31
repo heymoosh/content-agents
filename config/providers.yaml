@@ -8,38 +8,18 @@ analyst: routed        # Analysis + interpretation (Generate insights, the outre
 # unavailable (usage limits, not installed) — the GUI shows which engine actually answered.
 # Drafting/voice work NEVER routes here; Claude keeps everything written in Muxin's voice.
 tts: kokoro            # local + free; needs kokoro-fastapi + whisper.cpp (see docs/setup-kokoro.md). Swap to "elevenlabs" if quality disappoints.
-image: openrouter-image   # default image ADAPTER. COST-FIRST: Riverflow by default; step UP only on request, never automatically.
-# Image model + settings passed to generate(). render.ts picks a profile per job:
-#   default → Riverflow, cheap — for MOST images                →  no flag
-#   pro     → Nano Banana Pro (direct Google), step-up #1        →  render ... --pro
-#   hero    → gpt-5.4-image-2, best look, step-up #2             →  render ... --hero
-# Escalation is ALWAYS offered to Muxin first, never auto — see the /atomize skill's image policy.
-image_params: { model: sourceful/riverflow-v2-fast, modalities: ["image"] }               # Riverflow v2 fast ~$0.02/img
-image_pro:   { provider: gemini-nano-banana, model: gemini-3-pro-image-preview }          # Nano Banana Pro ~$0.13/img (direct Google)
-image_hero:  { provider: openrouter-image, model: openai/gpt-5.4-image-2 }                # best look ~$0.23/img, slow
-transcription: gemini   # DELIBERATE PAID OPT-IN (per-token, ~$0.004/MB ≈ a few cents/voice-memo — cheap in
-# absolute terms, not $0). Used by /atomize's audio-memo path (src/atomize/new-content.ts). Not swapped to
-# free-local because verbatim transcription accuracy on Muxin's real voice memos hasn't been evaluated
-# against a local model — a genuine quality tradeoff, not ours to guess (CLAUDE.md rule 6). Note: this repo
-# already runs whisper.cpp locally and free for a DIFFERENT job — TTS caption forced-alignment
-# (src/video/align.ts, see docs/setup-kokoro.md).
-# UPDATE 2026-07-10: the free-local adapter now EXISTS — src/providers/transcription/whispercpp.ts
-# reuses that same binary/model. Engineering-verified on a synthetic clip (adapter correctness,
-# interface contract, cost tracking); NOT yet bake-off'd against Gemini on a real Muxin voice memo,
-# which is the only test that actually answers the quality question. To run that eval once a real
-# memo exists (drop a file in data/inbox/, gitignored):
-#   npm run bakeoff:transcription -- data/inbox/<memo-file>
-# See docs/bakeoffs/whispercpp-vs-gemini-transcription.md. Flip this line to `transcription:
-# whispercpp` only after that real-memo comparison clears whisper.cpp's accuracy.
-text-polish: claude-cli   # VIDEO SCRIPTS ONLY (/video step 3). Claude Code on Muxin's subscription — $0 marginal, no API key (CLAUDE.md rule 6). Model = CLAUDE_POLISH_MODEL alias (default "sonnet"; "haiku" for the cheapest short-script run). Swap to "grok-openrouter" to draft on Grok instead (needs OPENROUTER_API_KEY, bills per token). Text posts stay extraction-first — see CLAUDE.md rule 1.
-prose: grok-openrouter         # BUILD 2 — FICTION ONLY, OPT-IN EXTERNAL ADAPTER (paid, per-token). NOT the
+image: none   # Intentionally attended: generate art in a Codex session, review it, then supply the file. ChatGPT subscription image generation is not a callable repo API.
+image_params: {}
+image_pro:  { provider: none }
+image_hero: { provider: none }
+transcription: whispercpp   # Local + free. GEMINI_API_KEY is no longer required.
+text-polish: claude-cli   # VIDEO SCRIPTS ONLY (/video step 3). Claude Code on Muxin's subscription — $0 marginal, no API key. Studio per-run selectors can instead dispatch Grok or Codex through their subscription CLIs.
+prose: grok-cli         # BUILD 2 — FICTION ONLY, subscription-backed Grok CLI adapter. NOT the
 # per-series default — every series scaffolded by `story:new` sets `prose: claude-native` in its own
 # series.yaml ($0, no API key, CLAUDE.md rule 6) and never reads this line. This global value only
 # fires for a series that explicitly opts into an external adapter via `prose: default` or
-# `prose: grok-openrouter` in its own series.yaml (e.g. Grok's fiction voice earning its keep).
-# Kept on OpenRouter on purpose: it lets us bake off prose across models behind one key. Once
-# the model is locked, moving to the direct xAI API (to skip OpenRouter's ~5% fee) is one new
-# file, src/providers/prose/grok-xai.ts, plus changing this line to `prose: grok-xai`.
+# `prose: grok-cli` in its own series.yaml (e.g. Grok's fiction voice earning its keep).
+# Grok must be installed and signed in locally. This path has no OPENROUTER_API_KEY dependency.
 video-broll: openrouter-video   # animated scenes: Kling first+last-frame interpolation (OpenRouter). Used by /video.
 # Quote cards (publish:cards) ship as NATIVE Typefully image posts since 2026-07-08 (uploadMedia +
 # media_ids on a scheduled draft — src/publish/typefully.ts, reused by src/publish/cards.ts). No

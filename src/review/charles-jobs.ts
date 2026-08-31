@@ -56,7 +56,7 @@ export function charlesDraftPrompt(mode: CharlesDraftMode, input: string, existi
 
 export async function enqueueCharlesDraft(mode: string, input: string, engine: Engine = "claude"): Promise<{ id: string; post: CharlesPost }> {
   if (!CHARLES_DRAFT_MODES.has(mode as CharlesDraftMode)) {
-    throw new Error(`"${mode}" isn't a mode this can draft from the GUI — try one-liner, essay, or reply`);
+    throw new Error(`"${mode}" isn't a mode this can draft from the GUI. Try one-liner, essay, or reply`);
   }
   if (mode === "reply" && !input.trim()) throw new Error("a reply needs a URL to react to");
 
@@ -74,7 +74,7 @@ export async function enqueueCharlesDraft(mode: string, input: string, engine: E
     const after = listCharlesPosts(CHARLES_DIR);
     const newId = after.map((p) => p.id).find((id) => !before.has(id));
     if (!newId) {
-      throw new Error(`${engineName(job)} ran but didn't add a new row to charles/review-queue.md — check the view-log link${logTailSuffix(job.id)}`);
+      throw new Error(`${engineName(job)} ran but didn't add a new row to charles/review-queue.md. Check the view-log link${logTailSuffix(job.id)}`);
     }
     stampCharlesEngine(newId, job.engine ?? "claude", CHARLES_DIR);
     return { id: newId, post: readCharlesPost(newId, CHARLES_DIR) };

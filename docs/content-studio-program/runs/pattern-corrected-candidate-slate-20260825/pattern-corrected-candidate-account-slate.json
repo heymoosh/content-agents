@@ -1,0 +1,82 @@
+{
+  "task_id": "pattern-corrected-candidate-account-slate",
+  "batch_id": "pattern-corrected-candidate-slate-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-corrected-candidate-account-slate",
+    "family": "codex",
+    "commit_sha": "d220c40b276d879e41983a4165ff4b7f6f2b219b",
+    "changed_paths": [
+      "docs/content-studio-program/staging/corrected-candidate-account-slate-20260825/decision-packet.json",
+      "docs/content-studio-program/staging/corrected-candidate-account-slate-20260825/decision-packet.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "TypeScript check passed at the corrected committed HEAD."
+      },
+      {
+        "command": "npm run patterns:data-status -- --data-dir data/patterns --format json",
+        "passed": true,
+        "summary": "Command exited successfully in the task worktree; the coordinator also reran it against the preserved gitignored corpus and confirmed 499/499 corpus, 292/292 analyses, 12/12 baselines, and 225/225 staged Reddit records parse-valid."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Full base-to-final leased diff has no whitespace errors."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "The packet is noncanonical and cannot authorize pattern-data writes without Muxin's candidate-slate decision."
+    ],
+    "unresolved_items": [
+      "Cross-family audit remains required before integration.",
+      "Pinterest and comparison-universe gaps remain explicit."
+    ]
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-corrected-candidate-account-slate",
+    "family": "grok",
+    "verdict": "passed",
+    "findings": [
+      "No blocking findings: full base-to-final diff contains exactly the two leased packet files.",
+      "Deterministic checks confirmed 65 unique accounts, 13 represented platforms, Pinterest missing, W=207, R=132/123, and dispositions 30/8/27/0 across JSON and Markdown.",
+      "The packet is body-free, non-ranking, noncanonical, keeps all six evidence dimensions separate, preserves unknowns and caveats, and presents a minimal human decision gate.",
+      "Residual: upstream inventory arithmetic was not re-derived from data/** because corpus data was outside the authorized audit lease."
+    ]
+  },
+  "audit_history": [
+    {
+      "type": "audit",
+      "task_id": "pattern-corrected-candidate-account-slate",
+      "family": "claude",
+      "verdict": "failed",
+      "findings": [
+        "Blocking: regenerate the Markdown R column so its 65 account rows match JSON/corpus admitted/comparator totals (132/123).",
+        "Blocking: use one source-winner definition consistently across scope, platform, and account rows; current account rows sum 232 while scope/platform state 207.",
+        "The prior cohort-count, Reddit sub-count, hold-rationale, body-free, lease, and decision-gate issues are corrected or pass."
+      ],
+      "commit_sha": "3acb35ba48611f5654974672860fa011aff7cdb2"
+    }
+  ],
+  "diff_verified": true,
+  "verified_commit": "d220c40b276d879e41983a4165ff4b7f6f2b219b",
+  "audit_routing": [
+    {
+      "from_family": "claude",
+      "to_family": "grok",
+      "reason": "The prior Claude audit produced useful corrections, but that auditor path is no longer available in the stopped session. Route the corrected final commit to Grok for the required independent cross-family audit; execution remains pending explicit authorization to transmit the bounded private task packet and two leased outputs.",
+      "recorded_at": "2026-08-26T02:52:51.489Z"
+    }
+  ],
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-corrected-candidate-account-slate",
+    "family": "grok",
+    "verdict": "passed"
+  }
+}

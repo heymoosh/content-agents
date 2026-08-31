@@ -86,6 +86,7 @@ export function setStatus(folder: string, row: QueueRow, status: string): void {
 export interface QueueCellUpdate {
   status?: string;
   notes?: string;
+  asset?: string;
 }
 
 // A blank cell is a single space ("| |"), matching how every other row in a fresh review-queue.md
@@ -115,6 +116,7 @@ export function writeCell(folder: string, id: string, updates: QueueCellUpdate):
     // either one so neither can shift the row's column boundaries.
     if (updates.status !== undefined) cells[8] = formatCell(updates.status.replace(/[|\n\r]/g, " ").trim());
     if (updates.notes !== undefined) cells[9] = formatCell(updates.notes.replace(/[|\n\r]/g, " ").trim());
+    if (updates.asset !== undefined) cells[4] = formatCell(updates.asset.replace(/[|\n\r]/g, " ").trim());
     lines[i] = cells.join("|");
     writeFileSync(path, lines.join("\n"));
     return true;
@@ -139,14 +141,22 @@ export interface NewQueueRow {
 }
 
 export function appendRow(folder: string, row: NewQueueRow): void {
+  appendRows(folder, [row]);
+}
+
+/** Append a validated batch with one queue-file write so configured variants cannot land partially. */
+export function appendRows(folder: string, rows: readonly NewQueueRow[]): void {
   const path = join(folder, "review-queue.md");
   const text = readFileSync(path, "utf8").replace(/\n*$/, "\n");
-  const cells = [
-    row.id, row.platform, row.format, row.asset,
-    "—", "—", "—", // native/brand/cta — unscored; this action doesn't run the scoring rubric
-    row.status, row.notes ?? "", row.origin ?? "",
-  ].map((c) => formatCell(String(c).replace(/[|\n\r]/g, " ").trim()));
-  writeFileSync(path, text + "|" + cells.join("|") + "|\n");
+  const lines = rows.map((row) => {
+    const cells = [
+      row.id, row.platform, row.format, row.asset,
+      "—", "—", "—", // native/brand/cta — unscored; this action doesn't run the scoring rubric
+      row.status, row.notes ?? "", row.origin ?? "",
+    ].map((c) => formatCell(String(c).replace(/[|\n\r]/g, " ").trim()));
+    return "|" + cells.join("|") + "|";
+  });
+  writeFileSync(path, text + (lines.length ? lines.join("\n") + "\n" : ""));
 }
 
 // Status of the (at most one) storyboard row in folder's review-queue.md — the render gate

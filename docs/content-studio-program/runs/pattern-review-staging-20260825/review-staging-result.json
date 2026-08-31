@@ -6,7 +6,7 @@
   "side_effects": "none",
   "artifact_sha256": "552166afa23cf7ab36379a3bea7e356fee30456da8fbb086cb72a424af4b4cca",
   "cohort_size": 65,
-  "cohort_key_sha256": "1dc0bdb96fd447365701e6bcf3cc251b8611a97f4ae701407fb0c4903641479f",
+  "cohort_fingerprint_sha256": "1dc0bdb96fd447365701e6bcf3cc251b8611a97f4ae701407fb0c4903641479f",
   "existing_evidence_record_count": 499,
   "all_rows_unreviewed": true,
   "canonical_writes_allowed": false,

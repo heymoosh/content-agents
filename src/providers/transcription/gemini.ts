@@ -19,7 +19,7 @@ export const provider: TranscriptionProvider = {
   name: "gemini",
   async transcribe({ audioPath }) {
     const key = process.env.GEMINI_API_KEY;
-    if (!key) throw new Error("GEMINI_API_KEY missing in .env (see .env.example)");
+    if (!key) throw new Error("GEMINI_API_KEY missing in the repository .env");
     const mime = MIME[extname(audioPath).toLowerCase()];
     if (!mime) throw new Error(`unsupported audio extension: ${audioPath}`);
     const sizeMb = statSync(audioPath).size / (1024 * 1024);

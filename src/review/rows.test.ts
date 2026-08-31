@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -328,4 +328,48 @@ test("addCutCommentToFolder / resolveCutCommentInFolder: round-trip, scoped per 
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
+});
+
+// voice.yaml bans the em dash from every word a person reads. Server error strings land in the
+// GUI (job row, red banner, inline error), so they count. This scans only throw/error/scheduleError
+// /reason/text assignments and the Insights empty-db explanation — not comments, not /regex/ that
+// match on-disk markdown, not generation prompts, not console startup lines, not log headings.
+test("user-facing server error-string assignments have no em dashes", () => {
+  const em = "\u2014";
+  const files = [
+    "charles-jobs.ts",
+    "develop.ts",
+    "outreach-jobs.ts",
+    "reconcile.ts",
+    "rows.ts",
+    "serve.ts",
+    "studio-scheduling.ts",
+  ] as const;
+
+  function isUserFacingErrorAssign(line: string): boolean {
+    const t = line.trimStart();
+    if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return false;
+    // On-disk markdown matchers (publish-log rows, empty asset cells) — not UI copy.
+    if (t.includes('!== "—"') || t.includes("!== '—'") || /\/[^/\n]*\u2014[^/\n]*\//.test(line)) return false;
+    if (/throw new Error\(/.test(line)) return true;
+    if (/\b(?:error|scheduleError):\s*["'`]/.test(line)) return true;
+    if (/^\s*text = "\(no log/.test(line)) return true;
+    // Multi-line reason/error string values rendered in the UI.
+    if (/^\s*"(?:scheduled via the retired|storyboard not rendered|video not rendered|image not rendered|not scheduled)/.test(line)) {
+      return true;
+    }
+    // Insights pane empty-db explanation only (template starts with data/analytics.db, not a prompt).
+    if (/^\s*[?:]?\s*`(?:\\`)?data\/analytics\.db/.test(line)) return true;
+    return false;
+  }
+
+  const offenders: string[] = [];
+  for (const file of files) {
+    const src = readFileSync(new URL(`./${file}`, import.meta.url), "utf8");
+    for (const [i, line] of src.split("\n").entries()) {
+      if (!line.includes(em)) continue;
+      if (isUserFacingErrorAssign(line)) offenders.push(`${file}:${i + 1}: ${line.trim()}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `em dash in user-facing error copy:\n${offenders.join("\n")}`);
 });

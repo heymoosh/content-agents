@@ -98,6 +98,16 @@ test("fixtures enabled: banner, panel and interceptor all render", () => {
   // Unmistakable, and not dismissable: the panel has a hide button, the banner has none.
   assert.match(html, /NOTHING ON THIS PAGE IS REAL/);
   assert.ok(!/id="fxBanner"[^>]*hidden/.test(html), "the banner is never rendered hidden");
+  // Opening state with nothing forced stays honest: real data, nothing forced, writes refused.
+  assert.match(html, /real data &middot; nothing forced &middot; every write refused/);
+});
+
+test("fixture panel markup starts collapsed: panel hidden, re-open button shown", () => {
+  const html = fixturePanelHtml();
+  assert.match(html, /id="fxPanel"\s+hidden\b/, "the panel must render with the hidden attribute");
+  assert.match(html, /id="fxPanel"[^>]*display:\s*none/, "the panel must start display:none");
+  assert.match(html, /id="fxOpen"/, "the re-open button must still render");
+  assert.ok(!/\bid="fxOpen"[^>]*\bhidden\b/.test(html), "the re-open button must not start hidden");
 });
 
 // The whole design hinges on this ordering: the interceptor has to be installed before the app's
@@ -132,7 +142,7 @@ test("serve.ts refuses every non-GET above every route while fixtures are on", (
   // Structural proof that no mutating route can be reached while the flag is set: EVERY non-GET
   // route in the handler sits below the guard, and so does the very first route of any kind.
   const writes = [...src.matchAll(/req\.method === "(?!GET)[A-Z]+"/g)].map((m) => m.index as number);
-  assert.ok(writes.length > 40, `expected the handler's write routes, found ${writes.length}`);
+  assert.ok(writes.length >= 38, `expected the handler's write routes, found ${writes.length}`);
   for (const at of writes) {
     assert.ok(guard < at, `a non-GET route at index ${at} sits above the fixture write guard`);
   }
@@ -143,15 +153,28 @@ test("serve.ts refuses every non-GET above every route while fixtures are on", (
 
 test("no fixture scenario fakes a route that writes — every override is a GET read", () => {
   const src = readFileSync(join(HERE, "serve.ts"), "utf8");
+  const routeSources = [src];
+  for (const [handler, file] of [
+    ["handleFictionRoute", "serve-fiction.ts"],
+    ["handleCharlesRoute", "serve-charles.ts"],
+    ["handleSignalsRoute", "serve-signals.ts"],
+  ] as const) {
+    if (src.includes(`await ${handler}(`)) {
+      routeSources.push(readFileSync(join(HERE, file), "utf8"));
+    }
+  }
   for (const s of FIXTURE_SCENARIOS) {
     for (const path of Object.keys(s.overrides)) {
       // Venture reads are owned by handleVentureRead rather than by a literal pathname compare, and
       // that dispatcher is GET-only by construction (asserted just below), so a /api/venture/ path
       // it answers is as provably read-only as a literal GET route here.
       const isVentureRead = path.startsWith("/api/venture/") && src.includes("handleVentureRead");
+      const isLiteralGetRead = routeSources.some((routeSrc) =>
+        routeSrc.includes(`req.method === "GET" && url.pathname === "${path}"`),
+      );
       assert.ok(
-        isVentureRead || src.includes(`req.method === "GET" && url.pathname === "${path}"`),
-        `${s.id} overrides ${path}, which is not a GET route in serve.ts`,
+        isVentureRead || isLiteralGetRead,
+        `${s.id} overrides ${path}, which is not a GET route in the server dispatcher`,
       );
     }
   }
@@ -167,10 +190,12 @@ function valueImports(src: string): string[] {
 
 test("the fixtures module is I/O-free by construction — it cannot write anything", () => {
   const src = readFileSync(join(HERE, "fixtures.ts"), "utf8");
-  // Two value imports, and the second is why this test grew a second half: fixtures.ts builds its
-  // Venture scenarios by running the REAL buildVentureThread over fixture data, so a scenario can
-  // never drift from what the room renders. That is only safe while the builder is itself I/O-free.
-  assert.deepEqual(valueImports(src), ["./venture-thread.js"], "fixtures.ts value-imports only the thread builder");
+  // The one value import is safe only while venture-thread.js remains I/O-free.
+  assert.deepEqual(
+    valueImports(src),
+    ["./venture-thread.js"],
+    "fixtures.ts value-imports only the thread builder",
+  );
   for (const banned of ["node:fs", "node:child_process", "node:http", "writeFileSync", "appendFileSync", "mkdirSync", "execSync", "spawn("]) {
     assert.ok(!src.includes(banned), `fixtures.ts must not reference ${banned}`);
   }
@@ -290,7 +315,7 @@ test("a done job's finishedAt is stamped in the browser, not baked in at render"
 });
 
 test("job-by-room fixtures use real kinds, so each one lands in the room it claims", () => {
-  const rooms: JobRoom[] = ["Content", "Outreach", "Fiction", "Signals", "Charles"];
+  const rooms: JobRoom[] = ["Content", "Outreach", "Fiction", "Signals", "Charles", "Venture"];
   for (const room of rooms) {
     const s = scenario(`job-room-${room.toLowerCase()}`);
     assert.ok(!s.disabled, `${room} should be forceable`);
@@ -303,13 +328,15 @@ test("job-by-room fixtures use real kinds, so each one lands in the room it clai
   }
 });
 
-test("the Venture job button is honestly dead until a Venture job kind exists", () => {
+test("the Venture job-by-room fixture is forceable with a real Venture kind", () => {
   const s = scenario("job-room-venture");
-  assert.equal(s.disabled, true);
-  assert.match(s.note ?? "", /no job kind maps to Venture yet/);
-  assert.deepEqual(s.overrides, {});
-  // The panel renders it disabled rather than pretending — no room is jumped to, nothing forced.
-  assert.match(fixturePanelHtml(), /data-fx="job-room-venture" disabled/);
+  assert.ok(!s.disabled, "Venture should no longer be disabled");
+  assert.equal(s.note, undefined);
+  assert.equal(s.room, "venture");
+  const j = jobsOf("job-room-venture")[0];
+  assert.equal(j.kind, "venture-analysis");
+  assert.equal(jobRoom(j.kind), "Venture");
+  assert.ok(!/data-fx="job-room-venture" disabled/.test(fixturePanelHtml()), "panel button must be enabled");
 });
 
 test("the three Fiction states cover every scene shape, and each overrides all three fiction reads", () => {
@@ -394,7 +421,7 @@ function fakeEl(id: string): FakeEl {
   return el;
 }
 
-async function bootInterceptor() {
+async function bootInterceptor(opts: { storage?: Record<string, string>; throwOnStorage?: boolean } = {}) {
   const { runInNewContext } = await import("node:vm");
   const els: Record<string, FakeEl> = {
     fxBannerState: fakeEl("fxBannerState"),
@@ -402,11 +429,22 @@ async function bootInterceptor() {
     fxPanel: fakeEl("fxPanel"),
     fxOpen: fakeEl("fxOpen"),
   };
+  const store: Record<string, string> = { ...(opts.storage ?? {}) };
   const passthrough: string[] = [];
   const roomJumps: string[] = [];
+  const localStorage = opts.throwOnStorage
+    ? {
+        getItem() { throw new Error("blocked"); },
+        setItem() { throw new Error("blocked"); },
+      }
+    : {
+        getItem(k: string) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
+        setItem(k: string, v: string) { store[k] = String(v); },
+      };
   const ctx: Record<string, unknown> = {
     URL, Response, console,
     location: { href: "http://localhost:4600/" },
+    localStorage,
     document: {
       readyState: "complete",
       getElementById: (id: string) => els[id] ?? null,
@@ -431,7 +469,7 @@ async function bootInterceptor() {
   const get = (url: string) => (ctx.window as { fetch: (u: string) => Promise<unknown> }).fetch(url);
   const post = (url: string) =>
     (ctx.window as { fetch: (u: string, i: unknown) => Promise<Response> }).fetch(url, { method: "POST" });
-  return { ctx, els, click, get, post, passthrough, roomJumps };
+  return { ctx, els, click, get, post, passthrough, roomJumps, store };
 }
 
 test("the interceptor installs, and refuses every write without letting it reach the network", async () => {
@@ -448,17 +486,47 @@ test("the interceptor installs, and refuses every write without letting it reach
 
 test("fixture panel hide and reopen explicitly toggle display state", async () => {
   const fx = await bootInterceptor();
-  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  // No stored preference → starts collapsed.
   assert.equal(fx.els.fxPanel.hidden, true);
   assert.equal(fx.els.fxPanel.style.display, "none");
   assert.equal(fx.els.fxOpen.hidden, false);
   assert.equal(fx.els.fxOpen.style.display, "block");
+  assert.equal(fx.store["review-fixture-panel-open"], "0");
 
   fx.els.fxOpen.handler?.({ target: { closest: () => ({ id: "fxOpen", dataset: {} }) } });
   assert.equal(fx.els.fxPanel.hidden, false);
   assert.equal(fx.els.fxPanel.style.display, "flex");
   assert.equal(fx.els.fxOpen.hidden, true);
   assert.equal(fx.els.fxOpen.style.display, "none");
+  assert.equal(fx.store["review-fixture-panel-open"], "1");
+
+  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, true);
+  assert.equal(fx.els.fxPanel.style.display, "none");
+  assert.equal(fx.els.fxOpen.hidden, false);
+  assert.equal(fx.els.fxOpen.style.display, "block");
+  assert.equal(fx.store["review-fixture-panel-open"], "0");
+});
+
+test("fixture panel restores the last open choice from localStorage", async () => {
+  const fx = await bootInterceptor({ storage: { "review-fixture-panel-open": "1" } });
+  assert.equal(fx.els.fxPanel.hidden, false);
+  assert.equal(fx.els.fxPanel.style.display, "flex");
+  assert.equal(fx.els.fxOpen.hidden, true);
+  assert.equal(fx.els.fxOpen.style.display, "none");
+});
+
+test("fixture panel stays usable when localStorage throws", async () => {
+  const fx = await bootInterceptor({ throwOnStorage: true });
+  assert.equal(fx.els.fxPanel.hidden, true, "defaults collapsed when storage is blocked");
+  assert.equal(fx.els.fxOpen.hidden, false);
+  // Toggle still works even though persistence cannot.
+  fx.els.fxOpen.handler?.({ target: { closest: () => ({ id: "fxOpen", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, false);
+  assert.equal(fx.els.fxOpen.hidden, true);
+  fx.els.fxPanel.handler?.({ target: { closest: () => ({ id: "fxHide", dataset: {} }) } });
+  assert.equal(fx.els.fxPanel.hidden, true);
+  assert.equal(fx.els.fxOpen.hidden, false);
 });
 
 test("with nothing forced, every read passes straight through to the real server", async () => {
@@ -525,11 +593,12 @@ test("cold start empties every room at once, and reset hands the desk back to re
   assert.equal((await fx.post("/api/status")).status, 403);
 });
 
-test("the disabled Venture button forces nothing when clicked", async () => {
+test("the Venture job-by-room button forces a Venture job and jumps to the Venture room", async () => {
   const fx = await bootInterceptor();
   fx.click("job-room-venture");
-  assert.equal(await fx.get("/api/jobs"), "REAL", "a dead button must not fake a read");
-  assert.deepEqual(fx.roomJumps, [], "and must not jump to a room that does not exist");
+  const body = (await (await fx.get("/api/jobs") as unknown as Response).json()) as { jobs: JobView[] };
+  assert.equal(body.jobs[0].kind, "venture-analysis");
+  assert.deepEqual(fx.roomJumps, ["venture"]);
 });
 
 test("the room buttons are built from whatever rooms the header actually has", async () => {
@@ -538,4 +607,250 @@ test("the room buttons are built from whatever rooms the header actually has", a
   assert.match(fx.els.fxRooms.innerHTML, /data-fxroom="fiction"/);
   // The stub nav has no Venture tab today; the panel offers exactly what exists, no more.
   assert.ok(!fx.els.fxRooms.innerHTML.includes("venture"));
+});
+
+// ── Slice 2: approval, scheduling, interruption, history ─────────────────────────────────────────
+
+const SLICE2_IDS = [
+  "approval-waiting",
+  "approval-given-not-live",
+  "scheduling-slot-claimed",
+  "scheduling-no-slot",
+  "interruption-jobs-unreadable",
+  "interruption-studio-unreadable",
+  "history-quiet",
+] as const;
+
+test("every FIXTURE_SCENARIOS id is unique", () => {
+  const ids = FIXTURE_SCENARIOS.map((s) => s.id);
+  assert.equal(ids.length, new Set(ids).size);
+});
+
+test("slice-2 scenario ids are present", () => {
+  for (const id of SLICE2_IDS) {
+    assert.ok(FIXTURE_SCENARIOS.some((s) => s.id === id), `missing scenario ${id}`);
+  }
+});
+
+test("history-quiet has only settled jobs: no queued, no running", () => {
+  const jobs = jobsOf("history-quiet");
+  assert.ok(jobs.length >= 3);
+  assert.ok(jobs.every((j) => j.status !== "queued" && j.status !== "running"));
+  assert.ok(jobs.some((j) => j.status === "done"));
+  assert.ok(jobs.some((j) => j.status === "stopped"));
+  assert.ok(jobs.some((j) => j.status === "blocked" && j.answer));
+  for (const j of jobs) {
+    assert.equal(typeof j.elapsedMs, "number");
+    assert.ok(j.finishedAt != null, `${j.id} needs finishedAt so the clock reads as history`);
+  }
+});
+
+test("approval-given-not-live rows are all approve and none published", () => {
+  const queue = scenario("approval-given-not-live").overrides["/api/queue"] as {
+    pieces: { rows: { status: string }[] }[];
+  };
+  const rows = queue.pieces.flatMap((p) => p.rows);
+  assert.ok(rows.length > 0);
+  assert.ok(rows.every((r) => r.status === "approve"));
+  assert.ok(rows.every((r) => r.status !== "published"));
+});
+
+test("every new slice-2 fixture body string carries the FIXTURE: marker", () => {
+  // Only the payload each scenario uniquely forces — not the shared FX_CONTENT_BASE wizard
+  // scaffolding underneath approval/scheduling.
+  const uniquePayload: Record<(typeof SLICE2_IDS)[number], string> = {
+    "approval-waiting": "/api/queue",
+    "approval-given-not-live": "/api/queue",
+    "scheduling-slot-claimed": "/api/queue",
+    "scheduling-no-slot": "/api/queue",
+    "interruption-jobs-unreadable": "/api/jobs",
+    "interruption-studio-unreadable": "/api/studio",
+    "history-quiet": "/api/jobs",
+  };
+  function walk(v: unknown, path: string): void {
+    if (typeof v === "string") {
+      if (v.length === 0) return;
+      if (/^(approve|revise|discard|published|blocked|locked|text|image|quote-card|x|linkedin|bluesky|url)$/.test(v)) return;
+      if (/^fx-/.test(v) || /^fixture-/.test(v)) return;
+      if (/^\d{4}-\d{2}-\d{2}/.test(v)) return;
+      if (v === "FIXTURE_NOW") return;
+      assert.match(v, /FIXTURE/, `${path} is missing the FIXTURE marker: ${JSON.stringify(v)}`);
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    if (v && typeof v === "object") {
+      for (const [k, child] of Object.entries(v as Record<string, unknown>)) {
+        if (k === "status" || k === "id" || k === "platform" || k === "format" || k === "kind"
+            || k === "time" || k === "pending" || k === "liveStateAsOf" || k === "textPlatforms"
+            || k === "slug" || k === "editable" || k === "revisable" || k === "duplicatable"
+            || k === "sourceLines" || k === "step" || k === "stepTotal" || k === "failedAtStep"
+            || k === "retryable" || k === "elapsedMs" || k === "finishedAt") continue;
+        walk(child, `${path}.${k}`);
+      }
+    }
+  }
+  for (const id of SLICE2_IDS) {
+    const key = uniquePayload[id];
+    const payload = scenario(id).overrides[key];
+    assert.ok(payload != null, `${id} must override ${key}`);
+    walk(payload, `${id}${key}`);
+  }
+});
+
+test("approval-waiting rows all need a decision and pending is non-zero", () => {
+  const queue = scenario("approval-waiting").overrides["/api/queue"] as {
+    pending: number; pieces: { rows: { status: string }[] }[];
+  };
+  assert.ok(queue.pending > 0);
+  assert.ok(queue.pieces[0].rows.every((r) => r.status === ""));
+});
+
+test("scheduling-slot-claimed rows carry scheduledWhen and not reconciled; scheduling-no-slot rows do not", () => {
+  const claimed = scenario("scheduling-slot-claimed").overrides["/api/queue"] as {
+    pieces: { rows: { scheduledWhen?: string; reconciled?: unknown; slot?: unknown; status: string }[] }[];
+  };
+  const bare = scenario("scheduling-no-slot").overrides["/api/queue"] as {
+    pieces: { rows: { scheduledWhen?: string; reconciled?: unknown; slot?: unknown; status: string }[] }[];
+  };
+  for (const row of claimed.pieces[0].rows) {
+    assert.equal(row.scheduledWhen, "FIXTURE: Tue 09:00 PT");
+    assert.equal(row.reconciled, undefined, "reconciled unset is the point of this scenario");
+    assert.equal(row.slot, undefined, "rowEl renders scheduledWhen, not slot");
+    assert.equal(row.status, "approve");
+    assert.notEqual(row.status, "published");
+  }
+  for (const row of bare.pieces[0].rows) {
+    assert.equal(row.scheduledWhen, undefined);
+    assert.equal(row.slot, undefined);
+    assert.equal(row.status, "approve");
+  }
+});
+
+test("interruption fixtures force an error body on the failing read", () => {
+  const jobs = scenario("interruption-jobs-unreadable").overrides["/api/jobs"] as { error: string };
+  const studio = scenario("interruption-studio-unreadable").overrides["/api/studio"] as { error: string };
+  assert.match(jobs.error, /^FIXTURE:/);
+  assert.match(studio.error, /^FIXTURE:/);
+});
+
+test("interruption overrides answer as a non-ok text body so the recoverable path fires", async () => {
+  // loadStudio checks !r.ok; loadJobs only catches. A 500 text body trips both.
+  const fx = await bootInterceptor();
+  fx.click("interruption-jobs-unreadable");
+  const jobsRes = await fx.get("/api/jobs") as unknown as Response;
+  assert.equal(jobsRes.ok, false);
+  assert.equal(jobsRes.status, 500);
+  await assert.rejects(() => jobsRes.json());
+
+  fx.click("interruption-studio-unreadable");
+  const studioRes = await fx.get("/api/studio") as unknown as Response;
+  assert.equal(studioRes.ok, false);
+  assert.equal(studioRes.status, 500);
+  assert.match(await studioRes.text(), /^FIXTURE:/);
+});
+
+// ── Slice 6: Outreach, Fiction continuity, Charles ───────────────────────────────────────────────
+
+const SLICE6_IDS = [
+  "outreach-triage",
+  "outreach-thread",
+  "outreach-legacy-angle",
+  "outreach-followups",
+  "fiction-continuity-conflicts",
+  "fiction-continuity-clear",
+  "charles-drafts",
+] as const;
+
+test("slice-6 scenario ids are present and every FIXTURE_SCENARIOS id stays unique", () => {
+  const ids = FIXTURE_SCENARIOS.map((s) => s.id);
+  assert.equal(ids.length, new Set(ids).size);
+  for (const id of SLICE6_IDS) {
+    assert.ok(FIXTURE_SCENARIOS.some((s) => s.id === id), `missing scenario ${id}`);
+  }
+});
+
+test("outreach-thread evidence covers link, text, and none sources, plus dated and undated capture", () => {
+  const leads = (scenario("outreach-thread").overrides["/api/outreach/leads"] as {
+    leads: { evidence: { source?: string; captured_at?: string | null }[] }[];
+  }).leads;
+  assert.equal(leads.length, 1);
+  const evidence = leads[0].evidence;
+  const kinds = new Set(
+    evidence.map((e) => {
+      const src = (e.source ?? "").trim();
+      if (/^https?:\/\//i.test(src)) return "link";
+      if (/^vault:/i.test(src)) return "text";
+      return "none";
+    }),
+  );
+  assert.ok(kinds.has("link"), "needs a real link source");
+  assert.ok(kinds.has("text"), "needs a text-only (vault) source");
+  assert.ok(kinds.has("none"), "needs a no-source-recorded item");
+  assert.ok(evidence.some((e) => /^\d{4}-\d{2}-\d{2}$/.test((e.captured_at ?? "").trim())), "needs a dated capture");
+  assert.ok(evidence.some((e) => !/^\d{4}-\d{2}-\d{2}$/.test((e.captured_at ?? "").trim())), "needs an undated capture");
+});
+
+test("outreach-followups has two rows for the same lead and different people", () => {
+  const fu = scenario("outreach-followups").overrides["/api/followups"] as {
+    buckets: { client: { lead: string; person?: string; nextAction: string; lastTouch: string | null }[] };
+  };
+  const rows = fu.buckets.client;
+  assert.ok(rows.length >= 2);
+  assert.equal(rows[0].lead, rows[1].lead);
+  assert.notEqual(rows[0].person, rows[1].person);
+  assert.ok(rows[0].person && rows[1].person);
+  assert.notEqual(rows[0].lastTouch, rows[1].lastTouch);
+  assert.notEqual(rows[0].nextAction, rows[1].nextAction);
+});
+
+test("fiction-continuity-conflicts has a fixable conflict, an unfixable conflict, and a hold", () => {
+  const scene = scenario("fiction-continuity-conflicts").overrides["/api/fiction/scene"] as {
+    continuity: {
+      conflicts: { kind: string; fixable?: boolean; span: string; replacement: string; unfixableReason?: string }[];
+      holds: { kind: string }[];
+    };
+  };
+  const { conflicts, holds } = scene.continuity;
+  assert.ok(conflicts.some((c) => c.kind === "conflict" && c.fixable && c.span && c.replacement));
+  assert.ok(conflicts.some((c) => c.kind === "conflict" && !c.fixable && c.unfixableReason));
+  assert.ok(holds.some((h) => h.kind === "hold"));
+});
+
+test("charles-drafts covers all four Charles statuses", () => {
+  const posts = (scenario("charles-drafts").overrides["/api/charles"] as {
+    posts: { status: string; notes: string }[];
+  }).posts;
+  const statuses = new Set(posts.map((p) => p.status));
+  for (const want of ["pending", "approve", "revise", "discard"]) {
+    assert.ok(statuses.has(want), `missing Charles status ${want}`);
+  }
+  const revise = posts.find((p) => p.status === "revise");
+  assert.ok(revise && /FIXTURE:/.test(revise.notes), "revise post needs real revision notes");
+});
+
+test("slice-6 fixture strings carry no @ handle and only https://fixture.invalid URLs", () => {
+  function walk(v: unknown, path: string): void {
+    if (typeof v === "string") {
+      assert.ok(!v.includes("@"), `${path} must not contain an @ handle: ${JSON.stringify(v)}`);
+      for (const m of v.matchAll(/https?:\/\/[^\s"'\\]+/gi)) {
+        assert.match(m[0], /^https:\/\/fixture\.invalid(?:\/|$)/, `${path} has a non-fixture URL: ${m[0]}`);
+      }
+      return;
+    }
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => walk(item, `${path}[${i}]`));
+      return;
+    }
+    if (v && typeof v === "object") {
+      for (const [k, child] of Object.entries(v as Record<string, unknown>)) {
+        walk(child, `${path}.${k}`);
+      }
+    }
+  }
+  for (const id of SLICE6_IDS) {
+    walk(scenario(id).overrides, id);
+  }
 });

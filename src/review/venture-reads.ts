@@ -1,4 +1,4 @@
-// The Venture room's read side: nine GETs over the Build 3 backend.
+// The Venture room's read side over the Build 3 backend.
 //
 // Every one of these wraps a function that already existed in src/venture/**. Nothing here decides
 // anything, drafts anything, or advances a phase — the room could not open at all before this,
@@ -39,10 +39,18 @@ import { loadRules } from "../venture/rules.js";
 import { computeState } from "../venture/state.js";
 import { formatStatusReadOnly } from "../venture/status.js";
 import { buildVentureThread } from "./venture-thread.js";
+import { listVentureDocuments, readVentureDocument } from "./venture-documents.js";
 
 export interface VentureReadResult {
   status: number;
   body: unknown;
+}
+
+// formatStatusReadOnly still emits " -- " where an em dash used to sit. Muxin's voice rules strip
+// an em dash to a period, comma, colon, or parentheses, never to a double hyphen. The status module
+// is outside this change's edit wall, so the screen path rewrites here before the thread ships.
+export function screenStatusText(text: string): string {
+  return text.replace(/ -- /g, ": ");
 }
 
 // The same allowlist src/review/fiction.ts:113 uses for a fiction series, deliberately rather than
@@ -86,6 +94,15 @@ export function handleVentureRead(method: string, pathname: string): VentureRead
     return { status: 404, body: { ok: false, error: `no such venture: ${slug}` } };
   }
   if (param) {
+    if (param.kind === "document") {
+      try {
+        const document = readVentureDocument(slug, param.id);
+        if (!document) return { status: 404, body: { ok: false, error: `no such venture document: ${param.id}` } };
+        return { status: 200, body: { ok: true, document } };
+      } catch (e) {
+        return { status: 400, body: { ok: false, error: e instanceof Error ? e.message : String(e) } };
+      }
+    }
     if (!SAFE_ID.test(param.id)) {
       return { status: 400, body: { ok: false, error: `bad id: ${JSON.stringify(param.id)}` } };
     }
@@ -93,7 +110,7 @@ export function handleVentureRead(method: string, pathname: string): VentureRead
     // artifact id that does not exist, an artifact with no body file). Those are refusals with the
     // owning function's own sentence, not 500s, exactly as on the write side.
     try {
-      return { status: 200, body: { ok: true, ...param.handler(slug, param.id) } };
+      return { status: 200, body: { ok: true, ...param.handler!(slug, param.id) } };
     } catch (e) {
       return { status: 400, body: { ok: false, error: e instanceof Error ? e.message : String(e) } };
     }
@@ -105,7 +122,7 @@ export function handleVentureRead(method: string, pathname: string): VentureRead
 // part of a filesystem read.
 const SAFE_ID = /^[a-z0-9][\w-]*$/;
 
-// THE ONE READ THAT TAKES A PARAMETER, and the one exception to "two reads, composed".
+// Parameterized reads open one artifact body or one canonical Venture document.
 //
 // The thread deliberately does not inline body files (venture-thread.ts: "The room links to it; it
 // does not inline a file it has not read"), and that is still right -- shipping every artifact's
@@ -114,18 +131,24 @@ const SAFE_ID = /^[a-z0-9][\w-]*$/;
 //
 // It reads and writes nothing else: readArtifactBody resolves body_path under ventureDir(slug),
 // checks containment, and answers the text plus the edit stamp.
-const VENTURE_PARAM_READS: { pattern: RegExp; path: string; handler: (slug: string, id: string) => Record<string, unknown> }[] = [
+const VENTURE_PARAM_READS: { pattern: RegExp; path: string; kind: "artifact" | "document"; handler?: (slug: string, id: string) => Record<string, unknown> }[] = [
   {
     pattern: /^artifacts\/([^/]+)\/body$/,
     path: "/api/venture/:slug/artifacts/:id/body",
+    kind: "artifact",
     handler: (slug, id) => readArtifactBody(slug, id),
+  },
+  {
+    pattern: /^documents\/([^/]+)$/,
+    path: "/api/venture/:slug/documents/:id",
+    kind: "document",
   },
 ];
 
-function matchParamRead(rest: string): { id: string; handler: (slug: string, id: string) => Record<string, unknown> } | null {
+function matchParamRead(rest: string): { id: string; kind: "artifact" | "document"; handler?: (slug: string, id: string) => Record<string, unknown> } | null {
   for (const r of VENTURE_PARAM_READS) {
     const m = r.pattern.exec(rest);
-    if (m) return { id: m[1], handler: r.handler };
+    if (m) return { id: m[1], kind: r.kind, handler: r.handler };
   }
   return null;
 }
@@ -148,6 +171,7 @@ function matchParamRead(rest: string): { id: string; handler: (slug: string, id:
 // answers in the quotes panel, the gate counts in the gate panel, the clusters panel absent
 // entirely when the analysis is null.
 const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> = {
+  documents: (slug) => ({ documents: listVentureDocuments(slug) }),
   // The whole room in one read: the derived thread (src/review/venture-thread.ts) over every read
   // below it. A tenth route rather than the client assembling it from the other nine, because the
   // builder is several hundred lines of honesty-critical derivation and page.ts's Rule 5 mirror
@@ -158,7 +182,7 @@ const VENTURE_READS: Record<string, (slug: string) => Record<string, unknown>> =
     return { thread: buildVentureThread({
       slug,
       state: computeState(slug),
-      statusText: formatStatusReadOnly(slug),
+      statusText: screenStatusText(formatStatusReadOnly(slug)),
       artifacts: readArtifacts(slug),
       decisions: readDecisions(slug),
       canon: readCanonEvents(slug),

@@ -25,6 +25,7 @@ import {
   loadPlatformMax,
   rowDraftTitle,
 } from "./typefully.js";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 
 // Schedule approved `quote-card` (image) rows from a content folder's review queue to
 // X/LinkedIn/Bluesky, NATIVELY through Typefully (2026-07-08 rewire — src/publish/typefully.ts's
@@ -147,6 +148,7 @@ export interface ScheduledCard {
   id: string;
   platform: string; // destination platform (x | linkedin | bluesky)
   when: string; // human PT label (matches publishText/publishShorts, not a raw ISO string)
+  plannedFor?: string; // exact provider/ledger timestamp when observed in this run
   ref: string; // "typefully draft <id>"
 }
 
@@ -155,7 +157,7 @@ export interface ScheduledCard {
 // opts it behaves exactly as the CLI did — every approved card in the folder — so /publish is unchanged.
 export async function publishCards(
   folder: string,
-  opts: { onlyIds?: string[]; atOverride?: string; forceReuse?: boolean } = {}
+  opts: { onlyIds?: string[]; atOverride?: string; forceReuse?: boolean; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledCard[]> {
   let cards = approvedCards(folder);
   if (opts.onlyIds) cards = cards.filter((r) => opts.onlyIds!.includes(r.id));
@@ -163,6 +165,7 @@ export async function publishCards(
     console.log("no approved quote-card rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
 
   // Reuse guard: per TARGET platform (like publishText's checkReuse(slug, r.platform)), not a
   // shared "quote-card" bucket — bets.md Placed rows are keyed by the row's real destination
@@ -254,9 +257,7 @@ export async function publishCards(
 
       const { text: caption, fm } = cardCopy(folder, row.id);
       const { ctas, usedFallback } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
-      if (usedFallback) {
-        console.log(`  ↳ note: ${row.id} cta → homepage (no canonical_url in source.md)`);
-      }
+      if (usedFallback) console.log(`  ↳ note: ${row.id} used the configured CTA fallback`);
       const placement = cfg.placement[target] ?? "inline";
       const { posts, manualComment } = buildPosts(caption, ctas, placement, maxMap[target] ?? Infinity);
 
@@ -282,7 +283,7 @@ export async function publishCards(
         `scheduled: ${row.id} (${target}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
           (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
       );
-      results.push({ id: row.id, platform: target, when, ref: `typefully draft ${draft.id ?? "?"}` });
+      results.push({ id: row.id, platform: target, when, plannedFor: scheduledFor, ref: `typefully draft ${draft.id ?? "?"}` });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`  ✗ ${row.id}: ${msg}`);
@@ -314,7 +315,9 @@ async function main() {
     process.exit(1);
   }
   const folder = isAbsolute(folderArg) ? folderArg : join(repoRoot, folderArg);
-  await publishCards(folder, { atOverride, forceReuse });
+  if (atOverride || forceReuse) throw new Error("legacy scheduling overrides are unavailable on the unified capability-selected publish path");
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "card");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (e.g. in tests) without

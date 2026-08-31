@@ -2,6 +2,7 @@ import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
@@ -103,7 +104,7 @@ export const isShortRow = (platform: string, format: string): boolean =>
 // as the CLI did — every approved video row in the folder — so /publish is unchanged.
 export async function publishShorts(
   folder: string,
-  opts: { onlyIds?: string[] } = {}
+  opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledShort[]> {
   const { rows } = readQueue(folder);
   // The same render also feeds TikTok via a separate `tiktok` row (src/publish/tiktok.ts);
@@ -114,6 +115,7 @@ export async function publishShorts(
     console.log("no approved video rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "youtube", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to YouTube too recently.
   const slug = basename(folder);
@@ -163,7 +165,7 @@ export async function publishShorts(
     appendPublishLog(folder, `${row.id} → youtube ${url} (${when})`);
     appendBetPlacement(folder, row.id, "youtube", publishAt ? `${url} @ ${labels[i]}` : url, fm, title);
     console.log(publishAt ? `scheduled: ${url} → goes public ${labels[i]}` : `uploaded: ${url}`);
-    results.push({ id: row.id, platform: "youtube", when, ref: url, autoPublishes: !!publishAt });
+    results.push({ id: row.id, platform: "youtube", when, ...(publishAt ? { plannedFor: publishAt } : {}), ref: url, autoPublishes: !!publishAt });
   }
   return results;
 }
@@ -175,7 +177,8 @@ async function main() {
     process.exit(1);
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
-  await publishShorts(folder);
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "video");
 }
 
 // Read-only: list the channel's currently-scheduled Shorts (status.publishAt in the future) for the

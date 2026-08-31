@@ -15,18 +15,18 @@ file, don't restart from scratch.
   cron, that posts to public platforms (YouTube, TikTok, Bluesky, Typefully)
   under her own accounts. No third-party PII or accounts are handled, so it
   doesn't meet the Class B/C bar despite holding real credentials
-  (`.env.example` lists API keys and OAuth secrets for YouTube, ElevenLabs,
+  (the gitignored repository `.env` holds API keys and OAuth secrets for YouTube, ElevenLabs,
   OpenRouter, Typefully, PostPeer, plus a Bluesky app password). Flagging
   that distinction here rather than bumping the class: the rubric's axis is
   external-user/data exposure, not credential sensitivity in general — but
   the scanners below apply regardless of class per invariant 2.
 - **Maturity stage:** `docs/maturity.md` says Stage 0 explicitly (not
-  inferred). CI (`ci.yml`: typecheck + test) already exists, ahead of the
-  Stage 0 "deliberately absent" guidance — not this audit's call to change.
+  inferred). CI (`ci.yml`: typecheck + test) is manual-only for deliberate
+  diagnostics; routine verification runs locally through `npm run check`.
 - **Ecosystems:** npm/Node only.
 - **Change velocity:** active — 315 commits in the last 30 days.
-- **Already in place:** required status check `check` on `main`
-  (typecheck + test).
+- **Already in place:** branch protection on `main` with no required hosted
+  status contexts; the local merge gate is `npm run check`.
 
 ## Gaps found and what this PR does
 
@@ -48,6 +48,15 @@ it holds nothing else secret-shaped (just this login URL plus one public analyti
 Narrower than a rule-wide or repo-wide exemption, but broader than a single-fingerprint match;
 documented in a `.gitleaks.toml` comment. Nothing was rotated or treated as a real leak because
 it isn't one.
+
+The 2026-08-30 local-first policy pass exposed two more historical
+`generic-api-key` false positives after the hosted job was prevented from
+starting by GitHub billing. Both flagged values are explicitly named SHA-256
+cohort fingerprints in retained JSON review artifacts. The current files and
+the exact flagged historical blobs (`15b76c6` and `d091f62`) were read in full.
+Two exact-file path allowlists now cover those immutable review artifacts;
+the generic API-key rule remains active everywhere else. A full-history local
+scan with the same gitleaks 8.30.1 configuration passes after the change.
 
 Baseline `npm audit --audit-level=high` run on 2026-07-20 found **9
 advisories (6 high)** — `ws` (via `@remotion/renderer`/`@remotion/studio`)
@@ -92,7 +101,9 @@ Not filed (on-demand / no repo-specific gap found):
 
 ## Skipped (already covered)
 
-- Required-status-check gating: `check` already required on `main`.
+- Required-status-check gating: no hosted context is required on `main`, which
+  matches the local-first policy. The manually dispatched `check` workflow is
+  diagnostic and is not a merge gate.
 - Idea generation from epics (propose-cards) and idea scout (monthly cadence
   for Class A): both already running — `docs/.idea-scout-stamp` and two
   `ORIGIN: idea-scout 2026-07-14` cards already on the board.

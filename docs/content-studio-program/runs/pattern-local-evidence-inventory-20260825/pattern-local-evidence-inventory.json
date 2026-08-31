@@ -7,8 +7,11 @@
     "family": "codex",
     "commit_sha": "76641280ffae77764a292fea75a093b1813b6bc9",
     "changed_paths": [
+      "docs/content-studio-program/runs/pattern-local-evidence-inventory-20260825/pattern-local-evidence-inventory.json",
       "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.json",
-      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md"
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md",
+      "docs/content-studio-program/tasks/pattern-local-evidence-inventory.md",
+      "docs/content-studio-program/work.yaml"
     ],
     "acceptance_commands": [
       {
@@ -28,8 +31,8 @@
       },
       {
         "command": "git diff --check",
-        "passed": true,
-        "summary": "No whitespace errors."
+        "passed": false,
+        "summary": "Recovery verification found a new blank line at EOF in docs/content-studio-program/tasks/pattern-local-evidence-inventory.md."
       }
     ],
     "behavior_impact": "none",
@@ -38,7 +41,7 @@
       "The corpus is a targeted evidence sample, not a top-creator census or universal viral ranking."
     ],
     "unresolved_items": [
-      "Claude cross-family audit is pending because the local Claude CLI reports that it is not logged in."
+      "The full source commit violated its staging-only lease and failed git diff --check; it is superseded by pattern-local-evidence-inventory-clean-commit."
     ]
   }
 }

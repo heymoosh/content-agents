@@ -81,12 +81,41 @@ export const workManifestSchema = z.object({
   version: z.literal(1),
   program: z.literal("content-studio"),
   coordinator: z.string().min(1),
+  coordinator_branch: z.string().min(1).default("agent/content-studio-program"),
+  state_revision: z.number().int().nonnegative().default(0),
   authoritative_documents: z.array(pathSchema).min(1),
   tasks: z.array(taskSchema),
 }).strict();
 
 export type StudioTask = z.infer<typeof taskSchema>;
 export type WorkManifest = z.infer<typeof workManifestSchema>;
+
+export function advanceStateRevision(manifest: WorkManifest, expectedRevision: number): WorkManifest {
+  const normalized = validateWorkManifest(manifest);
+  if (normalized.state_revision !== expectedRevision) {
+    throw new Error(
+      `coordinator state revision changed: expected ${expectedRevision}, found ${normalized.state_revision}`,
+    );
+  }
+  return validateWorkManifest({ ...normalized, state_revision: expectedRevision + 1 });
+}
+
+export function commitCoordinatorMutation(input: {
+  expectedRevision: number;
+  currentRevision: number;
+  writeRun: () => unknown;
+  writeManifest: () => unknown;
+}): void {
+  if (input.currentRevision !== input.expectedRevision) {
+    throw new Error(
+      `coordinator state revision changed: expected ${input.expectedRevision}, found ${input.currentRevision}`,
+    );
+  }
+  // Prospective run evidence remains replayable with the old manifest state.
+  // Reversing this order can leave a task state that claims missing evidence.
+  input.writeRun();
+  input.writeManifest();
+}
 
 function normalizeTask(task: StudioTask): StudioTask {
   return {
@@ -283,6 +312,7 @@ export const auditReportSchema = z.object({
   verdict: z.enum(["passed", "failed"]),
   findings: z.array(z.string()),
 }).strict();
+const auditHistoryEntrySchema = auditReportSchema.extend({ commit_sha: shaSchema }).strict();
 export const integrationReportSchema = z.object({
   type: z.literal("integration"),
   task_id: z.string().min(1),
@@ -293,6 +323,7 @@ export const taskReportSchema = z.discriminatedUnion("type", [builderReportSchem
 export type TaskReport = z.infer<typeof taskReportSchema>;
 export type BuilderReport = z.infer<typeof builderReportSchema>;
 export type AuditReport = z.infer<typeof auditReportSchema>;
+export type AuditHistoryEntry = z.infer<typeof auditHistoryEntrySchema>;
 export type IntegrationReport = z.infer<typeof integrationReportSchema>;
 
 export interface RunRecord {
@@ -300,10 +331,20 @@ export interface RunRecord {
   batch_id?: string;
   builder?: BuilderReport;
   audit?: AuditReport;
+  audit_history?: AuditHistoryEntry[];
   integration?: IntegrationReport;
   diff_verified?: boolean;
   verified_commit?: string;
+  audit_routing?: AuditRoutingEvent[];
 }
+
+const auditRoutingEventSchema = z.object({
+  from_family: modelFamilySchema,
+  to_family: modelFamilySchema,
+  reason: z.string().min(1),
+  recorded_at: z.string().datetime(),
+}).strict();
+export type AuditRoutingEvent = z.infer<typeof auditRoutingEventSchema>;
 
 function normalizeReport(report: TaskReport): TaskReport {
   return { ...report, family: normalizeModelFamily(report.family) } as TaskReport;
@@ -314,7 +355,16 @@ function normalizeRunRecord(run: RunRecord): RunRecord {
     ...run,
     builder: run.builder ? normalizeReport(run.builder) as BuilderReport : undefined,
     audit: run.audit ? normalizeReport(run.audit) as AuditReport : undefined,
+    audit_history: run.audit_history?.map((entry) => ({
+      ...normalizeReport(entry) as AuditReport,
+      commit_sha: entry.commit_sha,
+    })),
     integration: run.integration ? normalizeReport(run.integration) as IntegrationReport : undefined,
+    audit_routing: run.audit_routing?.map((event) => ({
+      ...event,
+      from_family: normalizeModelFamily(event.from_family),
+      to_family: normalizeModelFamily(event.to_family),
+    })),
   };
 }
 
@@ -323,9 +373,11 @@ export const runRecordSchema = z.object({
   batch_id: z.string().min(1),
   builder: builderReportSchema.optional(),
   audit: auditReportSchema.optional(),
+  audit_history: z.array(auditHistoryEntrySchema).optional(),
   integration: integrationReportSchema.optional(),
   diff_verified: z.boolean().optional(),
   verified_commit: shaSchema.optional(),
+  audit_routing: z.array(auditRoutingEventSchema).optional(),
 }).strict();
 
 export function parseRunRecord(input: unknown): RunRecord {
@@ -347,6 +399,66 @@ function passingAcceptance(task: StudioTask, builder: BuilderReport | undefined)
     if (!result) throw new Error(`acceptance command was not reported: ${command}`);
     if (!result.passed) throw new Error(`acceptance command failed: ${command}`);
   }
+}
+
+export function rerouteAuditor(
+  manifest: WorkManifest,
+  taskId: string,
+  nextFamilyLabel: string,
+  reason: string,
+  recordedAt: string,
+  existing: RunRecord | null,
+): { manifest: WorkManifest; run: RunRecord } {
+  const normalizedManifest = validateWorkManifest(manifest);
+  const task = normalizedManifest.tasks.find((candidate) => candidate.id === taskId);
+  if (!task) throw new Error(`unknown task: ${taskId}`);
+  if (["accepted", "integrated"].includes(task.status)) {
+    throw new Error(`task ${task.id} cannot reroute its auditor from status ${task.status}`);
+  }
+  if (existing?.audit) {
+    throw new Error(`task ${task.id} cannot reroute after a completed audit; record a corrected builder report first`);
+  }
+  const nextFamily = normalizeModelFamily(nextFamilyLabel);
+  if (nextFamily === task.builder_family) {
+    throw new Error(`task ${task.id} auditor must use a different model family than its builder`);
+  }
+  if (nextFamily === task.auditor_family) {
+    throw new Error(`task ${task.id} auditor is already assigned to ${nextFamily}`);
+  }
+  if (!reason.trim()) throw new Error("auditor reroute requires a reason");
+  const priorRouting = existing?.audit_routing?.at(-1);
+  if (priorRouting?.from_family === task.auditor_family && priorRouting.to_family === nextFamily) {
+    return {
+      manifest: validateWorkManifest({
+        ...normalizedManifest,
+        tasks: normalizedManifest.tasks.map((candidate) => candidate.id === task.id
+          ? { ...candidate, auditor_family: nextFamily }
+          : candidate),
+      }),
+      run: normalizeRunRecord({ task_id: task.id, batch_id: task.batch_id, ...existing }),
+    };
+  }
+  const event = auditRoutingEventSchema.parse({
+    from_family: task.auditor_family,
+    to_family: nextFamily,
+    reason: reason.trim(),
+    recorded_at: recordedAt,
+  });
+  const run: RunRecord = normalizeRunRecord({
+    task_id: task.id,
+    batch_id: task.batch_id,
+    ...(existing ?? {}),
+    audit_routing: [...(existing?.audit_routing ?? []), event],
+  });
+  return {
+    manifest: validateWorkManifest({
+      ...normalizedManifest,
+      tasks: normalizedManifest.tasks.map((candidate) => candidate.id === task.id
+        ? { ...candidate, auditor_family: nextFamily }
+        : candidate),
+    }),
+    run,
+  };
 }
 
 export function applyTaskReport(
@@ -373,7 +485,21 @@ export function applyTaskReport(
       throw new Error(`builder report family ${report.family} does not own task ${task.id}`);
     }
     verifyChangedPaths(task, report.changed_paths);
-    run = { ...run, builder: report, audit: undefined, integration: undefined, diff_verified: false, verified_commit: undefined };
+    if (run.audit && !run.builder) {
+      throw new Error(`task ${task.id} cannot archive an audit without its audited builder report`);
+    }
+    const completedAudit = run.audit && run.builder
+      ? [{ ...run.audit, commit_sha: run.builder.commit_sha }]
+      : [];
+    run = {
+      ...run,
+      builder: report,
+      audit: undefined,
+      audit_history: [...(run.audit_history ?? []), ...completedAudit],
+      integration: undefined,
+      diff_verified: false,
+      verified_commit: undefined,
+    };
     updated = { ...task, status: "auditing", commit_sha: report.commit_sha, audit_verdict: "pending" };
   } else if (report.type === "audit") {
     if (task.status !== "auditing") throw new Error(`audit report is not allowed from status ${task.status}`);

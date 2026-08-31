@@ -1,0 +1,61 @@
+{
+  "task_id": "pattern-local-evidence-inventory-clean-commit",
+  "batch_id": "pattern-local-evidence-inventory-recovery-20260825",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-local-evidence-inventory-clean-commit",
+    "family": "codex",
+    "commit_sha": "4b7644f4b0f4ca71014be4fcd0fe579fcf119fab",
+    "changed_paths": [
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.json",
+      "docs/content-studio-program/staging/local-evidence-inventory-20260825/inventory.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "TypeScript check passed in the isolated builder worktree and again against the preserved primary corpus checkout."
+      },
+      {
+        "command": "npm run patterns:data-status -- --data-dir data/patterns --format json",
+        "passed": true,
+        "summary": "The preserved corpus checkout reports 499 valid corpus records, 292 valid analyses, and 12 valid baselines with no invalid artifacts."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Exact corrected commit range has no whitespace errors."
+      },
+      {
+        "command": "git diff --exit-code 76641280ffae77764a292fea75a093b1813b6bc9 -- docs/content-studio-program/staging/local-evidence-inventory-20260825",
+        "passed": true,
+        "summary": "Both staging outputs are byte-identical to the original inventory output commit."
+      }
+    ],
+    "behavior_impact": "none",
+    "logic_impact": "none",
+    "risks": [
+      "The local corpus remains an unreviewed targeted sample rather than a platform-wide ranking universe."
+    ],
+    "unresolved_items": []
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-local-evidence-inventory-clean-commit",
+    "family": "claude",
+    "verdict": "passed",
+    "findings": [
+      "Low, upstream non-blocking: the blocked source-task run record understates commit 76641280ffae77764a292fea75a093b1813b6bc9 as two changed paths; the coordinator will annotate its actual five-path diff separately.",
+      "Low, process non-blocking: the isolated builder worktree lacks the ignored local corpus, so data-status availability was independently confirmed against the preserved primary corpus checkout.",
+      "Informational: the accepted correction commit changes exactly the two leased staging files, preserves both source blobs byte-for-byte, and contains no body, account ranking, canonical write, or universal-score change."
+    ]
+  },
+  "diff_verified": true,
+  "verified_commit": "4b7644f4b0f4ca71014be4fcd0fe579fcf119fab",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-local-evidence-inventory-clean-commit",
+    "family": "claude",
+    "verdict": "passed"
+  }
+}

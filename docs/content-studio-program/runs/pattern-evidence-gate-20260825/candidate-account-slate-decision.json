@@ -11,7 +11,7 @@
   "account_count": 371,
   "evidence_record_count": 499,
   "candidate_account_count": 65,
-  "candidate_key_sha256": "1dc0bdb96fd447365701e6bcf3cc251b8611a97f4ae701407fb0c4903641479f",
+  "candidate_fingerprint_sha256": "1dc0bdb96fd447365701e6bcf3cc251b8611a97f4ae701407fb0c4903641479f",
   "reviewed_account_count": 0,
   "unmapped_account_count": 371,
   "comparison_ready_account_count": 0,

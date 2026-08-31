@@ -644,6 +644,11 @@ CARD TYPE: EPIC
 - GOAL_CONDITION: `npm run review` shows a pattern-library surface listing the collected corpus with its outlier flags and the current synthesized patterns, reading straight from `data/patterns/` with no new copy of that data committed to git.
 <!-- card-id: 92d4d11b-a112-40d4-b1d5-5ac7d611e7bf -->
 
+**Content Studio master status (index)**
+- INDEX ONLY: Latest decisions, implementation state, verification level, and remaining scope: `docs/content-studio-master-status.md`. Update the master with each capability-changing merge.
+- STATUS: Backlog
+<!-- card-id: 6a655144-e0ca-41f8-8c55-548136e17b92 -->
+
 **POSSE essay routing — point the essay CTA fallback at humaninference.ai**
 - ORIGIN: Muxin, 2026-08-18 — confirmed POSSE strategy (publish essays on her own site first,
   syndicate to platforms, drive traffic back so the audience is owned, not rented). Landing page

@@ -43,4 +43,3 @@ candidate-slate decision is renewed.
 - It identifies both usable strengths and evidence limitations, including missing platforms and
   content-completeness gaps.
 - It contains no creator content or creator-specific account ranking.
-

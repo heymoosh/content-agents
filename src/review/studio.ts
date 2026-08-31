@@ -10,9 +10,14 @@ import { listPieces } from "./rows.js";
 import { listLeads } from "../outreach/status.js";
 import { buildFollowups, summarizeFollowups } from "../outreach/tracker.js";
 import { jobs, publicJob } from "./jobs.js";
+import { listCharlesPosts } from "./charles.js";
+import { listVentures } from "../venture/paths.js";
+import { readDecisions } from "../venture/decisions.js";
+import { readArtifacts } from "../venture/artifacts.js";
+import { ledgerPath } from "../publish/slots.js";
 
 export interface NeedsYouItem {
-  room: "content" | "outreach" | "followups" | "signals";
+  room: "content" | "outreach" | "followups" | "signals" | "charles" | "venture";
   label: string; // 82px-mono room label in the design ("Outreach", "Content", ...)
   text: string; // the sentence, written to Muxin
   detail: string; // gray tail
@@ -41,7 +46,7 @@ export interface StudioHome {
 
 // Future claims in the publish slot ledger — "Publisher: holding N approved posts for slots".
 export function countFutureSlotClaims(nowIso: string = new Date().toISOString(), path?: string): number {
-  const ledger = path ?? join(repoRoot, "data", "publish-schedule.jsonl");
+  const ledger = path ?? ledgerPath();
   if (!existsSync(ledger)) return 0;
   let count = 0;
   for (const line of readFileSync(ledger, "utf8").split("\n").filter(Boolean)) {
@@ -74,6 +79,31 @@ export function lastScoutRun(path?: string): string | null {
 const UNDECIDED_LEAD_STATUSES = new Set(["intake", "researched", "qualified"]);
 
 // Friendly team-member name per job kind — the design's cast (Formatter, Scout, Publisher, ...).
+/**
+ * Wrap a title in quotes exactly once. A Substack note's own title usually arrives already
+ * quoted, and wrapping it again rendered `From """Why do we fear AI…"""` on the Studio queue.
+ */
+export function quoteOnce(title: string): string {
+  const bare = title.trim().replace(/^["“”']+/, "").replace(/["“”']+$/, "");
+  return `"${bare}"`;
+}
+
+/**
+ * Cut on a word boundary with a single ellipsis. Keeps approx `max` characters of the source.
+ *
+ * It also repairs " -- " on the way through. Scout and matchmaker prose arrives with an em dash
+ * already flattened to a double hyphen, and Muxin's voice rules strip an em dash to real
+ * punctuation, never to that. This is system-written description, not her own words, so a colon is
+ * safe here. Anything she wrote goes to the screen untouched.
+ */
+export function clipOnWord(text: string, max: number): string {
+  const t = (text || "").replace(/ +-- +/g, ": ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max).replace(/[\s,;:]+\S*$/, "").replace(/\s+$/, "");
+  return (cut || t.slice(0, max).trimEnd()) + "…";
+}
+
 function teamNameFor(kind: string): string {
   if (kind === "develop" || kind === "develop-reply") return "Director";
   if (kind === "scout") return "Scout";
@@ -82,6 +112,80 @@ function teamNameFor(kind: string): string {
   if (kind === "video") return "Illustrator";
   if (kind === "draft-follow-up") return "Ghostwriter";
   return "Formatter"; // url/file/text/notes/continue/revise/duplicate — the production crew
+}
+
+/** Charles drafts whose queue status is exactly `pending` (missing/empty status is not pending). */
+export function charlesNeedsYou(root?: string): NeedsYouItem[] {
+  try {
+    const pending = listCharlesPosts(root).filter((p) => p.status === "pending");
+    if (!pending.length) return [];
+    const n = pending.length;
+    return [{
+      room: "charles",
+      label: "Charles",
+      urgent: false,
+      text: n === 1
+        ? "A Charles draft is waiting on your yes."
+        : `${n} Charles drafts are waiting on your yes.`,
+      detail: n === 1
+        ? `${pending[0].type} · ${pending[0].id}`
+        : "Pending in his review queue.",
+      action: "Review",
+    }];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Venture decisions awaiting a selection, and artifacts still in editorial draft.
+ * Read-only: never writes a gate, checkpoint, or decision. Failure-tolerant per venture.
+ */
+export function ventureNeedsYou(): NeedsYouItem[] {
+  try {
+    let decisions = 0;
+    let drafts = 0;
+    for (const slug of listVentures()) {
+      try {
+        decisions += readDecisions(slug).filter((d) => d.status === "awaiting_user").length;
+      } catch {
+        /* skip unreadable decisions for this slug */
+      }
+      try {
+        drafts += readArtifacts(slug).filter((a) => a.editorial_status === "draft").length;
+      } catch {
+        /* skip unreadable artifacts for this slug */
+      }
+    }
+    if (!decisions && !drafts) return [];
+
+    let text: string;
+    let detail: string;
+    if (decisions && drafts) {
+      text = "Venture work is waiting on your decision.";
+      detail = `${decisions} decision${decisions === 1 ? "" : "s"} · ${drafts} draft${drafts === 1 ? "" : "s"}.`;
+    } else if (decisions) {
+      text = decisions === 1
+        ? "A Venture decision is waiting on your pick."
+        : `${decisions} Venture decisions are waiting on your pick.`;
+      detail = "Awaiting your selection.";
+    } else {
+      text = drafts === 1
+        ? "A Venture draft is waiting on your yes."
+        : `${drafts} Venture drafts are waiting on your yes.`;
+      detail = "Editorial approval still open.";
+    }
+    return [{
+      room: "venture",
+      label: "Venture",
+      urgent: false,
+      text,
+      detail,
+      action: "Open",
+    }];
+  } catch {
+    return [];
+  }
 }
 
 export async function buildStudioHome(nowIso: string = new Date().toISOString()): Promise<StudioHome> {
@@ -100,7 +204,7 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
       needsYou.push({
         room: "followups", label: "Outreach", urgent: true,
         text: `Follow up with ${row.who}.`,
-        detail: `${row.status === "overdue" ? "Worth a call on moving on. " : "Due now. "}${row.why.slice(0, 90)}`,
+        detail: `${row.status === "overdue" ? "Worth a call on moving on. " : "Due now. "}${clipOnWord(row.why, 90)}`,
         action: "Open", dir: row.dir,
       });
     }
@@ -110,7 +214,7 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
     needsYou.push({
       room: "content", label: "Content", urgent: false,
       text: `${piece.pending} draft${piece.pending === 1 ? "" : "s"} ready for your yes or no.`,
-      detail: `From "${piece.title}".`,
+      detail: `From ${quoteOnce(piece.title)}.`,
       action: "Review",
     });
   }
@@ -118,10 +222,12 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
     needsYou.push({
       room: "outreach", label: "Outreach", urgent: false,
       text: `${lead.name} dossier, worth a minute.`,
-      detail: lead.pitchAngle ? lead.pitchAngle.slice(0, 110) : "Researched and waiting on your pursue-or-pass.",
+      detail: lead.pitchAngle ? clipOnWord(lead.pitchAngle, 110) : "Researched and waiting on your pursue-or-pass.",
       action: "Read", dir: lead.dir,
     });
   }
+  needsYou.push(...charlesNeedsYou());
+  needsYou.push(...ventureNeedsYou());
   // Urgent first, then content, then dossiers — the design's "ranked by my day".
   needsYou.sort((a, b) => Number(b.urgent) - Number(a.urgent));
 
@@ -129,9 +235,14 @@ export async function buildStudioHome(nowIso: string = new Date().toISOString())
   const running = jobs.find((j) => j.status === "running");
   if (running) {
     const pub = publicJob(running);
-    const mins = pub.elapsedMs != null ? Math.floor(pub.elapsedMs / 60000) : 0;
-    const secs = pub.elapsedMs != null ? Math.floor((pub.elapsedMs % 60000) / 1000) : 0;
-    team.push({ name: teamNameFor(pub.kind), state: "working", line: `${pub.label} · ${mins}m ${String(secs).padStart(2, "0")}s` });
+    // Null elapsedMs means no measurement yet. Printing 0m 00s would invent a clock reading.
+    // formatElapsed / jobElapsedText in studio-job-ui.ts exist, but formatElapsed drops the
+    // always-Xm-YYs pad this rail uses, and jobElapsedText's null text is "not started", which
+    // is wrong for a job that is already running.
+    const line = pub.elapsedMs != null
+      ? `${pub.label} · ${Math.floor(pub.elapsedMs / 60000)}m ${String(Math.floor((pub.elapsedMs % 60000) / 1000)).padStart(2, "0")}s`
+      : `${pub.label} · started, time not measured yet`;
+    team.push({ name: teamNameFor(pub.kind), state: "working", line });
   }
   const queued = jobs.filter((j) => j.status === "queued").length;
   if (queued) team.push({ name: "Queue", state: "recent", line: `${queued} job${queued === 1 ? "" : "s"} waiting their turn` });

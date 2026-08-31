@@ -16,7 +16,7 @@ export const provider: ImageProvider = {
   name: "openrouter-image",
   async generate({ prompt, aspect, outPath, params }) {
     const key = process.env.OPENROUTER_API_KEY;
-    if (!key) throw new Error("OPENROUTER_API_KEY missing in .env (see .env.example)");
+    if (!key) throw new Error("OPENROUTER_API_KEY missing in the repository .env");
     const model = params?.model as string | undefined;
     if (!model) {
       throw new Error(

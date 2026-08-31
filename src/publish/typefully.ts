@@ -17,6 +17,7 @@ import {
 import { claimSlots, fmtLa, cadenceSourceFor } from "./slots.js";
 import { checkReuse } from "./reuse-guard.js";
 import { fetchWithRetry, type FetchRetryOptions } from "../util/fetch-retry.js";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 
 // Push approved text posts (x / linkedin / bluesky) from a content folder's review queue to
 // Typefully as SCHEDULED DRAFTS — never instant publish. Each post gets an EXPLICIT publish time
@@ -312,6 +313,7 @@ export interface ScheduledRow {
   id: string;
   platform: string;
   when: string; // human PT label, or "unscheduled"
+  plannedFor: string | null; // exact provider/ledger timestamp; null for an unscheduled draft
   draftId: string;
   manualComment: string | null;
 }
@@ -322,7 +324,7 @@ export interface ScheduledRow {
 // are unchanged.
 export async function publishText(
   folder: string,
-  opts: { onlyIds?: string[]; noSchedule?: boolean; forceReuse?: boolean } = {}
+  opts: { onlyIds?: string[]; noSchedule?: boolean; forceReuse?: boolean; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledRow[]> {
   const { rows } = readQueue(folder);
   let approved = rows.filter((r) => r.status === "approve" && TEXT_PLATFORMS.has(r.platform));
@@ -331,6 +333,7 @@ export async function publishText(
     console.log("no approved x/linkedin/bluesky rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "typefully", opts.deliveryPolicy);
 
   // UNSCHEDULED-draft mode (opts.noSchedule): skip claimSlots + OMIT publish_at, so drafts are saved
   // UNSCHEDULED and will NOT auto-post — they sit in Typefully until a human schedules them. Used by
@@ -413,9 +416,7 @@ export async function publishText(
     // Resolve the CTA line(s) (shared funnel layer — src/publish/cta.ts), then place them per
     // cta.yaml. A derivative can carry 2+ stacked CTAs when it matched multiple content types.
     const { ctas, usedFallback } = resolveCtaLines(fm, canonicalUrl, cfg, sourceKind, ctCfg);
-    if (usedFallback) {
-      console.log(`  ↳ note: ${row.id} cta → homepage (no canonical_url in source.md)`);
-    }
+    if (usedFallback) console.log(`  ↳ note: ${row.id} used the configured CTA fallback`);
     const placement = cfg.placement[row.platform] ?? "inline";
     const { posts, manualComment } = buildPosts(body, ctas, placement, maxMap[row.platform] ?? Infinity);
 
@@ -460,7 +461,7 @@ export async function publishText(
       `${verb}: ${row.id} (${row.platform}) → ${when} → typefully draft ${draft.id ?? "?"}${placeNote}` +
         (manualComment ? `\n  ↳ add link as first comment: ${manualComment}` : "")
     );
-    results.push({ id: row.id, platform: row.platform, when, draftId: String(draft.id ?? "?"), manualComment });
+    results.push({ id: row.id, platform: row.platform, when, plannedFor: publishAt, draftId: String(draft.id ?? "?"), manualComment });
   }
   return results;
 }
@@ -480,7 +481,9 @@ async function main() {
     process.argv.includes("--no-schedule") ||
     (process.env.TYPEFULLY_SCHEDULE ?? "").toLowerCase() === "off";
   const forceReuse = process.argv.includes("--force-reuse");
-  await publishText(folder, { noSchedule, forceReuse });
+  if (noSchedule || forceReuse) throw new Error("legacy scheduling overrides are unavailable on the unified capability-selected publish path");
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "text");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (fetchScheduledDrafts)

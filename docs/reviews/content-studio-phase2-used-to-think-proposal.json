@@ -1,0 +1,194 @@
+{
+  "question": {
+    "id": "used-to-think-now-text-first",
+    "text": "What does the bounded corpus support about using a personal used-to-think/now reversal as an opener across text-first feeds?",
+    "intendedUse": "hypothesis"
+  },
+  "selectionPolicy": {
+    "description": "Review every resolved opening in the current hook-frame bank that instantiates the used-to-think/now first-person belief reversal. Compare performance only within each creator file on its consistently available primary metric.",
+    "inclusionCriteria": [
+      "The opening states a belief formerly held by the author.",
+      "The opening immediately replaces or destabilizes that belief.",
+      "The source resolves to a captured entry with date and metric provenance.",
+      "The fixed connective wording is grounded across at least two creator files."
+    ],
+    "exclusionCriteria": [
+      "Cross-creator raw performance comparisons.",
+      "Generic contrasts that do not describe the author's changed belief.",
+      "Later-body reversals that are not part of the opening.",
+      "Rows without resolvable source provenance or a within-creator denominator."
+    ]
+  },
+  "evidence": [
+    {
+      "id": "julie-zhuo-entry-1-28",
+      "accountId": "substack|lg.substack.com",
+      "sourceId": "creator-content|julie-zhuo.md",
+      "postId": "the-looking-glass-how-to-tell-if",
+      "platform": "substack",
+      "pool": "format",
+      "membershipReason": "Proposed for the format pool because the opening uses a first-person belief reversal on a text-first feed; topic and audience similarity are not assumed.",
+      "popularityScope": "account-relative top quartile within the captured Julie Zhuo file",
+      "sampleScope": "30 rankable Julie Zhuo entries captured in the committed creator-content file",
+      "baselineScope": "likes across the same 30-entry creator file",
+      "baselineRef": "baseline-julie-zhuo-likes",
+      "metric": {
+        "name": "likes",
+        "numerator": 57,
+        "denominator": 30,
+        "observedAt": "2026-08-27T20:22:11.000Z"
+      },
+      "evidenceLinks": [
+        "https://lg.substack.com/p/the-looking-glass-how-to-tell-if"
+      ],
+      "provenance": "Committed creator-content capture at julie-zhuo.md#entry-1-28; source published 2023-11-16.",
+      "collectedAt": "2026-08-27T20:22:11.000Z",
+      "caveats": [
+        "The public source text is paywall-limited.",
+        "Likes are observational and can change after capture.",
+        "The opening was not tested against an alternate opener on the same post."
+      ]
+    },
+    {
+      "id": "julie-zhuo-entry-1-29",
+      "accountId": "substack|lg.substack.com",
+      "sourceId": "creator-content|julie-zhuo.md",
+      "postId": "the-looking-glass-all-the-world-is",
+      "platform": "substack",
+      "pool": "format",
+      "membershipReason": "Proposed for the format pool because the opening uses a first-person belief reversal on a text-first feed; topic and audience similarity are not assumed.",
+      "popularityScope": "account-relative top quartile within the captured Julie Zhuo file",
+      "sampleScope": "30 rankable Julie Zhuo entries captured in the committed creator-content file",
+      "baselineScope": "likes across the same 30-entry creator file",
+      "baselineRef": "baseline-julie-zhuo-likes",
+      "metric": {
+        "name": "likes",
+        "numerator": 54,
+        "denominator": 30,
+        "observedAt": "2026-08-27T20:22:11.000Z"
+      },
+      "evidenceLinks": [
+        "https://lg.substack.com/p/the-looking-glass-all-the-world-is"
+      ],
+      "provenance": "Committed creator-content capture at julie-zhuo.md#entry-1-29; source published 2024-10-10.",
+      "collectedAt": "2026-08-27T20:22:11.000Z",
+      "caveats": [
+        "The public source text is paywall-limited.",
+        "Likes are observational and can change after capture.",
+        "The opening was not tested against an alternate opener on the same post."
+      ]
+    },
+    {
+      "id": "lara-acosta-entry-1-1",
+      "accountId": "linkedin|laraacostar",
+      "sourceId": "creator-content|lara-acosta.md",
+      "postId": "lara-acosta-entry-1-1",
+      "platform": "linkedin",
+      "pool": "format",
+      "membershipReason": "Proposed for the format pool because the opening uses a first-person belief reversal on a text-first feed; topic and audience similarity are not assumed.",
+      "popularityScope": "account-relative top quartile within the constrained Lara Acosta capture",
+      "sampleScope": "12 rankable entries in the constrained LinkedIn profile-window capture",
+      "baselineScope": "reactions across the same 12-entry captured file",
+      "baselineRef": "baseline-lara-acosta-reactions",
+      "metric": {
+        "name": "reactions",
+        "numerator": 2285,
+        "denominator": 12,
+        "observedAt": "2026-08-27T20:22:11.000Z"
+      },
+      "evidenceLinks": [
+        "https://www.linkedin.com/in/laraacostar/recent-activity/all/"
+      ],
+      "provenance": "Committed constrained profile-window capture at lara-acosta.md#entry-1-1; LinkedIn showed an approximate source date of 2026-08-20.",
+      "collectedAt": "2026-08-27T20:22:11.000Z",
+      "caveats": [
+        "LinkedIn exposed a relative source date, so 2026-08-20 is approximate.",
+        "The capture stopped at 12 visible posts and uses the shared activity-feed URL rather than a post permalink.",
+        "Reactions are observational and can change after capture.",
+        "The opening was not tested against an alternate opener on the same post."
+      ]
+    }
+  ],
+  "baselines": [
+    {
+      "id": "baseline-julie-zhuo-likes",
+      "accountId": "substack|lg.substack.com",
+      "metric": "likes",
+      "numerator": 156,
+      "denominator": 30,
+      "windowStart": "2020-08-07T00:00:00.000Z",
+      "windowEnd": "2026-06-13T23:59:59.999Z",
+      "method": "Account-relative discrete 75th-percentile threshold across all 30 rankable entries in the captured creator file.",
+      "source": "docs/content-studio-program/creator-content/julie-zhuo.md",
+      "evidenceRefs": [
+        "julie-zhuo.md#entry-1-28",
+        "julie-zhuo.md#entry-1-29"
+      ],
+      "caveats": [
+        "The wide source window spans several years and may mix audience eras.",
+        "This threshold describes the captured file and is not a platform benchmark."
+      ]
+    },
+    {
+      "id": "baseline-lara-acosta-reactions",
+      "accountId": "linkedin|laraacostar",
+      "metric": "reactions",
+      "numerator": 1843,
+      "denominator": 12,
+      "windowStart": "2026-08-20T00:00:00.000Z",
+      "windowEnd": "2026-08-27T23:59:59.999Z",
+      "method": "Account-relative discrete 75th-percentile threshold across all 12 rankable entries in the constrained creator-file capture.",
+      "source": "docs/content-studio-program/creator-content/lara-acosta.md",
+      "evidenceRefs": [
+        "lara-acosta.md#entry-1-1"
+      ],
+      "caveats": [
+        "The 12-entry profile window is constrained and includes three reposts flagged in the source file.",
+        "Relative LinkedIn timestamps make some dates approximate.",
+        "This threshold describes the captured file and is not a platform benchmark."
+      ]
+    }
+  ],
+  "selections": [
+    {
+      "evidenceId": "julie-zhuo-entry-1-28",
+      "disposition": "include",
+      "reason": "The resolved opening meets every declared inclusion criterion."
+    },
+    {
+      "evidenceId": "julie-zhuo-entry-1-29",
+      "disposition": "include",
+      "reason": "The resolved opening meets every declared inclusion criterion."
+    },
+    {
+      "evidenceId": "lara-acosta-entry-1-1",
+      "disposition": "include",
+      "reason": "The resolved opening meets every declared inclusion criterion, with its constrained-capture caveats retained."
+    }
+  ],
+  "summaries": [
+    {
+      "id": "used-to-think-now-format-hypothesis",
+      "statement": "Across this bounded three-entry, two-creator sample, writers use a first-person belief reversal to establish the topic and create forward motion in the opening. Because only one of three instances is top-quartile and no controlled comparison exists, the corpus supports testing the scaffold when the source contains a real change of mind. It does not support a claim that the scaffold improves reach.",
+      "evidenceRefs": [
+        "julie-zhuo-entry-1-28",
+        "julie-zhuo-entry-1-29",
+        "lara-acosta-entry-1-1"
+      ],
+      "caveats": [
+        "Three instances across two creators are too few for a general performance claim.",
+        "One LinkedIn result and two Substack results do not establish platform-wide behavior.",
+        "No post was tested with two alternate openings, so causal impact is unknown."
+      ],
+      "originality": {
+        "checkedAgainstEvidenceRefs": [
+          "julie-zhuo-entry-1-28",
+          "julie-zhuo-entry-1-29",
+          "lara-acosta-entry-1-1"
+        ],
+        "note": "Proposed mechanism-level scaffold only. No creator claim, example, topic, identity, or distinctive phrase is retained for generation.",
+        "method": "Cross-creator grounding of fixed runs of three or more words, deterministic rejection of any fixed eight-word corpus run, and manual comparison against every cited opening."
+      }
+    }
+  ]
+}

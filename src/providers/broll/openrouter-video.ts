@@ -20,7 +20,7 @@ export const provider: VideoBrollProvider = {
   name: "openrouter-video",
   async interpolate({ prompt, firstFramePath, lastFramePath, aspect, durationSeconds, outPath, params }) {
     const key = process.env.OPENROUTER_API_KEY;
-    if (!key) throw new Error("OPENROUTER_API_KEY missing in .env (see .env.example)");
+    if (!key) throw new Error("OPENROUTER_API_KEY missing in the repository .env (required only for the temporary Kling video route)");
     const model = (params?.model as string) ?? DEFAULT_MODEL;
     const resolution = (params?.resolution as string) ?? "720p";
     const costPerSec = (params?.cost_per_sec as number) ?? DEFAULT_COST_PER_SEC;

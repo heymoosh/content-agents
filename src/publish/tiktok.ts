@@ -2,6 +2,7 @@ import "../util/env.js";
 import { readFileSync, existsSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
@@ -151,6 +152,7 @@ export interface ScheduledTikTok {
   id: string;
   platform: string; // always "tiktok"
   when: string; // human PT label (matches publishText/publishShorts, not a raw ISO string)
+  plannedFor: string; // exact provider/ledger timestamp
   ref: string; // provider post ref
 }
 
@@ -163,7 +165,7 @@ export const isTikTokRow = (platform: string): boolean => platform === "tiktok";
 // With no opts it behaves exactly as the CLI did — every approved tiktok row — so /publish is unchanged.
 export async function publishTikTok(
   folder: string,
-  opts: { onlyIds?: string[] } = {}
+  opts: { onlyIds?: string[]; deliveryPolicy?: DeliveryPolicyDecision } = {}
 ): Promise<ScheduledTikTok[]> {
   const { rows } = readQueue(folder);
   let approved = rows.filter((r) => r.status === "approve" && isTikTokRow(r.platform));
@@ -172,6 +174,7 @@ export async function publishTikTok(
     console.log("no approved tiktok rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "postpeer", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to TikTok too recently.
   const slug = basename(folder);
@@ -205,7 +208,7 @@ export async function publishTikTok(
     appendPublishLog(folder, `${row.id} → tiktok ${ref} (scheduled ${scheduledFor})`);
     appendBetPlacement(folder, row.id, "tiktok", `${ref} @ ${scheduledFor}`, fm, caption);
     console.log(`scheduled: ${row.id} → tiktok ${ref} @ ${scheduledFor}`);
-    results.push({ id: row.id, platform: "tiktok", when: fmtLa(new Date(scheduledFor)), ref });
+    results.push({ id: row.id, platform: "tiktok", when: fmtLa(new Date(scheduledFor)), plannedFor: scheduledFor, ref });
   }
   return results;
 }
@@ -221,7 +224,8 @@ async function main() {
     return;
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
-  await publishTikTok(folder);
+  const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+  await publishApprovedViaConfiguredProviders(folder, "tiktok");
 }
 
 // Run the CLI only when executed directly, so the module can be imported (e.g. in tests) without

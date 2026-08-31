@@ -117,8 +117,23 @@ npm run patterns:account-mapping
 npm run patterns:coverage
 npm run patterns:pool-evidence
 npm run patterns:hook-templates -- --file <hook-template-ledger.jsonl> [--platform X] [--niche Y] [--format json|markdown|both]
+npm run patterns:hook-frames -- <list|verify|fit|fill> [--platform X] [--draft <path>]
+npm run patterns:rewrite -- --draft <path> [--engine grok-cli|gpt-codex] [--patterns] [--brief-only]
 npm run grow:plan
 ```
+
+`patterns:hook-frames` reads `config/hook-frames.jsonl`, the mad-lib frame bank built from the
+creator corpus. `verify` recomputes every frame's support from the corpus rather than trusting the
+bank's own numbers, `fit` reports which frames a draft has the material for, and `fill` renders one
+frame from material you supply. Every frame is `review: pending` until Muxin approves it.
+
+`patterns:rewrite` is the one command behind "make this post perform better". It sends the stored
+prompt in `config/rewrite-prompt.md` (editable, read at run time) plus the draft to a model Muxin
+picks, and writes a proposal to `<draft>.rewrite.md`. The draft is never edited and nothing
+publishes. `--patterns` appends the corpus inventory for a second pass; the first pass deliberately
+does not. Claude is not an available engine here on purpose: it stays too close to the draft and
+loses the argument. Grok bills per token and self-logs to `data/cost-log.csv`; codex is
+subscription-backed and reports $0. See `docs/handoff-viral-rewrite-ui.md` for the Studio surface.
 
 `patterns:hook-templates` reads only the curated JSONL hook-mechanism ledger. It is a metadata
 adapter for common-hook mad-lib reuse: it keeps platform, niche, format, slot, source-reference,

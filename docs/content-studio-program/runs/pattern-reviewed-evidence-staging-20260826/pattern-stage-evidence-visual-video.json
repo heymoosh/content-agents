@@ -1,0 +1,50 @@
+{
+  "task_id": "pattern-stage-evidence-visual-video",
+  "batch_id": "pattern-reviewed-evidence-staging-20260826",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-stage-evidence-visual-video",
+    "family": "codex",
+    "commit_sha": "9b825e80e89a98ce8959493c906381eb9eb1b220",
+    "changed_paths": [
+      "docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/intake-input.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/intake-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/ledger-bridge-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/decision-packet.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Typecheck passed."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/intake-input.json --format json",
+        "passed": true,
+        "summary": "Accepted 20 accounts, 75 evidence rows, and 0 baselines as blocked or pending body-free staging."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-20260826/visual-video/intake-report.json --format json",
+        "passed": true,
+        "summary": "Projected 20 accounts and 75 sources with bodyIncluded false and sideEffects none."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Whitespace check passed."
+      }
+    ],
+    "behavior_impact": "None; staging artifacts only.",
+    "logic_impact": "None; existing intake and bridge contracts are consumed unchanged.",
+    "risks": [
+      "All rows intentionally remain noncanonical and blocked or pending."
+    ],
+    "unresolved_items": [
+      "Human review of 20 account proposals and 75 source rows remains required.",
+      "No visual or video baseline rows are supplied."
+    ]
+  },
+  "audit_history": [],
+  "diff_verified": true,
+  "verified_commit": "9b825e80e89a98ce8959493c906381eb9eb1b220"
+}

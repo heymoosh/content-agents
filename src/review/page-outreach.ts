@@ -1,13 +1,84 @@
-export function followupDraftRequest(dir: string, person?: string, engine = "claude"): { dir: string; recipient?: string; engine: string } {
-  return { dir, ...(person ? { recipient: person } : {}), engine: engine || "claude" };
+import {
+  conciseFitSummary,
+  contactDiscoveryState,
+  filterOutreachRecommendations,
+  type GmailConnectionState,
+} from "./outreach-domain.js";
+
+export type OutreachEngine = "codex" | "grok";
+
+export const OUTREACH_ENGINE_OPTIONS: readonly { value: OutreachEngine; label: string }[] = [
+  { value: "codex", label: "ChatGPT" },
+  { value: "grok", label: "Grok" },
+];
+
+export function isOutreachEngine(value: unknown): value is OutreachEngine {
+  return value === "codex" || value === "grok";
 }
 
-export function outreachDraftRequest(dir: string, direction: string, recipient?: string, engine = "claude"): { dir: string; direction: string; recipient?: string; engine: string } {
-  return { dir, direction, ...(recipient ? { recipient } : {}), engine: engine || "claude" };
+function requireOutreachEngine(value: unknown): OutreachEngine {
+  // Missing selection gets the deliberate GPT/Codex default. An explicit Claude or unknown
+  // selection is a caller error and must not be silently remapped to another model.
+  if (value === undefined) return "codex";
+  if (!isOutreachEngine(value)) throw new Error(`Outreach engine must be ChatGPT or Grok; received ${String(value)}`);
+  return value;
 }
 
-export function outreachMessageReviseRequest(dir: string, file: string, instruction: string, engine = "claude"): { dir: string; file: string; instruction: string; engine: string } {
-  return { dir, file, instruction, engine: engine || "claude" };
+function escOutreach(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
+}
+
+/** Render the main list from fit-cleared leads only. The caller can attach its existing selection handler. */
+export function renderOutreachRecommendations(leads: OutreachLeadView[]): string {
+  const eligible = filterOutreachRecommendations(leads.map((lead) => ({
+    ...lead,
+    kind: lead.kind ?? "",
+    classification: lead.classification ?? (lead.kind === "client" ? lead.classificationOrFit : undefined),
+    fit: lead.fit ?? (lead.kind === "platform" ? lead.classificationOrFit : undefined),
+  })));
+  if (!eligible.length) return '<div class="outreach-empty">No good-fit leads yet.</div>';
+  return eligible.map((lead) =>
+    `<button type="button" class="outreach-recommendation" data-outreach-dir="${escOutreach(lead.dir)}">` +
+    `<span class="outreach-recommendation-name">${escOutreach(lead.name || lead.dir)}</span>` +
+    `<span class="outreach-recommendation-fit">${escOutreach(conciseFitSummary(lead))}</span></button>`,
+  ).join("");
+}
+
+/** Render the focused writing surface. Sending stays manual and is recorded only after the user confirms it. */
+export function renderSelectedOutreachComposer(lead: OutreachLeadView, _gmail: GmailConnectionState = {}): string {
+  const summary = conciseFitSummary(lead);
+  const contacts = contactDiscoveryState({ contacts: lead.contacts });
+  const contactCopy = contacts.state === "found"
+    ? contacts.contacts.map((contact) => `${escOutreach(contact.name)}${contact.role ? ` · ${escOutreach(contact.role)}` : ""}`).join(", ")
+    : contacts.state === "not-searched" ? "Contact discovery has not run yet." : "No contact found yet.";
+  return `<section class="outreach-composer" data-outreach-dir="${escOutreach(lead.dir)}">` +
+    `<h3>${escOutreach(lead.name || lead.dir)}</h3>` +
+    `<p class="outreach-fit-summary">${escOutreach(summary)}</p>` +
+    `<div class="outreach-decision"><button type="button" class="outreach-pursue">Interested</button><button type="button" class="outreach-pass">Not for me</button></div>` +
+    `<details class="outreach-why"><summary>Why this lead?</summary><p class="outreach-angle">${escOutreach(lead.pitchAngle || "No angle recorded yet.")}</p></details>` +
+    `<label for="outreachDirection">What can you discuss?</label>` +
+    `<textarea id="outreachDirection" name="direction" rows="3"></textarea>` +
+    `<label for="outreachMessageEditor">Message to edit before sending</label>` +
+    `<textarea id="outreachMessageEditor" name="message" rows="10"></textarea>` +
+    `<label for="outreachEngine">Draft with</label><select id="outreachEngine" class="engine-select">` +
+    OUTREACH_ENGINE_OPTIONS.map((option) => `<option value="${option.value}">${option.label}</option>`).join("") + `</select>` +
+    `<p class="outreach-contacts"><strong>Contact:</strong> ${contactCopy}</p>` +
+    `<button type="button" class="outreach-draft">Draft outreach note</button>` +
+    `<button type="button" class="outreach-copy">Copy message</button>` +
+    `<button type="button" class="outreach-mark-sent">I sent this by hand</button>` +
+    `</section>`;
+}
+
+export function followupDraftRequest(dir: string, person?: string, engine?: unknown): { dir: string; recipient?: string; engine: OutreachEngine } {
+  return { dir, ...(person ? { recipient: person } : {}), engine: requireOutreachEngine(engine) };
+}
+
+export function outreachDraftRequest(dir: string, direction: string, recipient?: string, engine?: unknown): { dir: string; direction: string; recipient?: string; engine: OutreachEngine } {
+  return { dir, direction, ...(recipient ? { recipient } : {}), engine: requireOutreachEngine(engine) };
+}
+
+export function outreachMessageReviseRequest(dir: string, file: string, instruction: string, engine?: unknown): { dir: string; file: string; instruction: string; engine: OutreachEngine } {
+  return { dir, file, instruction, engine: requireOutreachEngine(engine) };
 }
 
 export interface OutreachContactView { name: string; role?: string; }
@@ -16,6 +87,9 @@ export interface OutreachMessageView { file?: string; channel?: string; status?:
 export interface OutreachLeadView {
   dir: string;
   kind?: string;
+  classification?: string;
+  fit?: string;
+  classificationOrFit?: string;
   name?: string;
   source?: string;
   status?: string;
@@ -114,7 +188,7 @@ export function outreachSendState(message: OutreachMessageView | null | undefine
 }
 export function outreachSendNote(state: OutreachSendState): string {
   if (state === "draft") return "Locking readies it. You send it by hand, and nothing here can send it for you.";
-  if (state === "locked") return "Paste it into your mail client and send it there. Tell me once it has gone.";
+  if (state === "locked") return "Copy the locked message, send it in the channel you choose, then record that you sent it.";
   return "";
 }
 export function outreachSendBadge(state: OutreachSendState, hasLoggedSend: boolean): string {

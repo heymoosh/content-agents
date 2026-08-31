@@ -2,6 +2,7 @@ import "../util/env.js";
 import { readFileSync } from "node:fs";
 import { join, isAbsolute, basename } from "node:path";
 import { pathToFileURL } from "node:url";
+import { assertProviderDispatch, type DeliveryPolicyDecision } from "./delivery-policy.js";
 import { repoRoot } from "../db/db.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
 import { readQueue, setStatus, appendPublishLog, appendBetPlacement } from "./queue.js";
@@ -140,6 +141,7 @@ export interface ScheduledSubstack {
   id: string;
   platform: string; // always "substack"
   when: string; // human PT label of the claimed slot (matches publishTikTok/publishText)
+  plannedFor?: string; // exact claimed timestamp when a claim exists
   ref: string; // provider ref once posted; "" while a slot is only claimed (not yet fired)
   posted: boolean; // false = claimed & waiting for its slot; true = fired to Substack this run
 }
@@ -161,6 +163,7 @@ export async function publishSubstack(
     now?: Date; // test-only override; never call new Date()/Date.now() inside the machine
     headed?: boolean;
     postFn?: PostFn;
+    deliveryPolicy?: DeliveryPolicyDecision;
   } = {}
 ): Promise<ScheduledSubstack[]> {
   const now = opts.now ?? new Date();
@@ -175,6 +178,7 @@ export async function publishSubstack(
     console.log("no approved substack rows in the review queue");
     return [];
   }
+  assertProviderDispatch(folder, "substack", opts.deliveryPolicy);
 
   // Reuse guard: skip if this slug was published to Substack too recently (config/platforms.yaml
   // substack.min_reuse_days). Checked even on a dry run, so --dry-run honestly reports a block.
@@ -197,10 +201,10 @@ export async function publishSubstack(
         results.push({ id: row.id, platform: "substack", when: "(unclaimed)", ref: "", posted: false });
       } else if (new Date(claim.time).getTime() <= now.getTime()) {
         console.log(`[dry-run] ${row.id} → would POST now (claimed slot ${claim.time} has arrived)`);
-        results.push({ id: row.id, platform: "substack", when: fmtLa(new Date(claim.time)), ref: "", posted: false });
+        results.push({ id: row.id, platform: "substack", when: fmtLa(new Date(claim.time)), plannedFor: claim.time, ref: "", posted: false });
       } else {
         console.log(`[dry-run] ${row.id} → claimed for ${fmtLa(new Date(claim.time))}, not yet due`);
-        results.push({ id: row.id, platform: "substack", when: fmtLa(new Date(claim.time)), ref: "", posted: false });
+        results.push({ id: row.id, platform: "substack", when: fmtLa(new Date(claim.time)), plannedFor: claim.time, ref: "", posted: false });
       }
     }
     return results;
@@ -214,7 +218,7 @@ export async function publishSubstack(
     // PHASE 1 — no claim yet: claim a FUTURE slot from the unified scheduler (records it in the
     // shared ledger) and stop. Nothing posts on this run.
     if (!existing) {
-      const { labels } = claimSlots({
+      const { times, labels } = claimSlots({
         windowKey: WINDOW_KEY,
         conflictPlatforms: [WINDOW_KEY],
         count: 1,
@@ -225,7 +229,7 @@ export async function publishSubstack(
       const when = labels[0] ?? "next-free-slot";
       appendPublishLog(folder, `${row.id} → substack slot claimed for ${when} (not yet posted)`);
       console.log(`claimed: ${row.id} → substack ${when} (will post once the slot arrives)`);
-      results.push({ id: row.id, platform: "substack", when, ref: "", posted: false });
+      results.push({ id: row.id, platform: "substack", when, ...(times[0] && times[0] !== "next-free-slot" ? { plannedFor: times[0] } : {}), ref: "", posted: false });
       continue;
     }
 
@@ -233,7 +237,7 @@ export async function publishSubstack(
     if (new Date(existing.time).getTime() > now.getTime()) {
       const when = fmtLa(new Date(existing.time));
       console.log(`waiting: ${row.id} → substack slot ${when} not yet due`);
-      results.push({ id: row.id, platform: "substack", when, ref: "", posted: false });
+      results.push({ id: row.id, platform: "substack", when, plannedFor: existing.time, ref: "", posted: false });
       continue;
     }
 
@@ -249,7 +253,7 @@ export async function publishSubstack(
     appendPublishLog(folder, `${row.id} → substack ${ref} (posted, claimed slot ${existing.time})`);
     appendBetPlacement(folder, row.id, "substack", `${ref} @ ${existing.time}`, fm, text);
     console.log(`posted: ${row.id} → substack ${ref}`);
-    results.push({ id: row.id, platform: "substack", when, ref, posted: true });
+    results.push({ id: row.id, platform: "substack", when, plannedFor: existing.time, ref, posted: true });
   }
 
   return results;
@@ -313,7 +317,9 @@ async function main() {
   }
   const folder = isAbsolute(arg) ? arg : join(repoRoot, arg);
   try {
-    await publishSubstack(folder, { dryRun, headed });
+    if (dryRun || headed) throw new Error("legacy browser overrides are unavailable on the unified capability-selected publish path");
+    const { publishApprovedViaConfiguredProviders } = await import("./unified-cli.js");
+    await publishApprovedViaConfiguredProviders(folder, "substack");
   } catch (e) {
     reportFailure(e);
     process.exit(1);

@@ -6,6 +6,11 @@
 # follow-up) -- verbatim from the card's table. `secondary` is optional: offer_adjacent_post
 # carries only one entry.
 #
+# These destinations are candidates, not automatic asks. A canonical essay/chapter/note wins by
+# default. With no canonical source, a content-type CTA is eligible only when the derivative also
+# carries cta_reviewed: true, cta_fit: high, and cta_value: high. Missing qualification means no
+# forced promotional CTA; the system never invents a lead magnet.
+#
 # Three destinations:
 #   - `source`  -- the essay/Substack link. Resolves like any other CTA (the essay's own
 #     canonical_url, falling back to source_fallback in cta.yaml).

@@ -1,0 +1,29 @@
+{
+  "kind": "creator_mechanism_proposal_validation",
+  "version": "creator-mechanism-proposals-v1",
+  "proposals_checked": 69,
+  "source_refs_checked": 727,
+  "findings": [],
+  "passed": true,
+  "cli_version": "creator-mechanism-proposals-cli-v1",
+  "proposals_by_family": {
+    "hook": 9,
+    "structure": 9,
+    "framing": 9,
+    "retention": 6,
+    "cta": 11,
+    "storytelling-sequence": 10,
+    "native-format": 8,
+    "visual-treatment": 7
+  },
+  "summary": {
+    "total": 69,
+    "cross_creator": 69,
+    "single_creator": 0,
+    "metric_backed": 34,
+    "pending_review": 69,
+    "pending_originality": 69
+  },
+  "body_included": false,
+  "available_to_generation": false
+}

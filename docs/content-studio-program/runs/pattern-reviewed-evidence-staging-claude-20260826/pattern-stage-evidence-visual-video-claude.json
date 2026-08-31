@@ -1,0 +1,83 @@
+{
+  "task_id": "pattern-stage-evidence-visual-video-claude",
+  "batch_id": "pattern-reviewed-evidence-staging-claude-20260826",
+  "builder": {
+    "type": "builder",
+    "task_id": "pattern-stage-evidence-visual-video-claude",
+    "family": "claude",
+    "commit_sha": "e7a7c23e88ab093a1711d0fbfdc429e94d6f6f63",
+    "changed_paths": [
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/intake-input.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/intake-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/ledger-bridge-report.json",
+      "docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/decision-packet.md"
+    ],
+    "acceptance_commands": [
+      {
+        "command": "npm run check",
+        "passed": true,
+        "summary": "Typecheck passed locally."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-intake -- --file docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/intake-input.json --format json",
+        "passed": true,
+        "summary": "Accepted 20 accounts and 75 actual source rows as blocked or pending, with no baselines or side effects."
+      },
+      {
+        "command": "npm run patterns:reviewed-evidence-ledger-bridge -- --input docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/visual-video/intake-report.json --format json",
+        "passed": true,
+        "summary": "Projected 20 accounts and 75 sources with bodyIncluded false and sideEffects none."
+      },
+      {
+        "command": "git diff --check",
+        "passed": true,
+        "summary": "Whitespace check passed for the corrected leased diff."
+      }
+    ],
+    "behavior_impact": "None; body-free staging artifacts only.",
+    "logic_impact": "None; existing intake and bridge contracts are consumed unchanged.",
+    "risks": [
+      "The rejected synthetic predecessor commit remains in branch history, but the final correction replaces every synthetic row in the leased output.",
+      "All rows remain blocked or pending until consolidated human review."
+    ],
+    "unresolved_items": [
+      "Muxin must review the 20 proposed account dispositions and evidence gaps before any canonical write.",
+      "No ranking or best-account claim is established."
+    ]
+  },
+  "audit": {
+    "type": "audit",
+    "task_id": "pattern-stage-evidence-visual-video-claude",
+    "family": "codex",
+    "verdict": "passed",
+    "findings": [
+      "Base-to-final diff is limited to the four leased visual/video staging files.",
+      "All 75 final evidence rows match the safe projection by id, sourceId, postId, platform, and bodyComplete; zero synthetic IDs remain and zero IDs overlap the rejected synthetic predecessor.",
+      "The package reconciles 20 accounts, 75 sources, zero baselines, and 5 recommend plus 2 hold plus 13 research-further proposals.",
+      "No raw bodies, ranking or winner claims, canonical data writes, or coordinator-state writes are present.",
+      "The exact coordinator intake and --input ledger-bridge commands, npm run check, and git diff --check all passed locally."
+    ]
+  },
+  "audit_history": [
+    {
+      "type": "audit",
+      "task_id": "pattern-stage-evidence-visual-video-claude",
+      "family": "codex",
+      "verdict": "failed",
+      "findings": [
+        "The 75 evidence rows are aggregate-count placeholders with synthetic local-corpus-staging identifiers and account-level profile URLs, not proposals tied to 75 actual local source records. Replace them with stable body-free source/post identifiers and per-record provenance from a minimized local projection.",
+        "bodyComplete is assigned across synthetic rows to reproduce aggregate C/I/U totals. The packet explicitly forbids inferred per-record completeness; each value must come from the matching actual record, otherwise remain null or unknown.",
+        "The builder did not run the two exact acceptance commands recorded in the lease; it used npx tsx variants. The corrected commit must run and report the exact npm run patterns:reviewed-evidence-intake and patterns:reviewed-evidence-ledger-bridge commands."
+      ],
+      "commit_sha": "6be528c0cd5ac58b90d2bb452a64e5abce72db86"
+    }
+  ],
+  "diff_verified": true,
+  "verified_commit": "e7a7c23e88ab093a1711d0fbfdc429e94d6f6f63",
+  "integration": {
+    "type": "integration",
+    "task_id": "pattern-stage-evidence-visual-video-claude",
+    "family": "codex",
+    "verdict": "passed"
+  }
+}

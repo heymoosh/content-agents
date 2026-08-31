@@ -12,7 +12,7 @@
 // body. What the GUI previews (previewText below) is resolved by the same function, so
 // what-you-see-is-what-you-accept.
 
-import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { addCut, listCuts, DEFAULT_LENS } from "../atomize/cuts.js";
 import { splitFrontmatter } from "../util/frontmatter.js";
@@ -178,12 +178,12 @@ export function acceptAngle(
   titleOverride?: string,
 ): { lens: string; cutDir: string; body: string } {
   const advice = readAdvice(folder);
-  if (!advice) throw new Error("no advice.json to accept from — run Develop first");
+  if (!advice) throw new Error("no advice.json to accept from. Run Develop first");
   const card = findCard(advice, cardId);
   if (!card) throw new Error("no such card");
   if (card.kind !== "angle") throw new Error("only an angle card can become a cut");
   if (card.status !== "open") throw new Error(`card already ${card.status}`);
-  if (!card.sourceLines?.length) throw new Error("this angle carries no source line refs — nothing verbatim to build a cut from");
+  if (!card.sourceLines?.length) throw new Error("this angle carries no source line refs: nothing verbatim to build a cut from");
   const lens = (lensOverride ?? card.lens ?? "").trim();
   if (!isValidLens(lens) || lens === DEFAULT_LENS) throw new Error("bad lens");
   if (listCuts(folder).includes(lens)) throw new Error(`a "${lens}" cut already exists`);
@@ -205,7 +205,7 @@ export function acceptAngle(
 
 export function dismissCard(folder: string, cardId: string): void {
   const advice = readAdvice(folder);
-  if (!advice) throw new Error("no advice.json — run Develop first");
+  if (!advice) throw new Error("no advice.json. Run Develop first");
   const card = findCard(advice, cardId);
   if (!card) throw new Error("no such card");
   if (card.status !== "open") throw new Error(`card already ${card.status}`);
@@ -419,7 +419,10 @@ export function contentSessionForFolder(
   } catch {
     /* no queue yet */
   }
-  if (!session && !cuts.length && !pending) return null;
+  // A validated cross-room handoff intentionally arrives before any draft exists. Its durable
+  // content-request.json makes it a real Content source that must open in configuration, rather
+  // than disappearing until an unrelated generation step happens.
+  if (!session && !cuts.length && !pending && !existsSync(join(folder, "content-request.json"))) return null;
   return {
     slug,
     title: firstHeading(folder),

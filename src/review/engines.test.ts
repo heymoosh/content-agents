@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildEngineSpawn, getEngineMetadata } from "./engines.js";
+import { buildEngineSpawn, getEngineMetadata, isEngine } from "./engines.js";
+import { parseOllamaList, ollamaAvailability } from "./ollama-availability.js";
 
 test("buildEngineSpawn keeps Claude's existing invocation", () => {
   assert.deepEqual(
@@ -34,4 +35,31 @@ test("engine metadata gives stable role guidance without renaming providers", ()
     roleHint: "Ideation / Humor",
   });
   assert.equal(getEngineMetadata("unknown").id, "claude");
+});
+
+test("Ollama GPT-OSS uses the exact local model and sends the prompt through stdin", () => {
+  assert.deepEqual(
+    buildEngineSpawn("ollama-gpt-oss", "private prompt", { timeoutMs: 1000 }),
+    { command: "ollama", args: ["run", "gpt-oss:20b"], input: "private prompt" },
+  );
+});
+
+test("Ollama GPT-OSS is a distinct engine with stable local metadata", () => {
+  assert.equal(isEngine("ollama-gpt-oss"), true);
+  assert.deepEqual(getEngineMetadata("ollama-gpt-oss"), {
+    id: "ollama-gpt-oss",
+    label: "GPT-OSS (local)",
+    description: "Local GPT-OSS analysis through Ollama.",
+    roleHint: "Deep / Structured Analysis",
+  });
+});
+
+test("Ollama list parsing recognizes an installed exact model", () => {
+  assert.deepEqual(parseOllamaList("NAME              ID              SIZE\ngpt-oss:20b       abc             12 GB\n"), ["gpt-oss:20b"]);
+  assert.deepEqual(ollamaAvailability({ listOutput: "NAME\ngpt-oss:20b\n" }), { state: "ready", model: "gpt-oss:20b" });
+});
+
+test("Ollama availability distinguishes missing model and unavailable daemon", () => {
+  assert.deepEqual(ollamaAvailability({ listOutput: "NAME\nllama3:8b\n" }), { state: "model-missing", model: "gpt-oss:20b" });
+  assert.deepEqual(ollamaAvailability({ listError: "Error: could not connect to ollama app" }), { state: "daemon-unavailable", model: "gpt-oss:20b" });
 });

@@ -1,10 +1,27 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parseReviseRefusal, revisePrompt, outreachMessageRevisePrompt, nextDerivativeId, duplicatePrompt, assertNoExistingDerivative, runQueued, publicJob, jobs, clearFinishedJobs, addVideoJob, decodeSpawnFailure, buildJobId, jobLogPath, buildClaudeSpawnArgs, isSpawnTimeout, charlesDraftPrompt, enqueueCharlesDraft, enqueueOutreachDraft, enqueueDirectedDraft, answerJob, retryJob, parseStepMarker, parseAskMarker, parseAskOptionMarker, ingestMarkerChunk, isRetryableFailure, shouldBlockOnAsk, answerPromptSuffix, jobElapsedMs, createSpawnStreamReader, jobIsSweepable, stopJob, runCommandSpawn, atomizeArtifactVerdict, MARKER_EXEMPT_KINDS, type MarkerTarget, fictionDraftPrompt, fictionRepassPrompt, fictionRunProduced, chapterSnapshot, findFictionDupe, gitStateDrift, type GitState } from "./jobs.js";
 import { resolveAngle } from "../atomize/spin.js";
+
+async function waitForJobStatus(
+  job: { status: string },
+  status: string,
+  timeoutMs = 2_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (job.status !== status && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(job.status, status);
+}
+
+test("runAgentSpawn forwards a selected engine's stdin payload", () => {
+  const source = readFileSync(join(process.cwd(), "src/review/jobs.ts"), "utf8");
+  assert.match(source, /runCommandSpawn\(job, built\.command, built\.args, \{[\s\S]*?input: built\.input/);
+});
 
 // ── Ask Claude refusal (Codebase review Phase 2, part 4) ────────────────────────────────────────
 // Card 9304e4a5: an out-of-scope "Ask Claude" request (retarget the platform, write a new post)
@@ -236,7 +253,7 @@ test("decodeSpawnFailure reports enoent the same way regardless of verb options"
   const result = decodeSpawnFailure({ code: null, timedOut: false, enoent: true }, "job-x", {
     timeoutVerb: "atomize", timeoutLabel: "15 min", exitVerb: "atomize",
   });
-  assert.equal(result, "the `claude` CLI isn't on this server's PATH — start the GUI from a terminal where `claude` runs");
+  assert.equal(result, "the `claude` CLI isn't on this server's PATH. Start the GUI from a terminal where `claude` runs");
 });
 
 test("decodeSpawnFailure uses timeoutVerb + timeoutLabel, and omits the log tail by default", () => {
@@ -266,7 +283,7 @@ test("decodeSpawnFailure names the given command in the enoent message (runComma
   const result = decodeSpawnFailure({ code: null, timedOut: false, enoent: true }, "job-x", {
     timeoutVerb: "scout", timeoutLabel: "30 min", exitVerb: "scout", command: "npm",
   });
-  assert.equal(result, "the `npm` CLI isn't on this server's PATH — start the GUI from a terminal where `npm` runs");
+  assert.equal(result, "the `npm` CLI isn't on this server's PATH. Start the GUI from a terminal where `npm` runs");
 });
 
 // ── outreachMessageRevisePrompt — the Outreach tab's inline "Revise with AI" on a drafted message.
@@ -1178,9 +1195,8 @@ test("stopping a task-closure job with no subprocess still settles as stopped an
     await new Promise<void>((r) => { release = r; });
     return "the answer nobody is waiting for any more";
   });
-  await new Promise((r) => setTimeout(r, 20));
   const job = jobs.find((j) => j.label === "mid-await, nothing to kill")!;
-  assert.equal(job.status, "running");
+  await waitForJobStatus(job, "running");
   assert.equal(job.proc, undefined, "a task closure has no child process to signal");
 
   const out = stopJob(job.id);
@@ -1204,8 +1220,8 @@ test("an orphaned stopped task resolving late does not double-release the job la
   const stoppedRun = runQueued("insights", "orphan", async () => {
     await new Promise<void>((r) => { release = r; });
   });
-  await new Promise((r) => setTimeout(r, 20));
   const orphan = jobs.find((j) => j.label === "orphan")!;
+  await waitForJobStatus(orphan, "running");
 
   let concurrent = 0;
   let maxConcurrent = 0;

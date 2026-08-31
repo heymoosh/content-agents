@@ -1,0 +1,49 @@
+{
+  "type": "batch_integration_audit",
+  "batch_id": "pattern-reviewed-evidence-staging-claude-20260826",
+  "family": "codex",
+  "verdict": "passed",
+  "recorded_at": "2026-08-26T06:13:00Z",
+  "integration_sha": "c64dc63388e9dfdee76c24da89e7d3faced58506",
+  "tasks": [
+    "pattern-stage-evidence-text-community-claude",
+    "pattern-stage-evidence-professional-publishing-claude",
+    "pattern-stage-evidence-visual-video-claude",
+    "pattern-stage-evidence-consolidated-review-claude"
+  ],
+  "checks": [
+    {
+      "command": "npm test",
+      "passed": true,
+      "summary": "Full local suite passed outside the sandbox. The first sandboxed run hit the known tsx IPC EPERM restriction in nested CLI tests."
+    },
+    {
+      "command": "npm run check",
+      "passed": true,
+      "summary": "TypeScript check passed on the integrated branch."
+    },
+    {
+      "command": "npm run studio:coord -- validate",
+      "passed": true,
+      "summary": "Validated 26 tasks with no lease or evidence conflicts."
+    },
+    {
+      "command": "node docs/content-studio-program/staging/reviewed-evidence-staging-claude-20260826/consolidated-review/verify.mjs",
+      "passed": true,
+      "summary": "Verified 65 unique accounts, 499 evidence rows, 12 baselines, 576 blocked rows, zero ready or unmapped, and 30/8/27 proposal totals."
+    },
+    {
+      "command": "gitleaks dir --no-banner --redact .",
+      "passed": true,
+      "summary": "Current integrated tree contains no detected leaks."
+    },
+    {
+      "command": "git diff --check",
+      "passed": true,
+      "summary": "Integrated branch has no whitespace errors."
+    }
+  ],
+  "user_visible_behavior_changed": false,
+  "e2e_required": false,
+  "human_gate": "pattern-reviewed-metadata-input"
+}

@@ -7,8 +7,7 @@
 //
 // EXPENSIVE_ROUTES are aborted at the browser (see harness.ts). Nothing here starts a model job.
 
-import { existsSync, readFileSync, rmSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bootServer, openSession, openRoom, waitLoaded, record, results, ROOT } from "./harness.js";
 
@@ -22,16 +21,24 @@ function answerFor(n: number): string {
 
 async function main(): Promise<void> {
   console.log("\n=== Pass B: writes, real server (worktree-isolated) ===\n");
-  // The intake DRAFT store is the one thing a worktree does not isolate: it lives in
-  // ~/.content-agents/venture-intake-drafts, keyed by slug, shared by every checkout. Clear only
-  // this suite's own slug — never anything else in that directory, which is Muxin's real scratch.
-  rmSync(join(homedir(), ".content-agents", "venture-intake-drafts", `${SLUG}.json`), { force: true });
-
+  // Keep the manual-send assertion independent of whatever personal lead data happens to exist.
+  const outreachFixture = join(ROOT, "outreach", "leads", "e2e-manual-send");
+  mkdirSync(join(outreachFixture, "messages"), { recursive: true });
+  writeFileSync(join(outreachFixture, "lead.md"), [
+    "---", "kind: client", 'name: "E2E Manual Send"', "url: https://example.invalid/e2e",
+    "source: e2e", "status: pursue", "classification: greenfield", 'pitch_angle: "Verify the manual handoff"', "---",
+    "", "## Profile", "", "Disposable browser fixture.",
+  ].join("\n"));
+  writeFileSync(join(outreachFixture, "messages", "message-01.md"), [
+    "---", "lead: e2e-manual-send", "channel: email", "status: locked", "locked_at: 2026-08-30", "---", "",
+    "Hello from the disposable manual-send fixture.",
+  ].join("\n"));
   const server = await bootServer({}, PORT);
-  const s = await openSession(PORT);
-  const { page } = s;
+  let s: Awaited<ReturnType<typeof openSession>> | null = null;
 
   try {
+    s = await openSession(PORT);
+    const { page } = s;
     // ── #381: the whole 25-question intake interview, on the desk, ending in a real intake.md ──
     await openRoom(page, "venture");
     await waitLoaded(page, "#ventureThread").catch(() => {});
@@ -163,7 +170,7 @@ async function main(): Promise<void> {
     // intake box instead of the room.
     await page.click("#ivLeave").catch(() => {});
     for (const slug of ["zz-test-phase3", "zz-test-phase2"]) {
-      await page.selectOption("#ventureSlug", slug).catch(() => {});
+      await page.selectOption("#ventureSelect", slug).catch(() => {});
       await page.waitForTimeout(1200);
       const controls = await page.evaluate(() =>
         Array.from(document.querySelectorAll("#roomVenture [data-v], #roomVenture button"))
@@ -177,32 +184,23 @@ async function main(): Promise<void> {
       console.log(`  (controls on ${slug}: ${controls.slice(0, 12).join(" · ")})`);
     }
 
-    // ── Outreach: mark-sent is the pre-send/post-send boundary (tracker.ts owns post-send). ──
+    // ── Outreach: delivery is manual; the Studio copies and records a send but never implies Gmail. ──
     await openRoom(page, "outreach");
     await waitLoaded(page, "#outreachList");
-    const markSent = await page.evaluate(async () => {
-      const r = await fetch("/api/outreach/leads");
-      const j = (await r.json()) as { ok: boolean; leads: { dir: string; status: string }[] };
-      const lead = (j.leads ?? []).find((l) => l.status === "pursue") ?? (j.leads ?? [])[0];
-      if (!lead) return { ok: false, why: "no leads on the desk to mark" };
-      const res = await fetch("/api/outreach/mark-sent", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dir: lead.dir, channel: "email" }),
-      });
-      return { ok: res.ok, status: res.status, body: (await res.text()).slice(0, 200), dir: lead.dir };
-    });
-    const trackerPath = join(ROOT, "data", "outreach", "tracker.jsonl");
-    const trackerHas = existsSync(trackerPath) && /"sent"|"contacted"/.test(readFileSync(trackerPath, "utf8"));
+    const rows = page.locator("#outreachList button.tri-row");
+    let manualControls = 0;
+    for (let i = 0; i < await rows.count(); i++) {
+      await rows.nth(i).click();
+      manualControls = await page.locator("#outreachList button", { hasText: "I sent this by hand" }).count();
+      if (manualControls > 0) break;
+      await page.locator("#outreachList button.out-back").click();
+    }
+    const outreachText = ((await page.locator("#outreachList").innerText()) ?? "").replace(/\s+/g, " ");
+    const copyControls = await page.locator("#outreachList button", { hasText: "Copy message" }).count();
     record({
-      feature: "Outreach mark-sent appends a real tracker event",
-      pr: "#350",
-      status: markSent.ok && trackerHas ? "pass" : markSent.ok ? "fail" : "fail",
-      detail: markSent.ok
-        ? trackerHas
-          ? `marked ${(markSent as { dir?: string }).dir}, tracker.jsonl carries the event`
-          : "route answered ok but no sent/contacted event reached tracker.jsonl"
-        : `route said ${JSON.stringify(markSent).slice(0, 200)}`,
+      feature: "Outreach exposes manual copy and sent-by-hand recording without claiming Gmail delivery",
+      status: copyControls > 0 && manualControls > 0 && !/Gmail|Connect Gmail/.test(outreachText) ? "pass" : "fail",
+      detail: `copy controls=${copyControls}; sent-by-hand controls=${manualControls}; Gmail claimed=${/Gmail|Connect Gmail/.test(outreachText)}`,
     });
 
     // ── Content: the approve write, the one gate rule 2 cares about. ──
@@ -230,22 +228,16 @@ async function main(): Promise<void> {
         : `${JSON.stringify(statusWrite).slice(0, 200)}`,
     });
 
-    // ── Signals: filing a backlog card is the room's only write. ──
+    // ── Signals: recommendations are session-local and do not expose a backlog write. ──
     await openRoom(page, "signals");
     await waitLoaded(page, "#signalsFamilies");
-    const backlog = await page.evaluate(async () => {
-      const res = await fetch("/api/signals/backlog", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: "E2E probe adjustment", detail: "Filed by the end-to-end suite to prove the write lands." }),
-      });
-      return { ok: res.ok, status: res.status, body: (await res.text()).slice(0, 200) };
-    });
+    const signalsText = ((await page.locator("#signalsReads").innerText()) ?? "").replace(/\s+/g, " ");
+    const backlogButtons = await page.getByRole("button", { name: "Send to backlog" }).count();
     record({
-      feature: "Signals files a backlog card",
+      feature: "Signals exposes actionable defaults without an orchestration write",
       pr: "#375",
-      status: backlog.ok ? "pass" : "fail",
-      detail: backlog.ok ? "card filed" : `route answered ${backlog.status}: ${backlog.body}`,
+      status: signalsText.includes("Content defaults") && backlogButtons === 0 ? "pass" : "fail",
+      detail: `Content defaults shown=${signalsText.includes("Content defaults")}; backlog buttons=${backlogButtons}`,
     });
 
     if (s.blockedCalls.length) {
@@ -255,8 +247,8 @@ async function main(): Promise<void> {
       console.log(`  (non-OK responses seen: ${[...new Set(s.badResponses)].slice(0, 12).join(", ")})`);
     }
   } finally {
-    await s.close();
-    server.stop();
+    if (s) await s.close();
+    await server.stop();
   }
 
   const failed = results.filter((r) => r.status === "fail").length;

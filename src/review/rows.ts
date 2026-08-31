@@ -19,6 +19,7 @@ import {
   type ReconciledStatus,
   type PublishLogRead,
 } from "./reconcile.js";
+import { publishingKey, readPublishingStatuses, type PublishingStatus } from "./publishing-status.js";
 
 export const CONTENT = join(repoRoot, "content");
 // Outreach Phase 2 (docs/outreach-engine-plan.md §6): a lead's review-queue.md row surfaces in
@@ -39,16 +40,22 @@ interface EnrichedRow extends QueueRow {
   body?: string; // derivative text / storyboard text (what a human reads)
   spin?: boolean;
   angle?: string;
+  media?: string;
+  treatment?: string;
+  variantKind?: "control" | "treated";
+  control?: boolean;
   sourceLines?: unknown;
   threadCheck?: string; // "pass" | "missing" — config/platforms.yaml home_brand thread-check
   threadSpinApplied?: boolean; // Spin already drafted the worldview thread in on a "missing" verdict
   replyToText?: string; // "reply to mention" rows (card db22283f) — what the mention/reply said
   assetUrl?: string; // image/video preview URL
+  mediaStage?: Record<string, unknown>; // inspectable configured-media plan/source gate
   editable: boolean; // can the body be edited-and-saved here?
   revisable: boolean; // has a derivatives/<id>.md that "Revise with Claude" can rewrite
   hasAsset: boolean;
   approveBlocked: string | null; // reason Approve is disabled, if any
   reconciled?: ReconciledStatus; // live Typefully/PostPeer reconciliation — omitted when not applicable
+  publishingStatus?: PublishingStatus;
   // "Generate storyboard" button (card 9e20a616): true for a video-script row whose storyboard
   // hasn't been generated yet — the one case Approve is blocked with no way in the GUI to fix it.
   canGenerateStoryboard: boolean;
@@ -101,18 +108,21 @@ export function approveBlockReason(
   row: QueueRow,
   exists: (p: string) => boolean = existsSync,
 ): string | null {
+  if (row.asset?.startsWith("media-stages/") && row.asset.endsWith(".json")) {
+    return "staged media plan is inspectable but is not a rendered asset. Approve the plan/source stage and run its named pipeline before approving delivery";
+  }
   if (row.format === "storyboard") {
-    return exists(join(folder, "video", "storyboard.md")) ? null : "storyboard not rendered yet — run /video";
+    return exists(join(folder, "video", "storyboard.md")) ? null : "storyboard not rendered yet. Run /video";
   }
   if (row.format === "video" || row.format === "short") {
     const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
     if (!asset) return null; // no known gate file to check
-    return exists(join(folder, asset)) ? null : "video not rendered yet — run /video";
+    return exists(join(folder, asset)) ? null : "video not rendered yet. Run /video";
   }
   if (row.format === "image") {
     const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
     if (!asset) return null; // no known gate file to check
-    return exists(join(folder, asset)) ? null : "image not rendered yet — run npm run render -- --still <folder>";
+    return exists(join(folder, asset)) ? null : "image not rendered yet. Run npm run render -- --still <folder>";
   }
   return null;
 }
@@ -167,7 +177,7 @@ async function fetchLiveProviderState(): Promise<LiveProviderState> {
 
 // Exported so the reconciliation wiring (row.reconciled) is testable against the REAL code path
 // /api/queue uses — a temp folder + a crafted publish-log.md + injected live state, no server/network.
-export function enrich(folder: string, slug: string, row: QueueRow, publishLog: PublishLogRead, live: LiveProviderState): EnrichedRow {
+export function enrich(folder: string, slug: string, row: QueueRow, publishLog: PublishLogRead, live: LiveProviderState, publishingStatus?: PublishingStatus): EnrichedRow {
   const asset = row.asset && row.asset !== "—" && row.asset !== "-" ? row.asset : "";
   let kind: Kind = "unknown";
   if (row.format === "text") kind = "text";
@@ -184,16 +194,26 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
   const isReply = row.origin === "reply to mention";
   const out: EnrichedRow = {
     ...row,
+    ...(publishingStatus ? { publishingStatus } : {}),
     kind,
     editable: false,
     revisable: !isReply && existsSync(join(folder, "derivatives", `${row.id}.md`)),
     hasAsset: false,
     approveBlocked: approveBlockReason(folder, row),
-    reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live) : undefined,
+    reconciled: needsReconciliation(row) ? reconcileRow(row, publishLog, live, publishingStatus) : undefined,
     canGenerateStoryboard: kind === "storyboard" && !existsSync(join(folder, "video", "storyboard.md")),
     duplicatable: false, // finalized below, once hasAsset is known
   };
   const assetUrl = (file: string) => `/asset?slug=${encodeURIComponent(slug)}&file=${encodeURIComponent(file)}`;
+
+  if (asset.startsWith("media-stages/") && asset.endsWith(".json")) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(folder, asset), "utf8"));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) out.mediaStage = parsed as Record<string, unknown>;
+    } catch {
+      // approveBlockReason still blocks a malformed/missing stage from being treated as an asset.
+    }
+  }
 
   const loadMd = (relPath: string) => {
     const p = join(folder, relPath);
@@ -202,6 +222,10 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
     out.body = body;
     out.spin = fm.spin === true;
     out.angle = typeof fm.angle === "string" ? fm.angle : undefined;
+    out.media = typeof fm.media === "string" ? fm.media : undefined;
+    out.treatment = typeof fm.treatment === "string" ? fm.treatment : undefined;
+    out.variantKind = fm.variant_kind === "control" || fm.variant_kind === "treated" ? fm.variant_kind : undefined;
+    out.control = out.variantKind === "control";
     out.sourceLines = fm.source_lines;
     out.threadCheck = classifyThread(fm);
     out.threadSpinApplied = fm.thread_spin_applied === true;
@@ -237,6 +261,8 @@ export function enrich(folder: string, slug: string, row: QueueRow, publishLog: 
       out.hasAsset = true;
     }
   }
+  if (kind === "video" && !out.body) loadMd(join("derivatives", `${row.id}.md`));
+  if (out.body && existsSync(join(folder, "derivatives", `${row.id}.md`))) out.editable = true;
   // "Duplicate to platform" only makes sense on a real text post — not an empty draft, and not an
   // asset row (image/video/storyboard) that has no body of its own to re-angle. Also excluded for
   // "reply to mention" rows — see isReply above.
@@ -323,9 +349,10 @@ export async function listPieces(): Promise<Piece[]> {
   if (anyNeedsReconcile) ensureLiveStatePolling();
   const live: LiveProviderState = anyNeedsReconcile ? liveState : { typefullyDrafts: [], postpeerPosts: [] };
 
+  const publishingStatuses = readPublishingStatuses();
   const pieces = folderRows.map(({ slug, folder, rows }) => {
     const publishLog: PublishLogRead = rows.some(needsReconciliation) ? readPublishLogSafe(folder) : { text: "" };
-    const enriched = rows.map((r) => enrich(folder, slug, r, publishLog, live));
+    const enriched = rows.map((r) => enrich(folder, slug, r, publishLog, live, publishingStatuses[publishingKey(slug, r.id)]));
     return {
       slug,
       title: firstHeading(folder),
@@ -382,7 +409,7 @@ function writeCutComments(folder: string, all: Record<string, CutComment[]>): vo
 // A lens is always a slugified name (see src/atomize/cuts.ts's addCut) — this is the one guard
 // every cut function below routes `lens` through before it ever reaches a join(), the same
 // posture saveDerivative() already takes on its `id` param. Without it, a client-supplied `lens`
-// like "../../../secret" would let /api/cut-save write outside the content folder entirely
+// like "../../../secret" would let a cut-edit caller write outside the content folder entirely
 // (path.join does NOT sandbox ".." segments) — caught in self-vet before this ever shipped.
 export function isValidLens(lens: string): boolean {
   return /^[a-z][a-z0-9-]*$/.test(lens);
@@ -539,7 +566,7 @@ export async function cancelScheduled(
   if (logged.provider === "upload-post") {
     return {
       ok: false,
-      error: "scheduled via the retired Upload-Post provider (no live adapter since PR #130) — cancel it by hand at upload-post.com",
+      error: "scheduled via the retired Upload-Post provider (no live adapter since PR #130). Cancel it by hand at upload-post.com",
     };
   }
   try {

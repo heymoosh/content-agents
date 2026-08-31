@@ -1,0 +1,4878 @@
+{
+  "kind": "reviewed_evidence_intake",
+  "version": "reviewed-evidence-intake-v1",
+  "rows": {
+    "accounts": [
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:linkedin|aagupta",
+        "currentAccountKey": "linkedin|aagupta",
+        "platform": "linkedin",
+        "handle": "aagupta",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/in/aagupta"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:linkedin|aagupta",
+          "profile-evidence:linkedin|aagupta"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:linkedin|codiesanchez",
+        "currentAccountKey": "linkedin|codiesanchez",
+        "platform": "linkedin",
+        "handle": "codiesanchez",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/in/codiesanchez"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:linkedin|codiesanchez",
+          "profile-evidence:linkedin|codiesanchez"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:linkedin|justinwelsh",
+        "currentAccountKey": "linkedin|justinwelsh",
+        "platform": "linkedin",
+        "handle": "justinwelsh",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/in/justinwelsh"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:linkedin|justinwelsh",
+          "profile-evidence:linkedin|justinwelsh"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:linkedin|thedankoe",
+        "currentAccountKey": "linkedin|thedankoe",
+        "platform": "linkedin",
+        "handle": "thedankoe",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/in/thedankoe"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:linkedin|thedankoe",
+          "profile-evidence:linkedin|thedankoe"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:substack-notes|robertreich",
+        "currentAccountKey": "substack-notes|robertreich",
+        "platform": "substack-notes",
+        "handle": "robertreich",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/%40robertreich"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:substack-notes|robertreich",
+          "profile-evidence:substack-notes|robertreich"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:substack-notes|tedgioia",
+        "currentAccountKey": "substack-notes|tedgioia",
+        "platform": "substack-notes",
+        "handle": "tedgioia",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/%40tedgioia"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:substack-notes|tedgioia",
+          "profile-evidence:substack-notes|tedgioia"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:substack|anandwrites",
+        "currentAccountKey": "substack|anandwrites",
+        "platform": "substack",
+        "handle": "anandwrites",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/%40anandwrites"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:substack|anandwrites",
+          "profile-evidence:substack|anandwrites"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:substack|davidpepper",
+        "currentAccountKey": "substack|davidpepper",
+        "platform": "substack",
+        "handle": "davidpepper",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://davidpepper.substack.com/"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:substack|davidpepper",
+          "profile-evidence:substack|davidpepper"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:substack|deepaiyer",
+        "currentAccountKey": "substack|deepaiyer",
+        "platform": "substack",
+        "handle": "deepaiyer",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/%40deepaiyer"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:substack|deepaiyer",
+          "profile-evidence:substack|deepaiyer"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: research_further; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:substack|elenaverna",
+        "currentAccountKey": "substack|elenaverna",
+        "platform": "substack",
+        "handle": "elenaverna",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/%40plgrowth"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:substack|elenaverna",
+          "profile-evidence:substack|elenaverna"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:substack|heathercoxrichardson",
+        "currentAccountKey": "substack|heathercoxrichardson",
+        "platform": "substack",
+        "handle": "heathercoxrichardson",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/%40heathercoxrichardson"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:substack|heathercoxrichardson",
+          "profile-evidence:substack|heathercoxrichardson"
+        ],
+        "caveats": [
+          "Broad pattern research profile access was not blocked for this account; audience and item evidence remain partial and unknown in the source research packet pending consolidated review.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:threads|danidonovan",
+        "currentAccountKey": "threads|danidonovan",
+        "platform": "threads",
+        "handle": "danidonovan",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.net/@danidonovan"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:threads|danidonovan",
+          "profile-evidence:threads|danidonovan"
+        ],
+        "caveats": [
+          "Direct profile access was blocked during broad research; topic, focus, medium, and format remain unknown per the corrected Threads evidence boundary and must not be reversed.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: research_further; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:threads|rowancheung",
+        "currentAccountKey": "threads|rowancheung",
+        "platform": "threads",
+        "handle": "rowancheung",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.net/@rowancheung"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:threads|rowancheung",
+          "profile-evidence:threads|rowancheung"
+        ],
+        "caveats": [
+          "Direct profile access was blocked during broad research; topic, focus, medium, and format remain unknown per the corrected Threads evidence boundary and must not be reversed.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: research_further; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_account_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "account:threads|thedankoe",
+        "currentAccountKey": "threads|thedankoe",
+        "platform": "threads",
+        "handle": "thedankoe",
+        "creator": "unknown",
+        "stableAccountId": null,
+        "stableAccountIdStatus": "unconfirmed",
+        "topics": "unknown",
+        "focus": "unknown",
+        "nicheLabel": "unknown",
+        "researchPoolMembership": null,
+        "popularityScope": "unknown",
+        "sampleScope": "local corpus account sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "medium": "text",
+        "format": "unknown",
+        "audienceSnapshot": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.net/@thedankoe"
+        ],
+        "evidenceRefs": [
+          "candidate-slate:threads|thedankoe",
+          "profile-evidence:threads|thedankoe"
+        ],
+        "caveats": [
+          "Direct profile access was blocked during broad research; topic, focus, medium, and format remain unknown per the corrected Threads evidence boundary and must not be reversed.",
+          "Disposition is a pending staging proposal and is not a reviewed decision.",
+          "Local corpus records are staged identifiers and metadata only; no creator body is included."
+        ],
+        "reviewer": null,
+        "reviewedAt": null,
+        "disposition": "pending",
+        "dispositionReason": "staging proposal: recommend; preserve this recommendation for Muxin's consolidated review",
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "audienceSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "focus",
+            "format",
+            "nicheLabel",
+            "popularityScope",
+            "researchPoolMembership",
+            "reviewedAt",
+            "reviewer",
+            "reviewStatus",
+            "stableAccountId",
+            "topics"
+          ]
+        },
+        "bodyIncluded": false
+      }
+    ],
+    "evidence": [
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-aagupta-388ab6c3",
+        "sourceId": "linkedin-aagupta-388ab6c3",
+        "postId": "linkedin-aagupta-388ab6c3",
+        "accountId": "linkedin|aagupta",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/aagupta_10-trends-that-will-define-product-management-activity-7147410631149703168-LUWM"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-aagupta-388ab6c3"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2024-01-01",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-aagupta-388ab6c3",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-aagupta-410910f0",
+        "sourceId": "linkedin-aagupta-410910f0",
+        "postId": "linkedin-aagupta-410910f0",
+        "accountId": "linkedin|aagupta",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/aagupta_chatgpt-has-a-new-head-of-product-who-is-activity-7069885167212933121-YG-J"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-aagupta-410910f0"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2023-06-01",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-aagupta-410910f0",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-aagupta-67d36f57",
+        "sourceId": "linkedin-aagupta-67d36f57",
+        "postId": "linkedin-aagupta-67d36f57",
+        "accountId": "linkedin|aagupta",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/aagupta_30-of-open-pm-jobs-in-2026-are-ai-pm-roles-activity-7455834008661401600-zZty"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-aagupta-67d36f57"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-05-01",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-aagupta-67d36f57",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-aagupta-72b25468",
+        "sourceId": "linkedin-aagupta-72b25468",
+        "postId": "linkedin-aagupta-72b25468",
+        "accountId": "linkedin|aagupta",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/aagupta_product-management-is-easy-ceo-saw-a-viral-activity-7361531386450649088-mkOi"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-aagupta-72b25468"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2025-08-13",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-aagupta-72b25468",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-aagupta-e7c901ac",
+        "sourceId": "linkedin-aagupta-e7c901ac",
+        "postId": "linkedin-aagupta-e7c901ac",
+        "accountId": "linkedin|aagupta",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/aagupta_im-unplugging-from-the-matrix-heres-why-activity-7131649038629670912-iACl"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-aagupta-e7c901ac"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2023-11-18",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-aagupta-e7c901ac",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-aagupta-fe1197a7",
+        "sourceId": "linkedin-aagupta-fe1197a7",
+        "postId": "linkedin-aagupta-fe1197a7",
+        "accountId": "linkedin|aagupta",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/aagupta_product-management-is-one-of-the-highest-activity-6951884554932543488-a4wB"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-aagupta-fe1197a7"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2022-07-10",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-aagupta-fe1197a7",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-codiesanchez-00162353",
+        "sourceId": "linkedin-codiesanchez-00162353",
+        "postId": "linkedin-codiesanchez-00162353",
+        "accountId": "linkedin|codiesanchez",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/codiesanchez_ive-built-100m-businesses-but-also-i-didnt-activity-7495102525612806144-HWtp"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-codiesanchez-00162353"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-17",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-codiesanchez-00162353",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-codiesanchez-104db588",
+        "sourceId": "linkedin-codiesanchez-104db588",
+        "postId": "linkedin-codiesanchez-104db588",
+        "accountId": "linkedin|codiesanchez",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/codiesanchez_the-simplest-path-i-know-to-build-wealth-activity-7495464577988702208-oEUU"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-codiesanchez-104db588"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-18",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-codiesanchez-104db588",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-codiesanchez-4f32cde8",
+        "sourceId": "linkedin-codiesanchez-4f32cde8",
+        "postId": "linkedin-codiesanchez-4f32cde8",
+        "accountId": "linkedin|codiesanchez",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/codiesanchez_i-sometimes-pinch-myself-i-dont-deserve-activity-7494377366471925760-IZxj"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-codiesanchez-4f32cde8"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-15",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-codiesanchez-4f32cde8",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-codiesanchez-645e48a9",
+        "sourceId": "linkedin-codiesanchez-645e48a9",
+        "postId": "linkedin-codiesanchez-645e48a9",
+        "accountId": "linkedin|codiesanchez",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/codiesanchez_winning-requires-reps-theres-only-1-way-activity-7496914097435873281-XVYf"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-codiesanchez-645e48a9"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-22",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-codiesanchez-645e48a9",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-codiesanchez-ad9765df",
+        "sourceId": "linkedin-codiesanchez-ad9765df",
+        "postId": "linkedin-codiesanchez-ad9765df",
+        "accountId": "linkedin|codiesanchez",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/codiesanchez_6-other-traits-of-rich-people-no-one-tells-activity-7494739853947871232-8rJB"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-codiesanchez-ad9765df"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-16",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-codiesanchez-ad9765df",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-justinwelsh-3d14f339",
+        "sourceId": "linkedin-justinwelsh-3d14f339",
+        "postId": "linkedin-justinwelsh-3d14f339",
+        "accountId": "linkedin|justinwelsh",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/justinwelsh_quit-your-job-and-go-all-in-advice-is-terrible-activity-7496171271458742273-bUGK"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-justinwelsh-3d14f339"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-20",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-justinwelsh-3d14f339",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-justinwelsh-53b804f2",
+        "sourceId": "linkedin-justinwelsh-53b804f2",
+        "postId": "linkedin-justinwelsh-53b804f2",
+        "accountId": "linkedin|justinwelsh",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/justinwelsh_happy-entrepreneurs-make-a-lot-of-money-and-activity-7495446496448909312-w-b3"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-justinwelsh-53b804f2"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-18",
+        "collectedAt": "2026-08-23T03:22:02.238Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-justinwelsh-53b804f2",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-justinwelsh-7931a8ab",
+        "sourceId": "linkedin-justinwelsh-7931a8ab",
+        "postId": "linkedin-justinwelsh-7931a8ab",
+        "accountId": "linkedin|justinwelsh",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/justinwelsh_a-lot-of-very-talented-people-are-underpaid-activity-7496533659425091584-Ssf9"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-justinwelsh-7931a8ab"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-21",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-justinwelsh-7931a8ab",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-justinwelsh-ce00d46f",
+        "sourceId": "linkedin-justinwelsh-ce00d46f",
+        "postId": "linkedin-justinwelsh-ce00d46f",
+        "accountId": "linkedin|justinwelsh",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/justinwelsh_most-successful-entrepreneurs-i-know-activity-7109147539941019648--7RN"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-justinwelsh-ce00d46f"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2023-09-17",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-justinwelsh-ce00d46f",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-justinwelsh-ef9a1124",
+        "sourceId": "linkedin-justinwelsh-ef9a1124",
+        "postId": "linkedin-justinwelsh-ef9a1124",
+        "accountId": "linkedin|justinwelsh",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/justinwelsh_youve-got-one-shot-at-life-one-shot-at-activity-7494721719052505088-CVNo"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-justinwelsh-ef9a1124"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-16",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-justinwelsh-ef9a1124",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-thedankoe-01fc7c18",
+        "sourceId": "linkedin-thedankoe-01fc7c18",
+        "postId": "linkedin-thedankoe-01fc7c18",
+        "accountId": "linkedin|thedankoe",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/thedankoe_drop-everything-activity-7478926156822405121-Upzv"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-thedankoe-01fc7c18"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-03",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-thedankoe-01fc7c18",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-thedankoe-60c1bc7e",
+        "sourceId": "linkedin-thedankoe-60c1bc7e",
+        "postId": "linkedin-thedankoe-60c1bc7e",
+        "accountId": "linkedin|thedankoe",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/thedankoe_4-habits-mind-body-spirit-business-1-activity-7473000277550313472-DobL"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-thedankoe-60c1bc7e"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-06-17",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-thedankoe-60c1bc7e",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-thedankoe-863974ed",
+        "sourceId": "linkedin-thedankoe-863974ed",
+        "postId": "linkedin-thedankoe-863974ed",
+        "accountId": "linkedin|thedankoe",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/thedankoe_funnily-enough-these-have-everything-to-activity-7477126993910657024-fW-h"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-thedankoe-863974ed"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-06-28",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-thedankoe-863974ed",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-thedankoe-dea6ae3b",
+        "sourceId": "linkedin-thedankoe-dea6ae3b",
+        "postId": "linkedin-thedankoe-dea6ae3b",
+        "accountId": "linkedin|thedankoe",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/thedankoe_just-one-hour-please-activity-7469088629802549248-Oj9q"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-thedankoe-dea6ae3b"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-06-06",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-thedankoe-dea6ae3b",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "linkedin-thedankoe-f0ad0190",
+        "sourceId": "linkedin-thedankoe-f0ad0190",
+        "postId": "linkedin-thedankoe-f0ad0190",
+        "accountId": "linkedin|thedankoe",
+        "platform": "linkedin",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.linkedin.com/posts/thedankoe_if-you-want-to-thrive-in-the-next-10-years-activity-7496592302568636416-ZFjv"
+        ],
+        "evidenceRefs": [
+          "corpus:linkedin-thedankoe-f0ad0190"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-21",
+        "collectedAt": "2026-08-23T03:22:02.239Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "linkedin-thedankoe-f0ad0190",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-anandwrites-398ea380",
+        "sourceId": "substack-anandwrites-398ea380",
+        "postId": "substack-anandwrites-398ea380",
+        "accountId": "substack|anandwrites",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://the.ink/p/the-rise-of-aoc-beginnings"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-anandwrites-398ea380"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-11",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-anandwrites-398ea380",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-anandwrites-7a25c315",
+        "sourceId": "substack-anandwrites-7a25c315",
+        "postId": "substack-anandwrites-7a25c315",
+        "accountId": "substack|anandwrites",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://the.ink/p/never-eat-with-women"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-anandwrites-7a25c315"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-03-08",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-anandwrites-7a25c315",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-anandwrites-c696c1e8",
+        "sourceId": "substack-anandwrites-c696c1e8",
+        "postId": "substack-anandwrites-c696c1e8",
+        "accountId": "substack|anandwrites",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://the.ink/p/the-most-overlooked-epstein-email"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-anandwrites-c696c1e8"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-03-25",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-anandwrites-c696c1e8",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-anandwrites-fe3e4934",
+        "sourceId": "substack-anandwrites-fe3e4934",
+        "postId": "substack-anandwrites-fe3e4934",
+        "accountId": "substack|anandwrites",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://the.ink/p/what-abdul-el-sayed-believes"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-anandwrites-fe3e4934"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-05",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-anandwrites-fe3e4934",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-davidpepper-19b5ae21",
+        "sourceId": "substack-davidpepper-19b5ae21",
+        "postId": "substack-davidpepper-19b5ae21",
+        "accountId": "substack|davidpepper",
+        "platform": "substack",
+        "medium": "text",
+        "format": "video",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://davidpepper.substack.com/p/meet-my-favorite-new-voice-for-democracy"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-davidpepper-19b5ae21"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2025-10-18",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-davidpepper-19b5ae21",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-davidpepper-38ec479d",
+        "sourceId": "substack-davidpepper-38ec479d",
+        "postId": "substack-davidpepper-38ec479d",
+        "accountId": "substack|davidpepper",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://davidpepper.substack.com/p/unpacking-the-lies"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-davidpepper-38ec479d"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-27",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-davidpepper-38ec479d",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-davidpepper-4eb98337",
+        "sourceId": "substack-davidpepper-4eb98337",
+        "postId": "substack-davidpepper-4eb98337",
+        "accountId": "substack|davidpepper",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://davidpepper.substack.com/p/resolve-8-reasons-that-keep-me-going"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-davidpepper-4eb98337"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2024-11-23",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-davidpepper-4eb98337",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-davidpepper-51c1a2a6",
+        "sourceId": "substack-davidpepper-51c1a2a6",
+        "postId": "substack-davidpepper-51c1a2a6",
+        "accountId": "substack|davidpepper",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://davidpepper.substack.com/p/new-report-ramaswamys-pump-and-dump"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-davidpepper-51c1a2a6"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-13",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-davidpepper-51c1a2a6",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-deepaiyer-66aa3704",
+        "sourceId": "substack-deepaiyer-66aa3704",
+        "postId": "substack-deepaiyer-66aa3704",
+        "accountId": "substack|deepaiyer",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://deepaiyer.substack.com/p/target-stretch-safety-a-discernment"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-deepaiyer-66aa3704"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-01-04",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-deepaiyer-66aa3704",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-deepaiyer-8d40718b",
+        "sourceId": "substack-deepaiyer-8d40718b",
+        "postId": "substack-deepaiyer-8d40718b",
+        "accountId": "substack|deepaiyer",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://deepaiyer.substack.com/p/all-of-us"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-deepaiyer-8d40718b"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2025-06-12",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-deepaiyer-8d40718b",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-deepaiyer-ae2d2191",
+        "sourceId": "substack-deepaiyer-ae2d2191",
+        "postId": "substack-deepaiyer-ae2d2191",
+        "accountId": "substack|deepaiyer",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://deepaiyer.substack.com/p/grieve-connect-act-reflect-correct"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-deepaiyer-ae2d2191"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2024-11-10",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-deepaiyer-ae2d2191",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-deepaiyer-f8bed7e4",
+        "sourceId": "substack-deepaiyer-f8bed7e4",
+        "postId": "substack-deepaiyer-f8bed7e4",
+        "accountId": "substack|deepaiyer",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://deepaiyer.substack.com/p/the-social-life-of-social-justice"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-deepaiyer-f8bed7e4"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-14",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-deepaiyer-f8bed7e4",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-elenaverna-2dd088a1",
+        "sourceId": "substack-elenaverna-2dd088a1",
+        "postId": "substack-elenaverna-2dd088a1",
+        "accountId": "substack|elenaverna",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.elenaverna.com/p/report-what-people-really-think-about"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-elenaverna-2dd088a1"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-13",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-elenaverna-2dd088a1",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-elenaverna-37345f62",
+        "sourceId": "substack-elenaverna-37345f62",
+        "postId": "substack-elenaverna-37345f62",
+        "accountId": "substack|elenaverna",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.elenaverna.com/p/your-ai-strategy-has-a-trust-problem"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-elenaverna-37345f62"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-06-05",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-elenaverna-37345f62",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-elenaverna-6182bc17",
+        "sourceId": "substack-elenaverna-6182bc17",
+        "postId": "substack-elenaverna-6182bc17",
+        "accountId": "substack|elenaverna",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.elenaverna.com/p/youll-lose-your-job-in-2027"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-elenaverna-6182bc17"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-05-21",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-elenaverna-6182bc17",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-elenaverna-8e193872",
+        "sourceId": "substack-elenaverna-8e193872",
+        "postId": "substack-elenaverna-8e193872",
+        "accountId": "substack|elenaverna",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.elenaverna.com/p/confessions-of-a-millennial-in-tech"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-elenaverna-8e193872"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-04-06",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-elenaverna-8e193872",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-elenaverna-972e64a5",
+        "sourceId": "substack-elenaverna-972e64a5",
+        "postId": "substack-elenaverna-972e64a5",
+        "accountId": "substack|elenaverna",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.elenaverna.com/p/ic-work-is-the-new-career-flex"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-elenaverna-972e64a5"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-05-14",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-elenaverna-972e64a5",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-elenaverna-f0aef61f",
+        "sourceId": "substack-elenaverna-f0aef61f",
+        "postId": "substack-elenaverna-f0aef61f",
+        "accountId": "substack|elenaverna",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.elenaverna.com/p/theres-a-short-window-to-get-radically"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-elenaverna-f0aef61f"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-02-20",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-elenaverna-f0aef61f",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-heathercoxrichardson-053b8b3c",
+        "sourceId": "substack-heathercoxrichardson-053b8b3c",
+        "postId": "substack-heathercoxrichardson-053b8b3c",
+        "accountId": "substack|heathercoxrichardson",
+        "platform": "substack",
+        "medium": "text",
+        "format": "mixed",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://heathercoxrichardson.substack.com/p/september-11-2022"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-heathercoxrichardson-053b8b3c"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2022-09-12",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-heathercoxrichardson-053b8b3c",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-heathercoxrichardson-19b08422",
+        "sourceId": "substack-heathercoxrichardson-19b08422",
+        "postId": "substack-heathercoxrichardson-19b08422",
+        "accountId": "substack|heathercoxrichardson",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://heathercoxrichardson.substack.com/p/august-19-2026"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-heathercoxrichardson-19b08422"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-20",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-heathercoxrichardson-19b08422",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-heathercoxrichardson-2d560439",
+        "sourceId": "substack-heathercoxrichardson-2d560439",
+        "postId": "substack-heathercoxrichardson-2d560439",
+        "accountId": "substack|heathercoxrichardson",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://heathercoxrichardson.substack.com/p/august-21-2026"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-heathercoxrichardson-2d560439"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-22",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-heathercoxrichardson-2d560439",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-heathercoxrichardson-61f4a851",
+        "sourceId": "substack-heathercoxrichardson-61f4a851",
+        "postId": "substack-heathercoxrichardson-61f4a851",
+        "accountId": "substack|heathercoxrichardson",
+        "platform": "substack",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://heathercoxrichardson.substack.com/p/march-18-2026"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-heathercoxrichardson-61f4a851"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-03-19",
+        "collectedAt": "2026-08-23T03:14:56.346Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-heathercoxrichardson-61f4a851",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-robertreich-0171afab",
+        "sourceId": "substack-notes-robertreich-0171afab",
+        "postId": "substack-notes-robertreich-0171afab",
+        "accountId": "substack-notes|robertreich",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@robertreich/note/c-295225063"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-robertreich-0171afab"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-15",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-robertreich-0171afab",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-robertreich-32f3dd8c",
+        "sourceId": "substack-notes-robertreich-32f3dd8c",
+        "postId": "substack-notes-robertreich-32f3dd8c",
+        "accountId": "substack-notes|robertreich",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@robertreich/note/c-305504391"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-robertreich-32f3dd8c"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-31",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-robertreich-32f3dd8c",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-robertreich-6cf20e26",
+        "sourceId": "substack-notes-robertreich-6cf20e26",
+        "postId": "substack-notes-robertreich-6cf20e26",
+        "accountId": "substack-notes|robertreich",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@robertreich/note/c-300508968"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-robertreich-6cf20e26"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-23",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-robertreich-6cf20e26",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-robertreich-b29d316a",
+        "sourceId": "substack-notes-robertreich-b29d316a",
+        "postId": "substack-notes-robertreich-b29d316a",
+        "accountId": "substack-notes|robertreich",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@robertreich/note/c-239761877"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-robertreich-b29d316a"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-04-07",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-robertreich-b29d316a",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-robertreich-ce13162f",
+        "sourceId": "substack-notes-robertreich-ce13162f",
+        "postId": "substack-notes-robertreich-ce13162f",
+        "accountId": "substack-notes|robertreich",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@robertreich/note/c-302848829"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-robertreich-ce13162f"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-27",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-robertreich-ce13162f",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-robertreich-e5ad8beb",
+        "sourceId": "substack-notes-robertreich-e5ad8beb",
+        "postId": "substack-notes-robertreich-e5ad8beb",
+        "accountId": "substack-notes|robertreich",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@robertreich/note/c-307475382"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-robertreich-e5ad8beb"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-03",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-robertreich-e5ad8beb",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-tedgioia-0450fdc4",
+        "sourceId": "substack-notes-tedgioia-0450fdc4",
+        "postId": "substack-notes-tedgioia-0450fdc4",
+        "accountId": "substack-notes|tedgioia",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@tedgioia/note/c-301891346"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-tedgioia-0450fdc4"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-26",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-tedgioia-0450fdc4",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-tedgioia-11283870",
+        "sourceId": "substack-notes-tedgioia-11283870",
+        "postId": "substack-notes-tedgioia-11283870",
+        "accountId": "substack-notes|tedgioia",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "link-preview",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@tedgioia/note/c-312230578"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-tedgioia-11283870"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-10",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-tedgioia-11283870",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-tedgioia-18ce7941",
+        "sourceId": "substack-notes-tedgioia-18ce7941",
+        "postId": "substack-notes-tedgioia-18ce7941",
+        "accountId": "substack-notes|tedgioia",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "link-preview",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@tedgioia/note/c-303022743"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-tedgioia-18ce7941"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-27",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-tedgioia-18ce7941",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-tedgioia-84ebc350",
+        "sourceId": "substack-notes-tedgioia-84ebc350",
+        "postId": "substack-notes-tedgioia-84ebc350",
+        "accountId": "substack-notes|tedgioia",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@tedgioia/note/c-314110015"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-tedgioia-84ebc350"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-13",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-tedgioia-84ebc350",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-tedgioia-c8253a2d",
+        "sourceId": "substack-notes-tedgioia-c8253a2d",
+        "postId": "substack-notes-tedgioia-c8253a2d",
+        "accountId": "substack-notes|tedgioia",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@tedgioia/note/c-316047588"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-tedgioia-c8253a2d"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-16",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-tedgioia-c8253a2d",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "substack-notes-tedgioia-df077cdc",
+        "sourceId": "substack-notes-tedgioia-df077cdc",
+        "postId": "substack-notes-tedgioia-df077cdc",
+        "accountId": "substack-notes|tedgioia",
+        "platform": "substack-notes",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://substack.com/@tedgioia/note/c-306425852"
+        ],
+        "evidenceRefs": [
+          "corpus:substack-notes-tedgioia-df077cdc"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-02",
+        "collectedAt": "2026-08-23T05:52:49.604Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "substack-notes-tedgioia-df077cdc",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-danidonovan-039567f8",
+        "sourceId": "threads-danidonovan-039567f8",
+        "postId": "threads-danidonovan-039567f8",
+        "accountId": "threads|danidonovan",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@danidonovan/post/DcORx70in15"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-danidonovan-039567f8"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-19",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-danidonovan-039567f8",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-danidonovan-4e233c55",
+        "sourceId": "threads-danidonovan-4e233c55",
+        "postId": "threads-danidonovan-4e233c55",
+        "accountId": "threads|danidonovan",
+        "platform": "threads",
+        "medium": "text",
+        "format": "image",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@danidonovan/post/DcLxbM-Dtc0"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-danidonovan-4e233c55"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-18",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-danidonovan-4e233c55",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-danidonovan-92e79622",
+        "sourceId": "threads-danidonovan-92e79622",
+        "postId": "threads-danidonovan-92e79622",
+        "accountId": "threads|danidonovan",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@danidonovan/post/DcRfUr1iFRY"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-danidonovan-92e79622"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-20",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-danidonovan-92e79622",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-danidonovan-cc0f9fb0",
+        "sourceId": "threads-danidonovan-cc0f9fb0",
+        "postId": "threads-danidonovan-cc0f9fb0",
+        "accountId": "threads|danidonovan",
+        "platform": "threads",
+        "medium": "text",
+        "format": "carousel",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@danidonovan/post/DcFkwdZjoWo"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-danidonovan-cc0f9fb0"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-16",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-danidonovan-cc0f9fb0",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-danidonovan-dac2358d",
+        "sourceId": "threads-danidonovan-dac2358d",
+        "postId": "threads-danidonovan-dac2358d",
+        "accountId": "threads|danidonovan",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@danidonovan/post/DcWOIsmjZVR"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-danidonovan-dac2358d"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-22",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-danidonovan-dac2358d",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-rowancheung-0cd343e1",
+        "sourceId": "threads-rowancheung-0cd343e1",
+        "postId": "threads-rowancheung-0cd343e1",
+        "accountId": "threads|rowancheung",
+        "platform": "threads",
+        "medium": "text",
+        "format": "video",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@rowancheung/post/DbV5M78lboh"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-rowancheung-0cd343e1"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-28",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-rowancheung-0cd343e1",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-rowancheung-702ddaca",
+        "sourceId": "threads-rowancheung-702ddaca",
+        "postId": "threads-rowancheung-702ddaca",
+        "accountId": "threads|rowancheung",
+        "platform": "threads",
+        "medium": "text",
+        "format": "video",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@rowancheung/post/Db58c9GkkLJ"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-rowancheung-702ddaca"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-11",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-rowancheung-702ddaca",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-rowancheung-8763df73",
+        "sourceId": "threads-rowancheung-8763df73",
+        "postId": "threads-rowancheung-8763df73",
+        "accountId": "threads|rowancheung",
+        "platform": "threads",
+        "medium": "text",
+        "format": "carousel",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@rowancheung/post/Db3klewlQ1x"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-rowancheung-8763df73"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-10",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-rowancheung-8763df73",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-rowancheung-99ecffe6",
+        "sourceId": "threads-rowancheung-99ecffe6",
+        "postId": "threads-rowancheung-99ecffe6",
+        "accountId": "threads|rowancheung",
+        "platform": "threads",
+        "medium": "text",
+        "format": "video",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@rowancheung/post/DavRJgciK1K"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-rowancheung-99ecffe6"
+        ],
+        "bodyComplete": false,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-13",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-rowancheung-99ecffe6",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "bodyComplete",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-rowancheung-cab1c305",
+        "sourceId": "threads-rowancheung-cab1c305",
+        "postId": "threads-rowancheung-cab1c305",
+        "accountId": "threads|rowancheung",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@rowancheung/post/DcBqsSaG59x"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-rowancheung-cab1c305"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-14",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-rowancheung-cab1c305",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-thedankoe-05298c22",
+        "sourceId": "threads-thedankoe-05298c22",
+        "postId": "threads-thedankoe-05298c22",
+        "accountId": "threads|thedankoe",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@thedankoe/post/DbgKiEXke0U"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-thedankoe-05298c22"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-01",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-thedankoe-05298c22",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-thedankoe-2bc7a797",
+        "sourceId": "threads-thedankoe-2bc7a797",
+        "postId": "threads-thedankoe-2bc7a797",
+        "accountId": "threads|thedankoe",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@thedankoe/post/DcV_xi_ltjZ"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-thedankoe-2bc7a797"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-22",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-thedankoe-2bc7a797",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-thedankoe-5ef50040",
+        "sourceId": "threads-thedankoe-5ef50040",
+        "postId": "threads-thedankoe-5ef50040",
+        "accountId": "threads|thedankoe",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@thedankoe/post/DanbFU_nF8Q"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-thedankoe-5ef50040"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-10",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-thedankoe-5ef50040",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-thedankoe-7044bc8e",
+        "sourceId": "threads-thedankoe-7044bc8e",
+        "postId": "threads-thedankoe-7044bc8e",
+        "accountId": "threads|thedankoe",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@thedankoe/post/Da3HhZWkfxN"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-thedankoe-7044bc8e"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-07-16",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-thedankoe-7044bc8e",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      },
+      {
+        "kind": "reviewed_source_evidence_intake_row",
+        "version": "reviewed-evidence-intake-v1",
+        "id": "threads-thedankoe-88f925cd",
+        "sourceId": "threads-thedankoe-88f925cd",
+        "postId": "threads-thedankoe-88f925cd",
+        "accountId": "threads|thedankoe",
+        "platform": "threads",
+        "medium": "text",
+        "format": "text-only",
+        "pool": null,
+        "membershipReason": null,
+        "audienceSizeSnapshot": "unknown",
+        "metricSnapshot": "unknown",
+        "comparisonClaimed": false,
+        "popularityScope": "local corpus record",
+        "sampleScope": "targeted local corpus sample",
+        "baselineScope": "unknown",
+        "baselineSource": "unknown",
+        "evidenceLinks": [
+          "https://www.threads.com/@thedankoe/post/DcTNPsBlNN_"
+        ],
+        "evidenceRefs": [
+          "corpus:threads-thedankoe-88f925cd"
+        ],
+        "bodyComplete": true,
+        "caveats": [
+          "Source body, caption, title, hook, transcript, and examples are excluded from this staging row.",
+          "Source identifier and locator are retained for later consolidated review only."
+        ],
+        "provenance": "local corpus record",
+        "observedAt": "2026-08-21",
+        "collectedAt": "2026-08-23T05:32:33.636Z",
+        "reviewStatus": "pending",
+        "status": "blocked",
+        "lineage": [
+          {
+            "recordType": "corpus",
+            "id": "threads-thedankoe-88f925cd",
+            "relation": "source-record"
+          }
+        ],
+        "readiness": {
+          "status": "blocked",
+          "blockers": [
+            "account metadata is not ready",
+            "audienceSizeSnapshot",
+            "baselineScope",
+            "baselineSource",
+            "membershipReason",
+            "pool",
+            "reviewStatus",
+            "status"
+          ]
+        },
+        "bodyIncluded": false
+      }
+    ],
+    "baselines": []
+  },
+  "summary": {
+    "accounts": {
+      "total": 14,
+      "ready": 0,
+      "blocked": 14,
+      "unmapped": 0,
+      "blockerCount": 182
+    },
+    "evidence": {
+      "total": 70,
+      "ready": 0,
+      "blocked": 70,
+      "unmapped": 0,
+      "blockerCount": 577
+    },
+    "baselines": {
+      "total": 0,
+      "ready": 0,
+      "blocked": 0,
+      "unmapped": 0,
+      "blockerCount": 0
+    },
+    "total": {
+      "total": 84,
+      "ready": 0,
+      "blocked": 84,
+      "unmapped": 0,
+      "blockerCount": 759
+    },
+    "blockerCounts": {
+      "account metadata is not ready": 70,
+      "audienceSizeSnapshot": 70,
+      "audienceSnapshot": 14,
+      "baselineScope": 84,
+      "baselineSource": 84,
+      "bodyComplete": 17,
+      "focus": 14,
+      "format": 14,
+      "membershipReason": 70,
+      "nicheLabel": 14,
+      "pool": 70,
+      "popularityScope": 14,
+      "researchPoolMembership": 14,
+      "reviewedAt": 14,
+      "reviewer": 14,
+      "reviewStatus": 84,
+      "stableAccountId": 14,
+      "status": 70,
+      "topics": 14
+    }
+  },
+  "readiness": {
+    "status": "blocked",
+    "total": 84,
+    "ready": 0,
+    "blocked": 84,
+    "unmapped": 0,
+    "blockerCount": 759
+  },
+  "bodyIncluded": false,
+  "sideEffects": "none",
+  "cliVersion": "reviewed-evidence-intake-cli-v1"
+}

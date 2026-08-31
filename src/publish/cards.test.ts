@@ -44,12 +44,14 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
   const originalKey = process.env.TYPEFULLY_API_KEY;
   const originalSetId = process.env.TYPEFULLY_SOCIAL_SET_ID;
   const originalBetsPath = process.env.CONTENT_AGENTS_TEST_BETS_PATH;
+  const originalAccountId = process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
   const dirs: string[] = [];
 
   before(() => {
     process.env.TYPEFULLY_API_KEY = "test-key";
     process.env.TYPEFULLY_SOCIAL_SET_ID = "test-set";
     process.env.CONTENT_AGENTS_TEST_BETS_PATH = TEST_BETS_PATH;
+    process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = "human-inference/typefully";
   });
 
   after(() => {
@@ -60,6 +62,8 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     else process.env.TYPEFULLY_SOCIAL_SET_ID = originalSetId;
     if (originalBetsPath === undefined) delete process.env.CONTENT_AGENTS_TEST_BETS_PATH;
     else process.env.CONTENT_AGENTS_TEST_BETS_PATH = originalBetsPath;
+    if (originalAccountId === undefined) delete process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID;
+    else process.env.CONTENT_AGENTS_TYPEFULLY_ACCOUNT_ID = originalAccountId;
     if (existsSync(TEST_BETS_PATH)) rmSync(TEST_BETS_PATH, { force: true });
     for (const d of dirs) rmSync(d, { recursive: true, force: true });
   });
@@ -91,9 +95,10 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     return { calls };
   }
 
-  function tmpFolder(rowLine: string, captionFrontmatter: string): string {
+  function tmpFolder(rowLine: string, captionFrontmatter: string, sourceFrontmatter = ""): string {
     const folder = mkdtempSync(join(tmpdir(), "cards-test-"));
     dirs.push(folder);
+    writeFileSync(join(folder, "content-request.json"), JSON.stringify({ origin: "human-inference" }));
     mkdirSync(join(folder, "derivatives"), { recursive: true });
     mkdirSync(join(folder, "images"), { recursive: true });
     writeFileSync(
@@ -103,6 +108,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
         rowLine
     );
     writeFileSync(join(folder, "derivatives", "quote-card-1-x.md"), `${captionFrontmatter}Context caption for the card.\n`);
+    if (sourceFrontmatter) writeFileSync(join(folder, "source.md"), sourceFrontmatter);
     writeFileSync(join(folder, "images", "quote-card-1.png"), "not real png bytes, just a fixture for the mocked upload");
     return folder;
   }
@@ -174,7 +180,8 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     stubTypefully();
     const folder = tmpFolder(
       `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
-      `---\nplatform: quote-card:x\ncta: source\n---\n`
+      `---\nplatform: quote-card:x\ncta: source\n---\n`,
+      `---\ncanonical_url: https://example.com/essay\nsource_kind: essay\n---\n`
     );
 
     await publishCards(folder, { atOverride: FUTURE_ISO });
@@ -186,7 +193,7 @@ describe("publishCards: native Typefully routing (mocked Typefully client)", () 
     stubTypefully();
     const folder = tmpFolder(
       `| quote-card-1-x | quote-card:x | image | images/quote-card-1.png | 4 | 5 | yes | approve | test row | from /cycle |\n`,
-      `---\nplatform: quote-card:x\ncontent_type: [offer_adjacent_post]\n---\n`
+      `---\nplatform: quote-card:x\ncontent_type: [offer_adjacent_post]\ncta_reviewed: true\ncta_fit: high\ncta_value: high\n---\n`
     );
 
     await publishCards(folder, { atOverride: FUTURE_ISO });

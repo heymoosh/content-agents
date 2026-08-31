@@ -2,8 +2,8 @@
   "builder_model": "gpt-5.6-terra",
   "reasoning_effort": "high",
   "escalation_reason": null,
-  "audit_model": "claude-cli",
+  "audit_model": "Claude Code 2.1.246",
   "audit_reasoning_effort": "unreported",
-  "audit_status": "pending",
-  "audit_blocker": "Attempted claude -p on 2026-08-25; the CLI returned Not logged in before reviewing repository content."
+  "audit_status": "source package invalid; superseded by pattern-local-evidence-inventory-clean-commit",
+  "audit_blocker": "The source commit changed three coordinator paths outside its staging-only lease and its full diff failed on a blank line at EOF."
 }

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -30,9 +31,161 @@ import {
   type SchedulerDeps,
   appendLeadContact,
   ventureAnalysisPrompt,
+  availableEngines,
+  requestEngine,
+  requestAnalysisEngine,
+  requestInteractiveAnalysisEngine,
+  recordOutreachInitialSend,
+  reviewRequestHandler,
 } from "./serve.js";
 import type { LiveProviderState } from "./reconcile.js";
 import type { QueueRow } from "../publish/queue.js";
+import { approveConfiguredMediaStage } from "./configured-media-runtime.js";
+
+test("engine availability requires the exact GPT-OSS model, not merely an Ollama binary", () => {
+  const missing = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\nllama3.2:latest\n" : "");
+  assert.equal(missing.find((e) => e.id === "ollama-gpt-oss")?.installed, false);
+  const ready = availableEngines((file, args) => file === "ollama" && args[0] === "list" ? "NAME\ngpt-oss:20b\n" : "");
+  assert.equal(ready.find((e) => e.id === "ollama-gpt-oss")?.installed, true);
+});
+
+test("GPT-OSS is accepted only by read-only analysis routes", () => {
+  assert.equal(requestAnalysisEngine("ollama-gpt-oss"), "ollama-gpt-oss");
+  assert.throws(() => requestEngine("ollama-gpt-oss"), /read-only|agentic|file/i);
+  assert.equal(requestEngine("codex"), "codex");
+  assert.throws(() => requestInteractiveAnalysisEngine("ollama-gpt-oss"), /self-contained|follow-up/i);
+});
+
+test("manual initial outreach sends use the folder slug and contacted event metadata", () => {
+  let recorded: unknown = null;
+  const event = recordOutreachInitialSend("outreach/leads/platform-moral-ambition", {
+    kind: "platform", latestMessage: {
+      file: "messages/message-01.md", channel: "email", status: "locked", recipient: "Jane Doe", body: "Hello",
+    }, contacts: [],
+  }, (bucket, lead, opts) => {
+    recorded = { bucket, lead, opts };
+    return { ts: "2026-08-29T00:00:00.000Z", bucket, lead, event: "contacted", ...opts } as never;
+  });
+  assert.equal(event.event, "contacted");
+  assert.deepEqual(recorded, {
+    bucket: "platform", lead: "platform-moral-ambition",
+    opts: { person: "Jane Doe", channel: "email", message: "messages/message-01.md", note: "Sent by hand from the Outreach composer" },
+  });
+  assert.throws(() => recordOutreachInitialSend("outreach/leads/platform-moral-ambition", {
+    kind: "platform", latestMessage: { file: "messages/message-01.md", channel: "email", status: "draft", recipient: "", body: "Hello" }, contacts: [],
+  }, (() => ({}) as never)), /lock/i);
+});
+
+test("fiction promotion handoff requires an approved promotional final", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/fiction/handoff"'));
+  assert.match(source, /createLockedChapterHandoff/);
+  assert.match(source, /scaffoldContentFolder/);
+  assert.match(source, /writeContentRequest\(folder/);
+  assert.match(source, /sourceKind: "fiction-promotion"/);
+  assert.match(source, /promotion\.state !== "Approved"/);
+  assert.match(source, /text: promotion\.body/);
+});
+
+test("Charles promotion has an approved request-only handoff route", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/charles/handoff"'));
+  assert.match(source, /createApprovedCharlesHandoff/);
+  assert.match(source, /toCharlesContentRequestInput/);
+});
+
+test("configured Content requests have one explicit draft-generation route", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/content/generate"'));
+  assert.match(source, /readContentRequest\(safeFolder\(slug\)\)/);
+  assert.match(source, /generateConfiguredContent/);
+});
+
+test("configured media has separate plan approval, queued render, and reviewed-file attachment routes", () => {
+  const source = readFileSync(join(process.cwd(), "src/review/serve.ts"), "utf8");
+  assert.ok(source.includes('url.pathname === "/api/content/media/approve"'));
+  assert.ok(source.includes('url.pathname === "/api/content/media/render"'));
+  assert.ok(source.includes('url.pathname === "/api/content/media/attach-reviewed"'));
+  assert.match(source, /approveConfiguredMediaStage\(safeFolder\(slug\), id\)/);
+  assert.match(source, /executeConfiguredMediaStage\(folder, id, defaultConfiguredMediaRenderer\)/);
+  assert.match(source, /attachReviewedConfiguredMediaFiles\(folder, id, assetPaths\)/);
+  assert.match(source, /runQueued\("configured-media-render"/);
+  const attachRoute = source.slice(source.indexOf('url.pathname === "/api/content/media/attach-reviewed"'), source.indexOf('url.pathname === "/api/develop/start"'));
+  assert.match(attachRoute, /await runQueued\("configured-media-render"/);
+  assert.match(attachRoute, /attachReviewedConfiguredMediaFiles\(folder, id, assetPaths\)/);
+});
+
+test("POST attach-reviewed executes the real route and returns promoted reviewed media", async () => {
+  const slug = `.test-attach-reviewed-${process.pid}-${Date.now()}`;
+  const folder = join(process.cwd(), "content", slug);
+  mkdirSync(join(folder, "media-stages"), { recursive: true });
+  mkdirSync(join(folder, "reviewed"));
+  writeFileSync(join(folder, "review-queue.md"), `| id | platform | format | asset | native | brand | cta | status | notes | origin |\n|---|---|---|---|---|---|---|---|---|---|\n| m1 | linkedin | image | media-stages/m1.json | — | — | — | pending | | from GUI queue |\n`);
+  writeFileSync(join(folder, "media-stages/m1.json"), JSON.stringify({
+    version: "configured-media-stage-v1", id: "m1", media: "image", status: "staged",
+    stage: "prompt-approval-required", plan: { kind: "image-prompt-brief", sourceExcerpt: "approved" }, primitives: ["reviewed"],
+  }));
+  writeFileSync(join(folder, "reviewed/art.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]));
+  approveConfiguredMediaStage(folder, "m1");
+  const httpServer = createServer(reviewRequestHandler);
+  try {
+    await new Promise<void>((resolve) => httpServer.listen(0, "127.0.0.1", resolve));
+    const address = httpServer.address();
+    assert.ok(address && typeof address === "object");
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/content/media/attach-reviewed`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slug, id: "m1", assetPaths: ["reviewed/art.png"] }),
+    });
+    const body = await response.json() as { ok?: boolean; result?: { primaryAsset?: string }; error?: string };
+    assert.equal(response.status, 200, body.error ?? "attach-reviewed route failed");
+    assert.equal(body.ok, true);
+    assert.equal(body.result?.primaryAsset, "configured-media/m1/image.png");
+    assert.match(readFileSync(join(folder, "review-queue.md"), "utf8"), /Attached reviewed image/);
+  } finally {
+    await new Promise<void>((resolve, reject) => httpServer.close((error) => error ? reject(error) : resolve()));
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test("the initial GUI Content save derives source authority on the server", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const start = source.indexOf('url.pathname === "/api/content/request"');
+  const end = source.indexOf('url.pathname === "/api/content/generate"', start);
+  const route = source.slice(start, end);
+  assert.match(route, /authorizeGuiContentRequest\(folder, input, existing\)/);
+  assert.doesNotMatch(route, /:\s*input\s*;/, "fresh client input must not be persisted as source authority");
+});
+
+test("approval dispatches through the existing reviewed platform schedulers", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const start = source.indexOf('url.pathname === "/api/status"');
+  const end = source.indexOf('url.pathname === "/api/cancel"', start);
+  const route = source.slice(start, end);
+  assert.match(route, /await scheduleApproved/);
+  assert.match(route, /schedulingInFlight/);
+  assert.doesNotMatch(route, /provider: "postiz"/);
+});
+
+test("Venture handoff refuses concurrent duplicate Content writes", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const start = source.indexOf('url.pathname === "/api/venture/handoff"');
+  const end = source.indexOf('url.pathname === "/api/studio"', start);
+  const route = source.slice(start, end);
+  assert.match(route, /ventureHandoffsInFlight\.has/);
+  assert.match(route, /ventureHandoffsInFlight\.add/);
+  assert.match(route, /ventureHandoffsInFlight\.delete/);
+  assert.match(route, /readContentRequest\(existingFolder\)/);
+  assert.match(route, /existingRequest\.ventureSource\?\.artifactId/);
+});
+
+test("the E2E start seam owns the loopback listen and direct execution delegates to it", () => {
+  const source = readFileSync(new URL("./serve.ts", import.meta.url), "utf8");
+  const seam = source.indexOf("export function startReviewServer");
+  const guard = source.indexOf("startReviewServer();", seam + 1);
+  assert.ok(seam >= 0, "serve.ts must export the explicit start seam");
+  assert.ok(guard > seam, "the direct-run guard must delegate to the seam");
+  assert.match(source.slice(seam, guard), /server\.listen\(PORT, "127\.0\.0\.1"/);
+});
 
 test("ventureAnalysisPrompt is read-only and carries the server-derived state", () => {
   const prompt = ventureAnalysisPrompt("my-venture", { phase: 2, next: "review" });
@@ -129,6 +282,14 @@ test("approveBlockReason allows the same storyboard row once video/storyboard.md
     (p) => p === "/content/2026-06-16-foo/video/storyboard.md",
   );
   assert.equal(reason, null);
+});
+
+test("approveBlockReason never treats a configured media plan record as a finished publishable asset", () => {
+  const staged: QueueRow = {
+    id: "carousel-1", platform: "linkedin", format: "image", asset: "media-stages/carousel-1.json",
+    status: "pending", notes: "", origin: "from GUI queue", lineIndex: 0,
+  };
+  assert.match(approveBlockReason("/content/example", staged, () => true) ?? "", /staged media plan.*not a rendered asset/i);
 });
 
 test("approveBlockReason never blocks text rows, even with nothing on disk", () => {
@@ -281,6 +442,11 @@ function stubDeps(): { deps: SchedulerDeps; calls: Record<string, { folder: stri
       publishShorts: rec("publishShorts"),
       publishSubstack: rec("publishSubstack"),
       lockOutreachMessage: rec("lockOutreachMessage"),
+      resolveDeliveryPolicy: (_folder, provider) => ({
+        policyVersion: "delivery-policy-v1", origin: "human-inference", brand: "human-inference",
+        provider, providerAccountId: provider === "manual" ? null : `human-inference/${provider}`,
+        mode: provider === "manual" ? "manual" : "provider", reason: "test fixture",
+      }),
     },
   };
 }
@@ -615,31 +781,32 @@ test("outreachDraftGuard refuses anything outside a real outreach/leads/<dir> fo
 
 test("outreachDraftGuard accepts a real lead folder and passes the direction through", () => {
   const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: "  keep it short  " });
-  assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: "keep it short", engine: "claude" });
+  assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: "keep it short", engine: "codex" });
 });
 
 test("outreachDraftGuard turns a blank direction into undefined, never an empty string", () => {
   // Load-bearing: `undefined` is what keeps buildDraftPrompt byte-identical for existing callers.
   for (const blank of ["", "   ", "\n\t "]) {
     const g = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", direction: blank });
-    assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "claude" });
+    assert.deepEqual(g, { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "codex" });
   }
   assert.deepEqual(outreachDraftGuard({ dir: "outreach/leads/client-acme-co" }), {
     dir: "outreach/leads/client-acme-co",
     direction: undefined,
-    engine: "claude",
+    engine: "codex",
   });
 });
 
-test("outreachDraftGuard normalizes the optional engine for the directed draft route", () => {
+test("outreachDraftGuard accepts ChatGPT/Grok and rejects every other outreach engine", () => {
   assert.deepEqual(
     outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "grok" }),
     { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "grok" },
   );
-  assert.deepEqual(
-    outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "unsupported" }),
-    { dir: "outreach/leads/client-acme-co", direction: undefined, engine: "claude" },
-  );
+  for (const engine of ["claude", "unsupported"]) {
+    const result = outreachDraftGuard({ dir: "outreach/leads/client-acme-co", engine });
+    assert.ok("error" in result);
+    assert.match((result as { error: string }).error, /ChatGPT or Grok/);
+  }
 });
 
 test("outreachDraftGuard caps a pasted-document direction before it reaches a spawn", () => {
@@ -657,8 +824,9 @@ test("followUpDraftGuard validates the route folder and propagates the optional 
   );
   assert.deepEqual(
     followUpDraftGuard({ dir: "outreach/leads/client-acme-co" }),
-    { dir: "outreach/leads/client-acme-co", engine: "claude" },
+    { dir: "outreach/leads/client-acme-co", engine: "codex" },
   );
+  assert.ok("error" in followUpDraftGuard({ dir: "outreach/leads/client-acme-co", engine: "claude" }));
   assert.ok("error" in followUpDraftGuard({ dir: "outreach/leads/../escape", engine: "codex" }));
 });
 

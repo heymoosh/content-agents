@@ -462,6 +462,9 @@ describe("per-person follow-up rows", () => {
       assert.equal(event.channel, "email");
       assert.equal(event.message, "message-01");
       assert.deepEqual(readTrackerEvents(path), [event]);
+      const repeated = markSent("client", "client-posthog", { person: "Jamie R.", channel: "email", message: "message-01" }, path);
+      assert.equal(repeated.ts, event.ts, "the same locked message is recorded only once");
+      assert.deepEqual(readTrackerEvents(path), [event]);
     } finally {
       rmSync(d, { recursive: true, force: true });
     }

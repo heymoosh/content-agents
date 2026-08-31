@@ -3,6 +3,8 @@ import { join, dirname } from "node:path";
 import { parse } from "yaml";
 import { repoRoot } from "../db/db.js";
 import { loadPlatforms } from "../config/platforms.js";
+import { dataPath } from "../runtime/data-root.js";
+import { withFileLock } from "../runtime/file-lock.js";
 
 // The shared cadence scheduler — one source of truth for WHEN every post goes out, used by both
 // text (Typefully) and quote cards (image relays). It extends main's per-run cadence (config/
@@ -148,9 +150,11 @@ export function fmtLa(d: Date): string {
 // Resolved lazily (not a top-level const) so tests can point it at an isolated file via
 // CONTENT_AGENTS_TEST_LEDGER before exercising claimSlots/pruneLedger/releaseClaims, instead of
 // racing each other against the real, shared data/publish-schedule.jsonl.
-function ledgerPath(): string {
-  return process.env.CONTENT_AGENTS_TEST_LEDGER ?? join(repoRoot, "data", "publish-schedule.jsonl");
+export function ledgerPath(): string {
+  return process.env.CONTENT_AGENTS_TEST_LEDGER ?? dataPath("scheduler", "publish-schedule.jsonl");
 }
+
+function withLedgerLock<T>(fn: () => T): T { return withFileLock(`${ledgerPath()}.lock`, fn); }
 
 export interface Claim {
   platform: string;
@@ -200,11 +204,13 @@ export function writeLedgerAtomic(
 // constrain new claims; keeping the file to FUTURE slots only keeps it honest and small. Append-only
 // during normal runs; this and releaseClaims are the only intentional rewrites.
 export function pruneLedger(nowMs: number = Date.now()): { removed: number; kept: number } {
+  return withLedgerLock(() => {
   const claims = readLedger();
   const future = claims.filter((c) => new Date(c.time).getTime() > nowMs);
   const removed = claims.length - future.length;
   if (removed > 0) writeLedgerAtomic(future);
   return { removed, kept: future.length };
+  });
 }
 
 function claimKey(c: Claim): string {
@@ -222,6 +228,7 @@ function claimKey(c: Claim): string {
 // every requested release landed.
 export function releaseClaims(toRelease: Claim[]): { removed: number; removedClaims: Claim[] } {
   if (!toRelease.length) return { removed: 0, removedClaims: [] };
+  return withLedgerLock(() => {
   const claims = readLedger();
   const toDrop = new Map<string, number>();
   for (const c of toRelease) toDrop.set(claimKey(c), (toDrop.get(claimKey(c)) ?? 0) + 1);
@@ -239,6 +246,7 @@ export function releaseClaims(toRelease: Claim[]): { removed: number; removedCla
   }
   if (removedClaims.length > 0) writeLedgerAtomic(remaining);
   return { removed: removedClaims.length, removedClaims };
+  });
 }
 
 function appendLedger(claims: Claim[]): void {
@@ -269,6 +277,11 @@ export function claimSlots(opts: {
   schedule?: Record<string, PlatformSchedule>; // test-only override; defaults to loadSchedule()
   now?: Date; // test-only override; defaults to new Date()
 }): { times: string[]; labels: string[] } {
+  if (!opts.dryRun) return withLedgerLock(() => computeClaimSlots(opts, true));
+  return computeClaimSlots(opts, false);
+}
+
+function computeClaimSlots(opts: Parameters<typeof claimSlots>[0], commit: boolean): { times: string[]; labels: string[] } {
   const schedule = opts.schedule ?? loadSchedule();
   const sched = schedule[opts.windowKey];
   if (!sched) {
@@ -350,6 +363,6 @@ export function claimSlots(opts: {
     }
   }
 
-  if (!opts.dryRun) appendLedger(newClaims);
+  if (commit) appendLedger(newClaims);
   return { times, labels };
 }
